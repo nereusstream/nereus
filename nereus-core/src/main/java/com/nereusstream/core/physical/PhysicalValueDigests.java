@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.api.Checksum;
@@ -11,10 +12,11 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 
-/** Length-delimited canonical SHA-256 encodings for F4 core proof values. */
+/**
+ * Length-delimited canonical SHA-256 encodings for F4 core proof values.
+ */
 final class PhysicalValueDigests {
-    private PhysicalValueDigests() {
-    }
+    private PhysicalValueDigests() {}
 
     static Checksum physicalIdentity(PhysicalObjectIdentity value) {
         DigestWriter writer = writer("nereus-physical-object-identity-v1");
@@ -30,10 +32,7 @@ final class PhysicalValueDigests {
     }
 
     static Checksum query(
-            GcReferenceQueryKind kind,
-            PhysicalObjectIdentity object,
-            List<StreamId> streams,
-            Checksum evidence) {
+            GcReferenceQueryKind kind, PhysicalObjectIdentity object, List<StreamId> streams, Checksum evidence) {
         DigestWriter writer = writer("nereus-gc-reference-query-v1");
         writer.int32(kind.ordinal() + 1);
         writer.checksum(physicalIdentity(object));

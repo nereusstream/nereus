@@ -17,7 +17,9 @@ package com.nereusstream.api;
 import java.util.Map;
 import java.util.Objects;
 
-/** Stream metadata returned by the protocol-neutral L0 API. */
+/**
+ * Stream metadata returned by the protocol-neutral L0 API.
+ */
 public record StreamMetadata(
         StreamId streamId,
         StreamName streamName,
@@ -35,11 +37,12 @@ public record StreamMetadata(
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(profile, "profile");
         attributes = MetadataCanonicalizer.canonicalStringMap(
-                attributes,
-                ApiLimits.MAX_STREAM_ATTRIBUTES_ENCODED_BYTES,
-                "attributes");
-        if (createdAtMillis < 0 || metadataVersion < 0 || committedEndOffset < 0
-                || cumulativeSize < 0 || trimOffset < 0) {
+                attributes, ApiLimits.MAX_STREAM_ATTRIBUTES_ENCODED_BYTES, "attributes");
+        if (createdAtMillis < 0
+                || metadataVersion < 0
+                || committedEndOffset < 0
+                || cumulativeSize < 0
+                || trimOffset < 0) {
             throw new IllegalArgumentException("metadata numeric fields must be non-negative");
         }
         if (trimOffset > committedEndOffset) {

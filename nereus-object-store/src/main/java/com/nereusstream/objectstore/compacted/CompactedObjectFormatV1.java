@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -21,11 +22,12 @@ import java.util.Set;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
 
-/** Closed NCP1/NTC1 Parquet schemas, metadata registry, limits, and object identity rules. */
+/**
+ * Closed NCP1/NTC1 Parquet schemas, metadata registry, limits, and object identity rules.
+ */
 public final class CompactedObjectFormatV1 {
     public static final String COMMITTED_PHYSICAL_FORMAT = "NEREUS_COMPACTED_PARQUET_V1";
-    public static final String TOPIC_COMPACTED_PHYSICAL_FORMAT =
-            "NEREUS_TOPIC_COMPACTED_PARQUET_V1";
+    public static final String TOPIC_COMPACTED_PHYSICAL_FORMAT = "NEREUS_TOPIC_COMPACTED_PARQUET_V1";
     public static final String COMMITTED_FORMAT_ID = "NCP1";
     public static final String TOPIC_COMPACTED_FORMAT_ID = "NTC1";
     public static final String PARQUET_LIBRARY_VERSION = "1.15.2";
@@ -104,8 +106,7 @@ public final class CompactedObjectFormatV1 {
             "nereus.compaction.key.codec",
             "nereus.compaction.key.encoding");
 
-    private CompactedObjectFormatV1() {
-    }
+    private CompactedObjectFormatV1() {}
 
     public static ObjectKeyPrefix prefix(String cluster, ReadView view) {
         Objects.requireNonNull(view, "view");
@@ -122,30 +123,29 @@ public final class CompactedObjectFormatV1 {
 
     public static String physicalFormat(ReadView view) {
         Objects.requireNonNull(view, "view");
-        return view == ReadView.COMMITTED
-                ? COMMITTED_PHYSICAL_FORMAT
-                : TOPIC_COMPACTED_PHYSICAL_FORMAT;
+        return view == ReadView.COMMITTED ? COMMITTED_PHYSICAL_FORMAT : TOPIC_COMPACTED_PHYSICAL_FORMAT;
     }
 
     public static Map<String, String> metadata(CompactedObjectWriteRequest request) {
         Objects.requireNonNull(request, "request");
         Map<String, String> metadata = new LinkedHashMap<>();
-        metadata.put("nereus.format", request.view() == ReadView.COMMITTED
-                ? COMMITTED_FORMAT_ID
-                : TOPIC_COMPACTED_FORMAT_ID);
+        metadata.put(
+                "nereus.format",
+                request.view() == ReadView.COMMITTED ? COMMITTED_FORMAT_ID : TOPIC_COMPACTED_FORMAT_ID);
         metadata.put("nereus.format.version", "1");
         metadata.put("nereus.read.view", request.view().name());
         metadata.put("nereus.stream.id", request.streamId().value());
-        metadata.put("nereus.offset.start", Long.toString(request.sourceCoverage().startOffset()));
+        metadata.put(
+                "nereus.offset.start", Long.toString(request.sourceCoverage().startOffset()));
         metadata.put("nereus.offset.end", Long.toString(request.sourceCoverage().endOffset()));
         metadata.put("nereus.source.set.sha256", request.sourceSetSha256().value());
         metadata.put("nereus.policy.sha256", request.policySha256().value());
         metadata.put("nereus.output.attempt.id", request.outputAttemptId());
         metadata.put("nereus.payload.format", request.payloadFormat().name());
         metadata.put("nereus.logical.format", request.logicalFormat());
-        metadata.put("nereus.projection.identity.sha256", request.projectionIdentitySha256()
-                .map(Checksum::value)
-                .orElse(""));
+        metadata.put(
+                "nereus.projection.identity.sha256",
+                request.projectionIdentitySha256().map(Checksum::value).orElse(""));
         metadata.put("nereus.source.record.count", Integer.toString(request.sourceRecordCount()));
         metadata.put("nereus.output.record.count", Integer.toString(request.expectedOutputRecordCount()));
         metadata.put("nereus.entry.count", Integer.toString(request.entryCount()));
@@ -155,17 +155,20 @@ public final class CompactedObjectFormatV1 {
         metadata.put("nereus.parquet.library.version", PARQUET_LIBRARY_VERSION);
         metadata.put("nereus.parquet.writer.version", PARQUET_WRITER_VERSION);
         metadata.put("nereus.parquet.compression", request.compression());
-        metadata.put("nereus.parquet.zstd.level", request.compression().equals("ZSTD")
-                ? Integer.toString(ZSTD_LEVEL)
-                : "");
+        metadata.put(
+                "nereus.parquet.zstd.level", request.compression().equals("ZSTD") ? Integer.toString(ZSTD_LEVEL) : "");
         metadata.put("nereus.parquet.data.page.bytes", Integer.toString(DATA_PAGE_BYTES));
         metadata.put("nereus.parquet.dictionary.enabled", "false");
         metadata.put("nereus.parquet.bloom.filter.enabled", "false");
         metadata.put("nereus.parquet.page.checksum.enabled", "true");
         metadata.put("nereus.parquet.row.group.records", Integer.toString(request.targetRowGroupRecords()));
         request.topicCompaction().ifPresent(spec -> {
-            metadata.put("nereus.source.coverage.start", Long.toString(request.sourceCoverage().startOffset()));
-            metadata.put("nereus.source.coverage.end", Long.toString(request.sourceCoverage().endOffset()));
+            metadata.put(
+                    "nereus.source.coverage.start",
+                    Long.toString(request.sourceCoverage().startOffset()));
+            metadata.put(
+                    "nereus.source.coverage.end",
+                    Long.toString(request.sourceCoverage().endOffset()));
             metadata.put("nereus.compaction.strategy", spec.strategyId());
             metadata.put("nereus.compaction.strategy.version", Long.toString(spec.strategyVersion()));
             metadata.put("nereus.compaction.key.codec", spec.keyCodecId());
@@ -174,15 +177,11 @@ public final class CompactedObjectFormatV1 {
         return Map.copyOf(metadata);
     }
 
-    public static void validateMetadata(
-            Map<String, String> actual,
-            CompactedObjectWriteRequest expected) {
+    public static void validateMetadata(Map<String, String> actual, CompactedObjectWriteRequest expected) {
         Objects.requireNonNull(actual, "actual");
         Objects.requireNonNull(expected, "expected");
         Map<String, String> expectedValues = metadata(expected);
-        Set<String> allowed = expected.view() == ReadView.COMMITTED
-                ? COMMON_METADATA_KEYS
-                : unionMetadataKeys();
+        Set<String> allowed = expected.view() == ReadView.COMMITTED ? COMMON_METADATA_KEYS : unionMetadataKeys();
         for (String key : allowed) {
             if (!actual.containsKey(key)) {
                 throw new CompactedObjectFormatException("missing required Parquet metadata: " + key);
@@ -190,8 +189,7 @@ public final class CompactedObjectFormatV1 {
         }
         for (Map.Entry<String, String> entry : expectedValues.entrySet()) {
             if (!entry.getValue().equals(actual.get(entry.getKey()))) {
-                throw new CompactedObjectFormatException(
-                        "Parquet metadata mismatch for " + entry.getKey());
+                throw new CompactedObjectFormatException("Parquet metadata mismatch for " + entry.getKey());
             }
         }
         for (String key : actual.keySet()) {
@@ -204,11 +202,12 @@ public final class CompactedObjectFormatV1 {
     public static CompactedObjectMetadata parseMetadata(Map<String, String> actual) {
         Objects.requireNonNull(actual, "actual");
         String format = require(actual, "nereus.format");
-        ReadView view = switch (format) {
-            case COMMITTED_FORMAT_ID -> ReadView.COMMITTED;
-            case TOPIC_COMPACTED_FORMAT_ID -> ReadView.TOPIC_COMPACTED;
-            default -> throw new CompactedObjectFormatException("unknown Nereus compacted format id");
-        };
+        ReadView view =
+                switch (format) {
+                    case COMMITTED_FORMAT_ID -> ReadView.COMMITTED;
+                    case TOPIC_COMPACTED_FORMAT_ID -> ReadView.TOPIC_COMPACTED;
+                    default -> throw new CompactedObjectFormatException("unknown Nereus compacted format id");
+                };
         Set<String> allowed = view == ReadView.COMMITTED ? COMMON_METADATA_KEYS : unionMetadataKeys();
         for (String key : allowed) {
             require(actual, key);
@@ -305,23 +304,21 @@ public final class CompactedObjectFormatV1 {
                 topicSpec);
     }
 
-    public static ObjectKey objectKey(
-            CompactedObjectWriteRequest request,
-            Checksum contentSha256) {
+    public static ObjectKey objectKey(CompactedObjectWriteRequest request, Checksum contentSha256) {
         Objects.requireNonNull(request, "request");
         requireSha256(contentSha256, "contentSha256");
-        String viewComponent = request.view() == ReadView.COMMITTED
-                ? "committed"
-                : "topic-compacted";
+        String viewComponent = request.view() == ReadView.COMMITTED ? "committed" : "topic-compacted";
         return new ObjectKey(KeyComponentCodec.encodeComponent(request.cluster())
                 + "/compacted/v1/"
                 + viewComponent
                 + "/"
                 + KeyComponentCodec.encodeComponent(request.streamId().value())
                 + "/"
-                + KeyComponentCodec.encodeNonNegativeLong(request.sourceCoverage().startOffset())
+                + KeyComponentCodec.encodeNonNegativeLong(
+                        request.sourceCoverage().startOffset())
                 + "-"
-                + KeyComponentCodec.encodeNonNegativeLong(request.sourceCoverage().endOffset())
+                + KeyComponentCodec.encodeNonNegativeLong(
+                        request.sourceCoverage().endOffset())
                 + "/"
                 + contentSha256.value()
                 + "-"
@@ -338,9 +335,10 @@ public final class CompactedObjectFormatV1 {
         return ObjectKeyHash.from(Objects.requireNonNull(objectKey, "objectKey"));
     }
 
-    /** Strict ownerless inverse used only by complete object inventory. */
-    public static ParsedCompactedObjectKey parseObjectKey(
-            String cluster, ReadView view, ObjectKey objectKey) {
+    /**
+     * Strict ownerless inverse used only by complete object inventory.
+     */
+    public static ParsedCompactedObjectKey parseObjectKey(String cluster, ReadView view, ObjectKey objectKey) {
         Objects.requireNonNull(view, "view");
         Objects.requireNonNull(objectKey, "objectKey");
         String exactPrefix = prefix(cluster, view).value();
@@ -357,22 +355,18 @@ public final class CompactedObjectFormatV1 {
             throw new IllegalArgumentException("compacted object range is not canonical");
         }
         OffsetRange coverage = new OffsetRange(
-                KeyComponentCodec.decodeNonNegativeLong(range[0]),
-                KeyComponentCodec.decodeNonNegativeLong(range[1]));
+                KeyComponentCodec.decodeNonNegativeLong(range[0]), KeyComponentCodec.decodeNonNegativeLong(range[1]));
         if (coverage.isEmpty()) {
             throw new IllegalArgumentException("compacted object range cannot be empty");
         }
-        String filename = components[2].substring(
-                0, components[2].length() - ".parquet".length());
+        String filename = components[2].substring(0, components[2].length() - ".parquet".length());
         int delimiter = filename.indexOf('-');
         if (delimiter != 64) {
             throw new IllegalArgumentException("compacted object content hash is not canonical");
         }
-        Checksum contentSha256 = new Checksum(
-                ChecksumType.SHA256, filename.substring(0, delimiter));
+        Checksum contentSha256 = new Checksum(ChecksumType.SHA256, filename.substring(0, delimiter));
         requireSha256(contentSha256, "contentSha256");
-        String outputAttemptId = requireBase32(
-                filename.substring(delimiter + 1), "outputAttemptId");
+        String outputAttemptId = requireBase32(filename.substring(delimiter + 1), "outputAttemptId");
         String canonical = exactPrefix
                 + KeyComponentCodec.encodeComponent(streamId.value())
                 + "/"
@@ -388,12 +382,7 @@ public final class CompactedObjectFormatV1 {
             throw new IllegalArgumentException("compacted object key is not canonical");
         }
         return new ParsedCompactedObjectKey(
-                view,
-                streamId,
-                coverage,
-                contentSha256,
-                outputAttemptId,
-                objectId(objectKey));
+                view, streamId, coverage, contentSha256, outputAttemptId, objectId(objectKey));
     }
 
     private static Set<String> unionMetadataKeys() {

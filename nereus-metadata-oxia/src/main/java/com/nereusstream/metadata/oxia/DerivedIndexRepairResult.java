@@ -18,7 +18,9 @@ import com.nereusstream.api.StreamId;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Result of one scan-bounded page of generation-zero derived-index repair. */
+/**
+ * Result of one scan-bounded page of generation-zero derived-index repair.
+ */
 public record DerivedIndexRepairResult(
         StreamId streamId,
         long repairedFromOffset,
@@ -32,8 +34,12 @@ public record DerivedIndexRepairResult(
     public DerivedIndexRepairResult {
         Objects.requireNonNull(streamId, "streamId");
         continuation = Objects.requireNonNull(continuation, "continuation");
-        if (repairedFromOffset < 0 || repairedToOffset < 0 || repairedToOffset < repairedFromOffset
-                || scannedRecords < 0 || repairedRecords < 0 || repairedRecords > scannedRecords
+        if (repairedFromOffset < 0
+                || repairedToOffset < 0
+                || repairedToOffset < repairedFromOffset
+                || scannedRecords < 0
+                || repairedRecords < 0
+                || repairedRecords > scannedRecords
                 || observedCommitVersion < 0) {
             throw new IllegalArgumentException("repair result numeric fields must be non-negative and ordered");
         }
@@ -48,8 +54,7 @@ public record DerivedIndexRepairResult(
         }
         if (continuation.isPresent()) {
             DerivedIndexRepairCursor cursor = continuation.orElseThrow();
-            if (!cursor.streamId().equals(streamId)
-                    || cursor.observedCommitVersion() != observedCommitVersion) {
+            if (!cursor.streamId().equals(streamId) || cursor.observedCommitVersion() != observedCommitVersion) {
                 throw new IllegalArgumentException("repair continuation must match result stream and head version");
             }
         }

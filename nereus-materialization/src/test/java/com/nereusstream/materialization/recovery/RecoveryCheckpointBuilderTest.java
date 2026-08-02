@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.recovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -65,11 +65,10 @@ import org.junit.jupiter.api.io.TempDir;
 class RecoveryCheckpointBuilderTest {
     private static final String CLUSTER = "checkpoint-builder-cluster";
     private static final StreamId STREAM = new StreamId("checkpoint-builder-stream");
-    private static final ProjectionRef PROJECTION = new ProjectionRef(
-            ProjectionType.VIRTUAL_LEDGER, "persistent://tenant/ns/topic");
+    private static final ProjectionRef PROJECTION =
+            new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "persistent://tenant/ns/topic");
     private static final String PROJECTION_IDENTITY = projectionIdentity(PROJECTION);
-    private static final Clock CLOCK = Clock.fixed(
-            Instant.ofEpochMilli(24L * 60 * 60 * 1_000), ZoneOffset.UTC);
+    private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(24L * 60 * 60 * 1_000), ZoneOffset.UTC);
 
     @TempDir
     Path staging;
@@ -82,11 +81,7 @@ class RecoveryCheckpointBuilderTest {
         AppendRecoveryCommit second = commit("commit-2", "commit-1", 1, 2, 20, 2);
         AppendRecoveryHead head = new AppendRecoveryHead(STREAM, "commit-2", 2, 20, 2, 8);
         AppendRecoveryTailPage tail = new AppendRecoveryTailPage(
-                AppendRecoveryAnchor.genesis(STREAM),
-                head,
-                List.of(second, first),
-                true,
-                Optional.empty());
+                AppendRecoveryAnchor.genesis(STREAM), head, List.of(second, first), true, Optional.empty());
         VersionedGenerationIndex generation = generation();
         GenerationMetadataStore generationStore = generationStore(root, List.of(generation));
         OxiaMetadataStore l0Store = l0Store(tail, snapshot());
@@ -98,19 +93,18 @@ class RecoveryCheckpointBuilderTest {
                 MaterializationConfig.defaults(staging),
                 CLOCK);
 
-        RecoveryCheckpointBuildResult result = builder.build(
-                STREAM, root, registration, "a".repeat(26)).join();
+        RecoveryCheckpointBuildResult result =
+                builder.build(STREAM, root, registration, "a".repeat(26)).join();
 
         assertThat(result.status()).isEqualTo(RecoveryCheckpointBuildStatus.READY);
         RecoveryCheckpointPlan plan = result.plan().orElseThrow();
         assertThat(plan.writeRequest().coverage()).isEqualTo(new OffsetRange(0, 2));
         assertThat(plan.writeRequest().firstCommitVersion()).isEqualTo(1);
         assertThat(plan.writeRequest().lastCommitVersion()).isEqualTo(2);
-        assertThat(plan.entries()).extracting(value -> value.commitId())
-                .containsExactly("commit-1", "commit-2");
+        assertThat(plan.entries()).extracting(value -> value.commitId()).containsExactly("commit-1", "commit-2");
         assertThat(plan.targets()).hasSize(1);
-        assertThat(plan.entries()).allSatisfy(value ->
-                assertThat(value.coveringPublicationIndexes()).containsExactly(0));
+        assertThat(plan.entries()).allSatisfy(value -> assertThat(value.coveringPublicationIndexes())
+                .containsExactly(0));
     }
 
     @Test
@@ -128,12 +122,12 @@ class RecoveryCheckpointBuilderTest {
         OxiaMetadataStore l0Store = l0Store(tail, snapshot(1, 10, 1));
 
         RecoveryCheckpointBuildResult result = new RecoveryCheckpointBuilder(
-                CLUSTER,
-                l0Store,
-                generationStore,
-                new AnchorAwareCommitWalker(CLUSTER, l0Store, generationStore),
-                MaterializationConfig.defaults(staging),
-                CLOCK)
+                        CLUSTER,
+                        l0Store,
+                        generationStore,
+                        new AnchorAwareCommitWalker(CLUSTER, l0Store, generationStore),
+                        MaterializationConfig.defaults(staging),
+                        CLOCK)
                 .build(STREAM, root, registration, "b".repeat(26))
                 .join();
 
@@ -145,22 +139,8 @@ class RecoveryCheckpointBuilderTest {
     void acceptsLegacyEmptyCommitProjectionUsingRegistrationAsEffectiveIdentity() {
         VersionedRecoveryCheckpointRoot root = emptyRoot();
         String absentProjection = ProjectionIdentity.encode(Optional.empty());
-        AppendRecoveryCommit first = commit(
-                "commit-1",
-                "",
-                0,
-                1,
-                10,
-                1,
-                absentProjection);
-        AppendRecoveryCommit second = commit(
-                "commit-2",
-                "commit-1",
-                1,
-                2,
-                20,
-                2,
-                absentProjection);
+        AppendRecoveryCommit first = commit("commit-1", "", 0, 1, 10, 1, absentProjection);
+        AppendRecoveryCommit second = commit("commit-2", "commit-1", 1, 2, 20, 2, absentProjection);
         AppendRecoveryTailPage tail = new AppendRecoveryTailPage(
                 AppendRecoveryAnchor.genesis(STREAM),
                 new AppendRecoveryHead(STREAM, "commit-2", 2, 20, 2, 8),
@@ -171,12 +151,12 @@ class RecoveryCheckpointBuilderTest {
         OxiaMetadataStore l0Store = l0Store(tail, snapshot());
 
         RecoveryCheckpointBuildResult result = new RecoveryCheckpointBuilder(
-                CLUSTER,
-                l0Store,
-                generationStore,
-                new AnchorAwareCommitWalker(CLUSTER, l0Store, generationStore),
-                MaterializationConfig.defaults(staging),
-                CLOCK)
+                        CLUSTER,
+                        l0Store,
+                        generationStore,
+                        new AnchorAwareCommitWalker(CLUSTER, l0Store, generationStore),
+                        MaterializationConfig.defaults(staging),
+                        CLOCK)
                 .build(STREAM, root, registration(), "d".repeat(26))
                 .join();
 
@@ -193,9 +173,8 @@ class RecoveryCheckpointBuilderTest {
                 1,
                 10,
                 1,
-                ProjectionIdentity.encode(Optional.of(new ProjectionRef(
-                        ProjectionType.VIRTUAL_LEDGER,
-                        "persistent://tenant/ns/recreated-topic"))));
+                ProjectionIdentity.encode(Optional.of(
+                        new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "persistent://tenant/ns/recreated-topic"))));
         AppendRecoveryTailPage tail = new AppendRecoveryTailPage(
                 AppendRecoveryAnchor.genesis(STREAM),
                 new AppendRecoveryHead(STREAM, "commit-1", 1, 10, 1, 8),
@@ -212,16 +191,12 @@ class RecoveryCheckpointBuilderTest {
                 MaterializationConfig.defaults(staging),
                 CLOCK);
 
-        assertThatThrownBy(() -> builder
-                        .build(STREAM, root, registration(), "e".repeat(26))
+        assertThatThrownBy(() -> builder.build(STREAM, root, registration(), "e".repeat(26))
                         .join())
-                .hasRootCauseMessage(
-                        "live commit projection differs from the recovery registration");
+                .hasRootCauseMessage("live commit projection differs from the recovery registration");
     }
 
-    private static OxiaMetadataStore l0Store(
-            AppendRecoveryTailPage tail,
-            StreamMetadataSnapshot snapshot) {
+    private static OxiaMetadataStore l0Store(AppendRecoveryTailPage tail, StreamMetadataSnapshot snapshot) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class},
@@ -235,15 +210,15 @@ class RecoveryCheckpointBuilderTest {
     }
 
     private static GenerationMetadataStore generationStore(
-            VersionedRecoveryCheckpointRoot root,
-            List<VersionedGenerationIndex> candidates) {
+            VersionedRecoveryCheckpointRoot root, List<VersionedGenerationIndex> candidates) {
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
                 (proxy, method, arguments) -> switch (method.getName()) {
                     case "getRecoveryRoot" -> CompletableFuture.completedFuture(Optional.of(root));
-                    case "scanIndex" -> CompletableFuture.completedFuture(
-                            new GenerationScanPage(List.copyOf(candidates), Optional.empty()));
+                    case "scanIndex" ->
+                        CompletableFuture.completedFuture(
+                                new GenerationScanPage(List.copyOf(candidates), Optional.empty()));
                     case "close" -> null;
                     case "toString" -> "recovery-builder-generation";
                     default -> throw new UnsupportedOperationException(method.getName());
@@ -253,8 +228,7 @@ class RecoveryCheckpointBuilderTest {
     private static VersionedRecoveryCheckpointRoot emptyRoot() {
         long version = 3;
         RecoveryCheckpointRootRecord value = new RecoveryCheckpointRootRecord(
-                1, STREAM.value(), 0, 0, 0, 0, 0, 0, 0,
-                "", "", List.of(), "", "", 0, 0, version);
+                1, STREAM.value(), 0, 0, 0, 0, 0, 0, 0, "", "", List.of(), "", "", 0, 0, version);
         return new VersionedRecoveryCheckpointRoot(
                 new F4Keyspace(CLUSTER).recoveryRootKey(STREAM), value, version, sha("root"));
     }
@@ -272,20 +246,14 @@ class RecoveryCheckpointBuilderTest {
                 2,
                 version);
         return new VersionedMaterializationStreamRegistration(
-                new F4Keyspace(CLUSTER).materializationRegistryKey(STREAM),
-                value,
-                version,
-                sha("registration"));
+                new F4Keyspace(CLUSTER).materializationRegistryKey(STREAM), value, version, sha("registration"));
     }
 
     private static StreamMetadataSnapshot snapshot() {
         return snapshot(2, 20, 2);
     }
 
-    private static StreamMetadataSnapshot snapshot(
-            long endOffset,
-            long cumulativeSize,
-            long commitVersion) {
+    private static StreamMetadataSnapshot snapshot(long endOffset, long cumulativeSize, long commitVersion) {
         long version = 8;
         return new StreamMetadataSnapshot(
                 new StreamMetadataRecord(
@@ -298,26 +266,13 @@ class RecoveryCheckpointBuilderTest {
                         1,
                         1,
                         version),
-                new CommittedEndOffsetRecord(
-                        STREAM.value(), endOffset, cumulativeSize, commitVersion, version),
+                new CommittedEndOffsetRecord(STREAM.value(), endOffset, cumulativeSize, commitVersion, version),
                 new TrimRecord(STREAM.value(), 0, "", 1, version));
     }
 
     private static AppendRecoveryCommit commit(
-            String id,
-            String previous,
-            long start,
-            long end,
-            long cumulative,
-            long version) {
-        return commit(
-                id,
-                previous,
-                start,
-                end,
-                cumulative,
-                version,
-                PROJECTION_IDENTITY);
+            String id, String previous, long start, long end, long cumulative, long version) {
+        return commit(id, previous, start, end, cumulative, version, PROJECTION_IDENTITY);
     }
 
     private static AppendRecoveryCommit commit(
@@ -352,8 +307,7 @@ class RecoveryCheckpointBuilderTest {
                 1,
                 1,
                 0);
-        byte[] bytes = MetadataRecordCodecFactory.encodeEnvelope(
-                value, StreamCommitTargetRecord.class);
+        byte[] bytes = MetadataRecordCodecFactory.encodeEnvelope(value, StreamCommitTargetRecord.class);
         Checksum digest = sha(bytes);
         return new AppendRecoveryCommit(
                 "/commit/" + id,
@@ -398,11 +352,9 @@ class RecoveryCheckpointBuilderTest {
                 "",
                 2,
                 0);
-        Checksum digest = sha(MetadataRecordCodecFactory.encodeEnvelope(
-                canonical, GenerationIndexRecord.class));
+        Checksum digest = sha(MetadataRecordCodecFactory.encodeEnvelope(canonical, GenerationIndexRecord.class));
         return new VersionedGenerationIndex(
-                new F4Keyspace(CLUSTER).generationIndexKey(
-                        STREAM, ReadView.COMMITTED, 2, 1),
+                new F4Keyspace(CLUSTER).generationIndexKey(STREAM, ReadView.COMMITTED, 2, 1),
                 canonical.withMetadataVersion(metadataVersion),
                 metadataVersion,
                 digest);
@@ -455,7 +407,8 @@ class RecoveryCheckpointBuilderTest {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
         } catch (Exception failure) {
             throw new AssertionError(failure);
         }

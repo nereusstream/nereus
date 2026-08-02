@@ -16,7 +16,6 @@ package com.nereusstream.core.recovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
@@ -72,9 +71,10 @@ class MetadataOrphanObjectScannerTest {
     void missingManifestIsDiagnosticOnlyAndNeverDeletionAuthorization() {
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
         RecordingRecoveryMetrics metrics = new RecordingRecoveryMetrics();
-        try (MetadataOrphanObjectScanner scanner = new MetadataOrphanObjectScanner(
-                CLUSTER, metadata, metrics, Runnable::run)) {
-            OrphanObjectAssessment assessment = scanner.scan(new ObjectId("operational-object-id")).join();
+        try (MetadataOrphanObjectScanner scanner =
+                new MetadataOrphanObjectScanner(CLUSTER, metadata, metrics, Runnable::run)) {
+            OrphanObjectAssessment assessment =
+                    scanner.scan(new ObjectId("operational-object-id")).join();
 
             assertThat(assessment.status()).isEqualTo(OrphanObjectStatus.MISSING_MANIFEST);
             assertThat(assessment.manifestSliceCount()).isZero();
@@ -93,22 +93,31 @@ class MetadataOrphanObjectScannerTest {
             StreamId streamId = context.createStream("manifest-only");
             context.metadata.failNext(FakeOxiaMetadataStore.FailurePoint.BEFORE_HEAD_CAS);
 
-            NereusException failure = failure(context.storage.append(
-                    streamId, batch("not-committed"), appendOptions()));
+            NereusException failure =
+                    failure(context.storage.append(streamId, batch("not-committed"), appendOptions()));
             ObjectManifestRecord manifest = context.lastManifest.get();
 
             assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
             assertThat(manifest).isNotNull();
-            OrphanObjectAssessment assessment = context.scanner.scan(new ObjectId(manifest.objectId())).join();
+            OrphanObjectAssessment assessment =
+                    context.scanner.scan(new ObjectId(manifest.objectId())).join();
             assertThat(assessment.status()).isEqualTo(OrphanObjectStatus.UNREFERENCED_MANIFEST);
             assertThat(assessment.reachableSliceCount()).isZero();
             assertThat(assessment.deletionAllowed()).isFalse();
-            assertThat(context.metadata.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).isEmpty();
-            assertThat(context.metadata.getCommittedEndOffset(CLUSTER, streamId).join().committedEndOffset())
+            assertThat(context.metadata
+                            .scanOffsetIndex(CLUSTER, streamId, 0, 10)
+                            .join())
+                    .isEmpty();
+            assertThat(context.metadata
+                            .getCommittedEndOffset(CLUSTER, streamId)
+                            .join()
+                            .committedEndOffset())
                     .isZero();
-            assertThat(context.objectStore.headObject(
-                    new ObjectKey(manifest.objectKey()),
-                    new HeadObjectOptions(Duration.ofSeconds(1))).join().objectLength())
+            assertThat(context.objectStore
+                            .headObject(
+                                    new ObjectKey(manifest.objectKey()), new HeadObjectOptions(Duration.ofSeconds(1)))
+                            .join()
+                            .objectLength())
                     .isEqualTo(manifest.objectLength());
         }
     }
@@ -117,27 +126,33 @@ class MetadataOrphanObjectScannerTest {
     void reachableHeadWithMissingIndexIsRepairedAndNeverClassifiedAsOrphan() {
         try (TestContext context = context()) {
             StreamId streamId = context.createStream("committed-repair");
-            context.metadata.failNext(
-                    FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
+            context.metadata.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
 
-            NereusException failure = failure(context.storage.append(
-                    streamId, batch("committed"), appendOptions()));
+            NereusException failure = failure(context.storage.append(streamId, batch("committed"), appendOptions()));
             ObjectManifestRecord manifest = context.lastManifest.get();
             ObjectId objectId = new ObjectId(manifest.objectId());
 
             assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED);
-            assertThat(context.metadata.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).isEmpty();
+            assertThat(context.metadata
+                            .scanOffsetIndex(CLUSTER, streamId, 0, 10)
+                            .join())
+                    .isEmpty();
 
             OrphanObjectAssessment assessment = context.scanner.scan(objectId).join();
             assertThat(assessment.status()).isEqualTo(OrphanObjectStatus.FULLY_REFERENCED);
             assertThat(assessment.reachableSliceCount()).isEqualTo(1);
             assertThat(assessment.deletionAllowed()).isFalse();
-            assertThat(context.metadata.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).hasSize(1);
-            assertThat(context.storage.read(
-                    streamId,
-                    0,
-                    new ReadOptions(10, 1024, ReadIsolation.COMMITTED, Duration.ofSeconds(1)))
-                    .join().batches())
+            assertThat(context.metadata
+                            .scanOffsetIndex(CLUSTER, streamId, 0, 10)
+                            .join())
+                    .hasSize(1);
+            assertThat(context.storage
+                            .read(
+                                    streamId,
+                                    0,
+                                    new ReadOptions(10, 1024, ReadIsolation.COMMITTED, Duration.ofSeconds(1)))
+                            .join()
+                            .batches())
                     .extracting(batch -> new String(batch.payload(), StandardCharsets.UTF_8))
                     .containsExactly("committed");
             assertThat(context.metrics.repairs).hasValue(1);
@@ -167,16 +182,17 @@ class MetadataOrphanObjectScannerTest {
     @Test
     void closedScannerRejectsNewDiagnosticsWithoutClosingMetadata() {
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
-        MetadataOrphanObjectScanner scanner = new MetadataOrphanObjectScanner(
-                CLUSTER, metadata, RecoveryMetricsObserver.noop(), Runnable::run);
+        MetadataOrphanObjectScanner scanner =
+                new MetadataOrphanObjectScanner(CLUSTER, metadata, RecoveryMetricsObserver.noop(), Runnable::run);
         scanner.close();
 
         assertThat(failure(scanner.scan(new ObjectId("closed-object"))).code())
                 .isEqualTo(com.nereusstream.api.ErrorCode.STORAGE_CLOSED);
         metadata.createOrGetStream(
-                CLUSTER,
-                new StreamName("metadata-still-open"),
-                new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join();
+                        CLUSTER,
+                        new StreamName("metadata-still-open"),
+                        new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                .join();
         metadata.close();
     }
 
@@ -184,14 +200,12 @@ class MetadataOrphanObjectScannerTest {
     void assessmentRejectsStatusAndCountContradictions() {
         ObjectId objectId = new ObjectId("object-id");
 
-        assertThatThrownBy(() -> new OrphanObjectAssessment(
-                objectId, OrphanObjectStatus.FULLY_REFERENCED, 2, 1, 0))
+        assertThatThrownBy(() -> new OrphanObjectAssessment(objectId, OrphanObjectStatus.FULLY_REFERENCED, 2, 1, 0))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new OrphanObjectAssessment(
-                objectId, OrphanObjectStatus.PARTIALLY_REFERENCED, 2, 0, 0))
+        assertThatThrownBy(() -> new OrphanObjectAssessment(objectId, OrphanObjectStatus.PARTIALLY_REFERENCED, 2, 0, 0))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new OrphanObjectAssessment(
-                objectId, OrphanObjectStatus.UNREFERENCED_MANIFEST, 0, 0, 0))
+        assertThatThrownBy(
+                        () -> new OrphanObjectAssessment(objectId, OrphanObjectStatus.UNREFERENCED_MANIFEST, 0, 0, 0))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -208,14 +222,13 @@ class MetadataOrphanObjectScannerTest {
                 CLOCK,
                 Runnable::run);
         RecordingRecoveryMetrics metrics = new RecordingRecoveryMetrics();
-        MetadataOrphanObjectScanner scanner = new MetadataOrphanObjectScanner(
-                CLUSTER, metadata, metrics, Runnable::run);
+        MetadataOrphanObjectScanner scanner =
+                new MetadataOrphanObjectScanner(CLUSTER, metadata, metrics, Runnable::run);
         return new TestContext(storage, metadata, objectStore, scanner, metrics, lastManifest);
     }
 
     private static OxiaMetadataStore captureManifest(
-            OxiaMetadataStore delegate,
-            AtomicReference<ObjectManifestRecord> capture) {
+            OxiaMetadataStore delegate, AtomicReference<ObjectManifestRecord> capture) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class, PhysicalObjectMetadataStore.class},
@@ -232,8 +245,7 @@ class MetadataOrphanObjectScannerTest {
     }
 
     private static AppendBatch batch(String value) {
-        AppendEntry entry = new AppendEntry(
-                value.getBytes(StandardCharsets.UTF_8), 1, NOW.toEpochMilli(), Map.of());
+        AppendEntry entry = new AppendEntry(value.getBytes(StandardCharsets.UTF_8), 1, NOW.toEpochMilli(), Map.of());
         return new AppendBatch(
                 PayloadFormat.OPAQUE_RECORD_BATCH,
                 List.of(entry),
@@ -286,12 +298,14 @@ class MetadataOrphanObjectScannerTest {
             LocalFileObjectStore objectStore,
             MetadataOrphanObjectScanner scanner,
             RecordingRecoveryMetrics metrics,
-            AtomicReference<ObjectManifestRecord> lastManifest) implements AutoCloseable {
+            AtomicReference<ObjectManifestRecord> lastManifest)
+            implements AutoCloseable {
         StreamId createStream(String name) {
             return storage.createOrGetStream(
-                    new StreamName(name),
-                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
-                    .join().streamId();
+                            new StreamName(name),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
         }
 
         @Override

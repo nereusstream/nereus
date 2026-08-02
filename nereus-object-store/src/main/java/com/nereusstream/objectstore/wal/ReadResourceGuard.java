@@ -18,8 +18,7 @@ public interface ReadResourceGuard {
     Reservation reserve(long bytes);
 
     static ReadResourceGuard unbounded() {
-        return ignored -> () -> {
-        };
+        return ignored -> () -> {};
     }
 
     interface Reservation extends AutoCloseable {

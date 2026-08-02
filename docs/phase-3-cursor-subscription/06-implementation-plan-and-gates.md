@@ -77,22 +77,22 @@ Against local Pulsar `master@7efae25af39a15407c1397d9e1f4ac4658d09daa`：
 
 ### 2.2 M0 questions
 
-| Gate question | Decision | Implementation consequence |
-| --- | --- | --- |
-| Durable cursors available synchronously at topic init? | yes, through `ledger.getCursors()` | ledger open hydrates all ACTIVE roots/snapshots before callback |
-| Does openCursor receive subscription type? | no | subscription type remains broker policy; not in root |
-| Is normal read position durable in stock recovery? | no | F3 persists no dispatch read position |
-| Ack completion boundary? | cursor callback/future | success only after authoritative CAS |
-| Batch ack coordinate? | Position extension, remaining-bit `long[]` | decode Entry for batch size; AND merge; no sub-offset |
-| Can existing Oxia primitive atomically update multiple keys? | not assumed | one cursor correctness root; ordered retention protocol |
-| Can current ObjectStore delete an orphan snapshot? | no | record orphan; F4 owns deletion |
-| Does F3 require new L0 cursor API? | no | keep cursor in L1; reuse committed read/metadata/trim |
-| Can broker housekeeping invoke L0 trim in F3? | no | `trimConsumedLedgersInBackground` stays no-op；F4 must use the coordinator |
-| Can admin trim silently succeed through that no-op? | no | add/reject `TRIM_TOPIC` at the loaded-topic route in F3；F4 later admits it |
-| Does live `getCursors()` include a later non-durable cursor? | yes, as locked stock behavior | open callback first exposes complete durable hydration；runtime registry may then include local non-durable facades |
-| Can temporary non-durable cleanup touch durable metadata? | no | registry mode dispatch closes/removes it locally and never calls `CursorStorage.delete` |
-| Can an old broker operation become visible after new-owner publication? | no | existing-root CAS is observed-before per-root claim or fenced；an already-pending CREATE/RECREATE target-key race cannot stale-finalize/callback and is recovered、claimed and rescanned before publication |
-| Does broker open supply an ownership check? | yes | thread the exact supplier through checked writable open；require it before claim and final publication instead of dropping it as F2 does |
+| Gate question                                                           | Decision                                   | Implementation consequence                                                                                                                                                                                |
+|-------------------------------------------------------------------------|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Durable cursors available synchronously at topic init?                  | yes, through `ledger.getCursors()`         | ledger open hydrates all ACTIVE roots/snapshots before callback                                                                                                                                           |
+| Does openCursor receive subscription type?                              | no                                         | subscription type remains broker policy; not in root                                                                                                                                                      |
+| Is normal read position durable in stock recovery?                      | no                                         | F3 persists no dispatch read position                                                                                                                                                                     |
+| Ack completion boundary?                                                | cursor callback/future                     | success only after authoritative CAS                                                                                                                                                                      |
+| Batch ack coordinate?                                                   | Position extension, remaining-bit `long[]` | decode Entry for batch size; AND merge; no sub-offset                                                                                                                                                     |
+| Can existing Oxia primitive atomically update multiple keys?            | not assumed                                | one cursor correctness root; ordered retention protocol                                                                                                                                                   |
+| Can current ObjectStore delete an orphan snapshot?                      | no                                         | record orphan; F4 owns deletion                                                                                                                                                                           |
+| Does F3 require new L0 cursor API?                                      | no                                         | keep cursor in L1; reuse committed read/metadata/trim                                                                                                                                                     |
+| Can broker housekeeping invoke L0 trim in F3?                           | no                                         | `trimConsumedLedgersInBackground` stays no-op；F4 must use the coordinator                                                                                                                                 |
+| Can admin trim silently succeed through that no-op?                     | no                                         | add/reject `TRIM_TOPIC` at the loaded-topic route in F3；F4 later admits it                                                                                                                                |
+| Does live `getCursors()` include a later non-durable cursor?            | yes, as locked stock behavior              | open callback first exposes complete durable hydration；runtime registry may then include local non-durable facades                                                                                        |
+| Can temporary non-durable cleanup touch durable metadata?               | no                                         | registry mode dispatch closes/removes it locally and never calls `CursorStorage.delete`                                                                                                                   |
+| Can an old broker operation become visible after new-owner publication? | no                                         | existing-root CAS is observed-before per-root claim or fenced；an already-pending CREATE/RECREATE target-key race cannot stale-finalize/callback and is recovered、claimed and rescanned before publication |
+| Does broker open supply an ownership check?                             | yes                                        | thread the exact supplier through checked writable open；require it before claim and final publication instead of dropping it as F2 does                                                                   |
 
 **M0 result：PASS。**
 
@@ -104,34 +104,34 @@ The original narrow question was：
 
 ### 3.1 F2-to-F3/F4 decision matrix
 
-| Review item | Locked answer | Gate |
-| --- | --- | --- |
-| `streamId + offset -> MessageId` stable? | F2 virtual ledger + `entryId=offset`; F3 never adds/remaps coordinates | pass |
-| virtual ledger / entry / batch forward and reverse conversion unambiguous? | one Entry per offset; batch index remains payload/Position extension | pass |
-| restart/failover/seek/history preserve MessageId? | same projection identity is hydrated before cursor; local read position is discarded | pass |
-| projection becomes correctness owner? | no; it interprets F1 committed truth only | pass |
-| metadata location/scale controlled? | F2 formula mapping; one root per cursor; ack holes spill to bounded snapshot | pass |
-| F1 commit/fencing/visibility reused? | yes; cursor CAS is independent and cannot publish append bytes/head | pass |
-| hidden compaction/GC invalidation? | closed by immutable snapshot refs, generation tombstones and recoverable protection/trim pending barriers | pass |
+| Review item                                                                | Locked answer                                                                                             | Gate |
+|----------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|------|
+| `streamId + offset -> MessageId` stable?                                   | F2 virtual ledger + `entryId=offset`; F3 never adds/remaps coordinates                                    | pass |
+| virtual ledger / entry / batch forward and reverse conversion unambiguous? | one Entry per offset; batch index remains payload/Position extension                                      | pass |
+| restart/failover/seek/history preserve MessageId?                          | same projection identity is hydrated before cursor; local read position is discarded                      | pass |
+| projection becomes correctness owner?                                      | no; it interprets F1 committed truth only                                                                 | pass |
+| metadata location/scale controlled?                                        | F2 formula mapping; one root per cursor; ack holes spill to bounded snapshot                              | pass |
+| F1 commit/fencing/visibility reused?                                       | yes; cursor CAS is independent and cannot publish append bytes/head                                       | pass |
+| hidden compaction/GC invalidation?                                         | closed by immutable snapshot refs, generation tombstones and recoverable protection/trim pending barriers | pass |
 
 ### 3.2 F3 protocol decision matrix
 
-| Decision | Rejected alternative | Why locked now |
-| --- | --- | --- |
-| one `CursorStateRecord` CAS root | state/range/property keys | prevents partially published ack truth |
-| local-only dispatch read offset | durable `readPositionOffset` | prevents failover skip of unacked delivery |
-| generation + permanent tombstone | delete key and reuse generation | fences stale broker after recreate |
-| full immutable snapshot + bounded root delta | mutable object or range truncation | root remains visibility owner; no lost ack |
-| durable `ackStateEpoch` for destructive replacement | infer reset from generic mutation sequence/current ack shape | monotonic ack retries cannot reapply across reset/clear |
-| per-writable-open owner session in retention + ACTIVE cursor roots | Pulsar ownership/watch or graceful drain alone | existing-root stale CAS is fenced；already-pending target races are recovered/claimed before the new dispatcher becomes visible |
-| remaining-bit batch state + AND | deleted-bit ambiguity or batch sub-offset | matches locked Pulsar API |
-| strict object/header/CRC/cap | best-effort decode/fallback | corruption cannot advance cursor |
-| recoverable `PROTECTION_PENDING` before every create/backward cursor CAS | momentary version bump or periodic `min(markDelete)` | freezes the whole pre-cursor interval and closes missing-create/reset vs later floor-raise/trim race |
-| `TRIM_PENDING` with exact offset/attempt/composed reason | fire-and-forget trim | uncertain/crash trim is replayable without changing audit identity and cannot unlock unsafe reset |
-| live two-mode cursor registry + durable-only retention | permanently durable-only `getCursors()` | preserves stock enumeration without letting temporary cursors create roots/tombstones or retention references |
-| monotonic topic-projection activation marker | capability signal alone | locked F2 decoder fails before exposing empty cursor state |
-| separate cursor capability | infer from storage-binding capability | upgrade converges before per-topic activation；later downgrade fails closed |
-| F4 physical GC consumes refs/trim truth | F3 deletes object on cursor callback | preserves read/ref safety and module ownership |
+| Decision                                                                 | Rejected alternative                                         | Why locked now                                                                                                                 |
+|--------------------------------------------------------------------------|--------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| one `CursorStateRecord` CAS root                                         | state/range/property keys                                    | prevents partially published ack truth                                                                                         |
+| local-only dispatch read offset                                          | durable `readPositionOffset`                                 | prevents failover skip of unacked delivery                                                                                     |
+| generation + permanent tombstone                                         | delete key and reuse generation                              | fences stale broker after recreate                                                                                             |
+| full immutable snapshot + bounded root delta                             | mutable object or range truncation                           | root remains visibility owner; no lost ack                                                                                     |
+| durable `ackStateEpoch` for destructive replacement                      | infer reset from generic mutation sequence/current ack shape | monotonic ack retries cannot reapply across reset/clear                                                                        |
+| per-writable-open owner session in retention + ACTIVE cursor roots       | Pulsar ownership/watch or graceful drain alone               | existing-root stale CAS is fenced；already-pending target races are recovered/claimed before the new dispatcher becomes visible |
+| remaining-bit batch state + AND                                          | deleted-bit ambiguity or batch sub-offset                    | matches locked Pulsar API                                                                                                      |
+| strict object/header/CRC/cap                                             | best-effort decode/fallback                                  | corruption cannot advance cursor                                                                                               |
+| recoverable `PROTECTION_PENDING` before every create/backward cursor CAS | momentary version bump or periodic `min(markDelete)`         | freezes the whole pre-cursor interval and closes missing-create/reset vs later floor-raise/trim race                           |
+| `TRIM_PENDING` with exact offset/attempt/composed reason                 | fire-and-forget trim                                         | uncertain/crash trim is replayable without changing audit identity and cannot unlock unsafe reset                              |
+| live two-mode cursor registry + durable-only retention                   | permanently durable-only `getCursors()`                      | preserves stock enumeration without letting temporary cursors create roots/tombstones or retention references                  |
+| monotonic topic-projection activation marker                             | capability signal alone                                      | locked F2 decoder fails before exposing empty cursor state                                                                     |
+| separate cursor capability                                               | infer from storage-binding capability                        | upgrade converges before per-topic activation；later downgrade fails closed                                                     |
+| F4 physical GC consumes refs/trim truth                                  | F3 deletes object on cursor callback                         | preserves read/ref safety and module ownership                                                                                 |
 
 ### 3.3 Deferred scope, not unresolved protocol
 
@@ -599,7 +599,8 @@ Required scenarios：
 
 1. create durable Exclusive at Earliest/Latest, publish, cumulative ack, unload/reload；
 2. Failover owner switch with delivered-but-unacked messages redelivered under identical MessageIds；
-3. Shared disjoint individual ack from two consumers on one claimed owner，then broker failover/restart；exact holes remain；
+3. Shared disjoint individual ack from two consumers on one claimed owner，then broker failover/restart；exact holes
+   remain；
 4. partial batch ack, unload/failover/runtime restart, remaining indexes and MessageIdAdv coordinates stable；
 5. ack CAS success + response loss, duplicate ack returns success exactly once；
 6. snapshot threshold crossing, root delta, replacement snapshot and restart hydration；
@@ -618,7 +619,8 @@ Required scenarios：
     cannot skip entries reopened by a destructive transition。The same gate starts from an unactivated empty topic and
     proves a pre-pending delayed old-owner first-create cannot enter PROTECTION_PENDING after the new owner-only root
     claim；when pending preceded takeover，its target-key winner is recovered/claimed and cannot stale-finalize or
-    callback。Ownership-checker false/error at pre-claim、post-claim publication and first-create final callback emits no success。
+    callback。Ownership-checker false/error at pre-claim、post-claim publication and first-create final callback emits no
+    success。
 
 Exit requires no orphan/reference leak to be mistaken for visible state；physical orphan deletion is not an F3 exit
 condition and remains an observable F4 handoff。
@@ -713,17 +715,17 @@ build or a Nereus test is consuming them。
 
 Code-level evidence mapping：
 
-| Scenario | Executable evidence |
-| --- | --- |
-| 17, 19, 24, 25 | Pulsar `NereusCursorMultiBrokerIntegrationTest.preservesMessageIdsPropertiesAndIncarnationAcrossCompatibilityCuts`；the same method covers reader/consumer seek, owner/runtime cuts, internal properties, loaded compaction, unloaded shadow policy, namespace clear and same-name recreation |
-| 18 | `NereusManagedCursorResetSeekTest.ordinaryResetNormalizesTrimmedAndFutureTargetsWhileForceCannotResurrectBytes` |
-| 20 | `CursorStorageLimitExhaustionTest` plus `CursorStorageSnapshotSpillTest`；failed mutations leave the last admitted full truth intact |
-| 21 | `CursorStorageOpenTest.activatesProjectionBeforeFirstCursorRootWithoutChangingTheF2PreactivationRecord` and the locked F2 `ProjectionCreateRequest` rejection |
-| 22 | `NereusManagedLedgerFacadeTest` committed-response-loss/write-fence suites and the inherited Phase 1/1.5/2 dependency chain |
-| 23 | `CursorSnapshotInventory`、`CursorSnapshotKeys`、`CursorSnapshotInventoryTest` and concurrent replacement-orphan coverage in `CursorStorageSnapshotSpillTest` |
-| 24 storage-only isolation | `ManagedLedgerCursorProtocolTest.topicRecreationUsesANewCursorNamespaceThatCannotAliasTheOldIncarnation` |
-| 25 static completeness | `scripts/check-phase3-pulsar-admin-routes.sh` and `checkPhase3PulsarAdminRoutes` |
-| 26 | `NereusManagedCursorCallbackSafetyTest.cancellationCloseAndReadCompletionSurviveCallbackExecutorRejectionWithoutLeaks` and `CallbackPrimitivesTest.executorRejectionDrainsEveryAdmittedTerminalCallbackExactlyOnce` |
+| Scenario                  | Executable evidence                                                                                                                                                                                                                                                                          |
+|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 17, 19, 24, 25            | Pulsar `NereusCursorMultiBrokerIntegrationTest.preservesMessageIdsPropertiesAndIncarnationAcrossCompatibilityCuts`；the same method covers reader/consumer seek, owner/runtime cuts, internal properties, loaded compaction, unloaded shadow policy, namespace clear and same-name recreation |
+| 18                        | `NereusManagedCursorResetSeekTest.ordinaryResetNormalizesTrimmedAndFutureTargetsWhileForceCannotResurrectBytes`                                                                                                                                                                              |
+| 20                        | `CursorStorageLimitExhaustionTest` plus `CursorStorageSnapshotSpillTest`；failed mutations leave the last admitted full truth intact                                                                                                                                                          |
+| 21                        | `CursorStorageOpenTest.activatesProjectionBeforeFirstCursorRootWithoutChangingTheF2PreactivationRecord` and the locked F2 `ProjectionCreateRequest` rejection                                                                                                                                |
+| 22                        | `NereusManagedLedgerFacadeTest` committed-response-loss/write-fence suites and the inherited Phase 1/1.5/2 dependency chain                                                                                                                                                                  |
+| 23                        | `CursorSnapshotInventory`、`CursorSnapshotKeys`、`CursorSnapshotInventoryTest` and concurrent replacement-orphan coverage in `CursorStorageSnapshotSpillTest`                                                                                                                                  |
+| 24 storage-only isolation | `ManagedLedgerCursorProtocolTest.topicRecreationUsesANewCursorNamespaceThatCannotAliasTheOldIncarnation`                                                                                                                                                                                     |
+| 25 static completeness    | `scripts/check-phase3-pulsar-admin-routes.sh` and `checkPhase3PulsarAdminRoutes`                                                                                                                                                                                                             |
+| 26                        | `NereusManagedCursorCallbackSafetyTest.cancellationCloseAndReadCompletionSurviveCallbackExecutorRejectionWithoutLeaks` and `CallbackPrimitivesTest.executorRejectionDrainsEveryAdmittedTerminalCallbackExactlyOnce`                                                                          |
 
 `checkPhase3ContractSurface` additionally locks every code-level M1-M4 production/test artifact named by this plan，
 both independent real-broker test methods，owner-claim-before-publication、checked `ackStateEpoch` replacement and F4

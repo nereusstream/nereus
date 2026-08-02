@@ -341,13 +341,13 @@ not make a reserved profile executable。
 
 Phase 1 state behavior:
 
-| State | createOrGet | append/acquire session | read/resolve | trim | Notes |
-| --- | --- | --- | --- | --- | --- |
-| `CREATING` | retriable `STREAM_NOT_ACTIVE` | retriable `STREAM_NOT_ACTIVE` | retriable `STREAM_NOT_ACTIVE` | retriable `STREAM_NOT_ACTIVE` | normally not persisted by Phase 1 create |
-| `ACTIVE` | returns metadata | allowed | allowed | allowed | normal state |
-| `SEALED` | returns metadata | non-retriable `STREAM_NOT_ACTIVE` | allowed | allowed | Phase 1 has no public seal API, but must tolerate metadata |
-| `DELETING` | non-retriable `STREAM_NOT_ACTIVE` | non-retriable `STREAM_NOT_ACTIVE` | non-retriable `STREAM_NOT_ACTIVE` | non-retriable `STREAM_NOT_ACTIVE` | reserved for future delete workflow |
-| `DELETED` | `STREAM_NOT_FOUND` or non-retriable `STREAM_NOT_ACTIVE` | `STREAM_NOT_FOUND` or non-retriable `STREAM_NOT_ACTIVE` | same | same | reserved for future delete workflow |
+| State      | createOrGet                                             | append/acquire session                                  | read/resolve                      | trim                              | Notes                                                      |
+|------------|---------------------------------------------------------|---------------------------------------------------------|-----------------------------------|-----------------------------------|------------------------------------------------------------|
+| `CREATING` | retriable `STREAM_NOT_ACTIVE`                           | retriable `STREAM_NOT_ACTIVE`                           | retriable `STREAM_NOT_ACTIVE`     | retriable `STREAM_NOT_ACTIVE`     | normally not persisted by Phase 1 create                   |
+| `ACTIVE`   | returns metadata                                        | allowed                                                 | allowed                           | allowed                           | normal state                                               |
+| `SEALED`   | returns metadata                                        | non-retriable `STREAM_NOT_ACTIVE`                       | allowed                           | allowed                           | Phase 1 has no public seal API, but must tolerate metadata |
+| `DELETING` | non-retriable `STREAM_NOT_ACTIVE`                       | non-retriable `STREAM_NOT_ACTIVE`                       | non-retriable `STREAM_NOT_ACTIVE` | non-retriable `STREAM_NOT_ACTIVE` | reserved for future delete workflow                        |
+| `DELETED`  | `STREAM_NOT_FOUND` or non-retriable `STREAM_NOT_ACTIVE` | `STREAM_NOT_FOUND` or non-retriable `STREAM_NOT_ACTIVE` | same                              | same                              | reserved for future delete workflow                        |
 
 `createOrGetStream` creates streams directly as `ACTIVE` in Phase 1. No Phase 1 API transitions a stream
 into `SEALED`, `DELETING`, or `DELETED`.
@@ -877,32 +877,32 @@ public enum ErrorCode {
 
 Error codes:
 
-| Code | Retriable | Meaning |
-| --- | --- | --- |
-| `INVALID_ARGUMENT` | no | caller supplied invalid options, offsets, batch shape, or unsupported value combination |
-| `CANCELLED` | yes | operation was cancelled；append commit certainty is carried separately by `appendOutcome` |
-| `STREAM_NOT_FOUND` | no | stream metadata missing |
-| `STREAM_NOT_ACTIVE` | depends | stream state does not allow the requested operation |
-| `APPEND_SESSION_EXPIRED` | yes | caller must reacquire |
-| `FENCED_APPEND` | yes | stale epoch/token rejected |
-| `OFFSET_CONFLICT` | yes | committed end offset changed before commit |
-| `BACKPRESSURE_REJECTED` | yes | append or read rejected before irreversible object IO because local resource limits are full |
-| `TIMEOUT` | yes | configured operation timeout elapsed；append commit certainty is carried separately by `appendOutcome` |
-| `STORAGE_CLOSED` | no | `StreamStorage` or one of its required clients is closing or closed |
-| `OBJECT_UPLOAD_FAILED` | yes | object store write failed |
-| `OBJECT_READ_FAILED` | yes | object range read failed for a transient or unknown reason |
-| `OBJECT_NOT_FOUND` | yes | offset index points to an object that is currently unavailable or missing |
-| `OBJECT_CHECKSUM_MISMATCH` | no | durable bytes do not match manifest/index |
-| `OFFSET_TRIMMED` | no | requested offset is below trim low-watermark |
-| `OFFSET_NOT_AVAILABLE` | yes | an operation that requires an existing committed offset targeted data beyond committed end |
-| `READ_LIMIT_TOO_SMALL` | no | first readable entry is larger than `ReadOptions.maxBytes` |
-| `METADATA_UNAVAILABLE` | yes | Oxia unavailable or timeout |
-| `METADATA_CONDITION_FAILED` | yes | CAS conflict not classified above |
-| `METADATA_INVARIANT_VIOLATION` | no | committed metadata is internally inconsistent |
-| `READ_RESOLUTION_FAILED` | depends | resolver could not map offset to object range |
-| `UNSUPPORTED_STORAGE_PROFILE` | no | stream uses a valid reserved profile for which the current core has no end-to-end writer/reader/coordinator |
-| `UNSUPPORTED_DURABILITY_LEVEL` | no | append requests a valid durability boundary not implemented by the selected profile/current core |
-| `UNSUPPORTED_FORMAT` | no | payload format, compression, or entry-index location is not implemented in Phase 1 |
+| Code                           | Retriable | Meaning                                                                                                     |
+|--------------------------------|-----------|-------------------------------------------------------------------------------------------------------------|
+| `INVALID_ARGUMENT`             | no        | caller supplied invalid options, offsets, batch shape, or unsupported value combination                     |
+| `CANCELLED`                    | yes       | operation was cancelled；append commit certainty is carried separately by `appendOutcome`                    |
+| `STREAM_NOT_FOUND`             | no        | stream metadata missing                                                                                     |
+| `STREAM_NOT_ACTIVE`            | depends   | stream state does not allow the requested operation                                                         |
+| `APPEND_SESSION_EXPIRED`       | yes       | caller must reacquire                                                                                       |
+| `FENCED_APPEND`                | yes       | stale epoch/token rejected                                                                                  |
+| `OFFSET_CONFLICT`              | yes       | committed end offset changed before commit                                                                  |
+| `BACKPRESSURE_REJECTED`        | yes       | append or read rejected before irreversible object IO because local resource limits are full                |
+| `TIMEOUT`                      | yes       | configured operation timeout elapsed；append commit certainty is carried separately by `appendOutcome`       |
+| `STORAGE_CLOSED`               | no        | `StreamStorage` or one of its required clients is closing or closed                                         |
+| `OBJECT_UPLOAD_FAILED`         | yes       | object store write failed                                                                                   |
+| `OBJECT_READ_FAILED`           | yes       | object range read failed for a transient or unknown reason                                                  |
+| `OBJECT_NOT_FOUND`             | yes       | offset index points to an object that is currently unavailable or missing                                   |
+| `OBJECT_CHECKSUM_MISMATCH`     | no        | durable bytes do not match manifest/index                                                                   |
+| `OFFSET_TRIMMED`               | no        | requested offset is below trim low-watermark                                                                |
+| `OFFSET_NOT_AVAILABLE`         | yes       | an operation that requires an existing committed offset targeted data beyond committed end                  |
+| `READ_LIMIT_TOO_SMALL`         | no        | first readable entry is larger than `ReadOptions.maxBytes`                                                  |
+| `METADATA_UNAVAILABLE`         | yes       | Oxia unavailable or timeout                                                                                 |
+| `METADATA_CONDITION_FAILED`    | yes       | CAS conflict not classified above                                                                           |
+| `METADATA_INVARIANT_VIOLATION` | no        | committed metadata is internally inconsistent                                                               |
+| `READ_RESOLUTION_FAILED`       | depends   | resolver could not map offset to object range                                                               |
+| `UNSUPPORTED_STORAGE_PROFILE`  | no        | stream uses a valid reserved profile for which the current core has no end-to-end writer/reader/coordinator |
+| `UNSUPPORTED_DURABILITY_LEVEL` | no        | append requests a valid durability boundary not implemented by the selected profile/current core            |
+| `UNSUPPORTED_FORMAT`           | no        | payload format, compression, or entry-index location is not implemented in Phase 1                          |
 
 Async rule:
 
@@ -947,25 +947,25 @@ static <T> CompletableFuture<T> failedAppendFuture(
 
 Exception mapping:
 
-| Source | Condition | ErrorCode |
-| --- | --- | --- |
-| Object store put | timeout before known result | `TIMEOUT` or `OBJECT_UPLOAD_FAILED` with retriable=true |
-| Object store put | duplicate key with `ifAbsent=true` | `OBJECT_UPLOAD_FAILED` unless idempotent same checksum is proven at metadata layer |
-| Object store read/head | object missing | `OBJECT_NOT_FOUND` |
-| Object store read | transient IO/permission/network error | `OBJECT_READ_FAILED` |
-| Object store checksum validation | returned bytes do not match expected checksum | `OBJECT_CHECKSUM_MISMATCH` |
-| WAL writer sizing | final encoded object length exceeds configured `maxObjectBytes` | `INVALID_ARGUMENT` |
-| Metadata client | transport unavailable, deadline, reconnecting | `METADATA_UNAVAILABLE` |
-| Metadata client | CAS/version condition failed and not classified | `METADATA_CONDITION_FAILED` |
-| Metadata codec | corrupt bytes, wrong record type, checksum mismatch | `METADATA_INVARIANT_VIOLATION` |
-| Metadata state machine | stale append epoch/token | `FENCED_APPEND` |
-| Metadata state machine | committed end changed | `OFFSET_CONFLICT` |
-| Append before head CAS is sent | any terminal failure | `appendOutcome=KNOWN_NOT_COMMITTED` |
-| Append after head CAS is sent, response unavailable | timeout/cancel/transport failure | `appendOutcome=MAY_HAVE_COMMITTED` |
-| Append head known committed, result/index confirmation unavailable | post-head failure | `appendOutcome=KNOWN_COMMITTED` |
-| Core preflight | stream profile is not canonical Object WAL sync in Phase 1 | `UNSUPPORTED_STORAGE_PROFILE` |
-| Core preflight | durability is not `WAL_DURABLE_AND_INDEX_COMMITTED` in Phase 1 | `UNSUPPORTED_DURABILITY_LEVEL` |
-| Resolver | no covering index below committed end | `METADATA_INVARIANT_VIOLATION` |
+| Source                                                             | Condition                                                       | ErrorCode                                                                          |
+|--------------------------------------------------------------------|-----------------------------------------------------------------|------------------------------------------------------------------------------------|
+| Object store put                                                   | timeout before known result                                     | `TIMEOUT` or `OBJECT_UPLOAD_FAILED` with retriable=true                            |
+| Object store put                                                   | duplicate key with `ifAbsent=true`                              | `OBJECT_UPLOAD_FAILED` unless idempotent same checksum is proven at metadata layer |
+| Object store read/head                                             | object missing                                                  | `OBJECT_NOT_FOUND`                                                                 |
+| Object store read                                                  | transient IO/permission/network error                           | `OBJECT_READ_FAILED`                                                               |
+| Object store checksum validation                                   | returned bytes do not match expected checksum                   | `OBJECT_CHECKSUM_MISMATCH`                                                         |
+| WAL writer sizing                                                  | final encoded object length exceeds configured `maxObjectBytes` | `INVALID_ARGUMENT`                                                                 |
+| Metadata client                                                    | transport unavailable, deadline, reconnecting                   | `METADATA_UNAVAILABLE`                                                             |
+| Metadata client                                                    | CAS/version condition failed and not classified                 | `METADATA_CONDITION_FAILED`                                                        |
+| Metadata codec                                                     | corrupt bytes, wrong record type, checksum mismatch             | `METADATA_INVARIANT_VIOLATION`                                                     |
+| Metadata state machine                                             | stale append epoch/token                                        | `FENCED_APPEND`                                                                    |
+| Metadata state machine                                             | committed end changed                                           | `OFFSET_CONFLICT`                                                                  |
+| Append before head CAS is sent                                     | any terminal failure                                            | `appendOutcome=KNOWN_NOT_COMMITTED`                                                |
+| Append after head CAS is sent, response unavailable                | timeout/cancel/transport failure                                | `appendOutcome=MAY_HAVE_COMMITTED`                                                 |
+| Append head known committed, result/index confirmation unavailable | post-head failure                                               | `appendOutcome=KNOWN_COMMITTED`                                                    |
+| Core preflight                                                     | stream profile is not canonical Object WAL sync in Phase 1      | `UNSUPPORTED_STORAGE_PROFILE`                                                      |
+| Core preflight                                                     | durability is not `WAL_DURABLE_AND_INDEX_COMMITTED` in Phase 1  | `UNSUPPORTED_DURABILITY_LEVEL`                                                     |
+| Resolver                                                           | no covering index below committed end                           | `METADATA_INVARIANT_VIOLATION`                                                     |
 
 ## 10. Immutability and Validation
 

@@ -80,14 +80,14 @@ fails `UNSUPPORTED_READ_TARGET`。
 
 `canonical-target-v1` uses big-endian fixed-width numeric values：
 
-| Primitive | Encoding |
-| --- | --- |
-| magic | four ASCII bytes |
-| string | unsigned 32-bit byte length + strict UTF-8 bytes |
-| byte array | unsigned 32-bit length + exact bytes |
-| long | signed 64-bit big-endian; owning field validation supplies non-negative constraint |
-| int | signed 32-bit big-endian; owning field validation supplies positive constraint |
-| enum/checksum type | canonical enum name encoded as string |
+| Primitive          | Encoding                                                                           |
+|--------------------|------------------------------------------------------------------------------------|
+| magic              | four ASCII bytes                                                                   |
+| string             | unsigned 32-bit byte length + strict UTF-8 bytes                                   |
+| byte array         | unsigned 32-bit length + exact bytes                                               |
+| long               | signed 64-bit big-endian; owning field validation supplies non-negative constraint |
+| int                | signed 32-bit big-endian; owning field validation supplies positive constraint     |
+| enum/checksum type | canonical enum name encoded as string                                              |
 
 Lengths greater than `Integer.MAX_VALUE`, truncated input and trailing bytes are rejected。There is no platform
 charset, Java serialization, JSON map ordering or reflection-dependent field name in this payload。
@@ -376,10 +376,10 @@ deferred to a separately announced compatibility break。
 
 At any commit-log or offset-index key, adapter decode first reads `MetadataRecordEnvelope.recordType`：
 
-| Key family | Legacy type | New type |
-| --- | --- | --- |
-| commit log | `StreamCommitRecord` | `StreamCommitTargetRecord` |
-| offset index | `OffsetIndexRecord` | `OffsetIndexTargetRecord` |
+| Key family    | Legacy type                          | New type                           |
+|---------------|--------------------------------------|------------------------------------|
+| commit log    | `StreamCommitRecord`                 | `StreamCommitTargetRecord`         |
+| offset index  | `OffsetIndexRecord`                  | `OffsetIndexTargetRecord`          |
 | replay marker | `CommittedSliceRecord` at legacy key | `CommittedAppendRecord` at new key |
 
 Rules：

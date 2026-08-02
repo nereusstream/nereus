@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -11,13 +12,17 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 
-/** SHA-256 over the exact NBKR1 framed contiguous BookKeeper entry sequence. */
+/**
+ * SHA-256 over the exact NBKR1 framed contiguous BookKeeper entry sequence.
+ */
 public final class BookKeeperRangeChecksums {
-    private BookKeeperRangeChecksums() { }
+    private BookKeeperRangeChecksums() {}
 
     public static Checksum compute(long firstEntryId, List<? extends ByteBuf> entries) {
         Objects.requireNonNull(entries, "entries");
-        if (firstEntryId < 0 || entries.isEmpty()) throw new IllegalArgumentException("invalid BookKeeper entry range");
+        if (firstEntryId < 0 || entries.isEmpty()) {
+            throw new IllegalArgumentException("invalid BookKeeper entry range");
+        }
         MessageDigest digest = digest();
         digest.update(new byte[] {'N', 'B', 'K', 'R', '1'});
         digest.update(u32(entries.size()));
@@ -36,7 +41,9 @@ public final class BookKeeperRangeChecksums {
 
     public static Checksum computeBytes(long firstEntryId, List<byte[]> entries) {
         Objects.requireNonNull(entries, "entries");
-        if (firstEntryId < 0 || entries.isEmpty()) throw new IllegalArgumentException("invalid BookKeeper entry range");
+        if (firstEntryId < 0 || entries.isEmpty()) {
+            throw new IllegalArgumentException("invalid BookKeeper entry range");
+        }
         MessageDigest digest = digest();
         digest.update(new byte[] {'N', 'B', 'K', 'R', '1'});
         digest.update(u32(entries.size()));
@@ -50,15 +57,24 @@ public final class BookKeeperRangeChecksums {
     }
 
     private static byte[] u32(long value) {
-        if (value < 0 || value > 0xffff_ffffL) throw new IllegalArgumentException("u32 value is out of range");
+        if (value < 0 || value > 0xffff_ffffL) {
+            throw new IllegalArgumentException("u32 value is out of range");
+        }
         return ByteBuffer.allocate(Integer.BYTES).putInt((int) value).array();
     }
+
     private static byte[] u64(long value) {
-        if (value < 0) throw new IllegalArgumentException("u64 value exceeds the supported positive domain");
+        if (value < 0) {
+            throw new IllegalArgumentException("u64 value exceeds the supported positive domain");
+        }
         return ByteBuffer.allocate(Long.BYTES).putLong(value).array();
     }
+
     private static MessageDigest digest() {
-        try { return MessageDigest.getInstance("SHA-256"); }
-        catch (NoSuchAlgorithmException e) { throw new IllegalStateException("SHA-256 is required", e); }
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is required", e);
+        }
     }
 }

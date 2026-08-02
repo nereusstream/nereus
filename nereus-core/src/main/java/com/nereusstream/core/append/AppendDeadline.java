@@ -58,9 +58,7 @@ final class AppendDeadline {
     }
 
     <T> CompletableFuture<T> bound(
-            Supplier<CompletableFuture<T>> operation,
-            AppendOutcome uncertainOutcome,
-            String operationName) {
+            Supplier<CompletableFuture<T>> operation, AppendOutcome uncertainOutcome, String operationName) {
         return bound(operation, uncertainOutcome, uncertainOutcome, operationName);
     }
 
@@ -85,11 +83,8 @@ final class AppendDeadline {
                 result.completeExceptionally(error);
             }
         });
-        cancellation.thenRun(() -> result.completeExceptionally(new NereusException(
-                ErrorCode.CANCELLED,
-                true,
-                operationName + " was cancelled",
-                inFlightOutcome)));
+        cancellation.thenRun(() -> result.completeExceptionally(
+                new NereusException(ErrorCode.CANCELLED, true, operationName + " was cancelled", inFlightOutcome)));
         long delay = Math.max(0, deadlineNanos - System.nanoTime());
         result.orTimeout(delay, java.util.concurrent.TimeUnit.NANOSECONDS);
         return result.handle((value, error) -> {
@@ -100,11 +95,7 @@ final class AppendDeadline {
                     ? error.getCause()
                     : error;
             if (cause instanceof TimeoutException) {
-                throw new NereusException(
-                        ErrorCode.TIMEOUT,
-                        true,
-                        operationName + " timed out",
-                        inFlightOutcome);
+                throw new NereusException(ErrorCode.TIMEOUT, true, operationName + " timed out", inFlightOutcome);
             }
             if (cause instanceof RuntimeException runtimeException) {
                 throw runtimeException;

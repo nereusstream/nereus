@@ -1,13 +1,15 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.recovery;
 
 import com.nereusstream.api.keys.DeterministicIds;
 import java.security.SecureRandom;
 import java.util.Objects;
 
-/** Cryptographically strong 128-bit checkpoint-attempt identity generator. */
-public final class SecureRecoveryCheckpointAttemptIdGenerator
-        implements RecoveryCheckpointAttemptIdGenerator {
+/**
+ * Cryptographically strong 128-bit checkpoint-attempt identity generator.
+ */
+public final class SecureRecoveryCheckpointAttemptIdGenerator implements RecoveryCheckpointAttemptIdGenerator {
     private final SecureRandom random;
 
     public SecureRecoveryCheckpointAttemptIdGenerator() {

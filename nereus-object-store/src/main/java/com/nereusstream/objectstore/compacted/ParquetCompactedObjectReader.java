@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.ChecksumType;
@@ -16,7 +17,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -40,7 +40,9 @@ import org.apache.parquet.io.ColumnIOFactory;
 import org.apache.parquet.io.MessageColumnIO;
 import org.apache.parquet.io.RecordReader;
 
-/** Strict range reader for NCP1 and the protocol-neutral NTC1 storage primitive. */
+/**
+ * Strict range reader for NCP1 and the protocol-neutral NTC1 storage primitive.
+ */
 public final class ParquetCompactedObjectReader implements CompactedObjectReader {
     private static final Set<Encoding> DICTIONARY_ENCODINGS =
             Set.of(Encoding.PLAIN_DICTIONARY, Encoding.RLE_DICTIONARY);
@@ -56,17 +58,14 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
     @Override
     public CompletableFuture<CompactedObjectReadResult> read(CompactedObjectReadRequest request) {
         if (request == null) {
-            return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.INVALID_ARGUMENT, false, "compacted read request is required"));
+            return CompletableFuture.failedFuture(
+                    new NereusException(ErrorCode.INVALID_ARGUMENT, false, "compacted read request is required"));
         }
         try {
             return CompletableFuture.supplyAsync(() -> readBlocking(request), readerExecutor);
         } catch (RejectedExecutionException failure) {
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    "compacted reader executor rejected the operation",
-                    failure));
+                    ErrorCode.STORAGE_CLOSED, false, "compacted reader executor rejected the operation", failure));
         }
     }
 
@@ -76,35 +75,30 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
             ObjectStoreParquetInputFile.ReadDeadline deadline =
                     new ObjectStoreParquetInputFile.ReadDeadline(request.timeout());
             long footerBytes = request.target().entryIndexRef().length();
-            RangeReadResult footer = objectStore.readRange(
+            RangeReadResult footer = objectStore
+                    .readRange(
                             request.target().objectKey(),
                             request.target().entryIndexRef().offset(),
                             footerBytes,
                             new RangeReadOptions(
-                                    Optional.of(request.target().entryIndexRef().checksum()),
-                                    deadline.remaining()))
+                                    Optional.of(request.target().entryIndexRef().checksum()), deadline.remaining()))
                     .join();
             if (!footer.key().equals(request.target().objectKey())
                     || footer.offset() != request.target().entryIndexRef().offset()
                     || footer.length() != footerBytes
                     || footer.payload().remaining() != footerBytes
                     || (footer.checksum().isPresent()
-                            && !footer.checksum().orElseThrow().equals(
-                                    request.target().entryIndexRef().checksum()))) {
-                throw new CompactedObjectFormatException(
-                        "object store returned a mismatched compacted footer range");
+                            && !footer.checksum()
+                                    .orElseThrow()
+                                    .equals(request.target().entryIndexRef().checksum()))) {
+                throw new CompactedObjectFormatException("object store returned a mismatched compacted footer range");
             }
-            long maximumReadBytes = Math.addExact(
-                    request.target().objectLength(), Math.multiplyExact(footerBytes, 2));
+            long maximumReadBytes = Math.addExact(request.target().objectLength(), Math.multiplyExact(footerBytes, 2));
             ObjectStoreParquetInputFile.ReadBudget budget =
                     new ObjectStoreParquetInputFile.ReadBudget(maximumReadBytes);
             budget.reserve(footerBytes);
             ObjectStoreParquetInputFile input = new ObjectStoreParquetInputFile(
-                    objectStore,
-                    request.target().objectKey(),
-                    request.target().objectLength(),
-                    deadline,
-                    budget);
+                    objectStore, request.target().objectKey(), request.target().objectLength(), deadline, budget);
             ParquetReadOptions readOptions = ParquetReadOptions.builder()
                     .usePageChecksumVerification(true)
                     .useBloomFilter(false)
@@ -115,26 +109,19 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
                 CompactedObjectMetadata metadata = validateFile(reader, request);
                 ReadRows rows = readRows(reader, request, metadata);
                 return new CompactedObjectReadResult(
-                        metadata,
-                        rows.rows(),
-                        rows.sourceCoverageEndOffset(),
-                        budget.used(),
-                        footerBytes);
+                        metadata, rows.rows(), rows.sourceCoverageEndOffset(), budget.used(), footerBytes);
             }
         } catch (Throwable failure) {
             throw new CompletionException(mapFailure(failure));
         }
     }
 
-    private static CompactedObjectMetadata validateFile(
-            ParquetFileReader reader,
-            CompactedObjectReadRequest request) {
-        if (!reader.getFileMetaData().getSchema().equals(
-                CompactedObjectFormatV1.schema(request.view()))) {
+    private static CompactedObjectMetadata validateFile(ParquetFileReader reader, CompactedObjectReadRequest request) {
+        if (!reader.getFileMetaData().getSchema().equals(CompactedObjectFormatV1.schema(request.view()))) {
             throw new CompactedObjectFormatException("compacted Parquet schema is not the frozen V1 schema");
         }
-        CompactedObjectMetadata metadata = CompactedObjectFormatV1.parseMetadata(
-                reader.getFileMetaData().getKeyValueMetaData());
+        CompactedObjectMetadata metadata =
+                CompactedObjectFormatV1.parseMetadata(reader.getFileMetaData().getKeyValueMetaData());
         if (metadata.view() != request.view()
                 || !metadata.streamId().equals(request.streamId())
                 || !metadata.sourceCoverage().equals(request.sourceCoverage())
@@ -148,18 +135,15 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
         return metadata;
     }
 
-    private static void validateRowGroups(
-            List<BlockMetaData> blocks,
-            CompactedObjectMetadata metadata) {
+    private static void validateRowGroups(List<BlockMetaData> blocks, CompactedObjectMetadata metadata) {
         if (blocks.size() > CompactedObjectFormatV1.MAX_ROW_GROUPS
                 || (metadata.outputRecordCount() > 0 && blocks.isEmpty())) {
             throw new CompactedObjectFormatException("compacted Parquet row-group count is invalid");
         }
         long rows = 0;
         long previousMaximum = -1;
-        CompressionCodecName expectedCodec = metadata.compression().equals("ZSTD")
-                ? CompressionCodecName.ZSTD
-                : CompressionCodecName.UNCOMPRESSED;
+        CompressionCodecName expectedCodec =
+                metadata.compression().equals("ZSTD") ? CompressionCodecName.ZSTD : CompressionCodecName.UNCOMPRESSED;
         for (BlockMetaData block : blocks) {
             long rowCount = block.getRowCount();
             if (rowCount <= 0 || rowCount > metadata.targetRowGroupRecords()) {
@@ -168,8 +152,7 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
             ColumnChunkMetaData offsetColumn = block.getColumns().stream()
                     .filter(column -> column.getPath().toDotString().equals("stream_offset"))
                     .findFirst()
-                    .orElseThrow(() -> new CompactedObjectFormatException(
-                            "compacted row group omits stream_offset"));
+                    .orElseThrow(() -> new CompactedObjectFormatException("compacted row group omits stream_offset"));
             Statistics<?> statistics = offsetColumn.getStatistics();
             if (!statistics.hasNonNullValue()
                     || !(statistics.genericGetMin() instanceof Long minimum)
@@ -184,14 +167,12 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
             if (metadata.view() == ReadView.COMMITTED
                     && ((previousMaximum >= 0 && minimum != previousMaximum + 1)
                             || maximum - minimum + 1 != rowCount)) {
-                throw new CompactedObjectFormatException(
-                        "committed row-group statistics are not dense");
+                throw new CompactedObjectFormatException("committed row-group statistics are not dense");
             }
             if (metadata.view() == ReadView.COMMITTED
                     && previousMaximum < 0
                     && minimum != metadata.sourceCoverage().startOffset()) {
-                throw new CompactedObjectFormatException(
-                        "first committed row group does not begin at source coverage");
+                throw new CompactedObjectFormatException("first committed row group does not begin at source coverage");
             }
             for (ColumnChunkMetaData column : block.getColumns()) {
                 if (column.getCodec() != expectedCodec
@@ -212,16 +193,15 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
     }
 
     private static ReadRows readRows(
-            ParquetFileReader reader,
-            CompactedObjectReadRequest request,
-            CompactedObjectMetadata metadata) throws IOException {
+            ParquetFileReader reader, CompactedObjectReadRequest request, CompactedObjectMetadata metadata)
+            throws IOException {
         List<CompactedObjectRow> returned = new ArrayList<>();
         long returnedBytes = 0;
         long coverageCursor = request.startOffset();
         long previousDecodedOffset = -1;
         boolean limited = false;
-        MessageColumnIO columnIo = new ColumnIOFactory(true)
-                .getColumnIO(CompactedObjectFormatV1.schema(request.view()));
+        MessageColumnIO columnIo =
+                new ColumnIOFactory(true).getColumnIO(CompactedObjectFormatV1.schema(request.view()));
         List<BlockMetaData> blocks = reader.getRowGroups();
         for (int blockIndex = 0; blockIndex < blocks.size() && !limited; blockIndex++) {
             BlockMetaData block = blocks.get(blockIndex);
@@ -230,8 +210,8 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
                 continue;
             }
             try (PageReadStore pages = reader.readRowGroup(blockIndex)) {
-                GroupRecordConverter converter = new GroupRecordConverter(
-                        CompactedObjectFormatV1.schema(request.view()));
+                GroupRecordConverter converter =
+                        new GroupRecordConverter(CompactedObjectFormatV1.schema(request.view()));
                 RecordReader<Group> records = columnIo.getRecordReader(pages, converter);
                 for (long rowIndex = 0; rowIndex < pages.getRowCount(); rowIndex++) {
                     CompactedObjectRow row = decode(records.read(), request.view());
@@ -241,13 +221,10 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
                         continue;
                     }
                     int payloadBytes = row.exactPayload().remaining();
-                    if (returned.size() >= request.maxRecords()
-                            || payloadBytes > request.maxBytes() - returnedBytes) {
+                    if (returned.size() >= request.maxRecords() || payloadBytes > request.maxBytes() - returnedBytes) {
                         if (returned.isEmpty()) {
                             throw new NereusException(
-                                    ErrorCode.READ_LIMIT_TOO_SMALL,
-                                    false,
-                                    "compacted row exceeds caller read limits");
+                                    ErrorCode.READ_LIMIT_TOO_SMALL, false, "compacted row exceeds caller read limits");
                         }
                         limited = true;
                         break;
@@ -259,16 +236,14 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
             }
         }
         if (request.view() == ReadView.COMMITTED) {
-            if (returned.isEmpty()
-                    || returned.get(0).streamOffset() != request.startOffset()) {
+            if (returned.isEmpty() || returned.get(0).streamOffset() != request.startOffset()) {
                 throw new CompactedObjectFormatException(
                         "committed compacted read did not return the requested dense offset");
             }
             for (int index = 1; index < returned.size(); index++) {
                 if (returned.get(index).streamOffset()
                         != returned.get(index - 1).streamOffset() + 1) {
-                    throw new CompactedObjectFormatException(
-                            "committed compacted read returned a sparse sequence");
+                    throw new CompactedObjectFormatException("committed compacted read returned a sparse sequence");
                 }
             }
         } else if (!limited) {
@@ -309,8 +284,7 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
         return new CompactedObjectRow(
                 offset,
                 payload.orElseGet(() -> ByteBuffer.allocate(0)),
-                crc.orElseGet(() -> Crc32cChecksums.intValue(
-                        Crc32cChecksums.checksum(new byte[0]))),
+                crc.orElseGet(() -> Crc32cChecksums.intValue(Crc32cChecksums.checksum(new byte[0]))),
                 publishTime,
                 eventTime,
                 Optional.empty(),
@@ -324,20 +298,15 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
     }
 
     private static void validateDecodedRow(
-            CompactedObjectRow row,
-            CompactedObjectMetadata metadata,
-            long previousOffset) {
+            CompactedObjectRow row, CompactedObjectMetadata metadata, long previousOffset) {
         byte[] payload = new byte[row.exactPayload().remaining()];
         row.exactPayload().get(payload);
         if (Crc32cChecksums.intValue(Crc32cChecksums.checksum(payload)) != row.payloadCrc32c()
                 || !metadata.sourceCoverage().contains(row.streamOffset())
                 || (previousOffset >= 0 && row.streamOffset() <= previousOffset)) {
-            throw new CompactedObjectFormatException(
-                    "compacted row offset ordering or payload CRC is invalid");
+            throw new CompactedObjectFormatException("compacted row offset ordering or payload CRC is invalid");
         }
-        if (metadata.view() == ReadView.COMMITTED
-                && previousOffset >= 0
-                && row.streamOffset() != previousOffset + 1) {
+        if (metadata.view() == ReadView.COMMITTED && previousOffset >= 0 && row.streamOffset() != previousOffset + 1) {
             throw new CompactedObjectFormatException("committed compacted rows are not dense");
         }
         if (metadata.view() == ReadView.TOPIC_COMPACTED
@@ -347,8 +316,7 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
             throw new CompactedObjectFormatException("topic-compacted row omits key/disposition");
         }
         if (metadata.view() == ReadView.TOPIC_COMPACTED) {
-            TopicCompactionKeyEncodingV1.validateForOffset(
-                    row.compactionKey().orElseThrow(), row.streamOffset());
+            TopicCompactionKeyEncodingV1.validateForOffset(row.compactionKey().orElseThrow(), row.streamOffset());
         }
     }
 
@@ -370,9 +338,7 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
                 + "-"
                 + com.nereusstream.api.keys.KeyComponentCodec.encodeNonNegativeLong(
                         metadata.sourceCoverage().endOffset());
-        String viewComponent = metadata.view() == ReadView.COMMITTED
-                ? "committed"
-                : "topic-compacted";
+        String viewComponent = metadata.view() == ReadView.COMMITTED ? "committed" : "topic-compacted";
         String[] components = key.value().split("/", -1);
         if (components.length != 7
                 || components[0].isEmpty()
@@ -395,9 +361,8 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
                 .filter(column -> column.getPath().toDotString().equals("stream_offset"))
                 .findFirst()
                 .orElseThrow();
-        return new OffsetStats(
-                (Long) offsetColumn.getStatistics().genericGetMin(),
-                (Long) offsetColumn.getStatistics().genericGetMax());
+        return new OffsetStats((Long) offsetColumn.getStatistics().genericGetMin(), (Long)
+                offsetColumn.getStatistics().genericGetMax());
     }
 
     private static byte[] requiredBinary(Group group, String field) {
@@ -447,8 +412,7 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
         }
         for (int index = 0; index < value.length(); index++) {
             char character = value.charAt(index);
-            if (!((character >= '0' && character <= '9')
-                    || (character >= 'a' && character <= 'f'))) {
+            if (!((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f'))) {
                 return false;
             }
         }
@@ -473,13 +437,10 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
                 || current instanceof IllegalStateException) {
             return new CompactedObjectFormatException("invalid compacted Parquet structure", current);
         }
-        return new CompactedObjectFormatException(
-                "cannot decode immutable compacted Parquet bytes", current);
+        return new CompactedObjectFormatException("cannot decode immutable compacted Parquet bytes", current);
     }
 
-    private record OffsetStats(long minimum, long maximum) {
-    }
+    private record OffsetStats(long minimum, long maximum) {}
 
-    private record ReadRows(List<CompactedObjectRow> rows, long sourceCoverageEndOffset) {
-    }
+    private record ReadRows(List<CompactedObjectRow> rows, long sourceCoverageEndOffset) {}
 }

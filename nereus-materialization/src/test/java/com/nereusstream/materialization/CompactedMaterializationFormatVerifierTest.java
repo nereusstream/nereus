@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -44,11 +44,9 @@ class CompactedMaterializationFormatVerifierTest {
 
     @Test
     void verifiesFullObjectAgainstTaskAndRejectsAChangedPolicyIdentity() throws Exception {
-        try (GenerationPublicationTestSupport.Context context =
-                        GenerationPublicationTestSupport.context();
+        try (GenerationPublicationTestSupport.Context context = GenerationPublicationTestSupport.context();
                 StagingFileManager staging = staging();
-                LocalFileObjectStore store =
-                        new LocalFileObjectStore(temporaryDirectory.resolve("objects"))) {
+                LocalFileObjectStore store = new LocalFileObjectStore(temporaryDirectory.resolve("objects"))) {
             MaterializationTask task = context.task();
             MaterializationOutput template = context.output();
             byte[] first = new byte[40];
@@ -93,15 +91,14 @@ class CompactedMaterializationFormatVerifierTest {
                         .join();
                 ObjectSliceReadTarget target = target(writeRequest, written);
                 MaterializationOutput output = output(task.taskId(), template, target, written);
-                CompactedObjectVerifier objectVerifier = new CompactedObjectVerifier(
-                        store,
-                        new ParquetCompactedObjectReader(store, Runnable::run));
+                CompactedObjectVerifier objectVerifier =
+                        new CompactedObjectVerifier(store, new ParquetCompactedObjectReader(store, Runnable::run));
                 MaterializationOutputVerifier verifier = new DefaultMaterializationOutputVerifier(
-                        store,
-                        new CompactedMaterializationFormatVerifier(objectVerifier));
+                        store, new CompactedMaterializationFormatVerifier(objectVerifier));
 
                 verifier.verify(task, output, Duration.ofSeconds(10)).join();
-                objectVerifier.verifyExact(
+                objectVerifier
+                        .verifyExact(
                                 new CompactedObjectVerificationRequest(
                                         task.streamId(),
                                         task.view(),
@@ -127,17 +124,13 @@ class CompactedMaterializationFormatVerifierTest {
                         task.policy().targetRowGroupRecords(),
                         "UNCOMPRESSED",
                         task.policy().topicCompaction());
-                MaterializationTask changedTask = MaterializationTask.create(
-                        task.streamId(), task.coverage(), task.sources(), changedPolicy);
-                MaterializationOutput relabelled = output(
-                        changedTask.taskId(), template, target, written);
-                assertThatThrownBy(() -> verifier.verify(
-                                        changedTask,
-                                        relabelled,
-                                        Duration.ofSeconds(10))
+                MaterializationTask changedTask =
+                        MaterializationTask.create(task.streamId(), task.coverage(), task.sources(), changedPolicy);
+                MaterializationOutput relabelled = output(changedTask.taskId(), template, target, written);
+                assertThatThrownBy(() -> verifier.verify(changedTask, relabelled, Duration.ofSeconds(10))
                                 .join())
-                        .satisfies(failure -> assertThat(findNereus(failure).code())
-                                .isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH));
+                        .satisfies(failure ->
+                                assertThat(findNereus(failure).code()).isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH));
             }
         }
     }
@@ -180,8 +173,7 @@ class CompactedMaterializationFormatVerifierTest {
     }
 
     private static ObjectSliceReadTarget target(
-            CompactedObjectWriteRequest request,
-            CompactedObjectWriteResult written) {
+            CompactedObjectWriteRequest request, CompactedObjectWriteResult written) {
         return new ObjectSliceReadTarget(
                 1,
                 written.objectId(),
@@ -200,11 +192,7 @@ class CompactedMaterializationFormatVerifierTest {
         Path directory = Files.createDirectory(temporaryDirectory.resolve("staging"));
         Files.setPosixFilePermissions(directory, PosixFilePermissions.fromString("rwx------"));
         return new StagingFileManager(
-                directory,
-                32L << 20,
-                StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
-                Duration.ofHours(1),
-                Runnable::run);
+                directory, 32L << 20, StagingFileManager.MIN_UPLOAD_CHUNK_BYTES, Duration.ofHours(1), Runnable::run);
     }
 
     private static CompactedObjectRow row(long offset, byte[] payload) {

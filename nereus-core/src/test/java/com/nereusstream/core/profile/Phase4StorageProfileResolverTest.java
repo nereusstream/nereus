@@ -16,7 +16,6 @@ package com.nereusstream.core.profile;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
@@ -25,33 +24,21 @@ import com.nereusstream.api.target.ReadTargetType;
 import org.junit.jupiter.api.Test;
 
 class Phase4StorageProfileResolverTest {
-    private final Phase4StorageProfileResolver resolver =
-            new Phase4StorageProfileResolver();
+    private final Phase4StorageProfileResolver resolver = new Phase4StorageProfileResolver();
 
     @Test
     void acceptsOnlyTheFrozenObjectWalMatrix() {
         StorageExecutionPlan sync = resolver.requireExecutable(
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
-                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
-                true,
-                true);
-        assertThat(sync.profile())
-                .isEqualTo(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
-        assertThat(sync.primaryTargetType())
-                .isEqualTo(ReadTargetType.OBJECT_SLICE);
-        assertThat(sync.publicationMode())
-                .isEqualTo(ObjectPublicationMode.SYNCHRONOUS);
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT, DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED, true, true);
+        assertThat(sync.profile()).isEqualTo(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+        assertThat(sync.primaryTargetType()).isEqualTo(ReadTargetType.OBJECT_SLICE);
+        assertThat(sync.publicationMode()).isEqualTo(ObjectPublicationMode.SYNCHRONOUS);
 
         for (DurabilityLevel durability : DurabilityLevel.values()) {
-            StorageExecutionPlan async = resolver.requireExecutable(
-                    StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
-                    durability,
-                    true,
-                    true);
-            assertThat(async.profile())
-                    .isEqualTo(StorageProfile.OBJECT_WAL_ASYNC_OBJECT);
-            assertThat(async.publicationMode())
-                    .isEqualTo(ObjectPublicationMode.ASYNCHRONOUS);
+            StorageExecutionPlan async =
+                    resolver.requireExecutable(StorageProfile.OBJECT_WAL_ASYNC_OBJECT, durability, true, true);
+            assertThat(async.profile()).isEqualTo(StorageProfile.OBJECT_WAL_ASYNC_OBJECT);
+            assertThat(async.publicationMode()).isEqualTo(ObjectPublicationMode.ASYNCHRONOUS);
             assertThat(async.allowedDurability()).isEqualTo(durability);
         }
     }
@@ -60,24 +47,13 @@ class Phase4StorageProfileResolverTest {
     @SuppressWarnings("deprecation")
     void canonicalLegacyObjectWalRemainsStrict() {
         StorageExecutionPlan plan = resolver.requireExecutable(
-                StorageProfile.OBJECT_WAL,
-                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
-                true,
-                true);
+                StorageProfile.OBJECT_WAL, DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED, true, true);
 
-        assertThat(plan.profile())
-                .isEqualTo(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
-        assertThatThrownBy(() -> resolver.requireExecutable(
-                        StorageProfile.OBJECT_WAL,
-                        DurabilityLevel.WAL_DURABLE,
-                        true,
-                        true))
-                .isInstanceOfSatisfying(
-                        NereusException.class,
-                        failure -> assertThat(failure.code())
-                                .isEqualTo(
-                                        ErrorCode
-                                                .UNSUPPORTED_DURABILITY_LEVEL));
+        assertThat(plan.profile()).isEqualTo(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+        assertThatThrownBy(() ->
+                        resolver.requireExecutable(StorageProfile.OBJECT_WAL, DurabilityLevel.WAL_DURABLE, true, true))
+                .isInstanceOfSatisfying(NereusException.class, failure -> assertThat(failure.code())
+                        .isEqualTo(ErrorCode.UNSUPPORTED_DURABILITY_LEVEL));
     }
 
     @Test
@@ -87,38 +63,18 @@ class Phase4StorageProfileResolverTest {
             StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
             StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
         }) {
-            assertThatThrownBy(() -> resolver.requireExecutable(
-                            profile,
-                            profile.defaultDurabilityLevel(),
-                            true,
-                            true))
-                    .isInstanceOfSatisfying(
-                            NereusException.class,
-                            failure -> assertThat(failure.code())
-                                    .isEqualTo(
-                                            ErrorCode
-                                                    .UNSUPPORTED_STORAGE_PROFILE));
+            assertThatThrownBy(() -> resolver.requireExecutable(profile, profile.defaultDurabilityLevel(), true, true))
+                    .isInstanceOfSatisfying(NereusException.class, failure -> assertThat(failure.code())
+                            .isEqualTo(ErrorCode.UNSUPPORTED_STORAGE_PROFILE));
         }
 
         assertThatThrownBy(() -> resolver.requireExecutable(
-                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
-                        DurabilityLevel.WAL_DURABLE,
-                        false,
-                        true))
-                .isInstanceOfSatisfying(
-                        NereusException.class,
-                        failure -> assertThat(failure.code())
-                                .isEqualTo(
-                                        ErrorCode.UNSUPPORTED_STORAGE_PROFILE));
+                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT, DurabilityLevel.WAL_DURABLE, false, true))
+                .isInstanceOfSatisfying(NereusException.class, failure -> assertThat(failure.code())
+                        .isEqualTo(ErrorCode.UNSUPPORTED_STORAGE_PROFILE));
         assertThatThrownBy(() -> resolver.requireExecutable(
-                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
-                        DurabilityLevel.WAL_DURABLE,
-                        true,
-                        false))
-                .isInstanceOfSatisfying(
-                        NereusException.class,
-                        failure -> assertThat(failure.code())
-                                .isEqualTo(
-                                        ErrorCode.UNSUPPORTED_STORAGE_PROFILE));
+                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT, DurabilityLevel.WAL_DURABLE, true, false))
+                .isInstanceOfSatisfying(NereusException.class, failure -> assertThat(failure.code())
+                        .isEqualTo(ErrorCode.UNSUPPORTED_STORAGE_PROFILE));
     }
 }

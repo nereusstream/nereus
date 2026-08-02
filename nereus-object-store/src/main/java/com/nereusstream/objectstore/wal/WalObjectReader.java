@@ -14,8 +14,13 @@
 
 package com.nereusstream.objectstore.wal;
 
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.FirstEntryPolicy;
+import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ReadBatch;
+import com.nereusstream.api.ReadBoundaryMode;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ResolvedObjectRange;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -26,14 +31,22 @@ public interface WalObjectReader {
      * actually downloaded and verified.
      */
     CompletableFuture<WalReadResult> readWithStats(
-            long startOffset,
-            List<ResolvedObjectRange> ranges,
-            ReadOptions options);
+            long startOffset, List<ResolvedObjectRange> ranges, ReadOptions options);
+
+    /**
+     * Request-aware read; old implementations fail closed for new boundary or limit semantics.
+     */
+    default CompletableFuture<WalReadResult> readWithStats(ReadRequest request, List<ResolvedObjectRange> ranges) {
+        if (request.boundaryMode() != ReadBoundaryMode.EXACT_START
+                || request.firstEntryPolicy() != FirstEntryPolicy.LEGACY_STRICT_LIMIT) {
+            return NereusException.failedFuture(
+                    ErrorCode.UNSUPPORTED_READ_SEMANTICS, false, "WAL reader does not support ranged-entry semantics");
+        }
+        return readWithStats(request.startOffset(), ranges, request.options());
+    }
 
     default CompletableFuture<List<ReadBatch>> read(
-            long startOffset,
-            List<ResolvedObjectRange> ranges,
-            ReadOptions options) {
+            long startOffset, List<ResolvedObjectRange> ranges, ReadOptions options) {
         return readWithStats(startOffset, ranges, options).thenApply(WalReadResult::batches);
     }
 }

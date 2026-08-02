@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.CursorNames;
@@ -26,8 +27,7 @@ final class F3MetadataCodecSamples {
     static final String SNAPSHOT = "ffeeddccbbaa99887766554433221100";
     static final String TRIM_ATTEMPT = "11112222333344445555666677778888";
 
-    private F3MetadataCodecSamples() {
-    }
+    private F3MetadataCodecSamples() {}
 
     static ManagedLedgerProjectionIdentity projection() {
         return new ManagedLedgerProjectionIdentity(

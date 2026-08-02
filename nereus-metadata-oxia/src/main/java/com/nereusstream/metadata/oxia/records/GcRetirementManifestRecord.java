@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.ObjectKeyHash;
 import java.util.Comparator;
 import java.util.List;
 
-/** Sealed recovery manifest authenticating the sharded facts required after GC enters DELETING. */
+/**
+ * Sealed recovery manifest authenticating the sharded facts required after GC enters DELETING.
+ */
 public record GcRetirementManifestRecord(
         int schemaVersion,
         String objectKeyHash,
@@ -21,8 +24,8 @@ public record GcRetirementManifestRecord(
     public static final int REFERENCE_SET_PROTOCOL_VERSION = 2;
     public static final int MAX_REFERENCE_DOMAINS = 32;
     public static final int MAX_PLAN_ENTRIES = 100_000;
-    private static final Comparator<GcDomainSnapshotProofRecord> DOMAIN_ORDER = Comparator
-            .comparing(GcDomainSnapshotProofRecord::domainId)
+    private static final Comparator<GcDomainSnapshotProofRecord> DOMAIN_ORDER = Comparator.comparing(
+                    GcDomainSnapshotProofRecord::domainId)
             .thenComparingInt(GcDomainSnapshotProofRecord::protocolVersion);
 
     public GcRetirementManifestRecord {
@@ -32,10 +35,8 @@ public record GcRetirementManifestRecord(
         if (referenceSetProtocolVersion != REFERENCE_SET_PROTOCOL_VERSION) {
             throw new IllegalArgumentException("referenceSetProtocolVersion must be 2");
         }
-        queryIdentitySha256 = F4RecordValidation.requireSha256(
-                queryIdentitySha256, "queryIdentitySha256");
-        domainProofs = F4RecordValidation.immutableBoundedList(
-                domainProofs, MAX_REFERENCE_DOMAINS, "domainProofs");
+        queryIdentitySha256 = F4RecordValidation.requireSha256(queryIdentitySha256, "queryIdentitySha256");
+        domainProofs = F4RecordValidation.immutableBoundedList(domainProofs, MAX_REFERENCE_DOMAINS, "domainProofs");
         if (domainProofs.isEmpty()) {
             throw new IllegalArgumentException("domainProofs cannot be empty");
         }
@@ -50,8 +51,7 @@ public record GcRetirementManifestRecord(
         }
         requireEntryCount(protectionCount, "protectionCount");
         requireEntryCount(metadataRemovalCount, "metadataRemovalCount");
-        referenceSetSha256 = F4RecordValidation.requireSha256(
-                referenceSetSha256, "referenceSetSha256");
+        referenceSetSha256 = F4RecordValidation.requireSha256(referenceSetSha256, "referenceSetSha256");
         F4RecordValidation.requireNonNegative(createdAtMillis, "createdAtMillis");
         F4RecordValidation.requireMetadataVersion(metadataVersion);
     }

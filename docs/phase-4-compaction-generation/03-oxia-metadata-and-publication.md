@@ -4,18 +4,18 @@
 
 Phase 4 metadata is split deliberately：
 
-| Domain | Authoritative record | Linearization |
-| --- | --- | --- |
-| generation number allocation | `GenerationSequenceRecord` | counter version-CAS |
-| physical target visibility | one `GenerationIndexRecord` | same-key `PREPARED -> COMMITTED` CAS |
-| stream work discovery | `MaterializationStreamRegistrationRecord` | registration CAS；hint only，never stream truth |
-| task workflow | `MaterializationTaskRecord` | task same-key CAS；never read visibility |
-| materialization progress | `MaterializationCheckpointRecord` | progress CAS；never read visibility |
-| append/recovery prefix | `RecoveryCheckpointRootRecord` + immutable NRC1 bytes | root CAS |
-| logical trim | existing `CursorRetentionRecord` + `StreamHeadRecord` | existing F3 pending protocol/head CAS |
-| object deletion | `PhysicalObjectRootRecord` | lifecycle CAS；object-store delete is a later side effect |
-| read protection | `ObjectReaderLeaseRecord` | lease create/CAS followed by object-root revalidation |
-| durable reference | `ObjectProtectionRecord` | protection create followed by object-root revalidation |
+| Domain                       | Authoritative record                                  | Linearization                                            |
+|------------------------------|-------------------------------------------------------|----------------------------------------------------------|
+| generation number allocation | `GenerationSequenceRecord`                            | counter version-CAS                                      |
+| physical target visibility   | one `GenerationIndexRecord`                           | same-key `PREPARED -> COMMITTED` CAS                     |
+| stream work discovery        | `MaterializationStreamRegistrationRecord`             | registration CAS；hint only，never stream truth            |
+| task workflow                | `MaterializationTaskRecord`                           | task same-key CAS；never read visibility                  |
+| materialization progress     | `MaterializationCheckpointRecord`                     | progress CAS；never read visibility                       |
+| append/recovery prefix       | `RecoveryCheckpointRootRecord` + immutable NRC1 bytes | root CAS                                                 |
+| logical trim                 | existing `CursorRetentionRecord` + `StreamHeadRecord` | existing F3 pending protocol/head CAS                    |
+| object deletion              | `PhysicalObjectRootRecord`                            | lifecycle CAS；object-store delete is a later side effect |
+| read protection              | `ObjectReaderLeaseRecord`                             | lease create/CAS followed by object-root revalidation    |
+| durable reference            | `ObjectProtectionRecord`                              | protection create followed by object-root revalidation   |
 
 No task、checkpoint、watch、cache or object listing can substitute for an authoritative record named for another
 domain. The stream registration owns enumeration only；it never proves work、visibility or deletion eligibility.
@@ -59,7 +59,8 @@ two retries) before same-view fallback and never changes health metadata.
 `nereus-materialization` now also contains strict policy/source/task/output values、canonical source/policy/task
 identity、secure publication-id generation、durable task/output/index mapping、exact HEAD plus task-aware full-format
 verification and a shared monotonic operation deadline. The M3 bridge now streams whole-file CRC/SHA verification
-and checks the Parquet policy digest against the exact publishing task. `DefaultGenerationCommitter` implements the restart-safe
+and checks the Parquet policy digest against the exact publishing task. `DefaultGenerationCommitter` implements the
+restart-safe
 publication state machine: it freezes publication id, attaches one allocated view-scoped generation to the durable
 task, creates the deterministic `PREPARED` index, revalidates exact task/output/head/source/root/activation/protection
 facts, and exposes the result only through the exact index `PREPARED -> COMMITTED` version-CAS. It then transfers
@@ -169,7 +170,8 @@ write. A concurrent identical restore is idempotent；a different value at the s
 
 `GenerationReadResolver` now accepts a `GenerationIndexRepairer`. Its compatibility constructor installs
 `MetadataGenerationIndexRepairer` for live commits；checkpoint AF's production runtime explicitly injects the
-checkpoint-aware implementation. After either repair source reports terminal success, resolver performs a new authoritative index
+checkpoint-aware implementation. After either repair source reports terminal success, resolver performs a new
+authoritative index
 scan and the existing physical read-pin revalidation. Repair evidence never becomes a parallel visibility domain.
 
 ### 1.8 F4-M4 exact retirement metadata checkpoint
@@ -177,7 +179,8 @@ scan and the existing physical read-pin revalidation. Repair evidence never beco
 Checkpoint G implements the focused `retirement` package and keeps it intentionally narrower than the ordinary
 metadata stores. `SharedOxiaClientRuntime.retirementMetadataClient` lends only exact `get` and
 `deleteIfVersion`, and accepts only a package-constructible opaque `RetirementMetadataKey`；the adapter cannot
-create、CAS-update、scan or list metadata, while unrelated runtime callers cannot forge arbitrary delete keys. The source adapter supports both
+create、CAS-update、scan or list metadata, while unrelated runtime callers cannot forge arbitrary delete keys. The source
+adapter supports both
 legacy and generic generation-zero index/marker/commit encodings, verifies the canonical key against strictly decoded
 record identity, requires encoded `metadataVersion == 0`, then compares the captured Oxia version and SHA-256 of the
 exact stored envelope before conditional delete.
@@ -382,7 +385,8 @@ watch. `CompletedTrimRetirementVerifier` reads `OxiaMetadataStore.getStreamSnaps
 when the source's whole `[offsetStart, offsetEnd)` is below `TrimRecord.trimOffset`. It freezes the full versioned
 authority exposed by `StreamMetadataSnapshot` rather than only the scalar trim offset, together with the exact source
 wrapper and optional `VersionedRecoveryCheckpointRoot`; all persisted facts and the shared head version are reread
-before the proof returns. Hydrated trim reason/read time are response-local and are deliberately excluded. Canonical source keys
+before the proof returns. Hydrated trim reason/read time are response-local and are deliberately excluded. Canonical
+source keys
 are reconstructed for generation zero and for either higher-generation view. A changed source、snapshot or root is a
 retryable condition failure, while contradictory stream identities are invariant failures.
 
@@ -773,10 +777,13 @@ record codecs and invariant validators. Fake behavior may inject conflicts/failu
 CAS or pagination semantics.
 
 Every delete above is expected-version conditional and is reachable only from the retirement proofs in documents 04/
+
 05. Missing-key success is accepted only after re-reading the exact identity for the same cleanup attempt；no public
-unconditional task/index/checkpoint/stats/sequence/root deletion is exposed.
-Retirement/audit code uses only the optional `get*` methods；calling a `getOrCreate*` method from a deletion path is a
-source-audit failure because it could resurrect empty sequence/checkpoint/root metadata while proving a prefix empty.
+    unconditional task/index/checkpoint/stats/sequence/root deletion is exposed.
+    Retirement/audit code uses only the optional `get*` methods；calling a `getOrCreate*` method from a deletion path is
+    a
+    source-audit failure because it could resurrect empty sequence/checkpoint/root metadata while proving a prefix
+    empty.
 
 The low-level client gains：
 
@@ -859,7 +866,8 @@ public interface SourceRetirementMetadataStore extends AutoCloseable {
 ```
 
 Each delete rebuilds the key through `OxiaKeyspace`, re-reads/strictly decodes the existing L0 record, compares its
-exact stored-envelope SHA-256 and then calls `deleteIfVersion` in the stream partition. Missing is idempotent only when the
+exact stored-envelope SHA-256 and then calls `deleteIfVersion` in the stream partition. Missing is idempotent only when
+the
 same retirement plan already recorded that exact key/identity. The caller must hold/revalidate the recovery-root、
 generation、activation and physical-root proof from document 05 before every batch；this adapter never infers safety
 from age or a higher generation alone.
@@ -1153,7 +1161,8 @@ public record RangeRetentionStatsRecord(
 This record is derived for one logical append/commit-version boundary；`commitVersion` is unique in a stream and the
 key's offset end must equal that commit's end. `sourceIndexKey` may name generation zero or any healthy lossless
 generation that completely covers the record range. Candidate planning revalidates its key/identity/version；if
-stale/missing, it reads and verifies source bytes or conservatively stops. Event time is never substituted for publish time. A corrupt stats
+stale/missing, it reads and verifies source bytes or conservatively stops. Event time is never substituted for publish
+time. A corrupt stats
 record can delay trim but cannot authorize an unsafe trim.
 
 `createRangeRetentionStats` is create-or-compare for byte-identical facts. Replacement at the same
@@ -1217,7 +1226,8 @@ checksums and object-key `(checkpointSequence, contentSha256, checkpointAttemptI
 and within document 02 limits；attempt ids are random 128-bit lowercase base32 and have no sequence meaning. Nested
 references have no independent `metadataVersion` or lifecycle；the enclosing root version owns their visibility.
 
-Root coverage is a prefix whose start is the current logical trim checkpoint (genesis is logical trim offset zero). Any covered
+Root coverage is a prefix whose start is the current logical trim checkpoint (genesis is logical trim offset zero). Any
+covered
 commit must reference a committed lossless generation in NRC1. The root CAS is the point at which anchor-aware append
 replay/index repair may stop consulting the replaced live commit nodes. It does not itself delete any key/object.
 
@@ -1354,22 +1364,22 @@ embedded policy snapshot.
 
 F4 records use existing `MetadataRecordEnvelope(NRM1, binary-v1)` and a new `F4MetadataCodecs` registry：
 
-| Record type string | Codec | schema/min reader |
-| --- | --- | --- |
-| `GenerationSequenceRecord` | `GenerationSequenceRecordCodecV1` | `1 / 1` |
-| `GenerationIndexRecord` | `GenerationIndexRecordCodecV1` | `1 / 1` |
-| `MaterializationStreamRegistrationRecord` | `MaterializationStreamRegistrationRecordCodecV1` | `1 / 1` |
-| `MaterializationTaskRecord` | `MaterializationTaskRecordCodecV2` dual reader (`V1` + `V2`) | `1 / 1` or `2 / 2` |
-| `MaterializationCheckpointRecord` | `MaterializationCheckpointRecordCodecV1` | `1 / 1` |
-| `RangeRetentionStatsRecord` | `RangeRetentionStatsRecordCodecV1` | `1 / 1` |
-| `RecoveryCheckpointRootRecord` | `RecoveryCheckpointRootRecordCodecV1` | `1 / 1` |
-| `PhysicalObjectRootRecord` | `PhysicalObjectRootRecordCodecV1` | `1 / 1` |
-| `ObjectReaderLeaseRecord` | `ObjectReaderLeaseRecordCodecV1` | `1 / 1` |
-| `ObjectProtectionRecord` | `ObjectProtectionRecordCodecV1` | `1 / 1` |
-| `GcRetirementManifestRecord` | `GcRetirementManifestRecordCodecV1` | `1 / 1` |
-| `GcRetirementProtectionRecord` | `GcRetirementProtectionRecordCodecV1` | `1 / 1` |
-| `GcRetirementRemovalRecord` | `GcRetirementRemovalRecordCodecV1` | `1 / 1` |
-| `GenerationProtocolActivationRecord` | `GenerationProtocolActivationRecordCodecV1` | `1 / 1` |
+| Record type string                        | Codec                                                        | schema/min reader  |
+|-------------------------------------------|--------------------------------------------------------------|--------------------|
+| `GenerationSequenceRecord`                | `GenerationSequenceRecordCodecV1`                            | `1 / 1`            |
+| `GenerationIndexRecord`                   | `GenerationIndexRecordCodecV1`                               | `1 / 1`            |
+| `MaterializationStreamRegistrationRecord` | `MaterializationStreamRegistrationRecordCodecV1`             | `1 / 1`            |
+| `MaterializationTaskRecord`               | `MaterializationTaskRecordCodecV2` dual reader (`V1` + `V2`) | `1 / 1` or `2 / 2` |
+| `MaterializationCheckpointRecord`         | `MaterializationCheckpointRecordCodecV1`                     | `1 / 1`            |
+| `RangeRetentionStatsRecord`               | `RangeRetentionStatsRecordCodecV1`                           | `1 / 1`            |
+| `RecoveryCheckpointRootRecord`            | `RecoveryCheckpointRootRecordCodecV1`                        | `1 / 1`            |
+| `PhysicalObjectRootRecord`                | `PhysicalObjectRootRecordCodecV1`                            | `1 / 1`            |
+| `ObjectReaderLeaseRecord`                 | `ObjectReaderLeaseRecordCodecV1`                             | `1 / 1`            |
+| `ObjectProtectionRecord`                  | `ObjectProtectionRecordCodecV1`                              | `1 / 1`            |
+| `GcRetirementManifestRecord`              | `GcRetirementManifestRecordCodecV1`                          | `1 / 1`            |
+| `GcRetirementProtectionRecord`            | `GcRetirementProtectionRecordCodecV1`                        | `1 / 1`            |
+| `GcRetirementRemovalRecord`               | `GcRetirementRemovalRecordCodecV1`                           | `1 / 1`            |
+| `GenerationProtocolActivationRecord`      | `GenerationProtocolActivationRecordCodecV1`                  | `1 / 1`            |
 
 `F4Binary` follows `F3Binary`：big-endian numeric fields、strict UTF-8、length/count before bytes、canonical map/list
 order、no trailing bytes and a 64 KiB payload limit. Booleans/optionals are one byte exactly `0/1`. Enum values are
@@ -1579,15 +1589,15 @@ ack、index-repair lag nor commit-key retirement creates an unprotected interval
 
 Crash cuts：
 
-| Cut | Head-visible? | Required recovery |
-| --- | --- | --- |
-| upload/manifest before intent | no | missing-root inventory or retry registers root；orphan grace applies |
-| intent before root/protection | no | same deterministic prepare retries；no acknowledgement |
-| protection before head CAS | no | retry CAS or abandoned-intent proof removes only after grace |
-| head CAS before response | maybe | replay search proves exact commit；protection already vetoes GC |
-| head committed before generation-zero index | yes | async ack is legal；registry/read repair materializes index |
-| index written before visible protection | yes | reachable protection still vetoes GC；repair adds index protection |
-| visible protection before strict response | yes | reload exact head/index/protection and return same append result |
+| Cut                                         | Head-visible? | Required recovery                                                   |
+|---------------------------------------------|---------------|---------------------------------------------------------------------|
+| upload/manifest before intent               | no            | missing-root inventory or retry registers root；orphan grace applies |
+| intent before root/protection               | no            | same deterministic prepare retries；no acknowledgement               |
+| protection before head CAS                  | no            | retry CAS or abandoned-intent proof removes only after grace        |
+| head CAS before response                    | maybe         | replay search proves exact commit；protection already vetoes GC      |
+| head committed before generation-zero index | yes           | async ack is legal；registry/read repair materializes index          |
+| index written before visible protection     | yes           | reachable protection still vetoes GC；repair adds index protection   |
+| visible protection before strict response   | yes           | reload exact head/index/protection and return same append result    |
 
 ## 11. Higher-generation Publication Protocol
 
@@ -1655,15 +1665,15 @@ the first publication may already be committed without proving the first outcome
 
 ### 11.3 Crash cuts
 
-| Cut | Visible? | Recovery |
-| --- | --- | --- |
-| output upload before task output CAS | no | deterministic task scanner attaches exact object or orphan GC later |
-| generation allocation before PREPARED | no | gap is valid；task reuses recorded G/publication or allocates only after proving absent |
-| visible protection before PREPARED | no | recovery removes protection after task/index proof |
-| PREPARED before COMMITTED | no | verify and complete or CAS ABORTED |
-| COMMITTED before protection owner transfer | yes | task-owned protection remains a veto；rebind to exact index |
-| COMMITTED/protection rebound before task PUBLISHED | yes | task/checkpoint repair from authoritative index |
-| task PUBLISHED before checkpoint | yes | checkpoint repair |
+| Cut                                                | Visible? | Recovery                                                                               |
+|----------------------------------------------------|----------|----------------------------------------------------------------------------------------|
+| output upload before task output CAS               | no       | deterministic task scanner attaches exact object or orphan GC later                    |
+| generation allocation before PREPARED              | no       | gap is valid；task reuses recorded G/publication or allocates only after proving absent |
+| visible protection before PREPARED                 | no       | recovery removes protection after task/index proof                                     |
+| PREPARED before COMMITTED                          | no       | verify and complete or CAS ABORTED                                                     |
+| COMMITTED before protection owner transfer         | yes      | task-owned protection remains a veto；rebind to exact index                             |
+| COMMITTED/protection rebound before task PUBLISHED | yes      | task/checkpoint repair from authoritative index                                        |
+| task PUBLISHED before checkpoint                   | yes      | checkpoint repair                                                                      |
 
 ## 12. Committed Resolver Algorithm
 

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.retirement;
 
 import com.nereusstream.api.Checksum;
@@ -17,7 +18,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Shared exact-byte validation for the two destructive, read-before-delete adapters. */
+/**
+ * Shared exact-byte validation for the two destructive, read-before-delete adapters.
+ */
 final class RetirementMetadataSupport {
     private final RetirementMetadataClient client;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -26,30 +29,25 @@ final class RetirementMetadataSupport {
         this.client = Objects.requireNonNull(client, "client");
     }
 
-    CompletableFuture<Optional<RetirementMetadataValue>> get(
-            String key, PartitionKey partitionKey) {
+    CompletableFuture<Optional<RetirementMetadataValue>> get(String key, PartitionKey partitionKey) {
         ensureOpen();
         RetirementMetadataKey exactKey = new RetirementMetadataKey(key, partitionKey);
-        return client.get(exactKey).thenApply(optional -> optional.map(value -> {
-            if (!value.key().equals(key)) {
-                throw invariant("retirement metadata read returned a different key");
-            }
-            return value;
-        }));
+        return client.get(exactKey)
+                .thenApply(optional -> optional.map(value -> {
+                    if (!value.key().equals(key)) {
+                        throw invariant("retirement metadata read returned a different key");
+                    }
+                    return value;
+                }));
     }
 
-    CompletableFuture<Void> delete(
-            String key, long expectedVersion, PartitionKey partitionKey) {
+    CompletableFuture<Void> delete(String key, long expectedVersion, PartitionKey partitionKey) {
         ensureOpen();
         requireVersion(expectedVersion);
-        return client.deleteIfVersion(
-                new RetirementMetadataKey(key, partitionKey), expectedVersion);
+        return client.deleteIfVersion(new RetirementMetadataKey(key, partitionKey), expectedVersion);
     }
 
-    void requireExpected(
-            RetirementMetadataValue value,
-            long expectedVersion,
-            Checksum expectedDurableValueSha256) {
+    void requireExpected(RetirementMetadataValue value, long expectedVersion, Checksum expectedDurableValueSha256) {
         requireVersion(expectedVersion);
         Checksum expected = requireSha256(expectedDurableValueSha256, "expectedDurableValueSha256");
         if (value.version() != expectedVersion) {
@@ -57,8 +55,7 @@ final class RetirementMetadataSupport {
                     "retirement metadata version changed before conditional delete");
         }
         if (!sha256(value.value()).equals(expected)) {
-            throw new F4MetadataConditionFailedException(
-                    "retirement metadata bytes changed before conditional delete");
+            throw new F4MetadataConditionFailedException("retirement metadata bytes changed before conditional delete");
         }
     }
 
@@ -110,7 +107,8 @@ final class RetirementMetadataSupport {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }

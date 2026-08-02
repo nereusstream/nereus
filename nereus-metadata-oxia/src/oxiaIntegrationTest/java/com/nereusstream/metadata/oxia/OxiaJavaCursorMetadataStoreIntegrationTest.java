@@ -15,7 +15,6 @@
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.testing.CursorMetadataStoreContractScenario;
 import io.oxia.testcontainers.OxiaContainer;
@@ -35,8 +34,7 @@ class OxiaJavaCursorMetadataStoreIntegrationTest {
     private static final String IMAGE = "oxia/oxia:0.16.3";
 
     @Container
-    private static final OxiaContainer OXIA =
-            new OxiaContainer(DockerImageName.parse(IMAGE)).withShards(4);
+    private static final OxiaContainer OXIA = new OxiaContainer(DockerImageName.parse(IMAGE)).withShards(4);
 
     @Test
     void fakeAndRealRunTheSameContractAndRealBytesSurviveRuntimeRestart() {
@@ -51,38 +49,54 @@ class OxiaJavaCursorMetadataStoreIntegrationTest {
         var projection = CursorMetadataStoreContractScenario.projection(managedLedgerName);
         StreamId streamId = new StreamId(projection.streamId());
         OxiaClientConfiguration configuration = configuration();
-        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(
-                        configuration, Clock.systemUTC());
+        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, Clock.systemUTC());
                 OxiaJavaCursorMetadataStore store = OxiaJavaCursorMetadataStore.usingSharedRuntime(
                         configuration, runtime, CursorMetadataStoreConfig.defaults())) {
             real = CursorMetadataStoreContractScenario.run(store, cluster, managedLedgerName);
             CursorKeyspace keyspace = new CursorKeyspace(cluster);
-            assertThat(runtime.client().list(
-                    keyspace.cursorStateScanFrom(streamId),
-                    keyspace.cursorStateScanToExclusive(streamId),
-                    keyspace.streamPartitionKey(streamId)).join())
+            assertThat(runtime.client()
+                            .list(
+                                    keyspace.cursorStateScanFrom(streamId),
+                                    keyspace.cursorStateScanToExclusive(streamId),
+                                    keyspace.streamPartitionKey(streamId))
+                            .join())
                     .as("real Oxia cursor key range")
                     .hasSize(2);
-            assertThat(runtime.client().rangeScan(
-                    keyspace.cursorStateScanFrom(streamId),
-                    keyspace.cursorStateScanToExclusive(streamId),
-                    256,
-                    keyspace.streamPartitionKey(streamId)).join())
+            assertThat(runtime.client()
+                            .rangeScan(
+                                    keyspace.cursorStateScanFrom(streamId),
+                                    keyspace.cursorStateScanToExclusive(streamId),
+                                    256,
+                                    keyspace.streamPartitionKey(streamId))
+                            .join())
                     .as("real Oxia cursor value range")
                     .hasSize(2);
         }
         assertThat(real).isEqualTo(fake);
 
-        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(
-                        configuration, Clock.systemUTC());
+        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, Clock.systemUTC());
                 OxiaJavaCursorMetadataStore restarted = OxiaJavaCursorMetadataStore.usingSharedRuntime(
                         configuration, runtime, CursorMetadataStoreConfig.defaults())) {
-            assertThat(restarted.getCursor(cluster, streamId, "sub-a").join().orElseThrow().value())
+            assertThat(restarted
+                            .getCursor(cluster, streamId, "sub-a")
+                            .join()
+                            .orElseThrow()
+                            .value())
                     .isEqualTo(real.updatedCursor());
-            assertThat(restarted.getRetention(cluster, streamId).join().orElseThrow().value())
+            assertThat(restarted
+                            .getRetention(cluster, streamId)
+                            .join()
+                            .orElseThrow()
+                            .value())
                     .isEqualTo(real.updatedRetention());
-            assertThat(restarted.scanCursors(cluster, streamId, java.util.Optional.empty(), 256)
-                    .join().records().stream().map(VersionedCursorState::value).toList())
+            assertThat(
+                            restarted
+                                    .scanCursors(cluster, streamId, java.util.Optional.empty(), 256)
+                                    .join()
+                                    .records()
+                                    .stream()
+                                    .map(VersionedCursorState::value)
+                                    .toList())
                     .containsExactlyElementsOf(real.scannedCursors());
         }
     }
@@ -94,36 +108,30 @@ class OxiaJavaCursorMetadataStoreIntegrationTest {
         var projection = CursorMetadataStoreContractScenario.projection(managedLedgerName);
         StreamId streamId = new StreamId(projection.streamId());
         OxiaClientConfiguration configuration = configuration();
-        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(
-                        configuration, Clock.systemUTC());
+        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, Clock.systemUTC());
                 OxiaJavaCursorMetadataStore store = OxiaJavaCursorMetadataStore.usingSharedRuntime(
                         configuration, runtime, CursorMetadataStoreConfig.defaults())) {
             CountDownLatch invalidated = new CountDownLatch(1);
-            try (WatchRegistration ignored = store.watchStreamCursors(
-                    cluster, streamId, invalidated::countDown)) {
+            try (WatchRegistration ignored = store.watchStreamCursors(cluster, streamId, invalidated::countDown)) {
                 var candidate = CursorMetadataStoreContractScenario.cursor(projection, "contended", 1);
                 var attempts = java.util.stream.IntStream.range(0, 32)
                         .mapToObj(index -> store.createCursor(cluster, candidate))
                         .toList();
                 CompletableFuture.allOf(attempts.stream()
-                        .map(future -> future.handle((value, error) -> null))
-                        .toArray(CompletableFuture[]::new))
+                                .map(future -> future.handle((value, error) -> null))
+                                .toArray(CompletableFuture[]::new))
                         .join();
                 assertThat(attempts.stream().filter(future -> !future.isCompletedExceptionally()))
                         .hasSize(1);
                 assertThat(invalidated.await(10, TimeUnit.SECONDS)).isTrue();
-                assertThat(store.getCursor(cluster, streamId, "contended").join()).isPresent();
+                assertThat(store.getCursor(cluster, streamId, "contended").join())
+                        .isPresent();
             }
         }
     }
 
     private static OxiaClientConfiguration configuration() {
         return new OxiaClientConfiguration(
-                OXIA.getServiceAddress(),
-                "default",
-                Duration.ofSeconds(10),
-                Duration.ofSeconds(30),
-                100,
-                1_024);
+                OXIA.getServiceAddress(), "default", Duration.ofSeconds(10), Duration.ofSeconds(30), 100, 1_024);
     }
 }

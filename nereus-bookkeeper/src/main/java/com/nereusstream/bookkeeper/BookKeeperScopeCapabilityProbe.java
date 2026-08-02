@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -31,8 +32,6 @@ import java.util.function.Function;
 import java.util.random.RandomGenerator;
 import org.apache.bookkeeper.client.api.LedgerEntries;
 import org.apache.bookkeeper.client.api.LedgerEntry;
-import org.apache.bookkeeper.client.api.LedgerMetadata;
-import org.apache.bookkeeper.client.api.ReadHandle;
 import org.apache.bookkeeper.client.api.WriteAdvHandle;
 
 /**
@@ -41,7 +40,7 @@ import org.apache.bookkeeper.client.api.WriteAdvHandle;
  * <p>The permanent audit root is created before CreateAdv, so an ordinary allocator can never race the canary for the
  * same advanced ledger id. Only an exact NBKL1 match may be fenced or deleted after an uncertain provider response.
  */
-public final class BookKeeperScopeCapabilityProbe {
+public final class BookKeeperScopeCapabilityProbe implements BookKeeperScopeCapabilityProofProvider {
     private static final int MAX_CANDIDATE_ATTEMPTS = 16;
     private static final int MAX_DELETE_ATTEMPTS = 3;
     private static final String DOMAIN = "NBKSCOPE1";
@@ -107,8 +106,8 @@ public final class BookKeeperScopeCapabilityProbe {
         requireNamespace(expectedNamespace);
     }
 
-    public CompletableFuture<BookKeeperScopeCapabilityProof> probe(
-            BookKeeperScopeCapabilityRequest request) {
+    @Override
+    public CompletableFuture<BookKeeperScopeCapabilityProof> probe(BookKeeperScopeCapabilityRequest request) {
         final BookKeeperScopeCapabilityRequest exact;
         final BookKeeperOperationDeadline deadline;
         try {
@@ -117,7 +116,8 @@ public final class BookKeeperScopeCapabilityProbe {
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return namespaceVerifier.requireActive(configuration, deadline.remaining())
+        return namespaceVerifier
+                .requireActive(configuration, deadline.remaining())
                 .thenApply(this::requireNamespace)
                 .thenCompose(namespace -> candidate(exact, namespace, deadline, 0))
                 .thenCompose(proof -> namespaceVerifier
@@ -138,12 +138,11 @@ public final class BookKeeperScopeCapabilityProbe {
                     "BookKeeper scope canary exhausted its bounded advanced-ledger-id attempts"));
         }
         long ledgerId = configuration.ledgerIdNamespace().candidate(random);
-        String allocationId = "scope-canary-" + BookKeeperIdentityDigests.sha256(
-                request.runId() + ":" + attempt + ":" + ledgerId);
+        String allocationId =
+                "scope-canary-" + BookKeeperIdentityDigests.sha256(request.runId() + ":" + attempt + ":" + ledgerId);
         BookKeeperLedgerCustomMetadata custom = BookKeeperLedgerCustomMetadata.create(
                 cluster, configuration, namespace, CANARY_STREAM, attempt, allocationId);
-        BookKeeperLedgerRootRecord root = quarantineRoot(
-                request, namespace, ledgerId, attempt, allocationId, custom);
+        BookKeeperLedgerRootRecord root = quarantineRoot(request, namespace, ledgerId, attempt, allocationId, custom);
         return deadline.bound(metadata.createRoot(cluster, root))
                 .handle((reserved, failure) -> {
                     if (failure == null) {
@@ -167,19 +166,14 @@ public final class BookKeeperScopeCapabilityProbe {
             int attempt) {
         final byte[] password;
         try {
-            password = Objects.requireNonNull(
-                    passwords.resolve(configuration.passwordRef()), "resolved password");
+            password = Objects.requireNonNull(passwords.resolve(configuration.passwordRef()), "resolved password");
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
         CompletableFuture<WriteAdvHandle> create;
         try {
             create = client.createAdvanced(
-                    root.value().ledgerId(),
-                    configuration,
-                    password,
-                    custom.values(),
-                    providerDeadline(deadline));
+                    root.value().ledgerId(), configuration, password, custom.values(), providerDeadline(deadline));
         } catch (Throwable failure) {
             create = CompletableFuture.failedFuture(failure);
         }
@@ -187,14 +181,7 @@ public final class BookKeeperScopeCapabilityProbe {
                     if (failure == null) {
                         return runCanary(request, root, custom, handle, deadline);
                     }
-                    return recoverCreateFailure(
-                            request,
-                            root,
-                            custom,
-                            namespace,
-                            deadline,
-                            attempt,
-                            unwrap(failure));
+                    return recoverCreateFailure(request, root, custom, namespace, deadline, attempt, unwrap(failure));
                 })
                 .thenCompose(Function.identity())
                 .whenComplete((ignored, failure) -> Arrays.fill(password, (byte) 0));
@@ -212,21 +199,19 @@ public final class BookKeeperScopeCapabilityProbe {
         return client.metadata(ledgerId, providerDeadline(deadline))
                 .handle((providerMetadata, metadataFailure) -> {
                     if (metadataFailure != null) {
-                        return CompletableFuture.<BookKeeperScopeCapabilityProof>failedFuture(
-                                new NereusException(
-                                        ErrorCode.PRIMARY_WAL_WRITE_FAILED,
-                                        false,
-                                        "BookKeeper scope canary create outcome remains unknown; its durable root is quarantined",
-                                        createFailure));
+                        return CompletableFuture.<BookKeeperScopeCapabilityProof>failedFuture(new NereusException(
+                                ErrorCode.PRIMARY_WAL_WRITE_FAILED,
+                                false,
+                                "BookKeeper scope canary create outcome remains unknown; its durable root is "
+                                        + "quarantined",
+                                createFailure));
                     }
                     try {
-                        custom.requireExactImmutableLedgerMetadata(
-                                ledgerId, configuration, providerMetadata);
+                        custom.requireExactImmutableLedgerMetadata(ledgerId, configuration, providerMetadata);
                     } catch (Throwable foreign) {
                         return candidate(request, namespace, deadline, attempt + 1);
                     }
-                    return fenceDeleteAndRetry(
-                            request, root, namespace, deadline, attempt, createFailure);
+                    return fenceDeleteAndRetry(request, root, namespace, deadline, attempt, createFailure);
                 })
                 .thenCompose(Function.identity());
     }
@@ -240,21 +225,16 @@ public final class BookKeeperScopeCapabilityProbe {
             Throwable createFailure) {
         byte[] password = password();
         return client.open(
-                        root.value().ledgerId(),
-                        configuration.digestType(),
-                        password,
-                        true,
-                        providerDeadline(deadline))
+                        root.value().ledgerId(), configuration.digestType(), password, true, providerDeadline(deadline))
                 .whenComplete((ignored, failure) -> Arrays.fill(password, (byte) 0))
                 .thenCompose(handle -> close(handle, deadline))
                 .thenCompose(ignored -> deleteAndConfirm(root.value().ledgerId(), deadline, 0))
                 .thenCompose(ignored -> candidate(request, namespace, deadline, attempt + 1))
-                .exceptionallyCompose(cleanupFailure -> CompletableFuture.failedFuture(
-                        new NereusException(
-                                ErrorCode.PRIMARY_WAL_WRITE_FAILED,
-                                false,
-                                "BookKeeper scope canary could not clean an exact uncertain create",
-                                combine(createFailure, unwrap(cleanupFailure)))));
+                .exceptionallyCompose(cleanupFailure -> CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.PRIMARY_WAL_WRITE_FAILED,
+                        false,
+                        "BookKeeper scope canary could not clean an exact uncertain create",
+                        combine(createFailure, unwrap(cleanupFailure)))));
     }
 
     private CompletableFuture<BookKeeperScopeCapabilityProof> runCanary(
@@ -268,12 +248,11 @@ public final class BookKeeperScopeCapabilityProbe {
             requireHandle(root, custom, handle);
             payload = payload();
         } catch (Throwable failure) {
-            return close(handle, deadline)
-                    .thenCompose(ignored -> CompletableFuture.failedFuture(failure));
+            return close(handle, deadline).thenCompose(ignored -> CompletableFuture.failedFuture(failure));
         }
         ByteBuf entry = Unpooled.wrappedBuffer(payload);
-        CompletableFuture<BookKeeperScopeCapabilityProof> canary = client
-                .write(handle, 0, entry, providerDeadline(deadline))
+        CompletableFuture<BookKeeperScopeCapabilityProof> canary = client.write(
+                        handle, 0, entry, providerDeadline(deadline))
                 .thenApply(written -> {
                     if (written != 0) {
                         throw invariant("BookKeeper scope canary wrote another entry id");
@@ -320,18 +299,14 @@ public final class BookKeeperScopeCapabilityProbe {
                 .thenCompose(handle -> {
                     try {
                         custom.requireExactImmutableLedgerMetadata(
-                                root.value().ledgerId(),
-                                configuration,
-                                handle.getLedgerMetadata());
+                                root.value().ledgerId(), configuration, handle.getLedgerMetadata());
                         if (recovery && !handle.getLedgerMetadata().isClosed()) {
                             throw invariant("BookKeeper scope canary recovery open did not fence/close the ledger");
                         }
                     } catch (Throwable failure) {
-                        return close(handle, deadline)
-                                .thenCompose(ignored -> CompletableFuture.failedFuture(failure));
+                        return close(handle, deadline).thenCompose(ignored -> CompletableFuture.failedFuture(failure));
                     }
-                    return client.readUnconfirmed(
-                                    handle, 0, 0, providerDeadline(deadline))
+                    return client.readUnconfirmed(handle, 0, 0, providerDeadline(deadline))
                             .thenAccept(entries -> requirePayload(entries, expected))
                             .handle((ignored, readFailure) -> close(handle, deadline)
                                     .handle((closed, closeFailure) -> {
@@ -351,8 +326,7 @@ public final class BookKeeperScopeCapabilityProbe {
                 });
     }
 
-    private CompletableFuture<Void> deleteAndConfirm(
-            long ledgerId, BookKeeperOperationDeadline deadline, int attempt) {
+    private CompletableFuture<Void> deleteAndConfirm(long ledgerId, BookKeeperOperationDeadline deadline, int attempt) {
         if (attempt >= MAX_DELETE_ATTEMPTS) {
             return CompletableFuture.failedFuture(new NereusException(
                     ErrorCode.PRIMARY_WAL_WRITE_FAILED,
@@ -370,46 +344,38 @@ public final class BookKeeperScopeCapabilityProbe {
                 .thenCompose(absent -> absent
                         ? absent(ledgerId, deadline).thenCompose(second -> {
                             if (!second) {
-                                return CompletableFuture.failedFuture(invariant(
-                                        "BookKeeper scope canary reappeared after deletion"));
+                                return CompletableFuture.failedFuture(
+                                        invariant("BookKeeper scope canary reappeared after deletion"));
                             }
                             return CompletableFuture.completedFuture(null);
                         })
                         : deleteAndConfirm(ledgerId, deadline, attempt + 1));
     }
 
-    private CompletableFuture<Boolean> absent(
-            long ledgerId, BookKeeperOperationDeadline deadline) {
-        return client.metadata(ledgerId, providerDeadline(deadline))
-                .handle((value, failure) -> {
-                    if (failure == null) {
-                        return false;
-                    }
-                    Throwable cause = unwrap(failure);
-                    if (cause instanceof NereusException nereus
-                            && nereus.code() == ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND) {
-                        return true;
-                    }
-                    throw new CompletionException(cause);
-                });
+    private CompletableFuture<Boolean> absent(long ledgerId, BookKeeperOperationDeadline deadline) {
+        return client.metadata(ledgerId, providerDeadline(deadline)).handle((value, failure) -> {
+            if (failure == null) {
+                return false;
+            }
+            Throwable cause = unwrap(failure);
+            if (cause instanceof NereusException nereus && nereus.code() == ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND) {
+                return true;
+            }
+            throw new CompletionException(cause);
+        });
     }
 
     private CompletableFuture<Void> cleanupExact(
-            long ledgerId,
-            WriteAdvHandle handle,
-            BookKeeperOperationDeadline deadline) {
-        return closeBestEffort(handle, deadline)
-                .thenCompose(ignored -> deleteAndConfirm(ledgerId, deadline, 0));
+            long ledgerId, WriteAdvHandle handle, BookKeeperOperationDeadline deadline) {
+        return closeBestEffort(handle, deadline).thenCompose(ignored -> deleteAndConfirm(ledgerId, deadline, 0));
     }
 
-    private CompletableFuture<Void> closeBestEffort(
-            WriteAdvHandle handle, BookKeeperOperationDeadline deadline) {
+    private CompletableFuture<Void> closeBestEffort(WriteAdvHandle handle, BookKeeperOperationDeadline deadline) {
         return close(handle, deadline).handle((ignored, failure) -> null);
     }
 
     private CompletableFuture<Void> close(
-            org.apache.bookkeeper.client.api.Handle handle,
-            BookKeeperOperationDeadline deadline) {
+            org.apache.bookkeeper.client.api.Handle handle, BookKeeperOperationDeadline deadline) {
         try {
             return deadline.bound(handle.closeAsync());
         } catch (Throwable failure) {
@@ -424,8 +390,7 @@ public final class BookKeeperScopeCapabilityProbe {
         if (handle.getId() != root.value().ledgerId()) {
             throw invariant("BookKeeper scope canary CreateAdv returned another ledger id");
         }
-        custom.requireExactImmutableLedgerMetadata(
-                root.value().ledgerId(), configuration, handle.getLedgerMetadata());
+        custom.requireExactImmutableLedgerMetadata(root.value().ledgerId(), configuration, handle.getLedgerMetadata());
     }
 
     private static void requirePayload(LedgerEntries entries, byte[] expected) {
@@ -454,8 +419,7 @@ public final class BookKeeperScopeCapabilityProbe {
             String allocationId,
             BookKeeperLedgerCustomMetadata custom) {
         long now = Math.max(0, clock.millis());
-        String ledgerIdentity = keys.ledgerIdentitySha256(
-                configuration.providerScopeSha256(), ledgerId);
+        String ledgerIdentity = keys.ledgerIdentitySha256(configuration.providerScopeSha256(), ledgerId);
         String runHash = BookKeeperIdentityDigests.sha256(request.runId());
         return new BookKeeperLedgerRootRecord(
                 1,
@@ -500,12 +464,8 @@ public final class BookKeeperScopeCapabilityProbe {
     }
 
     private BookKeeperScopeCapabilityProof proof(
-            BookKeeperScopeCapabilityRequest request,
-            long ledgerId,
-            byte[] payload) {
-        Checksum payloadSha = new Checksum(
-                ChecksumType.SHA256,
-                HexFormat.of().formatHex(sha256().digest(payload)));
+            BookKeeperScopeCapabilityRequest request, long ledgerId, byte[] payload) {
+        Checksum payloadSha = new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(sha256().digest(payload)));
         MessageDigest digest = sha256();
         frame(digest, DOMAIN);
         frame(digest, cluster);
@@ -523,9 +483,7 @@ public final class BookKeeperScopeCapabilityProbe {
                 request.readiness().brokerSetSha256(),
                 ledgerId,
                 payloadSha,
-                new Checksum(
-                        ChecksumType.SHA256,
-                        HexFormat.of().formatHex(digest.digest())));
+                new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest())));
     }
 
     private byte[] payload() {
@@ -538,12 +496,10 @@ public final class BookKeeperScopeCapabilityProbe {
     }
 
     private byte[] password() {
-        return Objects.requireNonNull(
-                passwords.resolve(configuration.passwordRef()), "resolved password");
+        return Objects.requireNonNull(passwords.resolve(configuration.passwordRef()), "resolved password");
     }
 
-    private BookKeeperLedgerIdNamespaceReservation requireNamespace(
-            BookKeeperLedgerIdNamespaceReservation actual) {
+    private BookKeeperLedgerIdNamespaceReservation requireNamespace(BookKeeperLedgerIdNamespaceReservation actual) {
         BookKeeperLedgerIdNamespaceReservation exact = Objects.requireNonNull(actual, "namespace");
         if (!exact.equals(expectedNamespace)) {
             throw new NereusException(
@@ -554,10 +510,8 @@ public final class BookKeeperScopeCapabilityProbe {
         return exact;
     }
 
-    private BookKeeperOperationDeadline providerDeadline(
-            BookKeeperOperationDeadline overall) {
-        return new BookKeeperOperationDeadline(min(
-                overall.remaining(), configuration.operationTimeout()));
+    private BookKeeperOperationDeadline providerDeadline(BookKeeperOperationDeadline overall) {
+        return new BookKeeperOperationDeadline(min(overall.remaining(), configuration.operationTimeout()));
     }
 
     private static Duration min(Duration left, Duration right) {
@@ -601,8 +555,7 @@ public final class BookKeeperScopeCapabilityProbe {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static String text(String value, String name) {

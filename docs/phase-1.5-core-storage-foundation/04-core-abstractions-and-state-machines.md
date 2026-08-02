@@ -91,11 +91,11 @@ public interface StorageProfileResolver {
 
 P15-M5 executable table：
 
-| Profile | Primary adapter | Publication | Allowed public durability |
-| --- | --- | --- | --- |
-| `OBJECT_WAL_SYNC_OBJECT` | object | synchronous generation zero | `WAL_DURABLE_AND_INDEX_COMMITTED` |
-| all BookKeeper profiles | none | reserved | reject before resource/WAL IO |
-| `OBJECT_WAL_ASYNC_OBJECT` | object reader/writer exists but async coordinator absent | reserved | reject before IO |
+| Profile                   | Primary adapter                                          | Publication                 | Allowed public durability         |
+|---------------------------|----------------------------------------------------------|-----------------------------|-----------------------------------|
+| `OBJECT_WAL_SYNC_OBJECT`  | object                                                   | synchronous generation zero | `WAL_DURABLE_AND_INDEX_COMMITTED` |
+| all BookKeeper profiles   | none                                                     | reserved                    | reject before resource/WAL IO     |
+| `OBJECT_WAL_ASYNC_OBJECT` | object reader/writer exists but async coordinator absent | reserved                    | reject before IO                  |
 
 Canonicalization of deprecated `OBJECT_WAL` happens before lookup。The presence of a target codec or reader alone does
 not enable a profile；profile resolver, appender, reader and completion-policy bindings must all exist。
@@ -204,12 +204,12 @@ from the reachable commit alone。
 
 Failure classification：
 
-| Boundary | Outcome |
-| --- | --- |
-| before head request | `KNOWN_NOT_COMMITTED`, no public attempt ID |
-| head request submitted, response unavailable | `MAY_HAVE_COMMITTED` + attempt ID |
-| head reachable, materialization/result fails | `KNOWN_COMMITTED` + attempt ID |
-| strict result returned | normal success and terminal attempt cached |
+| Boundary                                     | Outcome                                     |
+|----------------------------------------------|---------------------------------------------|
+| before head request                          | `KNOWN_NOT_COMMITTED`, no public attempt ID |
+| head request submitted, response unavailable | `MAY_HAVE_COMMITTED` + attempt ID           |
+| head reachable, materialization/result fails | `KNOWN_COMMITTED` + attempt ID              |
+| strict result returned                       | normal success and terminal attempt cached  |
 
 The Phase 1.5 `StorageProfileResolver` continues to reject public `WAL_DURABLE` before IO. Final-gated Future 4 enables
 it only through the explicit Object-WAL async composition with activation proof、task repair and primary-index repair；

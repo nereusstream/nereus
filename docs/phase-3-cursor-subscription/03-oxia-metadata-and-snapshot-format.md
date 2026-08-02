@@ -386,7 +386,8 @@ Owner claim and every same-generation mutation preserve `createdAtMillis`。
 
 ### 4.2 DELETED tombstone invariants
 
-- projection、owner-session ID、exact cursor name/hash、generation、last mutation sequence、ack-state epoch、protection attempt and
+- projection、owner-session ID、exact cursor name/hash、generation、last mutation sequence、ack-state epoch、protection
+  attempt and
   timestamps remain；
 - snapshot ref, inline ranges, partials, position properties and cursor properties are empty；
 - `deletedAtMillis` is present and `>= createdAtMillis`；
@@ -556,7 +557,8 @@ new RangeReadOptions(
 After PUT，the store requires `PutObjectResult` key、length and checksum to equal the request，then HEAD requires the
 same key/length/checksum and the exact three metadata entries。Read first HEAD-validates those values and the root
 reference，then calls
-`readRange(key, 0, objectLength, new RangeReadOptions(Optional.of(checksum), objectCallTimeout))` exactly once。The returned
+`readRange(key, 0, objectLength, new RangeReadOptions(Optional.of(checksum), objectCallTimeout))` exactly once。The
+returned
 `RangeReadResult` must repeat the exact key、offset `0`、length、remaining payload size and present checksum；a mismatch
 fails。PUT+HEAD and HEAD+read share their respective one captured snapshot deadline；they are not each granted a fresh
 60 seconds。The 64-MiB cap guarantees the full read fits one Java `ByteBuffer`。No S3 SDK type enters the cursor package。
@@ -689,7 +691,7 @@ computes the already-merged remaining words before encoding it。Whole ranges wi
 state。
 
 If hydration normalization changes the semantic state beyond clipping entries below the newer root mark-delete, the
-  record/object pair is noncanonical corruption。Reader does not silently repair bytes while opening a topic。
+record/object pair is noncanonical corruption。Reader does not silently repair bytes while opening a topic。
 
 ## 8. Snapshot Publish Protocol
 
@@ -933,12 +935,12 @@ the cost of one small key per historically used cursor name；`cursorRecordsPerS
 
 Object lifecycle：
 
-| Object | Visible/protected when | Eligible orphan/unreferenced when | Physical delete owner |
-| --- | --- | --- | --- |
-| current cursor snapshot | referenced by ACTIVE root | root generation/ref changes or cursor deleted | F4 |
-| CAS-lost uploaded snapshot | never visible | immediately after failed CAS | F4 orphan scanner |
-| snapshot of DELETED cursor | never referenced after delete CAS | delete CAS succeeds | F4 |
-| old stream-incarnation snapshots | old stream is deleted | stream deletion/reference grace satisfied | F4 |
+| Object                           | Visible/protected when            | Eligible orphan/unreferenced when             | Physical delete owner |
+|----------------------------------|-----------------------------------|-----------------------------------------------|-----------------------|
+| current cursor snapshot          | referenced by ACTIVE root         | root generation/ref changes or cursor deleted | F4                    |
+| CAS-lost uploaded snapshot       | never visible                     | immediately after failed CAS                  | F4 orphan scanner     |
+| snapshot of DELETED cursor       | never referenced after delete CAS | delete CAS succeeds                           | F4                    |
+| old stream-incarnation snapshots | old stream is deleted             | stream deletion/reference grace satisfied     | F4                    |
 
 F3-M6 exposes this handoff without taking ownership of deletion：
 

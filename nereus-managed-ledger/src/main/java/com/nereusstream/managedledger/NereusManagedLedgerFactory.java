@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import com.nereusstream.api.ErrorCode;
@@ -44,13 +45,14 @@ import org.apache.bookkeeper.mledger.ManagedLedgerFactoryMXBean;
 import org.apache.bookkeeper.mledger.ManagedLedgerInfo;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.ReadOnlyCursor;
-import org.apache.bookkeeper.mledger.ReadOnlyManagedLedger;
 import org.apache.bookkeeper.mledger.impl.cache.EntryCacheManager;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.PersistentOfflineTopicStats;
 import org.apache.pulsar.common.util.DateFormatter;
 
-/** F2 factory with exact-name single-flight opens and bounded handle ownership. */
+/**
+ * F2 factory with exact-name single-flight opens and bounded handle ownership.
+ */
 public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
     private final NereusManagedLedgerRuntime runtime;
     private final ManagedLedgerConfig defaultConfig;
@@ -79,16 +81,15 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         }
         this.defaultConfig = Objects.requireNonNull(defaultManagedLedgerConfig, "defaultManagedLedgerConfig");
         ManagedLedgerConfigValidator.captureForOperation(defaultConfig);
-        this.compatibilityConfig = Objects.requireNonNull(
-                compatibilityFactoryConfig, "compatibilityFactoryConfig");
+        this.compatibilityConfig = Objects.requireNonNull(compatibilityFactoryConfig, "compatibilityFactoryConfig");
         this.compatibilityConfig.setMaxCacheSize(0);
         this.ownsRuntime = ownsRuntime;
-        this.openCoordinator = new NereusManagedLedgerOpenCoordinator(
-                runtime, Objects.requireNonNull(creationGuard, "creationGuard"));
+        this.openCoordinator =
+                new NereusManagedLedgerOpenCoordinator(runtime, Objects.requireNonNull(creationGuard, "creationGuard"));
         this.handlePermits = new Semaphore(runtime.config().maxOpenLedgers());
         this.cacheStats = new NereusManagedLedgerFactoryStats(this::completedLedgerCount);
-        this.cacheEvictionThresholdNanos = new AtomicLong(saturatedMillisToNanos(
-                compatibilityConfig.getCacheEvictionTimeThresholdMillis()));
+        this.cacheEvictionThresholdNanos =
+                new AtomicLong(saturatedMillisToNanos(compatibilityConfig.getCacheEvictionTimeThresholdMillis()));
     }
 
     public CompletableFuture<NereusStorageStateSnapshot> inspectStorageState(String managedLedgerName) {
@@ -100,8 +101,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
 
     public CompletableFuture<ManagedLedgerMaterializationRegistrationCandidate>
             inspectMaterializationRegistrationCandidate(
-                    String managedLedgerName,
-                    long expectedStorageClassBindingGeneration) {
+                    String managedLedgerName, long expectedStorageClassBindingGeneration) {
         if (closed.get()) {
             return CompletableFuture.failedFuture(factoryClosed());
         }
@@ -119,24 +119,17 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
 
     public CompletableFuture<Void> completeGenerationRegistrationBackfill(
             GenerationRegistrationBackfillCompletion completion) {
-        return completeGenerationRegistrationBackfill(
-                completion, 1, Duration.ofHours(1));
+        return completeGenerationRegistrationBackfill(completion, 1, Duration.ofHours(1));
     }
 
     public CompletableFuture<Void> completeGenerationRegistrationBackfill(
-            GenerationRegistrationBackfillCompletion completion,
-            int maxConcurrentStreams,
-            Duration timeout) {
+            GenerationRegistrationBackfillCompletion completion, int maxConcurrentStreams, Duration timeout) {
         if (closed.get()) {
             return CompletableFuture.failedFuture(factoryClosed());
         }
         try {
-            return runtime
-                    .generationRegistrationBackfillProofCoordinator()
-                    .complete(
-                            completion,
-                            maxConcurrentStreams,
-                            timeout);
+            return runtime.generationRegistrationBackfillProofCoordinator()
+                    .complete(completion, maxConcurrentStreams, timeout);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -147,24 +140,19 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             return CompletableFuture.failedFuture(factoryClosed());
         }
         try {
-            return runtime
-                    .generationProtocolActivationCoordinator()
-                    .activatePublication();
+            return runtime.generationProtocolActivationCoordinator().activatePublication();
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
     }
 
-    public CompletableFuture<ManagedLedgerPhysicalDeletionActivationResult>
-            activatePhysicalDeletion(
-                    ManagedLedgerPhysicalDeletionActivationRequest request) {
+    public CompletableFuture<ManagedLedgerPhysicalDeletionActivationResult> activatePhysicalDeletion(
+            ManagedLedgerPhysicalDeletionActivationRequest request) {
         if (closed.get()) {
             return CompletableFuture.failedFuture(factoryClosed());
         }
         try {
-            return runtime
-                    .physicalDeletionActivationCoordinator()
-                    .activate(request);
+            return runtime.physicalDeletionActivationCoordinator().activate(request);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -218,19 +206,20 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             OpenLedgerCallback callback,
             NereusManagedLedgerOwnershipGuard ownershipGuard,
             Object ctx) {
-        openFuture(name, config, ownershipGuard).whenCompleteAsync((ledger, error) -> {
-            if (error == null) {
-                callback.openLedgerComplete(ledger, ctx);
-            } else {
-                callback.openLedgerFailed(mapFactory(error, "open"), ctx);
-            }
-        }, runtime.callbackExecutor());
+        openFuture(name, config, ownershipGuard)
+                .whenCompleteAsync(
+                        (ledger, error) -> {
+                            if (error == null) {
+                                callback.openLedgerComplete(ledger, ctx);
+                            } else {
+                                callback.openLedgerFailed(mapFactory(error, "open"), ctx);
+                            }
+                        },
+                        runtime.callbackExecutor());
     }
 
     private CompletableFuture<NereusManagedLedger> openFuture(
-            String name,
-            ManagedLedgerConfig config,
-            NereusManagedLedgerOwnershipGuard ownershipGuard) {
+            String name, ManagedLedgerConfig config, NereusManagedLedgerOwnershipGuard ownershipGuard) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(ownershipGuard, "ownershipGuard");
         ManagedLedgerOpenConfigView configView;
@@ -272,11 +261,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             }
             try {
                 NereusManagedLedger ledger = new NereusManagedLedger(
-                        runtime,
-                        opened,
-                        ownershipGuard,
-                        config,
-                        () -> releaseLedger(name, candidate));
+                        runtime, opened, ownershipGuard, config, () -> releaseLedger(name, candidate));
                 candidate.complete(ledger);
             } catch (Throwable constructionFailure) {
                 ledgers.remove(name, candidate);
@@ -288,9 +273,9 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
     }
 
     private static CompletableFuture<NereusManagedLedger> requireOwnershipBeforeCachedReturn(
-            CompletableFuture<NereusManagedLedger> existing,
-            NereusManagedLedgerOwnershipGuard ownershipGuard) {
-        return ownershipGuard.requireOwned("cached writable open")
+            CompletableFuture<NereusManagedLedger> existing, NereusManagedLedgerOwnershipGuard ownershipGuard) {
+        return ownershipGuard
+                .requireOwned("cached writable open")
                 .thenCompose(ignored -> existing)
                 .thenCompose(ledger -> ownershipGuard
                         .requireOwned("cached writable open final return")
@@ -301,8 +286,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
     public ReadOnlyCursor openReadOnlyCursor(
             String managedLedgerName, Position startPosition, ManagedLedgerConfig config)
             throws InterruptedException, ManagedLedgerException {
-        return await(readOnlyFuture(managedLedgerName, config))
-                .createReadOnlyCursor(startPosition);
+        return await(readOnlyFuture(managedLedgerName, config)).createReadOnlyCursor(startPosition);
     }
 
     @Override
@@ -313,18 +297,21 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             OpenReadOnlyCursorCallback callback,
             Object ctx) {
         Objects.requireNonNull(callback, "callback");
-        readOnlyFuture(managedLedgerName, config).whenCompleteAsync((ledger, error) -> {
-            if (error != null) {
-                callback.openReadOnlyCursorFailed(mapFactory(error, "openReadOnlyCursor"), ctx);
-                return;
-            }
-            try {
-                callback.openReadOnlyCursorComplete(ledger.createReadOnlyCursor(startPosition), ctx);
-            } catch (Throwable creationFailure) {
-                callback.openReadOnlyCursorFailed(
-                        mapFactory(creationFailure, "openReadOnlyCursor"), ctx);
-            }
-        }, runtime.callbackExecutor());
+        readOnlyFuture(managedLedgerName, config)
+                .whenCompleteAsync(
+                        (ledger, error) -> {
+                            if (error != null) {
+                                callback.openReadOnlyCursorFailed(mapFactory(error, "openReadOnlyCursor"), ctx);
+                                return;
+                            }
+                            try {
+                                callback.openReadOnlyCursorComplete(ledger.createReadOnlyCursor(startPosition), ctx);
+                            } catch (Throwable creationFailure) {
+                                callback.openReadOnlyCursorFailed(
+                                        mapFactory(creationFailure, "openReadOnlyCursor"), ctx);
+                            }
+                        },
+                        runtime.callbackExecutor());
     }
 
     @Override
@@ -334,17 +321,20 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             ManagedLedgerConfig config,
             Object ctx) {
         Objects.requireNonNull(callback, "callback");
-        readOnlyFuture(managedLedgerName, config).whenCompleteAsync((ledger, error) -> {
-            if (error == null) {
-                callback.openReadOnlyManagedLedgerComplete(ledger, ctx);
-            } else {
-                callback.openReadOnlyManagedLedgerFailed(mapFactory(error, "openReadOnlyManagedLedger"), ctx);
-            }
-        }, runtime.callbackExecutor());
+        readOnlyFuture(managedLedgerName, config)
+                .whenCompleteAsync(
+                        (ledger, error) -> {
+                            if (error == null) {
+                                callback.openReadOnlyManagedLedgerComplete(ledger, ctx);
+                            } else {
+                                callback.openReadOnlyManagedLedgerFailed(
+                                        mapFactory(error, "openReadOnlyManagedLedger"), ctx);
+                            }
+                        },
+                        runtime.callbackExecutor());
     }
 
-    private CompletableFuture<NereusReadOnlyManagedLedger> readOnlyFuture(
-            String name, ManagedLedgerConfig config) {
+    private CompletableFuture<NereusReadOnlyManagedLedger> readOnlyFuture(String name, ManagedLedgerConfig config) {
         ManagedLedgerOpenConfigView captured;
         try {
             captured = ManagedLedgerConfigValidator.captureForOpen(config);
@@ -354,8 +344,8 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         if (closed.get()) {
             return CompletableFuture.failedFuture(factoryClosed());
         }
-        ManagedLedgerOpenConfigView noCreate = new ManagedLedgerOpenConfigView(
-                captured.operationView(), false, Map.of());
+        ManagedLedgerOpenConfigView noCreate =
+                new ManagedLedgerOpenConfigView(captured.operationView(), false, Map.of());
         CompletableFuture<NereusReadOnlyManagedLedger> existing = readOnlyLedgers.get(name);
         if (existing != null) {
             return existing;
@@ -379,8 +369,8 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
                 return;
             }
             try {
-                candidate.complete(new NereusReadOnlyManagedLedger(
-                        runtime, opened, () -> releaseReadOnlyLedger(name, candidate)));
+                candidate.complete(
+                        new NereusReadOnlyManagedLedger(runtime, opened, () -> releaseReadOnlyLedger(name, candidate)));
             } catch (Throwable constructionFailure) {
                 readOnlyLedgers.remove(name, candidate);
                 handlePermits.release();
@@ -391,20 +381,22 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
     }
 
     @Override
-    public ManagedLedgerInfo getManagedLedgerInfo(String name)
-            throws InterruptedException, ManagedLedgerException {
+    public ManagedLedgerInfo getManagedLedgerInfo(String name) throws InterruptedException, ManagedLedgerException {
         return await(infoFuture(name));
     }
 
     @Override
     public void asyncGetManagedLedgerInfo(String name, ManagedLedgerInfoCallback callback, Object ctx) {
-        infoFuture(name).whenCompleteAsync((info, error) -> {
-            if (error == null) {
-                callback.getInfoComplete(info, ctx);
-            } else {
-                callback.getInfoFailed(mapFactory(error, "getManagedLedgerInfo"), ctx);
-            }
-        }, runtime.callbackExecutor());
+        infoFuture(name)
+                .whenCompleteAsync(
+                        (info, error) -> {
+                            if (error == null) {
+                                callback.getInfoComplete(info, ctx);
+                            } else {
+                                callback.getInfoFailed(mapFactory(error, "getManagedLedgerInfo"), ctx);
+                            }
+                        },
+                        runtime.callbackExecutor());
     }
 
     private CompletableFuture<ManagedLedgerInfo> infoFuture(String name) {
@@ -416,7 +408,8 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
                     && snapshot.state() != NereusDurableStorageState.SEALED) {
                 return notFound("managed ledger is not active or sealed");
             }
-            return runtime.projectionStore().getProjection(runtime.cluster(), name)
+            return runtime.projectionStore()
+                    .getProjection(runtime.cluster(), name)
                     .thenApply(optional -> toManagedLedgerInfo(
                             optional.orElseThrow(), snapshot.streamMetadata().orElseThrow()));
         });
@@ -431,12 +424,21 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
     public void delete(String name, CompletableFuture<ManagedLedgerConfig> mlConfigFuture)
             throws InterruptedException, ManagedLedgerException {
         CompletableFuture<Void> result = new CompletableFuture<>();
-        asyncDelete(name, mlConfigFuture, new DeleteLedgerCallback() {
-            @Override public void deleteLedgerComplete(Object ctx) { result.complete(null); }
-            @Override public void deleteLedgerFailed(ManagedLedgerException exception, Object ctx) {
-                result.completeExceptionally(exception);
-            }
-        }, null);
+        asyncDelete(
+                name,
+                mlConfigFuture,
+                new DeleteLedgerCallback() {
+                    @Override
+                    public void deleteLedgerComplete(Object ctx) {
+                        result.complete(null);
+                    }
+
+                    @Override
+                    public void deleteLedgerFailed(ManagedLedgerException exception, Object ctx) {
+                        result.completeExceptionally(exception);
+                    }
+                },
+                null);
         await(result);
     }
 
@@ -463,14 +465,17 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             });
             return;
         }
-        mlConfigFuture.thenCompose(config -> openExistingForDelete(name, config))
-                .whenCompleteAsync((ignored, error) -> {
-                    if (error == null) {
-                        callback.deleteLedgerComplete(ctx);
-                    } else {
-                        callback.deleteLedgerFailed(mapFactory(error, "delete"), ctx);
-                    }
-                }, runtime.callbackExecutor());
+        mlConfigFuture
+                .thenCompose(config -> openExistingForDelete(name, config))
+                .whenCompleteAsync(
+                        (ignored, error) -> {
+                            if (error == null) {
+                                callback.deleteLedgerComplete(ctx);
+                            } else {
+                                callback.deleteLedgerFailed(mapFactory(error, "delete"), ctx);
+                            }
+                        },
+                        runtime.callbackExecutor());
     }
 
     private CompletableFuture<Void> openExistingForDelete(String name, ManagedLedgerConfig config) {
@@ -479,37 +484,42 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             return CompletableFuture.failedFuture(new NereusException(
                     ErrorCode.BACKPRESSURE_REJECTED, true, "managed-ledger handle capacity is exhausted"));
         }
-        ManagedLedgerOpenConfigView noCreate = new ManagedLedgerOpenConfigView(
-                captured.operationView(), false, Map.of());
+        ManagedLedgerOpenConfigView noCreate =
+                new ManagedLedgerOpenConfigView(captured.operationView(), false, Map.of());
         NereusManagedLedgerOwnershipGuard ownershipGuard =
                 NereusManagedLedgerOwnershipGuard.trustedDirect(runtime.config().metadataTimeout());
-        return openCoordinator.openForLogicalDelete(name, noCreate, ownershipGuard).thenCompose(opened -> {
-            CompletableFuture<Void> result = new CompletableFuture<>();
-            NereusManagedLedger ephemeral = new NereusManagedLedger(
-                    runtime, opened, ownershipGuard, config, () -> { });
-            ephemeral.asyncDelete(new DeleteLedgerCallback() {
-                @Override
-                public void deleteLedgerComplete(Object ctx) {
-                    try {
-                        ephemeral.close();
-                        result.complete(null);
-                    } catch (ManagedLedgerException e) {
-                        result.completeExceptionally(e);
-                    }
-                }
+        return openCoordinator
+                .openForLogicalDelete(name, noCreate, ownershipGuard)
+                .thenCompose(opened -> {
+                    CompletableFuture<Void> result = new CompletableFuture<>();
+                    NereusManagedLedger ephemeral =
+                            new NereusManagedLedger(runtime, opened, ownershipGuard, config, () -> {});
+                    ephemeral.asyncDelete(
+                            new DeleteLedgerCallback() {
+                                @Override
+                                public void deleteLedgerComplete(Object ctx) {
+                                    try {
+                                        ephemeral.close();
+                                        result.complete(null);
+                                    } catch (ManagedLedgerException e) {
+                                        result.completeExceptionally(e);
+                                    }
+                                }
 
-                @Override
-                public void deleteLedgerFailed(ManagedLedgerException exception, Object ctx) {
-                    try {
-                        ephemeral.close();
-                    } catch (ManagedLedgerException closeFailure) {
-                        exception.addSuppressed(closeFailure);
-                    }
-                    result.completeExceptionally(exception);
-                }
-            }, null);
-            return result;
-        }).whenComplete((ignored, error) -> handlePermits.release());
+                                @Override
+                                public void deleteLedgerFailed(ManagedLedgerException exception, Object ctx) {
+                                    try {
+                                        ephemeral.close();
+                                    } catch (ManagedLedgerException closeFailure) {
+                                        exception.addSuppressed(closeFailure);
+                                    }
+                                    result.completeExceptionally(exception);
+                                }
+                            },
+                            null);
+                    return result;
+                })
+                .whenComplete((ignored, error) -> handlePermits.release());
     }
 
     @Override
@@ -523,25 +533,36 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             return CompletableFuture.completedFuture(null);
         }
         List<CompletableFuture<Void>> closes = new ArrayList<>();
-        ledgers.values().forEach(open -> closes.add(open.handle((ledger, error) -> {
-            if (ledger == null) {
-                return CompletableFuture.<Void>completedFuture(null);
-            }
-            CompletableFuture<Void> closedLedger = new CompletableFuture<>();
-            ledger.asyncClose(new org.apache.bookkeeper.mledger.AsyncCallbacks.CloseCallback() {
-                @Override public void closeComplete(Object ctx) { closedLedger.complete(null); }
-                @Override public void closeFailed(ManagedLedgerException exception, Object ctx) {
-                    closedLedger.completeExceptionally(exception);
-                }
-            }, null);
-            return closedLedger;
-        }).thenCompose(value -> value)));
-        readOnlyLedgers.values().forEach(open -> closes.add(open.handle((ledger, error) -> {
-            if (ledger != null) {
-                ledger.factoryClose();
-            }
-            return null;
-        })));
+        ledgers.values()
+                .forEach(open -> closes.add(open.handle((ledger, error) -> {
+                            if (ledger == null) {
+                                return CompletableFuture.<Void>completedFuture(null);
+                            }
+                            CompletableFuture<Void> closedLedger = new CompletableFuture<>();
+                            ledger.asyncClose(
+                                    new org.apache.bookkeeper.mledger.AsyncCallbacks.CloseCallback() {
+                                        @Override
+                                        public void closeComplete(Object ctx) {
+                                            closedLedger.complete(null);
+                                        }
+
+                                        @Override
+                                        public void closeFailed(ManagedLedgerException exception, Object ctx) {
+                                            closedLedger.completeExceptionally(exception);
+                                        }
+                                    },
+                                    null);
+                            return closedLedger;
+                        })
+                        .thenCompose(value -> value)));
+        readOnlyLedgers
+                .values()
+                .forEach(open -> closes.add(open.handle((ledger, error) -> {
+                    if (ledger != null) {
+                        ledger.factoryClose();
+                    }
+                    return null;
+                })));
         return CompletableFuture.allOf(closes.toArray(CompletableFuture[]::new))
                 .thenRun(() -> {
                     ledgers.clear();
@@ -558,23 +579,37 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         if (closed.get()) {
             return CompletableFuture.failedFuture(factoryClosed());
         }
-        return openCoordinator.inspectStorageState(ledgerName)
+        return openCoordinator
+                .inspectStorageState(ledgerName)
                 .thenApply(snapshot -> snapshot.state() == NereusDurableStorageState.ACTIVE
                         || snapshot.state() == NereusDurableStorageState.SEALED);
     }
 
-    @Override public EntryCacheManager getEntryCacheManager() { return cacheManager; }
-    @Override public void updateCacheEvictionTimeThreshold(long value) {
+    @Override
+    public EntryCacheManager getEntryCacheManager() {
+        return cacheManager;
+    }
+
+    @Override
+    public void updateCacheEvictionTimeThreshold(long value) {
         if (value < 0) {
             throw new IllegalArgumentException("cache eviction threshold cannot be negative");
         }
         cacheEvictionThresholdNanos.set(value);
     }
-    @Override public long getCacheEvictionTimeThreshold() { return cacheEvictionThresholdNanos.get(); }
-    @Override public void updateCacheEvictionExtendTTLOfEntriesWithRemainingExpectedReadsMaxTimes(int value) {
+
+    @Override
+    public long getCacheEvictionTimeThreshold() {
+        return cacheEvictionThresholdNanos.get();
+    }
+
+    @Override
+    public void updateCacheEvictionExtendTTLOfEntriesWithRemainingExpectedReadsMaxTimes(int value) {
         cacheManager.updateCacheEvictionExtendTTLOfEntriesWithRemainingExpectedReadsMaxTimes(value);
     }
-    @Override public void updateCacheEvictionExtendTTLOfRecentlyAccessed(boolean value) {
+
+    @Override
+    public void updateCacheEvictionExtendTTLOfRecentlyAccessed(boolean value) {
         cacheManager.updateCacheEvictionExtendTTLOfRecentlyAccessed(value);
     }
 
@@ -592,7 +627,8 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
                     && snapshot.state() != NereusDurableStorageState.SEALED) {
                 return notFound("managed ledger properties are unavailable");
             }
-            return runtime.projectionStore().getProjection(runtime.cluster(), name)
+            return runtime.projectionStore()
+                    .getProjection(runtime.cluster(), name)
                     .thenApply(optional -> Map.copyOf(optional.orElseThrow().properties()));
         });
     }
@@ -609,22 +645,22 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         return Map.copyOf(result);
     }
 
-    @Override public ManagedLedgerFactoryMXBean getCacheStats() { return cacheStats; }
+    @Override
+    public ManagedLedgerFactoryMXBean getCacheStats() {
+        return cacheStats;
+    }
 
     @Override
     public void estimateUnloadedTopicBacklog(
-            PersistentOfflineTopicStats offlineTopicStats,
-            TopicName topicName,
-            boolean accurate,
-            Object ctx) throws Exception {
+            PersistentOfflineTopicStats offlineTopicStats, TopicName topicName, boolean accurate, Object ctx)
+            throws Exception {
         Objects.requireNonNull(offlineTopicStats, "offlineTopicStats");
         Objects.requireNonNull(topicName, "topicName");
         String name = topicName.getPersistenceNamingEncoding();
         NereusStorageStateSnapshot snapshot = await(openCoordinator.inspectStorageState(name));
         if (snapshot.state() != NereusDurableStorageState.ACTIVE
                 && snapshot.state() != NereusDurableStorageState.SEALED) {
-            throw new ManagedLedgerException.ManagedLedgerNotFoundException(
-                    "managed ledger is not active or sealed");
+            throw new ManagedLedgerException.ManagedLedgerNotFoundException("managed ledger is not active or sealed");
         }
         com.nereusstream.api.StreamMetadata metadata = snapshot.streamMetadata().orElseThrow();
         offlineTopicStats.reset();
@@ -640,7 +676,10 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         }
     }
 
-    @Override public ManagedLedgerFactoryConfig getConfig() { return compatibilityConfig; }
+    @Override
+    public ManagedLedgerFactoryConfig getConfig() {
+        return compatibilityConfig;
+    }
 
     private void releaseLedger(String name, CompletableFuture<NereusManagedLedger> future) {
         if (ledgers.remove(name, future)) {
@@ -649,8 +688,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         }
     }
 
-    private void releaseReadOnlyLedger(
-            String name, CompletableFuture<NereusReadOnlyManagedLedger> future) {
+    private void releaseReadOnlyLedger(String name, CompletableFuture<NereusReadOnlyManagedLedger> future) {
         if (readOnlyLedgers.remove(name, future)) {
             handlePermits.release();
         }
@@ -672,8 +710,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
     }
 
     private ManagedLedgerException mapFactory(Throwable error, String operation) {
-        return errorMapper.map(unwrap(error), new OperationContext(
-                operation, true, false, java.util.Optional.empty()));
+        return errorMapper.map(unwrap(error), new OperationContext(operation, true, false, java.util.Optional.empty()));
     }
 
     private ManagedLedgerException unsupported(String operation) {
@@ -681,8 +718,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
     }
 
     private static <T> CompletableFuture<T> notFound(String message) {
-        return CompletableFuture.failedFuture(new NereusException(
-                ErrorCode.STREAM_NOT_FOUND, false, message));
+        return CompletableFuture.failedFuture(new NereusException(ErrorCode.STREAM_NOT_FOUND, false, message));
     }
 
     private ManagedLedgerException.ManagedLedgerFactoryClosedException factoryClosed() {
@@ -690,8 +726,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
                 new IllegalStateException("Nereus managed-ledger factory is closed"));
     }
 
-    private <T> T await(CompletableFuture<T> future)
-            throws InterruptedException, ManagedLedgerException {
+    private <T> T await(CompletableFuture<T> future) throws InterruptedException, ManagedLedgerException {
         try {
             return future.get();
         } catch (ExecutionException e) {
@@ -700,8 +735,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
     }
 
     private static ManagedLedgerInfo toManagedLedgerInfo(
-            TopicProjectionRecord topic,
-            com.nereusstream.api.StreamMetadata metadata) {
+            TopicProjectionRecord topic, com.nereusstream.api.StreamMetadata metadata) {
         ManagedLedgerInfo info = new ManagedLedgerInfo();
         info.version = topic.metadataVersion();
         info.creationDate = DateFormatter.format(topic.createdAtMillis());
@@ -713,9 +747,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         ledger.timestamp = null;
         info.ledgers = List.of(ledger);
         info.cursors = Map.of();
-        info.properties = topic.properties().isEmpty()
-                ? null
-                : new java.util.TreeMap<>(topic.properties());
+        info.properties = topic.properties().isEmpty() ? null : new java.util.TreeMap<>(topic.properties());
         if (metadata.state() == com.nereusstream.api.StreamState.SEALED) {
             ManagedLedgerInfo.PositionInfo terminated = new ManagedLedgerInfo.PositionInfo();
             terminated.ledgerId = topic.virtualLedgerId();

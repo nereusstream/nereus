@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import java.util.ArrayList;
@@ -6,14 +7,15 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-/** Bounded canonical builder shared by protocol-neutral reference-domain implementations. */
+/**
+ * Bounded canonical builder shared by protocol-neutral reference-domain implementations.
+ */
 public final class GcReferenceSnapshotBuilder {
-    private static final Comparator<GcAuthorityToken> AUTHORITY_ORDER = Comparator
-            .comparing(GcAuthorityToken::authorityKey)
+    private static final Comparator<GcAuthorityToken> AUTHORITY_ORDER = Comparator.comparing(
+                    GcAuthorityToken::authorityKey)
             .thenComparingLong(GcAuthorityToken::metadataVersion)
             .thenComparing(value -> value.identitySha256().value());
-    private static final Comparator<GcReference> REFERENCE_ORDER = Comparator
-            .comparing(GcReference::referenceType)
+    private static final Comparator<GcReference> REFERENCE_ORDER = Comparator.comparing(GcReference::referenceType)
             .thenComparing(GcReference::referenceId)
             .thenComparing(GcReference::ownerKey)
             .thenComparingLong(GcReference::ownerMetadataVersion)
@@ -33,10 +35,7 @@ public final class GcReferenceSnapshotBuilder {
     private boolean veto;
 
     public GcReferenceSnapshotBuilder(
-            String domainId,
-            int protocolVersion,
-            GcReferenceQuery query,
-            GcReferenceDomainConfig config) {
+            String domainId, int protocolVersion, GcReferenceQuery query, GcReferenceDomainConfig config) {
         this.domainId = Objects.requireNonNull(domainId, "domainId");
         if (protocolVersion <= 0) {
             throw new IllegalArgumentException("protocolVersion must be positive");
@@ -99,15 +98,7 @@ public final class GcReferenceSnapshotBuilder {
             String domainId, int protocolVersion, GcReferenceQuery query) {
         Objects.requireNonNull(query, "query");
         return GcReferenceSnapshot.create(
-                domainId,
-                protocolVersion,
-                query.queryIdentitySha256(),
-                false,
-                true,
-                0,
-                0,
-                List.of(),
-                List.of());
+                domainId, protocolVersion, query.queryIdentitySha256(), false, true, 0, 0, List.of(), List.of());
     }
 
     private static long boundedIncrement(long current, int maximum) {

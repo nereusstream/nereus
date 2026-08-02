@@ -2,15 +2,15 @@
 
 ## 1. State-machine Owners
 
-| State | Durable owner | Local owner |
-| --- | --- | --- |
-| stream committed end / trim / lifecycle | F1 `StreamStorage` | F2 `StreamSnapshotTracker` cache |
-| projection identity / virtual ledger | F2 projection root | `NereusManagedLedger` |
-| writable cursor owner session | F3 retention + ACTIVE cursor roots | one writable `NereusManagedLedger` instance |
-| cursor ack/properties/generation | F3 `CursorStateRecord` | hydrated `CursorHandle` cache |
-| cursor protection / trim pending | F3 `CursorRetentionRecord` | `CursorRetentionCoordinator` |
-| next dispatch read | none | `NereusManagedCursor.localReadOffset` |
-| snapshot bytes | immutable object | decoded effective ack-state cache |
+| State                                   | Durable owner                      | Local owner                                 |
+|-----------------------------------------|------------------------------------|---------------------------------------------|
+| stream committed end / trim / lifecycle | F1 `StreamStorage`                 | F2 `StreamSnapshotTracker` cache            |
+| projection identity / virtual ledger    | F2 projection root                 | `NereusManagedLedger`                       |
+| writable cursor owner session           | F3 retention + ACTIVE cursor roots | one writable `NereusManagedLedger` instance |
+| cursor ack/properties/generation        | F3 `CursorStateRecord`             | hydrated `CursorHandle` cache               |
+| cursor protection / trim pending        | F3 `CursorRetentionRecord`         | `CursorRetentionCoordinator`                |
+| next dispatch read                      | none                               | `NereusManagedCursor.localReadOffset`       |
+| snapshot bytes                          | immutable object                   | decoded effective ack-state cache           |
 
 Every transition below preserves this ownership. Watchers, local lanes, metrics and projection state are not durable
 commit authorities。
@@ -55,8 +55,10 @@ durable cursor fence。An old mutation of an existing root either linearizes bef
 in the claim/reload，or loses the changed root version/session。A protected CREATE/RECREATE whose target is still
 ABSENT/DELETED is the explicit cross-key exception：if its pending intent linearized before retention claim，the old
 target-key CAS may race takeover recovery，but it cannot finalize the now-claimed retention root or publish success；
-the new owner recovers、claims and stabilizes the winner before callback。The exact broker-supplied ownership checker is required before claim and before publication；it is not inferred
-from timeout or watch state。M4 also keeps stock graceful unload ordering：old topic close stops admission and drains accepted cursor lanes。
+the new owner recovers、claims and stabilizes the winner before callback。The exact broker-supplied ownership checker is
+required before claim and before publication；it is not inferred
+from timeout or watch state。M4 also keeps stock graceful unload ordering：old topic close stops admission and drains
+accepted cursor lanes。
 The new broker does not hydrate/dispatch until every ACTIVE root is claimed and stabilized。A watch is not a fence；M5
 injects delayed old-owner retention/reset CAS at every claim cut。
 
@@ -64,14 +66,14 @@ injects delayed old-owner retention/reset CAS at every claim cut。
 
 The stabilized open scan applies this exact matrix：
 
-| Activation marker | Cursor records | Retention root | Result |
-| --- | ---: | --- | --- |
-| absent | none | absent | absent-create ACTIVE owner-only root at current L0 trim，then continue |
-| absent | one or more | any | corruption；fail open |
-| absent | none | present | require ACTIVE/no pending，validate and claim as preactivation owner root |
-| present | none | absent | safe bootstrap for a marker-preserving new topic incarnation；create the root below |
-| present | one or more | absent | corruption；a cursor root can only follow the retention barrier |
-| present | any/none | present | validate identity/lifecycle/L0 relation and continue |
+| Activation marker | Cursor records | Retention root | Result                                                                             |
+|-------------------|---------------:|----------------|------------------------------------------------------------------------------------|
+| absent            |           none | absent         | absent-create ACTIVE owner-only root at current L0 trim，then continue              |
+| absent            |    one or more | any            | corruption；fail open                                                               |
+| absent            |           none | present        | require ACTIVE/no pending，validate and claim as preactivation owner root           |
+| present           |           none | absent         | safe bootstrap for a marker-preserving new topic incarnation；create the root below |
+| present           |    one or more | absent         | corruption；a cursor root can only follow the retention barrier                     |
+| present           |       any/none | present        | validate identity/lifecycle/L0 relation and continue                               |
 
 For either legal root-absent case，create absent-only：
 
@@ -96,19 +98,19 @@ P proves an uncoordinated trim and fails rather than being accepted as equivalen
 
 ### 2.3 Hydration failures
 
-| Failure | Open behavior |
-| --- | --- |
-| unknown cursor record/snapshot version | fail topic open |
-| key/name/hash/projection mismatch | fail topic open |
-| root points to missing/corrupt stable object | fail topic open |
-| object read fails but root ref/version changed | retry new root |
-| stable root hits object timeout/transport failure | fail this open with the original retriable object error；do not relabel it corruption |
-| ACTIVE cursor below current L0 trim | fail corruption; never clamp durable ack truth |
-| DELETED tombstone with old ref/properties | fail corruption |
-| stable pending protection intent cannot be proved/applied | keep pending and fail topic open |
-| ACTIVE root cannot be claimed/stabilized before deadline | fail topic open；never dispatch under a mixed owner set |
-| scan exceeds count/page/deadline | fail topic open |
-| metadata/watch transient failure | bounded retry, then fail open |
+| Failure                                                   | Open behavior                                                                        |
+|-----------------------------------------------------------|--------------------------------------------------------------------------------------|
+| unknown cursor record/snapshot version                    | fail topic open                                                                      |
+| key/name/hash/projection mismatch                         | fail topic open                                                                      |
+| root points to missing/corrupt stable object              | fail topic open                                                                      |
+| object read fails but root ref/version changed            | retry new root                                                                       |
+| stable root hits object timeout/transport failure         | fail this open with the original retriable object error；do not relabel it corruption |
+| ACTIVE cursor below current L0 trim                       | fail corruption; never clamp durable ack truth                                       |
+| DELETED tombstone with old ref/properties                 | fail corruption                                                                      |
+| stable pending protection intent cannot be proved/applied | keep pending and fail topic open                                                     |
+| ACTIVE root cannot be claimed/stabilized before deadline  | fail topic open；never dispatch under a mixed owner set                               |
+| scan exceeds count/page/deadline                          | fail topic open                                                                      |
+| metadata/watch transient failure                          | bounded retry, then fail open                                                        |
 
 There is no “skip one bad subscription and open the topic” mode. Such a mode changes the durable subscriptions
 visible to broker and can cause accidental delete/recreate or retention advancement。
@@ -388,7 +390,8 @@ view of such an ack can cause duplicate dispatch，which Pulsar permits，but ca
 Reset、clear-backlog、delete and recreate are admitted only on the fenced topic owner and serialize with that owner's
 cursor read/mutation lane；ownership transfer stops new admission on the old topic，while the fresh F3 root claims
 durably order any already accepted destructive CAS before the new dispatcher hydrates。Graceful lane drain helps the
-normal unload path but is not the crash fence。A watch is only an optimization and cannot establish this ordering。If a local read path
+normal unload path but is not the crash fence。A watch is only an optimization and cannot establish this ordering。If a
+local read path
 observes a generation/lifecycle/`ackStateEpoch` change，it blocks whole-ack skipping until authoritative reload；it
 never treats a pre-destructive cache as a safe filter。Before skipping an Entry solely due to a remotely observed
 whole ack，the cache must be from a strictly decoded root/version。
@@ -796,30 +799,30 @@ A client carrying another owner session fails fenced before any of these CAS-reb
 
 ## 16. Failure Matrix
 
-| Failure point | Durable outcome | Client/broker outcome | Recovery |
-| --- | --- | --- | --- |
-| batch Entry read/parse fails | unchanged | ack fails | retry after source repair |
-| snapshot PUT fails | unchanged | mutation fails | retry mutation |
-| snapshot PUT succeeds, HEAD fails | root unchanged; possible orphan | mutation fails/uncertain object only | root remains authority |
-| snapshot upload succeeds, root CAS loses | winner root only; uploaded orphan | reload/recompute | F4 reclaims orphan |
-| monotonic ack root CAS succeeds, callback process crashes | ack durable | response lost | duplicate ack proves ALREADY_APPLIED；destructive retry follows exact-result/epoch rules |
-| watch event lost | root correct, local cache stale | possible redelivery | mutation GET/CAS and polling refresh |
-| old mutation reaches Oxia while new writable open claims roots | one total order per root | new open remains hidden | old CAS is observed before claim or loses changed version/session |
-| old first-create resumes after an empty-topic new owner claim | owner-only retention version/session changed；marker CAS may already be durable | old create fails fenced before pending/cursor write | marker-only state is safe；current owner alone may begin protection |
+| Failure point                                                                           | Durable outcome                                                                                                  | Client/broker outcome                                                       | Recovery                                                                                                                         |
+|-----------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| batch Entry read/parse fails                                                            | unchanged                                                                                                        | ack fails                                                                   | retry after source repair                                                                                                        |
+| snapshot PUT fails                                                                      | unchanged                                                                                                        | mutation fails                                                              | retry mutation                                                                                                                   |
+| snapshot PUT succeeds, HEAD fails                                                       | root unchanged; possible orphan                                                                                  | mutation fails/uncertain object only                                        | root remains authority                                                                                                           |
+| snapshot upload succeeds, root CAS loses                                                | winner root only; uploaded orphan                                                                                | reload/recompute                                                            | F4 reclaims orphan                                                                                                               |
+| monotonic ack root CAS succeeds, callback process crashes                               | ack durable                                                                                                      | response lost                                                               | duplicate ack proves ALREADY_APPLIED；destructive retry follows exact-result/epoch rules                                          |
+| watch event lost                                                                        | root correct, local cache stale                                                                                  | possible redelivery                                                         | mutation GET/CAS and polling refresh                                                                                             |
+| old mutation reaches Oxia while new writable open claims roots                          | one total order per root                                                                                         | new open remains hidden                                                     | old CAS is observed before claim or loses changed version/session                                                                |
+| old first-create resumes after an empty-topic new owner claim                           | owner-only retention version/session changed；marker CAS may already be durable                                   | old create fails fenced before pending/cursor write                         | marker-only state is safe；current owner alone may begin protection                                                               |
 | old protected CREATE/RECREATE resumes after new owner claims its pending retention root | target cursor CAS may still win because no cross-key atomic condition is assumed；old pending finalize cannot win | old operation is fenced and cannot callback success；new open remains hidden | new owner reloads/rebuilds and claims the target winner，proves the attempt，then alone finalizes ACTIVE before rescan/publication |
-| ownership checker becomes false/errors after root claims | roots may carry unpublished session | ledger callback fails fenced | next legitimate open claims the roots under a fresh session |
-| new open crashes after retention claim or a subset of cursor claims | mixed owner IDs, no published ledger | topic open fails/absent | next fresh owner reclaims retention + every ACTIVE root and restabilizes |
-| stable referenced snapshot missing/corrupt | root references invalid bytes | topic/cursor open fails | restore exact object or operator repair; no fallback |
-| stable referenced snapshot read times out or hits a transport failure | root remains authoritative and unchanged | open fails with the original retriable object error | retry hydration; do not misclassify an operational failure as corruption |
-| close races accepted mutation | root determined by CAS | one terminal callback per op | late result cannot reopen handle |
-| protection pending CAS succeeds, crash before cursor CAS | lower floor + durable complete intent | create/reset response uncertain | startup applies exact intent; no raise/trim |
-| protected cursor CAS succeeds, crash before finalize | cursor root carries attempt ID + pending root | response uncertain | prove attempt, CAS pending -> ACTIVE |
-| in-flight ack wins reset cursor CAS | ack durable + reset still pending | ack may succeed; reset waits | rebuild exact reset from latest same generation |
-| delete wins pending backward reset | tombstone + conservative pending floor | reset closes/fails | prove delete version, finalize without resurrection |
-| trim pending then crash before L0 call | pending barrier | backward ops blocked | reissue same offset |
-| L0 trim succeeds then broker crashes before completion CAS | L0 advanced, pending remains | no unsafe reset | observe L0, finish pending |
-| cursor delete succeeds before snapshot cleanup | tombstone visible, old object unreferenced | delete succeeds | F4 cleanup later |
-| protection-intent/metadata/snapshot limit exceeded before pending/root CAS | unchanged | mutation fails explicitly | operator changes workload/limit |
+| ownership checker becomes false/errors after root claims                                | roots may carry unpublished session                                                                              | ledger callback fails fenced                                                | next legitimate open claims the roots under a fresh session                                                                      |
+| new open crashes after retention claim or a subset of cursor claims                     | mixed owner IDs, no published ledger                                                                             | topic open fails/absent                                                     | next fresh owner reclaims retention + every ACTIVE root and restabilizes                                                         |
+| stable referenced snapshot missing/corrupt                                              | root references invalid bytes                                                                                    | topic/cursor open fails                                                     | restore exact object or operator repair; no fallback                                                                             |
+| stable referenced snapshot read times out or hits a transport failure                   | root remains authoritative and unchanged                                                                         | open fails with the original retriable object error                         | retry hydration; do not misclassify an operational failure as corruption                                                         |
+| close races accepted mutation                                                           | root determined by CAS                                                                                           | one terminal callback per op                                                | late result cannot reopen handle                                                                                                 |
+| protection pending CAS succeeds, crash before cursor CAS                                | lower floor + durable complete intent                                                                            | create/reset response uncertain                                             | startup applies exact intent; no raise/trim                                                                                      |
+| protected cursor CAS succeeds, crash before finalize                                    | cursor root carries attempt ID + pending root                                                                    | response uncertain                                                          | prove attempt, CAS pending -> ACTIVE                                                                                             |
+| in-flight ack wins reset cursor CAS                                                     | ack durable + reset still pending                                                                                | ack may succeed; reset waits                                                | rebuild exact reset from latest same generation                                                                                  |
+| delete wins pending backward reset                                                      | tombstone + conservative pending floor                                                                           | reset closes/fails                                                          | prove delete version, finalize without resurrection                                                                              |
+| trim pending then crash before L0 call                                                  | pending barrier                                                                                                  | backward ops blocked                                                        | reissue same offset                                                                                                              |
+| L0 trim succeeds then broker crashes before completion CAS                              | L0 advanced, pending remains                                                                                     | no unsafe reset                                                             | observe L0, finish pending                                                                                                       |
+| cursor delete succeeds before snapshot cleanup                                          | tombstone visible, old object unreferenced                                                                       | delete succeeds                                                             | F4 cleanup later                                                                                                                 |
+| protection-intent/metadata/snapshot limit exceeded before pending/root CAS              | unchanged                                                                                                        | mutation fails explicitly                                                   | operator changes workload/limit                                                                                                  |
 
 ## 17. Required Deterministic State-machine Tests
 

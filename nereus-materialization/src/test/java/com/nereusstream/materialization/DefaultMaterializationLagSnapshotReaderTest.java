@@ -1,11 +1,11 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.CLUSTER;
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.STREAM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.PayloadFormat;
@@ -47,34 +47,20 @@ import java.util.function.LongSupplier;
 import org.junit.jupiter.api.Test;
 
 class DefaultMaterializationLagSnapshotReaderTest {
-    private static final Clock CLOCK =
-            Clock.fixed(Instant.ofEpochMilli(5_000), ZoneOffset.UTC);
+    private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(5_000), ZoneOffset.UTC);
 
     @Test
     void rebuildsCommittedCoverageAndMeasuresTheExactLiveTail() {
-        MaterializationPolicy policy =
-                MaterializationPlannerTestSupport.policy();
-        GenerationMetadataStore durable =
-                GenerationMetadataStoreTestFactory.inMemory(CLOCK);
-        GenerationMetadataStore generations =
-                MaterializationPlannerTestSupport.generationStore(
-                        List.of(MaterializationPlannerTestSupport.higher(
-                                "/index/covered-1",
-                                0,
-                                1,
-                                1,
-                                0,
-                                10,
-                                1,
-                                policy.digestSha256(),
-                                policy.targetPhysicalFormat())),
-                        List.of(),
-                        durable);
-        ScheduledExecutorService scheduler =
-                Executors.newSingleThreadScheduledExecutor();
+        MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
+        GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+        GenerationMetadataStore generations = MaterializationPlannerTestSupport.generationStore(
+                List.of(MaterializationPlannerTestSupport.higher(
+                        "/index/covered-1", 0, 1, 1, 0, 10, 1, policy.digestSha256(), policy.targetPhysicalFormat())),
+                List.of(),
+                durable);
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
-            MaterializationLagSnapshot snapshot = reader(
-                            policy, generations, scheduler)
+            MaterializationLagSnapshot snapshot = reader(policy, generations, scheduler)
                     .measure(STREAM, Duration.ofSeconds(5))
                     .join();
 
@@ -83,8 +69,7 @@ class DefaultMaterializationLagSnapshotReaderTest {
             assertThat(snapshot.lagRecords()).isOne();
             assertThat(snapshot.lagBytes()).isEqualTo(20);
             assertThat(snapshot.oldestLagMillis()).isEqualTo(3_000);
-            assertThat(snapshot.observedHeadMetadataVersion())
-                    .isEqualTo(5);
+            assertThat(snapshot.observedHeadMetadataVersion()).isEqualTo(5);
             assertThat(snapshot.observedAtMillis()).isEqualTo(5_000);
         } finally {
             scheduler.shutdownNow();
@@ -95,16 +80,10 @@ class DefaultMaterializationLagSnapshotReaderTest {
     @Test
     void measuresBookKeeperAsyncObjectWithTheSharedLagAuthority() {
         MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
-        GenerationMetadataStore durable =
-                GenerationMetadataStoreTestFactory.inMemory(CLOCK);
-        GenerationMetadataStore generations =
-                MaterializationPlannerTestSupport.generationStore(
-                        List.of(),
-                        List.of(),
-                        durable,
-                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT);
-        ScheduledExecutorService scheduler =
-                Executors.newSingleThreadScheduledExecutor();
+        GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+        GenerationMetadataStore generations = MaterializationPlannerTestSupport.generationStore(
+                List.of(), List.of(), durable, StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT);
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             MaterializationLagSnapshot snapshot = new DefaultMaterializationLagSnapshotReader(
                             CLUSTER,
@@ -129,16 +108,10 @@ class DefaultMaterializationLagSnapshotReaderTest {
 
     @Test
     void rejectsAnAdvisoryCheckpointAheadOfVerifiedCoverage() {
-        MaterializationPolicy policy =
-                MaterializationPlannerTestSupport.policy();
-        GenerationMetadataStore durable =
-                GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+        MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
+        GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(CLOCK);
         var bootstrap = durable.getOrCreateMaterializationCheckpoint(
-                        CLUSTER,
-                        STREAM,
-                        policy.policyId(),
-                        policy.policyVersion(),
-                        policy.digestSha256())
+                        CLUSTER, STREAM, policy.policyId(), policy.policyVersion(), policy.digestSha256())
                 .join();
         MaterializationCheckpointRecord value = bootstrap.value();
         durable.compareAndSetMaterializationCheckpoint(
@@ -158,17 +131,13 @@ class DefaultMaterializationLagSnapshotReaderTest {
                         bootstrap.metadataVersion())
                 .join();
         GenerationMetadataStore generations =
-                MaterializationPlannerTestSupport.generationStore(
-                        List.of(), List.of(), durable);
-        ScheduledExecutorService scheduler =
-                Executors.newSingleThreadScheduledExecutor();
+                MaterializationPlannerTestSupport.generationStore(List.of(), List.of(), durable);
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
-            assertThatThrownBy(() -> reader(
-                                    policy, generations, scheduler)
+            assertThatThrownBy(() -> reader(policy, generations, scheduler)
                             .measure(STREAM, Duration.ofSeconds(5))
                             .join())
-                    .hasRootCauseMessage(
-                            "materialization checkpoint is ahead of verified committed coverage");
+                    .hasRootCauseMessage("materialization checkpoint is ahead of verified committed coverage");
         } finally {
             scheduler.shutdownNow();
             generations.close();
@@ -177,32 +146,20 @@ class DefaultMaterializationLagSnapshotReaderTest {
 
     @Test
     void ignoresReadObservationTimeWhenRevalidatingStableStreamHead() {
-        MaterializationPolicy policy =
-                MaterializationPlannerTestSupport.policy();
-        GenerationMetadataStore durable =
-                GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+        MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
+        GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(CLOCK);
         GenerationMetadataStore generations =
-                MaterializationPlannerTestSupport.generationStore(
-                        List.of(), List.of(), durable);
-        ScheduledExecutorService scheduler =
-                Executors.newSingleThreadScheduledExecutor();
+                MaterializationPlannerTestSupport.generationStore(List.of(), List.of(), durable);
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         AtomicLong observedAt = new AtomicLong(10_000);
         try {
             MaterializationLagSnapshot snapshot = new DefaultMaterializationLagSnapshotReader(
-                            CLUSTER,
-                            l0(observedAt::incrementAndGet),
-                            generations,
-                            policy,
-                            16,
-                            16,
-                            scheduler,
-                            CLOCK)
+                            CLUSTER, l0(observedAt::incrementAndGet), generations, policy, 16, 16, scheduler, CLOCK)
                     .measure(STREAM, Duration.ofSeconds(5))
                     .join();
 
             assertThat(snapshot.committedEndOffset()).isEqualTo(2);
-            assertThat(snapshot.observedHeadMetadataVersion())
-                    .isEqualTo(5);
+            assertThat(snapshot.observedHeadMetadataVersion()).isEqualTo(5);
             assertThat(observedAt).hasValueGreaterThan(10_001);
         } finally {
             scheduler.shutdownNow();
@@ -211,18 +168,9 @@ class DefaultMaterializationLagSnapshotReaderTest {
     }
 
     private static DefaultMaterializationLagSnapshotReader reader(
-            MaterializationPolicy policy,
-            GenerationMetadataStore generations,
-            ScheduledExecutorService scheduler) {
+            MaterializationPolicy policy, GenerationMetadataStore generations, ScheduledExecutorService scheduler) {
         return new DefaultMaterializationLagSnapshotReader(
-                CLUSTER,
-                l0(),
-                generations,
-                policy,
-                16,
-                16,
-                scheduler,
-                CLOCK);
+                CLUSTER, l0(), generations, policy, 16, 16, scheduler, CLOCK);
     }
 
     private static OxiaMetadataStore l0() {
@@ -233,60 +181,33 @@ class DefaultMaterializationLagSnapshotReaderTest {
         return l0(() -> 1, profile);
     }
 
-    private static OxiaMetadataStore l0(
-            LongSupplier observedAtMillis) {
+    private static OxiaMetadataStore l0(LongSupplier observedAtMillis) {
         return l0(observedAtMillis, StorageProfile.OBJECT_WAL_SYNC_OBJECT);
     }
 
-    private static OxiaMetadataStore l0(
-            LongSupplier observedAtMillis,
-            StorageProfile profile) {
-        AppendRecoveryAnchor anchor =
-                AppendRecoveryAnchor.genesis(STREAM);
-        AppendRecoveryHead head =
-                new AppendRecoveryHead(
-                        STREAM, "commit-2", 2, 30, 2, 5);
-        AppendRecoveryTailPage tail =
-                new AppendRecoveryTailPage(
-                        anchor,
-                        head,
-                        List.of(
-                                commit(
-                                        "commit-2",
-                                        "commit-1",
-                                        1,
-                                        2,
-                                        30,
-                                        20,
-                                        2,
-                                        2_000),
-                                commit(
-                                        "commit-1",
-                                        "",
-                                        0,
-                                        1,
-                                        10,
-                                        10,
-                                        1,
-                                        1_000)),
-                        true,
-                        Optional.empty());
+    private static OxiaMetadataStore l0(LongSupplier observedAtMillis, StorageProfile profile) {
+        AppendRecoveryAnchor anchor = AppendRecoveryAnchor.genesis(STREAM);
+        AppendRecoveryHead head = new AppendRecoveryHead(STREAM, "commit-2", 2, 30, 2, 5);
+        AppendRecoveryTailPage tail = new AppendRecoveryTailPage(
+                anchor,
+                head,
+                List.of(
+                        commit("commit-2", "commit-1", 1, 2, 30, 20, 2, 2_000),
+                        commit("commit-1", "", 0, 1, 10, 10, 1, 1_000)),
+                true,
+                Optional.empty());
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class},
                 (proxy, method, arguments) -> switch (method.getName()) {
                     case "getStreamSnapshot" ->
-                        CompletableFuture.completedFuture(
-                                snapshot(observedAtMillis.getAsLong(), profile));
-                    case "readAppendRecoveryTail" ->
-                        CompletableFuture.completedFuture(tail);
+                        CompletableFuture.completedFuture(snapshot(observedAtMillis.getAsLong(), profile));
+                    case "readAppendRecoveryTail" -> CompletableFuture.completedFuture(tail);
                     case "close" -> null;
                     case "toString" -> "materialization-lag-l0";
                     case "hashCode" -> System.identityHashCode(proxy);
                     case "equals" -> proxy == arguments[0];
-                    default ->
-                        throw new UnsupportedOperationException(
-                                method.getName());
+                    default -> throw new UnsupportedOperationException(method.getName());
                 });
     }
 
@@ -294,16 +215,11 @@ class DefaultMaterializationLagSnapshotReaderTest {
         return snapshot(1);
     }
 
-    private static StreamMetadataSnapshot snapshot(
-            long trimUpdatedAtMillis) {
-        return snapshot(
-                trimUpdatedAtMillis,
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+    private static StreamMetadataSnapshot snapshot(long trimUpdatedAtMillis) {
+        return snapshot(trimUpdatedAtMillis, StorageProfile.OBJECT_WAL_SYNC_OBJECT);
     }
 
-    private static StreamMetadataSnapshot snapshot(
-            long trimUpdatedAtMillis,
-            StorageProfile profile) {
+    private static StreamMetadataSnapshot snapshot(long trimUpdatedAtMillis, StorageProfile profile) {
         return new StreamMetadataSnapshot(
                 new StreamMetadataRecord(
                         STREAM.value(),
@@ -315,10 +231,8 @@ class DefaultMaterializationLagSnapshotReaderTest {
                         1,
                         1,
                         5),
-                new CommittedEndOffsetRecord(
-                        STREAM.value(), 2, 30, 2, 5),
-                new TrimRecord(
-                        STREAM.value(), 0, "", trimUpdatedAtMillis, 5));
+                new CommittedEndOffsetRecord(STREAM.value(), 2, 30, 2, 5),
+                new TrimRecord(STREAM.value(), 0, "", trimUpdatedAtMillis, 5));
     }
 
     private static AppendRecoveryCommit commit(
@@ -330,47 +244,42 @@ class DefaultMaterializationLagSnapshotReaderTest {
             long logicalBytes,
             long commitVersion,
             long preparedAtMillis) {
-        StreamCommitTargetRecord value =
-                new StreamCommitTargetRecord(
-                        STREAM.value(),
-                        commitId,
-                        previousCommitId,
-                        start,
-                        end,
-                        0,
-                        cumulativeSize,
-                        commitVersion,
-                        "writer",
-                        "writer-run",
+        StreamCommitTargetRecord value = new StreamCommitTargetRecord(
+                STREAM.value(),
+                commitId,
+                previousCommitId,
+                start,
+                end,
+                0,
+                cumulativeSize,
+                commitVersion,
+                "writer",
+                "writer-run",
+                1,
+                "fencing-hash",
+                new ReadTargetRecord(
+                        "OBJECT_SLICE",
                         1,
-                        "fencing-hash",
-                        new ReadTargetRecord(
-                                "OBJECT_SLICE",
-                                1,
-                                "canonical-target-v1",
-                                new byte[] {1},
-                                ChecksumType.SHA256.name(),
-                                "a".repeat(64)),
-                        PayloadFormat.PULSAR_ENTRY_BATCH.name(),
-                        1,
-                        1,
-                        logicalBytes,
-                        List.of(),
-                        MaterializationRecordMapper
-                                .projectionIdentity(Optional.of(
-                                        MaterializationPlannerTestSupport
-                                                .PROJECTION)),
-                        1,
-                        1,
-                        preparedAtMillis,
-                        0);
-        byte[] bytes = MetadataRecordCodecFactory.encodeEnvelope(
-                value, StreamCommitTargetRecord.class);
+                        "canonical-target-v1",
+                        new byte[] {1},
+                        ChecksumType.SHA256.name(),
+                        "a".repeat(64)),
+                PayloadFormat.PULSAR_ENTRY_BATCH.name(),
+                1,
+                1,
+                logicalBytes,
+                List.of(),
+                MaterializationRecordMapper.projectionIdentity(
+                        Optional.of(MaterializationPlannerTestSupport.PROJECTION)),
+                1,
+                1,
+                preparedAtMillis,
+                0);
+        byte[] bytes = MetadataRecordCodecFactory.encodeEnvelope(value, StreamCommitTargetRecord.class);
         Checksum digest = sha256(bytes);
         return new AppendRecoveryCommit(
                 "/commit/" + commitId,
-                AppendRecoveryCommitEncoding
-                        .GENERIC_STREAM_COMMIT_TARGET_V1,
+                AppendRecoveryCommitEncoding.GENERIC_STREAM_COMMIT_TARGET_V1,
                 value,
                 commitVersion,
                 digest,
@@ -382,9 +291,8 @@ class DefaultMaterializationLagSnapshotReaderTest {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(
-                            MessageDigest.getInstance("SHA-256")
-                                    .digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (Exception failure) {
             throw new AssertionError(failure);
         }

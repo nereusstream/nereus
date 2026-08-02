@@ -16,10 +16,10 @@ package com.nereusstream.api;
 
 import java.util.Objects;
 
-/** Opaque reference to future protocol projection metadata. */
-public record ProjectionRef(
-        ProjectionType type,
-        String value) {
+/**
+ * Opaque reference to future protocol projection metadata.
+ */
+public record ProjectionRef(ProjectionType type, String value) {
     public ProjectionRef {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(value, "value");

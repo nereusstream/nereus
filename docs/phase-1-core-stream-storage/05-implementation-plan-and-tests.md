@@ -168,10 +168,12 @@ M2 foundation implementation status:
 - current tests cover key encoding and offset ordering, metadata envelope corruption/truncation,
   strict metadata UTF-8 decode, per-record codec round-trip/error-path/golden bytes,
   fake-store codec-backed value persistence,
-  deterministic stream id create-or-get, session renew/fencing/expiry/steal/reacquire, commit materialization, partition-key access
+  deterministic stream id create-or-get, session renew/fencing/expiry/steal/reacquire, commit materialization,
+  partition-key access
   recording, failure after head CAS before derived index, repair-derived-index recovery, same-slice retry,
   object-reference repair, manifest-only slices not becoming visible, watch drop/duplicate/stale/collapsed/
-  reconnect events，watch-callback failure isolation/closed-store rejection，offset conflict classification, commit identity delimiter/event-time/projection
+  reconnect events，watch-callback failure isolation/closed-store rejection，offset conflict classification, commit
+  identity delimiter/event-time/projection
   coverage, metadata record range overflow rejection, committed-slice-marker-first replay, post-commit
   object-audit failure leaving visible data repairable, and adapter-private partition-key helper
   enforcement；
@@ -667,251 +669,251 @@ including the same ordinary suites、5 production-adapter Docker tests、5 capab
 
 ### API/value tests
 
-| Test | Expected |
-| --- | --- |
-| blank `StreamId` | constructor fails |
-| negative offset range | constructor fails |
-| negative read or resolve start offset | failed future with `INVALID_ARGUMENT` |
-| `endOffset < startOffset` | constructor fails |
-| stream attributes contain null or exceed 16 KiB encoded size | constructor or validation fails |
-| append session option with blank writer, sub-millisecond/non-positive TTL, or millisecond overflow | constructor or validation fails before metadata write |
-| decoded non-empty append session has zero epoch, leaseVersion, or expiry | record validation fails before fencing use |
-| append with session for another stream or writer id | append fails before WAL upload |
-| invalid `StreamStorageConfig` duration/count relationship | construction fails with `INVALID_ARGUMENT` |
-| empty append batch | constructor fails |
-| record count mismatch | constructor fails |
-| append entry with null payload | constructor fails |
-| zero-byte append entry | succeeds, consumes one offset, and can be read without infinite loop |
-| append batch event time range invalid | constructor fails |
-| append entry event time outside batch range | constructor fails |
-| append batch checksum mismatch | constructor fails |
-| schema refs contain null, duplicate tuple, or exceed 16 KiB encoded size | constructor fails |
-| schema refs supplied in different orders | WAL metadata and offset index use the same canonical order |
-| entry attributes contain null or exceed 16 KiB encoded size | constructor fails |
-| non-empty `AppendOptions.tags` | not persisted in WAL or metadata |
-| non-empty `projectionHints` in public append | constructor fails |
-| `OPAQUE_RECORD_BATCH` entry with `recordCount > 1` | rejected until a decoder exists |
-| public append with non-`OPAQUE_RECORD_BATCH` payload format | constructor fails before WAL upload |
-| `EntryIndexRef` with `INDEX_OBJECT` but no object key | constructor or validation fails |
-| `EntryIndexRef` with `INLINE` but no inline bytes | constructor or validation fails |
-| physical object range where `offset + length` overflows | constructor or validation fails |
-| append result with empty range or zero counts | constructor or validation fails |
-| malformed checksum text | constructor or validation fails |
-| `ReadOptions.maxRecords <= 0` or `maxBytes <= 0` | constructor or validation fails |
-| `ResolveOptions.maxRanges <= 0` | constructor or validation fails |
-| object-store operation timeout option is non-positive | constructor or validation fails |
-| `WalWriteOptions.targetObjectSizeBytes <= 0`, `maxObjectBytes <= 0`, or target greater than max | constructor or validation fails |
-| append after `StreamStorage.close()` | failed future with `STORAGE_CLOSED` |
-| first readable entry exceeds `ReadOptions.maxBytes` | `READ_LIMIT_TOO_SMALL` |
+| Test                                                                                               | Expected                                                             |
+|----------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
+| blank `StreamId`                                                                                   | constructor fails                                                    |
+| negative offset range                                                                              | constructor fails                                                    |
+| negative read or resolve start offset                                                              | failed future with `INVALID_ARGUMENT`                                |
+| `endOffset < startOffset`                                                                          | constructor fails                                                    |
+| stream attributes contain null or exceed 16 KiB encoded size                                       | constructor or validation fails                                      |
+| append session option with blank writer, sub-millisecond/non-positive TTL, or millisecond overflow | constructor or validation fails before metadata write                |
+| decoded non-empty append session has zero epoch, leaseVersion, or expiry                           | record validation fails before fencing use                           |
+| append with session for another stream or writer id                                                | append fails before WAL upload                                       |
+| invalid `StreamStorageConfig` duration/count relationship                                          | construction fails with `INVALID_ARGUMENT`                           |
+| empty append batch                                                                                 | constructor fails                                                    |
+| record count mismatch                                                                              | constructor fails                                                    |
+| append entry with null payload                                                                     | constructor fails                                                    |
+| zero-byte append entry                                                                             | succeeds, consumes one offset, and can be read without infinite loop |
+| append batch event time range invalid                                                              | constructor fails                                                    |
+| append entry event time outside batch range                                                        | constructor fails                                                    |
+| append batch checksum mismatch                                                                     | constructor fails                                                    |
+| schema refs contain null, duplicate tuple, or exceed 16 KiB encoded size                           | constructor fails                                                    |
+| schema refs supplied in different orders                                                           | WAL metadata and offset index use the same canonical order           |
+| entry attributes contain null or exceed 16 KiB encoded size                                        | constructor fails                                                    |
+| non-empty `AppendOptions.tags`                                                                     | not persisted in WAL or metadata                                     |
+| non-empty `projectionHints` in public append                                                       | constructor fails                                                    |
+| `OPAQUE_RECORD_BATCH` entry with `recordCount > 1`                                                 | rejected until a decoder exists                                      |
+| public append with non-`OPAQUE_RECORD_BATCH` payload format                                        | constructor fails before WAL upload                                  |
+| `EntryIndexRef` with `INDEX_OBJECT` but no object key                                              | constructor or validation fails                                      |
+| `EntryIndexRef` with `INLINE` but no inline bytes                                                  | constructor or validation fails                                      |
+| physical object range where `offset + length` overflows                                            | constructor or validation fails                                      |
+| append result with empty range or zero counts                                                      | constructor or validation fails                                      |
+| malformed checksum text                                                                            | constructor or validation fails                                      |
+| `ReadOptions.maxRecords <= 0` or `maxBytes <= 0`                                                   | constructor or validation fails                                      |
+| `ResolveOptions.maxRanges <= 0`                                                                    | constructor or validation fails                                      |
+| object-store operation timeout option is non-positive                                              | constructor or validation fails                                      |
+| `WalWriteOptions.targetObjectSizeBytes <= 0`, `maxObjectBytes <= 0`, or target greater than max    | constructor or validation fails                                      |
+| append after `StreamStorage.close()`                                                               | failed future with `STORAGE_CLOSED`                                  |
+| first readable entry exceeds `ReadOptions.maxBytes`                                                | `READ_LIMIT_TOO_SMALL`                                               |
 
 ### Metadata tests
 
-| Test | Expected |
-| --- | --- |
-| concurrent create same stream name | same `StreamId` |
-| create same stream name after restart | same deterministic `StreamId` |
-| stream names differ only by caller-provided whitespace | different `streamNameHash` and different `StreamId` unless caller normalized before construction |
-| deterministic stream id format | `s-` plus full `base32lower_nopad(sha256(UTF-8 exact StreamName.value()))`; no durable readable alias |
-| shared key/hash helper parity | metadata keyspace and object key generation use the same helper outputs |
-| create stream with attributes | `getStreamMetadata` returns the same attributes |
-| create stream head | one `putIfAbsent` creates authoritative `StreamHeadRecord` |
-| by-name cache write fails after head create | create-or-get still returns stream from deterministic head |
-| stream name hash collision | non-retriable invariant/collision error |
-| deterministic stream id collision with different metadata name | non-retriable invariant/collision error |
-| existing sealed stream | create-or-get returns metadata; append/session acquire rejected; read/trim allowed |
-| deleting/deleted stream metadata | append/read/trim rejected according to API state table |
-| slice id contains `/` | committed-slice marker uses encoded component, not nested raw path |
-| dynamic component starts with reserved `b32-` prefix | key encoder escapes it instead of storing raw |
-| dynamic component is `.` or `..` | key encoder escapes it instead of emitting filesystem-special segments |
-| dynamic component looks like a Windows drive designator | key encoder escapes it instead of emitting a platform-special segment |
-| cluster contains `/` or starts with reserved `b32-` prefix | Oxia paths and object keys use `clusterComponent`, not raw cluster |
-| writer id contains path separators | object id uses full key-safe writer/run hashes from shared helpers, not raw writer id |
-| writer hash helper truncation attempt | rejected by tests unless a collision-budget migration document exists |
-| writer run id entropy | generated from at least 128 bits of strong randomness per process incarnation |
-| writer restarts in same timestamp bucket | object id changes because `writerRunIdHash` changes |
-| object upload timeout then new attempt in same process | new attempt uses a fresh object sequence and object id |
-| validation failure before upload | consumed object sequence is not reused by later attempts |
-| acquire when missing | epoch created |
-| acquire by same writer | session reused or renewed |
-| acquire expired different-writer session without allow-steal | `APPEND_SESSION_EXPIRED` |
-| acquire expired different-writer session with allow-steal | higher epoch |
-| two live writers use same `writerId` | documented invalid configuration; test rejects duplicate in local harness when detectable |
-| same writer live renew | epoch and fencing token stay stable |
-| same writer renew after expiry | higher epoch and new fencing token |
-| acquire by different writer before expiry | fenced |
-| acquire by different writer after expiry | requires allow-steal; otherwise `APPEND_SESSION_EXPIRED` |
-| renew after stream becomes non-active | rejected with `STREAM_NOT_ACTIVE` |
-| commit with stale token | `FENCED_APPEND` |
-| same-writer live renew during in-flight append | append can still commit with same epoch/token |
-| head CAS loses to same-writer live renew | retries with latest head and preserves renewed session fields |
-| head CAS loses to trim-only head update | retries with latest head and preserves updated trim offset |
-| append starts with lease below minimum remaining | renews before WAL upload or fails without upload |
-| lease falls below minimum before commit | renews before `commitStreamSlice` or fails without sending commit |
-| commit with wrong expected offset | `OFFSET_CONFLICT` |
-| offsetEnd overflow while committing | rejected before commit-log put and head CAS |
-| cumulativeSize overflow while committing | rejected before commit-log put and head CAS |
-| `CommitSliceRequest.expectedStartOffset + recordCount` overflow | constructor rejects it before metadata access |
-| commit valid slice | commit-log record written, stream-head CAS advances, offset-index and marker materialized before ack |
-| committed offset index value | contains logical bytes and slice checksum needed for resolve/read |
-| committed offset index value schema refs | contains canonical schema refs derived from append batch |
-| hydrated offset index record | exposes Oxia `metadataVersion` separately from durable `commitVersion` |
-| valid sequential commits | `commitVersion` increments by one and matches stream head, commit-log, offset-index, and committed-slice records |
-| commit same visible slice again after lost response | returns original commit result; no second offset range |
-| new append at current committed end after history exceeds replay budget | commits normally without historical replay scan |
-| compatible renew/trim changes only head metadata version on a long stream | retries CAS without historical replay scan |
-| historical replay reaches a different commit occupying/crossing expected start at the scan boundary | proves not committed and returns classified conflict, not `MAY_HAVE_COMMITTED` |
-| concurrent same-slice replay loses marker-missing condition race | re-reads marker or head chain and returns original commit result |
-| head CAS succeeds but offset index materialization fails | same physical retry repairs index and returns original result |
-| resolver sees gap below stream head committed end | repairs derived offset index from commit-log before returning data |
-| resolver repair scan budget exhausted before covering target | continues from returned cursor within read budget or fails retriably, not as metadata corruption |
-| repair continuation tuple is altered or points at an inconsistent record | `METADATA_INVARIANT_VIOLATION`; no derived record is materialized |
-| reachable commit chain ends before a below-head repair target | `METADATA_INVARIANT_VIOLATION` |
-| committed-slice marker exists but offset index missing | repair from head chain or `METADATA_INVARIANT_VIOLATION` if bytes conflict |
-| committed-slice marker exists but offset index fields differ from request | `METADATA_INVARIANT_VIOLATION` |
-| object-reference rebuild conflicts with manifest identity or would drop an existing visible slice | `METADATA_INVARIANT_VIOLATION` |
-| manifest ordinal/order differs, slice ranges overlap, or object references duplicate one stream/slice identity | record/manifest validation fails before commit or repair write |
-| commit path tries to use multi-key batch | fake store contract rejects the unsupported primitive |
-| missing partition key in adapter call | fake contract test fails before write |
-| wrong metadata record type or unsupported schema version | decode fails before state machine uses the value |
-| decoded head/commit/index/marker/reference has impossible anchor, zero commitVersion, non-dense logical range, or zero physical slice length | record decode/validation fails before append, replay, or read |
-| metadata codec golden bytes | stable for every Phase 1 record type |
-| metadata map encoding | maps are encoded in deterministic UTF-8 key order |
-| schema refs encoding | schema refs are encoded in canonical tuple order |
-| offset/generation key encoding | non-negative long encoded as 19-digit zero-padded decimal |
-| scan offset index for offset inside first range | returns covering entry |
-| scan offset index for offset at range boundary | returns next range |
-| scan offset index for one-record range `[9, 10)` at offset `9` | does not skip `offsetEnd=10` |
-| trim decreases | rejected |
-| trim beyond committed end | rejected |
-| trim negative offset | rejected |
-| null trim reason or invalid trim range | `INVALID_ARGUMENT` before head mutation |
-| trim sealed stream | allowed if within committed bounds |
-| manifest exists but object reference missing | no Phase 1 delete; data visibility follows offset index |
-| repair object references | rebuilds from validated manifest + stream-head chain, materializes derived indexes, and never drops an existing visible reference |
-| repair object references for missing manifest | fails with metadata invariant error |
+| Test                                                                                                                                         | Expected                                                                                                                          |
+|----------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| concurrent create same stream name                                                                                                           | same `StreamId`                                                                                                                   |
+| create same stream name after restart                                                                                                        | same deterministic `StreamId`                                                                                                     |
+| stream names differ only by caller-provided whitespace                                                                                       | different `streamNameHash` and different `StreamId` unless caller normalized before construction                                  |
+| deterministic stream id format                                                                                                               | `s-` plus full `base32lower_nopad(sha256(UTF-8 exact StreamName.value()))`; no durable readable alias                             |
+| shared key/hash helper parity                                                                                                                | metadata keyspace and object key generation use the same helper outputs                                                           |
+| create stream with attributes                                                                                                                | `getStreamMetadata` returns the same attributes                                                                                   |
+| create stream head                                                                                                                           | one `putIfAbsent` creates authoritative `StreamHeadRecord`                                                                        |
+| by-name cache write fails after head create                                                                                                  | create-or-get still returns stream from deterministic head                                                                        |
+| stream name hash collision                                                                                                                   | non-retriable invariant/collision error                                                                                           |
+| deterministic stream id collision with different metadata name                                                                               | non-retriable invariant/collision error                                                                                           |
+| existing sealed stream                                                                                                                       | create-or-get returns metadata; append/session acquire rejected; read/trim allowed                                                |
+| deleting/deleted stream metadata                                                                                                             | append/read/trim rejected according to API state table                                                                            |
+| slice id contains `/`                                                                                                                        | committed-slice marker uses encoded component, not nested raw path                                                                |
+| dynamic component starts with reserved `b32-` prefix                                                                                         | key encoder escapes it instead of storing raw                                                                                     |
+| dynamic component is `.` or `..`                                                                                                             | key encoder escapes it instead of emitting filesystem-special segments                                                            |
+| dynamic component looks like a Windows drive designator                                                                                      | key encoder escapes it instead of emitting a platform-special segment                                                             |
+| cluster contains `/` or starts with reserved `b32-` prefix                                                                                   | Oxia paths and object keys use `clusterComponent`, not raw cluster                                                                |
+| writer id contains path separators                                                                                                           | object id uses full key-safe writer/run hashes from shared helpers, not raw writer id                                             |
+| writer hash helper truncation attempt                                                                                                        | rejected by tests unless a collision-budget migration document exists                                                             |
+| writer run id entropy                                                                                                                        | generated from at least 128 bits of strong randomness per process incarnation                                                     |
+| writer restarts in same timestamp bucket                                                                                                     | object id changes because `writerRunIdHash` changes                                                                               |
+| object upload timeout then new attempt in same process                                                                                       | new attempt uses a fresh object sequence and object id                                                                            |
+| validation failure before upload                                                                                                             | consumed object sequence is not reused by later attempts                                                                          |
+| acquire when missing                                                                                                                         | epoch created                                                                                                                     |
+| acquire by same writer                                                                                                                       | session reused or renewed                                                                                                         |
+| acquire expired different-writer session without allow-steal                                                                                 | `APPEND_SESSION_EXPIRED`                                                                                                          |
+| acquire expired different-writer session with allow-steal                                                                                    | higher epoch                                                                                                                      |
+| two live writers use same `writerId`                                                                                                         | documented invalid configuration; test rejects duplicate in local harness when detectable                                         |
+| same writer live renew                                                                                                                       | epoch and fencing token stay stable                                                                                               |
+| same writer renew after expiry                                                                                                               | higher epoch and new fencing token                                                                                                |
+| acquire by different writer before expiry                                                                                                    | fenced                                                                                                                            |
+| acquire by different writer after expiry                                                                                                     | requires allow-steal; otherwise `APPEND_SESSION_EXPIRED`                                                                          |
+| renew after stream becomes non-active                                                                                                        | rejected with `STREAM_NOT_ACTIVE`                                                                                                 |
+| commit with stale token                                                                                                                      | `FENCED_APPEND`                                                                                                                   |
+| same-writer live renew during in-flight append                                                                                               | append can still commit with same epoch/token                                                                                     |
+| head CAS loses to same-writer live renew                                                                                                     | retries with latest head and preserves renewed session fields                                                                     |
+| head CAS loses to trim-only head update                                                                                                      | retries with latest head and preserves updated trim offset                                                                        |
+| append starts with lease below minimum remaining                                                                                             | renews before WAL upload or fails without upload                                                                                  |
+| lease falls below minimum before commit                                                                                                      | renews before `commitStreamSlice` or fails without sending commit                                                                 |
+| commit with wrong expected offset                                                                                                            | `OFFSET_CONFLICT`                                                                                                                 |
+| offsetEnd overflow while committing                                                                                                          | rejected before commit-log put and head CAS                                                                                       |
+| cumulativeSize overflow while committing                                                                                                     | rejected before commit-log put and head CAS                                                                                       |
+| `CommitSliceRequest.expectedStartOffset + recordCount` overflow                                                                              | constructor rejects it before metadata access                                                                                     |
+| commit valid slice                                                                                                                           | commit-log record written, stream-head CAS advances, offset-index and marker materialized before ack                              |
+| committed offset index value                                                                                                                 | contains logical bytes and slice checksum needed for resolve/read                                                                 |
+| committed offset index value schema refs                                                                                                     | contains canonical schema refs derived from append batch                                                                          |
+| hydrated offset index record                                                                                                                 | exposes Oxia `metadataVersion` separately from durable `commitVersion`                                                            |
+| valid sequential commits                                                                                                                     | `commitVersion` increments by one and matches stream head, commit-log, offset-index, and committed-slice records                  |
+| commit same visible slice again after lost response                                                                                          | returns original commit result; no second offset range                                                                            |
+| new append at current committed end after history exceeds replay budget                                                                      | commits normally without historical replay scan                                                                                   |
+| compatible renew/trim changes only head metadata version on a long stream                                                                    | retries CAS without historical replay scan                                                                                        |
+| historical replay reaches a different commit occupying/crossing expected start at the scan boundary                                          | proves not committed and returns classified conflict, not `MAY_HAVE_COMMITTED`                                                    |
+| concurrent same-slice replay loses marker-missing condition race                                                                             | re-reads marker or head chain and returns original commit result                                                                  |
+| head CAS succeeds but offset index materialization fails                                                                                     | same physical retry repairs index and returns original result                                                                     |
+| resolver sees gap below stream head committed end                                                                                            | repairs derived offset index from commit-log before returning data                                                                |
+| resolver repair scan budget exhausted before covering target                                                                                 | continues from returned cursor within read budget or fails retriably, not as metadata corruption                                  |
+| repair continuation tuple is altered or points at an inconsistent record                                                                     | `METADATA_INVARIANT_VIOLATION`; no derived record is materialized                                                                 |
+| reachable commit chain ends before a below-head repair target                                                                                | `METADATA_INVARIANT_VIOLATION`                                                                                                    |
+| committed-slice marker exists but offset index missing                                                                                       | repair from head chain or `METADATA_INVARIANT_VIOLATION` if bytes conflict                                                        |
+| committed-slice marker exists but offset index fields differ from request                                                                    | `METADATA_INVARIANT_VIOLATION`                                                                                                    |
+| object-reference rebuild conflicts with manifest identity or would drop an existing visible slice                                            | `METADATA_INVARIANT_VIOLATION`                                                                                                    |
+| manifest ordinal/order differs, slice ranges overlap, or object references duplicate one stream/slice identity                               | record/manifest validation fails before commit or repair write                                                                    |
+| commit path tries to use multi-key batch                                                                                                     | fake store contract rejects the unsupported primitive                                                                             |
+| missing partition key in adapter call                                                                                                        | fake contract test fails before write                                                                                             |
+| wrong metadata record type or unsupported schema version                                                                                     | decode fails before state machine uses the value                                                                                  |
+| decoded head/commit/index/marker/reference has impossible anchor, zero commitVersion, non-dense logical range, or zero physical slice length | record decode/validation fails before append, replay, or read                                                                     |
+| metadata codec golden bytes                                                                                                                  | stable for every Phase 1 record type                                                                                              |
+| metadata map encoding                                                                                                                        | maps are encoded in deterministic UTF-8 key order                                                                                 |
+| schema refs encoding                                                                                                                         | schema refs are encoded in canonical tuple order                                                                                  |
+| offset/generation key encoding                                                                                                               | non-negative long encoded as 19-digit zero-padded decimal                                                                         |
+| scan offset index for offset inside first range                                                                                              | returns covering entry                                                                                                            |
+| scan offset index for offset at range boundary                                                                                               | returns next range                                                                                                                |
+| scan offset index for one-record range `[9, 10)` at offset `9`                                                                               | does not skip `offsetEnd=10`                                                                                                      |
+| trim decreases                                                                                                                               | rejected                                                                                                                          |
+| trim beyond committed end                                                                                                                    | rejected                                                                                                                          |
+| trim negative offset                                                                                                                         | rejected                                                                                                                          |
+| null trim reason or invalid trim range                                                                                                       | `INVALID_ARGUMENT` before head mutation                                                                                           |
+| trim sealed stream                                                                                                                           | allowed if within committed bounds                                                                                                |
+| manifest exists but object reference missing                                                                                                 | no Phase 1 delete; data visibility follows offset index                                                                           |
+| repair object references                                                                                                                     | rebuilds from validated manifest + stream-head chain, materializes derived indexes, and never drops an existing visible reference |
+| repair object references for missing manifest                                                                                                | fails with metadata invariant error                                                                                               |
 
 ### Object WAL tests
 
-| Test | Expected |
-| --- | --- |
-| write/read one-slice object | payload and index match |
-| write/read multi-slice object | each slice has independent range |
-| `forceSingleStreamObject=true` with multiple stream ids | writer rejects before object upload |
-| `forceSingleStreamObject=true` with one stream id | writer may write one or more slices for that stream without changing layout |
-| WAL write request | carries `writerRunIdHash` into object id/key/header |
-| WAL section envelope | each variable-length section has type, version, length, and checksum |
-| WAL binary ids | object/section ids use fixed constants, never Java enum ordinal |
-| object manifest format metadata | stores format major/minor version and writer version |
-| deterministic slice id and order | slices have zero-based ordinals and stable object-local slice ids |
-| Phase 1 entry index location | writer always emits `OBJECT_FOOTER` |
-| read `INLINE` or `INDEX_OBJECT` entry index | fails with `UNSUPPORTED_FORMAT` in Phase 1 |
-| WAL header/footer checksum | decoder rejects wrong header, footer, or object checksum |
-| WAL canonical checksum versus storage checksum | writer computes both domains and manifest stores both without comparing them as equal |
-| WAL descriptor bounds | decoder rejects offsets/lengths outside object bounds |
-| entry payload offset inside non-zero slice offset | reader computes `slicePayloadOffset + entryPayloadOffset` |
-| entry index deterministic encoding | checksum golden test is stable |
-| zero-byte entry index item | payload length zero is valid and still advances relative offset |
-| malformed entry index ordering | reader rejects non-contiguous or overlapping opaque entries |
-| slice checksum domain | checksum covers `concat(slicePayloadBytes, entryIndexBytes)` |
-| WAL upload timeout propagation | `WalWriteOptions.uploadTimeout` is copied into `PutObjectOptions.timeout` |
-| final encoded object length exceeds `maxObjectBytes` | writer fails with `INVALID_ARGUMENT` before object upload |
-| object payload fits but footer/index/header push encoded length over max | writer fails before upload |
-| request exceeds `targetObjectSizeBytes` but fits `maxObjectBytes` | writer succeeds because target is advisory |
-| WAL sizing arithmetic overflows | writer fails before allocation and before upload |
-| duplicate object key with `ifAbsent` | fails |
-| manifest retry with same object id but different checksum/length/slices | non-retriable corruption |
-| object id generation after process restart | no collision with previous same-writer sequence |
-| concurrent WAL object id generation | object sequences are unique and monotonic within one writer run |
-| local object store path traversal key | rejected before filesystem write |
-| local object store absolute key, empty segment, or symlink escape | rejected before final object path is visible |
-| local object store failed write | final object path is not visible |
-| local object store test cleanup | removes only files under injected root and is unavailable from production `ObjectStore` |
-| range read past EOF | fails as object read error |
-| `CompressionType.ZSTD` write request | rejected with `UNSUPPORTED_FORMAT` in Phase 1 |
-| corrupted payload checksum | read fails |
-| corrupted entry index checksum | read fails |
-| unsupported major version | reader rejects |
-| unsupported minor version | reader rejects until optional-section compatibility tests exist |
-| committed slice uses non-supported payload format | reader fails with `UNSUPPORTED_FORMAT` in Phase 1 |
+| Test                                                                     | Expected                                                                                |
+|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| write/read one-slice object                                              | payload and index match                                                                 |
+| write/read multi-slice object                                            | each slice has independent range                                                        |
+| `forceSingleStreamObject=true` with multiple stream ids                  | writer rejects before object upload                                                     |
+| `forceSingleStreamObject=true` with one stream id                        | writer may write one or more slices for that stream without changing layout             |
+| WAL write request                                                        | carries `writerRunIdHash` into object id/key/header                                     |
+| WAL section envelope                                                     | each variable-length section has type, version, length, and checksum                    |
+| WAL binary ids                                                           | object/section ids use fixed constants, never Java enum ordinal                         |
+| object manifest format metadata                                          | stores format major/minor version and writer version                                    |
+| deterministic slice id and order                                         | slices have zero-based ordinals and stable object-local slice ids                       |
+| Phase 1 entry index location                                             | writer always emits `OBJECT_FOOTER`                                                     |
+| read `INLINE` or `INDEX_OBJECT` entry index                              | fails with `UNSUPPORTED_FORMAT` in Phase 1                                              |
+| WAL header/footer checksum                                               | decoder rejects wrong header, footer, or object checksum                                |
+| WAL canonical checksum versus storage checksum                           | writer computes both domains and manifest stores both without comparing them as equal   |
+| WAL descriptor bounds                                                    | decoder rejects offsets/lengths outside object bounds                                   |
+| entry payload offset inside non-zero slice offset                        | reader computes `slicePayloadOffset + entryPayloadOffset`                               |
+| entry index deterministic encoding                                       | checksum golden test is stable                                                          |
+| zero-byte entry index item                                               | payload length zero is valid and still advances relative offset                         |
+| malformed entry index ordering                                           | reader rejects non-contiguous or overlapping opaque entries                             |
+| slice checksum domain                                                    | checksum covers `concat(slicePayloadBytes, entryIndexBytes)`                            |
+| WAL upload timeout propagation                                           | `WalWriteOptions.uploadTimeout` is copied into `PutObjectOptions.timeout`               |
+| final encoded object length exceeds `maxObjectBytes`                     | writer fails with `INVALID_ARGUMENT` before object upload                               |
+| object payload fits but footer/index/header push encoded length over max | writer fails before upload                                                              |
+| request exceeds `targetObjectSizeBytes` but fits `maxObjectBytes`        | writer succeeds because target is advisory                                              |
+| WAL sizing arithmetic overflows                                          | writer fails before allocation and before upload                                        |
+| duplicate object key with `ifAbsent`                                     | fails                                                                                   |
+| manifest retry with same object id but different checksum/length/slices  | non-retriable corruption                                                                |
+| object id generation after process restart                               | no collision with previous same-writer sequence                                         |
+| concurrent WAL object id generation                                      | object sequences are unique and monotonic within one writer run                         |
+| local object store path traversal key                                    | rejected before filesystem write                                                        |
+| local object store absolute key, empty segment, or symlink escape        | rejected before final object path is visible                                            |
+| local object store failed write                                          | final object path is not visible                                                        |
+| local object store test cleanup                                          | removes only files under injected root and is unavailable from production `ObjectStore` |
+| range read past EOF                                                      | fails as object read error                                                              |
+| `CompressionType.ZSTD` write request                                     | rejected with `UNSUPPORTED_FORMAT` in Phase 1                                           |
+| corrupted payload checksum                                               | read fails                                                                              |
+| corrupted entry index checksum                                           | read fails                                                                              |
+| unsupported major version                                                | reader rejects                                                                          |
+| unsupported minor version                                                | reader rejects until optional-section compatibility tests exist                         |
+| committed slice uses non-supported payload format                        | reader fails with `UNSUPPORTED_FORMAT` in Phase 1                                       |
 
 ### Append path tests
 
-| Test | Expected |
-| --- | --- |
-| stream uses canonical `OBJECT_WAL_SYNC_OBJECT` + strict durability | append enters WAL path |
-| stream uses deprecated `OBJECT_WAL` alias | metadata canonicalization yields sync object behavior |
-| stream uses BK or async profile | append fails before WAL IO with `UNSUPPORTED_STORAGE_PROFILE` |
-| options request `WAL_DURABLE` | Phase 1 fails before WAL IO with `UNSUPPORTED_DURABILITY_LEVEL`；future support cannot return before head commit |
-| append one batch | range starts at previous committed end |
-| append two batches | second starts at first end |
-| concurrent appends through one `DefaultStreamStorage` for same stream | sequenced dense ranges |
-| different writer takes over session before commit | stale attempt fails with retriable `FENCED_APPEND + KNOWN_NOT_COMMITTED` before offset conflict |
-| same-session concurrent commit wins offset race | losing attempt fails with retriable `OFFSET_CONFLICT + KNOWN_NOT_COMMITTED`; uploaded slice is not rebased |
-| append after offset conflict in same instance | sequencer refreshes committed end before next append |
-| backpressure limit reached | append fails before object upload with `BACKPRESSURE_REJECTED` |
-| `maxBufferedBytes` exact-size adjustment would exceed limit | append fails before object upload with `BACKPRESSURE_REJECTED` and releases reservation |
-| accepted append later fails validation or upload | in-flight count and buffered-byte reservations are released |
-| append encoded object exceeds `maxObjectBytes` | append fails before object upload with `INVALID_ARGUMENT` |
-| append caller-cancelled before WAL upload | no object and no offset index; caller future may be cancelled |
-| append service-cancelled before WAL upload | no object and no offset index; `CANCELLED` |
-| append cancelled after stream-head CAS sent | final state is unknown; same physical slice retry can discover marker or head-chain commit |
-| close after stream-head CAS sent | waits up to shutdown grace for commit/materialization result before closing owned clients |
-| object upload fails | no manifest and no offset index |
-| manifest put fails | no offset index |
-| head CAS rejects after manifest | object invisible because no committed head-chain record is reachable |
-| head CAS succeeds but materialization fails | `KNOWN_COMMITTED`; retry/read repair materializes offset index from commit-log |
-| commit manifest slice fields mismatch request | no offset index; non-retriable metadata invariant or checksum-style failure |
-| commit manifest slice state already visible but committed-slice marker missing | search head chain first; if no matching committed record, `METADATA_INVARIANT_VIOLATION` |
-| commit manifest writer id/run/epoch mismatch request | no offset index; non-retriable metadata invariant |
-| stream becomes non-active before commit | no offset index; append fails as `STREAM_NOT_ACTIVE` |
-| timeout before stream-head CAS starts | no committed head-chain record is created by that attempt |
-| timeout after stream-head CAS is sent | `MAY_HAVE_COMMITTED`; same physical slice replay/repair resolves the result |
-| next append after `MAY_HAVE_COMMITTED/KNOWN_COMMITTED` | remains suspended until the original physical attempt is resolved |
-| commit succeeds but ack future interrupted in test | read sees data; retry same slice returns original result |
-| process crashes after ack loss and caller resubmits batch | may append duplicate data; producer-level dedup is outside Phase 1 |
-| caller-level retry without same physical slice context | may append duplicate data; no producer identity/sequence dedup in Phase 1 |
-| CAS response timeout mapping | append fails with `TIMEOUT + MAY_HAVE_COMMITTED`, not `OFFSET_CONFLICT` or generic metadata failure |
-| head known committed, index confirmation fails | append fails with `KNOWN_COMMITTED`; a new physical append is forbidden |
-| object reference update fails after stream commit | read sees data and repair can rebuild reference |
-| concurrent post-commit object reference updates | CAS merge does not lose another visible slice; conflict exhaustion leaves repairable stale metadata |
-| stale session after upload | no visible data |
-| manifest object key/type/format mismatch request | no offset index; non-retriable metadata invariant |
-| partial multi-slice commit | committed slice readable, failed slice invisible |
+| Test                                                                           | Expected                                                                                                        |
+|--------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| stream uses canonical `OBJECT_WAL_SYNC_OBJECT` + strict durability             | append enters WAL path                                                                                          |
+| stream uses deprecated `OBJECT_WAL` alias                                      | metadata canonicalization yields sync object behavior                                                           |
+| stream uses BK or async profile                                                | append fails before WAL IO with `UNSUPPORTED_STORAGE_PROFILE`                                                   |
+| options request `WAL_DURABLE`                                                  | Phase 1 fails before WAL IO with `UNSUPPORTED_DURABILITY_LEVEL`；future support cannot return before head commit |
+| append one batch                                                               | range starts at previous committed end                                                                          |
+| append two batches                                                             | second starts at first end                                                                                      |
+| concurrent appends through one `DefaultStreamStorage` for same stream          | sequenced dense ranges                                                                                          |
+| different writer takes over session before commit                              | stale attempt fails with retriable `FENCED_APPEND + KNOWN_NOT_COMMITTED` before offset conflict                 |
+| same-session concurrent commit wins offset race                                | losing attempt fails with retriable `OFFSET_CONFLICT + KNOWN_NOT_COMMITTED`; uploaded slice is not rebased      |
+| append after offset conflict in same instance                                  | sequencer refreshes committed end before next append                                                            |
+| backpressure limit reached                                                     | append fails before object upload with `BACKPRESSURE_REJECTED`                                                  |
+| `maxBufferedBytes` exact-size adjustment would exceed limit                    | append fails before object upload with `BACKPRESSURE_REJECTED` and releases reservation                         |
+| accepted append later fails validation or upload                               | in-flight count and buffered-byte reservations are released                                                     |
+| append encoded object exceeds `maxObjectBytes`                                 | append fails before object upload with `INVALID_ARGUMENT`                                                       |
+| append caller-cancelled before WAL upload                                      | no object and no offset index; caller future may be cancelled                                                   |
+| append service-cancelled before WAL upload                                     | no object and no offset index; `CANCELLED`                                                                      |
+| append cancelled after stream-head CAS sent                                    | final state is unknown; same physical slice retry can discover marker or head-chain commit                      |
+| close after stream-head CAS sent                                               | waits up to shutdown grace for commit/materialization result before closing owned clients                       |
+| object upload fails                                                            | no manifest and no offset index                                                                                 |
+| manifest put fails                                                             | no offset index                                                                                                 |
+| head CAS rejects after manifest                                                | object invisible because no committed head-chain record is reachable                                            |
+| head CAS succeeds but materialization fails                                    | `KNOWN_COMMITTED`; retry/read repair materializes offset index from commit-log                                  |
+| commit manifest slice fields mismatch request                                  | no offset index; non-retriable metadata invariant or checksum-style failure                                     |
+| commit manifest slice state already visible but committed-slice marker missing | search head chain first; if no matching committed record, `METADATA_INVARIANT_VIOLATION`                        |
+| commit manifest writer id/run/epoch mismatch request                           | no offset index; non-retriable metadata invariant                                                               |
+| stream becomes non-active before commit                                        | no offset index; append fails as `STREAM_NOT_ACTIVE`                                                            |
+| timeout before stream-head CAS starts                                          | no committed head-chain record is created by that attempt                                                       |
+| timeout after stream-head CAS is sent                                          | `MAY_HAVE_COMMITTED`; same physical slice replay/repair resolves the result                                     |
+| next append after `MAY_HAVE_COMMITTED/KNOWN_COMMITTED`                         | remains suspended until the original physical attempt is resolved                                               |
+| commit succeeds but ack future interrupted in test                             | read sees data; retry same slice returns original result                                                        |
+| process crashes after ack loss and caller resubmits batch                      | may append duplicate data; producer-level dedup is outside Phase 1                                              |
+| caller-level retry without same physical slice context                         | may append duplicate data; no producer identity/sequence dedup in Phase 1                                       |
+| CAS response timeout mapping                                                   | append fails with `TIMEOUT + MAY_HAVE_COMMITTED`, not `OFFSET_CONFLICT` or generic metadata failure             |
+| head known committed, index confirmation fails                                 | append fails with `KNOWN_COMMITTED`; a new physical append is forbidden                                         |
+| object reference update fails after stream commit                              | read sees data and repair can rebuild reference                                                                 |
+| concurrent post-commit object reference updates                                | CAS merge does not lose another visible slice; conflict exhaustion leaves repairable stale metadata             |
+| stale session after upload                                                     | no visible data                                                                                                 |
+| manifest object key/type/format mismatch request                               | no offset index; non-retriable metadata invariant                                                               |
+| partial multi-slice commit                                                     | committed slice readable, failed slice invisible                                                                |
 
 ### Read path tests
 
-| Test | Expected |
-| --- | --- |
-| read first offset | returns first batch |
-| read middle offset | clips result to requested offset |
-| read middle offset in a larger resolved slice | `WalObjectReader` uses explicit `startOffset` |
-| resolve committed range | `ResolvedObjectRange` includes slice checksum from offset index |
-| resolve committed range schema refs | `ResolvedObjectRange` includes schema refs from offset index |
-| resolve across two adjacent offset index entries | returns contiguous ranges and advances `resolvedEndOffset` |
-| resolve with `includeEntryIndex=true` | does not read object footer or index object in Phase 1 |
-| read clipped batch | `ReadBatch.sourceObjectOffset/sourceObjectLength` matches returned payload bytes |
-| read 100 bytes from 16 MiB resolved slice | reader downloads/verifies full slice plus entry index, returns clipped bytes, and records amplification metrics |
-| read buffer limit exhausted before range read | fails with retriable `BACKPRESSURE_REJECTED` and does not call `ObjectStore.readRange` |
-| read permit limit exhausted before range read | fails with retriable `BACKPRESSURE_REJECTED` and releases no extra buffer reservation |
-| read adjacent opaque entries | returns one `ReadBatch` per entry and does not concatenate payload bytes |
-| read zero-byte entry | returns one record and advances `nextOffset` even though payload bytes are empty |
-| read positive entry exactly consumes `maxBytes` followed by zero-byte entry | returns both entries if `maxRecords` allows |
-| read positive entry exactly consumes `maxBytes` followed by positive entry | stops before the second positive entry |
-| read batch schema refs | copied from resolved range, not decoded from payload |
-| read clipped batch entry index ref | still references source committed slice index, not a rewritten clipped index |
-| clipped read with corrupted bytes outside returned subrange | fails because full resolved slice checksum is verified |
-| read at committed end | empty EOF result |
-| read below trim | `OFFSET_TRIMMED` |
-| offset index cache stale | refetch and return correct data |
-| offset index cache empty scan | does not cache EOF/negative lookup |
-| watch offset update without follow-up scan | invalidates only and does not populate positive cache data |
-| watch event missed or collapsed | cache still becomes correct through TTL/read-through scan |
-| watch event out of order or duplicate | cache invalidation remains safe |
-| watcher callback throws during session/trim/index notification | mutation result is unchanged; failure metric increments; other deliveries continue |
-| register watch after metadata store close | synchronous `STORAGE_CLOSED` rejection |
-| `enableMetadataWatch=false` | no-op registration; cache remains correct through TTL/read-through |
-| index points to missing object | retriable object read failure |
-| gap below committed end | repair from commit-log first; invariant only if chain/record/materialized bytes are corrupt |
+| Test                                                                        | Expected                                                                                                        |
+|-----------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| read first offset                                                           | returns first batch                                                                                             |
+| read middle offset                                                          | clips result to requested offset                                                                                |
+| read middle offset in a larger resolved slice                               | `WalObjectReader` uses explicit `startOffset`                                                                   |
+| resolve committed range                                                     | `ResolvedObjectRange` includes slice checksum from offset index                                                 |
+| resolve committed range schema refs                                         | `ResolvedObjectRange` includes schema refs from offset index                                                    |
+| resolve across two adjacent offset index entries                            | returns contiguous ranges and advances `resolvedEndOffset`                                                      |
+| resolve with `includeEntryIndex=true`                                       | does not read object footer or index object in Phase 1                                                          |
+| read clipped batch                                                          | `ReadBatch.sourceObjectOffset/sourceObjectLength` matches returned payload bytes                                |
+| read 100 bytes from 16 MiB resolved slice                                   | reader downloads/verifies full slice plus entry index, returns clipped bytes, and records amplification metrics |
+| read buffer limit exhausted before range read                               | fails with retriable `BACKPRESSURE_REJECTED` and does not call `ObjectStore.readRange`                          |
+| read permit limit exhausted before range read                               | fails with retriable `BACKPRESSURE_REJECTED` and releases no extra buffer reservation                           |
+| read adjacent opaque entries                                                | returns one `ReadBatch` per entry and does not concatenate payload bytes                                        |
+| read zero-byte entry                                                        | returns one record and advances `nextOffset` even though payload bytes are empty                                |
+| read positive entry exactly consumes `maxBytes` followed by zero-byte entry | returns both entries if `maxRecords` allows                                                                     |
+| read positive entry exactly consumes `maxBytes` followed by positive entry  | stops before the second positive entry                                                                          |
+| read batch schema refs                                                      | copied from resolved range, not decoded from payload                                                            |
+| read clipped batch entry index ref                                          | still references source committed slice index, not a rewritten clipped index                                    |
+| clipped read with corrupted bytes outside returned subrange                 | fails because full resolved slice checksum is verified                                                          |
+| read at committed end                                                       | empty EOF result                                                                                                |
+| read below trim                                                             | `OFFSET_TRIMMED`                                                                                                |
+| offset index cache stale                                                    | refetch and return correct data                                                                                 |
+| offset index cache empty scan                                               | does not cache EOF/negative lookup                                                                              |
+| watch offset update without follow-up scan                                  | invalidates only and does not populate positive cache data                                                      |
+| watch event missed or collapsed                                             | cache still becomes correct through TTL/read-through scan                                                       |
+| watch event out of order or duplicate                                       | cache invalidation remains safe                                                                                 |
+| watcher callback throws during session/trim/index notification              | mutation result is unchanged; failure metric increments; other deliveries continue                              |
+| register watch after metadata store close                                   | synchronous `STORAGE_CLOSED` rejection                                                                          |
+| `enableMetadataWatch=false`                                                 | no-op registration; cache remains correct through TTL/read-through                                              |
+| index points to missing object                                              | retriable object read failure                                                                                   |
+| gap below committed end                                                     | repair from commit-log first; invariant only if chain/record/materialized bytes are corrupt                     |
 
 ## 3. Failure Injection Points
 

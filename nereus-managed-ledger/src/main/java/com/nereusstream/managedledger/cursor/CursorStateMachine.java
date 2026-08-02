@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.metadata.oxia.CursorNames;
@@ -12,7 +13,9 @@ import java.util.Optional;
 import java.util.TreeMap;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 
-/** Pure deterministic durable cursor transitions; this class performs no IO or callback work. */
+/**
+ * Pure deterministic durable cursor transitions; this class performs no IO or callback work.
+ */
 public final class CursorStateMachine {
     private static final String INTERNAL_PROPERTY_PREFIX = "#pulsar.internal.";
 
@@ -38,11 +41,7 @@ public final class CursorStateMachine {
             throw new IllegalArgumentException("cursor create generation, sequence, or time is invalid");
         }
         return new CursorState(
-                new CursorIdentity(
-                        owner.ledger(),
-                        exactName,
-                        CursorNames.cursorNameHash(exactName),
-                        generation),
+                new CursorIdentity(owner.ledger(), exactName, CursorNames.cursorNameHash(exactName), generation),
                 owner.ownerSessionId(),
                 CursorLifecycle.ACTIVE,
                 mutationSequence,
@@ -78,11 +77,8 @@ public final class CursorStateMachine {
     }
 
     public CursorMutationResult cumulativeAck(
-            CursorState current,
-            CursorAckRequest request,
-            long trimOffset,
-            long committedEndOffset,
-            long nowMillis) throws ManagedLedgerException {
+            CursorState current, CursorAckRequest request, long trimOffset, long committedEndOffset, long nowMillis)
+            throws ManagedLedgerException {
         requireMutableBounds(current, trimOffset, committedEndOffset);
         Objects.requireNonNull(request, "request");
         requireAckOffset(request.entryOffset(), trimOffset, committedEndOffset);
@@ -120,7 +116,8 @@ public final class CursorStateMachine {
             List<CursorAckRequest> requests,
             long trimOffset,
             long committedEndOffset,
-            long nowMillis) throws ManagedLedgerException {
+            long nowMillis)
+            throws ManagedLedgerException {
         requireMutableBounds(current, trimOffset, committedEndOffset);
         List<CursorAckRequest> canonical = canonicalIndividualRequests(requests);
         List<OffsetRange> ranges = new ArrayList<>(current.acknowledgements().wholeAckRanges());
@@ -129,8 +126,7 @@ public final class CursorStateMachine {
         for (CursorAckRequest request : canonical) {
             requireAckOffset(request.entryOffset(), trimOffset, committedEndOffset);
             long offset = request.entryOffset();
-            if (current.acknowledgements().isWholeEntryAcknowledged(offset)
-                    || covered(ranges, offset)) {
+            if (current.acknowledgements().isWholeEntryAcknowledged(offset) || covered(ranges, offset)) {
                 continue;
             }
             if (request.wholeEntry()) {
@@ -152,8 +148,7 @@ public final class CursorStateMachine {
                 partials.put(offset, merged);
             }
         }
-        CursorAckState nextAck = new CursorAckState(
-                current.acknowledgements().markDeleteOffset(), ranges, partials);
+        CursorAckState nextAck = new CursorAckState(current.acknowledgements().markDeleteOffset(), ranges, partials);
         if (nextAck.equals(current.acknowledgements())) {
             return alreadyApplied(current);
         }
@@ -172,10 +167,8 @@ public final class CursorStateMachine {
     }
 
     public CursorMutationResult reset(
-            CursorState current,
-            CursorResetRequest request,
-            String protectionAttemptId,
-            long nowMillis) throws ManagedLedgerException {
+            CursorState current, CursorResetRequest request, String protectionAttemptId, long nowMillis)
+            throws ManagedLedgerException {
         requireActive(current);
         Objects.requireNonNull(request, "request");
         requireResetBounds(request);
@@ -194,10 +187,8 @@ public final class CursorStateMachine {
                 nextUpdatedAt(current, nowMillis)));
     }
 
-    public CursorMutationResult clearBacklog(
-            CursorState current,
-            long committedEndOffset,
-            long nowMillis) throws ManagedLedgerException {
+    public CursorMutationResult clearBacklog(CursorState current, long committedEndOffset, long nowMillis)
+            throws ManagedLedgerException {
         requireActive(current);
         if (committedEndOffset < current.acknowledgements().markDeleteOffset()) {
             throw new ManagedLedgerException.InvalidCursorPositionException(
@@ -219,9 +210,7 @@ public final class CursorStateMachine {
     }
 
     public CursorMutationResult mutateCursorProperties(
-            CursorState current,
-            CursorPropertyMutation mutation,
-            long nowMillis) throws ManagedLedgerException {
+            CursorState current, CursorPropertyMutation mutation, long nowMillis) throws ManagedLedgerException {
         requireActive(current);
         Objects.requireNonNull(mutation, "mutation");
         LinkedHashMap<String, String> next = new LinkedHashMap<>(current.cursorProperties());
@@ -230,8 +219,7 @@ public final class CursorStateMachine {
         } else if (mutation instanceof CursorPropertyMutation.Remove remove) {
             next.remove(remove.key());
         } else {
-            CursorPropertyMutation.ReplaceExternal replace =
-                    (CursorPropertyMutation.ReplaceExternal) mutation;
+            CursorPropertyMutation.ReplaceExternal replace = (CursorPropertyMutation.ReplaceExternal) mutation;
             next.entrySet().removeIf(entry -> !entry.getKey().startsWith(INTERNAL_PROPERTY_PREFIX));
             next.putAll(replace.properties());
         }
@@ -253,9 +241,7 @@ public final class CursorStateMachine {
     }
 
     public CursorMutationResult flushPositionProperties(
-            CursorState current,
-            Map<String, Long> fullProperties,
-            long nowMillis) throws ManagedLedgerException {
+            CursorState current, Map<String, Long> fullProperties, long nowMillis) throws ManagedLedgerException {
         requireActive(current);
         Objects.requireNonNull(fullProperties, "fullProperties");
         if (fullProperties.equals(current.positionProperties())) {
@@ -275,8 +261,7 @@ public final class CursorStateMachine {
                 nextUpdatedAt(current, nowMillis)));
     }
 
-    public CursorMutationResult delete(CursorState current, long nowMillis)
-            throws ManagedLedgerException {
+    public CursorMutationResult delete(CursorState current, long nowMillis) throws ManagedLedgerException {
         Objects.requireNonNull(current, "current");
         if (current.lifecycle() == CursorLifecycle.DELETED) {
             return alreadyApplied(current);
@@ -319,8 +304,7 @@ public final class CursorStateMachine {
                 ack.partialBatchAcks().get(offset), request.batchAck().orElseThrow());
     }
 
-    public boolean isIndividualAckSubsumed(
-            CursorState current, List<CursorAckRequest> requests) {
+    public boolean isIndividualAckSubsumed(CursorState current, List<CursorAckRequest> requests) {
         Objects.requireNonNull(current, "current");
         for (CursorAckRequest request : canonicalIndividualRequests(requests)) {
             if (current.acknowledgements().isWholeEntryAcknowledged(request.entryOffset())) {
@@ -336,8 +320,7 @@ public final class CursorStateMachine {
         return true;
     }
 
-    public boolean isExactResetResult(
-            CursorState state, CursorResetRequest request, long capturedEpoch) {
+    public boolean isExactResetResult(CursorState state, CursorResetRequest request, long capturedEpoch) {
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(request, "request");
         return state.ackStateEpoch() == Math.addExact(capturedEpoch, 1)
@@ -346,8 +329,7 @@ public final class CursorStateMachine {
                 && state.positionProperties().isEmpty();
     }
 
-    public boolean isExactClearResult(
-            CursorState state, long committedEndOffset, long capturedEpoch) {
+    public boolean isExactClearResult(CursorState state, long committedEndOffset, long capturedEpoch) {
         Objects.requireNonNull(state, "state");
         return state.ackStateEpoch() == Math.addExact(capturedEpoch, 1)
                 && state.acknowledgements().equals(CursorAckState.empty(committedEndOffset))
@@ -379,8 +361,8 @@ public final class CursorStateMachine {
         if (left.wholeEntry() || right.wholeEntry()) {
             return new CursorAckRequest(left.entryOffset(), Optional.empty(), Map.of());
         }
-        BatchAckState merged = mergeSameBatch(
-                left.batchAck().orElseThrow(), right.batchAck().orElseThrow());
+        BatchAckState merged =
+                mergeSameBatch(left.batchAck().orElseThrow(), right.batchAck().orElseThrow());
         return new CursorAckRequest(left.entryOffset(), Optional.of(merged), Map.of());
     }
 
@@ -396,8 +378,7 @@ public final class CursorStateMachine {
         return clipAt(current, markDelete);
     }
 
-    private static CursorAckState partialCumulative(
-            CursorAckState current, long offset, BatchAckState request) {
+    private static CursorAckState partialCumulative(CursorAckState current, long offset, BatchAckState request) {
         CursorAckState base = clipAt(current, offset);
         if (base.isWholeEntryAcknowledged(offset)) {
             return base;
@@ -405,9 +386,8 @@ public final class CursorStateMachine {
         List<OffsetRange> ranges = new ArrayList<>(base.wholeAckRanges());
         NavigableMap<Long, BatchAckState> partials = new TreeMap<>(base.partialBatchAcks());
         BatchAckState existing = partials.get(offset);
-        BatchAckState merged = existing == null
-                ? allRemaining(request.batchSize()).and(request)
-                : mergeSameBatch(existing, request);
+        BatchAckState merged =
+                existing == null ? allRemaining(request.batchSize()).and(request) : mergeSameBatch(existing, request);
         if (merged.isWholeEntryAcknowledged()) {
             partials.remove(offset);
             ranges.add(new OffsetRange(offset, Math.addExact(offset, 1)));
@@ -532,8 +512,7 @@ public final class CursorStateMachine {
         }
     }
 
-    private static void requireMutableBounds(
-            CursorState current, long trimOffset, long committedEndOffset)
+    private static void requireMutableBounds(CursorState current, long trimOffset, long committedEndOffset)
             throws ManagedLedgerException {
         requireActive(current);
         if (trimOffset < 0
@@ -556,8 +535,7 @@ public final class CursorStateMachine {
             throws ManagedLedgerException.InvalidCursorPositionException {
         if (request.nextReadOffset() < request.observedTrimOffset()
                 || request.nextReadOffset() > request.observedCommittedEndOffset()
-                || (request.force()
-                        && request.nextReadOffset() < request.observedTrimOffset())) {
+                || (request.force() && request.nextReadOffset() < request.observedTrimOffset())) {
             throw new ManagedLedgerException.InvalidCursorPositionException(
                     "reset target is outside the retained committed range");
         }

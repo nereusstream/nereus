@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.errors;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamState;
@@ -29,14 +29,10 @@ class ManagedLedgerErrorMapperTest {
                         failure(ErrorCode.OFFSET_TRIMMED),
                         new OperationContext("read", false, true, Optional.of(StreamState.ACTIVE))))
                 .isInstanceOf(ManagedLedgerException.InvalidCursorPositionException.class);
-        assertThat(mapper.map(
-                        failure(ErrorCode.PRIMARY_WAL_CHECKSUM_MISMATCH),
-                        OperationContext.ledger("read")))
+        assertThat(mapper.map(failure(ErrorCode.PRIMARY_WAL_CHECKSUM_MISMATCH), OperationContext.ledger("read")))
                 .isInstanceOf(ManagedLedgerException.NonRecoverableLedgerException.class)
                 .hasCauseInstanceOf(NereusException.class);
-        assertThat(mapper.map(
-                        failure(ErrorCode.METADATA_CONDITION_FAILED),
-                        OperationContext.ledger("append")))
+        assertThat(mapper.map(failure(ErrorCode.METADATA_CONDITION_FAILED), OperationContext.ledger("append")))
                 .hasMessage("Nereus append failed [METADATA_CONDITION_FAILED, retriable=false]: test failure")
                 .hasCauseInstanceOf(NereusException.class);
     }
@@ -45,8 +41,7 @@ class ManagedLedgerErrorMapperTest {
     void unsupportedChannelsShareTheStablePrefix() {
         assertThat(mapper.unsupported("offloadPrefix").getMessage())
                 .isEqualTo("NEREUS_UNSUPPORTED_OPERATION:offloadPrefix");
-        assertThat(mapper.unsupportedRuntime("migrate").getMessage())
-                .isEqualTo("NEREUS_UNSUPPORTED_OPERATION:migrate");
+        assertThat(mapper.unsupportedRuntime("migrate").getMessage()).isEqualTo("NEREUS_UNSUPPORTED_OPERATION:migrate");
     }
 
     private static NereusException failure(ErrorCode code) {

@@ -8,7 +8,6 @@ import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.objectstore.ObjectStoreConfiguration;
 import com.nereusstream.pulsar.NereusBookKeeperRuntimeConfiguration;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -56,42 +55,28 @@ public final class AdminConfiguration {
     private static final String BK_PASSWORD_VERSION = "bookkeeper.passwordIdentityVersion";
     private static final String BK_MAX_ENTRIES_PER_LEDGER = "bookkeeper.maxEntriesPerLedger";
     private static final String BK_MAX_BYTES_PER_LEDGER = "bookkeeper.maxBytesPerLedger";
-    private static final String BK_MAX_APPEND_RANGES_PER_LEDGER =
-            "bookkeeper.maxAppendRangesPerLedger";
-    private static final String BK_PROTECTION_SLOTS_PER_RANGE =
-            "bookkeeper.protectionSlotsPerRange";
-    private static final String BK_MAX_READER_LEASES_PER_LEDGER =
-            "bookkeeper.maxReaderLeasesPerLedger";
-    private static final String BK_MAX_UNCERTAIN_ALLOCATIONS =
-            "bookkeeper.maxUncertainAllocations";
+    private static final String BK_MAX_APPEND_RANGES_PER_LEDGER = "bookkeeper.maxAppendRangesPerLedger";
+    private static final String BK_PROTECTION_SLOTS_PER_RANGE = "bookkeeper.protectionSlotsPerRange";
+    private static final String BK_MAX_READER_LEASES_PER_LEDGER = "bookkeeper.maxReaderLeasesPerLedger";
+    private static final String BK_MAX_UNCERTAIN_ALLOCATIONS = "bookkeeper.maxUncertainAllocations";
     private static final String BK_MAX_LEDGER_AGE_SECONDS = "bookkeeper.maxLedgerAgeSeconds";
     private static final String BK_MAX_WRITES_IN_FLIGHT = "bookkeeper.maxWritesInFlight";
     private static final String BK_MAX_READS_IN_FLIGHT = "bookkeeper.maxReadsInFlight";
-    private static final String BK_MAX_READ_BYTES_IN_FLIGHT =
-            "bookkeeper.maxReadBytesInFlight";
-    private static final String BK_OPERATION_TIMEOUT_SECONDS =
-            "bookkeeper.operationTimeoutSeconds";
-    private static final String BK_ALLOCATION_TIMEOUT_SECONDS =
-            "bookkeeper.allocationTimeoutSeconds";
+    private static final String BK_MAX_READ_BYTES_IN_FLIGHT = "bookkeeper.maxReadBytesInFlight";
+    private static final String BK_OPERATION_TIMEOUT_SECONDS = "bookkeeper.operationTimeoutSeconds";
+    private static final String BK_ALLOCATION_TIMEOUT_SECONDS = "bookkeeper.allocationTimeoutSeconds";
     private static final String BK_SEAL_TIMEOUT_SECONDS = "bookkeeper.sealTimeoutSeconds";
     private static final String BK_DELETE_TIMEOUT_SECONDS = "bookkeeper.deleteTimeoutSeconds";
     private static final String BK_READER_LEASE_SECONDS = "bookkeeper.readerLeaseSeconds";
-    private static final String BK_READER_LEASE_RENEW_SECONDS =
-            "bookkeeper.readerLeaseRenewSeconds";
-    private static final String BK_RETENTION_SCAN_INTERVAL_SECONDS =
-            "bookkeeper.retentionScanIntervalSeconds";
-    private static final String BK_RETENTION_SCAN_PAGE_SIZE =
-            "bookkeeper.retentionScanPageSize";
+    private static final String BK_READER_LEASE_RENEW_SECONDS = "bookkeeper.readerLeaseRenewSeconds";
+    private static final String BK_RETENTION_SCAN_INTERVAL_SECONDS = "bookkeeper.retentionScanIntervalSeconds";
+    private static final String BK_RETENTION_SCAN_PAGE_SIZE = "bookkeeper.retentionScanPageSize";
     private static final String BK_GC_ENABLED = "bookkeeper.gc.enabled";
     private static final String BK_GC_DRY_RUN = "bookkeeper.gc.dryRun";
-    private static final String BK_GC_MAX_CONCURRENT_DELETES =
-            "bookkeeper.gc.maxConcurrentDeletes";
-    private static final String BK_GC_MAX_CLOCK_SKEW_SECONDS =
-            "bookkeeper.gc.maxClockSkewSeconds";
-    private static final String BK_GC_DRAIN_GRACE_SECONDS =
-            "bookkeeper.gc.drainGraceSeconds";
-    private static final String BK_GC_LATE_CREATE_AUDIT_GRACE_SECONDS =
-            "bookkeeper.gc.lateCreateAuditGraceSeconds";
+    private static final String BK_GC_MAX_CONCURRENT_DELETES = "bookkeeper.gc.maxConcurrentDeletes";
+    private static final String BK_GC_MAX_CLOCK_SKEW_SECONDS = "bookkeeper.gc.maxClockSkewSeconds";
+    private static final String BK_GC_DRAIN_GRACE_SECONDS = "bookkeeper.gc.drainGraceSeconds";
+    private static final String BK_GC_LATE_CREATE_AUDIT_GRACE_SECONDS = "bookkeeper.gc.lateCreateAuditGraceSeconds";
 
     private static final String OPERATOR_EVIDENCE = "operatorEvidenceSha256";
     private static final Set<String> SUPPORTED_KEYS = Set.of(
@@ -167,8 +152,7 @@ public final class AdminConfiguration {
         this.cluster = Objects.requireNonNull(cluster);
         this.oxia = Objects.requireNonNull(oxia);
         this.objectStore = Objects.requireNonNull(objectStore);
-        this.objectStoreSecretResolverClassName =
-                Objects.requireNonNull(objectStoreSecretResolverClassName);
+        this.objectStoreSecretResolverClassName = Objects.requireNonNull(objectStoreSecretResolverClassName);
         this.bookKeeper = Objects.requireNonNull(bookKeeper);
         this.operatorEvidenceSha256 = Objects.requireNonNull(operatorEvidenceSha256);
     }
@@ -190,8 +174,7 @@ public final class AdminConfiguration {
     }
 
     public NereusBookKeeperRuntimeConfiguration bookKeeper() {
-        return bookKeeper.orElseThrow(() ->
-                new IllegalStateException("BookKeeper administration is disabled"));
+        return bookKeeper.orElseThrow(() -> new IllegalStateException("BookKeeper administration is disabled"));
     }
 
     public Optional<NereusBookKeeperRuntimeConfiguration> optionalBookKeeper() {
@@ -199,9 +182,8 @@ public final class AdminConfiguration {
     }
 
     public String operatorEvidenceSha256() {
-        return operatorEvidenceSha256.orElseThrow(() ->
-                new IllegalStateException(
-                        "operatorEvidenceSha256 is required for BookKeeper administration"));
+        return operatorEvidenceSha256.orElseThrow(
+                () -> new IllegalStateException("operatorEvidenceSha256 is required for BookKeeper administration"));
     }
 
     public static AdminConfiguration load(Path configFile) {
@@ -212,8 +194,7 @@ public final class AdminConfiguration {
                 .reduce((first, second) -> first + ", " + second)
                 .orElse("");
         if (!unknownKeys.isEmpty()) {
-            throw new IllegalStateException(
-                    "unsupported config keys: " + unknownKeys);
+            throw new IllegalStateException("unsupported config keys: " + unknownKeys);
         }
 
         String cluster = required(props, CLUSTER);
@@ -307,8 +288,7 @@ public final class AdminConfiguration {
                     seconds(props, BK_GC_LATE_CREATE_AUDIT_GRACE_SECONDS, 604_800),
                     boolProp(props, BK_GC_ENABLED, false),
                     boolProp(props, BK_GC_DRY_RUN, true));
-            bookKeeper = Optional.of(new NereusBookKeeperRuntimeConfiguration(
-                    deploymentId, wal, gc));
+            bookKeeper = Optional.of(new NereusBookKeeperRuntimeConfiguration(deploymentId, wal, gc));
             operatorEvidence = Optional.of(required(props, OPERATOR_EVIDENCE));
         } else {
             bookKeeper = Optional.empty();
@@ -316,12 +296,7 @@ public final class AdminConfiguration {
         }
 
         return new AdminConfiguration(
-                cluster,
-                oxia,
-                objectStore,
-                secretResolverClassName,
-                bookKeeper,
-                operatorEvidence);
+                cluster, oxia, objectStore, secretResolverClassName, bookKeeper, operatorEvidence);
     }
 
     private static Properties loadProperties(Path path) {

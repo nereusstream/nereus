@@ -1,17 +1,18 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
-import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.ObjectType;
+import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.PutObjectOptions;
-import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.objectstore.staging.StagedObjectFile;
 import com.nereusstream.objectstore.staging.StagingFileManager;
 import java.io.ByteArrayOutputStream;
@@ -21,7 +22,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,25 +34,17 @@ import org.apache.parquet.io.InputFile;
 import org.apache.parquet.io.SeekableInputStream;
 
 final class CompactedParquetTestSupport {
-    private CompactedParquetTestSupport() {
-    }
+    private CompactedParquetTestSupport() {}
 
     static StagingFileManager staging(Path parent, long bytes) throws IOException {
         Path directory = Files.createDirectory(parent.resolve("staging"));
         Files.setPosixFilePermissions(directory, PosixFilePermissions.fromString("rwx------"));
         return new StagingFileManager(
-                directory,
-                bytes,
-                StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
-                Duration.ofHours(1),
-                Runnable::run);
+                directory, bytes, StagingFileManager.MIN_UPLOAD_CHUNK_BYTES, Duration.ofHours(1), Runnable::run);
     }
 
     static CompactedObjectWriteRequest committedRequest(
-            int records,
-            long logicalBytes,
-            int rowGroupRecords,
-            String compression) {
+            int records, long logicalBytes, int rowGroupRecords, String compression) {
         return new CompactedObjectWriteRequest(
                 "test-cluster",
                 ReadView.COMMITTED,
@@ -78,11 +70,7 @@ final class CompactedParquetTestSupport {
     }
 
     static CompactedObjectWriteRequest topicRequest(
-            int sourceRecords,
-            int outputRecords,
-            long logicalBytes,
-            int rowGroupRecords,
-            String compression) {
+            int sourceRecords, int outputRecords, long logicalBytes, int rowGroupRecords, String compression) {
         return new CompactedObjectWriteRequest(
                 "test-cluster",
                 ReadView.TOPIC_COMPACTED,
@@ -104,10 +92,7 @@ final class CompactedParquetTestSupport {
                 rowGroupRecords,
                 compression,
                 "nereus-test-build",
-                Optional.of(new TopicCompactionFormatSpec(
-                        "latest-key",
-                        1,
-                        "pulsar-message-key-v1")));
+                Optional.of(new TopicCompactionFormatSpec("latest-key", 1, "pulsar-message-key-v1")));
     }
 
     static CompactedObjectRow denseRow(long offset, byte[] payload) {
@@ -162,9 +147,7 @@ final class CompactedParquetTestSupport {
                 Optional.of(TopicCompactionKeyEncodingV1.keyed(ByteBuffer.wrap(key))));
     }
 
-    static ObjectSliceReadTarget target(
-            CompactedObjectWriteRequest request,
-            CompactedObjectWriteResult result) {
+    static ObjectSliceReadTarget target(CompactedObjectWriteRequest request, CompactedObjectWriteResult result) {
         return new ObjectSliceReadTarget(
                 1,
                 result.objectId(),
@@ -172,7 +155,8 @@ final class CompactedParquetTestSupport {
                 ObjectType.STREAM_COMPACTED_OBJECT,
                 result.physicalFormat(),
                 request.logicalFormat(),
-                request.sourceCoverage().startOffset() + "-" + request.sourceCoverage().endOffset(),
+                request.sourceCoverage().startOffset() + "-"
+                        + request.sourceCoverage().endOffset(),
                 0,
                 result.objectLength(),
                 result.storageCrc32c(),

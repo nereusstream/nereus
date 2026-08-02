@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.ResolveOptions;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.bookkeeper.BookKeeperWalRuntime;
@@ -64,13 +64,12 @@ class NereusBookKeeperManagedLedgerIntegrationTest {
 
     @Test
     void facadePreservesEntryBytesAndVirtualPositionOverBookKeeperGenerationZero() throws Exception {
-        try (InMemoryBookKeeperPrimaryWalFixture provider =
-                new InMemoryBookKeeperPrimaryWalFixture()) {
+        try (InMemoryBookKeeperPrimaryWalFixture provider = new InMemoryBookKeeperPrimaryWalFixture()) {
             FakeOxiaMetadataStore l0 = l0(provider);
-            StreamStorageConfig streamConfig = StreamStorageConfig.defaults(
-                    InMemoryBookKeeperPrimaryWalFixture.CLUSTER, "writer-1");
-            try (BookKeeperWalRuntime bookKeeper = new BookKeeperWalRuntime(
-                            provider.appender, provider.reader, provider.references);
+            StreamStorageConfig streamConfig =
+                    StreamStorageConfig.defaults(InMemoryBookKeeperPrimaryWalFixture.CLUSTER, "writer-1");
+            try (BookKeeperWalRuntime bookKeeper =
+                            new BookKeeperWalRuntime(provider.appender, provider.reader, provider.references);
                     DefaultStreamStorage storage = bookKeeper.newGenerationZeroStorage(
                             streamConfig,
                             l0,
@@ -82,30 +81,24 @@ class NereusBookKeeperManagedLedgerIntegrationTest {
                             TrimMetricsObserver.noop());
                     NereusManagedLedgerRuntime runtime = managedLedgerRuntime(storage, l0)) {
                 NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
-                        runtime,
-                        creationGuard(),
-                        managedLedgerConfig(),
-                        new ManagedLedgerFactoryConfig(),
-                        false);
+                        runtime, creationGuard(), managedLedgerConfig(), new ManagedLedgerFactoryConfig(), false);
                 try {
-                    NereusManagedLedger ledger = (NereusManagedLedger) factory.open(
-                            NAME, managedLedgerConfig());
+                    NereusManagedLedger ledger = (NereusManagedLedger) factory.open(NAME, managedLedgerConfig());
                     byte[] payload = "pulsar-entry-over-bk".getBytes(StandardCharsets.UTF_8);
                     Position position = ledger.addEntry(payload, 2);
 
-                    var resolved = storage.resolve(
-                            ledger.projection().streamId(),
-                            0,
-                            new ResolveOptions(1, true, true))
+                    var resolved = storage.resolve(ledger.projection().streamId(), 0, new ResolveOptions(1, true, true))
                             .join();
                     assertThat(resolved.ranges()).singleElement().satisfies(range -> {
-                        assertThat(range.readTarget()).isInstanceOf(
-                                com.nereusstream.api.target.BookKeeperEntryRangeReadTarget.class);
+                        assertThat(range.readTarget())
+                                .isInstanceOf(com.nereusstream.api.target.BookKeeperEntryRangeReadTarget.class);
                         long physicalLedger = ((com.nereusstream.api.target.BookKeeperEntryRangeReadTarget)
-                                range.readTarget()).ledgerId();
+                                        range.readTarget())
+                                .ledgerId();
                         assertThat(position.getLedgerId()).isNotEqualTo(physicalLedger);
                     });
-                    assertThat(position.getLedgerId()).isEqualTo(ledger.projection().virtualLedgerId());
+                    assertThat(position.getLedgerId())
+                            .isEqualTo(ledger.projection().virtualLedgerId());
                     assertThat(position.getEntryId()).isZero();
 
                     Entry read = read(ledger, position).join();
@@ -126,14 +119,13 @@ class NereusBookKeeperManagedLedgerIntegrationTest {
 
     @Test
     void rolloverReopenSeekAndDurableCursorRemainOnStableVirtualTruth() throws Exception {
-        try (InMemoryBookKeeperPrimaryWalFixture provider =
-                new InMemoryBookKeeperPrimaryWalFixture()) {
+        try (InMemoryBookKeeperPrimaryWalFixture provider = new InMemoryBookKeeperPrimaryWalFixture()) {
             FakeOxiaMetadataStore l0 = l0(provider);
-            StreamStorageConfig streamConfig = StreamStorageConfig.defaults(
-                    InMemoryBookKeeperPrimaryWalFixture.CLUSTER, "writer-1");
+            StreamStorageConfig streamConfig =
+                    StreamStorageConfig.defaults(InMemoryBookKeeperPrimaryWalFixture.CLUSTER, "writer-1");
             TestCursorStorage cursors = new TestCursorStorage();
-            try (BookKeeperWalRuntime bookKeeper = new BookKeeperWalRuntime(
-                            provider.appender, provider.reader, provider.references);
+            try (BookKeeperWalRuntime bookKeeper =
+                            new BookKeeperWalRuntime(provider.appender, provider.reader, provider.references);
                     DefaultStreamStorage storage = bookKeeper.newGenerationZeroStorage(
                             streamConfig,
                             l0,
@@ -145,48 +137,35 @@ class NereusBookKeeperManagedLedgerIntegrationTest {
                             TrimMetricsObserver.noop());
                     NereusManagedLedgerRuntime runtime = managedLedgerRuntime(storage, l0, cursors)) {
                 NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
-                        runtime,
-                        creationGuard(),
-                        managedLedgerConfig(),
-                        new ManagedLedgerFactoryConfig(),
-                        false);
+                        runtime, creationGuard(), managedLedgerConfig(), new ManagedLedgerFactoryConfig(), false);
                 try {
-                    NereusManagedLedger firstOpen = (NereusManagedLedger) factory.open(
-                            NAME + "-rollover", managedLedgerConfig());
+                    NereusManagedLedger firstOpen =
+                            (NereusManagedLedger) factory.open(NAME + "-rollover", managedLedgerConfig());
                     List<byte[]> payloads = List.of(
-                            bytes("entry-0"),
-                            bytes("entry-1"),
-                            bytes("entry-2"),
-                            bytes("entry-3"),
-                            bytes("entry-4"));
+                            bytes("entry-0"), bytes("entry-1"), bytes("entry-2"), bytes("entry-3"), bytes("entry-4"));
                     List<Position> positions = new java.util.ArrayList<>();
                     for (byte[] payload : payloads) {
                         positions.add(firstOpen.addEntry(payload));
                     }
 
                     long virtualLedgerId = firstOpen.projection().virtualLedgerId();
-                    assertThat(positions).extracting(Position::getLedgerId)
-                            .containsOnly(virtualLedgerId);
-                    assertThat(positions).extracting(Position::getEntryId)
-                            .containsExactly(0L, 1L, 2L, 3L, 4L);
+                    assertThat(positions).extracting(Position::getLedgerId).containsOnly(virtualLedgerId);
+                    assertThat(positions).extracting(Position::getEntryId).containsExactly(0L, 1L, 2L, 3L, 4L);
                     Set<Long> physicalLedgers = new java.util.HashSet<>();
                     for (int offset = 0; offset < positions.size(); offset++) {
                         var resolved = storage.resolve(
-                                        firstOpen.projection().streamId(),
-                                        offset,
-                                        new ResolveOptions(1, true, true))
+                                        firstOpen.projection().streamId(), offset, new ResolveOptions(1, true, true))
                                 .join();
                         assertThat(resolved.ranges()).singleElement().satisfies(range -> {
-                            var target = (com.nereusstream.api.target.BookKeeperEntryRangeReadTarget)
-                                    range.readTarget();
+                            var target =
+                                    (com.nereusstream.api.target.BookKeeperEntryRangeReadTarget) range.readTarget();
                             physicalLedgers.add(target.ledgerId());
                             assertThat(target.ledgerId()).isNotEqualTo(virtualLedgerId);
                         });
                     }
                     assertThat(physicalLedgers).hasSize(3);
 
-                    ManagedCursor durable = firstOpen.openCursor(
-                            "durable", InitialPosition.Earliest);
+                    ManagedCursor durable = firstOpen.openCursor("durable", InitialPosition.Earliest);
                     durable.markDelete(positions.get(1));
                     List<Entry> beforeReopen = durable.readEntries(1);
                     assertThat(beforeReopen).singleElement().satisfies(entry -> {
@@ -196,8 +175,8 @@ class NereusBookKeeperManagedLedgerIntegrationTest {
                     });
                     firstOpen.close();
 
-                    NereusManagedLedger reopened = (NereusManagedLedger) factory.open(
-                            NAME + "-rollover", managedLedgerConfig());
+                    NereusManagedLedger reopened =
+                            (NereusManagedLedger) factory.open(NAME + "-rollover", managedLedgerConfig());
                     assertThat(reopened.projection().virtualLedgerId()).isEqualTo(virtualLedgerId);
                     ManagedCursor hydrated = reopened.openCursor("durable");
                     assertThat(hydrated.getMarkDeletedPosition()).isEqualTo(positions.get(1));
@@ -243,15 +222,13 @@ class NereusBookKeeperManagedLedgerIntegrationTest {
     }
 
     private static NereusManagedLedgerRuntime managedLedgerRuntime(
-            DefaultStreamStorage storage,
-            FakeOxiaMetadataStore l0) throws ReflectiveOperationException {
+            DefaultStreamStorage storage, FakeOxiaMetadataStore l0) throws ReflectiveOperationException {
         return managedLedgerRuntime(storage, l0, cursorStorage());
     }
 
     private static NereusManagedLedgerRuntime managedLedgerRuntime(
-            DefaultStreamStorage storage,
-            FakeOxiaMetadataStore l0,
-            CursorStorage cursors) throws ReflectiveOperationException {
+            DefaultStreamStorage storage, FakeOxiaMetadataStore l0, CursorStorage cursors)
+            throws ReflectiveOperationException {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         ExecutorService callbacks = Executors.newSingleThreadExecutor();
         ManagedLedgerMaterializationRegistrationCoordinator registration =
@@ -288,8 +265,15 @@ class NereusBookKeeperManagedLedgerIntegrationTest {
                     case "retentionView" -> {
                         CursorOwnerSession owner = (CursorOwnerSession) arguments[0];
                         yield CompletableFuture.completedFuture(new CursorRetentionView(
-                                owner.ledger(), owner.ownerSessionId(), CursorRetentionView.Lifecycle.ACTIVE,
-                                1, 0, 0, 0, Optional.empty(), Optional.empty()));
+                                owner.ledger(),
+                                owner.ownerSessionId(),
+                                CursorRetentionView.Lifecycle.ACTIVE,
+                                1,
+                                0,
+                                0,
+                                0,
+                                Optional.empty(),
+                                Optional.empty()));
                     }
                     case "close" -> null;
                     case "toString" -> "bk-only-cursor-storage";
@@ -326,9 +310,18 @@ class NereusBookKeeperManagedLedgerIntegrationTest {
 
     private static NereusCreationGuard creationGuard() {
         return name -> CompletableFuture.completedFuture(new NereusCreationPermit() {
-            @Override public String persistenceName() { return name; }
-            @Override public long bindingGeneration() { return 1; }
-            @Override public CompletableFuture<Void> validateBeforeProjectionPublish() {
+            @Override
+            public String persistenceName() {
+                return name;
+            }
+
+            @Override
+            public long bindingGeneration() {
+                return 1;
+            }
+
+            @Override
+            public CompletableFuture<Void> validateBeforeProjectionPublish() {
                 return CompletableFuture.completedFuture(null);
             }
         });
@@ -336,14 +329,20 @@ class NereusBookKeeperManagedLedgerIntegrationTest {
 
     private static CompletableFuture<Entry> read(NereusManagedLedger ledger, Position position) {
         CompletableFuture<Entry> result = new CompletableFuture<>();
-        ledger.asyncReadEntry(position, new ReadEntryCallback() {
-            @Override public void readEntryComplete(Entry entry, Object context) {
-                result.complete(entry);
-            }
-            @Override public void readEntryFailed(ManagedLedgerException exception, Object context) {
-                result.completeExceptionally(exception);
-            }
-        }, null);
+        ledger.asyncReadEntry(
+                position,
+                new ReadEntryCallback() {
+                    @Override
+                    public void readEntryComplete(Entry entry, Object context) {
+                        result.complete(entry);
+                    }
+
+                    @Override
+                    public void readEntryFailed(ManagedLedgerException exception, Object context) {
+                        result.completeExceptionally(exception);
+                    }
+                },
+                null);
         return result;
     }
 
@@ -371,7 +370,7 @@ class NereusBookKeeperManagedLedgerIntegrationTest {
         Method factory = SharedOxiaClientRuntime.class.getDeclaredMethod(
                 "usingClient", OxiaClientConfiguration.class, SyncOxiaClient.class, Clock.class);
         factory.setAccessible(true);
-        return (SharedOxiaClientRuntime) factory.invoke(
-                null, OxiaClientConfiguration.defaults("unused:6648"), client, Clock.systemUTC());
+        return (SharedOxiaClientRuntime)
+                factory.invoke(null, OxiaClientConfiguration.defaults("unused:6648"), client, Clock.systemUTC());
     }
 }

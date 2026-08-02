@@ -17,7 +17,6 @@ package com.nereusstream.objectstore.testing;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
@@ -50,20 +49,23 @@ class LocalFileObjectStoreGcSafetyTest {
     void inProgressPrivateUploadIsNeverVisibleToInventoryListing() {
         try (LocalFileObjectStore store = new LocalFileObjectStore(root)) {
             DeferredUpload upload = new DeferredUpload(new byte[] {1, 2, 3});
-            CompletableFuture<?> put = store.putObject(
-                    new ObjectKey("objects/final"), upload, options(upload.bytes));
+            CompletableFuture<?> put = store.putObject(new ObjectKey("objects/final"), upload, options(upload.bytes));
 
             assertThat(store.listObjects(
-                            new ObjectKeyPrefix("objects/"),
-                            Optional.empty(),
-                            new ListObjectsOptions(10, TIMEOUT)).join().objects())
+                                    new ObjectKeyPrefix("objects/"),
+                                    Optional.empty(),
+                                    new ListObjectsOptions(10, TIMEOUT))
+                            .join()
+                            .objects())
                     .isEmpty();
             upload.emit();
             put.join();
             assertThat(store.listObjects(
-                            new ObjectKeyPrefix("objects/"),
-                            Optional.empty(),
-                            new ListObjectsOptions(10, TIMEOUT)).join().objects())
+                                    new ObjectKeyPrefix("objects/"),
+                                    Optional.empty(),
+                                    new ListObjectsOptions(10, TIMEOUT))
+                            .join()
+                            .objects())
                     .extracting(value -> value.key().value())
                     .containsExactly("objects/final");
         }
@@ -78,17 +80,17 @@ class LocalFileObjectStoreGcSafetyTest {
             createSymbolicLinkOrSkip(link, external);
 
             assertThat(store.listObjects(
-                            new ObjectKeyPrefix("objects/"),
-                            Optional.empty(),
-                            new ListObjectsOptions(10, TIMEOUT)).join().objects())
+                                    new ObjectKeyPrefix("objects/"),
+                                    Optional.empty(),
+                                    new ListObjectsOptions(10, TIMEOUT))
+                            .join()
+                            .objects())
                     .isEmpty();
             assertThatThrownBy(() -> store.deleteObject(
-                            new ObjectKey("objects/link"),
-                            new DeleteObjectOptions(
-                                    1,
-                                    Crc32cChecksums.checksum(new byte[] {9}),
-                                    Optional.empty(),
-                                    TIMEOUT)).join())
+                                    new ObjectKey("objects/link"),
+                                    new DeleteObjectOptions(
+                                            1, Crc32cChecksums.checksum(new byte[] {9}), Optional.empty(), TIMEOUT))
+                            .join())
                     .satisfies(error -> assertThat(unwrap(error).code()).isEqualTo(ErrorCode.INVALID_ARGUMENT));
             assertThat(external).exists();
         }
@@ -99,20 +101,15 @@ class LocalFileObjectStoreGcSafetyTest {
         try (LocalFileObjectStore store = new LocalFileObjectStore(root)) {
             byte[] bytes = {1};
             assertThatThrownBy(() -> store.putObject(
-                            new ObjectKey(".nereus-internal-v1/fake"),
-                            ByteBuffer.wrap(bytes),
-                            options(bytes)).join())
+                                    new ObjectKey(".nereus-internal-v1/fake"), ByteBuffer.wrap(bytes), options(bytes))
+                            .join())
                     .satisfies(error -> assertThat(unwrap(error).code()).isEqualTo(ErrorCode.INVALID_ARGUMENT));
         }
     }
 
     private static PutObjectOptions options(byte[] bytes) {
         return new PutObjectOptions(
-                "application/octet-stream",
-                Crc32cChecksums.checksum(bytes),
-                true,
-                Map.of(),
-                TIMEOUT);
+                "application/octet-stream", Crc32cChecksums.checksum(bytes), true, Map.of(), TIMEOUT);
     }
 
     private static NereusException unwrap(Throwable supplied) {
@@ -157,8 +154,7 @@ class LocalFileObjectStoreGcSafetyTest {
                     }
 
                     @Override
-                    public void cancel() {
-                    }
+                    public void cancel() {}
                 });
             };
         }
@@ -170,7 +166,6 @@ class LocalFileObjectStoreGcSafetyTest {
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
     }
 }

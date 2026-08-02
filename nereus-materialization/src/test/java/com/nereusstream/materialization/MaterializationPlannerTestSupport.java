@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -17,12 +18,13 @@ import com.nereusstream.api.SchemaRef;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamState;
+import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.target.ReadTarget;
+import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.GenerationZeroIndexEncoding;
-import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
@@ -40,9 +42,9 @@ import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
+import com.nereusstream.objectstore.compacted.CompactedObjectFormatV2;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -52,16 +54,13 @@ import java.util.concurrent.CompletableFuture;
 final class MaterializationPlannerTestSupport {
     static final String CLUSTER = "cluster-planner";
     static final StreamId STREAM = new StreamId("stream-planner");
-    static final ProjectionRef PROJECTION = new ProjectionRef(
-            ProjectionType.VIRTUAL_LEDGER, "projection-planner");
+    static final ProjectionRef PROJECTION = new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "projection-planner");
     static final List<SchemaRef> SCHEMAS = List.of(new SchemaRef("pulsar", "bytes", 1));
 
-    private MaterializationPlannerTestSupport() {
-    }
+    private MaterializationPlannerTestSupport() {}
 
     static MaterializationPolicy policy() {
-        return MaterializationPolicyFactory.losslessCommitted(
-                2, 16, 1_000, 1_000_000, 128, "ZSTD");
+        return MaterializationPolicyFactory.losslessCommitted(2, 16, 1_000, 1_000_000, 128, "ZSTD");
     }
 
     static DefaultMaterializationPlanner planner(
@@ -70,11 +69,23 @@ final class MaterializationPlannerTestSupport {
             long trimOffset,
             long committedEndOffset) {
         GenerationMetadataStore store = generationStore(candidates, tasks, null);
+        return new DefaultMaterializationPlanner(CLUSTER, l0Store(snapshot(trimOffset, committedEndOffset)), store, 2);
+    }
+
+    static DefaultMaterializationPlanner directPlanner(
+            List<VersionedGenerationCandidate> candidates,
+            List<VersionedMaterializationTask> tasks,
+            long trimOffset,
+            long committedEndOffset,
+            StorageProfile profile) {
+        GenerationMetadataStore store =
+                generationStore(candidates, tasks, null, profile, MaterializationStreamAuthorityMode.DIRECT_STREAM);
         return new DefaultMaterializationPlanner(
                 CLUSTER,
-                l0Store(snapshot(trimOffset, committedEndOffset)),
+                l0Store(snapshot(trimOffset, committedEndOffset, profile)),
                 store,
-                2);
+                2,
+                MaterializationStreamAuthorityMode.DIRECT_STREAM);
     }
 
     static GenerationMetadataStore generationStore(
@@ -85,7 +96,8 @@ final class MaterializationPlannerTestSupport {
                 candidates,
                 tasks,
                 delegate,
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                MaterializationStreamAuthorityMode.PROJECTION_REQUIRED);
     }
 
     static GenerationMetadataStore generationStore(
@@ -93,13 +105,23 @@ final class MaterializationPlannerTestSupport {
             List<VersionedMaterializationTask> tasks,
             GenerationMetadataStore delegate,
             StorageProfile profile) {
+        return generationStore(
+                candidates, tasks, delegate, profile, MaterializationStreamAuthorityMode.PROJECTION_REQUIRED);
+    }
+
+    static GenerationMetadataStore generationStore(
+            List<VersionedGenerationCandidate> candidates,
+            List<VersionedMaterializationTask> tasks,
+            GenerationMetadataStore delegate,
+            StorageProfile profile,
+            MaterializationStreamAuthorityMode authorityMode) {
         List<VersionedGenerationCandidate> orderedCandidates = candidates.stream()
                 .sorted(Comparator.comparing(VersionedGenerationCandidate::key))
                 .toList();
         List<VersionedMaterializationTask> orderedTasks = tasks.stream()
                 .sorted(Comparator.comparing(VersionedMaterializationTask::key))
                 .toList();
-        VersionedMaterializationStreamRegistration registration = registration(profile);
+        VersionedMaterializationStreamRegistration registration = registration(profile, authorityMode);
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
@@ -114,27 +136,27 @@ final class MaterializationPlannerTestSupport {
                     }
                     return switch (method.getName()) {
                         case "getStreamRegistration" -> CompletableFuture.completedFuture(Optional.of(registration));
-                        case "scanStreamRegistrations" -> CompletableFuture.completedFuture(
-                                new StreamRegistrationScanPage(
-                                        ((int) args[1]) == new F4Keyspace(CLUSTER)
-                                                        .materializationRegistryShard(STREAM)
-                                                ? List.of(registration)
-                                                : List.of(),
-                                        Optional.empty()));
-                        case "scanIndex" -> CompletableFuture.completedFuture(
-                                new GenerationScanPage(
-                                        orderedCandidates.stream()
-                                                .filter(candidate -> candidateView(candidate)
-                                                        == (ReadView) args[2])
-                                                .toList(),
-                                        Optional.empty()));
-                        case "scanTasks" -> delegate == null
-                                ? CompletableFuture.completedFuture(
-                                        new TaskScanPage(orderedTasks, Optional.empty()))
-                                : invokeDelegate(delegate, method, args);
-                        case "getCandidate" -> CompletableFuture.completedFuture(orderedCandidates.stream()
-                                .filter(candidate -> candidateMatches(candidate, args))
-                                .findFirst());
+                        case "scanStreamRegistrations" ->
+                            CompletableFuture.completedFuture(new StreamRegistrationScanPage(
+                                    ((int) args[1]) == new F4Keyspace(CLUSTER).materializationRegistryShard(STREAM)
+                                            ? List.of(registration)
+                                            : List.of(),
+                                    Optional.empty()));
+                        case "scanIndex" ->
+                            CompletableFuture.completedFuture(new GenerationScanPage(
+                                    orderedCandidates.stream()
+                                            .filter(candidate -> candidateView(candidate) == (ReadView) args[2])
+                                            .toList(),
+                                    Optional.empty()));
+                        case "scanTasks" ->
+                            delegate == null
+                                    ? CompletableFuture.completedFuture(
+                                            new TaskScanPage(orderedTasks, Optional.empty()))
+                                    : invokeDelegate(delegate, method, args);
+                        case "getCandidate" ->
+                            CompletableFuture.completedFuture(orderedCandidates.stream()
+                                    .filter(candidate -> candidateMatches(candidate, args))
+                                    .findFirst());
                         case "close" -> null;
                         default -> invokeDelegate(delegate, method, args);
                     };
@@ -142,16 +164,16 @@ final class MaterializationPlannerTestSupport {
     }
 
     static VersionedGenerationZeroIndex zero(
-            String key,
-            long start,
-            long end,
-            long cumulativeStart,
-            long logicalBytes,
-            long commitVersion) {
-        ObjectSliceReadTarget target = target(
-                "l0-" + start + "-" + end,
-                ObjectType.MULTI_STREAM_WAL_OBJECT,
-                "WAL_OBJECT_V1");
+            String key, long start, long end, long cumulativeStart, long logicalBytes, long commitVersion) {
+        ObjectSliceReadTarget target =
+                target("l0-" + start + "-" + end, ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
+        return zero(key, start, end, cumulativeStart, logicalBytes, commitVersion, target);
+    }
+
+    static VersionedGenerationZeroIndex kafkaZero(
+            String key, long start, long end, long cumulativeStart, long logicalBytes, long commitVersion) {
+        ObjectSliceReadTarget target =
+                target("kafka-l0-" + start + "-" + end, ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
         return zero(
                 key,
                 start,
@@ -159,7 +181,31 @@ final class MaterializationPlannerTestSupport {
                 cumulativeStart,
                 logicalBytes,
                 commitVersion,
-                target);
+                target,
+                PayloadFormat.KAFKA_RECORD_BATCH,
+                1,
+                List.of());
+    }
+
+    static VersionedGenerationZeroIndex kafkaBookKeeperZero(
+            String key,
+            long start,
+            long end,
+            long cumulativeStart,
+            long logicalBytes,
+            long commitVersion,
+            BookKeeperEntryRangeReadTarget target) {
+        return zero(
+                key,
+                start,
+                end,
+                cumulativeStart,
+                logicalBytes,
+                commitVersion,
+                target,
+                PayloadFormat.KAFKA_RECORD_BATCH,
+                1,
+                List.of());
     }
 
     static VersionedGenerationZeroIndex zero(
@@ -170,6 +216,30 @@ final class MaterializationPlannerTestSupport {
             long logicalBytes,
             long commitVersion,
             ReadTarget target) {
+        return zero(
+                key,
+                start,
+                end,
+                cumulativeStart,
+                logicalBytes,
+                commitVersion,
+                target,
+                PayloadFormat.PULSAR_ENTRY_BATCH,
+                Math.toIntExact(end - start),
+                SCHEMAS);
+    }
+
+    private static VersionedGenerationZeroIndex zero(
+            String key,
+            long start,
+            long end,
+            long cumulativeStart,
+            long logicalBytes,
+            long commitVersion,
+            ReadTarget target,
+            PayloadFormat payloadFormat,
+            int entryCount,
+            List<SchemaRef> schemas) {
         long metadataVersion = 10 + commitVersion;
         OffsetIndexEntry value = new OffsetIndexEntry(
                 STREAM,
@@ -177,11 +247,11 @@ final class MaterializationPlannerTestSupport {
                 0,
                 cumulativeStart + logicalBytes,
                 target,
-                PayloadFormat.PULSAR_ENTRY_BATCH,
+                payloadFormat,
                 Math.toIntExact(end - start),
-                Math.toIntExact(end - start),
+                entryCount,
                 logicalBytes,
-                SCHEMAS,
+                schemas,
                 Optional.empty(),
                 commitVersion,
                 false,
@@ -205,10 +275,8 @@ final class MaterializationPlannerTestSupport {
             Checksum policyDigest,
             String physicalFormat) {
         long metadataVersion = 100 + generation;
-        ObjectSliceReadTarget target = target(
-                "g" + generation + "-" + start + "-" + end,
-                ObjectType.STREAM_COMPACTED_OBJECT,
-                physicalFormat);
+        ObjectSliceReadTarget target =
+                target("g" + generation + "-" + start + "-" + end, ObjectType.STREAM_COMPACTED_OBJECT, physicalFormat);
         var encodedTarget = ReadTargetCodecRegistry.phase15().encode(target);
         GenerationIndexRecord record = new GenerationIndexRecord(
                 1,
@@ -236,6 +304,56 @@ final class MaterializationPlannerTestSupport {
                 commitVersion,
                 SCHEMAS,
                 MaterializationRecordMapper.projectionIdentity(Optional.of(PROJECTION)),
+                100,
+                110,
+                "",
+                110,
+                metadataVersion);
+        return new VersionedGenerationIndex(key, record, metadataVersion, sha(hexCharacter(key)));
+    }
+
+    static VersionedGenerationIndex kafkaHigher(
+            String key,
+            long start,
+            long end,
+            long generation,
+            long cumulativeStart,
+            long logicalBytes,
+            long commitVersion,
+            Checksum policyDigest) {
+        long metadataVersion = 100 + generation;
+        ObjectSliceReadTarget target = target(
+                "kafka-g" + generation + "-" + start + "-" + end,
+                ObjectType.STREAM_COMPACTED_OBJECT,
+                MaterializationPolicy.KAFKA_COMMITTED_FORMAT,
+                CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT);
+        var encodedTarget = ReadTargetCodecRegistry.phase15().encode(target);
+        GenerationIndexRecord record = new GenerationIndexRecord(
+                1,
+                STREAM.value(),
+                ReadView.COMMITTED.wireId(),
+                start,
+                end,
+                generation,
+                "k".repeat(26),
+                "kafka-source-task-" + generation + "-" + start + "-" + end,
+                GenerationLifecycle.COMMITTED,
+                sha('b').value(),
+                policyDigest.value(),
+                encodedTarget,
+                encodedTarget.identityChecksumValue(),
+                policyDigest.value(),
+                PayloadFormat.KAFKA_RECORD_BATCH.name(),
+                Math.toIntExact(end - start),
+                Math.toIntExact(end - start),
+                1,
+                logicalBytes,
+                cumulativeStart,
+                cumulativeStart + logicalBytes,
+                commitVersion,
+                commitVersion,
+                List.of(),
+                MaterializationRecordMapper.projectionIdentity(Optional.empty()),
                 100,
                 110,
                 "",
@@ -273,7 +391,9 @@ final class MaterializationPlannerTestSupport {
                 Math.toIntExact(task.coverage().recordCount()),
                 outputRecordCount,
                 task.sources().stream().mapToInt(SourceGeneration::entryCount).sum(),
-                task.sources().stream().mapToLong(SourceGeneration::logicalBytes).sum(),
+                task.sources().stream()
+                        .mapToLong(SourceGeneration::logicalBytes)
+                        .sum(),
                 first.cumulativeSizeAtStart(),
                 last.cumulativeSizeAtEnd(),
                 first.commitVersion(),
@@ -286,16 +406,12 @@ final class MaterializationPlannerTestSupport {
                 301,
                 metadataVersion);
         return new VersionedGenerationIndex(
-                "/index/topic-published-" + task.coverage().endOffset(),
-                record,
-                metadataVersion,
-                sha('9'));
+                "/index/topic-published-" + task.coverage().endOffset(), record, metadataVersion, sha('9'));
     }
 
     static VersionedMaterializationTask durableTask(MaterializationTask task, long metadataVersion) {
         var record = MaterializationRecordMapper.plannedTask(task, 500).withMetadataVersion(metadataVersion);
-        return new VersionedMaterializationTask(
-                "/task/" + task.taskId(), record, metadataVersion, sha('f'));
+        return new VersionedMaterializationTask("/task/" + task.taskId(), record, metadataVersion, sha('f'));
     }
 
     static Checksum sha(char character) {
@@ -303,9 +419,7 @@ final class MaterializationPlannerTestSupport {
     }
 
     private static Object invokeDelegate(
-            GenerationMetadataStore delegate,
-            java.lang.reflect.Method method,
-            Object[] args) throws Throwable {
+            GenerationMetadataStore delegate, java.lang.reflect.Method method, Object[] args) throws Throwable {
         if (delegate == null) {
             throw new UnsupportedOperationException(method.getName());
         }
@@ -334,41 +448,47 @@ final class MaterializationPlannerTestSupport {
         if (candidate instanceof VersionedGenerationZeroIndex) {
             return ReadView.COMMITTED;
         }
-        return ReadView.fromWireId(((VersionedGenerationIndex) candidate).value().readViewId());
+        return ReadView.fromWireId(
+                ((VersionedGenerationIndex) candidate).value().readViewId());
     }
 
     static VersionedMaterializationStreamRegistration registration() {
         return registration(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
     }
 
+    static VersionedMaterializationStreamRegistration registration(StorageProfile profile) {
+        return registration(profile, MaterializationStreamAuthorityMode.PROJECTION_REQUIRED);
+    }
+
     static VersionedMaterializationStreamRegistration registration(
-            StorageProfile profile) {
+            StorageProfile profile, MaterializationStreamAuthorityMode authorityMode) {
         long metadataVersion = 7;
+        boolean direct = authorityMode == MaterializationStreamAuthorityMode.DIRECT_STREAM
+                || authorityMode == MaterializationStreamAuthorityMode.KAFKA_TOPIC_COMPACTION;
         MaterializationStreamRegistrationRecord record = new MaterializationStreamRegistrationRecord(
                 1,
                 STREAM.value(),
-                MaterializationRecordMapper.projectionIdentity(Optional.of(PROJECTION)),
-                sha('e').value(),
+                direct
+                        ? DirectMaterializationStreamAuthority.encodedProjectionRef()
+                        : MaterializationRecordMapper.projectionIdentity(Optional.of(PROJECTION)),
+                direct
+                        ? DirectMaterializationStreamAuthority.identitySha256(STREAM, profile.canonical())
+                                .value()
+                        : sha('e').value(),
                 profile.canonical().name(),
                 100,
                 4,
                 100,
                 metadataVersion);
         return new VersionedMaterializationStreamRegistration(
-                new F4Keyspace(CLUSTER).materializationRegistryKey(STREAM),
-                record,
-                metadataVersion,
-                sha('d'));
+                new F4Keyspace(CLUSTER).materializationRegistryKey(STREAM), record, metadataVersion, sha('d'));
     }
 
     static StreamMetadataSnapshot snapshot(long trimOffset, long committedEndOffset) {
         return snapshot(trimOffset, committedEndOffset, StorageProfile.OBJECT_WAL_SYNC_OBJECT);
     }
 
-    static StreamMetadataSnapshot snapshot(
-            long trimOffset,
-            long committedEndOffset,
-            StorageProfile profile) {
+    static StreamMetadataSnapshot snapshot(long trimOffset, long committedEndOffset, StorageProfile profile) {
         long metadataVersion = 5;
         long commitVersion = committedEndOffset == 0 ? 0 : committedEndOffset;
         return new StreamMetadataSnapshot(
@@ -383,11 +503,7 @@ final class MaterializationPlannerTestSupport {
                         1,
                         metadataVersion),
                 new CommittedEndOffsetRecord(
-                        STREAM.value(),
-                        committedEndOffset,
-                        committedEndOffset * 50,
-                        commitVersion,
-                        metadataVersion),
+                        STREAM.value(), committedEndOffset, committedEndOffset * 50, commitVersion, metadataVersion),
                 new TrimRecord(STREAM.value(), trimOffset, "", 1, metadataVersion));
     }
 
@@ -403,10 +519,12 @@ final class MaterializationPlannerTestSupport {
                 });
     }
 
+    private static ObjectSliceReadTarget target(String id, ObjectType objectType, String physicalFormat) {
+        return target(id, objectType, physicalFormat, PayloadFormat.PULSAR_ENTRY_BATCH.name());
+    }
+
     private static ObjectSliceReadTarget target(
-            String id,
-            ObjectType objectType,
-            String physicalFormat) {
+            String id, ObjectType objectType, String physicalFormat, String logicalFormat) {
         byte[] indexBytes = new byte[] {1, 2, 3};
         EntryIndexRef index = new EntryIndexRef(
                 EntryIndexLocation.INLINE,
@@ -422,7 +540,7 @@ final class MaterializationPlannerTestSupport {
                 new ObjectKey("objects/planner/" + id),
                 objectType,
                 physicalFormat,
-                PayloadFormat.PULSAR_ENTRY_BATCH.name(),
+                logicalFormat,
                 "slice-" + id,
                 0,
                 100,

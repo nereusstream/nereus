@@ -16,7 +16,9 @@ package com.nereusstream.api;
 
 import java.util.Objects;
 
-/** Opaque logical stream name used for idempotent create-or-get. */
+/**
+ * Opaque logical stream name used for idempotent create-or-get.
+ */
 public record StreamName(String value) {
     public StreamName {
         Objects.requireNonNull(value, "value");

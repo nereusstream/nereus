@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import com.nereusstream.api.StreamStorage;
@@ -33,20 +34,17 @@ final class ManagedLedgerRuntimeTestSupport {
     static final String PROCESS_RUN_ID = "ABCDEFGHIJKLMNOPQRSTUV";
     private static final AtomicLong OWNER_IDS = new AtomicLong();
 
-    private ManagedLedgerRuntimeTestSupport() {
-    }
+    private ManagedLedgerRuntimeTestSupport() {}
 
     static NereusManagedLedgerRuntime runtime(
-            StreamStorage streamStorage,
-            ManagedLedgerProjectionMetadataStore projectionStore) {
+            StreamStorage streamStorage, ManagedLedgerProjectionMetadataStore projectionStore) {
         return runtime(streamStorage, projectionStore, new TestCursorStorage());
     }
 
     static NereusManagedLedgerRuntime runtime(
             StreamStorage streamStorage,
             ManagedLedgerProjectionMetadataStore projectionStore,
-            ManagedLedgerMaterializationRegistrationCoordinator
-                    registrationCoordinator) {
+            ManagedLedgerMaterializationRegistrationCoordinator registrationCoordinator) {
         return runtime(
                 streamStorage,
                 projectionStore,
@@ -75,13 +73,7 @@ final class ManagedLedgerRuntimeTestSupport {
             CursorStorage cursorStorage,
             ScheduledExecutorService scheduler,
             ExecutorService callbacks) {
-        return runtime(
-                streamStorage,
-                projectionStore,
-                cursorStorage,
-                scheduler,
-                callbacks,
-                allowRegistration());
+        return runtime(streamStorage, projectionStore, cursorStorage, scheduler, callbacks, allowRegistration());
     }
 
     static NereusManagedLedgerRuntime runtime(
@@ -90,12 +82,11 @@ final class ManagedLedgerRuntimeTestSupport {
             CursorStorage cursorStorage,
             ScheduledExecutorService scheduler,
             ExecutorService callbacks,
-            ManagedLedgerMaterializationRegistrationCoordinator
-                    registrationCoordinator) {
+            ManagedLedgerMaterializationRegistrationCoordinator registrationCoordinator) {
         try {
             CursorStorageConfig cursorConfig = CursorStorageConfig.defaults();
-            CursorProtocolActivationGuard activationGuard = ledger ->
-                    java.util.concurrent.CompletableFuture.completedFuture(null);
+            CursorProtocolActivationGuard activationGuard =
+                    ledger -> java.util.concurrent.CompletableFuture.completedFuture(null);
             return new NereusManagedLedgerRuntime(
                     streamStorage,
                     projectionStore,
@@ -122,16 +113,11 @@ final class ManagedLedgerRuntimeTestSupport {
         }
     }
 
-    private static ManagedLedgerMaterializationRegistrationCoordinator
-            allowRegistration() {
-        return (name, identity) ->
-                java.util.concurrent.CompletableFuture.completedFuture(
-                        null);
+    private static ManagedLedgerMaterializationRegistrationCoordinator allowRegistration() {
+        return (name, identity) -> java.util.concurrent.CompletableFuture.completedFuture(null);
     }
 
-    static NereusWritableLedgerOpenResult writable(
-            NereusManagedLedgerRuntime runtime,
-            NereusLedgerOpenResult ledger) {
+    static NereusWritableLedgerOpenResult writable(NereusManagedLedgerRuntime runtime, NereusLedgerOpenResult ledger) {
         String name = ledger.topicProjection().managedLedgerName();
         CursorOwnerSession owner = new CursorOwnerSession(
                 new CursorLedgerIdentity(
@@ -148,10 +134,8 @@ final class ManagedLedgerRuntimeTestSupport {
 
     @SuppressWarnings("unchecked")
     private static <T> T proxy(Class<T> type) {
-        return (T) Proxy.newProxyInstance(
-                type.getClassLoader(),
-                new Class<?>[] {type},
-                (instance, method, arguments) -> {
+        return (T)
+                Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, (instance, method, arguments) -> {
                     if ("close".equals(method.getName())) {
                         return null;
                     }
@@ -174,7 +158,7 @@ final class ManagedLedgerRuntimeTestSupport {
         Method factory = SharedOxiaClientRuntime.class.getDeclaredMethod(
                 "usingClient", OxiaClientConfiguration.class, SyncOxiaClient.class, Clock.class);
         factory.setAccessible(true);
-        return (SharedOxiaClientRuntime) factory.invoke(
-                null, OxiaClientConfiguration.defaults("unused:6648"), client, Clock.systemUTC());
+        return (SharedOxiaClientRuntime)
+                factory.invoke(null, OxiaClientConfiguration.defaults("unused:6648"), client, Clock.systemUTC());
     }
 }

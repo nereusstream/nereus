@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.recovery;
 
 import com.nereusstream.api.AppendOutcome;
@@ -14,7 +15,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Legacy genesis-reachable adapter retained for runtimes without recovery checkpoints. */
+/**
+ * Legacy genesis-reachable adapter retained for runtimes without recovery checkpoints.
+ */
 public final class MetadataAppendRecoverySearcher implements AppendRecoverySearcher {
     private final String cluster;
     private final OxiaMetadataStore store;
@@ -26,10 +29,7 @@ public final class MetadataAppendRecoverySearcher implements AppendRecoverySearc
 
     @Override
     public CompletableFuture<AppendReplayResolution> search(
-            CommitAppendRequest request,
-            int maximumLiveCommits,
-            int pageSize,
-            Duration timeout) {
+            CommitAppendRequest request, int maximumLiveCommits, int pageSize, Duration timeout) {
         Objects.requireNonNull(request, "request");
         requireBounds(maximumLiveCommits, pageSize, timeout);
         return searchPage(request, maximumLiveCommits, pageSize, Optional.empty(), 0);
@@ -45,13 +45,8 @@ public final class MetadataAppendRecoverySearcher implements AppendRecoverySearc
         if (remaining <= 0) {
             return exhausted();
         }
-        return store.searchAppendReplay(
-                        cluster,
-                        request,
-                        continuation,
-                        Math.min(pageSize, remaining))
-                .thenCompose(result -> resolvePage(
-                        request, maximumLiveCommits, pageSize, scanned, result));
+        return store.searchAppendReplay(cluster, request, continuation, Math.min(pageSize, remaining))
+                .thenCompose(result -> resolvePage(request, maximumLiveCommits, pageSize, scanned, result));
     }
 
     private CompletableFuture<AppendReplayResolution> resolvePage(
@@ -63,27 +58,19 @@ public final class MetadataAppendRecoverySearcher implements AppendRecoverySearc
         int scanned = Math.addExact(scannedBefore, result.scannedRecords());
         if (result.status() == AppendReplayStatus.FOUND) {
             return CompletableFuture.completedFuture(AppendReplayResolution.found(
-                    result.committedAppend().orElseThrow(),
-                    AppendReplayEvidenceSource.LIVE_COMMIT,
-                    scanned));
+                    result.committedAppend().orElseThrow(), AppendReplayEvidenceSource.LIVE_COMMIT, scanned));
         }
         if (result.status() == AppendReplayStatus.PROVEN_NOT_COMMITTED) {
-            return CompletableFuture.completedFuture(
-                    AppendReplayResolution.notCommitted(scanned));
+            return CompletableFuture.completedFuture(AppendReplayResolution.notCommitted(scanned));
         }
         if (result.scannedRecords() <= 0 || result.continuation().isEmpty()) {
-            return CompletableFuture.failedFuture(invariant(
-                    "live append replay returned a continuation without progress"));
+            return CompletableFuture.failedFuture(
+                    invariant("live append replay returned a continuation without progress"));
         }
         if (scanned >= maximumLiveCommits) {
             return exhausted();
         }
-        return searchPage(
-                request,
-                maximumLiveCommits,
-                pageSize,
-                result.continuation(),
-                scanned);
+        return searchPage(request, maximumLiveCommits, pageSize, result.continuation(), scanned);
     }
 
     private static <T> CompletableFuture<T> exhausted() {
@@ -94,10 +81,7 @@ public final class MetadataAppendRecoverySearcher implements AppendRecoverySearc
                 AppendOutcome.MAY_HAVE_COMMITTED));
     }
 
-    private static void requireBounds(
-            int maximumLiveCommits,
-            int pageSize,
-            Duration timeout) {
+    private static void requireBounds(int maximumLiveCommits, int pageSize, Duration timeout) {
         Objects.requireNonNull(timeout, "timeout");
         if (maximumLiveCommits <= 0
                 || pageSize <= 0
@@ -110,10 +94,7 @@ public final class MetadataAppendRecoverySearcher implements AppendRecoverySearc
 
     private static NereusException invariant(String message) {
         return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message,
-                AppendOutcome.MAY_HAVE_COMMITTED);
+                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, AppendOutcome.MAY_HAVE_COMMITTED);
     }
 
     private static String requireText(String value, String field) {

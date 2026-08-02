@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** Durable object-deletion veto tied to one revalidatable authoritative owner. */
+/**
+ * Durable object-deletion veto tied to one revalidatable authoritative owner.
+ */
 public record ObjectProtectionRecord(
         int schemaVersion,
         String objectKeyHash,
@@ -27,7 +30,8 @@ public record ObjectProtectionRecord(
         F4RecordValidation.requireNonNegative(createdAtMillis, "createdAtMillis");
         F4RecordValidation.requireNonNegative(expiresAtMillis, "expiresAtMillis");
         boolean pending = type == ObjectProtectionType.CURSOR_SNAPSHOT_PENDING
-                || type == ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING;
+                || type == ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING
+                || type == ObjectProtectionType.KAFKA_CHECKPOINT_PENDING;
         if (pending != (expiresAtMillis > createdAtMillis)) {
             throw new IllegalArgumentException("protection expiry does not match permanent/pending type");
         }
@@ -36,8 +40,16 @@ public record ObjectProtectionRecord(
 
     public ObjectProtectionRecord withMetadataVersion(long version) {
         return new ObjectProtectionRecord(
-                schemaVersion, objectKeyHash, protectionTypeId, referenceId, ownerKey,
-                ownerMetadataVersion, ownerIdentitySha256, rootLifecycleEpoch,
-                createdAtMillis, expiresAtMillis, version);
+                schemaVersion,
+                objectKeyHash,
+                protectionTypeId,
+                referenceId,
+                ownerKey,
+                ownerMetadataVersion,
+                ownerIdentitySha256,
+                rootLifecycleEpoch,
+                createdAtMillis,
+                expiresAtMillis,
+                version);
     }
 }

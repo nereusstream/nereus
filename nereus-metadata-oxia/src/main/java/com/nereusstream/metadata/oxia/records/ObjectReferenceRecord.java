@@ -21,10 +21,7 @@ import java.util.Objects;
 import java.util.Set;
 
 public record ObjectReferenceRecord(
-        String objectId,
-        List<VisibleSliceReferenceRecord> visibleSlices,
-        long updatedAtMillis,
-        long metadataVersion) {
+        String objectId, List<VisibleSliceReferenceRecord> visibleSlices, long updatedAtMillis, long metadataVersion) {
     public ObjectReferenceRecord {
         objectId = requireNonBlank(objectId, "objectId");
         visibleSlices = Objects.requireNonNull(visibleSlices, "visibleSlices").stream()
@@ -51,6 +48,5 @@ public record ObjectReferenceRecord(
         return value;
     }
 
-    private record SliceIdentity(String streamId, String sliceId) {
-    }
+    private record SliceIdentity(String streamId, String sliceId) {}
 }

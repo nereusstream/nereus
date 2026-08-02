@@ -7,7 +7,7 @@ dependencies {
     api(project(":nereus-core"))
     implementation(project(":nereus-materialization"))
     implementation(project(":nereus-metadata-oxia"))
-    implementation(libs.bookkeeper.server)
+    api(libs.bookkeeper.server)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
@@ -73,4 +73,12 @@ registerFocusedTest(
     "com.nereusstream.bookkeeper.BookKeeperLedgerRecoveryTest",
     "com.nereusstream.bookkeeper.BookKeeperAppendRecoveryCoordinatorTest",
     "com.nereusstream.bookkeeper.BookKeeperWalRetentionGateTest",
+)
+
+registerFocusedTest(
+    "rangedBookKeeperIntegrationTest",
+    "Run the F9-M1 BookKeeper ranged codec, boundary, overflow, and L0 composition contracts.",
+    "com.nereusstream.bookkeeper.BookKeeperRangedEntryCodecV1Test",
+    "com.nereusstream.bookkeeper.BookKeeperPrimaryWalReaderTest",
+    "com.nereusstream.bookkeeper.BookKeeperStreamStorageIntegrationTest",
 )

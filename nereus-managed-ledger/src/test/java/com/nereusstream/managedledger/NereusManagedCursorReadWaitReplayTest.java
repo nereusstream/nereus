@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.TrimOptions;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
@@ -53,8 +53,7 @@ class NereusManagedCursorReadWaitReplayTest {
         Clock clock = Clock.systemUTC();
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
-        FakeManagedLedgerProjectionMetadataStore projections =
-                new FakeManagedLedgerProjectionMetadataStore();
+        FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         DefaultStreamStorage streamStorage = new DefaultStreamStorage(
                 StreamStorageConfig.defaults("cluster/a", "cursor-read-wait-replay-test"),
                 metadata,
@@ -62,14 +61,10 @@ class NereusManagedCursorReadWaitReplayTest {
                 new DefaultWalObjectReader(objectStore),
                 clock,
                 Runnable::run);
-        try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(
-                streamStorage, projections, new TestCursorStorage())) {
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections, new TestCursorStorage())) {
             NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
-                    runtime,
-                    fixedGuard(1),
-                    config(),
-                    new ManagedLedgerFactoryConfig(),
-                    false);
+                    runtime, fixedGuard(1), config(), new ManagedLedgerFactoryConfig(), false);
             NereusManagedLedger ledger = (NereusManagedLedger) factory.open(NAME, config());
             Position first = ledger.addEntry(new byte[] {0});
             Position second = ledger.addEntry(new byte[] {1});
@@ -79,13 +74,8 @@ class NereusManagedCursorReadWaitReplayTest {
 
             ManagedCursor reader = ledger.openCursor("reader");
             reader.delete(second);
-            List<Entry> bounded = read(
-                    reader,
-                    10,
-                    ManagedLedgerUtils.NO_MAX_SIZE_LIMIT,
-                    third,
-                    null,
-                    false).join();
+            List<Entry> bounded = read(reader, 10, ManagedLedgerUtils.NO_MAX_SIZE_LIMIT, third, null, false)
+                    .join();
             assertThat(bounded).extracting(Entry::getPosition).containsExactly(first, third);
             bounded.set(0, bounded.get(0));
             bounded.forEach(Entry::release);
@@ -99,12 +89,13 @@ class NereusManagedCursorReadWaitReplayTest {
 
             reader.seek(first, true);
             List<Entry> predicateSkipped = read(
-                    reader,
-                    1,
-                    ManagedLedgerUtils.NO_MAX_SIZE_LIMIT,
-                    null,
-                    position -> position.equals(first),
-                    false).join();
+                            reader,
+                            1,
+                            ManagedLedgerUtils.NO_MAX_SIZE_LIMIT,
+                            null,
+                            position -> position.equals(first),
+                            false)
+                    .join();
             assertThat(predicateSkipped).extracting(Entry::getPosition).containsExactly(third);
             predicateSkipped.forEach(Entry::release);
 
@@ -116,46 +107,39 @@ class NereusManagedCursorReadWaitReplayTest {
             replay.entries().join().forEach(Entry::release);
 
             assertThat(reader.findNewestMatching(
-                    FindPositionConstraint.SearchActiveEntries,
-                    entry -> entry.getEntryId() == second.getEntryId())).isNull();
+                            FindPositionConstraint.SearchActiveEntries,
+                            entry -> entry.getEntryId() == second.getEntryId()))
+                    .isNull();
             assertThat(reader.findNewestMatching(
-                    FindPositionConstraint.SearchAllAvailableEntries,
-                    entry -> entry.getEntryId() == second.getEntryId())).isEqualTo(second);
+                            FindPositionConstraint.SearchAllAvailableEntries,
+                            entry -> entry.getEntryId() == second.getEntryId()))
+                    .isEqualTo(second);
 
             long readBeforeScan = reader.getReadPosition().getEntryId();
             AtomicInteger cappedPredicates = new AtomicInteger();
             assertThat(reader.scan(
-                    Optional.empty(),
-                    entry -> {
-                        cappedPredicates.incrementAndGet();
-                        return true;
-                    },
-                    1,
-                    3,
-                    TimeUnit.SECONDS.toMillis(5)).join()).isEqualTo(ScanOutcome.ABORTED);
+                                    Optional.empty(),
+                                    entry -> {
+                                        cappedPredicates.incrementAndGet();
+                                        return true;
+                                    },
+                                    1,
+                                    3,
+                                    TimeUnit.SECONDS.toMillis(5))
+                            .join())
+                    .isEqualTo(ScanOutcome.ABORTED);
             assertThat(cappedPredicates).hasValue(3);
             assertThat(reader.getReadPosition().getEntryId()).isEqualTo(readBeforeScan);
-            assertThat(reader.scan(
-                    Optional.of(first),
-                    entry -> false,
-                    2,
-                    10,
-                    TimeUnit.SECONDS.toMillis(5)).join()).isEqualTo(ScanOutcome.USER_INTERRUPTED);
-            assertThat(reader.scan(
-                    Optional.of(fifth),
-                    entry -> true,
-                    2,
-                    10,
-                    TimeUnit.SECONDS.toMillis(5)).join()).isEqualTo(ScanOutcome.COMPLETED);
+            assertThat(reader.scan(Optional.of(first), entry -> false, 2, 10, TimeUnit.SECONDS.toMillis(5))
+                            .join())
+                    .isEqualTo(ScanOutcome.USER_INTERRUPTED);
+            assertThat(reader.scan(Optional.of(fifth), entry -> true, 2, 10, TimeUnit.SECONDS.toMillis(5))
+                            .join())
+                    .isEqualTo(ScanOutcome.COMPLETED);
 
             ManagedCursor waiter = ledger.openCursor("waiter", InitialPosition.Latest);
-            CompletableFuture<List<Entry>> tailRead = read(
-                    waiter,
-                    1,
-                    ManagedLedgerUtils.NO_MAX_SIZE_LIMIT,
-                    null,
-                    null,
-                    true);
+            CompletableFuture<List<Entry>> tailRead =
+                    read(waiter, 1, ManagedLedgerUtils.NO_MAX_SIZE_LIMIT, null, null, true);
             assertThat(tailRead).isNotDone();
             Position appended = ledger.addEntry(new byte[] {5});
             assertThat(tailRead.join()).singleElement().satisfies(entry -> {
@@ -163,31 +147,23 @@ class NereusManagedCursorReadWaitReplayTest {
                 entry.release();
             });
 
-            CompletableFuture<List<Entry>> firstWaiter = read(
-                    waiter,
-                    1,
-                    ManagedLedgerUtils.NO_MAX_SIZE_LIMIT,
-                    null,
-                    null,
-                    true);
-            runtime.scheduler().submit(() -> { }).get(5, TimeUnit.SECONDS);
-            CompletableFuture<List<Entry>> concurrentWaiter = read(
-                    waiter,
-                    1,
-                    ManagedLedgerUtils.NO_MAX_SIZE_LIMIT,
-                    null,
-                    null,
-                    true);
+            CompletableFuture<List<Entry>> firstWaiter =
+                    read(waiter, 1, ManagedLedgerUtils.NO_MAX_SIZE_LIMIT, null, null, true);
+            runtime.scheduler().submit(() -> {}).get(5, TimeUnit.SECONDS);
+            CompletableFuture<List<Entry>> concurrentWaiter =
+                    read(waiter, 1, ManagedLedgerUtils.NO_MAX_SIZE_LIMIT, null, null, true);
             assertThatThrownBy(concurrentWaiter::join)
                     .isInstanceOf(CompletionException.class)
                     .hasCauseInstanceOf(ManagedLedgerException.ConcurrentWaitCallbackException.class);
             assertThat(waiter.cancelPendingReadRequest()).isTrue();
             assertThat(firstWaiter).isNotDone();
 
-            streamStorage.trim(
-                    ledger.projection().streamId(),
-                    1,
-                    new TrimOptions(Duration.ofSeconds(5), "cursor replay trim")).join();
+            streamStorage
+                    .trim(
+                            ledger.projection().streamId(),
+                            1,
+                            new TrimOptions(Duration.ofSeconds(5), "cursor replay trim"))
+                    .join();
             ledger.refreshMetadata().join();
             ReplayResult trimmedReplay = replay(reader, Set.of(first, fourth));
             assertThat(trimmedReplay.skipped()).isEqualTo(Set.of(first));
@@ -224,11 +200,9 @@ class NereusManagedCursorReadWaitReplayTest {
             }
         };
         if (skip != null && wait) {
-            cursor.asyncReadEntriesWithSkipOrWait(
-                    count, maxSizeBytes, callback, null, maxPosition, skip);
+            cursor.asyncReadEntriesWithSkipOrWait(count, maxSizeBytes, callback, null, maxPosition, skip);
         } else if (skip != null) {
-            cursor.asyncReadEntriesWithSkip(
-                    count, maxSizeBytes, callback, null, maxPosition, skip);
+            cursor.asyncReadEntriesWithSkip(count, maxSizeBytes, callback, null, maxPosition, skip);
         } else if (wait) {
             cursor.asyncReadEntriesOrWait(count, maxSizeBytes, callback, null, maxPosition);
         } else {
@@ -284,8 +258,5 @@ class NereusManagedCursorReadWaitReplayTest {
         });
     }
 
-    private record ReplayResult(
-            Set<? extends Position> skipped,
-            CompletableFuture<List<Entry>> entries) {
-    }
+    private record ReplayResult(Set<? extends Position> skipped, CompletableFuture<List<Entry>> entries) {}
 }

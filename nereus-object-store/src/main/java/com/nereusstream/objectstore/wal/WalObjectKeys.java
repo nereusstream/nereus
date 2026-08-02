@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.wal;
 
 import com.nereusstream.api.ObjectId;
@@ -13,28 +14,23 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Objects;
 
-/** Canonical Phase 1 WAL object-key builder and strict inverse used by F4 inventory. */
+/**
+ * Canonical Phase 1 WAL object-key builder and strict inverse used by F4 inventory.
+ */
 public final class WalObjectKeys {
-    private static final DateTimeFormatter OBJECT_TIME =
-            DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final DateTimeFormatter OBJECT_TIME = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final DateTimeFormatter YEAR = DateTimeFormatter.ofPattern("yyyy");
     private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("MM");
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd");
 
-    private WalObjectKeys() {
-    }
+    private WalObjectKeys() {}
 
     public static ObjectKeyPrefix prefix(String cluster) {
-        return new ObjectKeyPrefix(KeyComponentCodec.encodeComponent(requireText(cluster, "cluster"))
-                + "/wal/");
+        return new ObjectKeyPrefix(KeyComponentCodec.encodeComponent(requireText(cluster, "cluster")) + "/wal/");
     }
 
     public static ObjectKey objectKey(
-            String cluster,
-            String writerIdHash,
-            String writerRunIdHash,
-            ObjectId objectId,
-            Instant createdAt) {
+            String cluster, String writerIdHash, String writerRunIdHash, ObjectId objectId, Instant createdAt) {
         String writer = requireStableHash(writerIdHash, "writerIdHash");
         String run = requireCanonicalComponent(writerRunIdHash, "writerRunIdHash");
         Objects.requireNonNull(objectId, "objectId");
@@ -66,13 +62,7 @@ public final class WalObjectKeys {
         String writer = requireStableHash(components[3], "writerIdHash");
         String run = requireCanonicalComponent(components[4], "writerRunIdHash");
         String objectIdValue = components[5].substring(0, components[5].length() - ".nrs".length());
-        validateObjectId(
-                objectIdValue,
-                writer,
-                run,
-                components[0],
-                components[1],
-                components[2]);
+        validateObjectId(objectIdValue, writer, run, components[0], components[1], components[2]);
         ObjectId objectId = new ObjectId(objectIdValue);
         String canonical = exactPrefix
                 + components[0] + "/" + components[1] + "/" + components[2] + "/"
@@ -80,17 +70,11 @@ public final class WalObjectKeys {
         if (!canonical.equals(key.value())) {
             throw new IllegalArgumentException("WAL object key is not canonical");
         }
-        return new ParsedWalObjectKey(
-                components[0], components[1], components[2], writer, run, objectId);
+        return new ParsedWalObjectKey(components[0], components[1], components[2], writer, run, objectId);
     }
 
     private static void validateObjectId(
-            String value,
-            String writer,
-            String run,
-            String year,
-            String month,
-            String day) {
+            String value, String writer, String run, String year, String month, String day) {
         String exact = Objects.requireNonNull(value, "objectId");
         String prefix = "wo-";
         if (!exact.startsWith(prefix) || exact.length() < 3 + 14 + 1 + 52 + 1 + 1 + 1 + 19) {
@@ -98,15 +82,12 @@ public final class WalObjectKeys {
         }
         String timestampValue = exact.substring(3, 17);
         String writerValue = exact.substring(18, 70);
-        if (exact.charAt(17) != '-'
-                || exact.charAt(70) != '-'
-                || !writerValue.equals(writer)) {
+        if (exact.charAt(17) != '-' || exact.charAt(70) != '-' || !writerValue.equals(writer)) {
             throw new IllegalArgumentException("WAL object id writer identity is not canonical");
         }
         String tail = exact.substring(71);
         int sequenceDelimiter = tail.lastIndexOf('-');
-        if (sequenceDelimiter <= 0
-                || !tail.substring(0, sequenceDelimiter).equals(run)) {
+        if (sequenceDelimiter <= 0 || !tail.substring(0, sequenceDelimiter).equals(run)) {
             throw new IllegalArgumentException("WAL object id run identity is not canonical");
         }
         final LocalDateTime timestamp;
@@ -125,10 +106,7 @@ public final class WalObjectKeys {
 
     private static void requireDate(String year, String month, String day) {
         try {
-            LocalDate.of(
-                    Integer.parseInt(year),
-                    Integer.parseInt(month),
-                    Integer.parseInt(day));
+            LocalDate.of(Integer.parseInt(year), Integer.parseInt(month), Integer.parseInt(day));
         } catch (RuntimeException failure) {
             throw new IllegalArgumentException("WAL object key date is invalid", failure);
         }
@@ -165,12 +143,7 @@ public final class WalObjectKeys {
     }
 
     public record ParsedWalObjectKey(
-            String year,
-            String month,
-            String day,
-            String writerIdHash,
-            String writerRunIdHash,
-            ObjectId objectId) {
+            String year, String month, String day, String writerIdHash, String writerRunIdHash, ObjectId objectId) {
         public ParsedWalObjectKey {
             requireDate(year, month, day);
             writerIdHash = requireStableHash(writerIdHash, "writerIdHash");

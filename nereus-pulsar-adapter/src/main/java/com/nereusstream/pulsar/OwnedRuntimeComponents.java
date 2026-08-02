@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import java.util.Optional;
@@ -13,7 +14,8 @@ public interface OwnedRuntimeComponents extends AutoCloseable {
     <T extends AutoCloseable> Optional<T> component(Class<T> componentType);
 
     default <T extends AutoCloseable> T requireComponent(Class<T> componentType) {
-        return component(componentType).orElseThrow(() -> new IllegalArgumentException(
-                "owned runtime component is not installed: " + componentType.getName()));
+        return component(componentType)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "owned runtime component is not installed: " + componentType.getName()));
     }
 }

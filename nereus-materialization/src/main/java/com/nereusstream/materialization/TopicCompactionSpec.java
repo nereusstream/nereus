@@ -1,13 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import java.util.Objects;
 
-/** Immutable strategy identity for the separate sparse topic-compacted view. */
-public record TopicCompactionSpec(
-        String strategyId,
-        long strategyVersion,
-        String keyCodecId) {
+/**
+ * Immutable strategy identity for the separate sparse topic-compacted view.
+ */
+public record TopicCompactionSpec(String strategyId, long strategyVersion, String keyCodecId) {
     public TopicCompactionSpec {
         strategyId = requireText(strategyId, "strategyId");
         keyCodecId = requireText(keyCodecId, "keyCodecId");

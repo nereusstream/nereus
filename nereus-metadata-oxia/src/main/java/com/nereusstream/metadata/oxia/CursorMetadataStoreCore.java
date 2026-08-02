@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.ErrorCode;
@@ -28,7 +29,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Shared strict single-key CAS implementation used by fake and Java Oxia F3 adapters. */
+/**
+ * Shared strict single-key CAS implementation used by fake and Java Oxia F3 adapters.
+ */
 final class CursorMetadataStoreCore implements CursorMetadataStore {
     private final PartitionedOxiaClient client;
     private final CursorMetadataStoreConfig config;
@@ -41,8 +44,8 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
         this.client = Objects.requireNonNull(client, "client");
         this.config = Objects.requireNonNull(config, "config");
         this.admission = new Semaphore(config.maxPendingOperations());
-        this.operationExecutor = Executors.newFixedThreadPool(
-                Math.min(4, config.maxPendingOperations()), namedThreadFactory());
+        this.operationExecutor =
+                Executors.newFixedThreadPool(Math.min(4, config.maxPendingOperations()), namedThreadFactory());
     }
 
     @Override
@@ -55,8 +58,7 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
     }
 
     @Override
-    public CompletableFuture<VersionedCursorState> createCursor(
-            String cluster, CursorStateRecord value) {
+    public CompletableFuture<VersionedCursorState> createCursor(String cluster, CursorStateRecord value) {
         CursorKeyspace keyspace = new CursorKeyspace(cluster);
         CursorStateRecord candidate = Objects.requireNonNull(value, "value");
         StreamId streamId = streamId(candidate.projection().streamId());
@@ -90,10 +92,7 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
 
     @Override
     public CompletableFuture<CursorScanPage> scanCursors(
-            String cluster,
-            StreamId streamId,
-            Optional<CursorScanToken> continuation,
-            int pageSize) {
+            String cluster, StreamId streamId, Optional<CursorScanToken> continuation, int pageSize) {
         CursorKeyspace keyspace = new CursorKeyspace(cluster);
         StreamId exactStream = Objects.requireNonNull(streamId, "streamId");
         Optional<CursorScanToken> token = Objects.requireNonNull(continuation, "continuation");
@@ -102,18 +101,19 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
         }
         String prefix = keyspace.cursorStateScopePrefix(exactStream);
         String from = token.map(value -> {
-            if (!value.matches(new OxiaKeyspace(cluster).cluster(), exactStream, prefix)) {
-                throw new IllegalArgumentException("cursor scan continuation belongs to another scope");
-            }
-            return value.exclusiveLastKey() + '\0';
-        }).orElseGet(() -> keyspace.cursorStateScanFrom(exactStream));
+                    if (!value.matches(new OxiaKeyspace(cluster).cluster(), exactStream, prefix)) {
+                        throw new IllegalArgumentException("cursor scan continuation belongs to another scope");
+                    }
+                    return value.exclusiveLastKey() + '\0';
+                })
+                .orElseGet(() -> keyspace.cursorStateScanFrom(exactStream));
         String to = keyspace.cursorStateScanToExclusive(exactStream);
         if (!from.startsWith(prefix)) {
             throw new IllegalArgumentException("cursor scan continuation is outside the cursor-state prefix");
         }
         return submit(deadline -> {
-            List<PartitionedOxiaClient.VersionedValue> stored = deadline.await(client.rangeScan(
-                    from, to, pageSize, keyspace.streamPartitionKey(exactStream)));
+            List<PartitionedOxiaClient.VersionedValue> stored =
+                    deadline.await(client.rangeScan(from, to, pageSize, keyspace.streamPartitionKey(exactStream)));
             List<VersionedCursorState> records = new ArrayList<>(stored.size());
             String previous = null;
             for (PartitionedOxiaClient.VersionedValue item : stored) {
@@ -127,23 +127,24 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
             }
             Optional<CursorScanToken> next = stored.size() == pageSize
                     ? Optional.of(new CursorScanToken(
-                            new OxiaKeyspace(cluster).cluster(), exactStream, prefix, stored.get(stored.size() - 1).key()))
+                            new OxiaKeyspace(cluster).cluster(),
+                            exactStream,
+                            prefix,
+                            stored.get(stored.size() - 1).key()))
                     : Optional.empty();
             return new CursorScanPage(records, next);
         });
     }
 
     @Override
-    public CompletableFuture<Optional<VersionedCursorRetention>> getRetention(
-            String cluster, StreamId streamId) {
+    public CompletableFuture<Optional<VersionedCursorRetention>> getRetention(String cluster, StreamId streamId) {
         CursorKeyspace keyspace = new CursorKeyspace(cluster);
         StreamId exactStream = Objects.requireNonNull(streamId, "streamId");
         return submit(deadline -> readRetention(keyspace, exactStream, deadline));
     }
 
     @Override
-    public CompletableFuture<VersionedCursorRetention> createRetention(
-            String cluster, CursorRetentionRecord value) {
+    public CompletableFuture<VersionedCursorRetention> createRetention(String cluster, CursorRetentionRecord value) {
         CursorKeyspace keyspace = new CursorKeyspace(cluster);
         CursorRetentionRecord candidate = Objects.requireNonNull(value, "value");
         StreamId streamId = streamId(candidate.projection().streamId());
@@ -178,16 +179,13 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
     }
 
     @Override
-    public WatchRegistration watchStreamCursors(
-            String cluster, StreamId streamId, Runnable invalidation) {
+    public WatchRegistration watchStreamCursors(String cluster, StreamId streamId, Runnable invalidation) {
         ensureOpen();
         CursorKeyspace keyspace = new CursorKeyspace(cluster);
         StreamId exactStream = Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(invalidation, "invalidation");
         WatchRegistration delegate = client.watchPrefix(
-                keyspace.cursorWatchPrefix(exactStream),
-                keyspace.streamPartitionKey(exactStream),
-                invalidation);
+                keyspace.cursorWatchPrefix(exactStream), keyspace.streamPartitionKey(exactStream), invalidation);
         AtomicBoolean active = new AtomicBoolean(true);
         WatchRegistration registration = () -> {
             if (active.compareAndSet(true, false)) {
@@ -218,8 +216,8 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
     private Optional<VersionedCursorState> readCursor(
             CursorKeyspace keyspace, StreamId streamId, String cursorName, Deadline deadline) {
         String key = keyspace.cursorStateKey(streamId, cursorName);
-        Optional<PartitionedOxiaClient.VersionedValue> stored = deadline.await(
-                client.get(key, keyspace.streamPartitionKey(streamId)));
+        Optional<PartitionedOxiaClient.VersionedValue> stored =
+                deadline.await(client.get(key, keyspace.streamPartitionKey(streamId)));
         if (stored.isEmpty()) {
             return Optional.empty();
         }
@@ -235,14 +233,15 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
     private Optional<VersionedCursorRetention> readRetention(
             CursorKeyspace keyspace, StreamId streamId, Deadline deadline) {
         String key = keyspace.retentionKey(streamId);
-        Optional<PartitionedOxiaClient.VersionedValue> stored = deadline.await(
-                client.get(key, keyspace.streamPartitionKey(streamId)));
+        Optional<PartitionedOxiaClient.VersionedValue> stored =
+                deadline.await(client.get(key, keyspace.streamPartitionKey(streamId)));
         if (stored.isEmpty()) {
             return Optional.empty();
         }
         PartitionedOxiaClient.VersionedValue item = stored.orElseThrow();
         CursorRetentionRecord decoded = decode(item, CursorRetentionRecord.class);
-        if (!decoded.projection().streamId().equals(streamId.value()) || !item.key().equals(key)) {
+        if (!decoded.projection().streamId().equals(streamId.value())
+                || !item.key().equals(key)) {
             throw invariant("retention key/record stream identity mismatch");
         }
         return Optional.of(new VersionedCursorRetention(decoded, item.version()));
@@ -257,14 +256,11 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
     }
 
     private <T> long putIfAbsent(
-            String key,
-            PartitionKey partitionKey,
-            T candidate,
-            Class<T> recordClass,
-            Deadline deadline) {
+            String key, PartitionKey partitionKey, T candidate, Class<T> recordClass, Deadline deadline) {
         byte[] encoded = encode(candidate, recordClass);
         try {
-            return deadline.await(client.putIfAbsent(key, encoded, partitionKey)).version();
+            return deadline.await(client.putIfAbsent(key, encoded, partitionKey))
+                    .version();
         } catch (RuntimeException e) {
             if (isConditionCause(unwrap(e))) {
                 throw new CursorMetadataConditionFailedException("cursor metadata key already exists", unwrap(e));
@@ -282,7 +278,8 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
             Deadline deadline) {
         byte[] encoded = encode(candidate, recordClass);
         try {
-            return deadline.await(client.putIfVersion(key, encoded, expectedVersion, partitionKey)).version();
+            return deadline.await(client.putIfVersion(key, encoded, expectedVersion, partitionKey))
+                    .version();
         } catch (RuntimeException e) {
             if (isConditionCause(unwrap(e))) {
                 throw new CursorMetadataConditionFailedException("cursor metadata version condition failed", unwrap(e));
@@ -294,8 +291,7 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
     private <T> byte[] encode(T candidate, Class<T> recordClass) {
         byte[] encoded = MetadataRecordCodecFactory.encodeEnvelope(candidate, recordClass);
         if (encoded.length > config.maxValueBytes()) {
-            throw new NereusException(
-                    ErrorCode.INVALID_ARGUMENT, false, "encoded F3 metadata exceeds maxValueBytes");
+            throw new NereusException(ErrorCode.INVALID_ARGUMENT, false, "encoded F3 metadata exceeds maxValueBytes");
         }
         return encoded;
     }
@@ -318,16 +314,18 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
         }
         Deadline deadline = Deadline.start(config.operationTimeout());
         try {
-            return CompletableFuture.supplyAsync(() -> {
-                try {
-                    ensureOpen();
-                    return operation.call(deadline);
-                } catch (Throwable error) {
-                    throw normalize(error);
-                } finally {
-                    admission.release();
-                }
-            }, operationExecutor);
+            return CompletableFuture.supplyAsync(
+                    () -> {
+                        try {
+                            ensureOpen();
+                            return operation.call(deadline);
+                        } catch (Throwable error) {
+                            throw normalize(error);
+                        } finally {
+                            admission.release();
+                        }
+                    },
+                    operationExecutor);
         } catch (RejectedExecutionException e) {
             admission.release();
             return NereusException.failedFuture(
@@ -358,8 +356,7 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
         if (isConditionCause(cause)) {
             return new CursorMetadataConditionFailedException("cursor metadata condition failed", cause);
         }
-        return new NereusException(
-                ErrorCode.METADATA_UNAVAILABLE, true, "cursor metadata operation failed", cause);
+        return new NereusException(ErrorCode.METADATA_UNAVAILABLE, true, "cursor metadata operation failed", cause);
     }
 
     private static boolean isConditionCause(Throwable cause) {
@@ -440,8 +437,7 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
                 throw timeout(e);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new NereusException(
-                        ErrorCode.CANCELLED, true, "cursor metadata operation was interrupted", e);
+                throw new NereusException(ErrorCode.CANCELLED, true, "cursor metadata operation was interrupted", e);
             } catch (ExecutionException e) {
                 throw new CompletionException(e.getCause());
             }
@@ -456,8 +452,7 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
         }
 
         private static NereusException timeout(Throwable cause) {
-            return new NereusException(
-                    ErrorCode.TIMEOUT, true, "cursor metadata operation deadline expired", cause);
+            return new NereusException(ErrorCode.TIMEOUT, true, "cursor metadata operation deadline expired", cause);
         }
     }
 }

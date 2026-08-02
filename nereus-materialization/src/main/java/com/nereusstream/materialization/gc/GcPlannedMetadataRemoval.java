@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -6,20 +7,18 @@ import com.nereusstream.core.physical.GcReferenceQuery;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** Exact generic metadata key/version/envelope fact committed into a typed retirement action. */
+/**
+ * Exact generic metadata key/version/envelope fact committed into a typed retirement action.
+ */
 public record GcPlannedMetadataRemoval(
-        String removalType,
-        String key,
-        long metadataVersion,
-        Checksum durableValueSha256) {
+        String removalType, String key, long metadataVersion, Checksum durableValueSha256) {
     public GcPlannedMetadataRemoval {
         removalType = requireCanonicalType(removalType);
         key = requireKey(key);
         if (metadataVersion < 0) {
             throw new IllegalArgumentException("metadataVersion must be non-negative");
         }
-        durableValueSha256 = GcReferenceQuery.requireSha256(
-                durableValueSha256, "durableValueSha256");
+        durableValueSha256 = GcReferenceQuery.requireSha256(durableValueSha256, "durableValueSha256");
     }
 
     private static String requireCanonicalType(String value) {

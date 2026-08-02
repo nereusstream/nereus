@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.StreamId;
 import java.util.Objects;
 
-/** Exact mutation summary for one materialization stream-registration retirement pass. */
+/**
+ * Exact mutation summary for one materialization stream-registration retirement pass.
+ */
 public record StreamRegistrationRetirementResult(
         StreamId streamId,
         long registrationMetadataVersion,
@@ -35,20 +38,8 @@ public record StreamRegistrationRetirementResult(
     }
 
     public static StreamRegistrationRetirementResult simple(
-            StreamId streamId,
-            long registrationMetadataVersion,
-            StreamRegistrationRetirementStatus status) {
+            StreamId streamId, long registrationMetadataVersion, StreamRegistrationRetirementStatus status) {
         return new StreamRegistrationRetirementResult(
-                streamId,
-                registrationMetadataVersion,
-                status,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                false,
-                false);
+                streamId, registrationMetadataVersion, status, 0, 0, 0, 0, 0, 0, false, false);
     }
 }

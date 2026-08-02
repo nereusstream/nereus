@@ -61,21 +61,23 @@ public record OffsetIndexRecord(
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
         sliceChecksumType = requireNonBlank(sliceChecksumType, "sliceChecksumType");
         sliceChecksumValue = requireNonBlank(sliceChecksumValue, "sliceChecksumValue");
-        if (offsetStart < 0 || offsetEnd <= offsetStart || generation < 0 || cumulativeSize < 0
-                || recordCount <= 0 || entryCount <= 0 || logicalBytes < 0 || minEventTimeMillis < 0
-                || maxEventTimeMillis < minEventTimeMillis || commitVersion <= 0 || metadataVersion < 0
+        if (offsetStart < 0
+                || offsetEnd <= offsetStart
+                || generation < 0
+                || cumulativeSize < 0
+                || recordCount <= 0
+                || entryCount <= 0
+                || logicalBytes < 0
+                || minEventTimeMillis < 0
+                || maxEventTimeMillis < minEventTimeMillis
+                || commitVersion <= 0
+                || metadataVersion < 0
                 || cumulativeSize < logicalBytes) {
             throw new IllegalArgumentException("offset index numeric fields are invalid");
         }
         MetadataRecordValidation.requireDenseLogicalRange(
-                offsetStart,
-                offsetEnd,
-                recordCount,
-                "offset index logical range");
-        MetadataRecordValidation.requirePositiveNonOverflowingRange(
-                objectOffset,
-                objectLength,
-                "offset index object");
+                offsetStart, offsetEnd, recordCount, "offset index logical range");
+        MetadataRecordValidation.requirePositiveNonOverflowingRange(objectOffset, objectLength, "offset index object");
     }
 
     private static String requireNonBlank(String value, String fieldName) {

@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
@@ -17,8 +17,7 @@ import org.junit.jupiter.api.Test;
 class BookKeeperWriterStatePropertyTest {
     @Test
     void isMonotonicAcrossCasSchedules() {
-        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime =
-                new BookKeeperPrimaryWalAppenderTest.Runtime()) {
+        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
             Random random = new Random(29);
             long nextOffset = 0;
             long nextEntryId = 0;
@@ -37,8 +36,8 @@ class BookKeeperWriterStatePropertyTest {
                     appendBytes += payloads[entry].length;
                 }
                 BookKeeperEntryRangeReadTarget target;
-                try (BookKeeperPreparedPrimaryAppend prepared = runtime.appender.prepare(
-                        BookKeeperPrimaryWalAppenderTest.request(
+                try (BookKeeperPreparedPrimaryAppend prepared =
+                        runtime.appender.prepare(BookKeeperPrimaryWalAppenderTest.request(
                                 BookKeeperPrimaryWalAppenderTest.session(),
                                 "property-attempt-" + append,
                                 nextOffset,
@@ -57,15 +56,15 @@ class BookKeeperWriterStatePropertyTest {
                 for (long entryId = target.firstEntryId();
                         entryId < target.firstEntryId() + target.entryCount();
                         entryId++) {
-                    assertThat(physicalEntries.add(target.ledgerId() + ":" + entryId)).isTrue();
+                    assertThat(physicalEntries.add(target.ledgerId() + ":" + entryId))
+                            .isTrue();
                 }
                 nextEntryId += entryCount;
                 physicalBytes += appendBytes;
                 nextOffset += entryCount;
 
-                var writer = runtime.metadata.getWriter(
-                                BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                                BookKeeperPrimaryWalAppenderTest.STREAM)
+                var writer = runtime.metadata
+                        .getWriter(BookKeeperPrimaryWalAppenderTest.CLUSTER, BookKeeperPrimaryWalAppenderTest.STREAM)
                         .join()
                         .orElseThrow()
                         .value();
@@ -83,36 +82,39 @@ class BookKeeperWriterStatePropertyTest {
             runtime.operations.failWriteCall = Math.toIntExact(nextEntryId + 2);
             long failureOffset = nextOffset;
             assertThatThrownBy(() -> {
-                try (BookKeeperPreparedPrimaryAppend prepared = runtime.appender.prepare(
-                        BookKeeperPrimaryWalAppenderTest.request(
-                                BookKeeperPrimaryWalAppenderTest.session(),
-                                "property-partial-failure",
-                                failureOffset,
-                                new byte[] {1},
-                                new byte[] {2},
-                                new byte[] {3}))) {
-                    runtime.appender.persist(prepared, Duration.ofSeconds(10)).join();
-                }
-            }).hasRootCauseInstanceOf(NereusException.class)
+                        try (BookKeeperPreparedPrimaryAppend prepared =
+                                runtime.appender.prepare(BookKeeperPrimaryWalAppenderTest.request(
+                                        BookKeeperPrimaryWalAppenderTest.session(),
+                                        "property-partial-failure",
+                                        failureOffset,
+                                        new byte[] {1},
+                                        new byte[] {2},
+                                        new byte[] {3}))) {
+                            runtime.appender
+                                    .persist(prepared, Duration.ofSeconds(10))
+                                    .join();
+                        }
+                    })
+                    .hasRootCauseInstanceOf(NereusException.class)
                     .rootCause()
                     .extracting(error -> ((NereusException) error).code())
                     .isEqualTo(ErrorCode.PRIMARY_WAL_WRITE_FAILED);
-            assertThat(runtime.metadata.getRoot(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            runtime.configuration.providerScopeSha256(),
-                            activeLedgerId)
-                    .join())
+            assertThat(runtime.metadata
+                            .getRoot(
+                                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                                    runtime.configuration.providerScopeSha256(),
+                                    activeLedgerId)
+                            .join())
                     .get()
                     .extracting(root -> root.value().lifecycle())
                     .isEqualTo(BookKeeperLedgerLifecycle.SEALED);
 
             BookKeeperEntryRangeReadTarget replacement;
-            try (BookKeeperPreparedPrimaryAppend prepared = runtime.appender.prepare(
-                    BookKeeperPrimaryWalAppenderTest.request(
-                            BookKeeperPrimaryWalAppenderTest.session(),
-                            "property-replacement",
-                            nextOffset,
-                            new byte[] {9}))) {
+            try (BookKeeperPreparedPrimaryAppend prepared =
+                    runtime.appender.prepare(BookKeeperPrimaryWalAppenderTest.request(
+                            BookKeeperPrimaryWalAppenderTest.session(), "property-replacement", nextOffset, new byte[] {
+                                9
+                            }))) {
                 replacement = (BookKeeperEntryRangeReadTarget) runtime.appender
                         .persist(prepared, Duration.ofSeconds(10))
                         .join()
@@ -121,9 +123,8 @@ class BookKeeperWriterStatePropertyTest {
             assertThat(replacement.ledgerId()).isNotEqualTo(activeLedgerId);
             assertThat(replacement.firstEntryId()).isZero();
             assertThat(physicalEntries.add(replacement.ledgerId() + ":0")).isTrue();
-            var writer = runtime.metadata.getWriter(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            BookKeeperPrimaryWalAppenderTest.STREAM)
+            var writer = runtime.metadata
+                    .getWriter(BookKeeperPrimaryWalAppenderTest.CLUSTER, BookKeeperPrimaryWalAppenderTest.STREAM)
                     .join()
                     .orElseThrow()
                     .value();

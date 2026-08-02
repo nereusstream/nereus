@@ -5,8 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
-public final class EnvironmentObjectStoreSecretResolver
-        implements ObjectStoreSecretResolver {
+public final class EnvironmentObjectStoreSecretResolver implements ObjectStoreSecretResolver {
 
     private final Function<String, String> environment;
 
@@ -14,10 +13,8 @@ public final class EnvironmentObjectStoreSecretResolver
         this(System::getenv);
     }
 
-    EnvironmentObjectStoreSecretResolver(
-            Function<String, String> environment) {
-        this.environment = Objects.requireNonNull(
-                environment, "environment");
+    EnvironmentObjectStoreSecretResolver(Function<String, String> environment) {
+        this.environment = Objects.requireNonNull(environment, "environment");
     }
 
     @Override

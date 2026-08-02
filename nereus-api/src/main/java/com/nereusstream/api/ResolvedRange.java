@@ -5,6 +5,7 @@
  *
  *   https://www.apache.org/licenses/LICENSE-2.0
  */
+
 package com.nereusstream.api;
 
 import com.nereusstream.api.target.ReadTarget;
@@ -12,7 +13,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** A committed logical range and its selected physical read target. */
+/**
+ * A committed logical range and its selected physical read target.
+ */
 public record ResolvedRange(
         OffsetRange offsetRange,
         long generation,
@@ -30,8 +33,12 @@ public record ResolvedRange(
         Objects.requireNonNull(payloadFormat, "payloadFormat");
         schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
-        if (offsetRange.isEmpty() || generation < 0 || commitVersion <= 0
-                || recordCount <= 0 || entryCount <= 0 || logicalBytes < 0) {
+        if (offsetRange.isEmpty()
+                || generation < 0
+                || commitVersion <= 0
+                || recordCount <= 0
+                || entryCount < 0
+                || logicalBytes < 0) {
             throw new IllegalArgumentException("invalid resolved range fields");
         }
         if (recordCount != offsetRange.recordCount()) {

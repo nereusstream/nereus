@@ -16,7 +16,6 @@ package com.nereusstream.metadata.oxia.records;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -31,58 +30,23 @@ class MetadataRecordValidationTest {
 
     @Test
     void decodedEntryIndexRecordsRejectInvalidLocationShapes() {
-        assertThatThrownBy(() -> new EntryIndexReferenceRecord(
-                "MISSING",
-                "",
-                "",
-                new byte[0],
-                0,
-                0,
-                "CRC32C",
-                "11111111"))
+        assertThatThrownBy(
+                        () -> new EntryIndexReferenceRecord("MISSING", "", "", new byte[0], 0, 0, "CRC32C", "11111111"))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new EntryIndexReferenceRecord(
-                "INLINE",
-                "",
-                "",
-                new byte[0],
-                0,
-                0,
-                "CRC32C",
-                "11111111"))
+        assertThatThrownBy(
+                        () -> new EntryIndexReferenceRecord("INLINE", "", "", new byte[0], 0, 0, "CRC32C", "11111111"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("inlineData");
         assertThatThrownBy(() -> new EntryIndexReferenceRecord(
-                "OBJECT_FOOTER",
-                "index-object",
-                "",
-                new byte[0],
-                0,
-                1,
-                "CRC32C",
-                "11111111"))
+                        "OBJECT_FOOTER", "index-object", "", new byte[0], 0, 1, "CRC32C", "11111111"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("both be present");
         assertThatThrownBy(() -> new EntryIndexReferenceRecord(
-                "OBJECT_FOOTER",
-                "",
-                "",
-                new byte[] {1},
-                0,
-                1,
-                "CRC32C",
-                "11111111"))
+                        "OBJECT_FOOTER", "", "", new byte[] {1}, 0, 1, "CRC32C", "11111111"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("inlineData");
         assertThatThrownBy(() -> new EntryIndexReferenceRecord(
-                "INDEX_OBJECT",
-                "index-object",
-                "",
-                new byte[0],
-                0,
-                1,
-                "CRC32C",
-                "11111111"))
+                        "INDEX_OBJECT", "index-object", "", new byte[0], 0, 1, "CRC32C", "11111111"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("requires objectId and objectKey");
     }
@@ -121,14 +85,10 @@ class MetadataRecordValidationTest {
         assertThatThrownBy(() -> streamCommit(0, 1, 2, 1, 7, 7, 1))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("start + recordCount");
-        assertThatThrownBy(() -> offsetIndex(0, 1, 1, 1, 6, 7, 1))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> streamCommit(0, 1, 1, 1, 6, 7, 1))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> offsetIndex(0, 1, 1, 1, 7, 7, 0))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> streamCommit(0, 1, 1, 1, 7, 7, 0))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> offsetIndex(0, 1, 1, 1, 6, 7, 1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> streamCommit(0, 1, 1, 1, 6, 7, 1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> offsetIndex(0, 1, 1, 1, 7, 7, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> streamCommit(0, 1, 1, 1, 7, 7, 0)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new StreamCommitRecord(
                         "stream",
                         "commit",
@@ -206,27 +166,17 @@ class MetadataRecordValidationTest {
 
     @Test
     void objectReferenceCanonicalizesVisibleSliceOrder() {
-        VisibleSliceReferenceRecord later =
-                new VisibleSliceReferenceRecord("stream-b", "slice-b", 10, 11, 0, 2);
-        VisibleSliceReferenceRecord earlier =
-                new VisibleSliceReferenceRecord("stream-a", "slice-a", 0, 1, 0, 1);
+        VisibleSliceReferenceRecord later = new VisibleSliceReferenceRecord("stream-b", "slice-b", 10, 11, 0, 2);
+        VisibleSliceReferenceRecord earlier = new VisibleSliceReferenceRecord("stream-a", "slice-a", 0, 1, 0, 1);
 
-        ObjectReferenceRecord references =
-                new ObjectReferenceRecord("object", List.of(later, earlier), 1, 1);
+        ObjectReferenceRecord references = new ObjectReferenceRecord("object", List.of(later, earlier), 1, 1);
 
         assertThat(references.visibleSlices()).containsExactly(earlier, later);
     }
 
     private EntryIndexReferenceRecord entryIndex(long offset, long length) {
         return new EntryIndexReferenceRecord(
-                "OBJECT_FOOTER",
-                "",
-                "",
-                new byte[0],
-                offset,
-                length,
-                "CRC32C",
-                "11111111");
+                "OBJECT_FOOTER", "", "", new byte[0], offset, length, "CRC32C", "11111111");
     }
 
     private OffsetIndexRecord offsetIndex(long objectOffset, long objectLength) {
@@ -341,10 +291,7 @@ class MetadataRecordValidationTest {
     }
 
     private StreamHeadRecord streamHead(
-            long committedEndOffset,
-            long cumulativeSize,
-            long commitVersion,
-            String lastCommitId) {
+            long committedEndOffset, long cumulativeSize, long commitVersion, String lastCommitId) {
         return new StreamHeadRecord(
                 "stream",
                 "tenant/ns/topic",

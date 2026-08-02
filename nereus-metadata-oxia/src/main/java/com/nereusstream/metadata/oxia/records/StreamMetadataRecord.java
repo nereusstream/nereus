@@ -36,9 +36,7 @@ public record StreamMetadataRecord(
         requireNonBlank(state, "state");
         requireNonBlank(profile, "profile");
         attributes = MetadataCanonicalizer.canonicalStringMap(
-                attributes,
-                ApiLimits.MAX_STREAM_ATTRIBUTES_ENCODED_BYTES,
-                "attributes");
+                attributes, ApiLimits.MAX_STREAM_ATTRIBUTES_ENCODED_BYTES, "attributes");
         if (createdAtMillis < 0 || policyVersion < 0 || metadataVersion < 0) {
             throw new IllegalArgumentException("stream metadata numeric fields must be non-negative");
         }

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.api.ErrorCode;
@@ -7,7 +8,6 @@ import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
-import com.nereusstream.metadata.oxia.ReaderLeaseScanPage;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.VersionedReaderLease;
 import com.nereusstream.metadata.oxia.records.ObjectReaderLeaseRecord;
@@ -23,7 +23,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
-/** Durable create/revalidate/release handshake for physical-object reads. */
+/**
+ * Durable create/revalidate/release handshake for physical-object reads.
+ */
 public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
     private static final int SCAN_PAGE_SIZE = 1_000;
 
@@ -82,21 +84,18 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
 
     @Override
     public CompletableFuture<ObjectReadLease> acquire(
-            PhysicalObjectIdentity object,
-            long maximumReadDeadlineMillis,
-            SelectionRevalidator selectionRevalidator) {
+            PhysicalObjectIdentity object, long maximumReadDeadlineMillis, SelectionRevalidator selectionRevalidator) {
         Objects.requireNonNull(object, "object");
         Objects.requireNonNull(selectionRevalidator, "selectionRevalidator");
         if (closed.get()) {
-            return failed(new NereusException(
-                    ErrorCode.STORAGE_CLOSED, false, "object read pin manager is closed"));
+            return failed(new NereusException(ErrorCode.STORAGE_CLOSED, false, "object read pin manager is closed"));
         }
         LocalLeaseState state = local.computeIfAbsent(object.objectKeyHash(), ignored -> new LocalLeaseState());
         synchronized (state) {
             CompletableFuture<ObjectReadLease> operation = state.tail
                     .handle((ignored, previousFailure) -> null)
-                    .thenCompose(ignored -> acquireSerialized(
-                            state, object, maximumReadDeadlineMillis, selectionRevalidator));
+                    .thenCompose(ignored ->
+                            acquireSerialized(state, object, maximumReadDeadlineMillis, selectionRevalidator));
             state.tail = operation.handle((ignored, failure) -> null);
             return operation;
         }
@@ -113,8 +112,7 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
             long maximumReadDeadlineMillis,
             SelectionRevalidator selectionRevalidator) {
         if (closed.get()) {
-            return failed(new NereusException(
-                    ErrorCode.STORAGE_CLOSED, false, "object read pin manager is closed"));
+            return failed(new NereusException(ErrorCode.STORAGE_CLOSED, false, "object read pin manager is closed"));
         }
         long now = clock.millis();
         LeaseWindow window;
@@ -130,8 +128,8 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
             return failed(invariant("one object hash resolved to a different immutable identity"));
         }
         return findProcessLease(object.objectKeyHash(), Optional.empty()).thenCompose(currentOptional -> {
-            VersionedReaderLease current = currentOptional.orElseThrow(
-                    () -> condition("durable reader lease disappeared during local reuse"));
+            VersionedReaderLease current =
+                    currentOptional.orElseThrow(() -> condition("durable reader lease disappeared during local reuse"));
             if (!sameLeaseIdentity(current, state.lease)
                     || current.value().expiresAtMillis() <= Math.addExact(now, maximumClockSkewMillis)) {
                 return failed(condition("durable reader lease changed or expired during local reuse"));
@@ -141,10 +139,10 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
                     return failed(condition("physical root changed before local reader reuse"));
                 }
                 CompletableFuture<VersionedReaderLease> durable;
-                boolean extendExpiry = maximumReadDeadlineMillis
-                        > current.value().expiresAtMillis() - maximumClockSkewMillis;
-                boolean extendDeadline = maximumReadDeadlineMillis
-                        > current.value().maximumReadDeadlineMillis();
+                boolean extendExpiry =
+                        maximumReadDeadlineMillis > current.value().expiresAtMillis() - maximumClockSkewMillis;
+                boolean extendDeadline =
+                        maximumReadDeadlineMillis > current.value().maximumReadDeadlineMillis();
                 if (!extendExpiry && !extendDeadline) {
                     durable = CompletableFuture.completedFuture(current);
                 } else {
@@ -155,15 +153,15 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
                             current.value().leaseId(),
                             root.value().lifecycleEpoch(),
                             current.value().acquiredAtMillis(),
-                            extendExpiry ? window.expiresAtMillis() : current.value().expiresAtMillis(),
+                            extendExpiry
+                                    ? window.expiresAtMillis()
+                                    : current.value().expiresAtMillis(),
                             Math.max(current.value().maximumReadDeadlineMillis(), maximumReadDeadlineMillis),
                             Math.addExact(current.value().renewalSequence(), 1),
                             0);
-                    durable = store.compareAndSetReaderLease(
-                            cluster, renewed, current.metadataVersion());
+                    durable = store.compareAndSetReaderLease(cluster, renewed, current.metadataVersion());
                 }
-                return durable.thenCompose(updated -> postCheck(
-                                object, root, updated, selectionRevalidator)
+                return durable.thenCompose(updated -> postCheck(object, root, updated, selectionRevalidator)
                         .thenApply(ignored -> {
                             state.root = root;
                             state.lease = updated;
@@ -182,11 +180,12 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
             SelectionRevalidator selectionRevalidator,
             long now,
             LeaseWindow window) {
-        return ensureActiveRoot(object, now).thenCompose(root ->
-                findProcessLease(object.objectKeyHash(), Optional.empty()).thenCompose(existing -> {
+        return ensureActiveRoot(object, now).thenCompose(root -> findProcessLease(
+                        object.objectKeyHash(), Optional.empty())
+                .thenCompose(existing -> {
                     String leaseId = new PublicationId(leaseIdSupplier.get()).value();
-                    long renewalSequence = existing
-                            .map(value -> Math.addExact(value.value().renewalSequence(), 1))
+                    long renewalSequence = existing.map(
+                                    value -> Math.addExact(value.value().renewalSequence(), 1))
                             .orElse(0L);
                     ObjectReaderLeaseRecord record = new ObjectReaderLeaseRecord(
                             1,
@@ -204,13 +203,7 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
                                     cluster, record, existing.orElseThrow().metadataVersion())
                             : store.createOrCompareReaderLease(cluster, record);
                     return write.thenCompose(lease -> completeFirstAcquisition(
-                            state,
-                            object,
-                            root,
-                            lease,
-                            leaseId,
-                            maximumReadDeadlineMillis,
-                            selectionRevalidator));
+                            state, object, root, lease, leaseId, maximumReadDeadlineMillis, selectionRevalidator));
                 }));
     }
 
@@ -229,8 +222,7 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
                 state.root = root;
                 state.lease = lease;
                 state.refCount = 1;
-                result.complete(new LeaseHandle(
-                        this, state, object, leaseId, maximumReadDeadlineMillis));
+                result.complete(new LeaseHandle(this, state, object, leaseId, maximumReadDeadlineMillis));
                 return;
             }
             Throwable exact = unwrap(failure);
@@ -255,32 +247,28 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
                 return failed(condition("physical root changed after durable reader lease write"));
             }
             try {
-                return Objects.requireNonNull(
-                        selectionRevalidator.revalidate(), "selection revalidator result");
+                return Objects.requireNonNull(selectionRevalidator.revalidate(), "selection revalidator result");
             } catch (Throwable failure) {
                 return failed(failure);
             }
         });
     }
 
-    private CompletableFuture<VersionedPhysicalObjectRoot> ensureActiveRoot(
-            PhysicalObjectIdentity object, long now) {
+    private CompletableFuture<VersionedPhysicalObjectRoot> ensureActiveRoot(PhysicalObjectIdentity object, long now) {
         return store.getRoot(cluster, object.objectKeyHash()).thenCompose(optional -> {
             if (optional.isPresent()) {
                 return verifyActiveRoot(object, optional.orElseThrow());
             }
             long orphanNotBefore = Math.addExact(now, orphanGraceMillis);
-            return store.createRoot(
-                            cluster,
-                            PhysicalObjectRecords.active(object, now, orphanNotBefore))
+            return store.createRoot(cluster, PhysicalObjectRecords.active(object, now, orphanNotBefore))
                     .thenCompose(root -> verifyActiveRoot(object, root));
         });
     }
 
-    private CompletableFuture<VersionedPhysicalObjectRoot> getExactActiveRoot(
-            PhysicalObjectIdentity object) {
-        return store.getRoot(cluster, object.objectKeyHash()).thenCompose(optional ->
-                optional.<CompletableFuture<VersionedPhysicalObjectRoot>>map(root -> verifyActiveRoot(object, root))
+    private CompletableFuture<VersionedPhysicalObjectRoot> getExactActiveRoot(PhysicalObjectIdentity object) {
+        return store.getRoot(cluster, object.objectKeyHash())
+                .thenCompose(optional -> optional.<CompletableFuture<VersionedPhysicalObjectRoot>>map(
+                                root -> verifyActiveRoot(object, root))
                         .orElseGet(() -> failed(condition("physical object root is absent"))));
     }
 
@@ -294,8 +282,7 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
     }
 
     private CompletableFuture<Optional<VersionedReaderLease>> findProcessLease(
-            com.nereusstream.api.ObjectKeyHash object,
-            Optional<F4ScanToken> continuation) {
+            com.nereusstream.api.ObjectKeyHash object, Optional<F4ScanToken> continuation) {
         return store.scanReaderLeases(cluster, object, continuation, SCAN_PAGE_SIZE)
                 .thenCompose(page -> {
                     Optional<VersionedReaderLease> found = page.values().stream()
@@ -319,7 +306,9 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
     }
 
     private CompletableFuture<Void> releaseSerialized(LocalLeaseState state, String leaseId) {
-        if (state.refCount <= 0 || state.lease == null || !state.lease.value().leaseId().equals(leaseId)) {
+        if (state.refCount <= 0
+                || state.lease == null
+                || !state.lease.value().leaseId().equals(leaseId)) {
             return failed(invariant("reader lease release does not match local durable lease"));
         }
         state.refCount--;
@@ -347,7 +336,8 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
                         return CompletableFuture.<Void>completedFuture(null);
                     }
                     return findProcessLease(
-                                    new com.nereusstream.api.ObjectKeyHash(lease.value().objectKeyHash()),
+                                    new com.nereusstream.api.ObjectKeyHash(
+                                            lease.value().objectKeyHash()),
                                     Optional.empty())
                             .thenCompose(current -> {
                                 if (current.isEmpty()) {
@@ -355,16 +345,18 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
                                 }
                                 VersionedReaderLease exact = current.orElseThrow();
                                 if (!sameLeaseIdentity(exact, lease)) {
-                                    return failed(invariant(
-                                            "reader lease delete response loss found a different lease"));
+                                    return failed(
+                                            invariant("reader lease delete response loss found a different lease"));
                                 }
                                 return store.deleteReaderLease(
                                         cluster,
-                                        new com.nereusstream.api.ObjectKeyHash(lease.value().objectKeyHash()),
+                                        new com.nereusstream.api.ObjectKeyHash(
+                                                lease.value().objectKeyHash()),
                                         processRunId,
                                         exact.metadataVersion());
                             });
-                }).thenCompose(value -> value);
+                })
+                .thenCompose(value -> value);
     }
 
     private LeaseWindow window(long now, long maximumReadDeadlineMillis) {
@@ -379,8 +371,7 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
         return new LeaseWindow(expiresAt);
     }
 
-    private static boolean sameLeaseIdentity(
-            VersionedReaderLease actual, VersionedReaderLease expected) {
+    private static boolean sameLeaseIdentity(VersionedReaderLease actual, VersionedReaderLease expected) {
         return actual.metadataVersion() == expected.metadataVersion()
                 && actual.value().equals(expected.value())
                 && actual.durableValueSha256().equals(expected.durableValueSha256());
@@ -436,8 +427,7 @@ public final class DefaultObjectReadPinManager implements ObjectReadPinManager {
         return CompletableFuture.failedFuture(failure);
     }
 
-    private record LeaseWindow(long expiresAtMillis) {
-    }
+    private record LeaseWindow(long expiresAtMillis) {}
 
     private static final class LocalLeaseState {
         private CompletableFuture<Void> tail = CompletableFuture.completedFuture(null);

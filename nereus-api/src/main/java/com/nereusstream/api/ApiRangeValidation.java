@@ -15,8 +15,7 @@
 package com.nereusstream.api;
 
 final class ApiRangeValidation {
-    private ApiRangeValidation() {
-    }
+    private ApiRangeValidation() {}
 
     static void requireNonNegativeNonOverflowingRange(long offset, long length, String fieldName) {
         if (offset < 0 || length < 0) {

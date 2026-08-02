@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -36,7 +37,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Proves an entire higher-generation range is checkpointed onto healthier newer targets. */
+/**
+ * Proves an entire higher-generation range is checkpointed onto healthier newer targets.
+ */
 final class HigherGenerationRecoveryCoverageVerifier {
     private final String cluster;
     private final GenerationMetadataStore generations;
@@ -59,9 +62,7 @@ final class HigherGenerationRecoveryCoverageVerifier {
         this.keys = new F4Keyspace(cluster);
     }
 
-    CompletableFuture<CoverageProof> prove(
-            GcReferenceQuery query,
-            VersionedGenerationIndex source) {
+    CompletableFuture<CoverageProof> prove(GcReferenceQuery query, VersionedGenerationIndex source) {
         Objects.requireNonNull(query, "query");
         Objects.requireNonNull(source, "source");
         GenerationIndexRecord value = source.value();
@@ -72,35 +73,30 @@ final class HigherGenerationRecoveryCoverageVerifier {
         if (value.lifecycle() != GenerationLifecycle.COMMITTED
                 && value.lifecycle() != GenerationLifecycle.QUARANTINED
                 && value.lifecycle() != GenerationLifecycle.DRAINING) {
-            return CompletableFuture.failedFuture(condition(
-                    "higher-generation source is not in a pre-drain or DRAINING lifecycle"));
+            return CompletableFuture.failedFuture(
+                    condition("higher-generation source is not in a pre-drain or DRAINING lifecycle"));
         }
         StreamId stream = new StreamId(value.streamId());
         return generations.getRecoveryRoot(cluster, stream).thenCompose(optionalRoot -> {
-            VersionedRecoveryCheckpointRoot root = optionalRoot.orElseThrow(() -> condition(
-                    "higher-generation source has no recovery root"));
+            VersionedRecoveryCheckpointRoot root =
+                    optionalRoot.orElseThrow(() -> condition("higher-generation source has no recovery root"));
             requireRootCovers(root, source);
             CoverageState state = new CoverageState(value);
             return proveNext(query, stream, root, source, state)
-                    .thenCompose(ignored -> revalidateReplacements(
-                            List.copyOf(state.replacements.values()), 0))
+                    .thenCompose(ignored -> revalidateReplacements(List.copyOf(state.replacements.values()), 0))
                     .thenCompose(ignored -> generations.getRecoveryRoot(cluster, stream))
                     .thenCompose(reloadedRoot -> {
                         if (!reloadedRoot.equals(Optional.of(root))) {
-                            return CompletableFuture.failedFuture(condition(
-                                    "recovery root changed while higher-generation coverage was frozen"));
+                            return CompletableFuture.failedFuture(
+                                    condition("recovery root changed while higher-generation coverage was frozen"));
                         }
                         GenerationIndexIdentity identity = identity(source.value());
                         return generations.getIndex(cluster, identity).thenApply(reloadedSource -> {
                             if (!reloadedSource.equals(Optional.of(source))) {
-                                throw condition(
-                                        "higher-generation source changed while coverage was frozen");
+                                throw condition("higher-generation source changed while coverage was frozen");
                             }
                             return new CoverageProof(
-                                    root,
-                                    source,
-                                    List.copyOf(state.replacements.values()),
-                                    state.entryCount);
+                                    root, source, List.copyOf(state.replacements.values()), state.entryCount);
                         });
                     });
         });
@@ -117,25 +113,21 @@ final class HigherGenerationRecoveryCoverageVerifier {
             return CompletableFuture.completedFuture(null);
         }
         if (state.entryCount >= config.maxAuthoritiesPerDomainSnapshot()) {
-            return CompletableFuture.failedFuture(invariant(
-                    "higher-generation recovery coverage exceeded its entry bound"));
+            return CompletableFuture.failedFuture(
+                    invariant("higher-generation recovery coverage exceeded its entry bound"));
         }
-        RecoveryCheckpointReferenceRecord reference = coveringReference(
-                root, state.offset, state.commitVersion);
-        Checksum content = new Checksum(
-                ChecksumType.SHA256, reference.contentSha256());
-        return checkpoints.openAndVerify(
+        RecoveryCheckpointReferenceRecord reference = coveringReference(root, state.offset, state.commitVersion);
+        Checksum content = new Checksum(ChecksumType.SHA256, reference.contentSha256());
+        return checkpoints
+                .openAndVerify(
                         new ObjectKey(reference.objectKey()),
                         reference.objectLength(),
                         content,
                         config.operationTimeout())
                 .thenCompose(checkpoint -> {
-                    replacements.requireCheckpointIdentity(
-                            stream, reference, checkpoint);
-                    return checkpoints.findCommitCoveringOffset(
-                                    checkpoint,
-                                    state.offset,
-                                    config.operationTimeout())
+                    replacements.requireCheckpointIdentity(stream, reference, checkpoint);
+                    return checkpoints
+                            .findCommitCoveringOffset(checkpoint, state.offset, config.operationTimeout())
                             .thenCompose(optionalEntry -> proveEntry(
                                     query,
                                     stream,
@@ -143,8 +135,8 @@ final class HigherGenerationRecoveryCoverageVerifier {
                                     source,
                                     state,
                                     checkpoint,
-                                    optionalEntry.orElseThrow(() -> condition(
-                                            "recovery checkpoint has a gap in higher-generation coverage"))));
+                                    optionalEntry.orElseThrow(() ->
+                                            condition("recovery checkpoint has a gap in higher-generation coverage"))));
                 });
     }
 
@@ -158,8 +150,7 @@ final class HigherGenerationRecoveryCoverageVerifier {
             RecoveryCheckpointEntry entry) {
         StreamCommitTargetRecord commit = decodeCommit(stream, entry);
         requireNextEntry(source.value(), state, entry, commit);
-        long cumulativeStart = Math.subtractExact(
-                entry.cumulativeSizeAtEnd(), commit.logicalBytes());
+        long cumulativeStart = Math.subtractExact(entry.cumulativeSizeAtEnd(), commit.logicalBytes());
         RecoveryReplacementVerifier.ReplacementRequirement requirement =
                 new RecoveryReplacementVerifier.ReplacementRequirement(
                         entry.range().startOffset(),
@@ -168,24 +159,18 @@ final class HigherGenerationRecoveryCoverageVerifier {
                         cumulativeStart,
                         entry.cumulativeSizeAtEnd(),
                         source.value().generation());
-        return replacements.select(
-                        query,
-                        stream,
-                        checkpoint,
-                        entry,
-                        requirement)
+        return replacements
+                .select(query, stream, checkpoint, entry, requirement)
                 .thenCompose(replacement -> {
                     RecoveryReplacementVerifier.HealthyReplacement previous =
-                            state.replacements.putIfAbsent(
-                                    replacement.index().key(), replacement);
+                            state.replacements.putIfAbsent(replacement.index().key(), replacement);
                     if (previous != null && !previous.equals(replacement)) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "one NRC1 replacement key resolved to different current facts"));
+                        return CompletableFuture.failedFuture(
+                                invariant("one NRC1 replacement key resolved to different current facts"));
                     }
-                    if (state.replacements.size()
-                            > config.maxReferencesPerDomainSnapshot()) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "higher-generation recovery replacements exceeded their bound"));
+                    if (state.replacements.size() > config.maxReferencesPerDomainSnapshot()) {
+                        return CompletableFuture.failedFuture(
+                                invariant("higher-generation recovery replacements exceeded their bound"));
                     }
                     state.advance(commit);
                     return proveNext(query, stream, root, source, state);
@@ -193,25 +178,20 @@ final class HigherGenerationRecoveryCoverageVerifier {
     }
 
     private CompletableFuture<Void> revalidateReplacements(
-            List<RecoveryReplacementVerifier.HealthyReplacement> values,
-            int index) {
+            List<RecoveryReplacementVerifier.HealthyReplacement> values, int index) {
         if (index == values.size()) {
             return CompletableFuture.completedFuture(null);
         }
-        return replacements.revalidate(values.get(index))
+        return replacements
+                .revalidate(values.get(index))
                 .thenCompose(ignored -> revalidateReplacements(values, index + 1));
     }
 
-    private void requireRootCovers(
-            VersionedRecoveryCheckpointRoot root,
-            VersionedGenerationIndex source) {
+    private void requireRootCovers(VersionedRecoveryCheckpointRoot root, VersionedGenerationIndex source) {
         GenerationIndexRecord value = source.value();
         StreamId stream = new StreamId(value.streamId());
         String expectedSourceKey = keys.generationIndexKey(
-                stream,
-                ReadView.fromWireId(value.readViewId()),
-                value.offsetEnd(),
-                value.generation());
+                stream, ReadView.fromWireId(value.readViewId()), value.offsetEnd(), value.generation());
         if (!source.key().equals(expectedSourceKey)
                 || !root.key().equals(keys.recoveryRootKey(stream))
                 || !root.value().streamId().equals(value.streamId())
@@ -219,19 +199,14 @@ final class HigherGenerationRecoveryCoverageVerifier {
                 || root.value().coveredEndOffset() < value.offsetEnd()
                 || root.value().firstCommitVersion() > value.firstCommitVersion()
                 || root.value().lastCommitVersion() < value.lastCommitVersion()
-                || root.value().cumulativeSizeAtStart()
-                        > value.cumulativeSizeAtStart()
-                || root.value().cumulativeSizeAtEnd()
-                        < value.cumulativeSizeAtEnd()) {
-            throw condition(
-                    "recovery root does not fully cover the higher-generation source");
+                || root.value().cumulativeSizeAtStart() > value.cumulativeSizeAtStart()
+                || root.value().cumulativeSizeAtEnd() < value.cumulativeSizeAtEnd()) {
+            throw condition("recovery root does not fully cover the higher-generation source");
         }
     }
 
     private static RecoveryCheckpointReferenceRecord coveringReference(
-            VersionedRecoveryCheckpointRoot root,
-            long offset,
-            long commitVersion) {
+            VersionedRecoveryCheckpointRoot root, long offset, long commitVersion) {
         List<RecoveryCheckpointReferenceRecord> matching = root.value().checkpoints().stream()
                 .filter(reference -> reference.coveredStartOffset() <= offset
                         && offset < reference.coveredEndOffset()
@@ -239,28 +214,20 @@ final class HigherGenerationRecoveryCoverageVerifier {
                         && reference.lastCommitVersion() >= commitVersion)
                 .toList();
         if (matching.size() != 1) {
-            throw condition(
-                    "higher-generation range is not covered by one exact recovery checkpoint at the cursor");
+            throw condition("higher-generation range is not covered by one exact recovery checkpoint at the cursor");
         }
         return matching.get(0);
     }
 
-    private static StreamCommitTargetRecord decodeCommit(
-            StreamId stream,
-            RecoveryCheckpointEntry entry) {
+    private static StreamCommitTargetRecord decodeCommit(StreamId stream, RecoveryCheckpointEntry entry) {
         byte[] canonical = bytes(entry.canonicalCommitRecord());
         StreamCommitTargetRecord commit;
         try {
-            commit = MetadataRecordCodecFactory.decodeEnvelope(
-                    canonical, StreamCommitTargetRecord.class);
+            commit = MetadataRecordCodecFactory.decodeEnvelope(canonical, StreamCommitTargetRecord.class);
         } catch (RuntimeException failure) {
-            throw invariant(
-                    "cannot decode higher-generation NRC1 commit evidence");
+            throw invariant("cannot decode higher-generation NRC1 commit evidence");
         }
-        if (!Arrays.equals(
-                        canonical,
-                        MetadataRecordCodecFactory.encodeEnvelope(
-                                commit, StreamCommitTargetRecord.class))
+        if (!Arrays.equals(canonical, MetadataRecordCodecFactory.encodeEnvelope(commit, StreamCommitTargetRecord.class))
                 || commit.metadataVersion() != 0
                 || commit.generation() != 0
                 || !commit.streamId().equals(stream.value())
@@ -270,8 +237,7 @@ final class HigherGenerationRecoveryCoverageVerifier {
                 || commit.offsetStart() != entry.range().startOffset()
                 || commit.offsetEnd() != entry.range().endOffset()
                 || commit.cumulativeSize() != entry.cumulativeSizeAtEnd()) {
-            throw invariant(
-                    "higher-generation NRC1 commit is non-canonical or contradicts its entry");
+            throw invariant("higher-generation NRC1 commit is non-canonical or contradicts its entry");
         }
         return commit;
     }
@@ -281,53 +247,33 @@ final class HigherGenerationRecoveryCoverageVerifier {
             CoverageState state,
             RecoveryCheckpointEntry entry,
             StreamCommitTargetRecord commit) {
-        long cumulativeStart = Math.subtractExact(
-                commit.cumulativeSize(), commit.logicalBytes());
+        long cumulativeStart = Math.subtractExact(commit.cumulativeSize(), commit.logicalBytes());
+        requireTiling(entry.range().startOffset() == state.offset, "offset start");
+        requireTiling(entry.range().endOffset() <= source.offsetEnd(), "offset end");
+        requireTiling(entry.commitVersion() == state.commitVersion, "commit version");
+        requireTiling(cumulativeStart == state.cumulativeSize, "cumulative size");
         requireTiling(
-                entry.range().startOffset() == state.offset,
-                "offset start");
-        requireTiling(
-                entry.range().endOffset() <= source.offsetEnd(),
-                "offset end");
-        requireTiling(
-                entry.commitVersion() == state.commitVersion,
-                "commit version");
-        requireTiling(
-                cumulativeStart == state.cumulativeSize,
-                "cumulative size");
-        requireTiling(
-                state.previousCommitId.isEmpty()
-                        || entry.previousCommitId().equals(state.previousCommitId),
+                state.previousCommitId.isEmpty() || entry.previousCommitId().equals(state.previousCommitId),
                 "previous commit");
-        requireTiling(
-                commit.payloadFormat().equals(source.payloadFormat()),
-                "payload format");
-        requireTiling(
-                compatibleProjection(source.projectionRef(), commit.projectionRef()),
-                "projection");
+        requireTiling(commit.payloadFormat().equals(source.payloadFormat()), "payload format");
+        requireTiling(compatibleProjection(source.projectionRef(), commit.projectionRef()), "projection");
     }
 
     private static void requireTiling(boolean exact, String fact) {
         if (!exact) {
-            throw invariant(
-                    "higher-generation source is not an exact tiling of NRC1 commit entries: "
-                            + fact);
+            throw invariant("higher-generation source is not an exact tiling of NRC1 commit entries: " + fact);
         }
     }
 
-    private static boolean compatibleProjection(
-            String sourceEncoded, String commitEncoded) {
-        Optional<ProjectionRef> source = decodeProjection(
-                sourceEncoded,
-                "higher-generation source projection cannot be decoded");
-        Optional<ProjectionRef> commit = decodeProjection(
-                commitEncoded,
-                "higher-generation NRC1 commit projection cannot be decoded");
+    private static boolean compatibleProjection(String sourceEncoded, String commitEncoded) {
+        Optional<ProjectionRef> source =
+                decodeProjection(sourceEncoded, "higher-generation source projection cannot be decoded");
+        Optional<ProjectionRef> commit =
+                decodeProjection(commitEncoded, "higher-generation NRC1 commit projection cannot be decoded");
         return commit.isEmpty() || commit.equals(source);
     }
 
-    private static Optional<ProjectionRef> decodeProjection(
-            String encoded, String failureMessage) {
+    private static Optional<ProjectionRef> decodeProjection(String encoded, String failureMessage) {
         try {
             return ProjectionIdentity.decode(encoded);
         } catch (RuntimeException failure) {
@@ -335,19 +281,15 @@ final class HigherGenerationRecoveryCoverageVerifier {
         }
     }
 
-    private static void validateComplete(
-            GenerationIndexRecord source,
-            CoverageState state) {
-        List<SchemaRef> schemas = MetadataCanonicalizer.canonicalSchemaRefs(
-                state.schemaRefs);
+    private static void validateComplete(GenerationIndexRecord source, CoverageState state) {
+        List<SchemaRef> schemas = MetadataCanonicalizer.canonicalSchemaRefs(state.schemaRefs);
         if (state.commitVersion != Math.addExact(source.lastCommitVersion(), 1)
                 || state.cumulativeSize != source.cumulativeSizeAtEnd()
                 || state.recordCount != source.sourceRecordCount()
                 || state.entryTotal != source.entryCount()
                 || state.logicalBytes != source.logicalBytes()
                 || !schemas.equals(source.schemaRefs())) {
-            throw invariant(
-                    "higher-generation NRC1 tiling does not reproduce source counts or schemas");
+            throw invariant("higher-generation NRC1 tiling does not reproduce source counts or schemas");
         }
     }
 
@@ -375,8 +317,7 @@ final class HigherGenerationRecoveryCoverageVerifier {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static NereusException condition(String message) {
@@ -391,11 +332,9 @@ final class HigherGenerationRecoveryCoverageVerifier {
         CoverageProof {
             Objects.requireNonNull(root, "root");
             Objects.requireNonNull(source, "source");
-            replacements = List.copyOf(Objects.requireNonNull(
-                    replacements, "replacements"));
+            replacements = List.copyOf(Objects.requireNonNull(replacements, "replacements"));
             if (replacements.isEmpty() || entryCount <= 0) {
-                throw new IllegalArgumentException(
-                        "higher-generation coverage proof is empty");
+                throw new IllegalArgumentException("higher-generation coverage proof is empty");
             }
         }
     }
@@ -410,8 +349,7 @@ final class HigherGenerationRecoveryCoverageVerifier {
         private long logicalBytes;
         private String previousCommitId = "";
         private final List<SchemaRef> schemaRefs = new ArrayList<>();
-        private final Map<String, RecoveryReplacementVerifier.HealthyReplacement>
-                replacements = new LinkedHashMap<>();
+        private final Map<String, RecoveryReplacementVerifier.HealthyReplacement> replacements = new LinkedHashMap<>();
 
         private CoverageState(GenerationIndexRecord source) {
             offset = source.offsetStart();

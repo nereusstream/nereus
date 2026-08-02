@@ -1,13 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
 
-public final class GcRetirementProtectionRecordCodecV1
-        extends AbstractF4RecordCodecV1<GcRetirementProtectionRecord> {
-    private final ObjectProtectionRecordCodecV1 protectionCodec =
-            new ObjectProtectionRecordCodecV1();
+public final class GcRetirementProtectionRecordCodecV1 extends AbstractF4RecordCodecV1<GcRetirementProtectionRecord> {
+    private final ObjectProtectionRecordCodecV1 protectionCodec = new ObjectProtectionRecordCodecV1();
 
     public GcRetirementProtectionRecordCodecV1() {
         super(GcRetirementProtectionRecord.class);
@@ -38,10 +37,8 @@ public final class GcRetirementProtectionRecordCodecV1
             String gcAttemptId = reader.readString("gcAttemptId");
             String protectionKey = reader.readString("protectionKey");
             long protectionMetadataVersion = reader.readLong("protectionMetadataVersion");
-            String protectionDurableValueSha256 = reader.readString(
-                    "protectionDurableValueSha256");
-            ObjectProtectionRecord protection = protectionCodec.decode(
-                    reader.readBytes("protection"));
+            String protectionDurableValueSha256 = reader.readString("protectionDurableValueSha256");
+            ObjectProtectionRecord protection = protectionCodec.decode(reader.readBytes("protection"));
             GcRetirementProtectionRecord value = new GcRetirementProtectionRecord(
                     VERSION,
                     objectKeyHash,

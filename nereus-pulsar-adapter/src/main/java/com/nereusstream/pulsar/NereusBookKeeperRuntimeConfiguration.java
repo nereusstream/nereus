@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import com.nereusstream.bookkeeper.BookKeeperLedgerGcConfiguration;
@@ -6,11 +7,11 @@ import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
 import java.util.Objects;
 
-/** Production composition values for the optional BookKeeper primary-WAL provider. */
+/**
+ * Production composition values for the optional BookKeeper primary-WAL provider.
+ */
 public record NereusBookKeeperRuntimeConfiguration(
-        String deploymentId,
-        BookKeeperWalConfiguration wal,
-        BookKeeperLedgerGcConfiguration ledgerGc) {
+        String deploymentId, BookKeeperWalConfiguration wal, BookKeeperLedgerGcConfiguration ledgerGc) {
     public NereusBookKeeperRuntimeConfiguration {
         Objects.requireNonNull(deploymentId, "deploymentId");
         if (deploymentId.isBlank()) {

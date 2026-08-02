@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -10,7 +11,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Objects;
 
-/** Exact live commit evidence plus its canonical NRC1 generic envelope. */
+/**
+ * Exact live commit evidence plus its canonical NRC1 generic envelope.
+ */
 public record AppendRecoveryCommit(
         String key,
         AppendRecoveryCommitEncoding sourceEncoding,
@@ -27,10 +30,9 @@ public record AppendRecoveryCommit(
             throw new IllegalArgumentException("recovery commit versions are inconsistent");
         }
         sourceRecordSha256 = requireSha256(sourceRecordSha256, "sourceRecordSha256");
-        canonicalCommitRecordSha256 = requireSha256(
-                canonicalCommitRecordSha256, "canonicalCommitRecordSha256");
-        ByteBuffer source = Objects.requireNonNull(
-                canonicalCommitRecord, "canonicalCommitRecord").asReadOnlyBuffer();
+        canonicalCommitRecordSha256 = requireSha256(canonicalCommitRecordSha256, "canonicalCommitRecordSha256");
+        ByteBuffer source = Objects.requireNonNull(canonicalCommitRecord, "canonicalCommitRecord")
+                .asReadOnlyBuffer();
         byte[] bytes = new byte[source.remaining()];
         source.get(bytes);
         if (bytes.length == 0 || !sha256(bytes).equals(canonicalCommitRecordSha256)) {
@@ -56,7 +58,8 @@ public record AppendRecoveryCommit(
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }

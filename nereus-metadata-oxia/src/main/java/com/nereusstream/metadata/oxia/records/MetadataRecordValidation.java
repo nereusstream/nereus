@@ -15,8 +15,7 @@
 package com.nereusstream.metadata.oxia.records;
 
 final class MetadataRecordValidation {
-    private MetadataRecordValidation() {
-    }
+    private MetadataRecordValidation() {}
 
     static void requireNonNegativeNonOverflowingRange(long offset, long length, String fieldName) {
         if (offset < 0 || length < 0) {

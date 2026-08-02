@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
-/** Runs one complete metadata-first physical-GC lifecycle pass without owning its components. */
+/**
+ * Runs one complete metadata-first physical-GC lifecycle pass without owning its components.
+ */
 public final class PhysicalGcLifecyclePass {
     private final Supplier<CompletableFuture<PhysicalObjectRootScanResult>> roots;
     private final Supplier<CompletableFuture<StreamRegistrationRetirementScanResult>> registrations;
@@ -17,15 +20,13 @@ public final class PhysicalGcLifecyclePass {
             StreamRegistrationRetirementScanner registrations,
             ObjectInventoryScanner inventory) {
         PhysicalObjectRootScanner exactRoots = Objects.requireNonNull(roots, "roots");
-        Supplier<PhysicalObjectRootVisitor> exactVisitors = Objects.requireNonNull(
-                visitors, "visitors");
+        Supplier<PhysicalObjectRootVisitor> exactVisitors = Objects.requireNonNull(visitors, "visitors");
         this.roots = () -> {
-            PhysicalObjectRootVisitor visitor = Objects.requireNonNull(
-                    exactVisitors.get(), "physical-root visitor factory returned null");
+            PhysicalObjectRootVisitor visitor =
+                    Objects.requireNonNull(exactVisitors.get(), "physical-root visitor factory returned null");
             return exactRoots.scan(visitor);
         };
-        this.registrations = Objects.requireNonNull(
-                registrations, "registrations")::scan;
+        this.registrations = Objects.requireNonNull(registrations, "registrations")::scan;
         this.inventory = Objects.requireNonNull(inventory, "inventory")::scan;
     }
 
@@ -45,22 +46,17 @@ public final class PhysicalGcLifecyclePass {
     public CompletableFuture<PhysicalGcLifecyclePassResult> scan() {
         final CompletableFuture<PhysicalObjectRootScanResult> rootPass;
         try {
-            rootPass = Objects.requireNonNull(
-                    roots.get(), "physical-root pass returned null");
+            rootPass = Objects.requireNonNull(roots.get(), "physical-root pass returned null");
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return rootPass.thenCompose(rootResult ->
-                require(registrations, "registration-retirement pass").thenCompose(registrationResult ->
-                        require(inventory, "object-inventory pass").thenApply(inventoryResult ->
-                                new PhysicalGcLifecyclePassResult(
-                                        rootResult,
-                                        registrationResult,
-                                        inventoryResult))));
+        return rootPass.thenCompose(rootResult -> require(registrations, "registration-retirement pass")
+                .thenCompose(registrationResult -> require(inventory, "object-inventory pass")
+                        .thenApply(inventoryResult ->
+                                new PhysicalGcLifecyclePassResult(rootResult, registrationResult, inventoryResult))));
     }
 
-    private static <T> CompletableFuture<T> require(
-            Supplier<CompletableFuture<T>> operation, String stage) {
+    private static <T> CompletableFuture<T> require(Supplier<CompletableFuture<T>> operation, String stage) {
         try {
             return Objects.requireNonNull(operation.get(), stage + " returned null");
         } catch (Throwable failure) {

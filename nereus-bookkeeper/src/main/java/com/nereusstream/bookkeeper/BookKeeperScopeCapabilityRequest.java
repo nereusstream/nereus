@@ -1,15 +1,15 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import java.time.Duration;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-/** One explicit, bounded provider-scope canary run. */
-public record BookKeeperScopeCapabilityRequest(
-        String runId,
-        BookKeeperBrokerReadiness readiness,
-        Duration timeout) {
+/**
+ * One explicit, bounded provider-scope canary run.
+ */
+public record BookKeeperScopeCapabilityRequest(String runId, BookKeeperBrokerReadiness readiness, Duration timeout) {
     private static final Pattern RUN_ID = Pattern.compile("[A-Za-z0-9_-]{8,128}");
 
     public BookKeeperScopeCapabilityRequest {

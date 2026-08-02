@@ -51,14 +51,20 @@ public record ObjectManifestRecord(
         storageChecksumType = requireNonBlank(storageChecksumType, "storageChecksumType");
         storageChecksumValue = requireNonBlank(storageChecksumValue, "storageChecksumValue");
         slices = List.copyOf(Objects.requireNonNull(slices, "slices"));
-        if (formatMajorVersion < 0 || formatMinorVersion < 0 || writerEpoch < 0 || createdAtMillis < 0
-                || uploadedAtMillis < 0 || objectLength < 0 || orphanExpiresAtMillis < 0
+        if (formatMajorVersion < 0
+                || formatMinorVersion < 0
+                || writerEpoch < 0
+                || createdAtMillis < 0
+                || uploadedAtMillis < 0
+                || objectLength < 0
+                || orphanExpiresAtMillis < 0
                 || metadataVersion < 0) {
             throw new IllegalArgumentException("object manifest numeric fields must be non-negative");
         }
     }
 
-    public ObjectManifestRecord withStateAndSlices(String newState, List<StreamSliceManifestRecord> newSlices, long newVersion) {
+    public ObjectManifestRecord withStateAndSlices(
+            String newState, List<StreamSliceManifestRecord> newSlices, long newVersion) {
         return new ObjectManifestRecord(
                 objectId,
                 objectKey,

@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.TrimOptions;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
@@ -46,8 +46,7 @@ class NereusManagedCursorResetSeekTest {
         Clock clock = Clock.systemUTC();
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
-        FakeManagedLedgerProjectionMetadataStore projections =
-                new FakeManagedLedgerProjectionMetadataStore();
+        FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         DefaultStreamStorage streamStorage = new DefaultStreamStorage(
                 StreamStorageConfig.defaults("cluster/a", "cursor-reset-seek-test"),
                 metadata,
@@ -56,14 +55,10 @@ class NereusManagedCursorResetSeekTest {
                 clock,
                 Runnable::run);
         TestCursorStorage cursorStorage = new TestCursorStorage();
-        try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(
-                streamStorage, projections, cursorStorage)) {
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections, cursorStorage)) {
             NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
-                    runtime,
-                    fixedGuard(1),
-                    config(),
-                    new ManagedLedgerFactoryConfig(),
-                    false);
+                    runtime, fixedGuard(1), config(), new ManagedLedgerFactoryConfig(), false);
             NereusManagedLedger ledger = (NereusManagedLedger) factory.open(NAME, config());
             Position first = ledger.addEntry(new byte[] {0});
             Position second = ledger.addEntry(new byte[] {1});
@@ -114,10 +109,12 @@ class NereusManagedCursorResetSeekTest {
             assertThat(ordered.getReadPosition().getEntryId()).isEqualTo(1);
             ordered.seek(first, true);
             assertThat(ordered.getReadPosition().getEntryId()).isZero();
-            streamStorage.trim(
-                    ledger.projection().streamId(),
-                    2,
-                    new TrimOptions(Duration.ofSeconds(5), "cursor rewind trim clamp")).join();
+            streamStorage
+                    .trim(
+                            ledger.projection().streamId(),
+                            2,
+                            new TrimOptions(Duration.ofSeconds(5), "cursor rewind trim clamp"))
+                    .join();
             ledger.refreshMetadata().join();
             ordered.rewind();
             assertThat(ordered.getReadPosition().getEntryId()).isEqualTo(2);
@@ -131,13 +128,11 @@ class NereusManagedCursorResetSeekTest {
     }
 
     @Test
-    void ordinaryResetNormalizesTrimmedAndFutureTargetsWhileForceCannotResurrectBytes()
-            throws Exception {
+    void ordinaryResetNormalizesTrimmedAndFutureTargetsWhileForceCannotResurrectBytes() throws Exception {
         Clock clock = Clock.systemUTC();
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("reset-bounds"));
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
-        FakeManagedLedgerProjectionMetadataStore projections =
-                new FakeManagedLedgerProjectionMetadataStore();
+        FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         DefaultStreamStorage streamStorage = new DefaultStreamStorage(
                 StreamStorageConfig.defaults("cluster/a", "cursor-reset-bounds-test"),
                 metadata,
@@ -145,32 +140,28 @@ class NereusManagedCursorResetSeekTest {
                 new DefaultWalObjectReader(objectStore),
                 clock,
                 Runnable::run);
-        try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(
-                streamStorage, projections, new TestCursorStorage())) {
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections, new TestCursorStorage())) {
             NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
-                    runtime,
-                    fixedGuard(1),
-                    config(),
-                    new ManagedLedgerFactoryConfig(),
-                    false);
-            NereusManagedLedger ledger = (NereusManagedLedger) factory.open(
-                    NAME + "-bounds", config());
+                    runtime, fixedGuard(1), config(), new ManagedLedgerFactoryConfig(), false);
+            NereusManagedLedger ledger = (NereusManagedLedger) factory.open(NAME + "-bounds", config());
             Position first = ledger.addEntry(new byte[] {0});
             ledger.addEntry(new byte[] {1});
             Position retained = ledger.addEntry(new byte[] {2});
             ledger.addEntry(new byte[] {3});
             ManagedCursor cursor = ledger.openCursor("bounded");
 
-            streamStorage.trim(
-                    ledger.projection().streamId(),
-                    2,
-                    new TrimOptions(Duration.ofSeconds(5), "reset bound normalization"))
+            streamStorage
+                    .trim(
+                            ledger.projection().streamId(),
+                            2,
+                            new TrimOptions(Duration.ofSeconds(5), "reset bound normalization"))
                     .join();
             ledger.refreshMetadata().join();
             long virtualLedger = ledger.projection().virtualLedgerId();
 
-            Position normalizedTrim = reset(
-                    cursor, PositionFactory.create(virtualLedger, 0), false).join();
+            Position normalizedTrim = reset(cursor, PositionFactory.create(virtualLedger, 0), false)
+                    .join();
             assertThat(normalizedTrim).isEqualTo(retained);
             List<Entry> fromTrim = read(cursor, 1, false).join();
             assertThat(fromTrim).singleElement().satisfies(entry -> {
@@ -178,16 +169,16 @@ class NereusManagedCursorResetSeekTest {
                 entry.release();
             });
 
-            Position normalizedTail = reset(
-                    cursor, PositionFactory.create(virtualLedger, 99), false).join();
+            Position normalizedTail = reset(cursor, PositionFactory.create(virtualLedger, 99), false)
+                    .join();
             assertThat(normalizedTail.getEntryId()).isEqualTo(4);
             assertThat(cursor.getReadPosition()).isEqualTo(normalizedTail);
 
             assertThatThrownBy(() -> reset(cursor, first, true).join())
                     .isInstanceOf(CompletionException.class)
                     .hasCauseInstanceOf(ManagedLedgerException.InvalidCursorPositionException.class);
-            assertThatThrownBy(() -> reset(
-                            cursor, PositionFactory.create(virtualLedger, 99), true).join())
+            assertThatThrownBy(() -> reset(cursor, PositionFactory.create(virtualLedger, 99), true)
+                            .join())
                     .isInstanceOf(CompletionException.class)
                     .hasCauseInstanceOf(ManagedLedgerException.InvalidCursorPositionException.class);
             assertThat(cursor.getReadPosition()).isEqualTo(normalizedTail);
@@ -203,10 +194,7 @@ class NereusManagedCursorResetSeekTest {
         }
     }
 
-    private static CompletableFuture<List<Entry>> read(
-            ManagedCursor cursor,
-            int count,
-            boolean wait) {
+    private static CompletableFuture<List<Entry>> read(ManagedCursor cursor, int count, boolean wait) {
         CompletableFuture<List<Entry>> result = new CompletableFuture<>();
         AsyncCallbacks.ReadEntriesCallback callback = new AsyncCallbacks.ReadEntriesCallback() {
             @Override
@@ -227,10 +215,7 @@ class NereusManagedCursorResetSeekTest {
         return result;
     }
 
-    private static CompletableFuture<Position> reset(
-            ManagedCursor cursor,
-            Position position,
-            boolean force) {
+    private static CompletableFuture<Position> reset(ManagedCursor cursor, Position position, boolean force) {
         CompletableFuture<Position> result = new CompletableFuture<>();
         cursor.asyncResetCursor(position, force, new AsyncCallbacks.ResetCursorCallback() {
             @Override

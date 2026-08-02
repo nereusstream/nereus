@@ -12,21 +12,17 @@ import java.util.concurrent.TimeUnit;
 
 public final class BookKeeperActivationReadCommand {
 
-    private BookKeeperActivationReadCommand() {
-    }
+    private BookKeeperActivationReadCommand() {}
 
     public static AdminExitCode execute(AdminConfiguration config, CommandLineArguments args) {
         Duration timeout = args.timeout();
         Clock clock = Clock.systemUTC();
-        try (SharedOxiaClientRuntime runtime =
-                     SharedOxiaClientRuntime.connect(config.oxia(), clock)) {
-            BookKeeperPrimaryWalAdministration admin =
-                    BookKeeperPrimaryWalAdministration.usingSharedRuntime(
-                            config.bookKeeper(), config.oxia(), runtime, clock);
+        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(config.oxia(), clock)) {
+            BookKeeperPrimaryWalAdministration admin = BookKeeperPrimaryWalAdministration.usingSharedRuntime(
+                    config.bookKeeper(), config.oxia(), runtime, clock);
 
             Optional<BookKeeperProtocolActivation> activation =
-                    admin.readActivation(timeout)
-                            .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+                    admin.readActivation(timeout).get(timeout.toMillis(), TimeUnit.MILLISECONDS);
 
             if (activation.isEmpty()) {
                 String evidence = activationAbsentEvidence();
@@ -34,15 +30,13 @@ public final class BookKeeperActivationReadCommand {
                 return AdminExitCode.CONDITION_FAILED;
             }
 
-            String evidence = AdminEvidenceWriter.activationReadEvidence(
-                    "bookkeeper activation read", activation.get());
+            String evidence =
+                    AdminEvidenceWriter.activationReadEvidence("bookkeeper activation read", activation.get());
             writeOutput(args.outputFile(), evidence);
             return AdminExitCode.SUCCESS;
         } catch (Exception e) {
-            System.err.println("activation read failed: "
-                    + AdminFailureClassifier.safeMessage(e));
-            return AdminFailureClassifier.classify(
-                    e, AdminExitCode.PROVIDER_ERROR);
+            System.err.println("activation read failed: " + AdminFailureClassifier.safeMessage(e));
+            return AdminFailureClassifier.classify(e, AdminExitCode.PROVIDER_ERROR);
         }
     }
 

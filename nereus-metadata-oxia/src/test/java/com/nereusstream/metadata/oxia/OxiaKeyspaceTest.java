@@ -16,7 +16,6 @@ package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
@@ -35,9 +34,12 @@ class OxiaKeyspaceTest {
                 .isLessThan(keyspace.offsetIndexKey(streamId, 10, 0))
                 .isLessThan(keyspace.offsetIndexKey(streamId, 100, 0));
         assertThat(List.of(
-                        keyspace.offsetIndexKey(streamId, 100, 0),
-                        keyspace.offsetIndexKey(streamId, 9, 0),
-                        keyspace.offsetIndexKey(streamId, 10, 0)).stream().sorted().toList())
+                                keyspace.offsetIndexKey(streamId, 100, 0),
+                                keyspace.offsetIndexKey(streamId, 9, 0),
+                                keyspace.offsetIndexKey(streamId, 10, 0))
+                        .stream()
+                        .sorted()
+                        .toList())
                 .containsExactly(
                         keyspace.offsetIndexKey(streamId, 9, 0),
                         keyspace.offsetIndexKey(streamId, 10, 0),
@@ -59,8 +61,10 @@ class OxiaKeyspaceTest {
     void partitionKeysUseRawStableIdentities() {
         OxiaKeyspace keyspace = new OxiaKeyspace("cluster");
 
-        assertThat(keyspace.streamPartitionKey(new StreamId("s-stream")).value()).isEqualTo("s-stream");
-        assertThat(keyspace.objectPartitionKey(new ObjectId("object-1")).value()).isEqualTo("object-1");
+        assertThat(keyspace.streamPartitionKey(new StreamId("s-stream")).value())
+                .isEqualTo("s-stream");
+        assertThat(keyspace.objectPartitionKey(new ObjectId("object-1")).value())
+                .isEqualTo("object-1");
     }
 
     @Test
@@ -70,14 +74,12 @@ class OxiaKeyspaceTest {
         String commit = "commit/one";
         String key = keys.streamCommitKey(stream, commit);
 
-        assertThat(keys.parseStreamCommitKey(key))
-                .isEqualTo(new StreamCommitKeyIdentity(stream, commit));
-        assertThatThrownBy(() -> keys.parseStreamCommitKey(
-                        new OxiaKeyspace("cluster/b").streamCommitKey(stream, commit)))
+        assertThat(keys.parseStreamCommitKey(key)).isEqualTo(new StreamCommitKeyIdentity(stream, commit));
+        assertThatThrownBy(
+                        () -> keys.parseStreamCommitKey(new OxiaKeyspace("cluster/b").streamCommitKey(stream, commit)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("another cluster");
-        assertThatThrownBy(() -> keys.parseStreamCommitKey(
-                        key.replace("/commit-log/", "/committed-appends/")))
+        assertThatThrownBy(() -> keys.parseStreamCommitKey(key.replace("/commit-log/", "/committed-appends/")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unknown family");
         assertThatThrownBy(() -> keys.parseStreamCommitKey(key + "/extra"))

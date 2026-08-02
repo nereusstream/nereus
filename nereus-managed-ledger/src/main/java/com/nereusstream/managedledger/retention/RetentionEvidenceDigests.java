@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.retention;
 
 import com.nereusstream.api.Checksum;
@@ -15,8 +16,7 @@ import java.util.HexFormat;
 import java.util.List;
 
 final class RetentionEvidenceDigests {
-    private RetentionEvidenceDigests() {
-    }
+    private RetentionEvidenceDigests() {}
 
     static Checksum candidate(
             StreamId streamId,
@@ -61,9 +61,7 @@ final class RetentionEvidenceDigests {
                 number(digest, token.metadataVersion());
                 text(digest, token.durableValueSha256().value());
             }
-            return new Checksum(
-                    ChecksumType.SHA256,
-                    HexFormat.of().formatHex(digest.digest()));
+            return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest()));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }

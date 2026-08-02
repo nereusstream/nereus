@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -83,15 +84,11 @@ import java.util.function.Function;
  * reference domains continue to expose any owner record that still exists.
  */
 public final class StreamRegistrationRetirementCoordinator {
-    private static final List<ReadView> VIEWS =
-            List.of(ReadView.COMMITTED, ReadView.TOPIC_COMPACTED);
-    private static final EnumSet<TaskLifecycle> TERMINAL_TASKS = EnumSet.of(
-            TaskLifecycle.PUBLISHED,
-            TaskLifecycle.CANCELLED,
-            TaskLifecycle.TERMINAL_FAILED);
-    private static final EnumSet<GenerationLifecycle> TERMINAL_INDEXES = EnumSet.of(
-            GenerationLifecycle.RETIRED,
-            GenerationLifecycle.ABORTED);
+    private static final List<ReadView> VIEWS = List.of(ReadView.COMMITTED, ReadView.TOPIC_COMPACTED);
+    private static final EnumSet<TaskLifecycle> TERMINAL_TASKS =
+            EnumSet.of(TaskLifecycle.PUBLISHED, TaskLifecycle.CANCELLED, TaskLifecycle.TERMINAL_FAILED);
+    private static final EnumSet<GenerationLifecycle> TERMINAL_INDEXES =
+            EnumSet.of(GenerationLifecycle.RETIRED, GenerationLifecycle.ABORTED);
     private static final int MAX_DELETE_RECOVERY_ATTEMPTS = 8;
 
     private final String cluster;
@@ -107,8 +104,7 @@ public final class StreamRegistrationRetirementCoordinator {
     private final ScheduledExecutorService scheduler;
     private final F4Keyspace keys;
     private final ReadTargetCodecRegistry targetCodecs = ReadTargetCodecRegistry.phase15();
-    private final GenerationIndexRecordCodecV1 generationCodec =
-            new GenerationIndexRecordCodecV1();
+    private final GenerationIndexRecordCodecV1 generationCodec = new GenerationIndexRecordCodecV1();
     private final RecoveryReplacementVerifier recoveryVerifier;
 
     public StreamRegistrationRetirementCoordinator(
@@ -128,26 +124,21 @@ public final class StreamRegistrationRetirementCoordinator {
         this.generations = Objects.requireNonNull(generations, "generations");
         this.physical = Objects.requireNonNull(physical, "physical");
         this.projections = Objects.requireNonNull(projections, "projections");
-        this.externalReferences = Objects.requireNonNull(
-                externalReferences, "externalReferences");
+        this.externalReferences = Objects.requireNonNull(externalReferences, "externalReferences");
         this.checkpoints = Objects.requireNonNull(checkpoints, "checkpoints");
         this.config = Objects.requireNonNull(config, "config");
-        this.metadataAuditGraceMillis = requirePositiveMillis(
-                metadataAuditGrace, "metadataAuditGrace");
+        this.metadataAuditGraceMillis = requirePositiveMillis(metadataAuditGrace, "metadataAuditGrace");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.keys = new F4Keyspace(cluster);
-        this.recoveryVerifier = new RecoveryReplacementVerifier(
-                cluster, generations, physical, checkpoints, config);
+        this.recoveryVerifier = new RecoveryReplacementVerifier(cluster, generations, physical, checkpoints, config);
     }
 
     public CompletableFuture<StreamRegistrationRetirementResult> retire(StreamId streamId) {
         StreamId exactStream = Objects.requireNonNull(streamId, "streamId");
         if (!config.enabled()) {
-            return CompletableFuture.completedFuture(simple(
-                    exactStream,
-                    0,
-                    StreamRegistrationRetirementStatus.DISABLED));
+            return CompletableFuture.completedFuture(
+                    simple(exactStream, 0, StreamRegistrationRetirementStatus.DISABLED));
         }
         Operation operation = new Operation(exactStream);
         CompletableFuture<StreamRegistrationRetirementResult> result;
@@ -174,21 +165,17 @@ public final class StreamRegistrationRetirementCoordinator {
 
         private Operation(StreamId stream) {
             this.stream = stream;
-            this.deadline = new MaterializationDeadline(
-                    config.operationTimeout(), scheduler);
+            this.deadline = new MaterializationDeadline(config.operationTimeout(), scheduler);
         }
 
         private CompletableFuture<StreamRegistrationRetirementResult> run() {
             return bound(
                             () -> generations.getStreamRegistration(cluster, stream),
                             "load stream registration for retirement")
-                    .thenCompose(optional -> optional
-                            .<CompletableFuture<StreamRegistrationRetirementResult>>map(
+                    .thenCompose(optional -> optional.<CompletableFuture<StreamRegistrationRetirementResult>>map(
                                     this::runRegistered)
-                            .orElseGet(() -> CompletableFuture.completedFuture(simple(
-                                    stream,
-                                    0,
-                                    StreamRegistrationRetirementStatus.ALREADY_ABSENT))));
+                            .orElseGet(() -> CompletableFuture.completedFuture(
+                                    simple(stream, 0, StreamRegistrationRetirementStatus.ALREADY_ABSENT))));
         }
 
         private CompletableFuture<StreamRegistrationRetirementResult> runRegistered(
@@ -207,35 +194,22 @@ public final class StreamRegistrationRetirementCoordinator {
                     return bound(
                                     () -> generations.getRecoveryRoot(cluster, stream),
                                     "load recovery root for registration retirement")
-                            .thenCompose(root -> requireEmptyRecoveryTail(root)
-                                    .thenCompose(tailEmpty -> {
-                                        if (!tailEmpty) {
-                                            return completed(
-                                                    registration,
-                                                    StreamRegistrationRetirementStatus
-                                                            .RECOVERY_TAIL_PRESENT);
-                                        }
-                                        return buildOwnerScope(workflow, root)
-                                                .thenCompose(scope -> {
-                                                    if (scope.limitExceeded()) {
-                                                        return completed(
-                                                                registration,
-                                                                StreamRegistrationRetirementStatus
-                                                                        .LIMIT_EXCEEDED);
-                                                    }
-                                                    if (config.dryRun()) {
-                                                        return completed(
-                                                                registration,
-                                                                StreamRegistrationRetirementStatus
-                                                                        .DRY_RUN);
-                                                    }
-                                                    return mutate(
-                                                            capture,
-                                                            workflow,
-                                                            root,
-                                                            scope);
-                                                });
-                                    }));
+                            .thenCompose(root -> requireEmptyRecoveryTail(root).thenCompose(tailEmpty -> {
+                                if (!tailEmpty) {
+                                    return completed(
+                                            registration, StreamRegistrationRetirementStatus.RECOVERY_TAIL_PRESENT);
+                                }
+                                return buildOwnerScope(workflow, root).thenCompose(scope -> {
+                                    if (scope.limitExceeded()) {
+                                        return completed(
+                                                registration, StreamRegistrationRetirementStatus.LIMIT_EXCEEDED);
+                                    }
+                                    if (config.dryRun()) {
+                                        return completed(registration, StreamRegistrationRetirementStatus.DRY_RUN);
+                                    }
+                                    return mutate(capture, workflow, root, scope);
+                                });
+                            }));
                 });
             });
         }
@@ -246,50 +220,38 @@ public final class StreamRegistrationRetirementCoordinator {
                 Optional<VersionedRecoveryCheckpointRoot> recoveryRoot,
                 OwnerScope scope) {
             return retireProtectionKind(capture, scope, OwnerKind.INDEX, 0)
-                    .thenCompose(exact -> exact
-                            ? retireIndexes(workflow.indexes(), 0)
-                            : CompletableFuture.completedFuture(false))
-                    .thenCompose(exact -> exact
-                            ? requireIndexesEmpty()
-                            : CompletableFuture.completedFuture(false))
+                    .thenCompose(exact ->
+                            exact ? retireIndexes(workflow.indexes(), 0) : CompletableFuture.completedFuture(false))
+                    .thenCompose(exact -> exact ? requireIndexesEmpty() : CompletableFuture.completedFuture(false))
                     .thenCompose(exact -> exact
                             ? retireProtectionKind(capture, scope, OwnerKind.TASK, 0)
                             : CompletableFuture.completedFuture(false))
-                    .thenCompose(exact -> exact
-                            ? retireTasks(workflow.tasks(), 0)
-                            : CompletableFuture.completedFuture(false))
-                    .thenCompose(exact -> exact
-                            ? requireTasksEmpty()
-                            : CompletableFuture.completedFuture(false))
+                    .thenCompose(exact ->
+                            exact ? retireTasks(workflow.tasks(), 0) : CompletableFuture.completedFuture(false))
+                    .thenCompose(exact -> exact ? requireTasksEmpty() : CompletableFuture.completedFuture(false))
                     .thenCompose(exact -> exact
                             ? retireProtectionKind(capture, scope, OwnerKind.RECOVERY_ROOT, 0)
                             : CompletableFuture.completedFuture(false))
-                    .thenCompose(exact -> exact
-                            ? deleteRecoveryRoot(recoveryRoot, 0)
-                            : CompletableFuture.completedFuture(false))
+                    .thenCompose(exact ->
+                            exact ? deleteRecoveryRoot(recoveryRoot, 0) : CompletableFuture.completedFuture(false))
                     .thenCompose(exact -> exact
                             ? retireCheckpoints(workflow.checkpoints(), 0)
                             : CompletableFuture.completedFuture(false))
-                    .thenCompose(exact -> exact
-                            ? retireStats(workflow.stats(), 0)
-                            : CompletableFuture.completedFuture(false))
-                    .thenCompose(exact -> exact
-                            ? retireSequences(workflow.sequences(), 0)
-                            : CompletableFuture.completedFuture(false))
-                    .thenCompose(exact -> exact
-                            ? requireAllStreamMetadataEmpty()
-                            : CompletableFuture.completedFuture(false))
+                    .thenCompose(exact ->
+                            exact ? retireStats(workflow.stats(), 0) : CompletableFuture.completedFuture(false))
+                    .thenCompose(exact ->
+                            exact ? retireSequences(workflow.sequences(), 0) : CompletableFuture.completedFuture(false))
+                    .thenCompose(
+                            exact -> exact ? requireAllStreamMetadataEmpty() : CompletableFuture.completedFuture(false))
                     .thenCompose(exact -> {
                         if (!exact) {
                             return completed(
-                                    capture.registration(),
-                                    StreamRegistrationRetirementStatus.VERSION_CHANGED);
+                                    capture.registration(), StreamRegistrationRetirementStatus.VERSION_CHANGED);
                         }
                         return revalidateCapture(capture).thenCompose(matches -> {
                             if (!matches) {
                                 return completed(
-                                        capture.registration(),
-                                        StreamRegistrationRetirementStatus.VERSION_CHANGED);
+                                        capture.registration(), StreamRegistrationRetirementStatus.VERSION_CHANGED);
                             }
                             return deleteRegistration(capture.registration(), 0)
                                     .thenCompose(retired -> retired
@@ -299,34 +261,24 @@ public final class StreamRegistrationRetirementCoordinator {
                                                     true))
                                             : completed(
                                                     capture.registration(),
-                                                    StreamRegistrationRetirementStatus
-                                                            .VERSION_CHANGED));
+                                                    StreamRegistrationRetirementStatus.VERSION_CHANGED));
                         });
                     });
         }
 
         private CompletableFuture<RetirementCapture> captureBasis(
-                VersionedMaterializationStreamRegistration registration,
-                LiveProjectionSubject subject) {
-            return bound(
-                            () -> l0.getStreamSnapshot(cluster, stream),
-                            "capture deleted L0 stream authority")
+                VersionedMaterializationStreamRegistration registration, LiveProjectionSubject subject) {
+            return bound(() -> l0.getStreamSnapshot(cluster, stream), "capture deleted L0 stream authority")
                     .thenCompose(streamSnapshot -> bound(
-                                    () -> projections.capture(subject),
-                                    "capture projection retirement authority")
+                                    () -> projections.capture(subject), "capture projection retirement authority")
                             .thenCompose(projection -> bound(
                                             () -> externalReferences.capture(subject),
                                             "capture external stream references")
                                     .thenApply(external -> new RetirementCapture(
-                                            registration,
-                                            subject,
-                                            streamSnapshot,
-                                            projection,
-                                            external))));
+                                            registration, subject, streamSnapshot, projection, external))));
         }
 
-        private StreamRegistrationRetirementStatus validateCapture(
-                RetirementCapture capture) {
+        private StreamRegistrationRetirementStatus validateCapture(RetirementCapture capture) {
             if (!capture.streamSnapshot().metadata().streamId().equals(stream.value())) {
                 throw invariant("L0 stream snapshot belongs to another stream");
             }
@@ -334,8 +286,7 @@ public final class StreamRegistrationRetirementCoordinator {
             StorageProfile registeredProfile;
             StorageProfile actualProfile;
             try {
-                state = StreamState.valueOf(
-                        capture.streamSnapshot().metadata().state());
+                state = StreamState.valueOf(capture.streamSnapshot().metadata().state());
                 registeredProfile = StorageProfile.valueOf(
                                 capture.registration().value().storageProfile())
                         .canonical();
@@ -373,9 +324,7 @@ public final class StreamRegistrationRetirementCoordinator {
         }
 
         private CompletableFuture<Boolean> revalidateCapture(RetirementCapture expected) {
-            return bound(
-                            () -> generations.getStreamRegistration(cluster, stream),
-                            "revalidate stream registration")
+            return bound(() -> generations.getStreamRegistration(cluster, stream), "revalidate stream registration")
                     .thenCompose(registration -> {
                         if (!registration.equals(Optional.of(expected.registration()))) {
                             return CompletableFuture.completedFuture(false);
@@ -384,8 +333,7 @@ public final class StreamRegistrationRetirementCoordinator {
                                         () -> l0.getStreamSnapshot(cluster, stream),
                                         "revalidate deleted L0 stream authority")
                                 .thenCompose(streamSnapshot -> {
-                                    if (!streamSnapshot.sameVersionedAuthority(
-                                            expected.streamSnapshot())) {
+                                    if (!streamSnapshot.sameVersionedAuthority(expected.streamSnapshot())) {
                                         return CompletableFuture.completedFuture(false);
                                     }
                                     return bound(
@@ -396,43 +344,31 @@ public final class StreamRegistrationRetirementCoordinator {
                                                     return CompletableFuture.completedFuture(false);
                                                 }
                                                 return bound(
-                                                                () -> externalReferences.capture(
-                                                                        expected.subject()),
+                                                                () -> externalReferences.capture(expected.subject()),
                                                                 "revalidate external stream references")
-                                                        .thenApply(external ->
-                                                                external.equals(expected.external()));
+                                                        .thenApply(external -> external.equals(expected.external()));
                                             });
                                 });
                     });
         }
 
         private CompletableFuture<WorkflowSnapshot> scanWorkflow() {
-            WorkflowAccumulator accumulator = new WorkflowAccumulator(
-                    config.maxAuthoritiesPerDomainSnapshot());
+            WorkflowAccumulator accumulator = new WorkflowAccumulator(config.maxAuthoritiesPerDomainSnapshot());
             return scanTasks(Optional.empty(), null, accumulator)
-                    .thenCompose(ignored -> scanIndexes(
-                            0, Optional.empty(), null, accumulator))
-                    .thenCompose(ignored -> scanCheckpoints(
-                            Optional.empty(), null, accumulator))
-                    .thenCompose(ignored -> scanStats(
-                            Optional.empty(), null, accumulator))
+                    .thenCompose(ignored -> scanIndexes(0, Optional.empty(), null, accumulator))
+                    .thenCompose(ignored -> scanCheckpoints(Optional.empty(), null, accumulator))
+                    .thenCompose(ignored -> scanStats(Optional.empty(), null, accumulator))
                     .thenCompose(ignored -> loadSequences(0, accumulator))
                     .thenApply(ignored -> accumulator.snapshot());
         }
 
         private CompletableFuture<Void> scanTasks(
-                Optional<F4ScanToken> continuation,
-                String previousKey,
-                WorkflowAccumulator accumulator) {
+                Optional<F4ScanToken> continuation, String previousKey, WorkflowAccumulator accumulator) {
             if (accumulator.limitExceeded) {
                 return CompletableFuture.completedFuture(null);
             }
             return bound(
-                            () -> generations.scanTasks(
-                                    cluster,
-                                    stream,
-                                    continuation,
-                                    config.metadataScanPageSize()),
+                            () -> generations.scanTasks(cluster, stream, continuation, config.metadataScanPageSize()),
                             "scan stream tasks for registration retirement")
                     .thenCompose(page -> {
                         requireProgress(page.values(), previousKey, VersionedMaterializationTask::key, "task");
@@ -488,34 +424,22 @@ public final class StreamRegistrationRetirementCoordinator {
                                     page.values().get(page.values().size() - 1).key(),
                                     accumulator);
                         }
-                        return scanIndexes(
-                                viewIndex + 1,
-                                Optional.empty(),
-                                null,
-                                accumulator);
+                        return scanIndexes(viewIndex + 1, Optional.empty(), null, accumulator);
                     });
         }
 
         private CompletableFuture<Void> scanCheckpoints(
-                Optional<F4ScanToken> continuation,
-                String previousKey,
-                WorkflowAccumulator accumulator) {
+                Optional<F4ScanToken> continuation, String previousKey, WorkflowAccumulator accumulator) {
             if (accumulator.limitExceeded) {
                 return CompletableFuture.completedFuture(null);
             }
             return bound(
                             () -> generations.scanMaterializationCheckpoints(
-                                    cluster,
-                                    stream,
-                                    continuation,
-                                    config.metadataScanPageSize()),
+                                    cluster, stream, continuation, config.metadataScanPageSize()),
                             "scan stream checkpoints for registration retirement")
                     .thenCompose(page -> {
                         requireProgress(
-                                page.values(),
-                                previousKey,
-                                VersionedMaterializationCheckpoint::key,
-                                "checkpoint");
+                                page.values(), previousKey, VersionedMaterializationCheckpoint::key, "checkpoint");
                         for (VersionedMaterializationCheckpoint checkpoint : page.values()) {
                             if (!checkpoint.value().streamId().equals(stream.value())) {
                                 throw invariant("checkpoint scan escaped the retiring stream");
@@ -535,27 +459,17 @@ public final class StreamRegistrationRetirementCoordinator {
         }
 
         private CompletableFuture<Void> scanStats(
-                Optional<F4ScanToken> continuation,
-                String previousKey,
-                WorkflowAccumulator accumulator) {
+                Optional<F4ScanToken> continuation, String previousKey, WorkflowAccumulator accumulator) {
             if (accumulator.limitExceeded) {
                 return CompletableFuture.completedFuture(null);
             }
             return bound(
                             () -> generations.scanRangeRetentionStats(
-                                    cluster,
-                                    stream,
-                                    0,
-                                    Long.MAX_VALUE,
-                                    continuation,
-                                    config.metadataScanPageSize()),
+                                    cluster, stream, 0, Long.MAX_VALUE, continuation, config.metadataScanPageSize()),
                             "scan stream retention stats for registration retirement")
                     .thenCompose(page -> {
                         requireProgress(
-                                page.values(),
-                                previousKey,
-                                VersionedRangeRetentionStats::key,
-                                "retention-stats");
+                                page.values(), previousKey, VersionedRangeRetentionStats::key, "retention-stats");
                         for (VersionedRangeRetentionStats stats : page.values()) {
                             if (!stats.value().streamId().equals(stream.value())) {
                                 throw invariant("retention-stats scan escaped the retiring stream");
@@ -574,9 +488,7 @@ public final class StreamRegistrationRetirementCoordinator {
                     });
         }
 
-        private CompletableFuture<Void> loadSequences(
-                int viewIndex,
-                WorkflowAccumulator accumulator) {
+        private CompletableFuture<Void> loadSequences(int viewIndex, WorkflowAccumulator accumulator) {
             if (accumulator.limitExceeded || viewIndex == VIEWS.size()) {
                 return CompletableFuture.completedFuture(null);
             }
@@ -625,12 +537,7 @@ public final class StreamRegistrationRetirementCoordinator {
             VersionedRecoveryCheckpointRoot root = optionalRoot.orElseThrow();
             AppendRecoveryAnchor anchor = recoveryAnchor(root);
             return bound(
-                            () -> l0.readAppendRecoveryTail(
-                                    cluster,
-                                    stream,
-                                    anchor,
-                                    Optional.empty(),
-                                    1),
+                            () -> l0.readAppendRecoveryTail(cluster, stream, anchor, Optional.empty(), 1),
                             "prove recovery tail empty before root retirement")
                     .thenApply(page -> page.anchorReached()
                             && page.continuation().isEmpty()
@@ -638,10 +545,8 @@ public final class StreamRegistrationRetirementCoordinator {
         }
 
         private CompletableFuture<OwnerScope> buildOwnerScope(
-                WorkflowSnapshot workflow,
-                Optional<VersionedRecoveryCheckpointRoot> recoveryRoot) {
-            OwnerScopeBuilder builder = new OwnerScopeBuilder(
-                    config.maxReferencesPerDomainSnapshot());
+                WorkflowSnapshot workflow, Optional<VersionedRecoveryCheckpointRoot> recoveryRoot) {
+            OwnerScopeBuilder builder = new OwnerScopeBuilder(config.maxReferencesPerDomainSnapshot());
             for (VersionedMaterializationTask task : workflow.tasks()) {
                 OwnerFact owner = OwnerFact.task(task);
                 for (ObjectKeyHash object : taskObjects(task)) {
@@ -659,21 +564,12 @@ public final class StreamRegistrationRetirementCoordinator {
             }
             VersionedRecoveryCheckpointRoot root = recoveryRoot.orElseThrow();
             OwnerFact owner = OwnerFact.recoveryRoot(root);
-            return addRecoveryReferences(
-                            root,
-                            owner,
-                            builder,
-                            0)
-                    .thenApply(ignored -> builder.build());
+            return addRecoveryReferences(root, owner, builder, 0).thenApply(ignored -> builder.build());
         }
 
         private CompletableFuture<Void> addRecoveryReferences(
-                VersionedRecoveryCheckpointRoot root,
-                OwnerFact owner,
-                OwnerScopeBuilder builder,
-                int index) {
-            if (builder.limitExceeded
-                    || index == root.value().checkpoints().size()) {
+                VersionedRecoveryCheckpointRoot root, OwnerFact owner, OwnerScopeBuilder builder, int index) {
+            if (builder.limitExceeded || index == root.value().checkpoints().size()) {
                 return CompletableFuture.completedFuture(null);
             }
             RecoveryCheckpointReferenceRecord reference =
@@ -682,8 +578,7 @@ public final class StreamRegistrationRetirementCoordinator {
             if (builder.limitExceeded) {
                 return CompletableFuture.completedFuture(null);
             }
-            Checksum content = new Checksum(
-                    ChecksumType.SHA256, reference.contentSha256());
+            Checksum content = new Checksum(ChecksumType.SHA256, reference.contentSha256());
             return bound(
                             () -> checkpoints.openAndVerify(
                                     new ObjectKey(reference.objectKey()),
@@ -692,17 +587,10 @@ public final class StreamRegistrationRetirementCoordinator {
                                     deadline.remaining()),
                             "open recovery checkpoint for root-owner retirement")
                     .thenCompose(checkpoint -> {
-                        recoveryVerifier.requireCheckpointIdentity(
-                                stream, reference, checkpoint);
-                        return scanRecoveryPublications(
-                                root,
-                                checkpoint,
-                                owner,
-                                builder,
-                                OptionalInt.empty());
+                        recoveryVerifier.requireCheckpointIdentity(stream, reference, checkpoint);
+                        return scanRecoveryPublications(root, checkpoint, owner, builder, OptionalInt.empty());
                     })
-                    .thenCompose(ignored -> addRecoveryReferences(
-                            root, owner, builder, index + 1));
+                    .thenCompose(ignored -> addRecoveryReferences(root, owner, builder, index + 1));
         }
 
         private CompletableFuture<Void> scanRecoveryPublications(
@@ -718,33 +606,25 @@ public final class StreamRegistrationRetirementCoordinator {
                             () -> checkpoints.scanPublications(
                                     checkpoint,
                                     continuation,
-                                    RecoveryCheckpointFormatV1
-                                            .MAX_PUBLICATION_SCAN_PAGE_SIZE,
+                                    RecoveryCheckpointFormatV1.MAX_PUBLICATION_SCAN_PAGE_SIZE,
                                     deadline.remaining()),
                             "scan recovery checkpoint publications for owner retirement")
                     .thenCompose(page -> {
                         for (RecoveryCheckpointPublication publication : page.values()) {
-                            GenerationIndexRecord embedded = decodePublication(
-                                    root, publication);
+                            GenerationIndexRecord embedded = decodePublication(root, publication);
                             builder.add(owner, targetObject(embedded.readTarget()));
                             if (builder.limitExceeded) {
                                 return CompletableFuture.completedFuture(null);
                             }
                         }
                         return page.continuation().isPresent()
-                                ? scanRecoveryPublications(
-                                        root,
-                                        checkpoint,
-                                        owner,
-                                        builder,
-                                        page.continuation())
+                                ? scanRecoveryPublications(root, checkpoint, owner, builder, page.continuation())
                                 : CompletableFuture.completedFuture(null);
                     });
         }
 
         private GenerationIndexRecord decodePublication(
-                VersionedRecoveryCheckpointRoot root,
-                RecoveryCheckpointPublication publication) {
+                VersionedRecoveryCheckpointRoot root, RecoveryCheckpointPublication publication) {
             byte[] canonical = bytes(publication.canonicalGenerationIndexRecord());
             GenerationIndexRecord record;
             try {
@@ -758,8 +638,8 @@ public final class StreamRegistrationRetirementCoordinator {
                     || record.readViewId() != ReadView.COMMITTED.wireId()
                     || !record.streamId().equals(stream.value())
                     || record.generation() != publication.generation()
-                    || !record.publicationId().equals(
-                            publication.publicationId().value())
+                    || !record.publicationId()
+                            .equals(publication.publicationId().value())
                     || record.offsetStart() != publication.coverage().startOffset()
                     || record.offsetEnd() != publication.coverage().endOffset()
                     || !GenerationIndexDigests.canonicalRecordSha256(record)
@@ -771,16 +651,12 @@ public final class StreamRegistrationRetirementCoordinator {
         }
 
         private CompletableFuture<Boolean> retireProtectionKind(
-                RetirementCapture capture,
-                OwnerScope scope,
-                OwnerKind kind,
-                int attempt) {
+                RetirementCapture capture, OwnerScope scope, OwnerKind kind, int attempt) {
             if (!scope.hasKind(kind)) {
                 return CompletableFuture.completedFuture(true);
             }
             if (attempt >= MAX_DELETE_RECOVERY_ATTEMPTS) {
-                return CompletableFuture.failedFuture(invariant(
-                        "stream-owner protection retirement did not converge"));
+                return CompletableFuture.failedFuture(invariant("stream-owner protection retirement did not converge"));
             }
             return revalidateCapture(capture).thenCompose(matches -> {
                 if (!matches) {
@@ -790,82 +666,66 @@ public final class StreamRegistrationRetirementCoordinator {
                     if (!exact) {
                         return CompletableFuture.completedFuture(false);
                     }
-                    return scanOwnerProtections(scope, kind)
-                            .thenCompose(scan -> {
-                                if (scan.limitExceeded()) {
-                                    return CompletableFuture.failedFuture(invariant(
-                                            "owner protection scan exceeded its configured bound"));
-                                }
-                                if (scan.values().isEmpty()) {
-                                    return CompletableFuture.completedFuture(true);
-                                }
-                                return deleteProtections(scan.values(), 0)
-                                        .thenCompose(deleted -> deleted
-                                                ? retireProtectionKind(
-                                                        capture,
-                                                        scope,
-                                                        kind,
-                                                        attempt + 1)
-                                                : CompletableFuture.completedFuture(false));
-                            });
+                    return scanOwnerProtections(scope, kind).thenCompose(scan -> {
+                        if (scan.limitExceeded()) {
+                            return CompletableFuture.failedFuture(
+                                    invariant("owner protection scan exceeded its configured bound"));
+                        }
+                        if (scan.values().isEmpty()) {
+                            return CompletableFuture.completedFuture(true);
+                        }
+                        return deleteProtections(scan.values(), 0)
+                                .thenCompose(deleted -> deleted
+                                        ? retireProtectionKind(capture, scope, kind, attempt + 1)
+                                        : CompletableFuture.completedFuture(false));
+                    });
                 });
             });
         }
 
-        private CompletableFuture<Boolean> requireOwnersExact(
-                OwnerScope scope,
-                OwnerKind kind,
-                int index) {
+        private CompletableFuture<Boolean> requireOwnersExact(OwnerScope scope, OwnerKind kind, int index) {
             List<OwnerFact> owners = scope.owners(kind);
             if (index == owners.size()) {
                 return CompletableFuture.completedFuture(true);
             }
             OwnerFact owner = owners.get(index);
-            CompletableFuture<Boolean> exact = switch (kind) {
-                case INDEX -> {
-                    VersionedGenerationIndex expected = owner.index().orElseThrow();
-                    GenerationIndexIdentity identity = indexIdentity(expected);
-                    yield bound(
-                                    () -> generations.getIndex(cluster, identity),
-                                    "revalidate terminal generation owner")
-                            .thenApply(current -> current.equals(Optional.of(expected)));
-                }
-                case TASK -> {
-                    VersionedMaterializationTask expected = owner.task().orElseThrow();
-                    yield bound(
-                                    () -> generations.getTask(
-                                            cluster,
-                                            stream,
-                                            expected.value().taskId()),
-                                    "revalidate terminal task owner")
-                            .thenApply(current -> current.equals(Optional.of(expected)));
-                }
-                case RECOVERY_ROOT -> {
-                    VersionedRecoveryCheckpointRoot expected =
-                            owner.recoveryRoot().orElseThrow();
-                    yield bound(
-                                    () -> generations.getRecoveryRoot(cluster, stream),
-                                    "revalidate recovery-root owner")
-                            .thenApply(current -> current.equals(Optional.of(expected)));
-                }
-            };
-            return exact.thenCompose(matches -> matches
-                    ? requireOwnersExact(scope, kind, index + 1)
-                    : CompletableFuture.completedFuture(false));
+            CompletableFuture<Boolean> exact =
+                    switch (kind) {
+                        case INDEX -> {
+                            VersionedGenerationIndex expected = owner.index().orElseThrow();
+                            GenerationIndexIdentity identity = indexIdentity(expected);
+                            yield bound(
+                                            () -> generations.getIndex(cluster, identity),
+                                            "revalidate terminal generation owner")
+                                    .thenApply(current -> current.equals(Optional.of(expected)));
+                        }
+                        case TASK -> {
+                            VersionedMaterializationTask expected = owner.task().orElseThrow();
+                            yield bound(
+                                            () -> generations.getTask(
+                                                    cluster,
+                                                    stream,
+                                                    expected.value().taskId()),
+                                            "revalidate terminal task owner")
+                                    .thenApply(current -> current.equals(Optional.of(expected)));
+                        }
+                        case RECOVERY_ROOT -> {
+                            VersionedRecoveryCheckpointRoot expected =
+                                    owner.recoveryRoot().orElseThrow();
+                            yield bound(
+                                            () -> generations.getRecoveryRoot(cluster, stream),
+                                            "revalidate recovery-root owner")
+                                    .thenApply(current -> current.equals(Optional.of(expected)));
+                        }
+                    };
+            return exact.thenCompose(matches ->
+                    matches ? requireOwnersExact(scope, kind, index + 1) : CompletableFuture.completedFuture(false));
         }
 
-        private CompletableFuture<ProtectionScan> scanOwnerProtections(
-                OwnerScope scope,
-                OwnerKind kind) {
-            ProtectionScanAccumulator accumulator = new ProtectionScanAccumulator(
-                    config.maxReferencesPerDomainSnapshot());
-            return scanOwnerObject(
-                            scope,
-                            kind,
-                            scope.objects(kind),
-                            0,
-                            Optional.empty(),
-                            accumulator)
+        private CompletableFuture<ProtectionScan> scanOwnerProtections(OwnerScope scope, OwnerKind kind) {
+            ProtectionScanAccumulator accumulator =
+                    new ProtectionScanAccumulator(config.maxReferencesPerDomainSnapshot());
+            return scanOwnerObject(scope, kind, scope.objects(kind), 0, Optional.empty(), accumulator)
                     .thenApply(ignored -> accumulator.snapshot());
         }
 
@@ -882,18 +742,15 @@ public final class StreamRegistrationRetirementCoordinator {
             ObjectKeyHash object = objects.get(objectIndex);
             return bound(
                             () -> physical.scanProtections(
-                                    cluster,
-                                    object,
-                                    continuation,
-                                    config.metadataScanPageSize()),
+                                    cluster, object, continuation, config.metadataScanPageSize()),
                             "scan protections owned by retiring stream metadata")
                     .thenCompose(page -> {
                         for (VersionedObjectProtection protection : page.values()) {
                             if (!protection.value().objectKeyHash().equals(object.value())) {
                                 throw invariant("protection scan escaped its physical object");
                             }
-                            Optional<OwnerFact> owner = scope.owner(
-                                    kind, protection.value().ownerKey());
+                            Optional<OwnerFact> owner =
+                                    scope.owner(kind, protection.value().ownerKey());
                             if (owner.isPresent()) {
                                 validateProtectionOwner(owner.orElseThrow(), protection);
                                 if (!accumulator.add(protection)) {
@@ -902,55 +759,43 @@ public final class StreamRegistrationRetirementCoordinator {
                             }
                         }
                         if (page.continuation().isPresent()) {
-                            return scanOwnerObject(
-                                    scope,
-                                    kind,
-                                    objects,
-                                    objectIndex,
-                                    page.continuation(),
-                                    accumulator);
+                            return scanOwnerObject(scope, kind, objects, objectIndex, page.continuation(), accumulator);
                         }
-                        return scanOwnerObject(
-                                scope,
-                                kind,
-                                objects,
-                                objectIndex + 1,
-                                Optional.empty(),
-                                accumulator);
+                        return scanOwnerObject(scope, kind, objects, objectIndex + 1, Optional.empty(), accumulator);
                     });
         }
 
-        private void validateProtectionOwner(
-                OwnerFact owner,
-                VersionedObjectProtection protection) {
+        private void validateProtectionOwner(OwnerFact owner, VersionedObjectProtection protection) {
             ObjectProtectionRecord value = protection.value();
             if (value.ownerMetadataVersion() > owner.metadataVersion()) {
                 throw invariant("protection owner version is ahead of its durable owner");
             }
             if (value.ownerMetadataVersion() == owner.metadataVersion()
-                    && !value.ownerIdentitySha256().equals(
-                            owner.identitySha256().value())) {
+                    && !value.ownerIdentitySha256()
+                            .equals(owner.identitySha256().value())) {
                 throw invariant("one protection owner version has conflicting identities");
             }
-            ObjectProtectionType type = ObjectProtectionType.fromWireId(
-                    value.protectionTypeId());
-            boolean allowed = switch (owner.kind()) {
-                case INDEX -> type == ObjectProtectionType.VISIBLE_GENERATION;
-                case TASK -> type == ObjectProtectionType.MATERIALIZATION_SOURCE
-                        || type == ObjectProtectionType.MATERIALIZATION_OUTPUT
-                        || type == ObjectProtectionType.VISIBLE_GENERATION;
-                case RECOVERY_ROOT -> type == ObjectProtectionType.RECOVERY_CHECKPOINT_OBJECT
-                        || type == ObjectProtectionType.RECOVERY_CHECKPOINT_TARGET
-                        || type == ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING;
-            };
+            ObjectProtectionType type = ObjectProtectionType.fromWireId(value.protectionTypeId());
+            boolean allowed =
+                    switch (owner.kind()) {
+                        case INDEX -> type == ObjectProtectionType.VISIBLE_GENERATION;
+                        case TASK ->
+                            type == ObjectProtectionType.MATERIALIZATION_SOURCE
+                                    || type == ObjectProtectionType.MATERIALIZATION_OUTPUT
+                                    || type == ObjectProtectionType.VISIBLE_GENERATION;
+                        case RECOVERY_ROOT ->
+                            type == ObjectProtectionType.RECOVERY_CHECKPOINT_OBJECT
+                                    || type == ObjectProtectionType.RECOVERY_CHECKPOINT_TARGET
+                                    || type == ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING
+                                    || type == ObjectProtectionType.KAFKA_CHECKPOINT_PENDING
+                                    || type == ObjectProtectionType.KAFKA_CHECKPOINT_ROOT;
+                    };
             if (!allowed) {
                 throw invariant("durable owner holds an unexpected protection type");
             }
         }
 
-        private CompletableFuture<Boolean> deleteProtections(
-                List<VersionedObjectProtection> values,
-                int index) {
+        private CompletableFuture<Boolean> deleteProtections(List<VersionedObjectProtection> values, int index) {
             if (index == values.size()) {
                 return CompletableFuture.completedFuture(true);
             }
@@ -963,53 +808,42 @@ public final class StreamRegistrationRetirementCoordinator {
             });
         }
 
-        private CompletableFuture<Boolean> deleteProtection(
-                VersionedObjectProtection expected,
-                int attempt) {
+        private CompletableFuture<Boolean> deleteProtection(VersionedObjectProtection expected, int attempt) {
             ObjectProtectionIdentity identity = protectionIdentity(expected.value());
             return bound(
-                            () -> physical.deleteProtection(
-                                    cluster,
-                                    identity,
-                                    expected.metadataVersion()),
+                            () -> physical.deleteProtection(cluster, identity, expected.metadataVersion()),
                             "conditionally delete retiring-owner protection")
                     .handle((ignored, failure) -> {
                         if (failure == null) {
                             return CompletableFuture.completedFuture(true);
                         }
                         Throwable original = unwrap(failure);
-                        return findProtection(identity, Optional.empty())
-                                .thenCompose(current -> {
-                                    if (current.isEmpty()) {
-                                        return CompletableFuture.completedFuture(true);
-                                    }
-                                    if (!current.orElseThrow().equals(expected)) {
-                                        return CompletableFuture.completedFuture(false);
-                                    }
-                                    if (attempt + 1 >= MAX_DELETE_RECOVERY_ATTEMPTS) {
-                                        return CompletableFuture.failedFuture(original);
-                                    }
-                                    return deleteProtection(
-                                            current.orElseThrow(), attempt + 1);
-                                });
+                        return findProtection(identity, Optional.empty()).thenCompose(current -> {
+                            if (current.isEmpty()) {
+                                return CompletableFuture.completedFuture(true);
+                            }
+                            if (!current.orElseThrow().equals(expected)) {
+                                return CompletableFuture.completedFuture(false);
+                            }
+                            if (attempt + 1 >= MAX_DELETE_RECOVERY_ATTEMPTS) {
+                                return CompletableFuture.failedFuture(original);
+                            }
+                            return deleteProtection(current.orElseThrow(), attempt + 1);
+                        });
                     })
                     .thenCompose(Function.identity());
         }
 
         private CompletableFuture<Optional<VersionedObjectProtection>> findProtection(
-                ObjectProtectionIdentity identity,
-                Optional<F4ScanToken> continuation) {
+                ObjectProtectionIdentity identity, Optional<F4ScanToken> continuation) {
             return bound(
                             () -> physical.scanProtections(
-                                    cluster,
-                                    identity.object(),
-                                    continuation,
-                                    config.metadataScanPageSize()),
+                                    cluster, identity.object(), continuation, config.metadataScanPageSize()),
                             "reload protection after uncertain delete")
                     .thenCompose(page -> {
                         Optional<VersionedObjectProtection> found = page.values().stream()
-                                .filter(value -> protectionIdentity(value.value())
-                                        .equals(identity))
+                                .filter(value ->
+                                        protectionIdentity(value.value()).equals(identity))
                                 .findFirst();
                         if (found.isPresent() || page.continuation().isEmpty()) {
                             return CompletableFuture.completedFuture(found);
@@ -1018,14 +852,11 @@ public final class StreamRegistrationRetirementCoordinator {
                     });
         }
 
-        private CompletableFuture<Boolean> retireIndexes(
-                List<VersionedGenerationCandidate> indexes,
-                int index) {
+        private CompletableFuture<Boolean> retireIndexes(List<VersionedGenerationCandidate> indexes, int index) {
             if (index == indexes.size()) {
                 return CompletableFuture.completedFuture(true);
             }
-            VersionedGenerationIndex expected =
-                    (VersionedGenerationIndex) indexes.get(index);
+            VersionedGenerationIndex expected = (VersionedGenerationIndex) indexes.get(index);
             return deleteIndex(expected, 0).thenCompose(deleted -> {
                 if (!deleted) {
                     return CompletableFuture.completedFuture(false);
@@ -1035,15 +866,10 @@ public final class StreamRegistrationRetirementCoordinator {
             });
         }
 
-        private CompletableFuture<Boolean> deleteIndex(
-                VersionedGenerationIndex expected,
-                int attempt) {
+        private CompletableFuture<Boolean> deleteIndex(VersionedGenerationIndex expected, int attempt) {
             GenerationIndexIdentity identity = indexIdentity(expected);
             return bound(
-                            () -> generations.deleteIndex(
-                                    cluster,
-                                    identity,
-                                    expected.metadataVersion()),
+                            () -> generations.deleteIndex(cluster, identity, expected.metadataVersion()),
                             "conditionally delete terminal generation index")
                     .handle((ignored, failure) -> {
                         if (failure == null) {
@@ -1063,24 +889,19 @@ public final class StreamRegistrationRetirementCoordinator {
                                     if (attempt + 1 >= MAX_DELETE_RECOVERY_ATTEMPTS) {
                                         return CompletableFuture.failedFuture(original);
                                     }
-                                    return deleteIndex(
-                                            current.orElseThrow(), attempt + 1);
+                                    return deleteIndex(current.orElseThrow(), attempt + 1);
                                 });
                     })
                     .thenCompose(Function.identity());
         }
 
         private CompletableFuture<Boolean> requireIndexesEmpty() {
-            WorkflowAccumulator accumulator = new WorkflowAccumulator(
-                    config.maxAuthoritiesPerDomainSnapshot());
+            WorkflowAccumulator accumulator = new WorkflowAccumulator(config.maxAuthoritiesPerDomainSnapshot());
             return scanIndexes(0, Optional.empty(), null, accumulator)
-                    .thenApply(ignored -> !accumulator.limitExceeded
-                            && accumulator.indexes.isEmpty());
+                    .thenApply(ignored -> !accumulator.limitExceeded && accumulator.indexes.isEmpty());
         }
 
-        private CompletableFuture<Boolean> retireTasks(
-                List<VersionedMaterializationTask> tasks,
-                int index) {
+        private CompletableFuture<Boolean> retireTasks(List<VersionedMaterializationTask> tasks, int index) {
             if (index == tasks.size()) {
                 return CompletableFuture.completedFuture(true);
             }
@@ -1094,15 +915,10 @@ public final class StreamRegistrationRetirementCoordinator {
             });
         }
 
-        private CompletableFuture<Boolean> deleteTask(
-                VersionedMaterializationTask expected,
-                int attempt) {
+        private CompletableFuture<Boolean> deleteTask(VersionedMaterializationTask expected, int attempt) {
             return bound(
                             () -> generations.deleteTask(
-                                    cluster,
-                                    stream,
-                                    expected.value().taskId(),
-                                    expected.metadataVersion()),
+                                    cluster, stream, expected.value().taskId(), expected.metadataVersion()),
                             "conditionally delete terminal task")
                     .handle((ignored, failure) -> {
                         if (failure == null) {
@@ -1125,31 +941,26 @@ public final class StreamRegistrationRetirementCoordinator {
                                     if (attempt + 1 >= MAX_DELETE_RECOVERY_ATTEMPTS) {
                                         return CompletableFuture.failedFuture(original);
                                     }
-                                    return deleteTask(
-                                            current.orElseThrow(), attempt + 1);
+                                    return deleteTask(current.orElseThrow(), attempt + 1);
                                 });
                     })
                     .thenCompose(Function.identity());
         }
 
         private CompletableFuture<Boolean> requireTasksEmpty() {
-            WorkflowAccumulator accumulator = new WorkflowAccumulator(
-                    config.maxAuthoritiesPerDomainSnapshot());
+            WorkflowAccumulator accumulator = new WorkflowAccumulator(config.maxAuthoritiesPerDomainSnapshot());
             return scanTasks(Optional.empty(), null, accumulator)
-                    .thenApply(ignored -> !accumulator.limitExceeded
-                            && accumulator.tasks.isEmpty());
+                    .thenApply(ignored -> !accumulator.limitExceeded && accumulator.tasks.isEmpty());
         }
 
         private CompletableFuture<Boolean> deleteRecoveryRoot(
-                Optional<VersionedRecoveryCheckpointRoot> expected,
-                int attempt) {
+                Optional<VersionedRecoveryCheckpointRoot> expected, int attempt) {
             if (expected.isEmpty()) {
                 return CompletableFuture.completedFuture(true);
             }
             VersionedRecoveryCheckpointRoot root = expected.orElseThrow();
             return bound(
-                            () -> generations.deleteRecoveryRoot(
-                                    cluster, stream, root.metadataVersion()),
+                            () -> generations.deleteRecoveryRoot(cluster, stream, root.metadataVersion()),
                             "conditionally delete drained recovery root")
                     .handle((ignored, failure) -> {
                         if (failure == null) {
@@ -1178,8 +989,7 @@ public final class StreamRegistrationRetirementCoordinator {
         }
 
         private CompletableFuture<Boolean> retireCheckpoints(
-                List<VersionedMaterializationCheckpoint> values,
-                int index) {
+                List<VersionedMaterializationCheckpoint> values, int index) {
             if (index == values.size()) {
                 return CompletableFuture.completedFuture(true);
             }
@@ -1193,9 +1003,7 @@ public final class StreamRegistrationRetirementCoordinator {
             });
         }
 
-        private CompletableFuture<Boolean> deleteCheckpoint(
-                VersionedMaterializationCheckpoint expected,
-                int attempt) {
+        private CompletableFuture<Boolean> deleteCheckpoint(VersionedMaterializationCheckpoint expected, int attempt) {
             return bound(
                             () -> generations.deleteMaterializationCheckpoint(
                                     cluster,
@@ -1226,16 +1034,13 @@ public final class StreamRegistrationRetirementCoordinator {
                                     if (attempt + 1 >= MAX_DELETE_RECOVERY_ATTEMPTS) {
                                         return CompletableFuture.failedFuture(original);
                                     }
-                                    return deleteCheckpoint(
-                                            current.orElseThrow(), attempt + 1);
+                                    return deleteCheckpoint(current.orElseThrow(), attempt + 1);
                                 });
                     })
                     .thenCompose(Function.identity());
         }
 
-        private CompletableFuture<Boolean> retireStats(
-                List<VersionedRangeRetentionStats> values,
-                int index) {
+        private CompletableFuture<Boolean> retireStats(List<VersionedRangeRetentionStats> values, int index) {
             if (index == values.size()) {
                 return CompletableFuture.completedFuture(true);
             }
@@ -1249,9 +1054,7 @@ public final class StreamRegistrationRetirementCoordinator {
             });
         }
 
-        private CompletableFuture<Boolean> deleteStats(
-                VersionedRangeRetentionStats expected,
-                int attempt) {
+        private CompletableFuture<Boolean> deleteStats(VersionedRangeRetentionStats expected, int attempt) {
             return bound(
                             () -> generations.deleteRangeRetentionStats(
                                     cluster,
@@ -1282,16 +1085,13 @@ public final class StreamRegistrationRetirementCoordinator {
                                     if (attempt + 1 >= MAX_DELETE_RECOVERY_ATTEMPTS) {
                                         return CompletableFuture.failedFuture(original);
                                     }
-                                    return deleteStats(
-                                            current.orElseThrow(), attempt + 1);
+                                    return deleteStats(current.orElseThrow(), attempt + 1);
                                 });
                     })
                     .thenCompose(Function.identity());
         }
 
-        private CompletableFuture<Boolean> retireSequences(
-                List<ViewSequence> values,
-                int index) {
+        private CompletableFuture<Boolean> retireSequences(List<ViewSequence> values, int index) {
             if (index == values.size()) {
                 return CompletableFuture.completedFuture(true);
             }
@@ -1305,9 +1105,7 @@ public final class StreamRegistrationRetirementCoordinator {
             });
         }
 
-        private CompletableFuture<Boolean> deleteSequence(
-                ViewSequence expected,
-                int attempt) {
+        private CompletableFuture<Boolean> deleteSequence(ViewSequence expected, int attempt) {
             return bound(
                             () -> generations.deleteSequence(
                                     cluster,
@@ -1321,8 +1119,7 @@ public final class StreamRegistrationRetirementCoordinator {
                         }
                         Throwable original = unwrap(failure);
                         return bound(
-                                        () -> generations.getSequence(
-                                                cluster, stream, expected.view()),
+                                        () -> generations.getSequence(cluster, stream, expected.view()),
                                         "reload generation sequence after uncertain delete")
                                 .thenCompose(current -> {
                                     if (current.isEmpty()) {
@@ -1350,21 +1147,15 @@ public final class StreamRegistrationRetirementCoordinator {
                         || !workflow.sequences().isEmpty()) {
                     return CompletableFuture.completedFuture(false);
                 }
-                return bound(
-                                () -> generations.getRecoveryRoot(cluster, stream),
-                                "revalidate recovery-root absence")
+                return bound(() -> generations.getRecoveryRoot(cluster, stream), "revalidate recovery-root absence")
                         .thenApply(Optional::isEmpty);
             });
         }
 
         private CompletableFuture<Boolean> deleteRegistration(
-                VersionedMaterializationStreamRegistration expected,
-                int attempt) {
+                VersionedMaterializationStreamRegistration expected, int attempt) {
             return bound(
-                            () -> generations.deleteStreamRegistration(
-                                    cluster,
-                                    stream,
-                                    expected.metadataVersion()),
+                            () -> generations.deleteStreamRegistration(cluster, stream, expected.metadataVersion()),
                             "conditionally delete final stream registration")
                     .handle((ignored, failure) -> {
                         if (failure == null) {
@@ -1372,8 +1163,7 @@ public final class StreamRegistrationRetirementCoordinator {
                         }
                         Throwable original = unwrap(failure);
                         return bound(
-                                        () -> generations.getStreamRegistration(
-                                                cluster, stream),
+                                        () -> generations.getStreamRegistration(cluster, stream),
                                         "reload registration after uncertain delete")
                                 .thenCompose(current -> {
                                     if (current.isEmpty()) {
@@ -1385,22 +1175,19 @@ public final class StreamRegistrationRetirementCoordinator {
                                     if (attempt + 1 >= MAX_DELETE_RECOVERY_ATTEMPTS) {
                                         return CompletableFuture.failedFuture(original);
                                     }
-                                    return deleteRegistration(
-                                            current.orElseThrow(), attempt + 1);
+                                    return deleteRegistration(current.orElseThrow(), attempt + 1);
                                 });
                     })
                     .thenCompose(Function.identity());
         }
 
         private <T> CompletableFuture<T> bound(
-                java.util.function.Supplier<CompletableFuture<T>> operation,
-                String stage) {
+                java.util.function.Supplier<CompletableFuture<T>> operation, String stage) {
             return deadline.bound(operation, stage);
         }
 
         private CompletableFuture<StreamRegistrationRetirementResult> completed(
-                VersionedMaterializationStreamRegistration registration,
-                StreamRegistrationRetirementStatus status) {
+                VersionedMaterializationStreamRegistration registration, StreamRegistrationRetirementStatus status) {
             return CompletableFuture.completedFuture(result(registration, status, false));
         }
 
@@ -1428,8 +1215,7 @@ public final class StreamRegistrationRetirementCoordinator {
         }
     }
 
-    private LiveProjectionSubject subject(
-            VersionedMaterializationStreamRegistration registration) {
+    private LiveProjectionSubject subject(VersionedMaterializationStreamRegistration registration) {
         StreamId stream = new StreamId(registration.value().streamId());
         if (!registration.key().equals(keys.materializationRegistryKey(stream))) {
             throw invariant("registration key/value identity mismatch");
@@ -1442,25 +1228,18 @@ public final class StreamRegistrationRetirementCoordinator {
         }
         return new LiveProjectionSubject(
                 stream,
-                projection.orElseThrow(() -> invariant(
-                        "registration has no projection reference")),
-                new Checksum(
-                        ChecksumType.SHA256,
-                        registration.value().projectionIdentitySha256()));
+                projection.orElseThrow(() -> invariant("registration has no projection reference")),
+                new Checksum(ChecksumType.SHA256, registration.value().projectionIdentitySha256()));
     }
 
     private void requireIndexIdentity(
-            StreamId expectedStream,
-            ReadView expectedView,
-            VersionedGenerationCandidate candidate) {
+            StreamId expectedStream, ReadView expectedView, VersionedGenerationCandidate candidate) {
         if (candidate instanceof VersionedGenerationZeroIndex zero) {
             if (expectedView != ReadView.COMMITTED
                     || !zero.value().streamId().equals(expectedStream)
-                    || !zero.key().equals(keys.generationIndexKey(
-                            expectedStream,
-                            expectedView,
-                            zero.value().offsetEnd(),
-                            0))) {
+                    || !zero.key()
+                            .equals(keys.generationIndexKey(
+                                    expectedStream, expectedView, zero.value().offsetEnd(), 0))) {
                 throw invariant("generation-zero index has a mismatched stream/view identity");
             }
             return;
@@ -1468,11 +1247,12 @@ public final class StreamRegistrationRetirementCoordinator {
         VersionedGenerationIndex higher = (VersionedGenerationIndex) candidate;
         if (!higher.value().streamId().equals(expectedStream.value())
                 || ReadView.fromWireId(higher.value().readViewId()) != expectedView
-                || !higher.key().equals(keys.generationIndexKey(
-                        expectedStream,
-                        expectedView,
-                        higher.value().offsetEnd(),
-                        higher.value().generation()))) {
+                || !higher.key()
+                        .equals(keys.generationIndexKey(
+                                expectedStream,
+                                expectedView,
+                                higher.value().offsetEnd(),
+                                higher.value().generation()))) {
             throw invariant("higher-generation index has a mismatched stream/view identity");
         }
     }
@@ -1482,13 +1262,11 @@ public final class StreamRegistrationRetirementCoordinator {
         for (SourceGenerationRecord source : task.value().sources()) {
             objects.add(targetObject(source.readTarget()));
         }
-        task.value().output().ifPresent(output ->
-                objects.add(new ObjectKeyHash(output.objectKeyHash())));
+        task.value().output().ifPresent(output -> objects.add(new ObjectKeyHash(output.objectKeyHash())));
         return List.copyOf(objects);
     }
 
-    private ObjectKeyHash targetObject(
-            com.nereusstream.metadata.oxia.records.ReadTargetRecord encoded) {
+    private ObjectKeyHash targetObject(com.nereusstream.metadata.oxia.records.ReadTargetRecord encoded) {
         ReadTarget target;
         try {
             target = targetCodecs.decode(encoded);
@@ -1511,8 +1289,7 @@ public final class StreamRegistrationRetirementCoordinator {
 
     private AppendRecoveryAnchor recoveryAnchor(VersionedRecoveryCheckpointRoot root) {
         if (root.value().checkpoints().isEmpty()) {
-            return AppendRecoveryAnchor.genesis(
-                    new StreamId(root.value().streamId()));
+            return AppendRecoveryAnchor.genesis(new StreamId(root.value().streamId()));
         }
         return new AppendRecoveryAnchor(
                 new StreamId(root.value().streamId()),
@@ -1527,8 +1304,7 @@ public final class StreamRegistrationRetirementCoordinator {
         long notBefore;
         try {
             safeGrace = Math.addExact(
-                    metadataAuditGraceMillis,
-                    config.maximumClockSkew().toMillis());
+                    metadataAuditGraceMillis, config.maximumClockSkew().toMillis());
             notBefore = Math.addExact(changedAtMillis, safeGrace);
         } catch (ArithmeticException overflow) {
             return false;
@@ -1536,8 +1312,7 @@ public final class StreamRegistrationRetirementCoordinator {
         return notBefore < clock.millis();
     }
 
-    private static ObjectProtectionIdentity protectionIdentity(
-            ObjectProtectionRecord value) {
+    private static ObjectProtectionIdentity protectionIdentity(ObjectProtectionRecord value) {
         return new ObjectProtectionIdentity(
                 new ObjectKeyHash(value.objectKeyHash()),
                 ObjectProtectionType.fromWireId(value.protectionTypeId()),
@@ -1551,22 +1326,14 @@ public final class StreamRegistrationRetirementCoordinator {
         return bytes;
     }
 
-    private static <T> void requireProgress(
-            List<T> values,
-            String previousKey,
-            Function<T, String> key,
-            String label) {
-        if (previousKey != null
-                && !values.isEmpty()
-                && key.apply(values.get(0)).compareTo(previousKey) <= 0) {
+    private static <T> void requireProgress(List<T> values, String previousKey, Function<T, String> key, String label) {
+        if (previousKey != null && !values.isEmpty() && key.apply(values.get(0)).compareTo(previousKey) <= 0) {
             throw invariant(label + " scan did not advance");
         }
     }
 
     private static StreamRegistrationRetirementResult simple(
-            StreamId stream,
-            long version,
-            StreamRegistrationRetirementStatus status) {
+            StreamId stream, long version, StreamRegistrationRetirementStatus status) {
         return StreamRegistrationRetirementResult.simple(stream, version, status);
     }
 
@@ -1587,8 +1354,7 @@ public final class StreamRegistrationRetirementCoordinator {
             throw new IllegalArgumentException(name + " must fit milliseconds", failure);
         }
         if (millis <= 0 || !exact.equals(Duration.ofMillis(millis))) {
-            throw new IllegalArgumentException(
-                    name + " must be positive and exactly millisecond-representable");
+            throw new IllegalArgumentException(name + " must be positive and exactly millisecond-representable");
         }
         return millis;
     }
@@ -1606,17 +1372,12 @@ public final class StreamRegistrationRetirementCoordinator {
     }
 
     private static NereusException invariant(String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message,
-                cause);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static Throwable unwrap(Throwable supplied) {
         Throwable current = supplied;
-        while ((current instanceof CompletionException
-                        || current instanceof ExecutionException)
+        while ((current instanceof CompletionException || current instanceof ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -1628,13 +1389,9 @@ public final class StreamRegistrationRetirementCoordinator {
             LiveProjectionSubject subject,
             StreamMetadataSnapshot streamSnapshot,
             GenerationProjectionAuthoritySnapshot projection,
-            StreamRetirementReferenceAuthoritySnapshot external) {
-    }
+            StreamRetirementReferenceAuthoritySnapshot external) {}
 
-    private record ViewSequence(
-            ReadView view,
-            VersionedGenerationSequence value) {
-    }
+    private record ViewSequence(ReadView view, VersionedGenerationSequence value) {}
 
     private record WorkflowSnapshot(
             List<VersionedMaterializationTask> tasks,
@@ -1642,8 +1399,7 @@ public final class StreamRegistrationRetirementCoordinator {
             List<VersionedMaterializationCheckpoint> checkpoints,
             List<VersionedRangeRetentionStats> stats,
             List<ViewSequence> sequences,
-            boolean limitExceeded) {
-    }
+            boolean limitExceeded) {}
 
     private static final class WorkflowAccumulator {
         private final int maximum;
@@ -1724,9 +1480,7 @@ public final class StreamRegistrationRetirementCoordinator {
             Objects.requireNonNull(index, "index");
             Objects.requireNonNull(task, "task");
             Objects.requireNonNull(recoveryRoot, "recoveryRoot");
-            int values = (index.isPresent() ? 1 : 0)
-                    + (task.isPresent() ? 1 : 0)
-                    + (recoveryRoot.isPresent() ? 1 : 0);
+            int values = (index.isPresent() ? 1 : 0) + (task.isPresent() ? 1 : 0) + (recoveryRoot.isPresent() ? 1 : 0);
             if (values != 1) {
                 throw new IllegalArgumentException("owner fact must carry exactly one durable value");
             }
@@ -1767,22 +1521,17 @@ public final class StreamRegistrationRetirementCoordinator {
     }
 
     private record OwnerScope(
-            Map<String, OwnerFact> owners,
-            Map<String, Set<ObjectKeyHash>> objectsByOwner,
-            boolean limitExceeded) {
+            Map<String, OwnerFact> owners, Map<String, Set<ObjectKeyHash>> objectsByOwner, boolean limitExceeded) {
         private OwnerScope {
             owners = Map.copyOf(owners);
             LinkedHashMap<String, Set<ObjectKeyHash>> canonical = new LinkedHashMap<>();
-            objectsByOwner.forEach((key, values) -> canonical.put(
-                    key, Set.copyOf(values)));
+            objectsByOwner.forEach((key, values) -> canonical.put(key, Set.copyOf(values)));
             objectsByOwner = Map.copyOf(canonical);
         }
 
         private Optional<OwnerFact> owner(OwnerKind kind, String key) {
             OwnerFact owner = owners.get(key);
-            return owner != null && owner.kind() == kind
-                    ? Optional.of(owner)
-                    : Optional.empty();
+            return owner != null && owner.kind() == kind ? Optional.of(owner) : Optional.empty();
         }
 
         private List<OwnerFact> owners(OwnerKind kind) {
@@ -1798,9 +1547,7 @@ public final class StreamRegistrationRetirementCoordinator {
 
         private List<ObjectKeyHash> objects(OwnerKind kind) {
             return owners(kind).stream()
-                    .flatMap(owner -> objectsByOwner.getOrDefault(
-                                    owner.ownerKey(), Set.of())
-                            .stream())
+                    .flatMap(owner -> objectsByOwner.getOrDefault(owner.ownerKey(), Set.of()).stream())
                     .distinct()
                     .sorted(Comparator.comparing(ObjectKeyHash::value))
                     .toList();
@@ -1810,8 +1557,7 @@ public final class StreamRegistrationRetirementCoordinator {
     private static final class OwnerScopeBuilder {
         private final int maximum;
         private final LinkedHashMap<String, OwnerFact> owners = new LinkedHashMap<>();
-        private final LinkedHashMap<String, LinkedHashSet<ObjectKeyHash>> objects =
-                new LinkedHashMap<>();
+        private final LinkedHashMap<String, LinkedHashSet<ObjectKeyHash>> objects = new LinkedHashMap<>();
         private int observed;
         private boolean limitExceeded;
 
@@ -1827,8 +1573,8 @@ public final class StreamRegistrationRetirementCoordinator {
             if (existing != null && !existing.equals(owner)) {
                 throw invariant("one retirement owner key has conflicting durable facts");
             }
-            LinkedHashSet<ObjectKeyHash> ownerObjects = objects.computeIfAbsent(
-                    owner.ownerKey(), ignored -> new LinkedHashSet<>());
+            LinkedHashSet<ObjectKeyHash> ownerObjects =
+                    objects.computeIfAbsent(owner.ownerKey(), ignored -> new LinkedHashSet<>());
             if (ownerObjects.add(Objects.requireNonNull(object, "object"))) {
                 observed = Math.addExact(observed, 1);
                 if (observed > maximum) {
@@ -1844,10 +1590,7 @@ public final class StreamRegistrationRetirementCoordinator {
         }
     }
 
-    private record ProtectionScan(
-            List<VersionedObjectProtection> values,
-            boolean limitExceeded) {
-    }
+    private record ProtectionScan(List<VersionedObjectProtection> values, boolean limitExceeded) {}
 
     private static final class ProtectionScanAccumulator {
         private final int maximum;

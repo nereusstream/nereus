@@ -29,19 +29,29 @@ public enum StorageProfile {
     @Deprecated
     OBJECT_WAL,
 
-    /** BookKeeper is the only durable WAL; remote object materialization is disabled. */
+    /**
+     * BookKeeper is the only durable WAL; remote object materialization is disabled.
+     */
     BOOKKEEPER_WAL_ONLY,
 
-    /** BookKeeper is the WAL and object-backed visibility/materialization is completed on the append path. */
+    /**
+     * BookKeeper is the WAL and object-backed visibility/materialization is completed on the append path.
+     */
     BOOKKEEPER_WAL_SYNC_OBJECT,
 
-    /** BookKeeper is the WAL and object-backed materialization is completed by background workers. */
+    /**
+     * BookKeeper is the WAL and object-backed materialization is completed by background workers.
+     */
     BOOKKEEPER_WAL_ASYNC_OBJECT,
 
-    /** Object storage is the WAL and object-backed visibility/materialization is completed on the append path. */
+    /**
+     * Object storage is the WAL and object-backed visibility/materialization is completed on the append path.
+     */
     OBJECT_WAL_SYNC_OBJECT,
 
-    /** Object storage is the WAL and read-optimized object materialization is completed by background workers. */
+    /**
+     * Object storage is the WAL and read-optimized object materialization is completed by background workers.
+     */
     OBJECT_WAL_ASYNC_OBJECT;
 
     public StorageProfile canonical() {

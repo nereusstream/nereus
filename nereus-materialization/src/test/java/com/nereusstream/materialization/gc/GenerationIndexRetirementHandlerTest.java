@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -63,20 +63,15 @@ class GenerationIndexRetirementHandlerTest {
 
     @Test
     void generationZeroDeleteUsesExactJournalFactsAndCanonicalRouting() {
-        String key = new F4Keyspace(CLUSTER).generationIndexKey(
-                STREAM, ReadView.COMMITTED, 12, 0);
+        String key = new F4Keyspace(CLUSTER).generationIndexKey(STREAM, ReadView.COMMITTED, 12, 0);
         VersionedGenerationZeroIndex zero = generationZero(key, SOURCE_VERSION, SOURCE_DIGEST);
         GcPlannedMetadataRemoval removal = new GcPlannedMetadataRemoval(
-                GenerationZeroIndexRetirementHandler.REMOVAL_TYPE,
-                key,
-                SOURCE_VERSION,
-                SOURCE_DIGEST);
+                GenerationZeroIndexRetirementHandler.REMOVAL_TYPE, key, SOURCE_VERSION, SOURCE_DIGEST);
         AtomicReference<VersionedGenerationCandidate> current = new AtomicReference<>(zero);
         AtomicInteger deletes = new AtomicInteger();
         GenerationZeroIndexRetirementHandler handler = new GenerationZeroIndexRetirementHandler(
                 CLUSTER,
-                (stream, view, suppliedKey) -> CompletableFuture.completedFuture(
-                        Optional.ofNullable(current.get())),
+                (stream, view, suppliedKey) -> CompletableFuture.completedFuture(Optional.ofNullable(current.get())),
                 (stream, offsetEnd, expectedVersion, expectedDigest) -> {
                     assertThat(stream).isEqualTo(STREAM);
                     assertThat(offsetEnd).isEqualTo(12);
@@ -99,23 +94,17 @@ class GenerationIndexRetirementHandlerTest {
 
     @Test
     void generationZeroLostDeleteResponseConvergesOnlyAfterExactReloadIsAbsent() {
-        String key = new F4Keyspace(CLUSTER).generationIndexKey(
-                STREAM, ReadView.COMMITTED, 12, 0);
+        String key = new F4Keyspace(CLUSTER).generationIndexKey(STREAM, ReadView.COMMITTED, 12, 0);
         VersionedGenerationZeroIndex zero = generationZero(key, SOURCE_VERSION, SOURCE_DIGEST);
         GcPlannedMetadataRemoval removal = new GcPlannedMetadataRemoval(
-                GenerationZeroIndexRetirementHandler.REMOVAL_TYPE,
-                key,
-                SOURCE_VERSION,
-                SOURCE_DIGEST);
+                GenerationZeroIndexRetirementHandler.REMOVAL_TYPE, key, SOURCE_VERSION, SOURCE_DIGEST);
         AtomicReference<VersionedGenerationCandidate> current = new AtomicReference<>(zero);
         GenerationZeroIndexRetirementHandler handler = new GenerationZeroIndexRetirementHandler(
                 CLUSTER,
-                (stream, view, suppliedKey) -> CompletableFuture.completedFuture(
-                        Optional.ofNullable(current.get())),
+                (stream, view, suppliedKey) -> CompletableFuture.completedFuture(Optional.ofNullable(current.get())),
                 (stream, offsetEnd, expectedVersion, expectedDigest) -> {
                     current.set(null);
-                    return CompletableFuture.failedFuture(
-                            new RuntimeException("injected lost delete response"));
+                    return CompletableFuture.failedFuture(new RuntimeException("injected lost delete response"));
                 });
 
         GcMetadataRetirementOutcome outcome;
@@ -128,14 +117,10 @@ class GenerationIndexRetirementHandlerTest {
 
     @Test
     void generationZeroDriftFailsBeforeDelete() {
-        String key = new F4Keyspace(CLUSTER).generationIndexKey(
-                STREAM, ReadView.COMMITTED, 12, 0);
+        String key = new F4Keyspace(CLUSTER).generationIndexKey(STREAM, ReadView.COMMITTED, 12, 0);
         VersionedGenerationZeroIndex zero = generationZero(key, SOURCE_VERSION, sha('f'));
         GcPlannedMetadataRemoval removal = new GcPlannedMetadataRemoval(
-                GenerationZeroIndexRetirementHandler.REMOVAL_TYPE,
-                key,
-                SOURCE_VERSION,
-                SOURCE_DIGEST);
+                GenerationZeroIndexRetirementHandler.REMOVAL_TYPE, key, SOURCE_VERSION, SOURCE_DIGEST);
         AtomicInteger deletes = new AtomicInteger();
         GenerationZeroIndexRetirementHandler handler = new GenerationZeroIndexRetirementHandler(
                 CLUSTER,
@@ -146,36 +131,31 @@ class GenerationIndexRetirementHandlerTest {
                 });
 
         try (MaterializationDeadline deadline = deadline()) {
-            assertThatThrownBy(() -> handler.retire(context(removal), removal, deadline).join())
-                    .hasRootCauseMessage(
-                            "generation-zero index no longer matches the sealed journal");
+            assertThatThrownBy(() ->
+                            handler.retire(context(removal), removal, deadline).join())
+                    .hasRootCauseMessage("generation-zero index no longer matches the sealed journal");
         }
         assertThat(deletes).hasValue(0);
     }
 
     @Test
     void higherGenerationRetiresExactDrainingIndexAndRestartRecognizesSameAttempt() {
-        String key = new F4Keyspace(CLUSTER).generationIndexKey(
-                STREAM, ReadView.TOPIC_COMPACTED, 12, 3);
-        VersionedGenerationIndex draining = higher(
-                key, SOURCE_VERSION, SOURCE_DIGEST, GenerationLifecycle.DRAINING, "draining", 150);
+        String key = new F4Keyspace(CLUSTER).generationIndexKey(STREAM, ReadView.TOPIC_COMPACTED, 12, 3);
+        VersionedGenerationIndex draining =
+                higher(key, SOURCE_VERSION, SOURCE_DIGEST, GenerationLifecycle.DRAINING, "draining", 150);
         GcPlannedMetadataRemoval removal = new GcPlannedMetadataRemoval(
-                HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
-                key,
-                SOURCE_VERSION,
-                SOURCE_DIGEST);
+                HigherGenerationIndexRetirementHandler.REMOVAL_TYPE, key, SOURCE_VERSION, SOURCE_DIGEST);
         GcMetadataRetirementContext context = context(removal);
         AtomicReference<VersionedGenerationCandidate> current = new AtomicReference<>(draining);
         AtomicInteger casCalls = new AtomicInteger();
         HigherGenerationIndexRetirementHandler handler = new HigherGenerationIndexRetirementHandler(
                 CLUSTER,
-                (stream, view, suppliedKey) -> CompletableFuture.completedFuture(
-                        Optional.ofNullable(current.get())),
+                (stream, view, suppliedKey) -> CompletableFuture.completedFuture(Optional.ofNullable(current.get())),
                 (replacement, expectedVersion) -> {
                     assertThat(expectedVersion).isEqualTo(SOURCE_VERSION);
                     casCalls.incrementAndGet();
-                    VersionedGenerationIndex retired = hydratedReplacement(
-                            key, replacement, SOURCE_VERSION + 1, sha('f'));
+                    VersionedGenerationIndex retired =
+                            hydratedReplacement(key, replacement, SOURCE_VERSION + 1, sha('f'));
                     current.set(retired);
                     return CompletableFuture.completedFuture(retired);
                 });
@@ -204,26 +184,19 @@ class GenerationIndexRetirementHandlerTest {
 
     @Test
     void higherGenerationLostCasResponseConvergesOnExactAttemptBoundReplacement() {
-        String key = new F4Keyspace(CLUSTER).generationIndexKey(
-                STREAM, ReadView.COMMITTED, 12, 3);
-        VersionedGenerationIndex draining = higher(
-                key, SOURCE_VERSION, SOURCE_DIGEST, GenerationLifecycle.DRAINING, "draining", 150);
+        String key = new F4Keyspace(CLUSTER).generationIndexKey(STREAM, ReadView.COMMITTED, 12, 3);
+        VersionedGenerationIndex draining =
+                higher(key, SOURCE_VERSION, SOURCE_DIGEST, GenerationLifecycle.DRAINING, "draining", 150);
         GcPlannedMetadataRemoval removal = new GcPlannedMetadataRemoval(
-                HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
-                key,
-                SOURCE_VERSION,
-                SOURCE_DIGEST);
+                HigherGenerationIndexRetirementHandler.REMOVAL_TYPE, key, SOURCE_VERSION, SOURCE_DIGEST);
         GcMetadataRetirementContext context = context(removal);
         AtomicReference<VersionedGenerationCandidate> current = new AtomicReference<>(draining);
         HigherGenerationIndexRetirementHandler handler = new HigherGenerationIndexRetirementHandler(
                 CLUSTER,
-                (stream, view, suppliedKey) -> CompletableFuture.completedFuture(
-                        Optional.ofNullable(current.get())),
+                (stream, view, suppliedKey) -> CompletableFuture.completedFuture(Optional.ofNullable(current.get())),
                 (replacement, expectedVersion) -> {
-                    current.set(hydratedReplacement(
-                            key, replacement, SOURCE_VERSION + 1, sha('f')));
-                    return CompletableFuture.failedFuture(
-                            new RuntimeException("injected lost CAS response"));
+                    current.set(hydratedReplacement(key, replacement, SOURCE_VERSION + 1, sha('f')));
+                    return CompletableFuture.failedFuture(new RuntimeException("injected lost CAS response"));
                 });
 
         GcMetadataRetirementOutcome outcome;
@@ -236,17 +209,13 @@ class GenerationIndexRetirementHandlerTest {
 
     @Test
     void higherGenerationRejectsNonDrainingOrPostIntentDrift() {
-        String key = new F4Keyspace(CLUSTER).generationIndexKey(
-                STREAM, ReadView.COMMITTED, 12, 3);
+        String key = new F4Keyspace(CLUSTER).generationIndexKey(STREAM, ReadView.COMMITTED, 12, 3);
         GcPlannedMetadataRemoval removal = new GcPlannedMetadataRemoval(
-                HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
-                key,
-                SOURCE_VERSION,
-                SOURCE_DIGEST);
-        VersionedGenerationIndex committed = higher(
-                key, SOURCE_VERSION, SOURCE_DIGEST, GenerationLifecycle.COMMITTED, "", 110);
-        VersionedGenerationIndex lateDraining = higher(
-                key, SOURCE_VERSION, SOURCE_DIGEST, GenerationLifecycle.DRAINING, "draining", 202);
+                HigherGenerationIndexRetirementHandler.REMOVAL_TYPE, key, SOURCE_VERSION, SOURCE_DIGEST);
+        VersionedGenerationIndex committed =
+                higher(key, SOURCE_VERSION, SOURCE_DIGEST, GenerationLifecycle.COMMITTED, "", 110);
+        VersionedGenerationIndex lateDraining =
+                higher(key, SOURCE_VERSION, SOURCE_DIGEST, GenerationLifecycle.DRAINING, "draining", 202);
         AtomicReference<VersionedGenerationCandidate> current = new AtomicReference<>(committed);
         AtomicInteger casCalls = new AtomicInteger();
         HigherGenerationIndexRetirementHandler handler = new HigherGenerationIndexRetirementHandler(
@@ -258,14 +227,15 @@ class GenerationIndexRetirementHandlerTest {
                 });
 
         try (MaterializationDeadline deadline = deadline()) {
-            assertThatThrownBy(() -> handler.retire(context(removal), removal, deadline).join())
+            assertThatThrownBy(() ->
+                            handler.retire(context(removal), removal, deadline).join())
                     .hasRootCauseMessage("journaled higher-generation index is not DRAINING");
         }
         current.set(lateDraining);
         try (MaterializationDeadline deadline = deadline()) {
-            assertThatThrownBy(() -> handler.retire(context(removal), removal, deadline).join())
-                    .hasRootCauseMessage(
-                            "higher-generation DRAINING timestamp follows delete intent");
+            assertThatThrownBy(() ->
+                            handler.retire(context(removal), removal, deadline).join())
+                    .hasRootCauseMessage("higher-generation DRAINING timestamp follows delete intent");
         }
         assertThat(casCalls).hasValue(0);
     }
@@ -275,9 +245,7 @@ class GenerationIndexRetirementHandlerTest {
     }
 
     private static VersionedGenerationZeroIndex generationZero(
-            String key,
-            long metadataVersion,
-            Checksum durableDigest) {
+            String key, long metadataVersion, Checksum durableDigest) {
         OffsetIndexEntry value = new OffsetIndexEntry(
                 STREAM,
                 new OffsetRange(0, 12),
@@ -353,17 +321,12 @@ class GenerationIndexRetirementHandlerTest {
     }
 
     private static VersionedGenerationIndex hydratedReplacement(
-            String key,
-            GenerationIndexRecord replacement,
-            long metadataVersion,
-            Checksum durableDigest) {
+            String key, GenerationIndexRecord replacement, long metadataVersion, Checksum durableDigest) {
         GenerationIndexRecord hydrated = replacement.withMetadataVersion(metadataVersion);
         return new VersionedGenerationIndex(key, hydrated, metadataVersion, durableDigest);
     }
 
-    private static ObjectSliceReadTarget target(
-            ObjectType objectType,
-            String physicalFormat) {
+    private static ObjectSliceReadTarget target(ObjectType objectType, String physicalFormat) {
         EntryIndexRef index = new EntryIndexRef(
                 EntryIndexLocation.INLINE,
                 Optional.empty(),
@@ -386,13 +349,10 @@ class GenerationIndexRetirementHandlerTest {
                 index);
     }
 
-    private static GcMetadataRetirementContext context(
-            GcPlannedMetadataRemoval removal) {
+    private static GcMetadataRetirementContext context(GcPlannedMetadataRemoval removal) {
         Checksum query = sha('a');
-        GcDomainSnapshotProof proof = new GcDomainSnapshotProof(
-                "generation-v1", 1, query, sha('c'));
-        Checksum referenceSet = GcPlanValidation.referenceSetSha256(
-                query, List.of(proof), List.of(), List.of(removal));
+        GcDomainSnapshotProof proof = new GcDomainSnapshotProof("generation-v1", 1, query, sha('c'));
+        Checksum referenceSet = GcPlanValidation.referenceSetSha256(query, List.of(proof), List.of(), List.of(removal));
         GcRetirementRemovalRecord removalValue = new GcRetirementRemovalRecord(
                 1,
                 ObjectKeyHash.from(PHYSICAL_OBJECT).value(),
@@ -402,8 +362,8 @@ class GenerationIndexRetirementHandlerTest {
                 removal.metadataVersion(),
                 removal.durableValueSha256().value(),
                 1);
-        VersionedGcRetirementRemoval removalEntry = new VersionedGcRetirementRemoval(
-                "/journal/removal", removalValue, 1, sha('f'));
+        VersionedGcRetirementRemoval removalEntry =
+                new VersionedGcRetirementRemoval("/journal/removal", removalValue, 1, sha('f'));
         GcRetirementManifestRecord manifestValue = new GcRetirementManifestRecord(
                 1,
                 ObjectKeyHash.from(PHYSICAL_OBJECT).value(),
@@ -421,8 +381,7 @@ class GenerationIndexRetirementHandlerTest {
                 100,
                 1);
         GcRetirementJournalSnapshot journal = new GcRetirementJournalSnapshot(
-                new VersionedGcRetirementManifest(
-                        "/journal/manifest", manifestValue, 1, sha('d')),
+                new VersionedGcRetirementManifest("/journal/manifest", manifestValue, 1, sha('d')),
                 List.of(),
                 List.of(removalEntry));
         PhysicalObjectRootRecord rootValue = new PhysicalObjectRootRecord(
@@ -450,8 +409,7 @@ class GenerationIndexRetirementHandlerTest {
                 "",
                 "",
                 2);
-        VersionedPhysicalObjectRoot root = new VersionedPhysicalObjectRoot(
-                "/physical/root", rootValue, 2, sha('d'));
+        VersionedPhysicalObjectRoot root = new VersionedPhysicalObjectRoot("/physical/root", rootValue, 2, sha('d'));
         return new GcMetadataRetirementContext(root, journal);
     }
 

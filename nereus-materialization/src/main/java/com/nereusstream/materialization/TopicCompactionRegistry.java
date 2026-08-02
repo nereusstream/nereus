@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import java.util.HashMap;
@@ -6,14 +7,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Closed process-local registry resolving the exact decoder and strategy frozen into a durable topic policy. */
+/**
+ * Closed process-local registry resolving the exact decoder and strategy frozen into a durable topic policy.
+ */
 public final class TopicCompactionRegistry {
     private final Map<String, TopicCompactionDecoder> decoders;
     private final Map<StrategyKey, TopicCompactionStrategy> strategies;
 
     public TopicCompactionRegistry(
-            List<? extends TopicCompactionDecoder> decoders,
-            List<? extends TopicCompactionStrategy> strategies) {
+            List<? extends TopicCompactionDecoder> decoders, List<? extends TopicCompactionStrategy> strategies) {
         Objects.requireNonNull(decoders, "decoders");
         Objects.requireNonNull(strategies, "strategies");
         Map<String, TopicCompactionDecoder> decoderMap = new HashMap<>();
@@ -27,11 +29,9 @@ public final class TopicCompactionRegistry {
         Map<StrategyKey, TopicCompactionStrategy> strategyMap = new HashMap<>();
         for (TopicCompactionStrategy strategy : strategies) {
             TopicCompactionStrategy exact = Objects.requireNonNull(strategy, "strategies contains null");
-            StrategyKey key = new StrategyKey(
-                    requireText(exact.id(), "strategy id"), exact.version());
+            StrategyKey key = new StrategyKey(requireText(exact.id(), "strategy id"), exact.version());
             if (strategyMap.putIfAbsent(key, exact) != null) {
-                throw new IllegalArgumentException(
-                        "duplicate topic-compaction strategy identity: " + key);
+                throw new IllegalArgumentException("duplicate topic-compaction strategy identity: " + key);
             }
         }
         this.decoders = Map.copyOf(decoderMap);
@@ -45,8 +45,7 @@ public final class TopicCompactionRegistry {
     public Binding resolve(TopicCompactionSpec spec) {
         Objects.requireNonNull(spec, "spec");
         TopicCompactionDecoder decoder = decoders.get(spec.keyCodecId());
-        TopicCompactionStrategy strategy = strategies.get(new StrategyKey(
-                spec.strategyId(), spec.strategyVersion()));
+        TopicCompactionStrategy strategy = strategies.get(new StrategyKey(spec.strategyId(), spec.strategyVersion()));
         if (decoder == null || strategy == null) {
             throw new IllegalArgumentException(
                     "topic-compaction policy references an unregistered decoder or strategy");
@@ -55,15 +54,12 @@ public final class TopicCompactionRegistry {
         if (!decoder.id().equals(spec.keyCodecId())
                 || !strategy.id().equals(spec.strategyId())
                 || strategy.version() != spec.strategyVersion()) {
-            throw new IllegalStateException(
-                    "registered topic-compaction implementation changed its identity");
+            throw new IllegalStateException("registered topic-compaction implementation changed its identity");
         }
         return new Binding(decoder, strategy);
     }
 
-    public record Binding(
-            TopicCompactionDecoder decoder,
-            TopicCompactionStrategy strategy) {
+    public record Binding(TopicCompactionDecoder decoder, TopicCompactionStrategy strategy) {
         public Binding {
             Objects.requireNonNull(decoder, "decoder");
             Objects.requireNonNull(strategy, "strategy");

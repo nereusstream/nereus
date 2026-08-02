@@ -37,20 +37,20 @@ dependencies before BK-M1 is accepted.
 
 Target package：`com.nereusstream.bookkeeper`。
 
-| Type | Responsibility | Must not own |
-| --- | --- | --- |
-| `BookKeeperWalConfiguration` | validated alias、quorums、digest/password reference、rollover/limits/timeouts | mutable policy lookup、secrets in logs/metadata |
-| `BookKeeperLedgerGcConfiguration` | deletion concurrency、clock/drain/audit windows and safe local switches | reference eligibility、activation authority |
-| `BookKeeperLedgerIdNamespace` | validate/probe reserved prefix and generate exact positive-63-bit candidates | self-authorizing namespace reservation |
-| `BookKeeperLedgerIdNamespaceReservationVerifier` | read exact provisioned reservation/version/digest and fail closed on revoke/drift | creating or renewing operator authority |
-| `BookKeeperWalRuntime` | appender/reader/allocator/recovery/retention lifecycle assembly | borrowed client close |
-| `BookKeeperPrimaryWalAppender` | prepare exact entries、persist one contiguous range、post-write validation | head CAS、offset allocation、MessageId |
-| `BookKeeperPrimaryWalReader` | exact non-recovery open/range read/checksum/provider-neutral result | generation choice、projection truth |
-| `BookKeeperLedgerAllocator` | allocation intent/durable slot、reserved exact-id create/reconcile、activate segment | random untracked create、listing correctness |
-| `BookKeeperLedgerRecovery` | fence/recovery-open old active ledger、seal/reconcile | ordinary reads |
-| `BookKeeperLedgerRetentionManager` | scan sealed candidates、whole-ledger proof/delete convergence | logical trim decision、Object output publication |
-| `BookKeeperLedgerHandleCache` | bounded non-authoritative read handles and close | durable ownership/fencing truth |
-| `BookKeeperWalReferenceManager` | range protections and reader leases | duplicate task/cursor truth |
+| Type                                             | Responsibility                                                                     | Must not own                                    |
+|--------------------------------------------------|------------------------------------------------------------------------------------|-------------------------------------------------|
+| `BookKeeperWalConfiguration`                     | validated alias、quorums、digest/password reference、rollover/limits/timeouts         | mutable policy lookup、secrets in logs/metadata  |
+| `BookKeeperLedgerGcConfiguration`                | deletion concurrency、clock/drain/audit windows and safe local switches             | reference eligibility、activation authority      |
+| `BookKeeperLedgerIdNamespace`                    | validate/probe reserved prefix and generate exact positive-63-bit candidates       | self-authorizing namespace reservation          |
+| `BookKeeperLedgerIdNamespaceReservationVerifier` | read exact provisioned reservation/version/digest and fail closed on revoke/drift  | creating or renewing operator authority         |
+| `BookKeeperWalRuntime`                           | appender/reader/allocator/recovery/retention lifecycle assembly                    | borrowed client close                           |
+| `BookKeeperPrimaryWalAppender`                   | prepare exact entries、persist one contiguous range、post-write validation           | head CAS、offset allocation、MessageId            |
+| `BookKeeperPrimaryWalReader`                     | exact non-recovery open/range read/checksum/provider-neutral result                | generation choice、projection truth              |
+| `BookKeeperLedgerAllocator`                      | allocation intent/durable slot、reserved exact-id create/reconcile、activate segment | random untracked create、listing correctness     |
+| `BookKeeperLedgerRecovery`                       | fence/recovery-open old active ledger、seal/reconcile                               | ordinary reads                                  |
+| `BookKeeperLedgerRetentionManager`               | scan sealed candidates、whole-ledger proof/delete convergence                       | logical trim decision、Object output publication |
+| `BookKeeperLedgerHandleCache`                    | bounded non-authoritative read handles and close                                   | durable ownership/fencing truth                 |
+| `BookKeeperWalReferenceManager`                  | range protections and reader leases                                                | duplicate task/cursor truth                     |
 
 No public class named durable `BookKeeperWalLocation` is added. If an internal convenience value exists, it must be
 constructed solely from `BookKeeperEntryRangeReadTarget` and may never be serialized.
@@ -283,15 +283,15 @@ enum/checksum/overflow rejection and decode-reencode equality are mandatory BK-M
 
 V1 does not create a second per-entry Oxia index：
 
-| Fact | Durable location | Bound |
-| --- | --- | --- |
-| logical offset range -> physical range | existing generation-zero offset index containing one `BookKeeperEntryRangeReadTarget` per committed append range | at most `maxAppendRangesPerLedger` source ranges per ledger |
-| entry boundary/order | BookKeeper entry ids inside the target's consecutive `[firstEntryId, entryCount]` range | at most `maxEntriesPerLedger`；checked arithmetic |
-| ledger quorum/closed/LAC/length | BookKeeper `LedgerMetadata` | one provider record per ledger |
-| Nereus ledger owner/lifecycle/config | `BookKeeperLedgerRootRecord` + writer/allocation state | one root per exact id, one writer per stream |
-| source/reference inventory | fixed `(ledgerRangeSlot, protectionSlot)` rows under the ledger shard | at most checked `maxAppendRangesPerLedger * protectionSlotsPerRange`；invalid/out-of-range rows veto GC |
-| reader pins | fixed reader-slot rows under the ledger shard | at most `maxReaderLeasesPerLedger` process occupants；claim before provider IO |
-| Pulsar batch metadata/index | inside the exact opaque serialized Pulsar Entry bytes | batch index does not consume an L0 offset and is never copied into BK lifecycle metadata |
+| Fact                                   | Durable location                                                                                                 | Bound                                                                                                  |
+|----------------------------------------|------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
+| logical offset range -> physical range | existing generation-zero offset index containing one `BookKeeperEntryRangeReadTarget` per committed append range | at most `maxAppendRangesPerLedger` source ranges per ledger                                            |
+| entry boundary/order                   | BookKeeper entry ids inside the target's consecutive `[firstEntryId, entryCount]` range                          | at most `maxEntriesPerLedger`；checked arithmetic                                                       |
+| ledger quorum/closed/LAC/length        | BookKeeper `LedgerMetadata`                                                                                      | one provider record per ledger                                                                         |
+| Nereus ledger owner/lifecycle/config   | `BookKeeperLedgerRootRecord` + writer/allocation state                                                           | one root per exact id, one writer per stream                                                           |
+| source/reference inventory             | fixed `(ledgerRangeSlot, protectionSlot)` rows under the ledger shard                                            | at most checked `maxAppendRangesPerLedger * protectionSlotsPerRange`；invalid/out-of-range rows veto GC |
+| reader pins                            | fixed reader-slot rows under the ledger shard                                                                    | at most `maxReaderLeasesPerLedger` process occupants；claim before provider IO                          |
+| Pulsar batch metadata/index            | inside the exact opaque serialized Pulsar Entry bytes                                                            | batch index does not consume an L0 offset and is never copied into BK lifecycle metadata               |
 
 F2 decodes batch information only when projecting the returned Entry. Physical BK entry id、ledger rollover and
 protection row identity never enter `MessageIdAdv` or become a second compatibility truth.
@@ -429,7 +429,8 @@ silently different namespace/digest/password.
 scope supplied and verified by the Pulsar composition boundary. `clusterAlias` is a durable lookup name, not enough
 to distinguish two physical provider scopes；one alias/config binding must resolve to exactly one scope digest.
 
-`maxUncertainAllocations` is `[1,65536]` and defines that many fixed durable allocation-slot identities across 16 shards.
+`maxUncertainAllocations` is `[1,65536]` and defines that many fixed durable allocation-slot identities across 16
+shards.
 Every provider create must hold one；there is no scan-then-increment counter race.
 
 `protectionSlotsPerRange` is `[4,64]`。Slots `0..2` are reserved for append-owned

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import com.nereusstream.api.Checksum;
@@ -42,7 +43,9 @@ import org.apache.bookkeeper.client.api.LedgerMetadata;
 import org.apache.bookkeeper.client.api.ReadHandle;
 import org.apache.bookkeeper.client.api.WriteAdvHandle;
 
-/** Provider-neutral in-memory BookKeeper client fixture owned by the broker composition tests. */
+/**
+ * Provider-neutral in-memory BookKeeper client fixture owned by the broker composition tests.
+ */
 final class InMemoryBookKeeperPrimaryWalFixture implements AutoCloseable {
     static final String CLUSTER = "cluster/bk-managed-ledger";
     static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
@@ -57,12 +60,12 @@ final class InMemoryBookKeeperPrimaryWalFixture implements AutoCloseable {
                     configuration.maxUncertainAllocations()),
             CLOCK);
     final FakeOperations operations = new FakeOperations();
-    private final BookKeeperWriterStateMachine writerState = new BookKeeperWriterStateMachine(
-            CLUSTER, configuration, metadata, CLOCK, "process-run-1");
+    private final BookKeeperWriterStateMachine writerState =
+            new BookKeeperWriterStateMachine(CLUSTER, configuration, metadata, CLOCK, "process-run-1");
     private final BookKeeperLedgerIdNamespaceReservationVerifier verifier =
             new BookKeeperLedgerIdNamespaceReservationVerifier(
-                    (scope, bits, prefix, timeout) -> CompletableFuture.completedFuture(
-                            Optional.of(reservation(configuration))),
+                    (scope, bits, prefix, timeout) ->
+                            CompletableFuture.completedFuture(Optional.of(reservation(configuration))),
                     DEPLOYMENT);
     private final BookKeeperLedgerAllocator allocator = new BookKeeperLedgerAllocator(
             CLUSTER,
@@ -85,22 +88,13 @@ final class InMemoryBookKeeperPrimaryWalFixture implements AutoCloseable {
             writerState,
             CLOCK);
     final BookKeeperPrimaryWalAppender appender = new BookKeeperPrimaryWalAppender(
-            CLUSTER,
-            configuration,
-            metadata,
-            metadata,
-            allocator,
-            recovery,
-            writerState,
-            operations,
-            CLOCK);
+            CLUSTER, configuration, metadata, metadata, allocator, recovery, writerState, operations, CLOCK);
     final BookKeeperPrimaryPhysicalReferenceAdapter references =
-            new BookKeeperPrimaryPhysicalReferenceAdapter(
-                    CLUSTER, configuration, metadata, metadata, CLOCK);
+            new BookKeeperPrimaryPhysicalReferenceAdapter(CLUSTER, configuration, metadata, metadata, CLOCK);
     private final BookKeeperLedgerHandleCache handles =
             new BookKeeperLedgerHandleCache(8, 8 * 1024, 1024, Duration.ofMinutes(1));
-    private final BookKeeperReaderLeaseManager readerLeases = new BookKeeperReaderLeaseManager(
-            CLUSTER, configuration, metadata, CLOCK, "reader-process-1");
+    private final BookKeeperReaderLeaseManager readerLeases =
+            new BookKeeperReaderLeaseManager(CLUSTER, configuration, metadata, CLOCK, "reader-process-1");
     final BookKeeperPrimaryWalReader reader = new BookKeeperPrimaryWalReader(
             CLUSTER,
             configuration,
@@ -149,8 +143,7 @@ final class InMemoryBookKeeperPrimaryWalFixture implements AutoCloseable {
                 256);
     }
 
-    private static BookKeeperLedgerIdNamespaceReservation reservation(
-            BookKeeperWalConfiguration configuration) {
+    private static BookKeeperLedgerIdNamespaceReservation reservation(BookKeeperWalConfiguration configuration) {
         return new BookKeeperLedgerIdNamespaceReservation(
                 1,
                 configuration.ledgerIdNamespaceReservationId(),
@@ -195,8 +188,8 @@ final class InMemoryBookKeeperPrimaryWalFixture implements AutoCloseable {
                 BookKeeperOperationDeadline deadline) {
             LedgerState state = ledgers.get(ledgerId);
             if (state == null) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND, false, "ledger is absent"));
+                return CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND, false, "ledger is absent"));
             }
             if (recovery) {
                 recoveryOpenCalls++;
@@ -209,10 +202,7 @@ final class InMemoryBookKeeperPrimaryWalFixture implements AutoCloseable {
 
         @Override
         public CompletableFuture<Long> write(
-                WriteAdvHandle handle,
-                long entryId,
-                ByteBuf entry,
-                BookKeeperOperationDeadline deadline) {
+                WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
             byte[] bytes = new byte[entry.readableBytes()];
             entry.getBytes(entry.readerIndex(), bytes);
             ledgers.get(handle.getId()).entries.put(entryId, bytes);
@@ -221,37 +211,30 @@ final class InMemoryBookKeeperPrimaryWalFixture implements AutoCloseable {
 
         @Override
         public CompletableFuture<LedgerEntries> readUnconfirmed(
-                ReadHandle handle,
-                long firstEntryId,
-                long lastEntryIdInclusive,
-                BookKeeperOperationDeadline deadline) {
+                ReadHandle handle, long firstEntryId, long lastEntryIdInclusive, BookKeeperOperationDeadline deadline) {
             LedgerState state = ledgers.get(handle.getId());
             if (state == null) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND, false, "ledger is absent"));
+                return CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND, false, "ledger is absent"));
             }
-            List<LedgerEntry> entries = state.entries
-                    .subMap(firstEntryId, true, lastEntryIdInclusive, true)
-                    .entrySet()
-                    .stream()
-                    .map(entry -> ledgerEntry(handle.getId(), entry.getKey(), entry.getValue()))
-                    .toList();
+            List<LedgerEntry> entries =
+                    state.entries.subMap(firstEntryId, true, lastEntryIdInclusive, true).entrySet().stream()
+                            .map(entry -> ledgerEntry(handle.getId(), entry.getKey(), entry.getValue()))
+                            .toList();
             return CompletableFuture.completedFuture(ledgerEntries(entries));
         }
 
         @Override
-        public CompletableFuture<LedgerMetadata> metadata(
-                long ledgerId, BookKeeperOperationDeadline deadline) {
+        public CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline) {
             LedgerState state = ledgers.get(ledgerId);
             return state == null
-                    ? CompletableFuture.failedFuture(new NereusException(
-                            ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND, false, "ledger is absent"))
+                    ? CompletableFuture.failedFuture(
+                            new NereusException(ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND, false, "ledger is absent"))
                     : CompletableFuture.completedFuture(ledgerMetadata(ledgerId, state));
         }
 
         @Override
-        public CompletableFuture<Void> delete(
-                long ledgerId, BookKeeperOperationDeadline deadline) {
+        public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
             ledgers.remove(ledgerId);
             return CompletableFuture.completedFuture(null);
         }
@@ -308,9 +291,10 @@ final class InMemoryBookKeeperPrimaryWalFixture implements AutoCloseable {
                     case "getDigestType" -> state.configuration.digestType().toClientType();
                     case "getCustomMetadata" -> state.customMetadata;
                     case "getLastEntryId" -> state.entries.isEmpty() ? -1L : state.entries.lastKey();
-                    case "getLength" -> state.entries.values().stream()
-                            .mapToLong(value -> value.length)
-                            .sum();
+                    case "getLength" ->
+                        state.entries.values().stream()
+                                .mapToLong(value -> value.length)
+                                .sum();
                     case "getCtime", "getCToken" -> 0L;
                     case "isClosed" -> state.closed;
                     case "hasPassword" -> false;
@@ -345,9 +329,10 @@ final class InMemoryBookKeeperPrimaryWalFixture implements AutoCloseable {
                     case "getLedgerMetadata" -> ledgerMetadata(ledgerId, state);
                     case "closeAsync" -> CompletableFuture.completedFuture(null);
                     case "getLastAddConfirmed" -> state.entries.isEmpty() ? -1L : state.entries.lastKey();
-                    case "getLength" -> state.entries.values().stream()
-                            .mapToLong(value -> value.length)
-                            .sum();
+                    case "getLength" ->
+                        state.entries.values().stream()
+                                .mapToLong(value -> value.length)
+                                .sum();
                     case "isClosed" -> state.closed;
                     case "toString" -> "fake-read-handle-" + ledgerId;
                     default -> defaultValue(method.getReturnType());
@@ -391,11 +376,10 @@ final class InMemoryBookKeeperPrimaryWalFixture implements AutoCloseable {
         private final TreeMap<Long, byte[]> entries = new TreeMap<>();
         private boolean closed;
 
-        private LedgerState(
-                BookKeeperWalConfiguration configuration, Map<String, byte[]> customMetadata) {
+        private LedgerState(BookKeeperWalConfiguration configuration, Map<String, byte[]> customMetadata) {
             this.configuration = configuration;
-            this.customMetadata = customMetadata.entrySet().stream().collect(
-                    java.util.stream.Collectors.toUnmodifiableMap(
+            this.customMetadata = customMetadata.entrySet().stream()
+                    .collect(java.util.stream.Collectors.toUnmodifiableMap(
                             Map.Entry::getKey, entry -> entry.getValue().clone()));
         }
     }

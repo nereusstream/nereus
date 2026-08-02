@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.api.ObjectKey;
@@ -72,32 +73,39 @@ public final class CursorSnapshotInventory {
         LinkedHashMap<String, RootVersion> versions = new LinkedHashMap<>();
         LinkedHashMap<ObjectKey, LiveReference> references = new LinkedHashMap<>();
         for (VersionedCursorState versioned : orderedRoots) {
-            CursorStateRecord root = Objects.requireNonNull(versioned, "cursorRoots contains null").value();
+            CursorStateRecord root = Objects.requireNonNull(versioned, "cursorRoots contains null")
+                    .value();
             validateRoot(ledger, root);
             Optional<ObjectKey> referenceKey = root.snapshotReference()
                     .map(CursorSnapshotReferenceRecord::objectKey)
                     .map(ObjectKey::new);
-            RootVersion prior = versions.putIfAbsent(root.cursorName(), new RootVersion(
-                    root.cursorGeneration(),
-                    root.lifecycle(),
-                    root.mutationSequence(),
-                    versioned.metadataVersion(),
-                    referenceKey));
+            RootVersion prior = versions.putIfAbsent(
+                    root.cursorName(),
+                    new RootVersion(
+                            root.cursorGeneration(),
+                            root.lifecycle(),
+                            root.mutationSequence(),
+                            versioned.metadataVersion(),
+                            referenceKey));
             if (prior != null) {
                 throw new IllegalArgumentException("snapshot inventory contains duplicate cursor roots");
             }
-            if (root.lifecycle() == CursorRecordLifecycle.ACTIVE && root.snapshotReference().isPresent()) {
-                CursorSnapshotReferenceRecord reference = root.snapshotReference().orElseThrow();
+            if (root.lifecycle() == CursorRecordLifecycle.ACTIVE
+                    && root.snapshotReference().isPresent()) {
+                CursorSnapshotReferenceRecord reference =
+                        root.snapshotReference().orElseThrow();
                 ObjectKey key = new ObjectKey(reference.objectKey());
                 if (!CursorSnapshotKeys.belongsToStream(cluster, ledger, key)) {
                     throw new IllegalArgumentException("live snapshot reference is outside its stream prefix");
                 }
-                LiveReference collision = references.putIfAbsent(key, new LiveReference(
-                        root.cursorName(),
-                        root.cursorGeneration(),
-                        root.mutationSequence(),
-                        versioned.metadataVersion(),
-                        reference));
+                LiveReference collision = references.putIfAbsent(
+                        key,
+                        new LiveReference(
+                                root.cursorName(),
+                                root.cursorGeneration(),
+                                root.mutationSequence(),
+                                versioned.metadataVersion(),
+                                reference));
                 if (collision != null) {
                     throw new IllegalArgumentException("two cursor roots reference the same snapshot object");
                 }
@@ -158,12 +166,9 @@ public final class CursorSnapshotInventory {
         return authority.retentionLifecycle() != CursorRetentionLifecycle.ACTIVE;
     }
 
-    public boolean stillMatches(
-            VersionedCursorRetention retention,
-            Collection<VersionedCursorState> cursorRoots) {
+    public boolean stillMatches(VersionedCursorRetention retention, Collection<VersionedCursorState> cursorRoots) {
         try {
-            CursorSnapshotInventory latest = classify(
-                    cluster, ledger, retention, cursorRoots, discoveredObjects);
+            CursorSnapshotInventory latest = classify(cluster, ledger, retention, cursorRoots, discoveredObjects);
             return authority.equals(latest.authority)
                     && roots.equals(latest.roots)
                     && liveReferences.equals(latest.liveReferences);

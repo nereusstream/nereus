@@ -17,11 +17,10 @@ package com.nereusstream.api;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Options for acquiring or stealing an expired append session. */
-public record AppendSessionOptions(
-        String writerId,
-        Duration ttl,
-        boolean allowStealExpiredSession) {
+/**
+ * Options for acquiring or stealing an expired append session.
+ */
+public record AppendSessionOptions(String writerId, Duration ttl, boolean allowStealExpiredSession) {
     public AppendSessionOptions {
         Objects.requireNonNull(writerId, "writerId");
         Objects.requireNonNull(ttl, "ttl");

@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.ObjectReaderLeaseRecord;
 
-public final class ObjectReaderLeaseRecordCodecV1
-        extends AbstractF4RecordCodecV1<ObjectReaderLeaseRecord> {
+public final class ObjectReaderLeaseRecordCodecV1 extends AbstractF4RecordCodecV1<ObjectReaderLeaseRecord> {
     public ObjectReaderLeaseRecordCodecV1() {
         super(ObjectReaderLeaseRecord.class);
     }

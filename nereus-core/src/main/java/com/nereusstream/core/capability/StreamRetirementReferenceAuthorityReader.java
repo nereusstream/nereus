@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.capability;
 
 import java.util.concurrent.CompletableFuture;
@@ -12,6 +13,5 @@ import java.util.concurrent.CompletableFuture;
  */
 @FunctionalInterface
 public interface StreamRetirementReferenceAuthorityReader {
-    CompletableFuture<StreamRetirementReferenceAuthoritySnapshot> capture(
-            LiveProjectionSubject subject);
+    CompletableFuture<StreamRetirementReferenceAuthoritySnapshot> capture(LiveProjectionSubject subject);
 }

@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
-/** Stable process-level reasons why one exact ledger cannot enter whole-ledger collection. */
+/**
+ * Stable process-level reasons why one exact ledger cannot enter whole-ledger collection.
+ */
 public enum BookKeeperRetentionBlocker {
     ROOT_CHANGED_OR_INELIGIBLE,
     LATE_CREATE_HAZARD,

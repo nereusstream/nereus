@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import com.nereusstream.core.physical.GcGlobalReferenceScope;
@@ -10,10 +11,11 @@ import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import java.util.Objects;
 
-/** One shared ownerless-reference interpretation used by both the activation guard and physical GC. */
+/**
+ * One shared ownerless-reference interpretation used by both the activation guard and physical GC.
+ */
 public record Phase4GcReferenceDomainAssembly(
-        GcGlobalReferenceScope globalScope,
-        ProjectionGenerationReferenceDomain projectionDomain) {
+        GcGlobalReferenceScope globalScope, ProjectionGenerationReferenceDomain projectionDomain) {
     public Phase4GcReferenceDomainAssembly {
         Objects.requireNonNull(globalScope, "globalScope");
         Objects.requireNonNull(projectionDomain, "projectionDomain");

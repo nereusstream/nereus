@@ -17,11 +17,7 @@ package com.nereusstream.metadata.oxia.records;
 import java.util.Objects;
 
 public record StreamNameRecord(
-        String streamName,
-        String streamId,
-        String streamNameHash,
-        long createdAtMillis,
-        long metadataVersion) {
+        String streamName, String streamId, String streamNameHash, long createdAtMillis, long metadataVersion) {
     public StreamNameRecord {
         requireNonBlank(streamName, "streamName");
         requireNonBlank(streamId, "streamId");

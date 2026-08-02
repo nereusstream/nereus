@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.MaterializationOutputRecord;
@@ -12,8 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-public final class MaterializationTaskRecordCodecV1
-        extends AbstractF4RecordCodecV1<MaterializationTaskRecord> {
+public final class MaterializationTaskRecordCodecV1 extends AbstractF4RecordCodecV1<MaterializationTaskRecord> {
     public MaterializationTaskRecordCodecV1() {
         super(MaterializationTaskRecord.class);
     }
@@ -80,12 +80,13 @@ public final class MaterializationTaskRecordCodecV1
             MaterializationPolicyRecord policy = readPolicy(reader);
             TaskLifecycle lifecycle = TaskLifecycle.fromWireId(reader.readUnsignedShort("lifecycle"));
             long attempt = reader.readLong("attempt");
-            Optional<WorkerClaimRecord> claim = reader.readOptional("workerClaimPresent")
-                    ? Optional.of(readClaim(reader)) : Optional.empty();
-            Optional<MaterializationOutputRecord> output = reader.readOptional("outputPresent")
-                    ? Optional.of(readOutput(reader)) : Optional.empty();
+            Optional<WorkerClaimRecord> claim =
+                    reader.readOptional("workerClaimPresent") ? Optional.of(readClaim(reader)) : Optional.empty();
+            Optional<MaterializationOutputRecord> output =
+                    reader.readOptional("outputPresent") ? Optional.of(readOutput(reader)) : Optional.empty();
             OptionalLong generation = reader.readOptional("allocatedGenerationPresent")
-                    ? OptionalLong.of(reader.readLong("allocatedGeneration")) : OptionalLong.empty();
+                    ? OptionalLong.of(reader.readLong("allocatedGeneration"))
+                    : OptionalLong.empty();
             MaterializationTaskRecord value = new MaterializationTaskRecord(
                     VERSION,
                     taskId,

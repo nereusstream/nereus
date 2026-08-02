@@ -19,19 +19,19 @@ they were one boundary. That made async-profile producer success and read-after-
 Nereus uses three distinct domains：
 
 1. **Logical append commit**
-   - primary WAL bytes are durable；
-   - immutable commit intent is written/reused；
-   - stream-head `putIfVersion` links the intent and advances stable offsets；
-   - the head CAS is the append linearization point。
+    - primary WAL bytes are durable；
+    - immutable commit intent is written/reused；
+    - stream-head `putIfVersion` links the intent and advances stable offsets；
+    - the head CAS is the append linearization point。
 2. **Generation-0 read-index materialization**
-   - offset-index and version-matched legacy committed-slice/generic committed-append records are derived from a
-     reachable commit；
-   - they can be repaired idempotently；
-   - strict durability waits for their confirmation。
+    - offset-index and version-matched legacy committed-slice/generic committed-append records are derived from a
+      reachable commit；
+    - they can be repaired idempotently；
+    - strict durability waits for their confirmation。
 3. **Secondary object materialization / higher generation**
-   - a worker copies or transforms a committed primary range；
-   - conditional generation publish changes the physical read target；
-   - it never changes logical offsets or append truth。
+    - a worker copies or transforms a committed primary range；
+    - conditional generation publish changes the physical read target；
+    - it never changes logical offsets or append truth。
 
 `DurabilityLevel.WAL_DURABLE` still requires domain 1 and a recoverable primary read target. It may defer domain
 2 confirmation and domain 3. `WAL_DURABLE_AND_INDEX_COMMITTED` requires domains 1 and 2. No current profile may

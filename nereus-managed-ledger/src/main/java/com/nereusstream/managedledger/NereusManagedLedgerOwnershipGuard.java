@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import java.time.Duration;
@@ -10,26 +11,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 
-/** Broker-ownership admission evidence retained by one writable managed-ledger instance. */
+/**
+ * Broker-ownership admission evidence retained by one writable managed-ledger instance.
+ */
 public final class NereusManagedLedgerOwnershipGuard {
     private final Supplier<CompletableFuture<Boolean>> checker;
     private final Duration timeout;
     private final boolean trustedDirect;
 
     private NereusManagedLedgerOwnershipGuard(
-            Supplier<CompletableFuture<Boolean>> checker,
-            Duration timeout,
-            boolean trustedDirect) {
+            Supplier<CompletableFuture<Boolean>> checker, Duration timeout, boolean trustedDirect) {
         this.checker = checker;
         this.timeout = requirePositive(timeout);
         this.trustedDirect = trustedDirect;
     }
 
     public static NereusManagedLedgerOwnershipGuard checked(
-            Supplier<CompletableFuture<Boolean>> checker,
-            Duration timeout) {
-        return new NereusManagedLedgerOwnershipGuard(
-                Objects.requireNonNull(checker, "checker"), timeout, false);
+            Supplier<CompletableFuture<Boolean>> checker, Duration timeout) {
+        return new NereusManagedLedgerOwnershipGuard(Objects.requireNonNull(checker, "checker"), timeout, false);
     }
 
     public static NereusManagedLedgerOwnershipGuard trustedDirect(Duration timeout) {
@@ -49,8 +48,8 @@ public final class NereusManagedLedgerOwnershipGuard {
             return CompletableFuture.failedFuture(fenced(exactOperation, error));
         }
 
-        CompletableFuture<Boolean> bounded = supplied.thenApply(Boolean.TRUE::equals)
-                .orTimeout(timeout.toNanos(), TimeUnit.NANOSECONDS);
+        CompletableFuture<Boolean> bounded =
+                supplied.thenApply(Boolean.TRUE::equals).orTimeout(timeout.toNanos(), TimeUnit.NANOSECONDS);
         return bounded.handle((owned, error) -> {
             if (error == null && Boolean.TRUE.equals(owned)) {
                 return null;
@@ -66,9 +65,7 @@ public final class NereusManagedLedgerOwnershipGuard {
         return trustedDirect;
     }
 
-    private static ManagedLedgerException.ManagedLedgerFencedException fenced(
-            String operation,
-            Throwable cause) {
+    private static ManagedLedgerException.ManagedLedgerFencedException fenced(String operation, Throwable cause) {
         ManagedLedgerException.ManagedLedgerFencedException fenced =
                 new ManagedLedgerException.ManagedLedgerFencedException(
                         "managed-ledger ownership check failed during " + operation);

@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -13,9 +13,11 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectType;
+import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.objectstore.compacted.CompactedObjectFormatV1;
 import com.nereusstream.objectstore.wal.WalReadResult;
 import java.util.List;
 import java.util.Optional;
@@ -26,31 +28,73 @@ class ReadTargetReaderRegistryTest {
     @Test
     void keepsWalAndCompactedReadersDistinctUnderTheSameTargetType() {
         TestReader wal = new TestReader(key(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1"));
-        TestReader compacted = new TestReader(key(
-                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1"));
+        TestReader compacted = new TestReader(key(ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1"));
         ReadTargetReaderRegistry registry = new ReadTargetReaderRegistry(List.of(wal, compacted));
 
         assertThat(registry.require(target(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1")))
                 .isSameAs(wal);
-        assertThat(registry.require(target(
-                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1")))
+        assertThat(registry.require(target(ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1")))
                 .isSameAs(compacted);
     }
 
     @Test
     void duplicateExactKeyAndUnknownFormatFailClosed() {
         ReadTargetReaderKey key = key(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
-        assertThatThrownBy(() -> new ReadTargetReaderRegistry(
-                List.of(new TestReader(key), new TestReader(key))))
+        assertThatThrownBy(() -> new ReadTargetReaderRegistry(List.of(new TestReader(key), new TestReader(key))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("duplicate");
 
-        ReadTargetReaderRegistry registry = new ReadTargetReaderRegistry(
-                List.of(new TestReader(key)));
-        assertThatThrownBy(() -> registry.require(target(
-                ObjectType.STREAM_COMPACTED_OBJECT, "UNKNOWN_FORMAT")))
-                .isInstanceOfSatisfying(NereusException.class,
-                        error -> assertThat(error.code()).isEqualTo(ErrorCode.UNSUPPORTED_READ_TARGET));
+        ReadTargetReaderRegistry registry = new ReadTargetReaderRegistry(List.of(new TestReader(key)));
+        assertThatThrownBy(() -> registry.require(target(ObjectType.STREAM_COMPACTED_OBJECT, "UNKNOWN_FORMAT")))
+                .isInstanceOfSatisfying(NereusException.class, error -> assertThat(error.code())
+                        .isEqualTo(ErrorCode.UNSUPPORTED_READ_TARGET));
+    }
+
+    @Test
+    void keepsLogicalFormatsDistinctUnderTheSamePhysicalContainer() {
+        ReadTargetReaderKey opaqueKey = key(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
+        ReadTargetReaderKey kafkaKey = new ReadTargetReaderKey(
+                com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE,
+                1,
+                Optional.of(ObjectType.MULTI_STREAM_WAL_OBJECT),
+                Optional.of("WAL_OBJECT_V1"),
+                Optional.of("KAFKA_RECORD_BATCH_V1"));
+        TestReader opaque = new TestReader(opaqueKey);
+        TestReader kafka = new TestReader(kafkaKey);
+        ReadTargetReaderRegistry registry = new ReadTargetReaderRegistry(List.of(opaque, kafka));
+
+        assertThat(registry.require(target(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1")))
+                .isSameAs(opaque);
+        ObjectSliceReadTarget kafkaTarget =
+                withLogicalFormat(target(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1"), "KAFKA_RECORD_BATCH_V1");
+        assertThat(registry.require(kafkaTarget)).isSameAs(kafka);
+        assertThatThrownBy(() -> registry.require(withLogicalFormat(kafkaTarget, "UNKNOWN_LOGICAL")))
+                .isInstanceOfSatisfying(NereusException.class, error -> assertThat(error.code())
+                        .isEqualTo(ErrorCode.UNSUPPORTED_READ_TARGET));
+    }
+
+    @Test
+    void registersOnlyTheTwoExactNcp1PulsarPayloadFormats() {
+        ParquetCompactedTargetReader reader = new ParquetCompactedTargetReader(request ->
+                CompletableFuture.failedFuture(new AssertionError("registry lookup must not read the object")));
+        ReadTargetReaderRegistry registry = new ReadTargetReaderRegistry(List.of(reader));
+        ObjectSliceReadTarget ncp1Target =
+                target(ObjectType.STREAM_COMPACTED_OBJECT, CompactedObjectFormatV1.COMMITTED_PHYSICAL_FORMAT);
+        ObjectSliceReadTarget pulsarEntryTarget =
+                withLogicalFormat(ncp1Target, PayloadFormat.PULSAR_ENTRY_BATCH.name());
+        ObjectSliceReadTarget legacyOpaqueTarget =
+                withLogicalFormat(ncp1Target, PayloadFormat.OPAQUE_RECORD_BATCH.name());
+
+        assertThat(reader.keys())
+                .containsExactlyInAnyOrder(
+                        ParquetCompactedTargetReader.KEY, ParquetCompactedTargetReader.LEGACY_OPAQUE_KEY);
+        assertThat(registry.size()).isEqualTo(2);
+        assertThat(registry.require(pulsarEntryTarget)).isSameAs(reader);
+        assertThat(registry.require(legacyOpaqueTarget)).isSameAs(reader);
+        assertThatThrownBy(
+                        () -> registry.require(withLogicalFormat(ncp1Target, PayloadFormat.KAFKA_RECORD_BATCH.name())))
+                .isInstanceOfSatisfying(NereusException.class, error -> assertThat(error.code())
+                        .isEqualTo(ErrorCode.UNSUPPORTED_READ_TARGET));
     }
 
     static ReadTargetReaderKey key(ObjectType type, String format) {
@@ -58,7 +102,8 @@ class ReadTargetReaderRegistryTest {
                 com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE,
                 1,
                 Optional.of(type),
-                Optional.of(format));
+                Optional.of(format),
+                Optional.of("OPAQUE_SLICE"));
     }
 
     static ObjectSliceReadTarget target(ObjectType type, String format) {
@@ -84,6 +129,21 @@ class ReadTargetReaderRegistryTest {
                 8,
                 new Checksum(ChecksumType.CRC32C, "00000002"),
                 index);
+    }
+
+    private static ObjectSliceReadTarget withLogicalFormat(ObjectSliceReadTarget target, String logicalFormat) {
+        return new ObjectSliceReadTarget(
+                target.version(),
+                target.objectId(),
+                target.objectKey(),
+                target.objectType(),
+                target.physicalFormat(),
+                logicalFormat,
+                target.sliceId(),
+                target.objectOffset(),
+                target.objectLength(),
+                target.sliceChecksum(),
+                target.entryIndexRef());
     }
 
     static final class TestReader implements ReadTargetReader {

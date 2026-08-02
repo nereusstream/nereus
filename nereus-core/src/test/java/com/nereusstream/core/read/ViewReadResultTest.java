@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;

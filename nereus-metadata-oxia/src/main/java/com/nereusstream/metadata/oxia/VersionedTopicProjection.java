@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -6,12 +7,11 @@ import com.nereusstream.api.ChecksumType;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import java.util.Objects;
 
-/** Exact stored topic-projection authority with its Oxia version and envelope digest. */
+/**
+ * Exact stored topic-projection authority with its Oxia version and envelope digest.
+ */
 public record VersionedTopicProjection(
-        String key,
-        TopicProjectionRecord value,
-        long metadataVersion,
-        Checksum durableValueSha256) {
+        String key, TopicProjectionRecord value, long metadataVersion, Checksum durableValueSha256) {
     public VersionedTopicProjection {
         key = requireText(key, "key");
         Objects.requireNonNull(value, "value");

@@ -1,0 +1,430 @@
+# Future 9 — Native Kafka Shared-Storage Integration
+
+> 2026-07-30 final exact-source result（supersedes the dated `open`/`pending` milestone wording below）：clean product
+> `main@efd9142fc5ff991ec78dccda3b6ec7347714ef31` completed
+> `./gradlew phase9FinalCheck --rerun-tasks` against Kafka fork
+> `nereus/future9-native-kafka-storage@76f62f3b83e882105219b6c7687dbde594a8b8a2`、Pulsar
+> `5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4` and AutoMQ
+> `main@1c648d84819d5c3fef2af585f02149c397584870`。The final receipt contains 218 JUnit suites / 798 tests；
+> the exact 146-row aggregator reports zero skipped、failures or errors，and every scenario is
+> `PASSED_CURRENT_SOURCE`。F9-M1–M7 are implemented/final-gated for this exact source tuple。Later product source
+> changes require a new clean final receipt before a newer HEAD may inherit that claim
+
+> 2026-07-30 final-evidence implementation slice：product `main@2ad7b6c` closes the missing executable
+> M3–M7 final-task graph and adds the strict pre-evidence/JUnit/final-report pipeline。It accepts only clean
+> `main` plus exact clean Kafka fork `76f62f3b83`、requires `--rerun-tasks`、parses a fixed set of predecessor JUnit
+> directories with zero skipped/failure/error results、hashes the manifest/matrix/compatibility/performance artifacts，
+> then emits exactly 146 scenario receipts and rejects any ID difference。All manifest rows are now runnable
+> (`IMPLEMENTED_NOT_RUN` or prior `PASSED_CURRENT_SOURCE`)；KF-SCL-010 itself remains
+> `IMPLEMENTED_NOT_RUN` until the clean `phase9FinalCheck --rerun-tasks` succeeds
+
+> 2026-07-30 inherited-source-lock correction：the first full-final attempt was rejected before F9 test execution
+> because `phase9M1FinalCheck` still consumed the historical global Pulsar lock。Product `main@4efa103` adds a
+> F9-only `phase9PulsarSourceLockCheck` for clean
+> `5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4`，leaves F2/F3/F4 historical locks untouched and
+> includes the Pulsar branch/SHA/clean receipt in both pre-evidence and aggregator assertions。Final passage remains open
+
+> 2026-07-30 inherited-compatibility correction：the second final attempt then exposed current Pulsar's removed
+> `ManagedLedgerInternalStats.properties` field；the ensuing full managed-ledger run also caught removed
+> `ManagedCursor.hasBacklog` and a legacy NCP1 exact-key regression introduced by F9 format registration。Product
+> `main@4d8d627` removes only the unavailable stats field assignment，retains managed-ledger properties through
+> `getProperties()`，keeps physical `LedgerInfo.properties` semantically separate，updates the locked cursor surface and
+> admits exactly NCP1 `OPAQUE_RECORD_BATCH` + `PULSAR_ENTRY_BATCH` keys。Core reader tests pass 22/22 tasks and all 223
+> managed-ledger tests pass in 44/44 tasks；final aggregate passage remains open
+
+> 2026-07-30 F9-M7 performance slice：product `main@33c889c` implements canonical
+> `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl009` behind `phase9PerformanceCheck`。All five storage profiles
+> run synchronous-ack Produce、READ_COMMITTED Fetch、actual broker-JVM resource sampling and fresh-process cold recovery
+> across ten release-process lifecycles。Cold recovery preserves only the KRaft `meta.properties` directory identity；
+> no partition cache data or checkpoint is copied。The gate writes
+> `nereus-kafka-adapter/build/f9-kafka-performance-evidence/performance-report.json` only after all five profiles pass，
+> marks it `OBSERVATION_ONLY` and retains the exact environment/workload with every sample。Fresh root rerun passes
+> 75/75 executed tasks in 3m28s；the owner reports one test、zero skipped and zero failures（192.872s suite，187.701s
+> test）。SCL009 is `IMPLEMENTED_NOT_RUN`；SCL010 and the clean final aggregate remain open
+
+> 2026-07-30 F9-M7 compatibility slice：product `main@dc590f7` adds canonical
+> `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl008` behind `phase9CompatibilityCheck`。Four independent client
+> JVMs load exactly one `kafka-clients` JAR each（`3.9.0`、`4.0.1`、`4.1.1`、fork-current `4.3.0-SNAPSHOT`）and prove
+> Admin、Produce/Fetch、group commit and committed/aborted transaction semantics against one real Nereus broker。The
+> machine report is preserved at
+> `nereus-kafka-adapter/build/f9-kafka-client-compatibility-evidence/compatibility-report.json`。The same root run
+> executes 20 focused current-fork ApiVersions/Produce/Fetch/Admin/group/transaction tests。Fresh rerun passes 70/70
+> outer tasks in 1m44s and 90/90 nested fork tasks in 49s，with zero skipped/failures。SCL008 is
+> `IMPLEMENTED_NOT_RUN`；SCL009–010 and the clean final aggregate remain open
+
+> 2026-07-30 F9-M7 provider-chaos slice：product `main@d6c1de0` makes
+> `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl007` the canonical Oxia network/fresh-process owner and expands
+> `phase9ChaosCheck` with Object sync/async plus BookKeeper WAL-only/async/sync trim response-loss tasks。The Oxia cut
+> resets the real transport during activation，recovers，then restarts both controller and broker from durable state；
+> each provider cut loses the caller completion after the trim has applied and requires a fresh process to converge
+> without repeating the physical trim。Fresh root rerun passes 80/80 tasks in 5m26s with four tests、zero skipped and zero
+> failures。SCL007 is `IMPLEMENTED_NOT_RUN`；SCL008–010 and the clean final aggregate remain open
+
+> 2026-07-30 F9-M7 leader-chaos slice：product `main@d9f8ccf` adds canonical
+> `NereusKafkaNativeProcessIntegrationTest.scenarioKfScl006` behind `phase9ChaosCheck`。Three live release brokers run
+> six RF1 transitions `1→2→3→1→2→3→1`；each round requires a higher KRaft leader epoch、higher Oxia binding epoch、
+> preempted Nereus append-session epoch/token、empty reassignment state and a durable head whose external authority is
+> the
+> new broker。A Produce bootstrapped only through the still-live stale broker must extend the new authority by exactly
+> one
+> offset。Fresh root rerun passes 75/75 tasks in 59s。SCL006 is `IMPLEMENTED_NOT_RUN`；provider/network chaos and
+> SCL007–010 remain open
+
+> 2026-07-30 F9-M7 scale slice：product `main@bbe0881` adds the executable
+> `phase9ScaleCheck` and five canonical owners `scenarioKfScl001`–`scenarioKfScl005`。Fresh
+> `phase9ScaleCheck --rerun-tasks` passes 36/36 executed tasks in 29s：16,384 real-Oxia bindings/64 shards/full runtime
+> reconnect，10,000 open partition managers with 64-way maintenance，1,000 bounded Produce/Fetch operations，
+> `Integer.MAX_VALUE` ranged-count metadata，and 128 exact sources/1,048,576 records through the production two-pass
+> NTC2 executor with bounded winner memory、real spill and terminal resource release。The five manifest rows move only
+> to `IMPLEMENTED_NOT_RUN`；SCL006–010 and clean `phase9FinalCheck --rerun-tasks` remain open
+
+> 状态：Implemented / final-gated for the exact source tuple in the final receipt above；F9-M1–M7 and all 146
+> scenario rows are closed for those sources。The dated milestone notes below remain audit history，not current open
+> status；newer product source must rerun the clean final gate before claiming `PASSED_CURRENT_SOURCE`
+> 2026-07-29 增量：two-release-process Object-WAL singleton handoff、three-release-process Object-WAL already-in-flight
+> fencing、真实 ZooKeeper/two-bookie/two-release-process BookKeeper WAL-only/async/sync post-handoff matrix，以及
+> Bookie-acked/metadata-`WRITING` BookKeeper stale append takeover cut 均通过；three-voter/three-combined-node ACTIVE
+> controller kill/re-election/reconciliation and native IO continuation also pass；three dedicated controllers plus one
+> broker now additionally pass all six before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS failover
+> cuts and all four initial snapshot-proof/capability-aggregation cuts；a dedicated-controller/broker Toxiproxy gate
+> further proves actual Oxia transport reset normalization and same-controller-epoch recovery；remaining open items are
+> coordinator migration、checkpoint/virtual-segment cuts and broader chaos
+> 2026-07-29 mandatory NTC2 五 profile 增量：product `4676c12` + unchanged fork `1e3783458b` now pass
+> delete/corrupt/fail-closed/exact-repair/re-election for Object sync/async and BookKeeper WAL-only/async/sync。The
+> code-level contract is frozen in phase-9 documents 04/05/07/08：WAL-only compaction has projection-free L0 authority
+> without an F4 registration；extended KCP1 decision sets preserve historical logical plan IDs and legacy raw bytes while
+> enforcing 60 KiB stored、1 MiB decoded and 4096-source limits
+> 2026-07-30 F9-M6 process aggregate 增量（覆盖上文的 M6 final-aggregate open wording）：fork `76f62f3b83` moves new-leader
+> lookup fencing into `Partition.makeLeader` under the partition state write lock，so ListOffsets cannot observe a
+> transient empty-cache LSO before recovered state is installed；product source lock `14fb643` pins 53 commits/126
+> files。Product test harness commits `3293d76`、`c76a466` and `4a0ec22` make timed readiness probes close with
+`Duration.ZERO`、reserve activation ports until process launch and give long Admin control-plane calls a 30-second
+> internal deadline without weakening data assertions。Focused ongoing-transaction、activation、Object/BK in-flight gates
+> pass，and fresh `phase9M6KafkaProcessCheck --rerun-tasks` passes 94/94 tasks in 34m21s。This closes the M6 real-process
+> aggregate only；M7 scale/chaos/compatibility and `phase9FinalCheck` remain open
+> 代码级合同：`../phase-9-kafka-native-storage/README.md`
+> 参考源码：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`，`3.9.0-SNAPSHOT`
+> 设计基线日期：2026-07-23
+
+## 1. 决策摘要
+
+Future 9（F9）把 **原生 KRaft Kafka broker** 接到 Nereus：Kafka 继续拥有协议、控制器、分区状态、
+producer/transaction coordinator 语义；Nereus 成为每个 Kafka partition 唯一的 durable log 和共享存储。
+
+F9 不复用 Future 5 的 KoP 边界：
+
+| 维度                      | F5 KoP/Kafka projection             | F9 native Kafka                                |
+|-------------------------|-------------------------------------|------------------------------------------------|
+| Kafka server            | KoP/Pulsar broker 内的 Kafka 协议投影     | Kafka broker fork                              |
+| partition log           | ManagedLedger facade 上的投影           | 直接映射到 `StreamStorage`                          |
+| payload mapping         | canonical record-per-offset mapping | exact Kafka `RecordBatch` bytes + ranged entry |
+| group/transaction truth | F5 定义的 Oxia projection              | 原生 Kafka internal compacted topics             |
+| leader truth            | KoP/Pulsar ownership projection     | KRaft partition/leader epoch                   |
+| compatibility target    | KoP client compatibility            | native Kafka broker/client compatibility       |
+
+两者可以消费相同的 Nereus protocol-neutral primitives，但不得共享一份含义不同的 durable binding 或
+把一种 payload mapping 当成另一种读取。
+
+## 2. 目标
+
+F9 的最终目标是：
+
+- Kafka client 的 Produce、Fetch、ListOffsets、DeleteRecords、transaction、group coordinator 与 log
+  compaction 语义由原生 Kafka 代码路径保持；
+- 任意有资格的 broker 都能在 KRaft leader 迁移后打开相同 Nereus stream，不复制本地日志；
+- producer acknowledgement 只依赖 Nereus stable append，不依赖 broker 本地磁盘；
+- partition 的 committed bytes、offset、leader fencing 和恢复有唯一 correctness owner；
+- object materialization、compaction、retention 与物理 GC 复用 Nereus F4/F1-BK 合同；
+- 目标接口、durable record、fork method、状态机、错误和测试在实现前全部冻结到代码级。
+
+## 3. 非目标
+
+首个交付不包含：
+
+- 在同一 Kafka 集群按 topic 混用本地 log 与 Nereus log；
+- Kafka follower replica 数据复制、ISR quorum durability 或 RF 大于 1；
+- 从现有 local-log/AutoMQ 集群在线迁移已有 topic；
+- 将 KRaft metadata、consumer group 或 transaction coordinator truth 搬入新 Oxia record；
+- 复用 AutoMQ S3Stream 格式或拷贝 AutoMQ 源码；
+- 把 stock `RemoteLogManager` 当成 Nereus 的主读写路径；
+- 第一个版本就实现多请求并行 append；正确的单 partition 串行路径先通过全部恢复门禁；
+- Pulsar 与 native Kafka 同时读写同一个 stream；跨协议 payload migration 需要独立 Future。
+
+## 4. 顶层架构
+
+```text
+Kafka client
+  -> KafkaApis / ReplicaManager / Partition / UnifiedLog
+  -> NereusLocalLog + NereusLogRecords
+  -> nereus-kafka-adapter
+       -> StreamStorage append/read/trim/recover
+       -> KafkaPartitionMetadataStore (Oxia)
+       -> checkpoint/object/materialization services
+  -> Nereus primary WAL + stable StreamHeadRecord
+  -> higher generations / object checkpoints
+```
+
+唯一真相分工：
+
+| Truth                                  | Authoritative owner                          | Derived/cache only                |
+|----------------------------------------|----------------------------------------------|-----------------------------------|
+| topic、partition、leader、leader epoch    | KRaft metadata log                           | broker metadata image             |
+| partition-to-stream identity/lifecycle | one Oxia `KafkaPartitionBindingRecord`       | broker cache                      |
+| committed offset/bytes                 | Nereus stream head + reachable commit chain  | Kafka LEO/HW fields               |
+| exact Kafka batch                      | committed Nereus entry payload               | decoded records/indexes           |
+| producer/transaction replay state      | committed Kafka bytes                        | checkpoint object + broker memory |
+| group/transaction coordinator state    | `__consumer_offsets` / `__transaction_state` | coordinator cache                 |
+| compacted read generation              | F4 committed generation record               | planner/task/checkpoint hints     |
+| routing/readiness                      | KRaft + activation/capability records        | local routing cache               |
+
+对象列表、本地 segment 文件、checkpoint root、broker 内存都不能独立证明一次 append 已提交。
+
+## 5. Partition 与 stream 映射
+
+F9 使用 Kafka `topicId`，而不是 topic name，构造不可混淆的 identity：
+
+```text
+KafkaPartitionId = kafkaClusterId + topicId + partitionId
+StreamName        = kafka/{clusterId}/{topicId}/{partitionId}/incarnation-1
+```
+
+一个 Kafka partition 在一个 incarnation 中只对应一个 Nereus stream。topic 删除后 binding 进入
+`DELETING`，stream 被 seal/delete；同名 topic 重建取得新 `topicId` 和新 stream，不允许 alias 旧 bytes。
+
+首个版本要求：
+
+- KRaft mode；
+- controller 强制 topic replica assignment 长度为 1，`min.insync.replicas=1`；
+- Nereus storage mode 是 cluster-wide immutable activation，不允许 broker 或 topic 局部打开；
+- 仅 new/empty Kafka cluster 可启用；已有 log migration 必须另行设计。
+
+RF=1 只描述 Kafka metadata layer。durability 由 stream 创建时冻结的 Nereus `StorageProfile` 决定，
+默认目标是 `BOOKKEEPER_WAL_ASYNC_OBJECT`；Kafka broker 不把本地副本数当作 Nereus durability。
+
+## 6. Kafka batch 到 Nereus range
+
+核心映射：
+
+```text
+one MemoryRecords append
+  -> one AppendBatch(payloadFormat = KAFKA_RECORD_BATCH)
+  -> one AppendEntry per Kafka RecordBatch
+  -> AppendEntry.recordCount = lastOffset - baseOffset + 1
+  -> AppendEntry.payload = exact RecordBatch bytes
+```
+
+Nereus logical offset 与 Kafka absolute offset 完全相同，但一个 entry 可以覆盖多个 offset。entry 的
+`OffsetRange[start,end)` 必须等于 Kafka batch 的 `[baseOffset,lastOffset+1)`。payload 保留 magic、attributes、
+compression、CRC、producer id/epoch、base sequence、timestamps 和 control/transactional bits；Nereus 不解压后
+重编码普通 append。
+
+Kafka stock `LogValidator` 先完成 offset assignment/validation。adapter 使用
+`expectedStartOffset = firstBatch.baseOffset` 调用 Nereus，并断言返回 range 与 MemoryRecords 的完整范围一致。
+不满足时 partition 进入 storage-error/write-fenced 状态，不能修正 offset 后继续写。
+
+## 7. 必须先演进的 protocol-neutral 合同
+
+F9 不允许把 Kafka 类型加入 `nereus-api`。目标演进是：
+
+1. `AppendBatch` 接受 `KAFKA_RECORD_BATCH`，并按 entry `recordCount` 累加总 record count；
+2. 新增 append expected-start precondition；默认调用仍维持当前自动分配行为；
+3. read 增加 `EXACT_START` 与 `CONTAINING_ENTRY` boundary mode；
+4. read 增加 first-entry overflow policy，使不可拆的 Kafka batch 可以单独超过请求 limits；
+5. semantic view read 变成 adapter 可消费的 public API；
+6. Object WAL reader 在 start 落入 range 内时返回包含 start 的完整 entry；
+7. NCP2 支持 ranged entry，NTC2 支持 Kafka-aware sparse compaction；旧格式永不重解释。
+
+推荐的 public surface、精确 invariant 和兼容方法见代码级文档 `02-ranged-entry-api-and-object-format.md`。
+
+## 8. Produce、LEO 与 high watermark
+
+初始实现采用 per-partition serialized append：
+
+```text
+UnifiedLog.append
+  -> stock validation and offset assignment
+  -> NereusLocalLog.append
+  -> bounded Nereus append executor
+  -> StreamStorage.append(... expectedStartOffset ...)
+  -> stable append completion
+  -> return to UnifiedLog
+  -> ProducerStateManager update / response eligibility
+```
+
+在这条保守路径中：
+
+- LEO 只在 stable append 后前进；
+- HW 等于 Nereus stable committed end；
+- LSO 继续由 Kafka producer/transaction state 计算；
+- `acks=1` 与 `acks=-1` 均只在 stable append 后成功；`acks=0` 不返回 response，但后台 append 仍遵守同一提交协议；
+- Kafka network thread 不直接执行存储 IO；请求进入有界 executor，partition append 顺序不变；
+- 后续 pipeline optimization 必须保持 expected-start、stable-HW 与 unknown-outcome fence，不在 F9 首版 gate 内。
+
+这比参考 AutoMQ 中“先推进 LEO、confirm 后推进 HW”的窗口更严格，目的是让 Kafka 内存中的
+ProducerStateManager 不领先于 Nereus truth。
+
+## 9. Unknown completion 与 leader fencing
+
+现有 lease 只能在 TTL 到期后由不同 writer 接管，不能满足 KRaft 新 leader 立即 fencing。F9 要求
+protocol-neutral session 增加可选 authority：
+
+```text
+AppendAuthority(
+  type = KAFKA_PARTITION_LEADER,
+  authorityId = clusterId/topicId/partition,
+  authorityEpoch = leaderEpoch
+)
+```
+
+新 epoch 严格大于 durable epoch 时可 preempt 活跃旧 session；相同 epoch 只有同 writer/token 可续租；
+较小 epoch 一律 `FENCED_APPEND`。无 authority 的 Pulsar/现有 caller 继续使用原 lease 规则。
+
+任何 `MAY_HAVE_COMMITTED`/`KNOWN_COMMITTED` 但调用结果未收敛的 append 都执行：
+
+1. 原子地把 partition 标成 `WRITE_FENCED_RECOVERY_REQUIRED`；
+2. 拒绝后续 append，不把普通 client retry 直接追加为新 attempt；
+3. 用 retained attempt 调用 `recoverAppend`；
+4. 进程丢失 attempt 时，从 durable head/checkpoint 重新打开并 replay committed stream；
+5. 重建 producer/transaction/index state 后才回到 `LEADER_WRITABLE`。
+
+## 10. Fetch 与 compacted view
+
+普通 `delete` policy topic 从 `COMMITTED` view 读取。`compact` policy topic 采用两段式 view：
+
+1. 在 cursor 处尝试 `TOPIC_COMPACTED`；返回 sparse rows，并使用 `sourceCoverageEndOffset` 跨过已压缩掉的 hole；
+2. coverage 结束后切到 `COMMITTED` tail；
+3. 一个 read candidate 不能在中途跨 view；assembler 在 Kafka 层拼接 response；
+4. start 落入原始 batch 中间时，storage 返回完整 containing batch，Kafka fetch 再按协议可见边界处理；
+5. `maxBytes` 的首批 overflow 服从 Kafka “至少允许第一批”语义，Nereus 不拆 compressed batch。
+
+Fetch isolation：
+
+- `READ_UNCOMMITTED` 上界是 HW；
+- `READ_COMMITTED` 上界是 LSO，并使用 stock aborted-transaction filtering；
+- 超出 Nereus stable end 的本地 cache 值不能作为 fetch 上界。
+
+当前 fork 的 request path 以 optional stock-owned executor seam 保留整次 `ReplicaManager.readFromLog` 为 opaque
+wave：initial、stable-event 与 deadline reread 均在 bounded worker 执行，stock 继续拥有 request-wide byte
+budget、partition order、divergence/preferred-replica/error 语义；actual response bytes 决定 `minBytes`。listener、
+timer、logical operation permit 和独立 callback executor 由 runtime drain/close 统一收敛。disabled mode 仍走原
+`DelayedFetch` purgatory。
+
+## 11. Checkpoint、恢复与虚拟 segment
+
+Kafka 本地文件不能在 broker failover 后充当 truth。F9 使用 immutable checkpoint object 保存 derived state：
+
+- producer state snapshot；
+- aborted transaction index；
+- leader-epoch checkpoint；
+- virtual segment descriptors；
+- time index；
+- checkpoint offset、source head/version 和内容摘要。
+
+一个 Oxia partition root 只引用最新 verified checkpoint。发布顺序是：读取 stable head → 生成 immutable
+object → exact HEAD/校验 → 在同 stream/session/head guard 下 CAS root → 延迟回收旧 object。
+
+打开 leader 时：验证 KRaft identity/epoch → 取得 authority session → 加载 `checkpointOffset <= stableEnd` 的
+checkpoint → 从 checkpoint replay `COMMITTED` bytes 到 head → 重建 Kafka state → 最终 publication。对象 list
+和本地 index 只用于修复提示，不能跳过 replay 验证。
+
+virtual segment 保留 Kafka roll、retention 和 index 语义，但数据仍在一个 Nereus stream。segment boundary
+必须在第一条属于该 segment 的 append 前由 guarded metadata transition 建立，不能事后根据本地时间猜测。
+
+## 12. Retention、DeleteRecords 与 compaction
+
+F9 遵循 native Kafka retention：consumer group offset **不保护** topic bytes。group offset 只是 coordinator
+状态；topic `retention.ms/bytes`、segment boundary 与 DeleteRecords 计算新的 log-start-offset，再通过
+`StreamStorage.trim` 推进 logical trim。若 trim 落入 ranged entry，reader 的 containing-entry 合同保证
+物理 batch 仍可读，Kafka 层屏蔽小于 log start 的 records。
+
+stock local `LogCleaner` 在 Nereus mode 禁用，因为 Nereus stream offset 不可原地替换。F9 使用 F4
+`TOPIC_COMPACTED` generation：
+
+- Kafka codec 解出每条 record 的 key、tombstone、absolute offset 与 batch facts；
+- retention engine 以 absolute offset 产生 survivor bitmap；
+- writer 把 survivors 重写为合法 Kafka batches，建议首版每条 survivor 一个 batch 以保持 sparse offset；
+- NTC2/NCP2 保存原 source coverage 与 survivor offsets；
+- internal topics `__consumer_offsets`、`__transaction_state` 走相同路径。
+
+没有通过 internal-topic compaction/transaction 恢复 gate 前，F9 不能宣称 native Kafka compatible。
+
+## 13. 模块与 fork 边界
+
+计划新增独立 module `nereus-kafka-adapter`，不把 Kafka dependency 泄漏到 `nereus-api`/`nereus-core`。
+Nereus 侧核心 owner：
+
+```text
+com.nereusstream.kafka.config
+com.nereusstream.kafka.runtime
+com.nereusstream.kafka.partition
+com.nereusstream.kafka.codec
+com.nereusstream.kafka.metadata
+com.nereusstream.kafka.checkpoint
+com.nereusstream.kafka.recovery
+com.nereusstream.kafka.retention
+com.nereusstream.kafka.compaction
+```
+
+Kafka fork 新类以 `kafka.log.nereus` / `kafka.server.nereus` 为边界，修改 stock files 时使用窄的、成对
+`// Nereus inject start/end` marker。精确 class/method map 见
+`03-kafka-fork-log-and-broker-integration.md`。
+
+## 14. 激活与升级
+
+所有 broker 在拥有 writable partition 前必须发布 exact capability digest。controller/metadata publisher 只在
+`KafkaStorageProtocolActivationRecord` 从 `PREPARED` 进入 `ACTIVE` 后允许 Nereus topic 创建与 leader
+publication。ACTIVE 至少冻结：
+
+- ranged-entry API version；
+- Object WAL entry-index version；
+- NCP2/NTC2 reader/writer versions；
+- Kafka payload mapping version；
+- binding/session/checkpoint record versions；
+- required broker set and capability digest。
+
+不允许旧 broker 继续拥有 Nereus partition，也不允许 ACTIVE 后降级为 local storage。关闭顺序必须先停止
+请求 admission，再 drain/fence partition，最后关闭 Nereus runtime 及 owned clients。
+
+## 15. 交付顺序
+
+| Milestone | Scope                                   | Exit condition                                                                 |
+|-----------|-----------------------------------------|--------------------------------------------------------------------------------|
+| F9-M0     | source lock + code-level design         | all target docs、hashes、method map、scenario traceability reviewed               |
+| F9-M1     | ranged-entry API + NCP2/NTC2 foundation | legacy exact-start and Pulsar gates unchanged；range property/golden tests pass |
+| F9-M2     | binding、authority session、checkpoint    | real Oxia/Object-store response-loss and leader-preemption gates pass          |
+| F9-M3     | native log Produce/Fetch                | exact bytes/offsets/acks/HW across restart and broker takeover pass            |
+| F9-M4     | producer/transaction/internal topics    | idempotence、transaction、LSO、coordinator recovery pass                          |
+| F9-M5     | retention/DeleteRecords/compaction      | native policies and compacted internal/user topics pass                        |
+| F9-M6     | activation/controller/runtime rollout   | RF=1 enforcement、mixed-version exclusion、shutdown/rejoin pass                  |
+| F9-M7     | scale/chaos/compatibility aggregate     | full scenario matrix and upstream Kafka compatibility suites pass              |
+
+文档完成不代表任何 milestone 已实现。
+
+## 16. 关键不变量
+
+1. `Kafka offset == Nereus logical offset`。
+2. 一个 Kafka batch 的 bytes、CRC 与 offset span 不被普通 append 改写。
+3. stable head 是 Produce success 与 HW 前进的必要条件。
+4. leader epoch 只增不减；新 leader 能立即 fence 旧 leader。
+5. topic name reuse 永不复用 stream identity。
+6. checkpoint 只能加速 recovery，不能制造 committed data。
+7. group offset 不阻塞 Kafka retention。
+8. compaction 产生新 generation，不改变 source offsets。
+9. default read/append API behavior 对非 Kafka caller 保持兼容。
+10. unknown completion 收敛前没有后继 append。
+11. local disk、object LIST 和 routing cache 永不成为 correctness truth。
+12. `Designed` capability 在 implementation/final gate 前不得对外宣称可用。
+
+## 17. 权威文档
+
+- 总入口：`../phase-9-kafka-native-storage/README.md`
+- 当前合同与 AutoMQ 审计：`../phase-9-kafka-native-storage/01-current-contract-and-automq-source-audit.md`
+- ranged entry/API/格式：`../phase-9-kafka-native-storage/02-ranged-entry-api-and-object-format.md`
+- Kafka fork 接入：`../phase-9-kafka-native-storage/03-kafka-fork-log-and-broker-integration.md`
+- Oxia/lifecycle/checkpoint：`../phase-9-kafka-native-storage/04-oxia-binding-session-checkpoint-and-lifecycle.md`
+- producer/transaction/compaction/retention：
+  `../phase-9-kafka-native-storage/05-producer-state-transactions-compaction-and-retention.md`
+- 配置/rollout/运维：`../phase-9-kafka-native-storage/06-runtime-configuration-rollout-and-observability.md`
+- 实施计划与 gates：`../phase-9-kafka-native-storage/07-implementation-plan-and-gates.md`
+- 场景证据矩阵：`../phase-9-kafka-native-storage/08-scenario-evidence-matrix.md`
+- F9-M0 设计评审：`../phase-9-kafka-native-storage/09-f9-m0-design-review-2026-07-23.md`

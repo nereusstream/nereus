@@ -23,14 +23,10 @@ import java.util.Objects;
  * <p>For an existing stream these values do not mutate its stored profile or attributes; profile migration is a
  * separate protocol.
  */
-public record StreamCreateOptions(
-        StorageProfile profile,
-        Map<String, String> attributes) {
+public record StreamCreateOptions(StorageProfile profile, Map<String, String> attributes) {
     public StreamCreateOptions {
         Objects.requireNonNull(profile, "profile");
         attributes = MetadataCanonicalizer.canonicalStringMap(
-                attributes,
-                ApiLimits.MAX_STREAM_ATTRIBUTES_ENCODED_BYTES,
-                "attributes");
+                attributes, ApiLimits.MAX_STREAM_ATTRIBUTES_ENCODED_BYTES, "attributes");
     }
 }

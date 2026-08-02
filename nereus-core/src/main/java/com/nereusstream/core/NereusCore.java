@@ -14,8 +14,9 @@
 
 package com.nereusstream.core;
 
-/** Marker class for the Nereus core module. */
+/**
+ * Marker class for the Nereus core module.
+ */
 public final class NereusCore {
-    private NereusCore() {
-    }
+    private NereusCore() {}
 }

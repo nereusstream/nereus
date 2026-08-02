@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -8,7 +9,9 @@ import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.objectstore.staging.StagedObjectFile;
 import java.util.Objects;
 
-/** Close-owned sealed NRC1 bytes and their exact immutable publication identity. */
+/**
+ * Close-owned sealed NRC1 bytes and their exact immutable publication identity.
+ */
 public record RecoveryCheckpointWriteResult(
         StagedObjectFile stagingFile,
         ObjectId objectId,
@@ -18,7 +21,8 @@ public record RecoveryCheckpointWriteResult(
         Checksum storageCrc32c,
         Checksum bodySha256,
         Checksum contentSha256,
-        RecoveryCheckpointDirectory directory) implements AutoCloseable {
+        RecoveryCheckpointDirectory directory)
+        implements AutoCloseable {
     public RecoveryCheckpointWriteResult {
         Objects.requireNonNull(stagingFile, "stagingFile");
         Objects.requireNonNull(objectId, "objectId");
@@ -34,8 +38,7 @@ public record RecoveryCheckpointWriteResult(
         storageCrc32c = RecoveryCheckpointValidation.requireCrc32c(storageCrc32c, "storageCrc32c");
         bodySha256 = RecoveryCheckpointValidation.requireSha256(bodySha256, "bodySha256");
         contentSha256 = RecoveryCheckpointValidation.requireSha256(contentSha256, "contentSha256");
-        if (!storageCrc32c.equals(stagingFile.storageCrc32c())
-                || !contentSha256.equals(stagingFile.contentSha256())) {
+        if (!storageCrc32c.equals(stagingFile.storageCrc32c()) || !contentSha256.equals(stagingFile.contentSha256())) {
             throw new IllegalArgumentException("recovery checkpoint checksums do not match staging bytes");
         }
         Objects.requireNonNull(directory, "directory");

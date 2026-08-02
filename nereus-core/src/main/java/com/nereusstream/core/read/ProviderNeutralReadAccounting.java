@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.Checksum;
@@ -13,14 +14,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Exact one-stat-per-resolved-target accounting validation shared by every physical reader. */
+/**
+ * Exact one-stat-per-resolved-target accounting validation shared by every physical reader.
+ */
 public final class ProviderNeutralReadAccounting {
-    private ProviderNeutralReadAccounting() { }
+    private ProviderNeutralReadAccounting() {}
 
     public static void validate(List<ResolvedRange> ranges, PhysicalReadResult result) {
         Map<Checksum, Integer> expectedRanges = new HashMap<>();
-        ranges.forEach(range -> expectedRanges.merge(
-                ReadTargetIdentities.sha256(range.readTarget()), 1, Math::addExact));
+        ranges.forEach(
+                range -> expectedRanges.merge(ReadTargetIdentities.sha256(range.readTarget()), 1, Math::addExact));
         Map<Checksum, Integer> observedRanges = new HashMap<>();
         long statsReturned = 0;
         long batchBytes = 0;
@@ -40,7 +43,8 @@ public final class ProviderNeutralReadAccounting {
             }
             for (ReadBatch batch : result.batches()) {
                 Checksum sourceIdentity = batch.source().targetIdentity();
-                if (!sourceIdentity.equals(ReadTargetIdentities.sha256(batch.source().target()))) {
+                if (!sourceIdentity.equals(
+                        ReadTargetIdentities.sha256(batch.source().target()))) {
                     throw invariant("WAL reader returned a batch with a non-canonical source identity");
                 }
                 if (!observedRanges.containsKey(sourceIdentity)) {
@@ -50,10 +54,7 @@ public final class ProviderNeutralReadAccounting {
             }
         } catch (ArithmeticException e) {
             throw new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION,
-                    false,
-                    "WAL reader accounting overflows",
-                    e);
+                    ErrorCode.METADATA_INVARIANT_VIOLATION, false, "WAL reader accounting overflows", e);
         }
         if (statsReturned != batchBytes) {
             throw invariant("WAL reader returned-byte accounting does not match batches");

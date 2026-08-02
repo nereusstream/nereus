@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
-/** Exact outcome counts from one complete pass over every registered product object prefix. */
+/**
+ * Exact outcome counts from one complete pass over every registered product object prefix.
+ */
 public record ObjectInventoryScanResult(
         long familiesScanned,
         long pagesScanned,
@@ -32,16 +35,12 @@ public record ObjectInventoryScanResult(
         }
         long classified = Math.addExact(
                 Math.addExact(
-                        Math.addExact(alreadyRooted, wouldRegister),
-                        Math.addExact(rootsRegistered, rootsConverged)),
+                        Math.addExact(alreadyRooted, wouldRegister), Math.addExact(rootsRegistered, rootsConverged)),
                 Math.addExact(
                         Math.addExact(ageBlocked, malformedKeys),
-                        Math.addExact(
-                                staleListings,
-                                Math.addExact(headMismatches, rootConflicts))));
+                        Math.addExact(staleListings, Math.addExact(headMismatches, rootConflicts))));
         if (classified != objectsListed) {
-            throw new IllegalArgumentException(
-                    "every listed object must have exactly one inventory outcome");
+            throw new IllegalArgumentException("every listed object must have exactly one inventory outcome");
         }
     }
 }

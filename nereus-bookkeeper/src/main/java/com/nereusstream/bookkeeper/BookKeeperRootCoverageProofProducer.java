@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -24,8 +25,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Produces NBKROOT1 only after a strict empty-continuation traversal of all 256 root shards. */
-public final class BookKeeperRootCoverageProofProducer {
+/**
+ * Produces NBKROOT1 only after a strict empty-continuation traversal of all 256 root shards.
+ */
+public final class BookKeeperRootCoverageProofProducer implements BookKeeperRootCoverageProofProvider {
     private static final String DOMAIN = "NBKROOT1";
 
     private final String cluster;
@@ -42,8 +45,8 @@ public final class BookKeeperRootCoverageProofProducer {
             BookKeeperLedgerMetadataStore metadata) {
         this.cluster = text(cluster, "cluster");
         this.configuration = Objects.requireNonNull(configuration, "configuration");
-        this.ledgerIdNamespaceSha256 = BookKeeperWalConfiguration.sha256(
-                ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256");
+        this.ledgerIdNamespaceSha256 =
+                BookKeeperWalConfiguration.sha256(ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256");
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         BookKeeperMetadataStoreConfig store = new BookKeeperMetadataStoreConfig(
                 configuration.maxAppendRangesPerLedger(),
@@ -54,6 +57,7 @@ public final class BookKeeperRootCoverageProofProducer {
         this.pageSize = Math.min(configuration.retentionPageSize(), 1_024);
     }
 
+    @Override
     public CompletableFuture<BookKeeperRootCoverageProof> produce(
             BookKeeperBrokerReadiness readiness, Duration timeout) {
         final BookKeeperBrokerReadiness exactReadiness;
@@ -66,8 +70,7 @@ public final class BookKeeperRootCoverageProofProducer {
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return scanShard(0, Optional.empty(), accumulator, deadline)
-                .thenApply(ignored -> accumulator.finish());
+        return scanShard(0, Optional.empty(), accumulator, deadline).thenApply(ignored -> accumulator.finish());
     }
 
     private CompletableFuture<Void> scanShard(
@@ -82,18 +85,10 @@ public final class BookKeeperRootCoverageProofProducer {
                 .thenCompose(page -> processRoots(page.values(), 0, shard, accumulator, deadline)
                         .thenCompose(ignored -> {
                             if (page.continuation().isPresent()) {
-                                return scanShard(
-                                        shard,
-                                        page.continuation(),
-                                        accumulator,
-                                        deadline);
+                                return scanShard(shard, page.continuation(), accumulator, deadline);
                             }
                             accumulator.completeShard(shard);
-                            return scanShard(
-                                    shard + 1,
-                                    Optional.empty(),
-                                    accumulator,
-                                    deadline);
+                            return scanShard(shard + 1, Optional.empty(), accumulator, deadline);
                         }));
     }
 
@@ -116,10 +111,8 @@ public final class BookKeeperRootCoverageProofProducer {
         accumulator.matchingRoots = Math.addExact(accumulator.matchingRoots, 1);
         accumulator.value("root", root);
         return scanProtections(root, Optional.empty(), null, 0, accumulator, deadline)
-                .thenCompose(ignored -> scanReaders(
-                        root, Optional.empty(), null, 0, accumulator, deadline))
-                .thenCompose(ignored -> processRoots(
-                        roots, index + 1, shard, accumulator, deadline));
+                .thenCompose(ignored -> scanReaders(root, Optional.empty(), null, 0, accumulator, deadline))
+                .thenCompose(ignored -> processRoots(roots, index + 1, shard, accumulator, deadline));
     }
 
     private CompletableFuture<Void> scanProtections(
@@ -131,11 +124,7 @@ public final class BookKeeperRootCoverageProofProducer {
             BookKeeperOperationDeadline deadline) {
         BookKeeperLedgerRootRecord value = root.value();
         return deadline.bound(metadata.scanProtections(
-                        cluster,
-                        configuration.providerScopeSha256(),
-                        value.ledgerId(),
-                        continuation,
-                        pageSize))
+                        cluster, configuration.providerScopeSha256(), value.ledgerId(), continuation, pageSize))
                 .thenCompose(page -> {
                     String last = previousKey;
                     int nextCount = count;
@@ -143,27 +132,19 @@ public final class BookKeeperRootCoverageProofProducer {
                         requireOrdered(last, protection.key(), "protection");
                         requireProtection(root, protection);
                         accumulator.value("protection", protection);
-                        accumulator.protectionsScanned = Math.addExact(
-                                accumulator.protectionsScanned, 1);
+                        accumulator.protectionsScanned = Math.addExact(accumulator.protectionsScanned, 1);
                         nextCount = Math.addExact(nextCount, 1);
                         last = protection.key();
                     }
                     int maximum = Math.multiplyExact(
-                            configuration.maxAppendRangesPerLedger(),
-                            configuration.protectionSlotsPerRange());
+                            configuration.maxAppendRangesPerLedger(), configuration.protectionSlotsPerRange());
                     if (nextCount > maximum) {
                         throw invariant("BookKeeper protection scan exceeded the configured Cartesian bound");
                     }
                     if (page.continuation().isEmpty()) {
                         return CompletableFuture.completedFuture(null);
                     }
-                    return scanProtections(
-                            root,
-                            page.continuation(),
-                            last,
-                            nextCount,
-                            accumulator,
-                            deadline);
+                    return scanProtections(root, page.continuation(), last, nextCount, accumulator, deadline);
                 });
     }
 
@@ -176,11 +157,7 @@ public final class BookKeeperRootCoverageProofProducer {
             BookKeeperOperationDeadline deadline) {
         BookKeeperLedgerRootRecord value = root.value();
         return deadline.bound(metadata.scanReaderLeases(
-                        cluster,
-                        configuration.providerScopeSha256(),
-                        value.ledgerId(),
-                        continuation,
-                        pageSize))
+                        cluster, configuration.providerScopeSha256(), value.ledgerId(), continuation, pageSize))
                 .thenCompose(page -> {
                     String last = previousKey;
                     int nextCount = count;
@@ -188,8 +165,7 @@ public final class BookKeeperRootCoverageProofProducer {
                         requireOrdered(last, reader.key(), "reader lease");
                         requireReader(root, reader);
                         accumulator.value("reader", reader);
-                        accumulator.readerLeasesScanned = Math.addExact(
-                                accumulator.readerLeasesScanned, 1);
+                        accumulator.readerLeasesScanned = Math.addExact(accumulator.readerLeasesScanned, 1);
                         nextCount = Math.addExact(nextCount, 1);
                         last = reader.key();
                     }
@@ -199,13 +175,7 @@ public final class BookKeeperRootCoverageProofProducer {
                     if (page.continuation().isEmpty()) {
                         return CompletableFuture.completedFuture(null);
                     }
-                    return scanReaders(
-                            root,
-                            page.continuation(),
-                            last,
-                            nextCount,
-                            accumulator,
-                            deadline);
+                    return scanReaders(root, page.continuation(), last, nextCount, accumulator, deadline);
                 });
     }
 
@@ -217,12 +187,10 @@ public final class BookKeeperRootCoverageProofProducer {
                 && root.ledgerIdNamespaceSha256().equals(ledgerIdNamespaceSha256);
     }
 
-    private void requireRoot(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> versioned,
-            int shard) {
+    private void requireRoot(BookKeeperVersionedValue<BookKeeperLedgerRootRecord> versioned, int shard) {
         BookKeeperLedgerRootRecord root = versioned.value();
-        BookKeeperKeyspace.RootKeyIdentity identity = keys.parseRootKey(
-                versioned.key(), root.providerScopeSha256(), root.ledgerId());
+        BookKeeperKeyspace.RootKeyIdentity identity =
+                keys.parseRootKey(versioned.key(), root.providerScopeSha256(), root.ledgerId());
         if (identity.shard() != shard
                 || !identity.ledgerIdentitySha256().equals(root.ledgerIdentitySha256())
                 || !configuration.ledgerIdNamespace().contains(root.ledgerId())
@@ -241,8 +209,8 @@ public final class BookKeeperRootCoverageProofProducer {
             BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> versioned) {
         BookKeeperLedgerRootRecord owner = root.value();
         BookKeeperLedgerProtectionRecord value = versioned.value();
-        BookKeeperKeyspace.ProtectionKeyIdentity key = keys.parseProtectionKey(
-                versioned.key(), configuration.providerScopeSha256(), owner.ledgerId());
+        BookKeeperKeyspace.ProtectionKeyIdentity key =
+                keys.parseProtectionKey(versioned.key(), configuration.providerScopeSha256(), owner.ledgerId());
         if (value.metadataVersion() != versioned.metadataVersion()
                 || value.ledgerId() != owner.ledgerId()
                 || !value.ledgerIdentitySha256().equals(owner.ledgerIdentitySha256())
@@ -259,8 +227,8 @@ public final class BookKeeperRootCoverageProofProducer {
             BookKeeperVersionedValue<BookKeeperLedgerReaderLeaseRecord> versioned) {
         BookKeeperLedgerRootRecord owner = root.value();
         BookKeeperLedgerReaderLeaseRecord value = versioned.value();
-        BookKeeperKeyspace.ReaderKeyIdentity key = keys.parseReaderLeaseKey(
-                versioned.key(), configuration.providerScopeSha256(), owner.ledgerId());
+        BookKeeperKeyspace.ReaderKeyIdentity key =
+                keys.parseReaderLeaseKey(versioned.key(), configuration.providerScopeSha256(), owner.ledgerId());
         if (value.metadataVersion() != versioned.metadataVersion()
                 || value.ledgerId() != owner.ledgerId()
                 || !value.ledgerIdentitySha256().equals(owner.ledgerIdentitySha256())
@@ -332,9 +300,7 @@ public final class BookKeeperRootCoverageProofProducer {
                     matchingRoots,
                     protectionsScanned,
                     readerLeasesScanned,
-                    new Checksum(
-                            ChecksumType.SHA256,
-                            HexFormat.of().formatHex(digest.digest())));
+                    new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest())));
         }
     }
 
@@ -357,8 +323,7 @@ public final class BookKeeperRootCoverageProofProducer {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static String text(String value, String name) {

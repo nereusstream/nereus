@@ -17,12 +17,7 @@ package com.nereusstream.metadata.oxia.records;
 import java.util.Objects;
 
 public record VisibleSliceReferenceRecord(
-        String streamId,
-        String sliceId,
-        long offsetStart,
-        long offsetEnd,
-        long generation,
-        long commitVersion) {
+        String streamId, String sliceId, long offsetStart, long offsetEnd, long generation, long commitVersion) {
     public VisibleSliceReferenceRecord {
         requireNonBlank(streamId, "streamId");
         requireNonBlank(sliceId, "sliceId");

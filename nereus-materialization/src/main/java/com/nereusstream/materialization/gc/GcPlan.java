@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -9,7 +10,9 @@ import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import java.util.List;
 import java.util.Objects;
 
-/** Canonical process-local plan reconstructed from authoritative facts after a root mark. */
+/**
+ * Canonical process-local plan reconstructed from authoritative facts after a root mark.
+ */
 public record GcPlan(
         String gcAttemptId,
         GcCandidate candidate,
@@ -38,17 +41,12 @@ public record GcPlan(
                 GcPlanValidation.METADATA_ORDER,
                 PhysicalGcConfig.MAX_DOMAIN_VALUES,
                 "plannedMetadataRemovals");
-        referenceSetSha256 = GcReferenceQuery.requireSha256(
-                referenceSetSha256, "referenceSetSha256");
+        referenceSetSha256 = GcReferenceQuery.requireSha256(referenceSetSha256, "referenceSetSha256");
         validateSnapshots(candidate, domainSnapshots);
         validateProtectionObjects(candidate, plannedProtectionRemovals);
-        GcPlanValidation.requireEveryReferenceHasExactRemoval(
-                domainSnapshots, plannedMetadataRemovals);
+        GcPlanValidation.requireEveryReferenceHasExactRemoval(domainSnapshots, plannedMetadataRemovals);
         Checksum expected = GcPlanValidation.referenceSetSha256(
-                candidate.referenceQuery(),
-                domainSnapshots,
-                plannedProtectionRemovals,
-                plannedMetadataRemovals);
+                candidate.referenceQuery(), domainSnapshots, plannedProtectionRemovals, plannedMetadataRemovals);
         if (!expected.equals(referenceSetSha256)) {
             throw new IllegalArgumentException("referenceSetSha256 does not match canonical plan facts");
         }
@@ -96,8 +94,7 @@ public record GcPlan(
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(candidate, "candidate");
         Objects.requireNonNull(markedRoot, "markedRoot");
-        List<GcReferenceSnapshot> snapshots = validateForConfig(
-                config, candidate.referenceQuery(), domainSnapshots);
+        List<GcReferenceSnapshot> snapshots = validateForConfig(config, candidate.referenceQuery(), domainSnapshots);
         List<GcPlannedProtectionRemoval> protections = GcPlanValidation.canonicalAllowEmpty(
                 plannedProtectionRemovals,
                 GcPlanValidation.PROTECTION_ORDER,
@@ -110,8 +107,8 @@ public record GcPlan(
                 "plannedMetadataRemovals");
         validateProtectionObjects(candidate, protections);
         GcPlanValidation.requireEveryReferenceHasExactRemoval(snapshots, removals);
-        Checksum digest = GcPlanValidation.referenceSetSha256(
-                candidate.referenceQuery(), snapshots, protections, removals);
+        Checksum digest =
+                GcPlanValidation.referenceSetSha256(candidate.referenceQuery(), snapshots, protections, removals);
         if (markedRoot.value().lifecycle() != PhysicalObjectLifecycle.MARKED
                 || !PhysicalObjectIdentityMatches.exact(candidate, markedRoot)
                 || !markedRoot.value().gcAttemptId().equals(gcAttemptId)
@@ -131,14 +128,9 @@ public record GcPlan(
     }
 
     private static List<GcReferenceSnapshot> validateForConfig(
-            PhysicalGcConfig config,
-            GcReferenceQuery query,
-            List<GcReferenceSnapshot> snapshots) {
+            PhysicalGcConfig config, GcReferenceQuery query, List<GcReferenceSnapshot> snapshots) {
         List<GcReferenceSnapshot> exact = GcPlanValidation.canonical(
-                snapshots,
-                GcPlanValidation.DOMAIN_ORDER,
-                GcPlanValidation.MAX_REFERENCE_DOMAINS,
-                "domainSnapshots");
+                snapshots, GcPlanValidation.DOMAIN_ORDER, GcPlanValidation.MAX_REFERENCE_DOMAINS, "domainSnapshots");
         for (GcReferenceSnapshot snapshot : exact) {
             if (snapshot.authorityCount() > config.maxAuthoritiesPerDomainSnapshot()
                     || snapshot.referenceCount() > config.maxReferencesPerDomainSnapshot()) {
@@ -149,13 +141,11 @@ public record GcPlan(
         return exact;
     }
 
-    private static void validateSnapshots(
-            GcCandidate candidate, List<GcReferenceSnapshot> snapshots) {
+    private static void validateSnapshots(GcCandidate candidate, List<GcReferenceSnapshot> snapshots) {
         validateSnapshots(candidate.referenceQuery(), snapshots);
     }
 
-    private static void validateSnapshots(
-            GcReferenceQuery query, List<GcReferenceSnapshot> snapshots) {
+    private static void validateSnapshots(GcReferenceQuery query, List<GcReferenceSnapshot> snapshots) {
         for (GcReferenceSnapshot snapshot : snapshots) {
             if (!snapshot.queryIdentitySha256().equals(query.queryIdentitySha256())
                     || !snapshot.complete()
@@ -166,16 +156,13 @@ public record GcPlan(
         }
     }
 
-    private static void validateProtectionObjects(
-            GcCandidate candidate, List<GcPlannedProtectionRemoval> protections) {
+    private static void validateProtectionObjects(GcCandidate candidate, List<GcPlannedProtectionRemoval> protections) {
         java.util.HashSet<com.nereusstream.metadata.oxia.ObjectProtectionIdentity> identities =
                 new java.util.HashSet<>();
         for (GcPlannedProtectionRemoval protection : protections) {
             if (!protection.identity().object().equals(candidate.object().objectKeyHash())
-                    || protection.protection().value().rootLifecycleEpoch()
-                            != candidate.activeRootLifecycleEpoch()) {
-                throw new IllegalArgumentException(
-                        "planned protection does not belong to the candidate ACTIVE root");
+                    || protection.protection().value().rootLifecycleEpoch() != candidate.activeRootLifecycleEpoch()) {
+                throw new IllegalArgumentException("planned protection does not belong to the candidate ACTIVE root");
             }
             if (!identities.add(protection.identity())) {
                 throw new IllegalArgumentException("planned protection identities must be unique");
@@ -184,24 +171,22 @@ public record GcPlan(
     }
 
     private static boolean matchesMarkedRoot(
-            GcCandidate candidate,
-            long markedRootMetadataVersion,
-            long markedRootLifecycleEpoch) {
+            GcCandidate candidate, long markedRootMetadataVersion, long markedRootLifecycleEpoch) {
         return switch (candidate.rootState()) {
-            case ACTIVE_DISCOVERY -> markedRootMetadataVersion > candidate.rootMetadataVersion()
-                    && markedRootLifecycleEpoch == Math.addExact(candidate.rootLifecycleEpoch(), 1);
-            case MARKED_RECOVERY -> markedRootMetadataVersion == candidate.rootMetadataVersion()
-                    && markedRootLifecycleEpoch == candidate.rootLifecycleEpoch();
+            case ACTIVE_DISCOVERY ->
+                markedRootMetadataVersion > candidate.rootMetadataVersion()
+                        && markedRootLifecycleEpoch == Math.addExact(candidate.rootLifecycleEpoch(), 1);
+            case MARKED_RECOVERY ->
+                markedRootMetadataVersion == candidate.rootMetadataVersion()
+                        && markedRootLifecycleEpoch == candidate.rootLifecycleEpoch();
         };
     }
 
     private static final class PhysicalObjectIdentityMatches {
-        private PhysicalObjectIdentityMatches() {
-        }
+        private PhysicalObjectIdentityMatches() {}
 
         private static boolean exact(GcCandidate candidate, VersionedPhysicalObjectRoot root) {
-            return candidate.object().equals(
-                    com.nereusstream.core.physical.PhysicalObjectIdentity.from(root.value()));
+            return candidate.object().equals(com.nereusstream.core.physical.PhysicalObjectIdentity.from(root.value()));
         }
     }
 }

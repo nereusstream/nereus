@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -38,7 +39,9 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Sorted-spill two-pass topic compaction with a bounded survivor bitmap and exact source replay. */
+/**
+ * Sorted-spill two-pass topic compaction with a bounded survivor bitmap and exact source replay.
+ */
 public final class DefaultTopicCompactionEngine implements TopicCompactionEngine {
     public static final long MIN_IN_MEMORY_KEY_BYTES = 64L << 10;
     public static final long MAX_IN_MEMORY_KEY_BYTES = 256L << 20;
@@ -65,8 +68,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
             int mergeFanIn,
             Executor executor) {
         this.stagingFiles = Objects.requireNonNull(stagingFiles, "stagingFiles");
-        if (maxInMemoryKeyBytes < MIN_IN_MEMORY_KEY_BYTES
-                || maxInMemoryKeyBytes > MAX_IN_MEMORY_KEY_BYTES) {
+        if (maxInMemoryKeyBytes < MIN_IN_MEMORY_KEY_BYTES || maxInMemoryKeyBytes > MAX_IN_MEMORY_KEY_BYTES) {
             throw new IllegalArgumentException("maxInMemoryKeyBytes must be in [64 KiB, 256 MiB]");
         }
         if (maxKeyBytes <= 0 || maxKeyBytes > MAX_KEY_BYTES) {
@@ -97,20 +99,16 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
                 throw new IllegalArgumentException("planningTimeMillis must be non-negative");
             }
             Collector collector = new Collector(exactTask, exactBinding, planningTimeMillis);
-            ExactSourceBatchPublisher batches = new ExactSourceBatchPublisher(
-                    exactTask, exactReader, exactOptions, executor);
+            ExactSourceBatchPublisher batches =
+                    new ExactSourceBatchPublisher(exactTask, exactReader, exactOptions, executor);
             CompletableFuture<Void> passOne = collect(batches, collector);
-            CompletableFuture<TopicCompactionPlan> result = passOne.thenApplyAsync(ignored -> {
-                PreparedFacts facts = collector.finish();
-                return new PreparedPlan(
-                        exactTask,
-                        exactReader,
-                        exactOptions,
-                        exactBinding,
-                        facts,
-                        maxKeyBytes,
-                        executor);
-            }, executor);
+            CompletableFuture<TopicCompactionPlan> result = passOne.thenApplyAsync(
+                    ignored -> {
+                        PreparedFacts facts = collector.finish();
+                        return new PreparedPlan(
+                                exactTask, exactReader, exactOptions, exactBinding, facts, maxKeyBytes, executor);
+                    },
+                    executor);
             result.whenComplete((ignored, failure) -> {
                 batches.close();
                 collector.close();
@@ -126,8 +124,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
         if (exact.taskKind() != TaskKind.TOPIC_KEY_COMPACTION
                 || exact.view() != com.nereusstream.api.ReadView.TOPIC_COMPACTED
                 || exact.sourceView() != com.nereusstream.api.ReadView.COMMITTED
-                || !exact.policy().targetPhysicalFormat()
-                        .equals(MaterializationPolicy.TOPIC_COMPACTED_FORMAT)
+                || !exact.policy().targetPhysicalFormat().equals(MaterializationPolicy.TOPIC_COMPACTED_FORMAT)
                 || exact.policy().topicCompaction().isEmpty()) {
             throw new IllegalArgumentException(
                     "topic compaction requires a TOPIC_COMPACTED task over COMMITTED sources");
@@ -136,8 +133,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
     }
 
     private static TopicCompactionRegistry.Binding requireBinding(
-            MaterializationTask task,
-            TopicCompactionRegistry.Binding binding) {
+            MaterializationTask task, TopicCompactionRegistry.Binding binding) {
         TopicCompactionRegistry.Binding exact = Objects.requireNonNull(binding, "binding");
         TopicCompactionSpec spec = task.policy().topicCompaction().orElseThrow();
         if (!exact.decoder().id().equals(spec.keyCodecId())
@@ -148,9 +144,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
         return exact;
     }
 
-    private static CompletableFuture<Void> collect(
-            ExactSourceBatchPublisher batches,
-            Collector collector) {
+    private static CompletableFuture<Void> collect(ExactSourceBatchPublisher batches, Collector collector) {
         CompletableFuture<Void> result = new CompletableFuture<>();
         batches.subscribe(new Flow.Subscriber<>() {
             private Flow.Subscription subscription;
@@ -160,8 +154,8 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
             public void onSubscribe(Flow.Subscription value) {
                 if (subscription != null || terminal) {
                     value.cancel();
-                    result.completeExceptionally(new IllegalStateException(
-                            "pass-one exact source subscribed more than once"));
+                    result.completeExceptionally(
+                            new IllegalStateException("pass-one exact source subscribed more than once"));
                     return;
                 }
                 subscription = value;
@@ -215,10 +209,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
         private boolean finished;
         private boolean closed;
 
-        private Collector(
-                MaterializationTask task,
-                TopicCompactionRegistry.Binding binding,
-                long planningTimeMillis) {
+        private Collector(MaterializationTask task, TopicCompactionRegistry.Binding binding, long planningTimeMillis) {
             this.task = task;
             this.binding = binding;
             this.planningTimeMillis = planningTimeMillis;
@@ -249,8 +240,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
                         "decoded topic-compaction key exceeds the configured byte cap",
                         null);
             }
-            ByteKey key = new ByteKey(bytes(TopicCompactionKeyEncodingV1.keyed(
-                    ByteBuffer.wrap(rawKey))));
+            ByteKey key = new ByteKey(bytes(TopicCompactionKeyEncodingV1.keyed(ByteBuffer.wrap(rawKey))));
             Candidate candidate = Candidate.from(record);
             Candidate previous = current.get(key);
             if (previous == null) {
@@ -288,10 +278,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
                     reduceRunsToFanIn();
                     mergeRuns(List.copyOf(runs), this::selectWinner);
                 }
-                return new PreparedFacts(
-                        (BitSet) survivors.clone(),
-                        survivors.cardinality(),
-                        facts.finish());
+                return new PreparedFacts((BitSet) survivors.clone(), survivors.cardinality(), facts.finish());
             } finally {
                 closeRuns(runs);
                 runs.clear();
@@ -367,8 +354,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
         RunWriter output = new RunWriter();
         boolean success = false;
         try {
-            mergeRuns(inputs, (key, candidate) ->
-                    output.write(new KeyedCandidate(key, candidate)));
+            mergeRuns(inputs, (key, candidate) -> output.write(new KeyedCandidate(key, candidate)));
             Run result = output.finish();
             success = true;
             return result;
@@ -381,8 +367,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
 
     private void mergeRuns(List<Run> inputs, WinnerConsumer consumer) {
         List<RunReader> readers = new ArrayList<>(inputs.size());
-        PriorityQueue<RunReader> queue = new PriorityQueue<>(Comparator.comparing(
-                reader -> reader.current.key));
+        PriorityQueue<RunReader> queue = new PriorityQueue<>(Comparator.comparing(reader -> reader.current.key));
         try {
             for (Run run : inputs) {
                 RunReader reader = new RunReader(run);
@@ -399,8 +384,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
                     Candidate candidate = reader.current.candidate;
                     if (winner == null || candidate.streamOffset > winner.streamOffset) {
                         winner = candidate;
-                    } else if (candidate.streamOffset == winner.streamOffset
-                            && !candidate.equals(winner)) {
+                    } else if (candidate.streamOffset == winner.streamOffset && !candidate.equals(winner)) {
                         throw invariant("spill merge found conflicting same-offset facts", null);
                     }
                     reader.advance();
@@ -439,8 +423,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
 
         private RunWriter() {
             try {
-                output = new DataOutputStream(new BufferedOutputStream(
-                        file.outputStream(), RUN_BUFFER_BYTES));
+                output = new DataOutputStream(new BufferedOutputStream(file.outputStream(), RUN_BUFFER_BYTES));
                 output.writeInt(RUN_MAGIC);
                 output.writeInt(RUN_VERSION);
             } catch (IOException failure) {
@@ -507,8 +490,8 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
         private RunReader(Run run) {
             this.run = run;
             try {
-                this.input = new DataInputStream(new BufferedInputStream(
-                        run.file.openVerifiedInputStream(), RUN_BUFFER_BYTES));
+                this.input = new DataInputStream(
+                        new BufferedInputStream(run.file.openVerifiedInputStream(), RUN_BUFFER_BYTES));
                 if (input.readInt() != RUN_MAGIC || input.readInt() != RUN_VERSION) {
                     throw new IOException("topic-compaction spill run header is invalid");
                 }
@@ -564,8 +547,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
                 if (entries > taskRecordHardLimit()) {
                     throw new IOException("topic-compaction spill run exceeds the task record hard limit");
                 }
-                current = new KeyedCandidate(
-                        key, new Candidate(offset, disposition, publish, event));
+                current = new KeyedCandidate(key, new Candidate(offset, disposition, publish, event));
                 previous = key;
             } catch (IOException | RuntimeException failure) {
                 throw storageFailure("read topic-compaction spill run", failure);
@@ -581,10 +563,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
         }
     }
 
-    static Optional<CompactionRecord> decode(
-            TopicCompactionDecoder decoder,
-            long offset,
-            byte[] payload) {
+    static Optional<CompactionRecord> decode(TopicCompactionDecoder decoder, long offset, byte[] payload) {
         try {
             return Objects.requireNonNull(
                     decoder.decode(offset, ByteBuffer.wrap(payload).asReadOnlyBuffer()),
@@ -637,8 +616,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
         return keyed.decodedKey();
     }
 
-    private static void writeOptionalLong(DataOutputStream output, OptionalLong value)
-            throws IOException {
+    private static void writeOptionalLong(DataOutputStream output, OptionalLong value) throws IOException {
         output.writeBoolean(value.isPresent());
         if (value.isPresent()) {
             output.writeLong(value.getAsLong());
@@ -665,24 +643,15 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
     }
 
     private static NereusException invariant(String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static MaterializationExecutionException execution(
-            TaskFailureClass failureClass,
-            ErrorCode code,
-            boolean retriable,
-            String message,
-            Throwable cause) {
-        return new MaterializationExecutionException(
-                failureClass, code, retriable, message, cause);
+            TaskFailureClass failureClass, ErrorCode code, boolean retriable, String message, Throwable cause) {
+        return new MaterializationExecutionException(failureClass, code, retriable, message, cause);
     }
 
-    private record PreparedFacts(
-            BitSet survivors,
-            int outputRecordCount,
-            Checksum factSha256) {
+    private record PreparedFacts(BitSet survivors, int outputRecordCount, Checksum factSha256) {
         private PreparedFacts {
             survivors = (BitSet) survivors.clone();
             Objects.requireNonNull(factSha256, "factSha256");
@@ -729,19 +698,11 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
 
         private static Candidate from(CompactionRecord record) {
             return new Candidate(
-                    record.streamOffset(),
-                    record.disposition(),
-                    record.publishTimeMillis(),
-                    record.eventTimeMillis());
+                    record.streamOffset(), record.disposition(), record.publishTimeMillis(), record.eventTimeMillis());
         }
 
         private CompactionRecord toRecord(ByteBuffer decodedKey) {
-            return new CompactionRecord(
-                    streamOffset,
-                    decodedKey,
-                    disposition,
-                    publishTimeMillis,
-                    eventTimeMillis);
+            return new CompactionRecord(streamOffset, decodedKey, disposition, publishTimeMillis, eventTimeMillis);
         }
     }
 
@@ -805,8 +766,7 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
                 throw new IllegalStateException("topic-compaction fact digest is already sealed");
             }
             finished = true;
-            return new Checksum(
-                    ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest()));
+            return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest()));
         }
 
         private static void updateInt(MessageDigest digest, int value) {
@@ -878,11 +838,14 @@ public final class DefaultTopicCompactionEngine implements TopicCompactionEngine
             Objects.requireNonNull(subscriber, "subscriber");
             if (!subscribed.compareAndSet(false, true) || closed.get()) {
                 subscriber.onSubscribe(new Flow.Subscription() {
-                    @Override public void request(long count) { }
-                    @Override public void cancel() { }
+                    @Override
+                    public void request(long count) {}
+
+                    @Override
+                    public void cancel() {}
                 });
-                subscriber.onError(new IllegalStateException(
-                        "topic-compaction plan permits one subscription before close"));
+                subscriber.onError(
+                        new IllegalStateException("topic-compaction plan permits one subscription before close"));
                 return;
             }
             TopicCompactionRowPublisher publisher = new TopicCompactionRowPublisher(

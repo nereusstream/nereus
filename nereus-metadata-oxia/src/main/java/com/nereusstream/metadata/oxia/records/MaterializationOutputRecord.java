@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.ObjectKey;
@@ -7,7 +8,9 @@ import com.nereusstream.api.SchemaRef;
 import java.util.List;
 import java.util.Objects;
 
-/** Strictly verified immutable object output frozen into a task root. */
+/**
+ * Strictly verified immutable object output frozen into a task root.
+ */
 public record MaterializationOutputRecord(
         String outputAttemptId,
         String objectId,
@@ -51,7 +54,10 @@ public record MaterializationOutputRecord(
         if (outputRecordCount > sourceRecordCount) {
             throw new IllegalArgumentException("output count cannot exceed source count");
         }
-        F4RecordValidation.requirePositive(entryCount, "entryCount");
+        F4RecordValidation.requireNonNegative(entryCount, "entryCount");
+        if ((entryCount == 0) != (outputRecordCount == 0) || (entryCount == 0 && logicalBytes != 0)) {
+            throw new IllegalArgumentException("output row/record/byte accounting is inconsistent");
+        }
         F4RecordValidation.requireNonNegative(logicalBytes, "logicalBytes");
         schemaRefs = F4RecordValidation.canonicalSchemaRefs(schemaRefs);
         F4RecordValidation.requireNonNegative(cumulativeSizeAtStart, "cumulativeSizeAtStart");

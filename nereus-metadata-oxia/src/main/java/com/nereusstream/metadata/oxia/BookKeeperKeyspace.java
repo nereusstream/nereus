@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.StreamId;
@@ -10,7 +11,9 @@ import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Objects;
 
-/** Strict durable key/partition builder for BookKeeper primary-WAL metadata. */
+/**
+ * Strict durable key/partition builder for BookKeeper primary-WAL metadata.
+ */
 public final class BookKeeperKeyspace {
     public static final int LEDGER_SHARDS = 256;
     public static final int ALLOCATION_SLOT_SHARDS = 16;
@@ -21,8 +24,12 @@ public final class BookKeeperKeyspace {
     private final int maxReaderLeasesPerLedger;
     private final int maxUncertainAllocations;
 
-    public BookKeeperKeyspace(String cluster, int maxAppendRangesPerLedger, int protectionSlotsPerRange,
-            int maxReaderLeasesPerLedger, int maxUncertainAllocations) {
+    public BookKeeperKeyspace(
+            String cluster,
+            int maxAppendRangesPerLedger,
+            int protectionSlotsPerRange,
+            int maxReaderLeasesPerLedger,
+            int maxUncertainAllocations) {
         this.oxia = new OxiaKeyspace(cluster);
         this.maxAppendRangesPerLedger = positive(maxAppendRangesPerLedger, "maxAppendRangesPerLedger");
         this.protectionSlotsPerRange = positive(protectionSlotsPerRange, "protectionSlotsPerRange");
@@ -59,7 +66,9 @@ public final class BookKeeperKeyspace {
 
     public String ledgerIdentitySha256(String providerScopeSha256, long ledgerId) {
         byte[] scope = decodeSha256(providerScopeSha256, "providerScopeSha256");
-        if (ledgerId <= 0) throw new IllegalArgumentException("ledgerId must be positive");
+        if (ledgerId <= 0) {
+            throw new IllegalArgumentException("ledgerId must be positive");
+        }
         MessageDigest digest = sha256();
         digest.update(scope);
         digest.update(ByteBuffer.allocate(Long.BYTES).putLong(ledgerId).array());
@@ -164,7 +173,9 @@ public final class BookKeeperKeyspace {
     public ProtectionKeyIdentity parseProtectionKey(String key, String providerScopeSha256, long ledgerId) {
         String prefix = protectionPrefix(providerScopeSha256, ledgerId) + "/";
         String supplied = text(key, "protectionKey");
-        if (!supplied.startsWith(prefix)) throw new IllegalArgumentException("protection key has wrong ledger scope");
+        if (!supplied.startsWith(prefix)) {
+            throw new IllegalArgumentException("protection key has wrong ledger scope");
+        }
         String suffix = supplied.substring(prefix.length());
         int separator = suffix.indexOf('/');
         if (separator <= 0 || separator == suffix.length() - 1 || suffix.indexOf('/', separator + 1) >= 0) {
@@ -172,19 +183,24 @@ public final class BookKeeperKeyspace {
         }
         int rangeSlot = parseDigits(suffix.substring(0, separator), 5, maxAppendRangesPerLedger, "rangeSlot");
         int protectionSlot = parseDigits(suffix.substring(separator + 1), 2, protectionSlotsPerRange, "protectionSlot");
-        if (!protectionKey(providerScopeSha256, ledgerId, rangeSlot, protectionSlot).equals(supplied)) {
+        if (!protectionKey(providerScopeSha256, ledgerId, rangeSlot, protectionSlot)
+                .equals(supplied)) {
             throw new IllegalArgumentException("protection key is not canonical");
         }
-        return new ProtectionKeyIdentity(ledgerIdentitySha256(providerScopeSha256, ledgerId), ledgerId,
-                rangeSlot, protectionSlot);
+        return new ProtectionKeyIdentity(
+                ledgerIdentitySha256(providerScopeSha256, ledgerId), ledgerId, rangeSlot, protectionSlot);
     }
 
     public ReaderKeyIdentity parseReaderLeaseKey(String key, String providerScopeSha256, long ledgerId) {
         String prefix = readerLeasePrefix(providerScopeSha256, ledgerId) + "/";
         String supplied = text(key, "readerLeaseKey");
-        if (!supplied.startsWith(prefix)) throw new IllegalArgumentException("reader key has wrong ledger scope");
+        if (!supplied.startsWith(prefix)) {
+            throw new IllegalArgumentException("reader key has wrong ledger scope");
+        }
         String suffix = supplied.substring(prefix.length());
-        if (suffix.indexOf('/') >= 0) throw new IllegalArgumentException("reader key has invalid depth");
+        if (suffix.indexOf('/') >= 0) {
+            throw new IllegalArgumentException("reader key has invalid depth");
+        }
         int readerSlot = parseDigits(suffix, 5, maxReaderLeasesPerLedger, "readerSlot");
         if (!readerLeaseKey(providerScopeSha256, ledgerId, readerSlot).equals(supplied)) {
             throw new IllegalArgumentException("reader key is not canonical");
@@ -195,7 +211,9 @@ public final class BookKeeperKeyspace {
     public AllocationSlotKeyIdentity parseAllocationSlotKey(String key) {
         String supplied = text(key, "allocationSlotKey");
         String prefix = oxia.prefix() + "/physical-bookkeeper/v1/allocation-slots/";
-        if (!supplied.startsWith(prefix)) throw new IllegalArgumentException("allocation slot key has wrong namespace");
+        if (!supplied.startsWith(prefix)) {
+            throw new IllegalArgumentException("allocation slot key has wrong namespace");
+        }
         String suffix = supplied.substring(prefix.length());
         int separator = suffix.indexOf('/');
         if (separator <= 0 || separator == suffix.length() - 1 || suffix.indexOf('/', separator + 1) >= 0) {
@@ -210,8 +228,9 @@ public final class BookKeeperKeyspace {
     }
 
     private String streamPrefix(StreamId streamId) {
-        return oxia.prefix() + "/streams/" + KeyComponentCodec.encodeComponent(
-                Objects.requireNonNull(streamId, "streamId").value());
+        return oxia.prefix() + "/streams/"
+                + KeyComponentCodec.encodeComponent(
+                        Objects.requireNonNull(streamId, "streamId").value());
     }
 
     private String physicalShardPrefix(int shard) {
@@ -223,17 +242,24 @@ public final class BookKeeperKeyspace {
     }
 
     private static int parseDigits(String value, int width, int upperExclusive, String name) {
-        if (value.length() != width) throw new IllegalArgumentException(name + " has wrong width");
+        if (value.length() != width) {
+            throw new IllegalArgumentException(name + " has wrong width");
+        }
         for (int index = 0; index < value.length(); index++) {
             if (value.charAt(index) < '0' || value.charAt(index) > '9') {
                 throw new IllegalArgumentException(name + " is not decimal");
             }
         }
         int decoded;
-        try { decoded = Integer.parseInt(value); }
-        catch (NumberFormatException failure) { throw new IllegalArgumentException(name + " is out of range", failure); }
+        try {
+            decoded = Integer.parseInt(value);
+        } catch (NumberFormatException failure) {
+            throw new IllegalArgumentException(name + " is out of range", failure);
+        }
         requireIndex(decoded, upperExclusive, name);
-        if (!digits(decoded, width).equals(value)) throw new IllegalArgumentException(name + " is not canonical");
+        if (!digits(decoded, width).equals(value)) {
+            throw new IllegalArgumentException(name + " is not canonical");
+        }
         return decoded;
     }
 
@@ -248,19 +274,25 @@ public final class BookKeeperKeyspace {
     }
 
     private static int positive(int value, String name) {
-        if (value <= 0) throw new IllegalArgumentException(name + " must be positive");
+        if (value <= 0) {
+            throw new IllegalArgumentException(name + " must be positive");
+        }
         return value;
     }
 
     private static String text(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " cannot be blank");
+        }
         return value;
     }
 
     private static byte[] decodeSha256(String value, String name) {
         text(value, name);
-        if (value.length() != 64) throw new IllegalArgumentException(name + " must be lowercase SHA-256 hex");
+        if (value.length() != 64) {
+            throw new IllegalArgumentException(name + " must be lowercase SHA-256 hex");
+        }
         for (int index = 0; index < value.length(); index++) {
             char c = value.charAt(index);
             if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
@@ -271,12 +303,19 @@ public final class BookKeeperKeyspace {
     }
 
     private static MessageDigest sha256() {
-        try { return MessageDigest.getInstance("SHA-256"); }
-        catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
-    public record RootKeyIdentity(int shard, String ledgerIdentitySha256, long ledgerId) { }
-    public record ProtectionKeyIdentity(String ledgerIdentitySha256, long ledgerId, int rangeSlot, int protectionSlot) { }
-    public record ReaderKeyIdentity(String ledgerIdentitySha256, long ledgerId, int readerSlot) { }
-    public record AllocationSlotKeyIdentity(int shard, int slot) { }
+    public record RootKeyIdentity(int shard, String ledgerIdentitySha256, long ledgerId) {}
+
+    public record ProtectionKeyIdentity(
+            String ledgerIdentitySha256, long ledgerId, int rangeSlot, int protectionSlot) {}
+
+    public record ReaderKeyIdentity(String ledgerIdentitySha256, long ledgerId, int readerSlot) {}
+
+    public record AllocationSlotKeyIdentity(int shard, int slot) {}
 }

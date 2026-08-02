@@ -15,7 +15,6 @@
 package com.nereusstream.metadata.oxia.testing;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 

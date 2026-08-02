@@ -376,7 +376,8 @@ artifacts。
 13. New/recreated cursor and backward reset remain inside recoverable PROTECTION_PENDING through cursor CAS。
 14. Redelivery is allowed；skipping unacked data is not。
 15. F4 can replace bytes and reclaim objects without changing MessageId/cursor coordinates；topic-owned trim carries
-    the current cursor owner session，while read-only planner/GC snapshots revalidate every observed root version/session。
+    the current cursor owner session，while read-only planner/GC snapshots revalidate every observed root
+    version/session。
 
 ## 13. Gate Result
 

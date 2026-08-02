@@ -14,7 +14,9 @@
 
 package com.nereusstream.metadata.oxia;
 
-/** Best-effort stream metadata watch registration. */
+/**
+ * Best-effort stream metadata watch registration.
+ */
 public interface WatchRegistration extends AutoCloseable {
     @Override
     void close();

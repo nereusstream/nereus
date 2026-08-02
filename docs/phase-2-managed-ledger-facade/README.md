@@ -1,5 +1,12 @@
 # Phase 2 ManagedLedger Facade Detailed Design
 
+> 2026-07-30 dual-source compatibility：product `main` adapts the facade to current Pulsar
+> `5.0.0-M1-nereus@50fc70fe` by removing the unavailable internal-stats properties assignment。The cursor surface gate
+> accepts the exact two legacy `ManagedCursor.hasBacklog` default overloads only when the historical F2/ordinary-build
+> baseline `100d3ef0` exposes them；their absence on `50fc70fe` remains valid, and unknown methods, overload counts,
+> signatures or non-default implementations still fail。The same compatibility slice restores F2's durable NCP1
+> `OPAQUE_RECORD_BATCH` reader key alongside F9's `PULSAR_ENTRY_BATCH` key without adding a wildcard。
+
 本文档目录是 Future 2 的 implemented/final-gated code-level contract。F2-M0 在 2026-07-11 完成第一轮 API spike；
 F2-M0R 补齐 append recovery、topic incarnation、role-aware Position、interface matrix 和 broker runtime
 bootstrap。2026-07-12 的 F2-M0R2 使用锁定 commit 的真实 Pulsar checkout 重新核验接口和 broker 私有
@@ -80,17 +87,17 @@ class 可以在 broker 内共存，但这不表示 Nereus 的 BookKeeper primary
 
 ## 1. Locked Inputs
 
-| Input | F2-M0 lock |
-| --- | --- |
-| F2-M0R2 Nereus design baseline | `nereusstream/nereus@fb98174c99a7379deb684d6f8d5f1fa74517c5f5`（P15-M5） |
-| Pulsar fork | `nereusstream/pulsar` |
-| Pulsar API/source-review baseline | `100d3ef0ff7c7da36d497453b141ddff6f34a9d3` |
-| Current product implementation | current Nereus commit（this document is committed with the F2-M6 completion code/gates） |
-| Current local Pulsar implementation commit | `7efae25af39a15407c1397d9e1f4ac4658d09daa`（based on locked baseline；remote publication awaits repository permission） |
-| Pulsar source-project version at that commit | `5.0.0-M1-SNAPSHOT`（source composite selector，not a published Maven snapshot） |
-| Java/build baseline | Pulsar/Nereus build with JDK 21 or 25；published production classes target Java 17 bytecode |
-| Executable Nereus profile | `OBJECT_WAL_SYNC_OBJECT` only |
-| Completed F2 prerequisite | P15-M6 carries protocol-neutral `AppendResult.cumulativeSize` from existing `CommittedAppend` truth；final-gated 2026-07-12 |
+| Input                                        | F2-M0 lock                                                                                                                 |
+|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| F2-M0R2 Nereus design baseline               | `nereusstream/nereus@fb98174c99a7379deb684d6f8d5f1fa74517c5f5`（P15-M5）                                                     |
+| Pulsar fork                                  | `nereusstream/pulsar`                                                                                                      |
+| Pulsar API/source-review baseline            | `100d3ef0ff7c7da36d497453b141ddff6f34a9d3`                                                                                 |
+| Current product implementation               | current Nereus commit（this document is committed with the F2-M6 completion code/gates）                                     |
+| Current local Pulsar implementation commit   | `7efae25af39a15407c1397d9e1f4ac4658d09daa`（based on locked baseline；remote publication awaits repository permission）       |
+| Pulsar source-project version at that commit | `5.0.0-M1-SNAPSHOT`（source composite selector，not a published Maven snapshot）                                              |
+| Java/build baseline                          | Pulsar/Nereus build with JDK 21 or 25；published production classes target Java 17 bytecode                                 |
+| Executable Nereus profile                    | `OBJECT_WAL_SYNC_OBJECT` only                                                                                              |
+| Completed F2 prerequisite                    | P15-M6 carries protocol-neutral `AppendResult.cumulativeSize` from existing `CommittedAppend` truth；final-gated 2026-07-12 |
 
 The original F2-M0 probe predated Phase 1.5. F2-M0R2 therefore replaces that Nereus input with the final-gated P15
 commit above. The API/source review used
@@ -134,7 +141,7 @@ audit must pass again before implementation continues.
    `recoverAppend` method. Outcome certainty alone cannot reconstruct the committed `Position` or safely resume a
    suspended lane.
 10. All asynchronous callbacks are terminal exactly once. Callback invocation is outside locks and on a
-   designated callback executor. A method returning `CompletableFuture` never throws synchronously.
+    designated callback executor. A method returning `CompletableFuture` never throws synchronously.
 11. Virtual ledger IDs are never sent to a BookKeeper client, ledger handle, offloader or BookKeeper
     metadata path. Unsupported offload/BookKeeper-shaped operations fail explicitly.
 12. `ManagedLedger.getFirstPosition()` returns the position immediately before the first retained entry. Direct
@@ -203,13 +210,13 @@ head/replay/lifecycle truth in projection metadata。
 
 ## 4. Repository Boundary
 
-| Repository/module | Ownership |
-| --- | --- |
-| `nereus-api` | P15-M6 implements generic result cumulative-size handoff；F2 consumes result/recovery/lifecycle API and adds no Pulsar or duplicate L0 type |
-| `nereus-metadata-oxia` | Exact managed-ledger name/hash helper；F2 keyspace, records, codecs, fake/real projection metadata contract |
-| `nereus-managed-ledger` | Projection model, entry codec, factory, ledger, entry/read-only/non-durable cursor facade |
-| `nereus-pulsar-adapter` | Product-owned configuration/bootstrap helpers that do not depend on Pulsar private internals |
-| `nereusstream/pulsar` fork | hybrid provider, cross-class binding/migration guard, broker config/distribution wiring, policy and integration tests |
+| Repository/module          | Ownership                                                                                                                                  |
+|----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| `nereus-api`               | P15-M6 implements generic result cumulative-size handoff；F2 consumes result/recovery/lifecycle API and adds no Pulsar or duplicate L0 type |
+| `nereus-metadata-oxia`     | Exact managed-ledger name/hash helper；F2 keyspace, records, codecs, fake/real projection metadata contract                                 |
+| `nereus-managed-ledger`    | Projection model, entry codec, factory, ledger, entry/read-only/non-durable cursor facade                                                  |
+| `nereus-pulsar-adapter`    | Product-owned configuration/bootstrap helpers that do not depend on Pulsar private internals                                               |
+| `nereusstream/pulsar` fork | hybrid provider, cross-class binding/migration guard, broker config/distribution wiring, policy and integration tests                      |
 
 `ManagedLedgerStorage` and `ManagedLedgerStorageClass` are Pulsar `@Private @Unstable` interfaces.
 The class that composes stock `ManagedLedgerClientFactory` with the Nereus factory therefore belongs in
@@ -217,17 +224,17 @@ the Pulsar fork. Stable product logic stays in Nereus.
 
 ## 5. Document Map
 
-| Document | Purpose |
-| --- | --- |
-| `01-pulsar-api-spike-and-repository-boundary.md` | Locked API evidence, broker call sites and code ownership |
-| `02-projection-and-entry-contract.md` | Virtual ledger, Position, batch and Entry byte contracts |
-| `03-oxia-metadata-and-recovery.md` | Keyspace, records, single-key CAS creation and repair protocol |
-| `04-facade-state-machines-and-compatibility.md` | Factory/ledger/cursor lifecycle, callbacks, errors and unsupported surface |
-| `05-implementation-plan-and-gates.md` | F2-M1 through F2-M6 files, tests, gates and completion criteria |
-| `06-code-level-interface-contract.md` | Exact L0 prerequisites, class contracts and complete locked method behavior |
-| `07-runtime-bootstrap-and-reference-review.md` | Hybrid provider/config/admission, resource ownership and `pulsar-storage` review |
-| `spikes/PulsarManagedLedgerApiProbe.java` | Compile-only exact-signature probe |
-| `spikes/pulsar-api-probe.init.gradle` | Temporary Pulsar source-set injection; does not edit the Pulsar checkout |
+| Document                                         | Purpose                                                                          |
+|--------------------------------------------------|----------------------------------------------------------------------------------|
+| `01-pulsar-api-spike-and-repository-boundary.md` | Locked API evidence, broker call sites and code ownership                        |
+| `02-projection-and-entry-contract.md`            | Virtual ledger, Position, batch and Entry byte contracts                         |
+| `03-oxia-metadata-and-recovery.md`               | Keyspace, records, single-key CAS creation and repair protocol                   |
+| `04-facade-state-machines-and-compatibility.md`  | Factory/ledger/cursor lifecycle, callbacks, errors and unsupported surface       |
+| `05-implementation-plan-and-gates.md`            | F2-M1 through F2-M6 files, tests, gates and completion criteria                  |
+| `06-code-level-interface-contract.md`            | Exact L0 prerequisites, class contracts and complete locked method behavior      |
+| `07-runtime-bootstrap-and-reference-review.md`   | Hybrid provider/config/admission, resource ownership and `pulsar-storage` review |
+| `spikes/PulsarManagedLedgerApiProbe.java`        | Compile-only exact-signature probe                                               |
+| `spikes/pulsar-api-probe.init.gradle`            | Temporary Pulsar source-set injection; does not edit the Pulsar checkout         |
 
 ## 6. F2-M0 Evidence
 
@@ -268,18 +275,18 @@ was repeated after the M1 implementation and remained green。
 
 ## 7. Milestone State
 
-| Milestone | State | Exit |
-| --- | --- | --- |
-| F2-M0 design/API spike | Complete | Locked target and successful compile probe |
-| F2-M0R code-level review | Complete | Initial documents 02-07 and L0 prerequisite review |
-| F2-M0R2 code-level closure | Complete | Exact target checkout revalidated；compile/type/state/runtime gaps closed in docs |
-| Phase 1.5 P15-M1-M5 | Complete | Generic L0/recovery/lifecycle implemented；ordinary and Docker final gates pass |
-| Phase 1.5 P15-M6 | Complete | `AppendResult.cumulativeSize` from existing committed truth；ordinary and Docker final gates pass |
-| F2-M1 projection model | Complete | Pure model/codec、locked Pulsar composite and restart-stable mapping tests |
-| F2-M2 projection metadata | Complete | Model/keyspace/codec、fake/real CAS/repair、shared runtime and Docker restart/race gates |
-| F2-M3 ManagedLedger facade | Complete | Writable/get-only factory/ledger、recovery/lifecycle/admin/cache/stats and locked interface audit gates pass |
-| F2-M4 cursor boundary | Complete | Read-only/non-durable/durable-boundary cursors and shared tail polling implemented/tested |
-| F2-M5 broker integration | Complete | Hybrid bootstrap/binding/admission/capability/policy/write-fence/peer lifecycle plus real dual-broker Oxia/LocalStack/BookKeeper restart/failover E2E pass |
-| F2-M6 final acceptance | Complete | all scenarios 1–19 are executable slices；ordinary and Docker-backed aggregate gates pass with exact source and storage-isolation locks |
+| Milestone                  | State    | Exit                                                                                                                                                       |
+|----------------------------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| F2-M0 design/API spike     | Complete | Locked target and successful compile probe                                                                                                                 |
+| F2-M0R code-level review   | Complete | Initial documents 02-07 and L0 prerequisite review                                                                                                         |
+| F2-M0R2 code-level closure | Complete | Exact target checkout revalidated；compile/type/state/runtime gaps closed in docs                                                                           |
+| Phase 1.5 P15-M1-M5        | Complete | Generic L0/recovery/lifecycle implemented；ordinary and Docker final gates pass                                                                             |
+| Phase 1.5 P15-M6           | Complete | `AppendResult.cumulativeSize` from existing committed truth；ordinary and Docker final gates pass                                                           |
+| F2-M1 projection model     | Complete | Pure model/codec、locked Pulsar composite and restart-stable mapping tests                                                                                  |
+| F2-M2 projection metadata  | Complete | Model/keyspace/codec、fake/real CAS/repair、shared runtime and Docker restart/race gates                                                                     |
+| F2-M3 ManagedLedger facade | Complete | Writable/get-only factory/ledger、recovery/lifecycle/admin/cache/stats and locked interface audit gates pass                                                |
+| F2-M4 cursor boundary      | Complete | Read-only/non-durable/durable-boundary cursors and shared tail polling implemented/tested                                                                  |
+| F2-M5 broker integration   | Complete | Hybrid bootstrap/binding/admission/capability/policy/write-fence/peer lifecycle plus real dual-broker Oxia/LocalStack/BookKeeper restart/failover E2E pass |
+| F2-M6 final acceptance     | Complete | all scenarios 1–19 are executable slices；ordinary and Docker-backed aggregate gates pass with exact source and storage-isolation locks                     |
 
 Future 2 is complete。F3/F4 may now consume this facade contract；neither capability is implied by F2 completion。

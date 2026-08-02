@@ -16,7 +16,6 @@ package com.nereusstream.api.keys;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import org.junit.jupiter.api.Test;
@@ -42,8 +41,6 @@ class DeterministicIdsTest {
     void randomRunIdHashRequiresAtLeast128BitsOfInputEntropy() {
         assertThatThrownBy(() -> DeterministicIds.randomRunIdHash(new byte[15]))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThat(DeterministicIds.randomRunIdHash(new byte[16]))
-                .hasSize(52)
-                .matches("[a-z2-7]+");
+        assertThat(DeterministicIds.randomRunIdHash(new byte[16])).hasSize(52).matches("[a-z2-7]+");
     }
 }

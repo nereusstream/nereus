@@ -44,8 +44,7 @@ public final class ObjectStoreContractCommand {
     private static final int MAX_LIST_PAGES = 100;
     private static final String PERSISTENCE_PREFIX = "__nereus_restart_gate/v1/";
 
-    private ObjectStoreContractCommand() {
-    }
+    private ObjectStoreContractCommand() {}
 
     /**
      * Provider creation executes the production HeadBucket gate. A normal empty bucket is therefore
@@ -85,40 +84,31 @@ public final class ObjectStoreContractCommand {
             evidence.put("overallSuccess", false);
             evidence.put("error", safeMessage(cause));
             printEvidence(createJson(evidence), args.outputFile());
-            System.err.println("object-store contract provider creation failed: "
-                    + safeMessage(cause));
+            System.err.println("object-store contract provider creation failed: " + safeMessage(cause));
             return exitCode(cause, AdminExitCode.PROVIDER_ERROR);
         }
     }
 
-    public static AdminExitCode persistenceCreate(
-            AdminConfiguration config, CommandLineArguments args) {
+    public static AdminExitCode persistenceCreate(AdminConfiguration config, CommandLineArguments args) {
         return runPersistenceCommand(config, args, PersistenceAction.CREATE);
     }
 
-    public static AdminExitCode persistenceVerify(
-            AdminConfiguration config, CommandLineArguments args) {
+    public static AdminExitCode persistenceVerify(AdminConfiguration config, CommandLineArguments args) {
         return runPersistenceCommand(config, args, PersistenceAction.VERIFY);
     }
 
-    public static AdminExitCode persistenceCleanup(
-            AdminConfiguration config, CommandLineArguments args) {
+    public static AdminExitCode persistenceCleanup(AdminConfiguration config, CommandLineArguments args) {
         return runPersistenceCommand(config, args, PersistenceAction.CLEANUP);
     }
 
     private static AdminExitCode runPersistenceCommand(
-            AdminConfiguration config,
-            CommandLineArguments args,
-            PersistenceAction action) {
+            AdminConfiguration config, CommandLineArguments args, PersistenceAction action) {
         String runId = args.runId().orElseThrow();
         try (ProviderSession session = createSession(config)) {
             return switch (action) {
-                case CREATE -> persistenceCreate(
-                        session.store(), runId, args.timeout(), args.outputFile());
-                case VERIFY -> persistenceVerify(
-                        session.store(), runId, args.timeout(), args.outputFile());
-                case CLEANUP -> persistenceCleanup(
-                        session.store(), runId, args.timeout(), args.outputFile());
+                case CREATE -> persistenceCreate(session.store(), runId, args.timeout(), args.outputFile());
+                case VERIFY -> persistenceVerify(session.store(), runId, args.timeout(), args.outputFile());
+                case CLEANUP -> persistenceCleanup(session.store(), runId, args.timeout(), args.outputFile());
             };
         } catch (Throwable failure) {
             Throwable cause = unwrap(failure);
@@ -127,17 +117,14 @@ public final class ObjectStoreContractCommand {
             evidence.put("overallSuccess", false);
             evidence.put("error", safeMessage(cause));
             printEvidence(createJson(evidence), args.outputFile());
-            System.err.println("object-store persistence " + action.commandName()
-                    + " provider creation failed: " + safeMessage(cause));
+            System.err.println("object-store persistence " + action.commandName() + " provider creation failed: "
+                    + safeMessage(cause));
             return exitCode(cause, AdminExitCode.PROVIDER_ERROR);
         }
     }
 
     static AdminExitCode persistenceCreate(
-            ObjectStore store,
-            String runId,
-            Duration timeout,
-            Optional<java.nio.file.Path> outputFile) {
+            ObjectStore store, String runId, Duration timeout, Optional<java.nio.file.Path> outputFile) {
         Map<String, Object> evidence = persistenceEvidence(PersistenceAction.CREATE, runId);
         evidence.put("headBucketSuccess", true);
         Duration opTimeout = operationTimeout(timeout);
@@ -151,15 +138,9 @@ public final class ObjectStoreContractCommand {
                             key,
                             ByteBuffer.wrap(payload),
                             new PutObjectOptions(
-                                    "application/octet-stream",
-                                    checksum,
-                                    true,
-                                    persistenceMetadata(runId),
-                                    opTimeout)),
+                                    "application/octet-stream", checksum, true, persistenceMetadata(runId), opTimeout)),
                     opTimeout);
-            HeadObjectResult head = await(
-                    store.headObject(key, new HeadObjectOptions(opTimeout)),
-                    opTimeout);
+            HeadObjectResult head = await(store.headObject(key, new HeadObjectOptions(opTimeout)), opTimeout);
             boolean identityExact = head.objectLength() == payload.length
                     && head.checksum().equals(checksum)
                     && head.etag().filter(put.etag()::equals).isPresent()
@@ -178,16 +159,11 @@ public final class ObjectStoreContractCommand {
             evidence.put("error", safeMessage(cause));
         }
         printEvidence(createJson(evidence), outputFile);
-        return Boolean.TRUE.equals(evidence.get("overallSuccess"))
-                ? AdminExitCode.SUCCESS
-                : failureExitCode;
+        return Boolean.TRUE.equals(evidence.get("overallSuccess")) ? AdminExitCode.SUCCESS : failureExitCode;
     }
 
     static AdminExitCode persistenceVerify(
-            ObjectStore store,
-            String runId,
-            Duration timeout,
-            Optional<java.nio.file.Path> outputFile) {
+            ObjectStore store, String runId, Duration timeout, Optional<java.nio.file.Path> outputFile) {
         Map<String, Object> evidence = persistenceEvidence(PersistenceAction.VERIFY, runId);
         evidence.put("headBucketSuccess", true);
         Duration opTimeout = operationTimeout(timeout);
@@ -196,15 +172,9 @@ public final class ObjectStoreContractCommand {
         ObjectKey key = persistenceKey(runId);
         AdminExitCode failureExitCode = AdminExitCode.CONDITION_FAILED;
         try {
-            HeadObjectResult head = await(
-                    store.headObject(key, new HeadObjectOptions(opTimeout)),
-                    opTimeout);
+            HeadObjectResult head = await(store.headObject(key, new HeadObjectOptions(opTimeout)), opTimeout);
             RangeReadResult read = await(
-                    store.readRange(
-                            key,
-                            0,
-                            expected.length,
-                            new RangeReadOptions(Optional.of(checksum), opTimeout)),
+                    store.readRange(key, 0, expected.length, new RangeReadOptions(Optional.of(checksum), opTimeout)),
                     opTimeout);
             boolean headExact = head.objectLength() == expected.length
                     && head.checksum().equals(checksum)
@@ -229,33 +199,21 @@ public final class ObjectStoreContractCommand {
             evidence.put("error", safeMessage(cause));
         }
         printEvidence(createJson(evidence), outputFile);
-        return Boolean.TRUE.equals(evidence.get("overallSuccess"))
-                ? AdminExitCode.SUCCESS
-                : failureExitCode;
+        return Boolean.TRUE.equals(evidence.get("overallSuccess")) ? AdminExitCode.SUCCESS : failureExitCode;
     }
 
     static AdminExitCode persistenceCleanup(
-            ObjectStore store,
-            String runId,
-            Duration timeout,
-            Optional<java.nio.file.Path> outputFile) {
+            ObjectStore store, String runId, Duration timeout, Optional<java.nio.file.Path> outputFile) {
         Map<String, Object> evidence = persistenceEvidence(PersistenceAction.CLEANUP, runId);
         evidence.put("headBucketSuccess", true);
         Duration opTimeout = operationTimeout(timeout);
         ObjectKey key = persistenceKey(runId);
         AdminExitCode failureExitCode = AdminExitCode.CONDITION_FAILED;
         try {
-            HeadObjectResult head = await(
-                    store.headObject(key, new HeadObjectOptions(opTimeout)),
-                    opTimeout);
+            HeadObjectResult head = await(store.headObject(key, new HeadObjectOptions(opTimeout)), opTimeout);
             await(
                     store.deleteObject(
-                            key,
-                            new DeleteObjectOptions(
-                                    head.objectLength(),
-                                    head.checksum(),
-                                    head.etag(),
-                                    opTimeout)),
+                            key, new DeleteObjectOptions(head.objectLength(), head.checksum(), head.etag(), opTimeout)),
                     opTimeout);
             boolean absent;
             try {
@@ -265,8 +223,7 @@ public final class ObjectStoreContractCommand {
                 Throwable cause = unwrap(expected);
                 absent = isNotFound(cause);
                 if (!absent) {
-                    failureExitCode =
-                            exitCode(cause, AdminExitCode.CONDITION_FAILED);
+                    failureExitCode = exitCode(cause, AdminExitCode.CONDITION_FAILED);
                 }
             }
             evidence.put("conditionalDeleteSucceeded", absent);
@@ -281,16 +238,11 @@ public final class ObjectStoreContractCommand {
             evidence.put("error", safeMessage(cause));
         }
         printEvidence(createJson(evidence), outputFile);
-        return Boolean.TRUE.equals(evidence.get("overallSuccess"))
-                ? AdminExitCode.SUCCESS
-                : failureExitCode;
+        return Boolean.TRUE.equals(evidence.get("overallSuccess")) ? AdminExitCode.SUCCESS : failureExitCode;
     }
 
     static AdminExitCode contract(
-            ObjectStore store,
-            String runId,
-            Duration timeout,
-            Optional<java.nio.file.Path> outputFile) {
+            ObjectStore store, String runId, Duration timeout, Optional<java.nio.file.Path> outputFile) {
         String contractPrefix = "__nereus_contract/v1/" + runId + "/";
         Map<String, Object> results = new LinkedHashMap<>();
         results.put("schemaVersion", 1);
@@ -299,31 +251,25 @@ public final class ObjectStoreContractCommand {
         results.put("headBucketSuccess", true);
         Duration opTimeout = operationTimeout(timeout);
 
-        byte[] testData = ("nereus-object-store-contract-" + runId)
-                .getBytes(StandardCharsets.UTF_8);
+        byte[] testData = ("nereus-object-store-contract-" + runId).getBytes(StandardCharsets.UTF_8);
         Checksum testChecksum = computeCrc32c(testData);
         ObjectKey keyA = new ObjectKey(contractPrefix + "object-a");
         ObjectKey keyB = new ObjectKey(contractPrefix + "object-b");
 
         try {
-            runConditionalCreate(
-                    store, keyA, testData, testChecksum, runId, opTimeout, results);
+            runConditionalCreate(store, keyA, testData, testChecksum, runId, opTimeout, results);
             stopAfterTimeout(results);
-            runHeadObject(
-                    store, keyA, testData, testChecksum, runId, opTimeout, results);
+            runHeadObject(store, keyA, testData, testChecksum, runId, opTimeout, results);
             stopAfterTimeout(results);
             runRangeReads(store, keyA, testData, opTimeout, results);
             stopAfterTimeout(results);
             runDuplicatePut(store, keyA, testData, testChecksum, opTimeout, results);
             stopAfterTimeout(results);
-            runConditionalCreateRace(
-                    store, keyB, testData, testChecksum, opTimeout, results);
+            runConditionalCreateRace(store, keyB, testData, testChecksum, opTimeout, results);
             stopAfterTimeout(results);
-            Set<String> expectedKeys = runListObjectCreates(
-                    store, contractPrefix, keyA, keyB, opTimeout, results);
+            Set<String> expectedKeys = runListObjectCreates(store, contractPrefix, keyA, keyB, opTimeout, results);
             stopAfterTimeout(results);
-            runPaginatedList(
-                    store, contractPrefix, expectedKeys, opTimeout, results);
+            runPaginatedList(store, contractPrefix, expectedKeys, opTimeout, results);
             stopAfterTimeout(results);
             runDeleteWithWrongEtag(store, keyA, opTimeout, results);
             stopAfterTimeout(results);
@@ -341,8 +287,7 @@ public final class ObjectStoreContractCommand {
             }
         }
 
-        boolean overallSuccess = !Boolean.TRUE.equals(results.get("timeoutObserved"))
-                && evaluateResults(results);
+        boolean overallSuccess = !Boolean.TRUE.equals(results.get("timeoutObserved")) && evaluateResults(results);
         results.put("overallSuccess", overallSuccess);
         printEvidence(createJson(results), outputFile);
         if (overallSuccess) {
@@ -390,11 +335,8 @@ public final class ObjectStoreContractCommand {
             Duration timeout,
             Map<String, Object> results) {
         try {
-            HeadObjectResult result = await(
-                    store.headObject(key, new HeadObjectOptions(timeout)), timeout);
-            results.put(
-                    "metadataRoundTrip",
-                    runId.equals(result.metadata().get("contract-marker")));
+            HeadObjectResult result = await(store.headObject(key, new HeadObjectOptions(timeout)), timeout);
+            results.put("metadataRoundTrip", runId.equals(result.metadata().get("contract-marker")));
             results.put("etagPresent", result.etag().isPresent());
             results.put(
                     "headIdentityExact",
@@ -409,19 +351,11 @@ public final class ObjectStoreContractCommand {
     }
 
     private static void runRangeReads(
-            ObjectStore store,
-            ObjectKey key,
-            byte[] data,
-            Duration timeout,
-            Map<String, Object> results) {
+            ObjectStore store, ObjectKey key, byte[] data, Duration timeout, Map<String, Object> results) {
         try {
             Checksum fullChecksum = computeCrc32c(data);
             RangeReadResult full = await(
-                    store.readRange(
-                            key,
-                            0,
-                            data.length,
-                            new RangeReadOptions(Optional.of(fullChecksum), timeout)),
+                    store.readRange(key, 0, data.length, new RangeReadOptions(Optional.of(fullChecksum), timeout)),
                     timeout);
             boolean fullExact = Arrays.equals(bytes(full.payload()), data)
                     && full.offset() == 0
@@ -430,8 +364,7 @@ public final class ObjectStoreContractCommand {
 
             int middleOffset = Math.min(3, data.length - 1);
             int middleLength = Math.min(7, data.length - middleOffset);
-            byte[] expectedMiddle = Arrays.copyOfRange(
-                    data, middleOffset, middleOffset + middleLength);
+            byte[] expectedMiddle = Arrays.copyOfRange(data, middleOffset, middleOffset + middleLength);
             Checksum middleChecksum = computeCrc32c(expectedMiddle);
             RangeReadResult middle = await(
                     store.readRange(
@@ -466,19 +399,12 @@ public final class ObjectStoreContractCommand {
                     store.putObject(
                             key,
                             ByteBuffer.wrap(data),
-                            new PutObjectOptions(
-                                    "application/octet-stream",
-                                    checksum,
-                                    true,
-                                    Map.of(),
-                                    timeout)),
+                            new PutObjectOptions("application/octet-stream", checksum, true, Map.of(), timeout)),
                     timeout);
             results.put("duplicatePutRejected", false);
         } catch (Throwable failure) {
             Throwable cause = unwrap(failure);
-            results.put(
-                    "duplicatePutRejected",
-                    cause instanceof ObjectAlreadyExistsException);
+            results.put("duplicatePutRejected", cause instanceof ObjectAlreadyExistsException);
             if (!(cause instanceof ObjectAlreadyExistsException)) {
                 recordFailure(results, "duplicatePutError", cause);
             }
@@ -492,12 +418,9 @@ public final class ObjectStoreContractCommand {
             Checksum checksum,
             Duration timeout,
             Map<String, Object> results) {
-        PutObjectOptions options = new PutObjectOptions(
-                "application/octet-stream", checksum, true, Map.of(), timeout);
-        CompletableFuture<PutObjectResult> first =
-                store.putObject(key, ByteBuffer.wrap(data), options);
-        CompletableFuture<PutObjectResult> second =
-                store.putObject(key, ByteBuffer.wrap(data), options);
+        PutObjectOptions options = new PutObjectOptions("application/octet-stream", checksum, true, Map.of(), timeout);
+        CompletableFuture<PutObjectResult> first = store.putObject(key, ByteBuffer.wrap(data), options);
+        CompletableFuture<PutObjectResult> second = store.putObject(key, ByteBuffer.wrap(data), options);
 
         int successes = 0;
         int alreadyExists = 0;
@@ -510,14 +433,11 @@ public final class ObjectStoreContractCommand {
                 if (cause instanceof ObjectAlreadyExistsException) {
                     alreadyExists++;
                 } else {
-                    recordFailure(
-                            results, "conditionalCreateRaceError", cause);
+                    recordFailure(results, "conditionalCreateRaceError", cause);
                 }
             }
         }
-        results.put(
-                "concurrentConditionalCreateSingleWinner",
-                successes == 1 && alreadyExists == 1);
+        results.put("concurrentConditionalCreateSingleWinner", successes == 1 && alreadyExists == 1);
     }
 
     private static Set<String> runListObjectCreates(
@@ -539,11 +459,7 @@ public final class ObjectStoreContractCommand {
                                 key,
                                 ByteBuffer.wrap(data),
                                 new PutObjectOptions(
-                                        "application/octet-stream",
-                                        computeCrc32c(data),
-                                        true,
-                                        Map.of(),
-                                        timeout)),
+                                        "application/octet-stream", computeCrc32c(data), true, Map.of(), timeout)),
                         timeout);
                 expected.add(key.value());
             }
@@ -556,11 +472,7 @@ public final class ObjectStoreContractCommand {
     }
 
     private static void runPaginatedList(
-            ObjectStore store,
-            String prefix,
-            Set<String> expectedKeys,
-            Duration timeout,
-            Map<String, Object> results) {
+            ObjectStore store, String prefix, Set<String> expectedKeys, Duration timeout, Map<String, Object> results) {
         try {
             List<String> listed = new ArrayList<>();
             Set<String> seenTokens = new HashSet<>();
@@ -584,8 +496,7 @@ public final class ObjectStoreContractCommand {
                 continuation = page.continuationToken();
                 continuation.ifPresent(token -> {
                     if (!seenTokens.add(token)) {
-                        throw new IllegalStateException(
-                                "list pagination repeated a continuation token");
+                        throw new IllegalStateException("list pagination repeated a continuation token");
                     }
                 });
             } while (continuation.isPresent());
@@ -593,9 +504,7 @@ public final class ObjectStoreContractCommand {
             Set<String> unique = new LinkedHashSet<>(listed);
             results.put("listPaginationObserved", pages > 1);
             results.put("listNoDuplicates", unique.size() == listed.size());
-            results.put(
-                    "listNoMissing",
-                    unique.equals(new LinkedHashSet<>(expectedKeys)));
+            results.put("listNoMissing", unique.equals(new LinkedHashSet<>(expectedKeys)));
         } catch (Throwable failure) {
             results.put("listPaginationObserved", false);
             results.put("listNoDuplicates", false);
@@ -605,42 +514,28 @@ public final class ObjectStoreContractCommand {
     }
 
     private static void runDeleteWithWrongEtag(
-            ObjectStore store,
-            ObjectKey key,
-            Duration timeout,
-            Map<String, Object> results) {
+            ObjectStore store, ObjectKey key, Duration timeout, Map<String, Object> results) {
         try {
-            HeadObjectResult before = await(
-                    store.headObject(key, new HeadObjectOptions(timeout)), timeout);
-            String wrongEtag = before.etag()
-                    .map(value -> value + "-wrong")
-                    .orElse("nereus-contract-wrong-etag");
+            HeadObjectResult before = await(store.headObject(key, new HeadObjectOptions(timeout)), timeout);
+            String wrongEtag = before.etag().map(value -> value + "-wrong").orElse("nereus-contract-wrong-etag");
             try {
                 await(
                         store.deleteObject(
                                 key,
                                 new DeleteObjectOptions(
-                                        before.objectLength(),
-                                        before.checksum(),
-                                        Optional.of(wrongEtag),
-                                        timeout)),
+                                        before.objectLength(), before.checksum(), Optional.of(wrongEtag), timeout)),
                         timeout);
                 results.put("wrongEtagDeletePreservesObject", false);
                 return;
             } catch (Throwable expected) {
                 // The authoritative postcondition is that the exact object still exists.
                 Throwable cause = unwrap(expected);
-                if (exitCode(cause, AdminExitCode.CONDITION_FAILED)
-                        == AdminExitCode.TIMEOUT) {
-                    recordFailure(
-                            results, "wrongEtagDeleteAttemptError", cause);
+                if (exitCode(cause, AdminExitCode.CONDITION_FAILED) == AdminExitCode.TIMEOUT) {
+                    recordFailure(results, "wrongEtagDeleteAttemptError", cause);
                 }
             }
-            HeadObjectResult after = await(
-                    store.headObject(key, new HeadObjectOptions(timeout)), timeout);
-            results.put(
-                    "wrongEtagDeletePreservesObject",
-                    sameIdentity(before, after));
+            HeadObjectResult after = await(store.headObject(key, new HeadObjectOptions(timeout)), timeout);
+            results.put("wrongEtagDeletePreservesObject", sameIdentity(before, after));
         } catch (Throwable failure) {
             results.put("wrongEtagDeletePreservesObject", false);
             recordFailure(results, "wrongEtagDeleteError", failure);
@@ -648,21 +543,12 @@ public final class ObjectStoreContractCommand {
     }
 
     private static void runDeleteWithCorrectEtag(
-            ObjectStore store,
-            ObjectKey key,
-            Duration timeout,
-            Map<String, Object> results) {
+            ObjectStore store, ObjectKey key, Duration timeout, Map<String, Object> results) {
         try {
-            HeadObjectResult head = await(
-                    store.headObject(key, new HeadObjectOptions(timeout)), timeout);
+            HeadObjectResult head = await(store.headObject(key, new HeadObjectOptions(timeout)), timeout);
             await(
                     store.deleteObject(
-                            key,
-                            new DeleteObjectOptions(
-                                    head.objectLength(),
-                                    head.checksum(),
-                                    head.etag(),
-                                    timeout)),
+                            key, new DeleteObjectOptions(head.objectLength(), head.checksum(), head.etag(), timeout)),
                     timeout);
             boolean absent;
             try {
@@ -684,19 +570,13 @@ public final class ObjectStoreContractCommand {
         }
     }
 
-    private static void cleanupPrefix(
-            ObjectStore store,
-            String prefix,
-            Duration timeout,
-            Map<String, Object> results) {
+    private static void cleanupPrefix(ObjectStore store, String prefix, Duration timeout, Map<String, Object> results) {
         List<String> failures = new ArrayList<>();
         try {
             for (int pageGuard = 0; pageGuard < MAX_LIST_PAGES; pageGuard++) {
                 ListObjectsResult page = await(
                         store.listObjects(
-                                new ObjectKeyPrefix(prefix),
-                                Optional.empty(),
-                                new ListObjectsOptions(100, timeout)),
+                                new ObjectKeyPrefix(prefix), Optional.empty(), new ListObjectsOptions(100, timeout)),
                         timeout);
                 if (page.objects().isEmpty()) {
                     results.put("contractPrefixCleanedUp", failures.isEmpty());
@@ -705,22 +585,16 @@ public final class ObjectStoreContractCommand {
                 }
                 for (ListedObject object : page.objects()) {
                     try {
-                        HeadObjectResult head = await(
-                                store.headObject(
-                                        object.key(), new HeadObjectOptions(timeout)),
-                                timeout);
+                        HeadObjectResult head =
+                                await(store.headObject(object.key(), new HeadObjectOptions(timeout)), timeout);
                         await(
                                 store.deleteObject(
                                         object.key(),
                                         new DeleteObjectOptions(
-                                                head.objectLength(),
-                                                head.checksum(),
-                                                head.etag(),
-                                                timeout)),
+                                                head.objectLength(), head.checksum(), head.etag(), timeout)),
                                 timeout);
                     } catch (Throwable failure) {
-                        failures.add(object.key().value() + ": "
-                                + safeMessage(unwrap(failure)));
+                        failures.add(object.key().value() + ": " + safeMessage(unwrap(failure)));
                         recordFailure(results, "cleanupObjectError", failure);
                     }
                 }
@@ -771,28 +645,23 @@ public final class ObjectStoreContractCommand {
     }
 
     private static ProviderSession createSession(AdminConfiguration config) throws Exception {
-        Class<?> resolverType = Class.forName(
-                config.objectStoreSecretResolverClassName());
+        Class<?> resolverType = Class.forName(config.objectStoreSecretResolverClassName());
         if (!ObjectStoreSecretResolver.class.isAssignableFrom(resolverType)) {
             throw new IllegalArgumentException(
                     "configured object-store resolver does not implement ObjectStoreSecretResolver");
         }
-        ObjectStoreSecretResolver resolver = (ObjectStoreSecretResolver) resolverType
-                .getDeclaredConstructor()
-                .newInstance();
+        ObjectStoreSecretResolver resolver = (ObjectStoreSecretResolver)
+                resolverType.getDeclaredConstructor().newInstance();
 
         Class<?> providerType = Class.forName(config.objectStore().providerClassName());
         if (!ObjectStoreProvider.class.isAssignableFrom(providerType)) {
             throw new IllegalArgumentException(
                     "configured object-store provider does not implement ObjectStoreProvider");
         }
-        ObjectStoreProvider provider = (ObjectStoreProvider) providerType
-                .getDeclaredConstructor()
-                .newInstance();
+        ObjectStoreProvider provider =
+                (ObjectStoreProvider) providerType.getDeclaredConstructor().newInstance();
         try {
-            return new ProviderSession(
-                    provider,
-                    provider.create(config.objectStore(), resolver));
+            return new ProviderSession(provider, provider.create(config.objectStore(), resolver));
         } catch (Throwable failure) {
             provider.close();
             throw failure;
@@ -804,15 +673,11 @@ public final class ObjectStoreContractCommand {
         return Duration.ofSeconds(Math.min(seconds, 30));
     }
 
-    private static <T> T await(
-            CompletableFuture<T> future,
-            Duration timeout) throws Exception {
+    private static <T> T await(CompletableFuture<T> future, Duration timeout) throws Exception {
         return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
     }
 
-    private static boolean sameIdentity(
-            HeadObjectResult first,
-            HeadObjectResult second) {
+    private static boolean sameIdentity(HeadObjectResult first, HeadObjectResult second) {
         return first.key().equals(second.key())
                 && first.objectLength() == second.objectLength()
                 && first.checksum().equals(second.checksum())
@@ -820,8 +685,7 @@ public final class ObjectStoreContractCommand {
     }
 
     private static boolean isNotFound(Throwable failure) {
-        return failure instanceof NereusException nereus
-                && nereus.code() == ErrorCode.OBJECT_NOT_FOUND;
+        return failure instanceof NereusException nereus && nereus.code() == ErrorCode.OBJECT_NOT_FOUND;
     }
 
     private static byte[] bytes(ByteBuffer buffer) {
@@ -834,9 +698,7 @@ public final class ObjectStoreContractCommand {
     private static Checksum computeCrc32c(byte[] data) {
         java.util.zip.CRC32C crc = new java.util.zip.CRC32C();
         crc.update(data);
-        return new Checksum(
-                ChecksumType.CRC32C,
-                String.format("%08x", crc.getValue()));
+        return new Checksum(ChecksumType.CRC32C, String.format("%08x", crc.getValue()));
     }
 
     private static ObjectKey persistenceKey(String runId) {
@@ -844,23 +706,17 @@ public final class ObjectStoreContractCommand {
     }
 
     private static byte[] persistencePayload(String runId) {
-        return ("nereus-object-store-restart-gate-" + runId)
-                .getBytes(StandardCharsets.UTF_8);
+        return ("nereus-object-store-restart-gate-" + runId).getBytes(StandardCharsets.UTF_8);
     }
 
     private static Map<String, String> persistenceMetadata(String runId) {
-        return Map.of(
-                "restart-gate-run-id", runId,
-                "restart-gate-schema", "v1");
+        return Map.of("restart-gate-run-id", runId, "restart-gate-schema", "v1");
     }
 
-    private static Map<String, Object> persistenceEvidence(
-            PersistenceAction action, String runId) {
+    private static Map<String, Object> persistenceEvidence(PersistenceAction action, String runId) {
         Map<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("schemaVersion", 1);
-        evidence.put(
-                "command",
-                "object-store persistence " + action.commandName());
+        evidence.put("command", "object-store persistence " + action.commandName());
         evidence.put("runId", runId);
         return evidence;
     }
@@ -869,9 +725,7 @@ public final class ObjectStoreContractCommand {
         return AdminFailureClassifier.unwrap(failure);
     }
 
-    private static AdminExitCode exitCode(
-            Throwable failure,
-            AdminExitCode fallback) {
+    private static AdminExitCode exitCode(Throwable failure, AdminExitCode fallback) {
         return AdminFailureClassifier.classify(failure, fallback);
     }
 
@@ -879,23 +733,17 @@ public final class ObjectStoreContractCommand {
         return AdminFailureClassifier.safeMessage(failure);
     }
 
-    private static void recordFailure(
-            Map<String, Object> evidence,
-            String field,
-            Throwable failure) {
+    private static void recordFailure(Map<String, Object> evidence, String field, Throwable failure) {
         Throwable cause = unwrap(failure);
         evidence.put(field, safeMessage(cause));
-        if (exitCode(cause, AdminExitCode.CONDITION_FAILED)
-                == AdminExitCode.TIMEOUT) {
+        if (exitCode(cause, AdminExitCode.CONDITION_FAILED) == AdminExitCode.TIMEOUT) {
             evidence.put("timeoutObserved", true);
         }
     }
 
-    private static void stopAfterTimeout(
-            Map<String, Object> evidence) throws java.util.concurrent.TimeoutException {
+    private static void stopAfterTimeout(Map<String, Object> evidence) throws java.util.concurrent.TimeoutException {
         if (Boolean.TRUE.equals(evidence.get("timeoutObserved"))) {
-            throw new java.util.concurrent.TimeoutException(
-                    "object-store contract operation timed out");
+            throw new java.util.concurrent.TimeoutException("object-store contract operation timed out");
         }
     }
 
@@ -937,17 +785,12 @@ public final class ObjectStoreContractCommand {
                 .replace("\t", "\\t");
     }
 
-    private static void printEvidence(
-            String evidence,
-            Optional<java.nio.file.Path> outputFile) {
+    private static void printEvidence(String evidence, Optional<java.nio.file.Path> outputFile) {
         AdminEvidenceWriter.printEvidence(evidence);
-        outputFile.ifPresent(path ->
-                AdminEvidenceWriter.writeEvidence(path, evidence));
+        outputFile.ifPresent(path -> AdminEvidenceWriter.writeEvidence(path, evidence));
     }
 
-    private record ProviderSession(
-            ObjectStoreProvider provider,
-            ObjectStore store) implements AutoCloseable {
+    private record ProviderSession(ObjectStoreProvider provider, ObjectStore store) implements AutoCloseable {
         private ProviderSession {
             java.util.Objects.requireNonNull(provider, "provider");
             java.util.Objects.requireNonNull(store, "store");

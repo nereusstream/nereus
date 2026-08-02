@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.ErrorCode;
@@ -12,8 +13,8 @@ import io.oxia.client.api.exceptions.OxiaException;
 import java.time.Clock;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -23,7 +24,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** One owned Oxia client plus request/watch executors shared by metadata adapters. */
+/**
+ * One owned Oxia client plus request/watch executors shared by metadata adapters.
+ */
 public final class SharedOxiaClientRuntime implements AutoCloseable {
     private final OxiaClientConfiguration configuration;
     private final SyncOxiaClient oxiaClient;
@@ -32,9 +35,7 @@ public final class SharedOxiaClientRuntime implements AutoCloseable {
     private final PartitionedOxiaClient client;
     private final AtomicBoolean closed = new AtomicBoolean();
 
-    public static SharedOxiaClientRuntime connect(
-            OxiaClientConfiguration configuration,
-            Clock clock) {
+    public static SharedOxiaClientRuntime connect(OxiaClientConfiguration configuration, Clock clock) {
         Objects.requireNonNull(configuration, "configuration");
         Objects.requireNonNull(clock, "clock");
         try {
@@ -51,25 +52,20 @@ public final class SharedOxiaClientRuntime implements AutoCloseable {
     }
 
     static SharedOxiaClientRuntime usingClient(
-            OxiaClientConfiguration configuration,
-            SyncOxiaClient oxiaClient,
-            Clock clock) {
+            OxiaClientConfiguration configuration, SyncOxiaClient oxiaClient, Clock clock) {
         Objects.requireNonNull(clock, "clock");
         return new SharedOxiaClientRuntime(configuration, oxiaClient);
     }
 
-    private SharedOxiaClientRuntime(
-            OxiaClientConfiguration configuration,
-            SyncOxiaClient oxiaClient) {
+    private SharedOxiaClientRuntime(OxiaClientConfiguration configuration, SyncOxiaClient oxiaClient) {
         OxiaClientConfiguration checked = Objects.requireNonNull(configuration, "configuration");
         this.configuration = checked;
         this.oxiaClient = Objects.requireNonNull(oxiaClient, "oxiaClient");
         this.clientExecutor = Executors.newFixedThreadPool(8, daemonFactory("nereus-oxia-client"));
-        this.watchExecutor = boundedExecutor(
-                2, checked.maxPendingOperations(), "nereus-oxia-watch");
+        this.watchExecutor = boundedExecutor(2, checked.maxPendingOperations(), "nereus-oxia-watch");
         try {
-            this.client = new PartitionedOxiaClient(
-                    new OxiaJavaClientBackend(oxiaClient, clientExecutor, watchExecutor));
+            this.client =
+                    new PartitionedOxiaClient(new OxiaJavaClientBackend(oxiaClient, clientExecutor, watchExecutor));
         } catch (RuntimeException e) {
             close();
             throw e;
@@ -102,7 +98,9 @@ public final class SharedOxiaClientRuntime implements AutoCloseable {
         ensureOpen();
     }
 
-    /** Returns a borrowed read/delete-only view used by exact Phase 4 retirement adapters. */
+    /**
+     * Returns a borrowed read/delete-only view used by exact Phase 4 retirement adapters.
+     */
     public RetirementMetadataClient retirementMetadataClient(OxiaClientConfiguration candidate) {
         requireCompatible(candidate);
         return new RetirementMetadataClient() {
@@ -110,8 +108,9 @@ public final class SharedOxiaClientRuntime implements AutoCloseable {
             public java.util.concurrent.CompletableFuture<java.util.Optional<RetirementMetadataValue>> get(
                     RetirementMetadataKey key) {
                 ensureOpen();
-                return client.get(key.key(), key.partitionKey()).thenApply(optional -> optional.map(value ->
-                        new RetirementMetadataValue(value.key(), value.value(), value.version())));
+                return client.get(key.key(), key.partitionKey())
+                        .thenApply(optional -> optional.map(
+                                value -> new RetirementMetadataValue(value.key(), value.value(), value.version())));
             }
 
             @Override
@@ -123,27 +122,28 @@ public final class SharedOxiaClientRuntime implements AutoCloseable {
         };
     }
 
-    /** Returns a borrowed exact-key read-only view for separately provisioned cluster capabilities. */
+    /**
+     * Returns a borrowed exact-key read-only view for separately provisioned cluster capabilities.
+     */
     public CompletableFuture<Optional<CapabilityMetadataValue>> readCapability(
-            OxiaClientConfiguration candidate,
-            String key,
-            String partitionKey) {
+            OxiaClientConfiguration candidate, String key, String partitionKey) {
         return capabilityMetadataClient(candidate).get(key, partitionKey);
     }
 
-    /** Returns a borrowed exact-key CAS view for explicit operator-owned capability mutations. */
-    public CapabilityMetadataClient capabilityMetadataClient(
-            OxiaClientConfiguration candidate) {
+    /**
+     * Returns a borrowed exact-key CAS view for explicit operator-owned capability mutations.
+     */
+    public CapabilityMetadataClient capabilityMetadataClient(OxiaClientConfiguration candidate) {
         requireCompatible(candidate);
         return new CapabilityMetadataClient() {
             @Override
-            public CompletableFuture<Optional<CapabilityMetadataValue>> get(
-                    String key, String partitionKey) {
+            public CompletableFuture<Optional<CapabilityMetadataValue>> get(String key, String partitionKey) {
                 ensureOpen();
                 String exactKey = requireCapabilityKey(key);
                 PartitionKey exactPartition = new PartitionKey(partitionKey);
-                return client.get(exactKey, exactPartition).thenApply(optional -> optional.map(value ->
-                        new CapabilityMetadataValue(value.key(), value.value(), value.version())));
+                return client.get(exactKey, exactPartition)
+                        .thenApply(optional -> optional.map(
+                                value -> new CapabilityMetadataValue(value.key(), value.value(), value.version())));
             }
 
             @Override
@@ -154,27 +154,18 @@ public final class SharedOxiaClientRuntime implements AutoCloseable {
                 byte[] exactValue = requireCapabilityValue(value);
                 PartitionKey exactPartition = new PartitionKey(partitionKey);
                 return client.putIfAbsent(exactKey, exactValue, exactPartition)
-                        .thenApply(result -> new CapabilityMetadataValue(
-                                exactKey, exactValue, result.version()));
+                        .thenApply(result -> new CapabilityMetadataValue(exactKey, exactValue, result.version()));
             }
 
             @Override
             public CompletableFuture<CapabilityMetadataValue> putIfVersion(
-                    String key,
-                    byte[] value,
-                    long expectedVersion,
-                    String partitionKey) {
+                    String key, byte[] value, long expectedVersion, String partitionKey) {
                 ensureOpen();
                 String exactKey = requireCapabilityKey(key);
                 byte[] exactValue = requireCapabilityValue(value);
                 PartitionKey exactPartition = new PartitionKey(partitionKey);
-                return client.putIfVersion(
-                                exactKey,
-                                exactValue,
-                                expectedVersion,
-                                exactPartition)
-                        .thenApply(result -> new CapabilityMetadataValue(
-                                exactKey, exactValue, result.version()));
+                return client.putIfVersion(exactKey, exactValue, expectedVersion, exactPartition)
+                        .thenApply(result -> new CapabilityMetadataValue(exactKey, exactValue, result.version()));
             }
         };
     }

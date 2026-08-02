@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.metadata.oxia.CursorIds;
@@ -9,7 +10,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-/** Single-key authority for one historical cursor-name key and its current generation. */
+/**
+ * Single-key authority for one historical cursor-name key and its current generation.
+ */
 public record CursorStateRecord(
         long metadataVersion,
         ManagedLedgerProjectionIdentity projection,
@@ -45,8 +48,7 @@ public record CursorStateRecord(
             throw new IllegalArgumentException("cursor generation, mutation sequence, and ack epoch must be positive");
         }
         Objects.requireNonNull(lifecycle, "lifecycle");
-        lastProtectionAttemptId = CursorIds.requireRandomId(
-                lastProtectionAttemptId, "lastProtectionAttemptId");
+        lastProtectionAttemptId = CursorIds.requireRandomId(lastProtectionAttemptId, "lastProtectionAttemptId");
         if (markDeleteOffset < 0) {
             throw new IllegalArgumentException("markDeleteOffset must be non-negative");
         }
@@ -58,14 +60,11 @@ public record CursorStateRecord(
                 throw new IllegalArgumentException("cursor snapshot reference does not match its parent root");
             }
         });
-        inlineWholeAckDeltas = CursorRecordValidation.canonicalRanges(
-                inlineWholeAckDeltas, markDeleteOffset);
+        inlineWholeAckDeltas = CursorRecordValidation.canonicalRanges(inlineWholeAckDeltas, markDeleteOffset);
         inlinePartialAckOverrides = CursorRecordValidation.canonicalPartials(
                 inlinePartialAckOverrides, markDeleteOffset, inlineWholeAckDeltas);
-        positionProperties = CursorRecordValidation.canonicalLongMap(
-                positionProperties, "positionProperties");
-        cursorProperties = CursorRecordValidation.canonicalStringMap(
-                cursorProperties, "cursorProperties");
+        positionProperties = CursorRecordValidation.canonicalLongMap(positionProperties, "positionProperties");
+        cursorProperties = CursorRecordValidation.canonicalStringMap(cursorProperties, "cursorProperties");
         if (createdAtMillis < 0 || updatedAtMillis < createdAtMillis) {
             throw new IllegalArgumentException("cursor timestamps are invalid");
         }

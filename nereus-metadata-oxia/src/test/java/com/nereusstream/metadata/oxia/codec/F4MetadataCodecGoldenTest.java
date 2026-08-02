@@ -1,17 +1,17 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.F4MetadataTestValues;
+import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
-import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
-import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
-import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
@@ -39,8 +39,8 @@ class F4MetadataCodecGoldenTest {
     void everyLifecycleAndOptionalBranchMatchesFrozenEnvelopeHex() throws IOException {
         Map<String, String> actual = canonicalEnvelopeHex();
         Properties expected = new Properties();
-        try (InputStream input = F4MetadataCodecGoldenTest.class.getResourceAsStream(
-                "f4-metadata-codec-golden.properties")) {
+        try (InputStream input =
+                F4MetadataCodecGoldenTest.class.getResourceAsStream("f4-metadata-codec-golden.properties")) {
             assertThat(input).isNotNull();
             expected.load(new java.io.InputStreamReader(input, StandardCharsets.UTF_8));
         }
@@ -57,22 +57,15 @@ class F4MetadataCodecGoldenTest {
     @Test
     void taskEnvelopeAndPayloadSchemaVersionsCannotAlias() {
         byte[] v1 = F4MetadataCodecs.encodeEnvelope(
-                F4MetadataTestValues.task(TaskLifecycle.PLANNED),
-                MaterializationTaskRecord.class);
-        byte[] v2 = F4MetadataCodecs.encodeEnvelope(
-                F4MetadataTestValues.taskV2(),
-                MaterializationTaskRecord.class);
-        MetadataRecordEnvelope.DecodedEnvelope v1Envelope =
-                MetadataRecordEnvelope.decode(v1);
-        MetadataRecordEnvelope.DecodedEnvelope v2Envelope =
-                MetadataRecordEnvelope.decode(v2);
+                F4MetadataTestValues.task(TaskLifecycle.PLANNED), MaterializationTaskRecord.class);
+        byte[] v2 = F4MetadataCodecs.encodeEnvelope(F4MetadataTestValues.taskV2(), MaterializationTaskRecord.class);
+        MetadataRecordEnvelope.DecodedEnvelope v1Envelope = MetadataRecordEnvelope.decode(v1);
+        MetadataRecordEnvelope.DecodedEnvelope v2Envelope = MetadataRecordEnvelope.decode(v2);
 
         assertThat(v1Envelope.schemaVersion()).isEqualTo(1);
         assertThat(v1Envelope.minReaderSchemaVersion()).isEqualTo(1);
-        assertThat(v2Envelope.schemaVersion())
-                .isEqualTo(MaterializationTaskRecord.CURRENT_SCHEMA_VERSION);
-        assertThat(v2Envelope.minReaderSchemaVersion())
-                .isEqualTo(MaterializationTaskRecord.CURRENT_SCHEMA_VERSION);
+        assertThat(v2Envelope.schemaVersion()).isEqualTo(MaterializationTaskRecord.CURRENT_SCHEMA_VERSION);
+        assertThat(v2Envelope.minReaderSchemaVersion()).isEqualTo(MaterializationTaskRecord.CURRENT_SCHEMA_VERSION);
 
         byte[] v1PayloadInV2Envelope = MetadataRecordEnvelope.encode(
                 v1Envelope.recordType(),
@@ -81,14 +74,10 @@ class F4MetadataCodecGoldenTest {
                 v1Envelope.payloadEncoding(),
                 v1Envelope.payload());
         byte[] v2PayloadInV1Envelope = MetadataRecordEnvelope.encode(
-                v2Envelope.recordType(),
-                1,
-                1,
-                v2Envelope.payloadEncoding(),
-                v2Envelope.payload());
+                v2Envelope.recordType(), 1, 1, v2Envelope.payloadEncoding(), v2Envelope.payload());
 
-        assertThatThrownBy(() -> F4MetadataCodecs.decodeEnvelope(
-                        v1PayloadInV2Envelope, MaterializationTaskRecord.class))
+        assertThatThrownBy(
+                        () -> F4MetadataCodecs.decodeEnvelope(v1PayloadInV2Envelope, MaterializationTaskRecord.class))
                 .isInstanceOf(MetadataCodecException.class)
                 .hasMessageContaining("payload schema");
         assertThatThrownBy(() -> MetadataRecordCodecFactory.decodeEnvelope(
@@ -99,16 +88,17 @@ class F4MetadataCodecGoldenTest {
 
     private static Map<String, String> canonicalEnvelopeHex() {
         Map<String, String> result = new LinkedHashMap<>();
-        vectors().forEach(sample -> result.put(
-                sample.key(), F4MetadataCodecs.envelopeHex(sample.value(), sample.type())));
+        vectors()
+                .forEach(sample ->
+                        result.put(sample.key(), F4MetadataCodecs.envelopeHex(sample.value(), sample.type())));
         return result;
     }
 
     private static List<Sample> vectors() {
         List<Sample> values = new ArrayList<>();
         values.add(sample("sequence.empty", F4MetadataTestValues.emptySequence(), GenerationSequenceRecord.class));
-        values.add(sample(
-                "sequence.allocated", F4MetadataTestValues.allocatedSequence(), GenerationSequenceRecord.class));
+        values.add(
+                sample("sequence.allocated", F4MetadataTestValues.allocatedSequence(), GenerationSequenceRecord.class));
         for (GenerationLifecycle lifecycle : GenerationLifecycle.values()) {
             values.add(sample(
                     "generation." + key(lifecycle),
@@ -137,18 +127,13 @@ class F4MetadataCodecGoldenTest {
                 MaterializationStreamRegistrationRecord.class));
         for (TaskLifecycle lifecycle : TaskLifecycle.values()) {
             values.add(sample(
-                    "task." + key(lifecycle),
-                    F4MetadataTestValues.task(lifecycle),
-                    MaterializationTaskRecord.class));
+                    "task." + key(lifecycle), F4MetadataTestValues.task(lifecycle), MaterializationTaskRecord.class));
         }
         values.add(sample(
                 "task.publishing-unallocated",
                 F4MetadataTestValues.publishingTaskWithoutGeneration(),
                 MaterializationTaskRecord.class));
-        values.add(sample(
-                "task-v2.planned",
-                F4MetadataTestValues.taskV2(),
-                MaterializationTaskRecord.class));
+        values.add(sample("task-v2.planned", F4MetadataTestValues.taskV2(), MaterializationTaskRecord.class));
         values.add(sample(
                 "checkpoint.empty",
                 F4MetadataTestValues.emptyMaterializationCheckpoint(),
@@ -158,17 +143,11 @@ class F4MetadataCodecGoldenTest {
                 F4MetadataTestValues.advancedMaterializationCheckpoint(),
                 MaterializationCheckpointRecord.class));
         values.add(sample(
-                "retention-stats.full",
-                F4MetadataTestValues.retentionStats(0, 2, 1),
-                RangeRetentionStatsRecord.class));
-        values.add(sample(
-                "recovery.empty",
-                F4MetadataTestValues.emptyRecoveryRoot(),
-                RecoveryCheckpointRootRecord.class));
-        values.add(sample(
-                "recovery.full",
-                F4MetadataTestValues.fullRecoveryRoot(),
-                RecoveryCheckpointRootRecord.class));
+                "retention-stats.full", F4MetadataTestValues.retentionStats(0, 2, 1), RangeRetentionStatsRecord.class));
+        values.add(
+                sample("recovery.empty", F4MetadataTestValues.emptyRecoveryRoot(), RecoveryCheckpointRootRecord.class));
+        values.add(
+                sample("recovery.full", F4MetadataTestValues.fullRecoveryRoot(), RecoveryCheckpointRootRecord.class));
         for (PhysicalObjectLifecycle lifecycle : PhysicalObjectLifecycle.values()) {
             values.add(sample(
                     "physical-root." + key(lifecycle),
@@ -179,15 +158,10 @@ class F4MetadataCodecGoldenTest {
                 "physical-root.deleted-tombstone",
                 F4MetadataTestValues.deletedRootWithTombstone(),
                 PhysicalObjectRootRecord.class));
-        values.add(sample(
-                "reader-lease.full",
-                F4MetadataTestValues.readerLease(),
-                ObjectReaderLeaseRecord.class));
+        values.add(sample("reader-lease.full", F4MetadataTestValues.readerLease(), ObjectReaderLeaseRecord.class));
         for (ObjectProtectionType type : ObjectProtectionType.values()) {
             values.add(sample(
-                    "protection." + key(type),
-                    F4MetadataTestValues.protection(type),
-                    ObjectProtectionRecord.class));
+                    "protection." + key(type), F4MetadataTestValues.protection(type), ObjectProtectionRecord.class));
         }
         values.add(sample(
                 "gc-retirement.manifest",
@@ -198,9 +172,7 @@ class F4MetadataCodecGoldenTest {
                 F4MetadataTestValues.gcRetirementProtection(),
                 GcRetirementProtectionRecord.class));
         values.add(sample(
-                "gc-retirement.removal",
-                F4MetadataTestValues.gcRetirementRemoval(),
-                GcRetirementRemovalRecord.class));
+                "gc-retirement.removal", F4MetadataTestValues.gcRetirementRemoval(), GcRetirementRemovalRecord.class));
         return List.copyOf(values);
     }
 
@@ -219,9 +191,9 @@ class F4MetadataCodecGoldenTest {
         Object factory = MetadataRecordCodecFactory.decodeEnvelope(encoded, (Class) sample.type());
         assertThat(direct).as(sample.key()).isEqualTo(sample.value());
         assertThat(factory).as(sample.key()).isEqualTo(sample.value());
-        assertThat(MetadataRecordCodecFactory.recordType(encoded)).isEqualTo(sample.type().getSimpleName());
+        assertThat(MetadataRecordCodecFactory.recordType(encoded))
+                .isEqualTo(sample.type().getSimpleName());
     }
 
-    private record Sample(String key, Object value, Class<?> type) {
-    }
+    private record Sample(String key, Object value, Class<?> type) {}
 }

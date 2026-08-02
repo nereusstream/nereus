@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.metadata.oxia.F4MetadataTestValues;
@@ -8,18 +9,15 @@ import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord
 import java.util.List;
 
 final class GenerationActivationTestSupport {
-    private GenerationActivationTestSupport() {
-    }
+    private GenerationActivationTestSupport() {}
 
     static List<GcReferenceDomainVersion> installedDomains() {
         return F4MetadataTestValues.referenceDomains().stream()
-                .map(value -> new GcReferenceDomainVersion(
-                        value.domainId(), value.protocolVersion()))
+                .map(value -> new GcReferenceDomainVersion(value.domainId(), value.protocolVersion()))
                 .toList();
     }
 
-    static GenerationProtocolActivationRecord publication(
-            GenerationProtocolActivationRecord current) {
+    static GenerationProtocolActivationRecord publication(GenerationProtocolActivationRecord current) {
         return copy(
                 current,
                 true,
@@ -43,15 +41,8 @@ final class GenerationActivationTestSupport {
                 true,
                 readinessEpoch,
                 complete(
-                        F4MetadataTestValues.ATTEMPT,
-                        readinessEpoch,
-                        F4MetadataTestValues.HASH_A,
-                        updatedAtMillis - 3),
-                complete(
-                        F4MetadataTestValues.CLAIM,
-                        readinessEpoch,
-                        F4MetadataTestValues.HASH_B,
-                        updatedAtMillis - 2),
+                        F4MetadataTestValues.ATTEMPT, readinessEpoch, F4MetadataTestValues.HASH_A, updatedAtMillis - 3),
+                complete(F4MetadataTestValues.CLAIM, readinessEpoch, F4MetadataTestValues.HASH_B, updatedAtMillis - 2),
                 complete(
                         F4MetadataTestValues.PUBLICATION,
                         readinessEpoch,
@@ -62,16 +53,8 @@ final class GenerationActivationTestSupport {
     }
 
     private static GenerationBackfillProofRecord complete(
-            String runId,
-            long readinessEpoch,
-            String coverageSha256,
-            long completedAtMillis) {
-        return new GenerationBackfillProofRecord(
-                runId,
-                readinessEpoch,
-                coverageSha256,
-                true,
-                completedAtMillis);
+            String runId, long readinessEpoch, String coverageSha256, long completedAtMillis) {
+        return new GenerationBackfillProofRecord(runId, readinessEpoch, coverageSha256, true, completedAtMillis);
     }
 
     private static GenerationProtocolActivationRecord copy(
@@ -84,8 +67,7 @@ final class GenerationActivationTestSupport {
             GenerationBackfillProofRecord cursors,
             String objectCapabilitySha256,
             long updatedAtMillis) {
-        boolean alreadyActive =
-                current.lifecycle() == GenerationProtocolActivationLifecycle.ACTIVE;
+        boolean alreadyActive = current.lifecycle() == GenerationProtocolActivationLifecycle.ACTIVE;
         return new GenerationProtocolActivationRecord(
                 current.schemaVersion(),
                 current.protocolVersion(),

@@ -31,55 +31,34 @@ final class PartitionedOxiaClient {
     }
 
     CompletableFuture<WriteResult> putIfAbsent(String key, byte[] value, PartitionKey partitionKey) {
-        return backend.putIfAbsent(
-                requireKey(key, "key"),
-                copyValue(value),
-                requirePartitionKey(partitionKey));
+        return backend.putIfAbsent(requireKey(key, "key"), copyValue(value), requirePartitionKey(partitionKey));
     }
 
     CompletableFuture<WriteResult> putIfVersion(
-            String key,
-            byte[] value,
-            long expectedVersion,
-            PartitionKey partitionKey) {
+            String key, byte[] value, long expectedVersion, PartitionKey partitionKey) {
         if (expectedVersion < 0) {
             throw new IllegalArgumentException("expectedVersion must be non-negative");
         }
         return backend.putIfVersion(
-                requireKey(key, "key"),
-                copyValue(value),
-                expectedVersion,
-                requirePartitionKey(partitionKey));
+                requireKey(key, "key"), copyValue(value), expectedVersion, requirePartitionKey(partitionKey));
     }
 
-    CompletableFuture<List<String>> list(
-            String fromInclusive,
-            String toExclusive,
-            PartitionKey partitionKey) {
+    CompletableFuture<List<String>> list(String fromInclusive, String toExclusive, PartitionKey partitionKey) {
         return backend.list(
                 requireKey(fromInclusive, "fromInclusive"),
                 requireKey(toExclusive, "toExclusive"),
                 requirePartitionKey(partitionKey));
     }
 
-    CompletableFuture<Void> deleteIfVersion(
-            String key,
-            long expectedVersion,
-            PartitionKey partitionKey) {
+    CompletableFuture<Void> deleteIfVersion(String key, long expectedVersion, PartitionKey partitionKey) {
         if (expectedVersion < 0) {
             throw new IllegalArgumentException("expectedVersion must be non-negative");
         }
-        return backend.deleteIfVersion(
-                requireKey(key, "key"),
-                expectedVersion,
-                requirePartitionKey(partitionKey));
+        return backend.deleteIfVersion(requireKey(key, "key"), expectedVersion, requirePartitionKey(partitionKey));
     }
 
     CompletableFuture<List<VersionedValue>> rangeScan(
-            String fromInclusive,
-            String toExclusive,
-            int limit,
-            PartitionKey partitionKey) {
+            String fromInclusive, String toExclusive, int limit, PartitionKey partitionKey) {
         if (limit <= 0) {
             throw new IllegalArgumentException("limit must be positive");
         }
@@ -90,10 +69,7 @@ final class PartitionedOxiaClient {
                 requirePartitionKey(partitionKey));
     }
 
-    WatchRegistration watchPrefix(
-            String prefix,
-            PartitionKey partitionKey,
-            Runnable invalidationCallback) {
+    WatchRegistration watchPrefix(String prefix, PartitionKey partitionKey, Runnable invalidationCallback) {
         return backend.watchPrefix(
                 requireKey(prefix, "prefix"),
                 requirePartitionKey(partitionKey),
@@ -122,31 +98,16 @@ final class PartitionedOxiaClient {
         CompletableFuture<WriteResult> putIfAbsent(String key, byte[] value, PartitionKey partitionKey);
 
         CompletableFuture<WriteResult> putIfVersion(
-                String key,
-                byte[] value,
-                long expectedVersion,
-                PartitionKey partitionKey);
+                String key, byte[] value, long expectedVersion, PartitionKey partitionKey);
 
-        CompletableFuture<Void> deleteIfVersion(
-                String key,
-                long expectedVersion,
-                PartitionKey partitionKey);
+        CompletableFuture<Void> deleteIfVersion(String key, long expectedVersion, PartitionKey partitionKey);
 
-        CompletableFuture<List<String>> list(
-                String fromInclusive,
-                String toExclusive,
-                PartitionKey partitionKey);
+        CompletableFuture<List<String>> list(String fromInclusive, String toExclusive, PartitionKey partitionKey);
 
         CompletableFuture<List<VersionedValue>> rangeScan(
-                String fromInclusive,
-                String toExclusive,
-                int limit,
-                PartitionKey partitionKey);
+                String fromInclusive, String toExclusive, int limit, PartitionKey partitionKey);
 
-        WatchRegistration watchPrefix(
-                String prefix,
-                PartitionKey partitionKey,
-                Runnable invalidationCallback);
+        WatchRegistration watchPrefix(String prefix, PartitionKey partitionKey, Runnable invalidationCallback);
     }
 
     record VersionedValue(String key, byte[] value, long version) {

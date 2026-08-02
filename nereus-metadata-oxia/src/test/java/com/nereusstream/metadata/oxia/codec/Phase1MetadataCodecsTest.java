@@ -16,7 +16,6 @@ package com.nereusstream.metadata.oxia.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
 import com.nereusstream.metadata.oxia.records.StreamNameRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
@@ -36,8 +35,8 @@ class Phase1MetadataCodecsTest {
         for (MetadataCodecSamples.Sample<?> sample : MetadataCodecSamples.samples()) {
             assertRoundTrip(sample);
             assertThat(Phase1MetadataCodecs.registry()
-                    .codecForType(sample.recordClass().getSimpleName())
-                    .recordType())
+                            .codecForType(sample.recordClass().getSimpleName())
+                            .recordType())
                     .isEqualTo(sample.recordClass().getSimpleName());
         }
     }
@@ -67,25 +66,9 @@ class Phase1MetadataCodecsTest {
         rightAttributes.put("b", "2");
 
         StreamMetadataRecord left = new StreamMetadataRecord(
-                "stream",
-                "tenant/ns/topic",
-                "stream-name-hash",
-                "ACTIVE",
-                "OBJECT_WAL",
-                leftAttributes,
-                1_000,
-                1,
-                7);
+                "stream", "tenant/ns/topic", "stream-name-hash", "ACTIVE", "OBJECT_WAL", leftAttributes, 1_000, 1, 7);
         StreamMetadataRecord right = new StreamMetadataRecord(
-                "stream",
-                "tenant/ns/topic",
-                "stream-name-hash",
-                "ACTIVE",
-                "OBJECT_WAL",
-                rightAttributes,
-                1_000,
-                1,
-                7);
+                "stream", "tenant/ns/topic", "stream-name-hash", "ACTIVE", "OBJECT_WAL", rightAttributes, 1_000, 1, 7);
 
         assertThat(Phase1MetadataCodecs.envelopeHex(left, StreamMetadataRecord.class))
                 .isEqualTo(Phase1MetadataCodecs.envelopeHex(right, StreamMetadataRecord.class));
@@ -109,17 +92,9 @@ class Phase1MetadataCodecsTest {
         byte[] payload = codec.encode(record);
 
         byte[] newerVersion = MetadataRecordEnvelope.encode(
-                codec.recordType(),
-                2,
-                2,
-                MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1,
-                payload);
+                codec.recordType(), 2, 2, MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1, payload);
         byte[] unsupportedEncoding = MetadataRecordEnvelope.encode(
-                codec.recordType(),
-                codec.schemaVersion(),
-                codec.minReaderSchemaVersion(),
-                "json-v1",
-                payload);
+                codec.recordType(), codec.schemaVersion(), codec.minReaderSchemaVersion(), "json-v1", payload);
 
         assertThatThrownBy(() -> Phase1MetadataCodecs.decodeEnvelope(newerVersion, StreamNameRecord.class))
                 .isInstanceOf(MetadataCodecException.class)
@@ -185,8 +160,8 @@ class Phase1MetadataCodecsTest {
 
     private static Properties loadGoldenEnvelopeHex() throws IOException {
         Properties properties = new Properties();
-        try (InputStream input = Phase1MetadataCodecsTest.class.getResourceAsStream(
-                "phase1-metadata-codec-golden.properties")) {
+        try (InputStream input =
+                Phase1MetadataCodecsTest.class.getResourceAsStream("phase1-metadata-codec-golden.properties")) {
             assertThat(input).isNotNull();
             properties.load(input);
         }

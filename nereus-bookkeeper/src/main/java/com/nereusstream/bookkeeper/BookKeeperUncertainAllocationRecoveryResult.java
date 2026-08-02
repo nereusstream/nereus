@@ -1,13 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
-/** Bounded summary from one complete fixed-slot uncertain-allocation recovery pass. */
+/**
+ * Bounded summary from one complete fixed-slot uncertain-allocation recovery pass.
+ */
 public record BookKeeperUncertainAllocationRecoveryResult(
-        int scannedSlots,
-        int uncertainSlots,
-        int absentLedgers,
-        int recoveredLedgers,
-        int quarantinedLedgers) {
+        int scannedSlots, int uncertainSlots, int absentLedgers, int recoveredLedgers, int quarantinedLedgers) {
     public BookKeeperUncertainAllocationRecoveryResult {
         if (scannedSlots < 0
                 || uncertainSlots < 0

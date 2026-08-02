@@ -16,36 +16,27 @@ package com.nereusstream.api.keys;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import org.junit.jupiter.api.Test;
 
 class KeyComponentCodecTest {
     @Test
     void rawComponentsAllowOnlyStableAsciiPathSegments() {
-        assertThat(KeyComponentCodec.encodeComponent("tenant_ns.topic-0"))
-                .isEqualTo("tenant_ns.topic-0");
+        assertThat(KeyComponentCodec.encodeComponent("tenant_ns.topic-0")).isEqualTo("tenant_ns.topic-0");
     }
 
     @Test
     void unsafeComponentsUseBase32LowerNoPadWithReservedPrefix() {
-        assertThat(KeyComponentCodec.encodeComponent("tenant/ns"))
-                .isEqualTo("b32-orsw4ylooqxw44y");
-        assertThat(KeyComponentCodec.encodeComponent("."))
-                .isEqualTo("b32-fy");
-        assertThat(KeyComponentCodec.encodeComponent(".."))
-                .isEqualTo("b32-fyxa");
-        assertThat(KeyComponentCodec.encodeComponent("b32-raw"))
-                .isEqualTo("b32-miztellsmf3q");
-        assertThat(KeyComponentCodec.encodeComponent("C:"))
-                .isEqualTo("b32-im5a");
+        assertThat(KeyComponentCodec.encodeComponent("tenant/ns")).isEqualTo("b32-orsw4ylooqxw44y");
+        assertThat(KeyComponentCodec.encodeComponent(".")).isEqualTo("b32-fy");
+        assertThat(KeyComponentCodec.encodeComponent("..")).isEqualTo("b32-fyxa");
+        assertThat(KeyComponentCodec.encodeComponent("b32-raw")).isEqualTo("b32-miztellsmf3q");
+        assertThat(KeyComponentCodec.encodeComponent("C:")).isEqualTo("b32-im5a");
     }
 
     @Test
     void strictDecodeRoundTripsRawEncodedAndUnicodeComponents() {
-        assertThat(KeyComponentCodec.decodeComponent("tenant_ns.topic-0"))
-                .isEqualTo("tenant_ns.topic-0");
-        assertThat(KeyComponentCodec.decodeComponent("b32-orsw4ylooqxw44y"))
-                .isEqualTo("tenant/ns");
+        assertThat(KeyComponentCodec.decodeComponent("tenant_ns.topic-0")).isEqualTo("tenant_ns.topic-0");
+        assertThat(KeyComponentCodec.decodeComponent("b32-orsw4ylooqxw44y")).isEqualTo("tenant/ns");
         String unicode = "租户/主题";
         assertThat(KeyComponentCodec.decodeComponent(KeyComponentCodec.encodeComponent(unicode)))
                 .isEqualTo(unicode);
@@ -62,14 +53,11 @@ class KeyComponentCodecTest {
 
     @Test
     void nonNegativeLongUsesLexicographicallySortableFixedWidthDecimal() {
-        assertThat(KeyComponentCodec.encodeNonNegativeLong(0))
-                .isEqualTo("0000000000000000000");
-        assertThat(KeyComponentCodec.encodeNonNegativeLong(9))
-                .isLessThan(KeyComponentCodec.encodeNonNegativeLong(10));
+        assertThat(KeyComponentCodec.encodeNonNegativeLong(0)).isEqualTo("0000000000000000000");
+        assertThat(KeyComponentCodec.encodeNonNegativeLong(9)).isLessThan(KeyComponentCodec.encodeNonNegativeLong(10));
         assertThat(KeyComponentCodec.encodeNonNegativeLong(10))
                 .isLessThan(KeyComponentCodec.encodeNonNegativeLong(100));
-        assertThat(KeyComponentCodec.encodeNonNegativeLong(Long.MAX_VALUE))
-                .isEqualTo("9223372036854775807");
+        assertThat(KeyComponentCodec.encodeNonNegativeLong(Long.MAX_VALUE)).isEqualTo("9223372036854775807");
         assertThatThrownBy(() -> KeyComponentCodec.encodeNonNegativeLong(-1))
                 .isInstanceOf(IllegalArgumentException.class);
     }

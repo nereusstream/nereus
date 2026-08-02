@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.core.physical.GcReferenceQuery;
@@ -7,7 +8,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable result of one ordered local reference-domain registry pass. */
+/**
+ * Immutable result of one ordered local reference-domain registry pass.
+ */
 public final class GcReferenceCollection {
     private final GcReferenceQuery query;
     private final List<GcReferenceSnapshot> snapshots;
@@ -31,8 +34,7 @@ public final class GcReferenceCollection {
             if (!snapshot.queryIdentitySha256().equals(query.queryIdentitySha256())) {
                 throw new IllegalArgumentException("reference collection contains a different query identity");
             }
-            if (index > 0 && GcPlanValidation.DOMAIN_ORDER.compare(
-                    this.snapshots.get(index - 1), snapshot) >= 0) {
+            if (index > 0 && GcPlanValidation.DOMAIN_ORDER.compare(this.snapshots.get(index - 1), snapshot) >= 0) {
                 throw new IllegalArgumentException("reference collection snapshots are not canonical");
             }
         }
@@ -40,7 +42,8 @@ public final class GcReferenceCollection {
             throw new IllegalArgumentException("reference collection blocking domain does not match status");
         }
         blockingDomainId.ifPresent(domain -> {
-            if (this.snapshots.stream().noneMatch(snapshot -> snapshot.domainId().equals(domain))) {
+            if (this.snapshots.stream()
+                    .noneMatch(snapshot -> snapshot.domainId().equals(domain))) {
                 throw new IllegalArgumentException("blocking domain has no captured snapshot");
             }
         });
@@ -72,6 +75,8 @@ public final class GcReferenceCollection {
 
     public Optional<GcReferenceSnapshot> snapshot(String domainId) {
         Objects.requireNonNull(domainId, "domainId");
-        return snapshots.stream().filter(value -> value.domainId().equals(domainId)).findFirst();
+        return snapshots.stream()
+                .filter(value -> value.domainId().equals(domainId))
+                .findFirst();
     }
 }

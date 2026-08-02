@@ -1,0 +1,1319 @@
+/* Licensed under the Apache License, Version 2.0 */
+
+dependencies {
+    api(project(":nereus-api"))
+    implementation(project(":nereus-core"))
+    implementation(project(":nereus-metadata-oxia"))
+    implementation(project(":nereus-object-store"))
+    implementation(project(":nereus-materialization"))
+    implementation(project(":nereus-bookkeeper"))
+    compileOnly(libs.kafka.clients)
+
+    testImplementation(testFixtures(project(":nereus-metadata-oxia")))
+    testImplementation(testFixtures(project(":nereus-object-store")))
+    testImplementation(libs.kafka.clients)
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.assertj)
+    testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+val f9ProviderIntegrationTest by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
+val f9BookKeeperFaultAgent by sourceSets.creating
+val f9ActivationFaultAgent by sourceSets.creating
+val f9TrimFaultAgent by sourceSets.creating
+val f9TransactionResolutionFaultAgent by sourceSets.creating
+val f9KafkaClient390Runtime by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+val f9KafkaClient401Runtime by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+val f9KafkaClient411Runtime by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
+configurations[f9ProviderIntegrationTest.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get(),
+)
+configurations[f9ProviderIntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get(),
+)
+
+dependencies {
+    add(f9ProviderIntegrationTest.implementationConfigurationName, project())
+    add(f9ProviderIntegrationTest.implementationConfigurationName, testFixtures(project(":nereus-object-store")))
+    add(f9ProviderIntegrationTest.implementationConfigurationName, platform(libs.aws.sdk.v2.bom))
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.aws.sdk.v2.s3)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.oxia.testcontainers)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.pulsar.metadata)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.testcontainers.localstack)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.testcontainers.toxiproxy)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.junit.jupiter)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.assertj)
+    add(
+        f9ProviderIntegrationTest.implementationConfigurationName,
+        "com.fasterxml.jackson.core:jackson-databind:2.21.1",
+    )
+    add(f9ProviderIntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+    add(f9BookKeeperFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
+    add(f9ActivationFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
+    add(f9TrimFaultAgent.implementationConfigurationName, "net.bytebuddy:byte-buddy:1.17.7")
+    add(
+        f9TransactionResolutionFaultAgent.implementationConfigurationName,
+        "net.bytebuddy:byte-buddy:1.17.7",
+    )
+    add(f9KafkaClient390Runtime.name, "org.apache.kafka:kafka-clients:3.9.0")
+    add(f9KafkaClient401Runtime.name, "org.apache.kafka:kafka-clients:4.0.1")
+    add(f9KafkaClient411Runtime.name, "org.apache.kafka:kafka-clients:4.1.1")
+}
+
+val stageF9KafkaClient390Runtime =
+    tasks.register<Sync>("stageF9KafkaClient390Runtime") {
+        group = "build"
+        description = "Stage the exact kafka-clients 3.9.0 runtime for the F9 compatibility process gate."
+        from(f9KafkaClient390Runtime)
+        into(layout.buildDirectory.dir("f9-kafka-client-runtimes/3.9.0"))
+    }
+
+val stageF9KafkaClient401Runtime =
+    tasks.register<Sync>("stageF9KafkaClient401Runtime") {
+        group = "build"
+        description = "Stage the exact kafka-clients 4.0.1 runtime for the F9 compatibility process gate."
+        from(f9KafkaClient401Runtime)
+        into(layout.buildDirectory.dir("f9-kafka-client-runtimes/4.0.1"))
+    }
+
+val stageF9KafkaClient411Runtime =
+    tasks.register<Sync>("stageF9KafkaClient411Runtime") {
+        group = "build"
+        description = "Stage the exact kafka-clients 4.1.1 runtime for the F9 compatibility process gate."
+        from(f9KafkaClient411Runtime)
+        into(layout.buildDirectory.dir("f9-kafka-client-runtimes/4.1.1"))
+    }
+
+val f9BookKeeperFaultAgentJar =
+    tasks.register<Jar>("f9BookKeeperFaultAgentJar") {
+        group = "build"
+        description =
+            "Build the test-only Java agent that gates one applied BookKeeper write completion."
+        archiveFileName.set("nereus-f9-bookkeeper-fault-agent.jar")
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        manifest {
+            attributes[
+                "Premain-Class"
+            ] = "com.nereusstream.kafka.testing.agent.BookKeeperWriteCompletionGateAgent"
+        }
+        from(f9BookKeeperFaultAgent.output)
+        from({
+            configurations[f9BookKeeperFaultAgent.runtimeClasspathConfigurationName]
+                .map { dependency ->
+                    if (dependency.isDirectory) dependency else zipTree(dependency)
+                }
+        })
+    }
+
+val f9ActivationFaultAgentJar =
+    tasks.register<Jar>("f9ActivationFaultAgentJar") {
+        group = "build"
+        description =
+            "Build the test-only Java agent that gates one activation-store publication boundary."
+        archiveFileName.set("nereus-f9-activation-fault-agent.jar")
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        manifest {
+            attributes[
+                "Premain-Class"
+            ] = "com.nereusstream.kafka.testing.agent.ActivationCompletionGateAgent"
+        }
+        from(f9ActivationFaultAgent.output)
+        from({
+            configurations[f9ActivationFaultAgent.runtimeClasspathConfigurationName]
+                .map { dependency ->
+                    if (dependency.isDirectory) dependency else zipTree(dependency)
+                }
+        })
+    }
+
+val f9TrimFaultAgentJar =
+    tasks.register<Jar>("f9TrimFaultAgentJar") {
+        group = "build"
+        description =
+            "Build the test-only Java agent that withholds one provider-applied stream-trim completion."
+        archiveFileName.set("nereus-f9-trim-fault-agent.jar")
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        manifest {
+            attributes[
+                "Premain-Class"
+            ] = "com.nereusstream.kafka.testing.agent.TrimCompletionLossAgent"
+        }
+        from(f9TrimFaultAgent.output)
+        from({
+            configurations[f9TrimFaultAgent.runtimeClasspathConfigurationName]
+                .map { dependency ->
+                    if (dependency.isDirectory) dependency else zipTree(dependency)
+                }
+        })
+    }
+
+val f9TransactionResolutionFaultAgentJar =
+    tasks.register<Jar>("f9TransactionResolutionFaultAgentJar") {
+        group = "build"
+        description =
+            "Build the test-only Java agent that gates one transaction marker append boundary."
+        archiveFileName.set("nereus-f9-transaction-resolution-fault-agent.jar")
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        manifest {
+            attributes[
+                "Premain-Class"
+            ] = "com.nereusstream.kafka.testing.agent.TransactionMarkerCompletionGateAgent"
+        }
+        from(f9TransactionResolutionFaultAgent.output)
+        from({
+            configurations[f9TransactionResolutionFaultAgent.runtimeClasspathConfigurationName]
+                .map { dependency ->
+                    if (dependency.isDirectory) dependency else zipTree(dependency)
+                }
+        })
+    }
+
+tasks.register<Test>("f9M2Test") {
+    group = "verification"
+    description = "Run F9-M2 deterministic Kafka binding, scanner, checkpoint, and recovery contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+}
+
+tasks.register<Test>("f9M2IntegrationTest") {
+    group = "verification"
+    description = "Run F9-M2 adapter restart/failure-cut integration contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    shouldRunAfter(tasks.test, tasks.named("f9M2Test"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.*IntegrationTest")
+    }
+}
+
+tasks.register<Test>("f9M3CodecTest") {
+    group = "verification"
+    description = "Run F9-M3 byte-exact codec, partition IO, and bounded async runtime contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.codec.*")
+        includeTestsMatching("com.nereusstream.kafka.partition.DefaultKafkaPartitionStorageTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.KafkaBoundedAppendExecutorTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.KafkaAppendFailureClassifierTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.KafkaStorageAdmissionTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.KafkaRuntimeResourcesTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.DefaultNereusKafkaRuntimeTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaRuntimeFactoryTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeConfigurationTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeFactoryTest")
+        includeTestsMatching("com.nereusstream.kafka.partition.KafkaFetchOperationTest")
+        includeTestsMatching("com.nereusstream.kafka.fetch.KafkaFetchWaveOperationTest")
+        includeTestsMatching("com.nereusstream.kafka.partition.KafkaPartitionLeaderManagerTest")
+        includeTestsMatching("com.nereusstream.kafka.partition.KafkaStorageProfilePolicyTest")
+        includeTestsMatching("com.nereusstream.kafka.partition.DefaultKafkaPartitionStorageManagerTest")
+        includeTestsMatching("com.nereusstream.kafka.partition.DefaultKafkaPartitionOpenerTest")
+        includeTestsMatching("com.nereusstream.kafka.partition.KafkaListOffsetsResolverTest")
+    }
+}
+
+tasks.register<Test>("f9M3ProviderIntegrationTest") {
+    group = "verification"
+    description = "Run the F9-M3 Object-WAL leader open/Produce/Fetch gate against real Oxia."
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test, tasks.named("f9M3CodecTest"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeIntegrationTest." +
+                    "activatesThenRoundTripsStableKafkaBatchThroughRealOxiaProviderGraph",
+        )
+    }
+}
+
+tasks.register<Test>("f9MultiBrokerTakeoverProviderIntegrationTest") {
+    group = "verification"
+    description =
+        "Run the F9 live two-broker higher-leader-epoch takeover gate against real Oxia and Object-WAL."
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.named("f9M3ProviderIntegrationTest"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeIntegrationTest." +
+                    "higherLeaderEpochTakesOverLiveBrokerAndRecoversCommittedKafkaBatch",
+        )
+    }
+}
+
+tasks.register<Test>("f9BookKeeperWalOnlyProviderIntegrationTest") {
+    group = "verification"
+    description = "Run the F9 BookKeeper-WAL-only leader open/Produce/Fetch gate against real Oxia and BookKeeper."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test, tasks.named("f9M3ProviderIntegrationTest"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeIntegrationTest." +
+                    "activatesThenRoundTripsKafkaBatchThroughRealBookKeeperWalOnlyGraph",
+        )
+    }
+}
+
+tasks.register<Test>("f9BookKeeperLedgerDeletionProviderIntegrationTest") {
+    group = "verification"
+    description =
+        "Run the F9 Kafka proof activation and physical BookKeeper ledger-deletion gate."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.named("f9BookKeeperWalOnlyProviderIntegrationTest"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeIntegrationTest." +
+                    "activatesKafkaProofThenPhysicallyDeletesSealedBookKeeperLedger",
+        )
+    }
+}
+
+tasks.register<Test>("f9M6KafkaProcessIntegrationTest") {
+    group = "verification"
+    description = "Run the F9 provider-backed Nereus Kafka cold-restart Produce/Fetch/ListOffsets gate."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-process-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "productProcessRecoversUserGroupAndTransactionStateAcrossGracefulAndForcedRestarts",
+        )
+    }
+}
+
+tasks.register<Test>("f9CheckpointTrimRecoveryProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Run native Kafka DeleteRecords through NKC1 publication, durable trim, and forced-restart virtual-segment recovery."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9M6KafkaProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-checkpoint-trim-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "deleteRecordsPublishesCheckpointAndRecoversVirtualSegmentsAfterForcedRestart",
+        )
+    }
+}
+
+tasks.register<Test>("f9DeleteRecordsBoundaryProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Run native Kafka DeleteRecords at a batch start, middle, end, and the high-watermark sentinel."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9CheckpointTrimRecoveryProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-delete-records-boundary-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "deleteRecordsMapsBatchStartMiddleEndAndHighWatermarkExactly",
+        )
+    }
+}
+
+tasks.register<Test>("f9TrimResponseLossProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Lose one provider-applied trim response, kill the broker, and prove fresh-process DeleteRecords convergence."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9TrimFaultAgentJar)
+    shouldRunAfter(tasks.named("f9DeleteRecordsBoundaryProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.trim.fault.agent",
+        layout.buildDirectory.file("libs/nereus-f9-trim-fault-agent.jar").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-trim-response-loss-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "trimResponseLossConvergesAfterForcedRestartWithoutRepeatingTrim",
+        )
+    }
+}
+
+tasks.register<Test>("f9TrimProfileMatrixProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Prove trim response-loss recovery for Object async and all three BookKeeper storage profiles."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9TrimFaultAgentJar)
+    shouldRunAfter(tasks.named("f9TrimResponseLossProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.trim.fault.agent",
+        layout.buildDirectory.file("libs/nereus-f9-trim-fault-agent.jar").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-trim-profile-matrix-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "remainingStorageProfilesConvergeAfterTrimResponseLoss",
+        )
+    }
+}
+
+tasks.register<Test>("f9MultiBrokerTakeoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Run two release Kafka processes through a live RF1 shared-storage leader reassignment."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9TrimProfileMatrixProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-multi-broker-process-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "twoReleaseProcessesAtomicallyReassignLiveSharedStorageLeader",
+        )
+    }
+}
+
+tasks.register<Test>("f9LeaderChurnChaosProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Run three live release brokers through repeated RF1 leader churn and durable authority fencing."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9MultiBrokerTakeoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-leader-churn-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "scenarioKfScl006",
+        )
+    }
+}
+
+tasks.register<Test>("f9ClientCompatibilityProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Run kafka-clients 3.9.0, 4.0.1, 4.1.1, and fork-current 4.3 against one real Nereus broker."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(
+        stageF9KafkaClient390Runtime,
+        stageF9KafkaClient401Runtime,
+        stageF9KafkaClient411Runtime,
+    )
+    shouldRunAfter(tasks.named("f9LeaderChurnChaosProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.compatibility.probe.classes",
+        f9ProviderIntegrationTest.java.destinationDirectory.get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.compatibility.client.3.9.0.dir",
+        layout.buildDirectory.dir("f9-kafka-client-runtimes/3.9.0").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.compatibility.client.4.0.1.dir",
+        layout.buildDirectory.dir("f9-kafka-client-runtimes/4.0.1").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.compatibility.client.4.1.1.dir",
+        layout.buildDirectory.dir("f9-kafka-client-runtimes/4.1.1").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-client-compatibility-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "scenarioKfScl008",
+        )
+    }
+}
+
+tasks.register<Test>("f9PerformanceProfileProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Record observation-only Produce, Fetch, fresh-cache recovery, and resource baselines for all five profiles."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9ClientCompatibilityProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-performance-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "scenarioKfScl009",
+        )
+    }
+}
+
+tasks.register<Test>("f9EvidenceAggregatorTest") {
+    group = "verification"
+    description =
+        "Map every F9 Markdown/manifest ID to one fresh passing owner task and exact-source evidence result."
+    shouldRunAfter(tasks.named("f9PerformanceProfileProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.f9.repository",
+        rootProject.layout.projectDirectory.asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.f9.manifest",
+        rootProject.layout.projectDirectory
+            .file("docs/phase-9-kafka-native-storage/f9-scenarios.json")
+            .asFile
+            .absolutePath,
+    )
+    systemProperty(
+        "nereus.f9.matrix",
+        rootProject.layout.projectDirectory
+            .file("docs/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md")
+            .asFile
+            .absolutePath,
+    )
+    systemProperty(
+        "nereus.f9.pre.evidence",
+        rootProject.layout.buildDirectory
+            .file("f9-final-evidence/pre-evidence.json")
+            .get()
+            .asFile
+            .absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.evidence.Phase9EvidenceAggregatorTest",
+        )
+    }
+}
+
+tasks.register<Test>("f9CoordinatorMigrationProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Migrate user, group, and transaction partitions across two live release Kafka processes " +
+                "and recover both coordinators."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9MultiBrokerTakeoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-coordinator-migration-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "twoReleaseProcessesMigrateRecoveredGroupAndTransactionCoordinators",
+        )
+    }
+}
+
+tasks.register<Test>("f9OngoingTransactionMigrationProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Commit and abort open transactions while user and transaction-state partitions migrate " +
+                "between two live release Kafka processes."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9CoordinatorMigrationProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-ongoing-transaction-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "ongoingTransactionsCommitAndAbortAcrossLiveCoordinatorMigrations",
+        )
+    }
+}
+
+tasks.register<Test>("f9TransactionResolutionCutProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Kill a release broker before and after durable transaction-marker append completion, " +
+                "then prove fresh-process abort resolution."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9TransactionResolutionFaultAgentJar)
+    shouldRunAfter(tasks.named("f9OngoingTransactionMigrationProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.transaction.resolution.fault.agent",
+        layout.buildDirectory
+            .file("libs/nereus-f9-transaction-resolution-fault-agent.jar")
+            .get()
+            .asFile
+            .absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-transaction-resolution-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "preparedAbortRecoversAcrossTransactionMarkerProcessCuts",
+        )
+    }
+}
+
+tasks.register<Test>("f9TransactionResolutionProfileMatrixProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Repeat both durable transaction-marker process cuts for Object async and all three BookKeeper profiles."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9TransactionResolutionFaultAgentJar)
+    shouldRunAfter(tasks.named("f9TransactionResolutionCutProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.transaction.resolution.fault.agent",
+        layout.buildDirectory
+            .file("libs/nereus-f9-transaction-resolution-fault-agent.jar")
+            .get()
+            .asFile
+            .absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory
+            .dir("f9-kafka-transaction-resolution-profile-matrix-evidence")
+            .get()
+            .asFile
+            .absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "remainingStorageProfilesRecoverAcrossTransactionMarkerProcessCuts",
+        )
+    }
+}
+
+tasks.register<Test>("f9MandatoryInternalTopicNtc2ProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Delete and corrupt activated internal-topic NTC2 objects, prove coordinator election fails closed, " +
+                "then restore the exact bytes and prove ordinary re-election."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9TransactionResolutionProfileMatrixProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-mandatory-ntc2-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "mandatoryInternalTopicNtc2FailureBlocksElectionUntilPhysicalRepair",
+        )
+    }
+}
+
+tasks.register<Test>("f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Repeat activated internal-topic NTC2 delete/corrupt/repair election cuts for Object async and all BookKeeper profiles."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9MandatoryInternalTopicNtc2ProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory
+            .dir("f9-kafka-mandatory-ntc2-profile-matrix-evidence")
+            .get()
+            .asFile
+            .absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "remainingStorageProfilesBlockInternalTopicElectionUntilNtc2Repair",
+        )
+    }
+}
+
+tasks.register<Test>("f9MultiControllerFailoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Kill the active controller in a three-voter release cluster and prove Nereus ACTIVE/IO continuity."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-multi-controller-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "threeCombinedNodesKeepNativeIoThroughControllerLeaderKill",
+        )
+    }
+}
+
+tasks.register<Test>("f9ActivationCutFailoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Kill the active controller before/after readiness, PREPARED, and ACTIVE Oxia publication and prove recovery."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9ActivationFaultAgentJar)
+    shouldRunAfter(tasks.named("f9MultiControllerFailoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.activation.fault.agent",
+        layout.buildDirectory.file("libs/nereus-f9-activation-fault-agent.jar").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-activation-cut-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "threeControllersRecoverEveryActivationStorePublicationCut",
+        )
+    }
+}
+
+tasks.register<Test>("f9ActivationTransportRecoveryProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Cut the real Oxia transport during first activation and prove same-epoch controller retry and native IO."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9ActivationCutFailoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-activation-transport-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "scenarioKfScl007",
+        )
+    }
+}
+
+tasks.register<Test>("f9ActivationProofCutFailoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Kill the active controller before/after initial snapshot proof and capability aggregation and prove recovery."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9ActivationFaultAgentJar)
+    shouldRunAfter(tasks.named("f9ActivationCutFailoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.activation.fault.agent",
+        layout.buildDirectory.file("libs/nereus-f9-activation-fault-agent.jar").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-activation-proof-cut-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "threeControllersRecoverEveryInitialActivationProofCut",
+        )
+    }
+}
+
+tasks.named("f9ActivationTransportRecoveryProcessIntegrationTest") {
+    shouldRunAfter(tasks.named("f9ActivationProofCutFailoverProcessIntegrationTest"))
+}
+
+tasks.register<Test>("f9InFlightTakeoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Hold an old broker inside real Object-WAL IO while a separate controller reassigns its partition."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9ActivationTransportRecoveryProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-inflight-takeover-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "threeReleaseProcessesFenceAlreadyDispatchedOldLeaderAppend",
+        )
+    }
+}
+
+tasks.register<Test>("f9BookKeeperProfileTakeoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Reassign a live partition across two release Kafka processes for all three BookKeeper profiles."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9InFlightTakeoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-bookkeeper-takeover-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "threeBookKeeperProfilesAtomicallyReassignLiveSharedStorageLeader",
+        )
+    }
+}
+
+tasks.register<Test>("f9BookKeeperInFlightTakeoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Hold an applied BookKeeper write before durable publication while a live release broker takes over."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9BookKeeperFaultAgentJar)
+    shouldRunAfter(tasks.named("f9BookKeeperProfileTakeoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.bookkeeper.fault.agent",
+        layout.buildDirectory.file("libs/nereus-f9-bookkeeper-fault-agent.jar").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-bookkeeper-inflight-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "threeReleaseProcessesFenceAppliedBookKeeperWriteBeforePublication",
+        )
+    }
+}
+
+tasks.register<Test>("f9BookKeeperWalOnlyProcessIntegrationTest") {
+    group = "verification"
+    description = "Run the native Kafka BookKeeper-WAL-only Produce/Fetch cold-restart process gate."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9M6KafkaProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-bookkeeper-process-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "bookKeeperWalOnlyProcessRecoversAcrossFreshJvmRestart",
+        )
+    }
+}
+
+tasks.register<Test>("f9BookKeeperWalAsyncObjectProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Run the native Kafka BookKeeper async-object physical-deletion and fresh-JVM NCP2 recovery process gate."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    mustRunAfter(tasks.named("f9BookKeeperWalOnlyProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-bookkeeper-async-process-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "bookKeeperWalAsyncObjectProcessMaterializesAndRecoversAcrossFreshJvmRestart",
+        )
+    }
+}
+
+tasks.register<Test>("f9BookKeeperWalSyncObjectProcessIntegrationTest") {
+    group = "verification"
+    description = "Run the native Kafka BookKeeper sync-object NCP2 cold-restart process gate."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    mustRunAfter(tasks.named("f9BookKeeperWalAsyncObjectProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-bookkeeper-sync-process-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "bookKeeperWalSyncObjectProcessMaterializesBeforeAppendAndRecoversAcrossFreshJvmRestart",
+        )
+    }
+}
+
+tasks.register<Test>("f9ObjectWalAsyncObjectProcessIntegrationTest") {
+    group = "verification"
+    description = "Run the native Kafka async Object-WAL Produce/Fetch cold-restart process gate."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9M6KafkaProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-object-async-process-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                    "objectWalAsyncObjectProcessRecoversAcrossFreshJvmRestart",
+        )
+    }
+}
+
+tasks.register<Test>("f9ProducerStatePropertyTest") {
+    group = "verification"
+    description = "Run the partial F9-M4 complete seven-section canonical checkpoint contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaProducerTransactionStateCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaProducerStatePropertyTest")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaLeaderEpochStateCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaDerivedIndexStateCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaVirtualSegmentStateCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaCanonicalCheckpointStateCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaCanonicalCheckpointPublicationFactoryTest")
+    }
+}
+
+tasks.register<Test>("f9RetentionTest") {
+    group = "verification"
+    description = "Run the partial F9-M5 retention, DeleteRecords, and checkpoint-before-trim contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaRetentionPlannerTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaTrimBarrierTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaRetentionCheckpointGateTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaRetentionCoordinatorTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaRetentionDurableTrimListenerTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaDeleteRecordsCoordinatorTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.DefaultKafkaPartitionMaintenanceTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaPartitionMaintenanceRuntimeTest")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaCheckpointPublicationRecoveryIntegrationTest")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.DurableKafkaCheckpointFailureQuarantineTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaMaintenanceConfigurationTest")
+    }
+}
+
+tasks.register<Test>("f9PartitionScaleTest") {
+    group = "verification"
+    description =
+        "Run the F9-M7 10,000-partition open, bounded checkpoint scheduling, and close gate."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxHeapSize = "1g"
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.retention.KafkaPartitionScaleIntegrationTest",
+        )
+    }
+}
+
+tasks.register<Test>("f9IoConcurrencyStressTest") {
+    group = "verification"
+    description =
+        "Run the F9-M7 1,000-operation Produce/Fetch queue, byte, thread, and progress gate."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.KafkaIoConcurrencyStressTest",
+        )
+    }
+}
+
+tasks.register<Test>("f9MaterializationScaleTest") {
+    group = "verification"
+    description =
+        "Run the F9-M7 128-source, 1,048,576-record bounded NTC2 spill and source-protection gate."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxHeapSize = "1g"
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.compaction.KafkaMaterializationScaleIntegrationTest",
+        )
+    }
+}
+
+tasks.register<Test>("f9CheckpointQuarantineTest") {
+    group = "verification"
+    description = "Run durable F9 NKC1 quarantine, audit, fallback-order, and restart-skip contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.DurableKafkaCheckpointFailureQuarantineTest")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaCheckpointPublicationRecoveryIntegrationTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaRetentionCheckpointGateTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeFactoryTest")
+    }
+}
+
+tasks.register<Test>("f9CompactionPropertyTest") {
+    group = "verification"
+    description = "Run the partial F9-M5 Kafka compaction planner, strategy, and codec contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionBatchSourceTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionGenerationSetTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPassOneCollectorTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPartitionPassTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlanCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlanCoordinatorTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlanOrphanScannerTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlannerTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionProductionRuntimeFactoryTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPublicationCoordinatorTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionRowMapperTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionRowSpoolTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionRuntimeTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionSchedulerTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionSourceResolverTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionStreamingExecutorTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1Test")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionTerminalRetirerTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaTopicCompactionCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionTwoPassExecutorTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionWinnerIndexTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaActivatedGenerationSetResolverTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactedFetchPlannerTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactedFetchIntegrationTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactedNoResurrectionIntegrationTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaInternalTopicNoResurrectionTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaCompactionRuntimeConfigurationTest")
+    }
+}
+
+tasks.register<Test>("f9ActivationTest") {
+    group = "verification"
+    description = "Run F9 broker capability publication and ACTIVE/readiness admission contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.activation.*")
+    }
+}

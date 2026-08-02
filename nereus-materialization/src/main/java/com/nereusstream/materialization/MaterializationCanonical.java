@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -13,8 +14,8 @@ import com.nereusstream.metadata.oxia.records.ReadTargetRecord;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -22,16 +23,17 @@ import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 
-/** Canonical length-delimited binary identities for policy, sources, and deterministic task ids. */
+/**
+ * Canonical length-delimited binary identities for policy, sources, and deterministic task ids.
+ */
 final class MaterializationCanonical {
-    private static final Comparator<SourceGeneration> SOURCE_ORDER = Comparator
-            .comparingLong((SourceGeneration source) -> source.range().startOffset())
+    private static final Comparator<SourceGeneration> SOURCE_ORDER = Comparator.comparingLong(
+                    (SourceGeneration source) -> source.range().startOffset())
             .thenComparingLong(source -> source.range().endOffset())
             .thenComparingLong(SourceGeneration::generation)
             .thenComparing(SourceGeneration::indexKey, MaterializationCanonical::compareUtf8);
 
-    private MaterializationCanonical() {
-    }
+    private MaterializationCanonical() {}
 
     static List<SourceGeneration> canonicalSources(List<SourceGeneration> sources) {
         List<SourceGeneration> copy = new ArrayList<>(sources);
@@ -82,6 +84,27 @@ final class MaterializationCanonical {
         return version == 0 ? 1 : version;
     }
 
+    static long kafkaOperatorPolicyVersion(
+            int minMergeSourceRanges,
+            int maxSourceRanges,
+            long maxRangeRecords,
+            long targetObjectBytes,
+            int targetRowGroupRecords,
+            String compression) {
+        CanonicalWriter writer = new CanonicalWriter();
+        writer.text("nereus-kafka-lossless-committed-operator-policy-v2");
+        writer.text(MaterializationPolicy.KAFKA_COMMITTED_FORMAT);
+        writer.intValue(minMergeSourceRanges);
+        writer.intValue(maxSourceRanges);
+        writer.longValue(maxRangeRecords);
+        writer.longValue(targetObjectBytes);
+        writer.intValue(targetRowGroupRecords);
+        writer.text(compression);
+        byte[] digest = sha256Bytes(writer.bytes());
+        long version = ByteBuffer.wrap(digest, 0, Long.BYTES).getLong() & Long.MAX_VALUE;
+        return version == 0 ? 1 : version;
+    }
+
     static long topicOperatorPolicyVersion(
             TopicCompactionSpec topicCompaction,
             int minMergeSourceRanges,
@@ -92,6 +115,31 @@ final class MaterializationCanonical {
             String compression) {
         CanonicalWriter writer = new CanonicalWriter();
         writer.text("nereus-topic-compacted-operator-policy-v1");
+        writer.text(topicCompaction.strategyId());
+        writer.longValue(topicCompaction.strategyVersion());
+        writer.text(topicCompaction.keyCodecId());
+        writer.intValue(minMergeSourceRanges);
+        writer.intValue(maxSourceRanges);
+        writer.longValue(maxRangeRecords);
+        writer.longValue(targetObjectBytes);
+        writer.intValue(targetRowGroupRecords);
+        writer.text(compression);
+        byte[] digest = sha256Bytes(writer.bytes());
+        long version = ByteBuffer.wrap(digest, 0, Long.BYTES).getLong() & Long.MAX_VALUE;
+        return version == 0 ? 1 : version;
+    }
+
+    static long kafkaTopicOperatorPolicyVersion(
+            TopicCompactionSpec topicCompaction,
+            int minMergeSourceRanges,
+            int maxSourceRanges,
+            long maxRangeRecords,
+            long targetObjectBytes,
+            int targetRowGroupRecords,
+            String compression) {
+        CanonicalWriter writer = new CanonicalWriter();
+        writer.text("nereus-kafka-topic-compacted-operator-policy-v2");
+        writer.text(MaterializationPolicy.KAFKA_TOPIC_COMPACTED_FORMAT);
         writer.text(topicCompaction.strategyId());
         writer.longValue(topicCompaction.strategyVersion());
         writer.text(topicCompaction.keyCodecId());
@@ -168,9 +216,7 @@ final class MaterializationCanonical {
         writer.longValue(source.cumulativeSizeAtEnd());
     }
 
-    private static void writeProjection(
-            CanonicalWriter writer,
-            java.util.Optional<ProjectionRef> projection) {
+    private static void writeProjection(CanonicalWriter writer, java.util.Optional<ProjectionRef> projection) {
         writer.booleanValue(projection.isPresent());
         projection.ifPresent(value -> {
             writer.text(value.type().name());

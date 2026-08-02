@@ -36,20 +36,19 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
-/** Process-shared owner of private staging files and their global byte budget. */
+/**
+ * Process-shared owner of private staging files and their global byte budget.
+ */
 public final class StagingFileManager implements AutoCloseable {
     public static final int MIN_UPLOAD_CHUNK_BYTES = 64 * 1024;
     public static final int MAX_UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
     static final String FILE_PREFIX = "nereus-staging-v1-";
-    private static final Pattern VALID_FILE_NAME = Pattern.compile(
-            "nereus-staging-v1-[a-z0-9](?:[a-z0-9-]{0,31})-[0-9a-f]{32}\\.tmp");
+    private static final Pattern VALID_FILE_NAME =
+            Pattern.compile("nereus-staging-v1-[a-z0-9](?:[a-z0-9-]{0,31})-[0-9a-f]{32}\\.tmp");
     private static final Set<PosixFilePermission> DIRECTORY_PERMISSIONS = EnumSet.of(
-            PosixFilePermission.OWNER_READ,
-            PosixFilePermission.OWNER_WRITE,
-            PosixFilePermission.OWNER_EXECUTE);
-    private static final Set<PosixFilePermission> FILE_PERMISSIONS = EnumSet.of(
-            PosixFilePermission.OWNER_READ,
-            PosixFilePermission.OWNER_WRITE);
+            PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE);
+    private static final Set<PosixFilePermission> FILE_PERMISSIONS =
+            EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
 
     private final Path directory;
     private final long maxStagingBytes;
@@ -133,7 +132,9 @@ public final class StagingFileManager implements AutoCloseable {
                 ErrorCode.OBJECT_UPLOAD_FAILED, false, "failed to allocate a unique private staging file");
     }
 
-    /** Creates an owner-only temporary file that shares the global staging-byte budget. */
+    /**
+     * Creates an owner-only temporary file that shares the global staging-byte budget.
+     */
     public PrivateStagingSpillFile createSpill(String purpose) {
         String canonicalPurpose = requirePurpose(purpose);
         ensureOpen();
@@ -171,7 +172,9 @@ public final class StagingFileManager implements AutoCloseable {
                 ErrorCode.OBJECT_UPLOAD_FAILED, false, "failed to allocate a unique private spill file");
     }
 
-    /** Deletes only closed-process product files older than the configured grace. */
+    /**
+     * Deletes only closed-process product files older than the configured grace.
+     */
     public int cleanupOrphans() {
         ensureOpen();
         Instant cutoff;
@@ -194,7 +197,8 @@ public final class StagingFileManager implements AutoCloseable {
                         || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
                     continue;
                 }
-                Instant modified = Files.getLastModifiedTime(path, LinkOption.NOFOLLOW_LINKS).toInstant();
+                Instant modified = Files.getLastModifiedTime(path, LinkOption.NOFOLLOW_LINKS)
+                        .toInstant();
                 if (!modified.isAfter(cutoff) && Files.deleteIfExists(path)) {
                     deleted++;
                 }
@@ -234,8 +238,7 @@ public final class StagingFileManager implements AutoCloseable {
         }
         ensureOpen();
         if (bytes > maxStagingBytes - reservedBytes) {
-            throw new NereusException(
-                    ErrorCode.BACKPRESSURE_REJECTED, true, "global staging byte budget is exhausted");
+            throw new NereusException(ErrorCode.BACKPRESSURE_REJECTED, true, "global staging byte budget is exhausted");
         }
         reservedBytes = Math.addExact(reservedBytes, bytes);
     }

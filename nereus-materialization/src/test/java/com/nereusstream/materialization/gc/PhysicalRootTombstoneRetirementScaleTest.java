@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -55,13 +55,11 @@ class PhysicalRootTombstoneRetirementScaleTest {
     private static final String CLUSTER = "cluster-tombstone-scale";
     private static final String ATTEMPT_ID = "a".repeat(52);
     private static final String REFERENCE_SHA = "b".repeat(64);
-    private static final Checksum STORAGE_CHECKSUM =
-            new Checksum(ChecksumType.CRC32C, "01020304");
+    private static final Checksum STORAGE_CHECKSUM = new Checksum(ChecksumType.CRC32C, "01020304");
 
     @Test
     void retiresTenThousandDeletedRootsThroughTwoBoundedWindowsWithoutAccumulation() {
-        ScheduledThreadPoolExecutor scheduler =
-                MaterializationSchedulers.newSingleThreadScheduler(Thread::new);
+        ScheduledThreadPoolExecutor scheduler = MaterializationSchedulers.newSingleThreadScheduler(Thread::new);
         PhysicalObjectRootScanner scanner = null;
         try {
             PhysicalGcConfig config = config();
@@ -71,32 +69,18 @@ class PhysicalRootTombstoneRetirementScaleTest {
                 createDeletedRoot(metadata, audits, index);
             }
 
-            ClearReferenceDomain domain = new ClearReferenceDomain(
-                    config.referenceDomainConfig());
-            GcReferenceDomainRegistry domains = new GcReferenceDomainRegistry(
-                    config, scheduler, List.of(domain));
+            ClearReferenceDomain domain = new ClearReferenceDomain(config.referenceDomainConfig());
+            GcReferenceDomainRegistry domains = new GcReferenceDomainRegistry(config, scheduler, List.of(domain));
             AbsentObjectStore objects = new AbsentObjectStore();
             MutableClock clock = new MutableClock(5_000);
             DefaultPhysicalRootTombstoneRetirementCoordinator coordinator =
                     new DefaultPhysicalRootTombstoneRetirementCoordinator(
-                            CLUSTER,
-                            config,
-                            metadata,
-                            audits,
-                            domains,
-                            objects,
-                            clock,
-                            scheduler);
-            scanner = new PhysicalObjectRootScanner(
-                    CLUSTER, config, metadata, scheduler);
+                            CLUSTER, config, metadata, audits, domains, objects, clock, scheduler);
+            scanner = new PhysicalObjectRootScanner(CLUSTER, config, metadata, scheduler);
 
-            RetirementPass firstPass = new RetirementPass(
-                    TombstoneRetirementStatus.NOT_OLD_ENOUGH,
-                    metadata,
-                    audits);
-            PhysicalObjectRootScanResult first = scanner.scan(
-                            root -> firstPass.visit(coordinator, root))
-                    .join();
+            RetirementPass firstPass = new RetirementPass(TombstoneRetirementStatus.NOT_OLD_ENOUGH, metadata, audits);
+            PhysicalObjectRootScanResult first =
+                    scanner.scan(root -> firstPass.visit(coordinator, root)).join();
 
             assertThat(first.deletedRoots()).isEqualTo(ROOT_COUNT);
             assertThat(first.totalRoots()).isEqualTo(ROOT_COUNT);
@@ -109,13 +93,9 @@ class PhysicalRootTombstoneRetirementScaleTest {
             assertThat(scheduler.getQueue()).isEmpty();
 
             clock.setMillis(7_000);
-            RetirementPass secondPass = new RetirementPass(
-                    TombstoneRetirementStatus.RETIRED,
-                    metadata,
-                    audits);
-            PhysicalObjectRootScanResult second = scanner.scan(
-                            root -> secondPass.visit(coordinator, root))
-                    .join();
+            RetirementPass secondPass = new RetirementPass(TombstoneRetirementStatus.RETIRED, metadata, audits);
+            PhysicalObjectRootScanResult second =
+                    scanner.scan(root -> secondPass.visit(coordinator, root)).join();
 
             assertThat(second.deletedRoots()).isEqualTo(ROOT_COUNT);
             assertThat(second.totalRoots()).isEqualTo(ROOT_COUNT);
@@ -128,9 +108,8 @@ class PhysicalRootTombstoneRetirementScaleTest {
             assertThat(metadata.rootsDeleted()).isEqualTo(ROOT_COUNT);
             assertThat(scheduler.getQueue()).isEmpty();
 
-            PhysicalObjectRootScanResult empty = scanner.scan(root ->
-                            CompletableFuture.failedFuture(
-                                    new AssertionError("retired root was rediscovered")))
+            PhysicalObjectRootScanResult empty = scanner.scan(
+                            root -> CompletableFuture.failedFuture(new AssertionError("retired root was rediscovered")))
                     .join();
 
             assertThat(empty.totalRoots()).isZero();
@@ -152,10 +131,7 @@ class PhysicalRootTombstoneRetirementScaleTest {
         }
     }
 
-    private static void createDeletedRoot(
-            TrackingPhysicalStore metadata,
-            ScaleAuditStore audits,
-            int index) {
+    private static void createDeletedRoot(TrackingPhysicalStore metadata, ScaleAuditStore audits, int index) {
         ObjectKey key = new ObjectKey("objects/tombstone-scale/" + index);
         ObjectKeyHash object = ObjectKeyHash.from(key);
         String objectId = "object-tombstone-scale-" + index;
@@ -189,38 +165,17 @@ class PhysicalRootTombstoneRetirementScaleTest {
                 .join();
         VersionedPhysicalObjectRoot marked = metadata.compareAndSetRoot(
                         CLUSTER,
-                        lifecycle(
-                                active.value(),
-                                PhysicalObjectLifecycle.MARKED,
-                                2,
-                                300,
-                                400,
-                                0,
-                                0),
+                        lifecycle(active.value(), PhysicalObjectLifecycle.MARKED, 2, 300, 400, 0, 0),
                         active.metadataVersion())
                 .join();
         VersionedPhysicalObjectRoot deleting = metadata.compareAndSetRoot(
                         CLUSTER,
-                        lifecycle(
-                                marked.value(),
-                                PhysicalObjectLifecycle.DELETING,
-                                3,
-                                300,
-                                400,
-                                500,
-                                0),
+                        lifecycle(marked.value(), PhysicalObjectLifecycle.DELETING, 3, 300, 400, 500, 0),
                         marked.metadataVersion())
                 .join();
         metadata.compareAndSetRoot(
                         CLUSTER,
-                        lifecycle(
-                                deleting.value(),
-                                PhysicalObjectLifecycle.DELETED,
-                                4,
-                                300,
-                                400,
-                                500,
-                                1_000),
+                        lifecycle(deleting.value(), PhysicalObjectLifecycle.DELETED, 4, 300, 400, 500, 1_000),
                         deleting.metadataVersion())
                 .join();
         audits.add(objectId, key);
@@ -296,17 +251,14 @@ class PhysicalRootTombstoneRetirementScaleTest {
         private final AtomicInteger completed = new AtomicInteger();
 
         private RetirementPass(
-                TombstoneRetirementStatus expected,
-                TrackingPhysicalStore metadata,
-                ScaleAuditStore audits) {
+                TombstoneRetirementStatus expected, TrackingPhysicalStore metadata, ScaleAuditStore audits) {
             this.expected = expected;
             this.metadata = metadata;
             this.audits = audits;
         }
 
         private CompletableFuture<Void> visit(
-                DefaultPhysicalRootTombstoneRetirementCoordinator coordinator,
-                VersionedPhysicalObjectRoot root) {
+                DefaultPhysicalRootTombstoneRetirementCoordinator coordinator, VersionedPhysicalObjectRoot root) {
             int admitted = concurrent.incrementAndGet();
             maximumConcurrent.accumulateAndGet(admitted, Math::max);
             CompletableFuture<Void> result;
@@ -322,10 +274,8 @@ class PhysicalRootTombstoneRetirementScaleTest {
                         assertThat(metadata.getRoot(CLUSTER, object).join()).isEmpty();
                         assertThat(audits.absent(objectId)).isTrue();
                     } else {
-                        VersionedPhysicalObjectRoot current = metadata
-                                .getRoot(CLUSTER, object)
-                                .join()
-                                .orElseThrow();
+                        VersionedPhysicalObjectRoot current =
+                                metadata.getRoot(CLUSTER, object).join().orElseThrow();
                         assertThat(current.value().tombstoneFirstAbsentAtMillis())
                                 .isEqualTo(5_000);
                         assertThat(current.value().tombstoneProofSha256()).hasSize(64);
@@ -349,8 +299,7 @@ class PhysicalRootTombstoneRetirementScaleTest {
         }
     }
 
-    private static final class TrackingPhysicalStore
-            extends FakePhysicalObjectMetadataStore {
+    private static final class TrackingPhysicalStore extends FakePhysicalObjectMetadataStore {
         private final ScaleAuditStore audits;
         private final AtomicInteger maximumPageSize = new AtomicInteger();
         private final AtomicInteger continuedScanCalls = new AtomicInteger();
@@ -364,44 +313,33 @@ class PhysicalRootTombstoneRetirementScaleTest {
 
         @Override
         public CompletableFuture<PhysicalObjectRootScanPage> scanRoots(
-                String cluster,
-                int shard,
-                Optional<F4ScanToken> continuation,
-                int limit) {
-            return super.scanRoots(cluster, shard, continuation, limit)
-                    .thenApply(page -> {
-                        maximumPageSize.accumulateAndGet(
-                                page.values().size(), Math::max);
-                        if (continuation.isPresent()) {
-                            continuedScanCalls.incrementAndGet();
-                        }
-                        return page;
-                    });
+                String cluster, int shard, Optional<F4ScanToken> continuation, int limit) {
+            return super.scanRoots(cluster, shard, continuation, limit).thenApply(page -> {
+                maximumPageSize.accumulateAndGet(page.values().size(), Math::max);
+                if (continuation.isPresent()) {
+                    continuedScanCalls.incrementAndGet();
+                }
+                return page;
+            });
         }
 
         @Override
         public CompletableFuture<Void> deleteRoot(
-                String cluster,
-                ObjectKeyHash object,
-                long expectedVersion,
-                Checksum expectedRootSha256) {
+                String cluster, ObjectKeyHash object, long expectedVersion, Checksum expectedRootSha256) {
             int admitted = concurrentRootDeletes.incrementAndGet();
             maximumConcurrentRootDeletes.accumulateAndGet(admitted, Math::max);
             CompletableFuture<Void> deletion;
             try {
-                VersionedPhysicalObjectRoot current = getRoot(cluster, object)
-                        .join()
-                        .orElseThrow();
+                VersionedPhysicalObjectRoot current =
+                        getRoot(cluster, object).join().orElseThrow();
                 assertThat(audits.absent(current.value().objectId())).isTrue();
-                deletion = super.deleteRoot(
-                        cluster, object, expectedVersion, expectedRootSha256);
+                deletion = super.deleteRoot(cluster, object, expectedVersion, expectedRootSha256);
             } catch (Throwable failure) {
                 concurrentRootDeletes.decrementAndGet();
                 return CompletableFuture.failedFuture(failure);
             }
             return deletion.thenRun(rootDeletes::incrementAndGet)
-                    .whenComplete((ignored, failure) ->
-                            concurrentRootDeletes.decrementAndGet());
+                    .whenComplete((ignored, failure) -> concurrentRootDeletes.decrementAndGet());
         }
 
         private int maximumPageSize() {
@@ -421,25 +359,19 @@ class PhysicalRootTombstoneRetirementScaleTest {
         }
     }
 
-    private static final class ScaleAuditStore
-            implements ObjectAuditRetirementStore {
-        private final Map<String, VersionedObjectReferencesAudit> references =
-                new HashMap<>();
-        private final Map<String, VersionedObjectManifestAudit> manifests =
-                new HashMap<>();
+    private static final class ScaleAuditStore implements ObjectAuditRetirementStore {
+        private final Map<String, VersionedObjectReferencesAudit> references = new HashMap<>();
+        private final Map<String, VersionedObjectManifestAudit> manifests = new HashMap<>();
         private final AtomicInteger concurrent = new AtomicInteger();
         private final AtomicInteger maximumConcurrent = new AtomicInteger();
         private final AtomicInteger referencesDeleted = new AtomicInteger();
         private final AtomicInteger manifestsDeleted = new AtomicInteger();
 
         private synchronized void add(String objectId, ObjectKey key) {
-            ObjectReferenceRecord referenceValue = new ObjectReferenceRecord(
-                    objectId, List.of(), 900, 11);
-            references.put(objectId, new VersionedObjectReferencesAudit(
-                    "/references/" + objectId,
-                    referenceValue,
-                    11,
-                    sha('1')));
+            ObjectReferenceRecord referenceValue = new ObjectReferenceRecord(objectId, List.of(), 900, 11);
+            references.put(
+                    objectId,
+                    new VersionedObjectReferencesAudit("/references/" + objectId, referenceValue, 11, sha('1')));
             ObjectManifestRecord manifestValue = new ObjectManifestRecord(
                     objectId,
                     key.value(),
@@ -461,40 +393,30 @@ class PhysicalRootTombstoneRetirementScaleTest {
                     List.of(),
                     300,
                     12);
-            manifests.put(objectId, new VersionedObjectManifestAudit(
-                    "/manifests/" + objectId,
-                    manifestValue,
-                    12,
-                    sha('2')));
+            manifests.put(
+                    objectId, new VersionedObjectManifestAudit("/manifests/" + objectId, manifestValue, 12, sha('2')));
         }
 
         @Override
         public CompletableFuture<Optional<VersionedObjectManifestAudit>> getManifest(
-                String cluster,
-                ObjectId objectId) {
+                String cluster, ObjectId objectId) {
             return call(() -> Optional.ofNullable(manifests.get(objectId.value())));
         }
 
         @Override
         public CompletableFuture<Optional<VersionedObjectReferencesAudit>> getReferences(
-                String cluster,
-                ObjectId objectId) {
+                String cluster, ObjectId objectId) {
             return call(() -> Optional.ofNullable(references.get(objectId.value())));
         }
 
         @Override
         public CompletableFuture<Void> deleteReferences(
-                String cluster,
-                ObjectId objectId,
-                long expectedVersion,
-                Checksum expectedDurableValueSha256) {
+                String cluster, ObjectId objectId, long expectedVersion, Checksum expectedDurableValueSha256) {
             return call(() -> {
-                VersionedObjectReferencesAudit current =
-                        references.get(objectId.value());
+                VersionedObjectReferencesAudit current = references.get(objectId.value());
                 assertThat(current).isNotNull();
                 assertThat(current.metadataVersion()).isEqualTo(expectedVersion);
-                assertThat(current.durableValueSha256())
-                        .isEqualTo(expectedDurableValueSha256);
+                assertThat(current.durableValueSha256()).isEqualTo(expectedDurableValueSha256);
                 references.remove(objectId.value());
                 referencesDeleted.incrementAndGet();
                 return null;
@@ -503,25 +425,20 @@ class PhysicalRootTombstoneRetirementScaleTest {
 
         @Override
         public CompletableFuture<Void> deleteManifest(
-                String cluster,
-                ObjectId objectId,
-                long expectedVersion,
-                Checksum expectedDurableValueSha256) {
+                String cluster, ObjectId objectId, long expectedVersion, Checksum expectedDurableValueSha256) {
             return call(() -> {
                 assertThat(references).doesNotContainKey(objectId.value());
                 VersionedObjectManifestAudit current = manifests.get(objectId.value());
                 assertThat(current).isNotNull();
                 assertThat(current.metadataVersion()).isEqualTo(expectedVersion);
-                assertThat(current.durableValueSha256())
-                        .isEqualTo(expectedDurableValueSha256);
+                assertThat(current.durableValueSha256()).isEqualTo(expectedDurableValueSha256);
                 manifests.remove(objectId.value());
                 manifestsDeleted.incrementAndGet();
                 return null;
             });
         }
 
-        private synchronized <T> CompletableFuture<T> call(
-                java.util.function.Supplier<T> operation) {
+        private synchronized <T> CompletableFuture<T> call(java.util.function.Supplier<T> operation) {
             int admitted = concurrent.incrementAndGet();
             maximumConcurrent.accumulateAndGet(admitted, Math::max);
             try {
@@ -558,8 +475,7 @@ class PhysicalRootTombstoneRetirementScaleTest {
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
     }
 
     private static final class ClearReferenceDomain implements GcReferenceDomain {
@@ -582,15 +498,13 @@ class PhysicalRootTombstoneRetirementScaleTest {
         }
 
         @Override
-        public CompletableFuture<GcReferenceSnapshot> snapshot(
-                GcReferenceQuery query) {
+        public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
             int admitted = concurrent.incrementAndGet();
             maximumConcurrent.accumulateAndGet(admitted, Math::max);
             try {
-                GcReferenceSnapshotBuilder builder = new GcReferenceSnapshotBuilder(
-                        domainId(), protocolVersion(), query, config);
-                builder.addAuthority(new GcAuthorityToken(
-                        "/authority/tombstone-scale", 1, sha('d')));
+                GcReferenceSnapshotBuilder builder =
+                        new GcReferenceSnapshotBuilder(domainId(), protocolVersion(), query, config);
+                builder.addAuthority(new GcAuthorityToken("/authority/tombstone-scale", 1, sha('d')));
                 return CompletableFuture.completedFuture(builder.build());
             } catch (Throwable failure) {
                 return CompletableFuture.failedFuture(failure);
@@ -600,9 +514,7 @@ class PhysicalRootTombstoneRetirementScaleTest {
         }
 
         @Override
-        public CompletableFuture<Boolean> stillMatches(
-                GcReferenceQuery query,
-                GcReferenceSnapshot snapshot) {
+        public CompletableFuture<Boolean> stillMatches(GcReferenceQuery query, GcReferenceSnapshot snapshot) {
             return snapshot(query).thenApply(snapshot::equals);
         }
 
@@ -619,37 +531,27 @@ class PhysicalRootTombstoneRetirementScaleTest {
 
         @Override
         public CompletableFuture<RangeReadResult> readRange(
-                ObjectKey key,
-                long offset,
-                long length,
-                RangeReadOptions options) {
+                ObjectKey key, long offset, long length, RangeReadOptions options) {
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
         }
 
         @Override
-        public CompletableFuture<HeadObjectResult> headObject(
-                ObjectKey key,
-                HeadObjectOptions options) {
+        public CompletableFuture<HeadObjectResult> headObject(ObjectKey key, HeadObjectOptions options) {
             int admitted = concurrentHeads.incrementAndGet();
             maximumConcurrentHeads.accumulateAndGet(admitted, Math::max);
             headCalls.incrementAndGet();
             try {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.OBJECT_NOT_FOUND,
-                        true,
-                        "object is durably absent"));
+                return CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.OBJECT_NOT_FOUND, true, "object is durably absent"));
             } finally {
                 concurrentHeads.decrementAndGet();
             }
         }
 
         @Override
-        public CompletableFuture<DeleteObjectResult> deleteObject(
-                ObjectKey key,
-                DeleteObjectOptions options) {
+        public CompletableFuture<DeleteObjectResult> deleteObject(ObjectKey key, DeleteObjectOptions options) {
             deleteCalls.incrementAndGet();
-            return CompletableFuture.failedFuture(
-                    new AssertionError("an absent tombstone object must not be deleted"));
+            return CompletableFuture.failedFuture(new AssertionError("an absent tombstone object must not be deleted"));
         }
 
         private int headCalls() {
@@ -665,8 +567,7 @@ class PhysicalRootTombstoneRetirementScaleTest {
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
     }
 
     private static final class MutableClock extends Clock {

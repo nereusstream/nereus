@@ -31,20 +31,20 @@ F1-BK BookKeeper primary-WAL exact target contract见
 
 Nereus 不把所有状态塞进一个“commit”概念：
 
-| Domain | Authority | Linearization/publish point |
-| --- | --- | --- |
-| Logical append | Oxia stream head | successful head `putIfVersion` |
-| Commit identity | reachable immutable commit log | head links the record |
-| Generation-0 read/replay index | Oxia derived records | records materialized and validated |
-| Stream seal | Oxia stream head | `ACTIVE -> SEALED` head CAS |
-| Logical stream delete | Oxia stream head | first `ACTIVE/SEALED -> DELETING` head CAS |
-| Higher-generation target | Oxia generation index | final index key same-key `PREPARED -> COMMITTED` CAS |
-| Cursor progress | Oxia `CursorStateRecord` | one-root cursor version-CAS |
-| Cursor trim protection | Oxia `CursorRetentionRecord` + L0 trim truth | retention pending/completion CAS protocol |
-| Transaction result | transaction state + required stream markers | explicit state-machine terminal CAS |
-| SBT visibility | table catalog | catalog snapshot commit |
-| SDT visibility | target catalog | idempotent delivery commit |
-| Object deletion | GC state + physical delete | all references checked, delete recorded |
+| Domain                         | Authority                                    | Linearization/publish point                          |
+|--------------------------------|----------------------------------------------|------------------------------------------------------|
+| Logical append                 | Oxia stream head                             | successful head `putIfVersion`                       |
+| Commit identity                | reachable immutable commit log               | head links the record                                |
+| Generation-0 read/replay index | Oxia derived records                         | records materialized and validated                   |
+| Stream seal                    | Oxia stream head                             | `ACTIVE -> SEALED` head CAS                          |
+| Logical stream delete          | Oxia stream head                             | first `ACTIVE/SEALED -> DELETING` head CAS           |
+| Higher-generation target       | Oxia generation index                        | final index key same-key `PREPARED -> COMMITTED` CAS |
+| Cursor progress                | Oxia `CursorStateRecord`                     | one-root cursor version-CAS                          |
+| Cursor trim protection         | Oxia `CursorRetentionRecord` + L0 trim truth | retention pending/completion CAS protocol            |
+| Transaction result             | transaction state + required stream markers  | explicit state-machine terminal CAS                  |
+| SBT visibility                 | table catalog                                | catalog snapshot commit                              |
+| SDT visibility                 | target catalog                               | idempotent delivery commit                           |
+| Object deletion                | GC state + physical delete                   | all references checked, delete recorded              |
 
 这些 domain 可以按顺序关联，但不能假装存在跨 Oxia shard、object store 和 external catalog 的
 全局事务。
@@ -232,10 +232,10 @@ commit is repairable audit/GC state，not logical rollback。
 
 ### 7.5 Result boundaries
 
-| Requested level | Success requires | Read-after-success |
-| --- | --- | --- |
-| `WAL_DURABLE` | WAL durable + F4 root/commit-owned `REACHABLE_APPEND` + reachable head commit | primary target protected/recoverable from commit log；resolver may repair index |
-| `WAL_DURABLE_AND_INDEX_COMMITTED` | above + offset index/marker + index-owned `VISIBLE_GENERATION` confirmed | normal protected generation-0 lookup immediately available |
+| Requested level                   | Success requires                                                              | Read-after-success                                                             |
+|-----------------------------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| `WAL_DURABLE`                     | WAL durable + F4 root/commit-owned `REACHABLE_APPEND` + reachable head commit | primary target protected/recoverable from commit log；resolver may repair index |
+| `WAL_DURABLE_AND_INDEX_COMMITTED` | above + offset index/marker + index-owned `VISIBLE_GENERATION` confirmed      | normal protected generation-0 lookup immediately available                     |
 
 Current Phase 1 implements only strict success。The name `WAL_DURABLE` never authorizes success before the
 head CAS or with a temporary local offset。
@@ -245,7 +245,8 @@ the strict second row. F4-M4 checkpoint B has now split the former stable-commit
 preparation and a protected head CAS, and changed materialization to return its exact durable index identity. This is
 still not implementation of `WAL_DURABLE` success。
 
-Phase 4's implemented checkpoint-B protocol splits commit-intent preparation from head CAS. After upload it stores/reloads the
+Phase 4's implemented checkpoint-B protocol splits commit-intent preparation from head CAS. After upload it
+stores/reloads the
 deterministic intent, registers the physical root, acquires `REACHABLE_APPEND` owned by that exact intent, and only
 then may CAS the head. Generation-zero materialization returns the exact index key/version/value digest and acquires
 `VISIBLE_GENERATION` before strict success. The head CAS remains logical linearization；the added records are physical
@@ -254,14 +255,14 @@ retention fences, not alternate commit truth. Full interfaces and crash cuts are
 
 ## 8. Retry and failure classification
 
-| Last boundary | `AppendOutcome` | Required action |
-| --- | --- | --- |
-| before WAL durable | `KNOWN_NOT_COMMITTED` | normal retry |
-| after WAL durable, before intent | `KNOWN_NOT_COMMITTED`；orphan bytes possible | reuse deterministic bytes or GC |
-| after intent, before head CAS is sent | `KNOWN_NOT_COMMITTED` | retry same id or abandon intent |
-| after head CAS is sent, response unavailable | `MAY_HAVE_COMMITTED` | re-read head/chain；never assume rollback |
-| head reachable, indexes missing | `KNOWN_COMMITTED` | repair indexes then satisfy requested boundary |
-| result constructed, response lost | `KNOWN_COMMITTED` | replay returns same range/version |
+| Last boundary                                | `AppendOutcome`                             | Required action                                |
+|----------------------------------------------|---------------------------------------------|------------------------------------------------|
+| before WAL durable                           | `KNOWN_NOT_COMMITTED`                       | normal retry                                   |
+| after WAL durable, before intent             | `KNOWN_NOT_COMMITTED`；orphan bytes possible | reuse deterministic bytes or GC                |
+| after intent, before head CAS is sent        | `KNOWN_NOT_COMMITTED`                       | retry same id or abandon intent                |
+| after head CAS is sent, response unavailable | `MAY_HAVE_COMMITTED`                        | re-read head/chain；never assume rollback       |
+| head reachable, indexes missing              | `KNOWN_COMMITTED`                           | repair indexes then satisfy requested boundary |
+| result constructed, response lost            | `KNOWN_COMMITTED`                           | replay returns same range/version              |
 
 Timeout and caller cancellation follow the same table。Cancellation cannot undo an already-sent CAS。
 
@@ -374,13 +375,14 @@ make it `ABORTED`。Its fixed allocation slot and monotonic `lateCreateHazard` r
 matching bytes later appear；BK-M0–M6 do not invent a provider operation fence that BookKeeper's public client API does
 not expose.
 
-| Profile | Logical visibility | Producer completion | Read/source behavior |
-| --- | --- | --- | --- |
-| `BOOKKEEPER_WAL_ONLY` | reachable head commit | stable head by default；strict caller may also wait for gen0 | generation 0 remains the exact BK range；no object task |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | reachable head commit | stable head after shared lag admission | BK range serves reads until normal F4 higher-generation publication |
-| `BOOKKEEPER_WAL_SYNC_OBJECT` | reachable head commit | `REQUIRED_OBJECT_GENERATION` COMMITTED + exact resolve/read proof | consumers may read committed BK bytes while producer waits；same F4 task/path as async |
+| Profile                       | Logical visibility    | Producer completion                                               | Read/source behavior                                                                  |
+|-------------------------------|-----------------------|-------------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| `BOOKKEEPER_WAL_ONLY`         | reachable head commit | stable head by default；strict caller may also wait for gen0       | generation 0 remains the exact BK range；no object task                                |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | reachable head commit | stable head after shared lag admission                            | BK range serves reads until normal F4 higher-generation publication                   |
+| `BOOKKEEPER_WAL_SYNC_OBJECT`  | reachable head commit | `REQUIRED_OBJECT_GENERATION` COMMITTED + exact resolve/read proof | consumers may read committed BK bytes while producer waits；same F4 task/path as async |
 
-Phase 1.5 freezes a generic BookKeeper entry-range target value/codec and adapter registry, but the final-gated runtime registers
+Phase 1.5 freezes a generic BookKeeper entry-range target value/codec and adapter registry, but the final-gated runtime
+registers
 only Object WAL IO。`WAL_DURABLE_AND_INDEX_COMMITTED` confirms generation zero, which is still the BK target；it
 does not prove an Object generation. F1-BK therefore keeps `DurabilityLevel` meanings unchanged and adds an independent
 `AppendCompletionPolicy`/internal `AppendAckBoundary` with `REQUIRED_OBJECT_GENERATION`。Failure after head success is
@@ -539,14 +541,16 @@ SDT terminal visibility belongs to target catalog。Timeout recovery queries the
 
 ## 15. GC protocol
 
-> Status: Implemented / final-gated. Physical reference values/leases/protections、NRC1 recovery-root publication/replay/index repair、
+> Status: Implemented / final-gated. Physical reference values/leases/protections、NRC1 recovery-root
+> publication/replay/index repair、
 > typed source retirement、DELETED-root/Phase 1 audit retirement、guarded/protected/pinned cursor snapshots、all-shard
 > physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless execution、current-writer inventory、
 > registration-last retirement、metadata-first lifecycle、typed broker GC config、configured-scope capability proof、
 > atomic deletion activation、provider/Pulsar restart fencing and shared reference-domain interpretation are
 > implemented through F4-M4 checkpoint BC. Real Oxia/LocalStack evidence covers scope mismatch、empty-list/lost-DELETE
 > response、post-DELETE/pre-DELETED-root-CAS independent recovery and applied-DELETED-CAS response-loss exact reload
-> without repeated DELETE, plus two-worker shared-intent/idempotent-delete convergence. F4-M5 checkpoints X–AI additionally implement
+> without repeated DELETE, plus two-worker shared-intent/idempotent-delete convergence. F4-M5 checkpoints X–AI
+> additionally implement
 > durable registration/readiness/activation、protected async Object-WAL acknowledgement/read repair、pre-I/O lag
 > admission、coupled materialization、stable retention planning/F3 trim delegation and exact Pulsar policy/admin
 > admission. Its retry-disabled real two-broker final gate covers durable backlog eviction、unloaded logical trim、
@@ -654,18 +658,20 @@ delete response loss converges only after the exact unchanged root authority pro
 
 ## 16. Linearization summary
 
-| Operation | Point |
-| --- | --- |
-| Append logical commit | stream-head CAS success |
-| Strict append success | logical commit + protected generation-0 index/marker confirmation |
-| Async append success | protected logical commit + requested primary durability boundary |
-| Generation replacement | final generation-index key `PREPARED -> COMMITTED` CAS |
-| Cursor update | cursor-state CAS |
-| Transaction terminal result | coordinator terminal CAS after required per-stream work |
-| SBT table visibility | catalog snapshot commit |
-| SDT delivery visibility | target catalog idempotent commit |
-| Routing change | routing-ring/version CAS；does not change data truth |
-| GC | reference-validated delete protocol |
+| Operation                                                          | Point                                                                                                                                         |
+|--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| Append logical commit                                              | stream-head CAS success                                                                                                                       |
+| Strict append success                                              | logical commit + protected generation-0 index/marker confirmation                                                                             |
+| Async append success                                               | protected logical commit + requested primary durability boundary                                                                              |
+| Generation replacement                                             | final generation-index key `PREPARED -> COMMITTED` CAS                                                                                        |
+| Cursor update                                                      | cursor-state CAS                                                                                                                              |
+| Transaction terminal result                                        | coordinator terminal CAS after required per-stream work                                                                                       |
+| SBT table visibility                                               | catalog snapshot commit                                                                                                                       |
+| SDT delivery visibility                                            | target catalog idempotent commit                                                                                                              |
+| Routing change                                                     | routing-ring/version CAS；does not change data truth                                                                                           |
+| GC                                                                 | reference-validated delete protocol                                                                                                           |
+| F9 native Kafka producer acknowledgement（exact-source final-gated） | exact stable Nereus append result validated against the requested range；initial RF=1 LEO/HW advance only after this point                     |
+| F9 newer KRaft leader preemption（exact-source final-gated）         | stream-head CAS installs a strictly higher protocol-neutral append authority and invalidates the prior session before new writes are admitted |
 
 ## 17. Repair priority
 
@@ -696,7 +702,8 @@ Phase 1.5 P15-M1-M6 implemented and verified：
 - unchanged Phase 1 ordinary/Docker gates and one-way rollout boundary。
 
 F4-M0 has frozen the async task/checkpoint/idempotence、higher-generation publication/overlap/read-view、
-64-shard restart-safe stream discovery、reader lease、recovery checkpoint、retention/GC and Object-WAL async error contracts in
+64-shard restart-safe stream discovery、reader lease、recovery checkpoint、retention/GC and Object-WAL async error
+contracts in
 `../phase-4-compaction-generation/`。Before enabling execution：
 
 - implement F4-M1–M6 in the specified order and pass their mandatory review stops；
@@ -707,7 +714,48 @@ F4-M0 has frozen the async task/checkpoint/idempotence、higher-generation publi
 - provide fault injection at every irreversible boundary；
 - keep code/docs/golden bytes updated together。
 
-## 19. References
+## 19. F9 append and leadership extension
+
+> Status: F9-M1–M7 implemented/final-gated for the exact product/Kafka/Pulsar/AutoMQ tuple in the 2026-07-30 clean
+> final receipt。Public precondition/read values、binary-safe ranged IO、conditional append/read and leader authority are
+> implemented；later product source changes require a fresh final receipt before inheriting current-source PASS.
+
+Native Kafka needs one Nereus entry to consume the complete offset range of one Kafka `RecordBatch`. F9 therefore
+extends the protocol-neutral contract instead of teaching L0 about Kafka classes：
+
+```text
+AppendEntry(base-independent payload, recordCount > 0, payloadFormat=KAFKA_RECORD_BATCH)
+AppendBatch(entries, total recordCount)
+AppendPrecondition(expectedStartOffset)
+AppendAuthority(term, ownerEpoch, ownerIdHash)
+```
+
+The exact API compatibility plan is frozen in
+`../phase-9-kafka-native-storage/02-ranged-entry-api-and-object-format.md`：existing methods keep their descriptors and
+defaults，the new overload is additive，and legacy one-record `OPAQUE_RECORD_BATCH` behavior stays byte-for-byte and
+semantically unchanged. `expectedStartOffset` participates in the same head CAS that linearizes append；checking it in
+an adapter cache is insufficient.
+
+For the initial serialized RF=1 native path：
+
+1. Kafka validates and assigns batch base offsets under the partition append lane.
+2. The adapter submits exact immutable batch bytes and the current expected start/append authority.
+3. Nereus returns success only with the exact `[startOffset,endOffset)` and total count requested.
+4. The adapter validates that result before updating native producer state、LEO or HW and before completing Produce.
+5. If completion is unknown after physical durability or head CAS may have occurred，the partition write-fences itself；
+   exact head/commit recovery classifies and replays the same range before any later append. It never allocates a new
+   offset or blind-retries a new physical attempt.
+
+A strictly higher KRaft leader term may immediately preempt a still-live prior session through the same stream-head
+authority CAS. Equal-term mismatched ownership fails closed；lower terms are fenced. Existing Pulsar writers that omit
+external authority retain their current TTL/session behavior，so F9 cannot silently weaken or reinterpret F2/F3 gates.
+
+The checkpoint (`NKC1`)、local Kafka checkpoint files、LEO/HW caches and KRaft metadata are not append truth. KRaft owns
+protocol leadership；the Nereus head/reachable commit chain owns partition bytes and committed ranges. Exact binding、
+recovery and failure mapping are in `../phase-9-kafka-native-storage/03-kafka-fork-log-and-broker-integration.md` and
+`../phase-9-kafka-native-storage/04-oxia-binding-session-checkpoint-and-lifecycle.md`.
+
+## 20. References
 
 - `nereus-overall-architecture.md`
 - `nereus-storage-object-format.md`
@@ -716,3 +764,4 @@ F4-M0 has frozen the async task/checkpoint/idempotence、higher-generation publi
 - `../phase-1-core-stream-storage/02-oxia-metadata-and-commit.md`
 - `../phase-1.5-core-storage-foundation/README.md`
 - `../phase-1-core-stream-storage/09-legacy-oxia-multi-key-commit-design.md`（Historical）
+- `../phase-9-kafka-native-storage/README.md`（F9 implemented/final-gated exact-source code-level contract）

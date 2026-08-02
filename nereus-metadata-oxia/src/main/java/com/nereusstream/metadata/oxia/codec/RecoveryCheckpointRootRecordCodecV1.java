@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointReferenceRecord;
@@ -6,8 +7,7 @@ import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class RecoveryCheckpointRootRecordCodecV1
-        extends AbstractF4RecordCodecV1<RecoveryCheckpointRootRecord> {
+public final class RecoveryCheckpointRootRecordCodecV1 extends AbstractF4RecordCodecV1<RecoveryCheckpointRootRecord> {
     public RecoveryCheckpointRootRecordCodecV1() {
         super(RecoveryCheckpointRootRecord.class);
     }

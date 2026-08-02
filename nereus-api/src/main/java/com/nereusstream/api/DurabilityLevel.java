@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Durability and derived-read-index boundary requested by append. */
+/**
+ * Durability and derived-read-index boundary requested by append.
+ */
 public enum DurabilityLevel {
     /**
      * The primary WAL append is durable and the logical append has a stable Oxia commit before the append future

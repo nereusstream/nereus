@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.metadata.oxia.CursorMetadataStoreConfig;
@@ -6,7 +7,9 @@ import com.nereusstream.metadata.oxia.CursorNames;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Frozen F3 cursor correctness, allocation, and deadline bounds. */
+/**
+ * Frozen F3 cursor correctness, allocation, and deadline bounds.
+ */
 public record CursorStorageConfig(
         int cursorMetadataValueMaxBytes,
         int cursorMetadataSafetyMarginBytes,

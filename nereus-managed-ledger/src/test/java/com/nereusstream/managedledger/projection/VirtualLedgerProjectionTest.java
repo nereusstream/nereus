@@ -16,7 +16,6 @@ package com.nereusstream.managedledger.projection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
 import org.junit.jupiter.api.Test;
@@ -35,32 +34,70 @@ class VirtualLedgerProjectionTest {
                 .isInstanceOf(ProjectionValidationException.class);
 
         assertThatThrownBy(() -> new VirtualLedgerProjection(
-                new StreamId("wrong"), NAME, 1, 1,
-                VirtualLedgerProjection.MIN_VIRTUAL_LEDGER_ID, 1,
-                ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1, 0, 0))
+                        new StreamId("wrong"),
+                        NAME,
+                        1,
+                        1,
+                        VirtualLedgerProjection.MIN_VIRTUAL_LEDGER_ID,
+                        1,
+                        ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1,
+                        0,
+                        0))
                 .isInstanceOf(ProjectionValidationException.class);
         assertThatThrownBy(() -> new VirtualLedgerProjection(
-                ManagedLedgerProjectionNames.streamId(NAME, 1), NAME, 0, 1,
-                VirtualLedgerProjection.MIN_VIRTUAL_LEDGER_ID, 1,
-                ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1, 0, 0))
+                        ManagedLedgerProjectionNames.streamId(NAME, 1),
+                        NAME,
+                        0,
+                        1,
+                        VirtualLedgerProjection.MIN_VIRTUAL_LEDGER_ID,
+                        1,
+                        ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1,
+                        0,
+                        0))
                 .isInstanceOf(ProjectionValidationException.class);
         assertThatThrownBy(() -> new VirtualLedgerProjection(
-                ManagedLedgerProjectionNames.streamId(NAME, 1), NAME, 1, 1,
-                VirtualLedgerProjection.MIN_VIRTUAL_LEDGER_ID - 1, 1,
-                ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1, 0, 0))
+                        ManagedLedgerProjectionNames.streamId(NAME, 1),
+                        NAME,
+                        1,
+                        1,
+                        VirtualLedgerProjection.MIN_VIRTUAL_LEDGER_ID - 1,
+                        1,
+                        ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1,
+                        0,
+                        0))
                 .isInstanceOf(ProjectionValidationException.class);
         assertThatThrownBy(() -> new VirtualLedgerProjection(
-                ManagedLedgerProjectionNames.streamId(NAME, 1), NAME, 1, 1,
-                Long.MAX_VALUE, 1, ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1, 0, 0))
+                        ManagedLedgerProjectionNames.streamId(NAME, 1),
+                        NAME,
+                        1,
+                        1,
+                        Long.MAX_VALUE,
+                        1,
+                        ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1,
+                        0,
+                        0))
                 .isInstanceOf(ProjectionValidationException.class);
         assertThatThrownBy(() -> new VirtualLedgerProjection(
-                ManagedLedgerProjectionNames.streamId(NAME, 1), NAME, 1, 1,
-                VirtualLedgerProjection.MIN_VIRTUAL_LEDGER_ID, 2,
-                ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1, 0, 0))
+                        ManagedLedgerProjectionNames.streamId(NAME, 1),
+                        NAME,
+                        1,
+                        1,
+                        VirtualLedgerProjection.MIN_VIRTUAL_LEDGER_ID,
+                        2,
+                        ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1,
+                        0,
+                        0))
                 .isInstanceOf(ProjectionValidationException.class);
         assertThatThrownBy(() -> new VirtualLedgerProjection(
-                ManagedLedgerProjectionNames.streamId(NAME, 1), NAME, 1, 1,
-                VirtualLedgerProjection.MIN_VIRTUAL_LEDGER_ID, 1, "wrong", 0, 0))
+                        ManagedLedgerProjectionNames.streamId(NAME, 1),
+                        NAME,
+                        1,
+                        1,
+                        VirtualLedgerProjection.MIN_VIRTUAL_LEDGER_ID,
+                        1,
+                        "wrong",
+                        0,
+                        0))
                 .isInstanceOf(ProjectionValidationException.class);
     }
 

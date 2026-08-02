@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.PublicationId;
@@ -7,7 +8,9 @@ import com.nereusstream.api.StreamId;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** Validating facade for the view-scoped single-key generation allocator. */
+/**
+ * Validating facade for the view-scoped single-key generation allocator.
+ */
 public final class GenerationAllocator {
     private final String cluster;
     private final GenerationMetadataStore store;
@@ -18,9 +21,7 @@ public final class GenerationAllocator {
     }
 
     public CompletableFuture<AllocatedGeneration> allocate(
-            StreamId streamId,
-            ReadView view,
-            PublicationId publicationId) {
+            StreamId streamId, ReadView view, PublicationId publicationId) {
         StreamId exactStream = Objects.requireNonNull(streamId, "streamId");
         ReadView exactView = Objects.requireNonNull(view, "view");
         PublicationId exactPublication = Objects.requireNonNull(publicationId, "publicationId");
@@ -32,24 +33,17 @@ public final class GenerationAllocator {
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return operation.thenApply(allocation -> validate(
-                Objects.requireNonNull(allocation, "allocation"),
-                exactStream,
-                exactView,
-                exactPublication));
+        return operation.thenApply(allocation ->
+                validate(Objects.requireNonNull(allocation, "allocation"), exactStream, exactView, exactPublication));
     }
 
     private static AllocatedGeneration validate(
-            AllocatedGeneration allocation,
-            StreamId streamId,
-            ReadView view,
-            PublicationId publicationId) {
+            AllocatedGeneration allocation, StreamId streamId, ReadView view, PublicationId publicationId) {
         if (!allocation.streamId().equals(streamId)
                 || allocation.view() != view
                 || !allocation.publicationId().equals(publicationId)
                 || allocation.generation().value() != allocation.allocationSequence()) {
-            throw F4MetadataStoreSupport.invariant(
-                    "generation allocator returned a mismatched allocation proof");
+            throw F4MetadataStoreSupport.invariant("generation allocator returned a mismatched allocation proof");
         }
         return allocation;
     }

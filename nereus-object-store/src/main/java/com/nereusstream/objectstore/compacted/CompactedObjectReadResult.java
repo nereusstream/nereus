@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import java.util.List;
 import java.util.Objects;
 
-/** Strictly verified compacted rows and exact source-coverage/read-amplification accounting. */
+/**
+ * Strictly verified compacted rows and exact source-coverage/read-amplification accounting.
+ */
 public record CompactedObjectReadResult(
         CompactedObjectMetadata metadata,
         List<CompactedObjectRow> rows,

@@ -22,9 +22,6 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
-import com.nereusstream.api.ObjectType;
-import com.nereusstream.api.OffsetRange;
-import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.ResolveOptions;
 import com.nereusstream.api.ResolveResult;
@@ -32,7 +29,6 @@ import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamState;
-import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.target.ReadTargetType;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.profile.Phase15StorageProfileResolver;
@@ -41,12 +37,12 @@ import com.nereusstream.metadata.oxia.CommitSliceRequest;
 import com.nereusstream.metadata.oxia.DerivedIndexRepairCursor;
 import com.nereusstream.metadata.oxia.DerivedIndexRepairResult;
 import com.nereusstream.metadata.oxia.MetadataWatcher;
+import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.WatchRegistration;
 import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
-import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
 import java.time.Clock;
@@ -63,9 +59,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 
 public final class ReadResolver implements AutoCloseable {
-    private static final Comparator<OffsetIndexEntry> GENERATION_ORDER = Comparator
-            .comparingLong(OffsetIndexEntry::generation)
-            .thenComparingLong(OffsetIndexEntry::commitVersion);
+    private static final Comparator<OffsetIndexEntry> GENERATION_ORDER =
+            Comparator.comparingLong(OffsetIndexEntry::generation).thenComparingLong(OffsetIndexEntry::commitVersion);
 
     private final StreamStorageConfig config;
     private final OxiaMetadataStore metadataStore;
@@ -118,65 +113,51 @@ public final class ReadResolver implements AutoCloseable {
     }
 
     CompletableFuture<Resolution> resolve(
-            StreamId streamId,
-            long startOffset,
-            ResolveOptions options,
-            ReadOperationDeadline deadline) {
+            StreamId streamId, long startOffset, ResolveOptions options, ReadOperationDeadline deadline) {
         Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(options, "options");
         if (startOffset < 0) {
-            return NereusException.failedFuture(
-                    ErrorCode.INVALID_ARGUMENT, false, "startOffset must be non-negative");
+            return NereusException.failedFuture(ErrorCode.INVALID_ARGUMENT, false, "startOffset must be non-negative");
         }
         if (closed.get()) {
             return NereusException.failedFuture(ErrorCode.STORAGE_CLOSED, false, "read resolver is closed");
         }
         ensureWatch(streamId);
         return loadSnapshot(streamId, deadline)
-                .thenComposeAsync(snapshot -> {
-                    validateReadable(snapshot.metadata());
-                    if (startOffset < snapshot.trim().trimOffset()) {
-                        throw new NereusException(
-                                ErrorCode.OFFSET_TRIMMED,
-                                false,
-                                "requested offset is below the stream trim offset");
-                    }
-                    int maxRanges = Math.min(options.maxRanges(), config.maxResolveRanges());
-                    if (startOffset >= snapshot.committed().committedEndOffset()) {
-                        return CompletableFuture.completedFuture(emptyResolution(
-                                streamId, startOffset, snapshot.metadataVersion()));
-                    }
-                    BuildState initial = new BuildState(
-                            startOffset,
-                            List.of(),
-                            snapshot.metadataVersion(),
-                            false);
-                    return buildRanges(
-                                    streamId,
-                                    snapshot,
-                                    options,
-                                    maxRanges,
-                                    initial,
-                                    false,
-                                    deadline)
-                            .thenApply(state -> new Resolution(
-                                    new ResolveResult(
-                                            streamId,
-                                            startOffset,
-                                            state.ranges(),
-                                            state.cursor(),
-                                            state.metadataVersion()),
-                                    state.cacheUsed()));
-                }, callbackExecutor);
+                .thenComposeAsync(
+                        snapshot -> {
+                            validateReadable(snapshot.metadata());
+                            if (startOffset < snapshot.trim().trimOffset()) {
+                                throw new NereusException(
+                                        ErrorCode.OFFSET_TRIMMED,
+                                        false,
+                                        "requested offset is below the stream trim offset");
+                            }
+                            int maxRanges = Math.min(options.maxRanges(), config.maxResolveRanges());
+                            if (startOffset >= snapshot.committed().committedEndOffset()) {
+                                return CompletableFuture.completedFuture(
+                                        emptyResolution(streamId, startOffset, snapshot.metadataVersion()));
+                            }
+                            BuildState initial =
+                                    new BuildState(startOffset, List.of(), snapshot.metadataVersion(), false);
+                            return buildRanges(streamId, snapshot, options, maxRanges, initial, false, deadline)
+                                    .thenApply(state -> new Resolution(
+                                            new ResolveResult(
+                                                    streamId,
+                                                    startOffset,
+                                                    state.ranges(),
+                                                    state.cursor(),
+                                                    state.metadataVersion()),
+                                            state.cacheUsed()));
+                        },
+                        callbackExecutor);
     }
 
     void invalidate(StreamId streamId) {
         cache.invalidate(streamId);
     }
 
-    private CompletableFuture<Snapshot> loadSnapshot(
-            StreamId streamId,
-            ReadOperationDeadline deadline) {
+    private CompletableFuture<Snapshot> loadSnapshot(StreamId streamId, ReadOperationDeadline deadline) {
         return deadline.bound(
                         () -> metadataStore.getStreamSnapshot(config.cluster(), streamId),
                         "load stream metadata snapshot for resolve")
@@ -187,11 +168,7 @@ public final class ReadResolver implements AutoCloseable {
         if (!snapshot.metadata().streamId().equals(streamId.value())) {
             throw invariant("resolve metadata snapshot belongs to another stream");
         }
-        return new Snapshot(
-                snapshot.metadata(),
-                snapshot.trim(),
-                snapshot.committedEnd(),
-                snapshot.metadataVersion());
+        return new Snapshot(snapshot.metadata(), snapshot.trim(), snapshot.committedEnd(), snapshot.metadataVersion());
     }
 
     private CompletableFuture<BuildState> buildRanges(
@@ -208,53 +185,44 @@ public final class ReadResolver implements AutoCloseable {
             return CompletableFuture.completedFuture(state);
         }
         return scan(streamId, state.cursor(), snapshot.trim().trimOffset(), options.allowCache(), deadline)
-                .thenComposeAsync(source -> {
-                    OffsetIndexEntry selected = select(streamId, state.cursor(), source.records());
-                    if (selected == null) {
-                        if (state.cursor() >= snapshot.committed().committedEndOffset()) {
-                            return CompletableFuture.completedFuture(state.withCacheUsed(source.fromCache()));
-                        }
-                        if (repairedAtCursor) {
-                            throw invariant("committed offset cannot be materialized into the offset index");
-                        }
-                        return repair(streamId, state.cursor(), deadline)
-                                .thenCompose(ignored -> {
-                                    cache.invalidate(streamId);
-                                    return buildRanges(
-                                            streamId,
-                                            snapshot,
-                                            options,
-                                            maxRanges,
-                                            state.withCacheUsed(source.fromCache()),
-                                            true,
-                                            deadline);
-                                });
-                    }
-                    ResolvedRange range = toResolvedRange(selected);
-                    List<ResolvedRange> ranges = new ArrayList<>(state.ranges());
-                    ranges.add(range);
-                    BuildState advanced = new BuildState(
-                            selected.range().endOffset(),
-                            List.copyOf(ranges),
-                            Math.max(state.metadataVersion(), selected.metadataVersion()),
-                            state.cacheUsed() || source.fromCache());
-                    return buildRanges(
-                            streamId,
-                            snapshot,
-                            options,
-                            maxRanges,
-                            advanced,
-                            false,
-                            deadline);
-                }, callbackExecutor);
+                .thenComposeAsync(
+                        source -> {
+                            OffsetIndexEntry selected = select(streamId, state.cursor(), source.records());
+                            if (selected == null) {
+                                if (state.cursor() >= snapshot.committed().committedEndOffset()) {
+                                    return CompletableFuture.completedFuture(state.withCacheUsed(source.fromCache()));
+                                }
+                                if (repairedAtCursor) {
+                                    throw invariant("committed offset cannot be materialized into the offset index");
+                                }
+                                return repair(streamId, state.cursor(), deadline)
+                                        .thenCompose(ignored -> {
+                                            cache.invalidate(streamId);
+                                            return buildRanges(
+                                                    streamId,
+                                                    snapshot,
+                                                    options,
+                                                    maxRanges,
+                                                    state.withCacheUsed(source.fromCache()),
+                                                    true,
+                                                    deadline);
+                                        });
+                            }
+                            ResolvedRange range = toResolvedRange(selected);
+                            List<ResolvedRange> ranges = new ArrayList<>(state.ranges());
+                            ranges.add(range);
+                            BuildState advanced = new BuildState(
+                                    selected.range().endOffset(),
+                                    List.copyOf(ranges),
+                                    Math.max(state.metadataVersion(), selected.metadataVersion()),
+                                    state.cacheUsed() || source.fromCache());
+                            return buildRanges(streamId, snapshot, options, maxRanges, advanced, false, deadline);
+                        },
+                        callbackExecutor);
     }
 
     private CompletableFuture<ScanSource> scan(
-            StreamId streamId,
-            long cursor,
-            long trimOffset,
-            boolean allowCache,
-            ReadOperationDeadline deadline) {
+            StreamId streamId, long cursor, long trimOffset, boolean allowCache, ReadOperationDeadline deadline) {
         if (allowCache) {
             Optional<List<OffsetIndexEntry>> cached = cache.lookup(streamId, cursor, trimOffset);
             if (cached.isPresent()) {
@@ -267,26 +235,22 @@ public final class ReadResolver implements AutoCloseable {
         }
         return deadline.bound(
                         () -> metadataStore.scanOffsetIndex(
-                                config.cluster(),
-                                streamId,
-                                cursor,
-                                config.maxCommitChainScan()),
+                                config.cluster(), streamId, cursor, config.maxCommitChainScan()),
                         "scan offset index")
-                .thenApplyAsync(records -> {
-                    for (OffsetIndexEntry record : records) {
-                        if (!record.streamId().equals(streamId)) {
-                            throw invariant("offset-index scan returned another stream");
-                        }
-                    }
-                    cache.putPositive(streamId, records, trimOffset);
-                    return new ScanSource(List.copyOf(records), false);
-                }, callbackExecutor);
+                .thenApplyAsync(
+                        records -> {
+                            for (OffsetIndexEntry record : records) {
+                                if (!record.streamId().equals(streamId)) {
+                                    throw invariant("offset-index scan returned another stream");
+                                }
+                            }
+                            cache.putPositive(streamId, records, trimOffset);
+                            return new ScanSource(List.copyOf(records), false);
+                        },
+                        callbackExecutor);
     }
 
-    private CompletableFuture<Void> repair(
-            StreamId streamId,
-            long targetOffset,
-            ReadOperationDeadline deadline) {
+    private CompletableFuture<Void> repair(StreamId streamId, long targetOffset, ReadOperationDeadline deadline) {
         return repairPage(streamId, targetOffset, Optional.empty(), 0, deadline);
     }
 
@@ -299,21 +263,16 @@ public final class ReadResolver implements AutoCloseable {
         int remainingBudget = config.maxCommitChainScan() - scannedRecords;
         if (remainingBudget <= 0) {
             return NereusException.failedFuture(
-                    ErrorCode.READ_RESOLUTION_FAILED,
-                    true,
-                    "derived-index repair exhausted the read repair budget");
+                    ErrorCode.READ_RESOLUTION_FAILED, true, "derived-index repair exhausted the read repair budget");
         }
         int pageSize = Math.min(config.maxDerivedIndexRepairCommitsPerCall(), remainingBudget);
         return deadline.bound(
                         () -> metadataStore.repairDerivedStreamIndexes(
-                                config.cluster(),
-                                streamId,
-                                targetOffset,
-                                continuation,
-                                pageSize),
+                                config.cluster(), streamId, targetOffset, continuation, pageSize),
                         "repair derived offset index")
-                .thenComposeAsync(result -> continueRepair(
-                        streamId, targetOffset, result, scannedRecords, deadline), callbackExecutor);
+                .thenComposeAsync(
+                        result -> continueRepair(streamId, targetOffset, result, scannedRecords, deadline),
+                        callbackExecutor);
     }
 
     private CompletableFuture<Void> continueRepair(
@@ -342,21 +301,17 @@ public final class ReadResolver implements AutoCloseable {
         }
         if (scanned >= config.maxCommitChainScan()) {
             return NereusException.failedFuture(
-                    ErrorCode.READ_RESOLUTION_FAILED,
-                    true,
-                    "derived-index repair exhausted the read repair budget");
+                    ErrorCode.READ_RESOLUTION_FAILED, true, "derived-index repair exhausted the read repair budget");
         }
         return repairPage(streamId, targetOffset, result.continuation(), scanned, deadline);
     }
 
-    private static OffsetIndexEntry select(
-            StreamId streamId,
-            long cursor,
-            List<OffsetIndexEntry> records) {
+    private static OffsetIndexEntry select(StreamId streamId, long cursor, List<OffsetIndexEntry> records) {
         return records.stream()
                 .filter(record -> record.streamId().equals(streamId))
                 .filter(record -> !record.tombstoned())
-                .filter(record -> record.range().startOffset() <= cursor && cursor < record.range().endOffset())
+                .filter(record -> record.range().startOffset() <= cursor
+                        && cursor < record.range().endOffset())
                 .max(GENERATION_ORDER)
                 .orElse(null);
     }
@@ -383,12 +338,10 @@ public final class ReadResolver implements AutoCloseable {
 
     private static EntryIndexRef toEntryIndexRef(EntryIndexReferenceRecord record) {
         EntryIndexLocation location = EntryIndexLocation.valueOf(record.location());
-        Optional<ObjectId> objectId = record.objectId().isEmpty()
-                ? Optional.empty()
-                : Optional.of(new ObjectId(record.objectId()));
-        Optional<ObjectKey> objectKey = record.objectKey().isEmpty()
-                ? Optional.empty()
-                : Optional.of(new ObjectKey(record.objectKey()));
+        Optional<ObjectId> objectId =
+                record.objectId().isEmpty() ? Optional.empty() : Optional.of(new ObjectId(record.objectId()));
+        Optional<ObjectKey> objectKey =
+                record.objectKey().isEmpty() ? Optional.empty() : Optional.of(new ObjectKey(record.objectKey()));
         byte[] inlineData = record.inlineData();
         Optional<byte[]> inline = inlineData.length == 0 ? Optional.empty() : Optional.of(inlineData);
         return new EntryIndexRef(
@@ -421,20 +374,19 @@ public final class ReadResolver implements AutoCloseable {
             throw invariant("stream metadata contains an unknown state or profile", e);
         }
         switch (state) {
-            case ACTIVE, SEALED -> {
-            }
-            case CREATING -> throw new NereusException(
-                    ErrorCode.STREAM_NOT_ACTIVE, true, "stream is still being created");
-            case DELETING -> throw new NereusException(
-                    ErrorCode.STREAM_NOT_ACTIVE, false, "stream is being deleted");
-            case DELETED -> throw new NereusException(
-                    ErrorCode.STREAM_NOT_FOUND, false, "stream was deleted");
+            case ACTIVE, SEALED -> {}
+            case CREATING ->
+                throw new NereusException(ErrorCode.STREAM_NOT_ACTIVE, true, "stream is still being created");
+            case DELETING -> throw new NereusException(ErrorCode.STREAM_NOT_ACTIVE, false, "stream is being deleted");
+            case DELETED -> throw new NereusException(ErrorCode.STREAM_NOT_FOUND, false, "stream was deleted");
         }
         profileResolver.requireReadable(profile, readerInstalled);
     }
 
     private void ensureWatch(StreamId streamId) {
-        if (!config.enableMetadataWatch() || !config.enableOffsetIndexCache() || closed.get()
+        if (!config.enableMetadataWatch()
+                || !config.enableOffsetIndexCache()
+                || closed.get()
                 || watches.containsKey(streamId)) {
             return;
         }
@@ -450,8 +402,8 @@ public final class ReadResolver implements AutoCloseable {
             return null;
         }
         try {
-            WatchRegistration delegate = metadataStore.watchStream(
-                    config.cluster(), streamId, new CacheInvalidatingWatcher());
+            WatchRegistration delegate =
+                    metadataStore.watchStream(config.cluster(), streamId, new CacheInvalidatingWatcher());
             AtomicBoolean active = new AtomicBoolean(true);
             return () -> {
                 if (active.compareAndSet(true, false)) {
@@ -468,13 +420,8 @@ public final class ReadResolver implements AutoCloseable {
         }
     }
 
-    private static Resolution emptyResolution(
-            StreamId streamId,
-            long startOffset,
-            long metadataVersion) {
-        return new Resolution(
-                new ResolveResult(streamId, startOffset, List.of(), startOffset, metadataVersion),
-                false);
+    private static Resolution emptyResolution(StreamId streamId, long startOffset, long metadataVersion) {
+        return new Resolution(new ResolveResult(streamId, startOffset, List.of(), startOffset, metadataVersion), false);
     }
 
     @Override
@@ -505,8 +452,7 @@ public final class ReadResolver implements AutoCloseable {
         }
 
         @Override
-        public void onAppendSessionChanged(StreamId streamId, long epoch, long leaseVersion) {
-        }
+        public void onAppendSessionChanged(StreamId streamId, long epoch, long leaseVersion) {}
 
         @Override
         public void onWatchReconnected(StreamId streamId, long metadataVersion) {
@@ -514,24 +460,14 @@ public final class ReadResolver implements AutoCloseable {
         }
     }
 
-    record Resolution(ResolveResult result, boolean cacheUsed) {
-    }
+    record Resolution(ResolveResult result, boolean cacheUsed) {}
 
     private record Snapshot(
-            StreamMetadataRecord metadata,
-            TrimRecord trim,
-            CommittedEndOffsetRecord committed,
-            long metadataVersion) {
-    }
+            StreamMetadataRecord metadata, TrimRecord trim, CommittedEndOffsetRecord committed, long metadataVersion) {}
 
-    private record ScanSource(List<OffsetIndexEntry> records, boolean fromCache) {
-    }
+    private record ScanSource(List<OffsetIndexEntry> records, boolean fromCache) {}
 
-    private record BuildState(
-            long cursor,
-            List<ResolvedRange> ranges,
-            long metadataVersion,
-            boolean cacheUsed) {
+    private record BuildState(long cursor, List<ResolvedRange> ranges, long metadataVersion, boolean cacheUsed) {
         private BuildState {
             ranges = List.copyOf(ranges);
         }
@@ -546,8 +482,7 @@ public final class ReadResolver implements AutoCloseable {
     }
 
     private static NereusException invariant(String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static void observe(Runnable callback) {

@@ -17,3 +17,14 @@ dependencies {
     testImplementation(libs.assertj)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
+
+tasks.register<Test>("f9RangedCountLimitTest") {
+    group = "verification"
+    description = "Run the F9-M7 signed-int ranged-count and checked-metadata boundary."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.api.KafkaRangedCountLimitTest")
+    }
+}

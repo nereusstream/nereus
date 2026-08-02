@@ -1,13 +1,16 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadiness;
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadinessProvider;
+import com.nereusstream.bookkeeper.BookKeeperDeletionActivationCoordinator;
+import com.nereusstream.bookkeeper.BookKeeperDeletionActivationRequest;
+import com.nereusstream.bookkeeper.BookKeeperDeletionActivationResult;
 import com.nereusstream.bookkeeper.BookKeeperDigestType;
 import com.nereusstream.bookkeeper.BookKeeperLedgerGcConfiguration;
 import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceProvisioningCoordinator;
@@ -15,8 +18,8 @@ import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservation;
 import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationAdminStore;
 import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationKeys;
 import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationStore;
-import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationVerifier;
 import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationValue;
+import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservationVerifier;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivation;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivationCodecV1;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivationCoordinator;
@@ -28,6 +31,7 @@ import com.nereusstream.bookkeeper.BookKeeperProtocolActivationValue;
 import com.nereusstream.bookkeeper.BookKeeperRootCoverageProof;
 import com.nereusstream.bookkeeper.BookKeeperScopeCapabilityProof;
 import com.nereusstream.bookkeeper.BookKeeperSecretRef;
+import com.nereusstream.bookkeeper.BookKeeperStreamCoverageProof;
 import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import java.security.MessageDigest;
 import java.time.Clock;
@@ -42,16 +46,14 @@ import org.junit.jupiter.api.Test;
 
 final class BookKeeperDeletionActivationCoordinatorTest {
     private static final String ZERO = "0".repeat(64);
-    private static final BookKeeperBrokerReadiness READY = new BookKeeperBrokerReadiness(
-            11, sha('8'), 2);
+    private static final BookKeeperBrokerReadiness READY = new BookKeeperBrokerReadiness(11, sha('8'), 2);
 
     @Test
     void producesAndInstallsAllProofsInOneCasAndThenReadsIdempotently() {
         Fixture fixture = new Fixture(new FixedReadinessProvider(READY));
 
         BookKeeperDeletionActivationResult first = fixture.coordinator()
-                .activate(new BookKeeperDeletionActivationRequest(
-                        "rollout-0001", 7, Duration.ofSeconds(10)))
+                .activate(new BookKeeperDeletionActivationRequest("rollout-0001", 7, Duration.ofSeconds(10)))
                 .join();
 
         assertThat(first.newlyActivated()).isTrue();
@@ -65,8 +67,7 @@ final class BookKeeperDeletionActivationCoordinatorTest {
         assertThat(fixture.scopeCalls).hasValue(1);
 
         BookKeeperDeletionActivationResult second = fixture.coordinator()
-                .activate(new BookKeeperDeletionActivationRequest(
-                        "rollout-0001", 7, Duration.ofSeconds(10)))
+                .activate(new BookKeeperDeletionActivationRequest("rollout-0001", 7, Duration.ofSeconds(10)))
                 .join();
 
         assertThat(second.activation()).isEqualTo(first.activation());
@@ -79,43 +80,35 @@ final class BookKeeperDeletionActivationCoordinatorTest {
 
     @Test
     void rebindsAllDeletionProofsWhenTheReadinessIdentityChanges() {
-        AtomicReference<BookKeeperBrokerReadiness> readiness =
-                new AtomicReference<>(READY);
+        AtomicReference<BookKeeperBrokerReadiness> readiness = new AtomicReference<>(READY);
         Fixture fixture = new Fixture(new BookKeeperBrokerReadinessProvider() {
             @Override
-            public CompletableFuture<BookKeeperBrokerReadiness>
-                    requireBookKeeperPrimaryWalReadiness() {
+            public CompletableFuture<BookKeeperBrokerReadiness> requireBookKeeperPrimaryWalReadiness() {
                 return CompletableFuture.completedFuture(readiness.get());
             }
 
             @Override
-            public Optional<BookKeeperBrokerReadiness>
-                    currentBookKeeperPrimaryWalReadiness() {
+            public Optional<BookKeeperBrokerReadiness> currentBookKeeperPrimaryWalReadiness() {
                 return Optional.of(readiness.get());
             }
         });
 
         BookKeeperDeletionActivationResult first = fixture.coordinator()
-                .activate(new BookKeeperDeletionActivationRequest(
-                        "rollout-epoch-1", 7, Duration.ofSeconds(10)))
+                .activate(new BookKeeperDeletionActivationRequest("rollout-epoch-1", 7, Duration.ofSeconds(10)))
                 .join();
-        BookKeeperBrokerReadiness replacement = new BookKeeperBrokerReadiness(
-                3, sha('9'), 1);
+        BookKeeperBrokerReadiness replacement = new BookKeeperBrokerReadiness(3, sha('9'), 1);
         readiness.set(replacement);
         fixture.scopeReadiness = replacement;
 
         BookKeeperDeletionActivationResult rebound = fixture.coordinator()
                 .activate(new BookKeeperDeletionActivationRequest(
-                        "rollout-epoch-2",
-                        first.activation().metadataVersion(),
-                        Duration.ofSeconds(10)))
+                        "rollout-epoch-2", first.activation().metadataVersion(), Duration.ofSeconds(10)))
                 .join();
 
         assertThat(rebound.newlyActivated()).isTrue();
         assertThat(rebound.activation().metadataVersion())
                 .isEqualTo(first.activation().metadataVersion() + 1);
-        assertThat(rebound.activation().value().brokerReadinessEpoch())
-                .isEqualTo(replacement.brokerReadinessEpoch());
+        assertThat(rebound.activation().value().brokerReadinessEpoch()).isEqualTo(replacement.brokerReadinessEpoch());
         assertThat(rebound.activation().value().brokerReadinessSha256())
                 .isEqualTo(replacement.brokerSetSha256().value());
         assertThat(rebound.activation().publicationActivationSha256())
@@ -129,29 +122,23 @@ final class BookKeeperDeletionActivationCoordinatorTest {
     @Test
     void refusesToInstallWhenBrokerReadinessChangesDuringProofProduction() {
         AtomicInteger reads = new AtomicInteger();
-        BookKeeperBrokerReadiness changed = new BookKeeperBrokerReadiness(
-                12, sha('9'), 2);
+        BookKeeperBrokerReadiness changed = new BookKeeperBrokerReadiness(12, sha('9'), 2);
         Fixture fixture = new Fixture(new BookKeeperBrokerReadinessProvider() {
             @Override
-            public CompletableFuture<BookKeeperBrokerReadiness>
-                    requireBookKeeperPrimaryWalReadiness() {
-                return CompletableFuture.completedFuture(
-                        reads.getAndIncrement() == 0 ? READY : changed);
+            public CompletableFuture<BookKeeperBrokerReadiness> requireBookKeeperPrimaryWalReadiness() {
+                return CompletableFuture.completedFuture(reads.getAndIncrement() == 0 ? READY : changed);
             }
 
             @Override
-            public Optional<BookKeeperBrokerReadiness>
-                    currentBookKeeperPrimaryWalReadiness() {
+            public Optional<BookKeeperBrokerReadiness> currentBookKeeperPrimaryWalReadiness() {
                 return Optional.of(changed);
             }
         });
 
         assertThatThrownBy(() -> fixture.coordinator()
-                        .activate(new BookKeeperDeletionActivationRequest(
-                                "rollout-0002", 7, Duration.ofSeconds(10)))
+                        .activate(new BookKeeperDeletionActivationRequest("rollout-0002", 7, Duration.ofSeconds(10)))
                         .join())
-                .hasRootCauseMessage(
-                        "BookKeeper broker readiness changed during deletion proof production");
+                .hasRootCauseMessage("BookKeeper broker readiness changed during deletion proof production");
         assertThat(fixture.store.compareAndSetCalls).isZero();
         assertThat(fixture.rootCalls).hasValue(0);
         assertThat(fixture.streamCalls).hasValue(0);
@@ -164,8 +151,7 @@ final class BookKeeperDeletionActivationCoordinatorTest {
         fixture.scopeReadiness = new BookKeeperBrokerReadiness(READY.brokerReadinessEpoch(), sha('9'), 2);
 
         assertThatThrownBy(() -> fixture.coordinator()
-                        .activate(new BookKeeperDeletionActivationRequest(
-                                "rollout-0003", 7, Duration.ofSeconds(10)))
+                        .activate(new BookKeeperDeletionActivationRequest("rollout-0003", 7, Duration.ofSeconds(10)))
                         .join())
                 .hasRootCauseMessage("BookKeeper deletion proof does not match broker readiness");
         assertThat(fixture.store.compareAndSetCalls).isZero();
@@ -187,8 +173,7 @@ final class BookKeeperDeletionActivationCoordinatorTest {
 
                     @Override
                     public CompletableFuture<BookKeeperLedgerIdNamespaceReservation> create(
-                            BookKeeperLedgerIdNamespaceReservationValue value,
-                            Duration timeout) {
+                            BookKeeperLedgerIdNamespaceReservationValue value, Duration timeout) {
                         return CompletableFuture.failedFuture(new AssertionError("unexpected create"));
                     }
 
@@ -201,16 +186,13 @@ final class BookKeeperDeletionActivationCoordinatorTest {
                     }
                 };
         Clock clock = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
-        BookKeeperPrimaryWalAdministration administration =
-                new BookKeeperPrimaryWalAdministration(
-                        new NereusBookKeeperRuntimeConfiguration(
-                                "deployment-1", fixture.configuration, gcConfiguration()),
-                        new BookKeeperLedgerIdNamespaceReservationVerifier(
-                                namespaces, "deployment-1"),
-                        new BookKeeperLedgerIdNamespaceProvisioningCoordinator(namespaces, clock),
-                        fixture.store,
-                        new BookKeeperProtocolActivationCoordinator(fixture.store, clock),
-                        Optional.of(fixture.coordinator()));
+        BookKeeperPrimaryWalAdministration administration = new BookKeeperPrimaryWalAdministration(
+                new NereusBookKeeperRuntimeConfiguration("deployment-1", fixture.configuration, gcConfiguration()),
+                new BookKeeperLedgerIdNamespaceReservationVerifier(namespaces, "deployment-1"),
+                new BookKeeperLedgerIdNamespaceProvisioningCoordinator(namespaces, clock),
+                fixture.store,
+                new BookKeeperProtocolActivationCoordinator(fixture.store, clock),
+                Optional.of(fixture.coordinator()));
         BookKeeperProtocolActivationUpdate injected = new BookKeeperProtocolActivationUpdate(
                 READY.brokerReadinessEpoch(),
                 READY.brokerSetSha256().value(),
@@ -222,9 +204,10 @@ final class BookKeeperDeletionActivationCoordinatorTest {
                 sha('d').value(),
                 7);
 
-        assertThatThrownBy(() -> administration.activate(injected, Duration.ofSeconds(10)).join())
-                .hasRootCauseMessage(
-                        "ledger deletion must use activateDeletion so proof digests are producer-owned");
+        assertThatThrownBy(() -> administration
+                        .activate(injected, Duration.ofSeconds(10))
+                        .join())
+                .hasRootCauseMessage("ledger deletion must use activateDeletion so proof digests are producer-owned");
         assertThat(fixture.store.compareAndSetCalls).isZero();
     }
 
@@ -244,19 +227,16 @@ final class BookKeeperDeletionActivationCoordinatorTest {
 
         private BookKeeperDeletionActivationCoordinator coordinator() {
             BookKeeperLedgerIdNamespaceReservationStore namespaces =
-                    (scope, bits, value, timeout) -> CompletableFuture.completedFuture(
-                            Optional.of(namespace));
+                    (scope, bits, value, timeout) -> CompletableFuture.completedFuture(Optional.of(namespace));
             return new BookKeeperDeletionActivationCoordinator(
                     configuration,
                     gcConfiguration(),
                     namespace,
-                    new BookKeeperLedgerIdNamespaceReservationVerifier(
-                            namespaces, "deployment-1"),
+                    new BookKeeperLedgerIdNamespaceReservationVerifier(namespaces, "deployment-1"),
                     readinessProvider,
                     store,
                     new BookKeeperProtocolActivationCoordinator(
-                            store,
-                            Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC)),
+                            store, Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC)),
                     (readiness, timeout) -> {
                         rootCalls.incrementAndGet();
                         return CompletableFuture.completedFuture(new BookKeeperRootCoverageProof(
@@ -272,12 +252,7 @@ final class BookKeeperDeletionActivationCoordinatorTest {
                     (readiness, timeout) -> {
                         streamCalls.incrementAndGet();
                         return CompletableFuture.completedFuture(new BookKeeperStreamCoverageProof(
-                                readiness.brokerReadinessEpoch(),
-                                readiness.brokerSetSha256(),
-                                64,
-                                2,
-                                1,
-                                sha('b')));
+                                readiness.brokerReadinessEpoch(), readiness.brokerSetSha256(), 64, 2, 1, sha('b')));
                     },
                     request -> {
                         scopeCalls.incrementAndGet();
@@ -292,8 +267,7 @@ final class BookKeeperDeletionActivationCoordinatorTest {
         }
     }
 
-    private static final class FixedReadinessProvider
-            implements BookKeeperBrokerReadinessProvider {
+    private static final class FixedReadinessProvider implements BookKeeperBrokerReadinessProvider {
         private final BookKeeperBrokerReadiness readiness;
 
         private FixedReadinessProvider(BookKeeperBrokerReadiness readiness) {
@@ -301,8 +275,7 @@ final class BookKeeperDeletionActivationCoordinatorTest {
         }
 
         @Override
-        public CompletableFuture<BookKeeperBrokerReadiness>
-                requireBookKeeperPrimaryWalReadiness() {
+        public CompletableFuture<BookKeeperBrokerReadiness> requireBookKeeperPrimaryWalReadiness() {
             return CompletableFuture.completedFuture(readiness);
         }
 
@@ -319,28 +292,29 @@ final class BookKeeperDeletionActivationCoordinatorTest {
         private int compareAndSetCalls;
 
         private ActivationStore(
-                BookKeeperWalConfiguration configuration,
-                BookKeeperLedgerIdNamespaceReservation namespace) {
+                BookKeeperWalConfiguration configuration, BookKeeperLedgerIdNamespaceReservation namespace) {
             this.configuration = configuration;
             this.namespace = namespace;
-            current = materialize(new BookKeeperProtocolActivationValue(
-                    1,
-                    BookKeeperProtocolActivationLifecycle.ACTIVE,
-                    1,
-                    configuration.clusterAlias(),
-                    configuration.providerScopeSha256(),
-                    READY.brokerReadinessEpoch(),
-                    READY.brokerSetSha256().value(),
-                    configuration.configurationBindingSha256().value(),
-                    namespace.ledgerIdNamespaceSha256().value(),
-                    true,
-                    true,
-                    true,
-                    false,
-                    ZERO,
-                    ZERO,
-                    ZERO,
-                    100), 7);
+            current = materialize(
+                    new BookKeeperProtocolActivationValue(
+                            1,
+                            BookKeeperProtocolActivationLifecycle.ACTIVE,
+                            1,
+                            configuration.clusterAlias(),
+                            configuration.providerScopeSha256(),
+                            READY.brokerReadinessEpoch(),
+                            READY.brokerSetSha256().value(),
+                            configuration.configurationBindingSha256().value(),
+                            namespace.ledgerIdNamespaceSha256().value(),
+                            true,
+                            true,
+                            true,
+                            false,
+                            ZERO,
+                            ZERO,
+                            ZERO,
+                            100),
+                    7);
         }
 
         @Override
@@ -359,9 +333,7 @@ final class BookKeeperDeletionActivationCoordinatorTest {
 
         @Override
         public CompletableFuture<BookKeeperProtocolActivation> compareAndSet(
-                BookKeeperProtocolActivationValue replacement,
-                long expectedMetadataVersion,
-                Duration timeout) {
+                BookKeeperProtocolActivationValue replacement, long expectedMetadataVersion, Duration timeout) {
             compareAndSetCalls++;
             if (current.metadataVersion() != expectedMetadataVersion) {
                 return CompletableFuture.failedFuture(new IllegalStateException("version mismatch"));
@@ -370,8 +342,7 @@ final class BookKeeperDeletionActivationCoordinatorTest {
             return CompletableFuture.completedFuture(current);
         }
 
-        private BookKeeperProtocolActivation materialize(
-                BookKeeperProtocolActivationValue value, long version) {
+        private BookKeeperProtocolActivation materialize(BookKeeperProtocolActivationValue value, long version) {
             byte[] bytes = BookKeeperProtocolActivationCodecV1.encode(value);
             return value.materialize(
                     BookKeeperProtocolActivationKeys.key(
@@ -383,8 +354,7 @@ final class BookKeeperDeletionActivationCoordinatorTest {
         }
     }
 
-    private static BookKeeperLedgerIdNamespaceReservation namespace(
-            BookKeeperWalConfiguration configuration) {
+    private static BookKeeperLedgerIdNamespaceReservation namespace(BookKeeperWalConfiguration configuration) {
         return new BookKeeperLedgerIdNamespaceReservation(
                 1,
                 configuration.ledgerIdNamespaceReservationId(),
@@ -408,12 +378,7 @@ final class BookKeeperDeletionActivationCoordinatorTest {
 
     private static BookKeeperLedgerGcConfiguration gcConfiguration() {
         return new BookKeeperLedgerGcConfiguration(
-                1,
-                Duration.ofSeconds(30),
-                Duration.ofMinutes(3),
-                Duration.ofDays(7),
-                true,
-                false);
+                1, Duration.ofSeconds(30), Duration.ofMinutes(3), Duration.ofDays(7), true, false);
     }
 
     private static BookKeeperWalConfiguration configuration() {
@@ -456,8 +421,8 @@ final class BookKeeperDeletionActivationCoordinatorTest {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    java.util.HexFormat.of().formatHex(
-                            MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    java.util.HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (java.security.NoSuchAlgorithmException failure) {
             throw new IllegalStateException(failure);
         }

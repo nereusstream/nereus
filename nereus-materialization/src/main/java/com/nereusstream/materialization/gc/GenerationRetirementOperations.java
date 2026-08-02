@@ -1,29 +1,25 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
+import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.retirement.VersionedGenerationZeroCommit;
 import com.nereusstream.metadata.oxia.retirement.VersionedGenerationZeroMarker;
-import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 @FunctionalInterface
 interface GenerationCandidateLoader {
-    CompletableFuture<Optional<VersionedGenerationCandidate>> load(
-            StreamId streamId,
-            ReadView view,
-            String key);
+    CompletableFuture<Optional<VersionedGenerationCandidate>> load(StreamId streamId, ReadView view, String key);
 }
 
 @FunctionalInterface
 interface HigherGenerationIndexCas {
-    CompletableFuture<VersionedGenerationIndex> compareAndSet(
-            GenerationIndexRecord replacement,
-            long expectedVersion);
+    CompletableFuture<VersionedGenerationIndex> compareAndSet(GenerationIndexRecord replacement, long expectedVersion);
 }
 
 @FunctionalInterface
@@ -43,9 +39,7 @@ interface GenerationZeroMarkerLoader {
 @FunctionalInterface
 interface GenerationZeroMarkerDelete {
     CompletableFuture<Void> delete(
-            String exactKey,
-            long expectedVersion,
-            com.nereusstream.api.Checksum expectedDurableValueSha256);
+            String exactKey, long expectedVersion, com.nereusstream.api.Checksum expectedDurableValueSha256);
 }
 
 @FunctionalInterface
@@ -56,7 +50,5 @@ interface GenerationZeroCommitLoader {
 @FunctionalInterface
 interface GenerationZeroCommitDelete {
     CompletableFuture<Void> delete(
-            String exactKey,
-            long expectedVersion,
-            com.nereusstream.api.Checksum expectedDurableValueSha256);
+            String exactKey, long expectedVersion, com.nereusstream.api.Checksum expectedDurableValueSha256);
 }

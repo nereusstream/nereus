@@ -1,14 +1,16 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Objects;
 
-/** Canonical remaining-message bitset operations for persisted Pulsar batches. */
+/**
+ * Canonical remaining-message bitset operations for persisted Pulsar batches.
+ */
 public final class AckWords {
-    private AckWords() {
-    }
+    private AckWords() {}
 
     public static long[] canonicalCopy(int batchSize, long[] words) {
         if (batchSize <= 0) {

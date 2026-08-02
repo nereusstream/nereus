@@ -1,11 +1,11 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
-import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.codec.MetadataCodecException;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
@@ -37,7 +37,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
-/** Shared single-key CAS protocol used by the fake and Java Oxia F2 metadata adapters. */
+/**
+ * Shared single-key CAS protocol used by the fake and Java Oxia F2 metadata adapters.
+ */
 final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetadataStore {
     enum WriteKind {
         ALLOCATOR,
@@ -71,51 +73,41 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
         Objects.requireNonNull(clock, "clock");
         this.writeObserver = Objects.requireNonNull(writeObserver, "writeObserver");
         this.admission = new Semaphore(config.maxPendingOperations());
-        this.operationExecutor = Executors.newFixedThreadPool(
-                Math.min(4, config.maxPendingOperations()), namedThreadFactory());
+        this.operationExecutor =
+                Executors.newFixedThreadPool(Math.min(4, config.maxPendingOperations()), namedThreadFactory());
     }
 
     @Override
-    public CompletableFuture<Optional<TopicProjectionRecord>> getProjection(
-            String cluster,
-            String managedLedgerName) {
+    public CompletableFuture<Optional<TopicProjectionRecord>> getProjection(String cluster, String managedLedgerName) {
         ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(cluster);
         String exactName = ManagedLedgerProjectionNames.requireManagedLedgerName(managedLedgerName);
         return submit(deadline -> readTopic(keyspace, exactName, deadline));
     }
 
     @Override
-    public CompletableFuture<ManagedLedgerStreamProjection> getProjectionByStream(
-            String cluster,
-            StreamId streamId) {
+    public CompletableFuture<ManagedLedgerStreamProjection> getProjectionByStream(String cluster, StreamId streamId) {
         ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(cluster);
         StreamId exactStream = Objects.requireNonNull(streamId, "streamId");
         return submit(deadline -> {
             Optional<VersionedVirtualLedgerProjection> binding =
                     readVirtualLedgerProjection(keyspace, exactStream, deadline);
             if (binding.isEmpty()) {
-                return new ManagedLedgerStreamProjection(
-                        exactStream, Optional.empty(), Optional.empty());
+                return new ManagedLedgerStreamProjection(exactStream, Optional.empty(), Optional.empty());
             }
-            Optional<VersionedTopicProjection> currentTopic = readTopicAuthority(
-                    keyspace,
-                    binding.orElseThrow().value().managedLedgerName(),
-                    deadline);
+            Optional<VersionedTopicProjection> currentTopic =
+                    readTopicAuthority(keyspace, binding.orElseThrow().value().managedLedgerName(), deadline);
             return new ManagedLedgerStreamProjection(exactStream, binding, currentTopic);
         });
     }
 
     @Override
     public CompletableFuture<TopicProjectionRecord> createFirstProjection(
-            String cluster,
-            ProjectionCreateRequest request,
-            ProjectionPublishGuard publishGuard) {
+            String cluster, ProjectionCreateRequest request, ProjectionPublishGuard publishGuard) {
         ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(cluster);
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(publishGuard, "publishGuard");
         return submit(deadline -> {
-            Optional<TopicProjectionRecord> raced = readTopic(
-                    keyspace, request.managedLedgerName(), deadline);
+            Optional<TopicProjectionRecord> raced = readTopic(keyspace, request.managedLedgerName(), deadline);
             if (raced.isPresent()) {
                 TopicProjectionRecord authoritative = raced.orElseThrow();
                 repairInside(keyspace, authoritative, deadline);
@@ -249,8 +241,8 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
                         || current.parsedFacadeState() == ManagedLedgerFacadeState.DELETED) {
                     throw invariant("cursor protocol cannot activate a deleting or deleted projection");
                 }
-                TopicProjectionRecord candidate = withProperties(
-                        current, ManagedLedgerCursorProtocol.activate(current.properties()));
+                TopicProjectionRecord candidate =
+                        withProperties(current, ManagedLedgerCursorProtocol.activate(current.properties()));
                 Optional<Long> version = putIfVersion(
                         keyspace.topicProjectionKey(exactName),
                         keyspace.topicProjectionPartitionKey(exactName),
@@ -289,17 +281,14 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
                     return current;
                 }
                 if (firstRead && current.metadataVersion() != expectedMetadataVersion) {
-                    throw conditionFailed(
-                            "topic metadata version changed before generation activation");
+                    throw conditionFailed("topic metadata version changed before generation activation");
                 }
                 if (current.parsedFacadeState() == ManagedLedgerFacadeState.DELETING
                         || current.parsedFacadeState() == ManagedLedgerFacadeState.DELETED) {
-                    throw invariant(
-                            "generation protocol cannot activate a deleting or deleted projection");
+                    throw invariant("generation protocol cannot activate a deleting or deleted projection");
                 }
-                TopicProjectionRecord candidate = withProperties(
-                        current,
-                        ManagedLedgerGenerationProtocol.activate(current.properties()));
+                TopicProjectionRecord candidate =
+                        withProperties(current, ManagedLedgerGenerationProtocol.activate(current.properties()));
                 Optional<Long> version = putIfVersion(
                         keyspace.topicProjectionKey(exactName),
                         keyspace.topicProjectionPartitionKey(exactName),
@@ -340,13 +329,11 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
 
     @Override
     public CompletableFuture<ProjectionRepairResult> repairProjectionIndexes(
-            String cluster,
-            TopicProjectionRecord authoritative) {
+            String cluster, TopicProjectionRecord authoritative) {
         ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(cluster);
         Objects.requireNonNull(authoritative, "authoritative");
         return submit(deadline -> {
-            TopicProjectionRecord current = readTopic(
-                            keyspace, authoritative.managedLedgerName(), deadline)
+            TopicProjectionRecord current = readTopic(keyspace, authoritative.managedLedgerName(), deadline)
                     .orElseThrow(() -> invariant("cannot repair derived records without topic authority"));
             requireIdentity(authoritative.projectionIdentity(), current);
             return repairInside(keyspace, current, deadline);
@@ -397,9 +384,7 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
     }
 
     private ProjectionRepairResult repairInside(
-            ManagedLedgerProjectionKeyspace keyspace,
-            TopicProjectionRecord authoritative,
-            Deadline deadline) {
+            ManagedLedgerProjectionKeyspace keyspace, TopicProjectionRecord authoritative, Deadline deadline) {
         ManagedLedgerProjectionIdentity identity = authoritative.projectionIdentity();
         VirtualLedgerProjectionRecord virtualCandidate = new VirtualLedgerProjectionRecord(
                 authoritative.managedLedgerName(),
@@ -461,14 +446,17 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
     private long allocateLedgerId(ManagedLedgerProjectionKeyspace keyspace, Deadline deadline) {
         long backoff = INITIAL_BACKOFF_NANOS;
         while (true) {
-            Optional<PartitionedOxiaClient.VersionedValue> stored = get(
-                    keyspace.ledgerIdAllocatorKey(), keyspace.ledgerIdAllocatorPartitionKey(), deadline);
+            Optional<PartitionedOxiaClient.VersionedValue> stored =
+                    get(keyspace.ledgerIdAllocatorKey(), keyspace.ledgerIdAllocatorPartitionKey(), deadline);
             if (stored.isEmpty()) {
                 LedgerIdAllocatorRecord initialized = new LedgerIdAllocatorRecord(
                         Math.addExact(ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID, 1), 1, 0);
                 Optional<Long> version = putIfAbsent(
-                        keyspace.ledgerIdAllocatorKey(), keyspace.ledgerIdAllocatorPartitionKey(), initialized,
-                        LedgerIdAllocatorRecord.class, deadline);
+                        keyspace.ledgerIdAllocatorKey(),
+                        keyspace.ledgerIdAllocatorPartitionKey(),
+                        initialized,
+                        LedgerIdAllocatorRecord.class,
+                        deadline);
                 if (version.isPresent()) {
                     writeObserver.afterWrite(WriteKind.ALLOCATOR);
                     return ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID;
@@ -482,8 +470,12 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
                 LedgerIdAllocatorRecord candidate = new LedgerIdAllocatorRecord(
                         Math.addExact(allocated, 1), Math.addExact(current.allocations(), 1), 0);
                 Optional<Long> version = putIfVersion(
-                        keyspace.ledgerIdAllocatorKey(), keyspace.ledgerIdAllocatorPartitionKey(),
-                        current.metadataVersion(), candidate, LedgerIdAllocatorRecord.class, deadline);
+                        keyspace.ledgerIdAllocatorKey(),
+                        keyspace.ledgerIdAllocatorPartitionKey(),
+                        current.metadataVersion(),
+                        candidate,
+                        LedgerIdAllocatorRecord.class,
+                        deadline);
                 if (version.isPresent()) {
                     writeObserver.afterWrite(WriteKind.ALLOCATOR);
                     return allocated;
@@ -494,71 +486,53 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
     }
 
     private Optional<TopicProjectionRecord> readTopic(
-            ManagedLedgerProjectionKeyspace keyspace,
-            String managedLedgerName,
-            Deadline deadline) {
+            ManagedLedgerProjectionKeyspace keyspace, String managedLedgerName, Deadline deadline) {
         return readTopicAuthority(keyspace, managedLedgerName, deadline)
                 .map(value -> withMetadataVersion(value.value(), value.metadataVersion()));
     }
 
     private Optional<VersionedTopicProjection> readTopicAuthority(
-            ManagedLedgerProjectionKeyspace keyspace,
-            String managedLedgerName,
-            Deadline deadline) {
+            ManagedLedgerProjectionKeyspace keyspace, String managedLedgerName, Deadline deadline) {
         String key = keyspace.topicProjectionKey(managedLedgerName);
-        Optional<PartitionedOxiaClient.VersionedValue> value = get(
-                key,
-                keyspace.topicProjectionPartitionKey(managedLedgerName),
-                deadline);
+        Optional<PartitionedOxiaClient.VersionedValue> value =
+                get(key, keyspace.topicProjectionPartitionKey(managedLedgerName), deadline);
         if (value.isEmpty()) {
             return Optional.empty();
         }
         PartitionedOxiaClient.VersionedValue stored = value.orElseThrow();
         TopicProjectionRecord record = decodeWire(stored, TopicProjectionRecord.class);
         if (!record.managedLedgerName().equals(managedLedgerName)
-                || !record.managedLedgerNameHash().equals(
-                        ManagedLedgerProjectionNames.managedLedgerNameHash(managedLedgerName))) {
+                || !record.managedLedgerNameHash()
+                        .equals(ManagedLedgerProjectionNames.managedLedgerNameHash(managedLedgerName))) {
             throw invariant("managed-ledger topic hash collision or exact-name mismatch");
         }
-        return Optional.of(new VersionedTopicProjection(
-                key,
-                record,
-                stored.version(),
-                sha256(stored.value())));
+        return Optional.of(new VersionedTopicProjection(key, record, stored.version(), sha256(stored.value())));
     }
 
     private Optional<VersionedVirtualLedgerProjection> readVirtualLedgerProjection(
-            ManagedLedgerProjectionKeyspace keyspace,
-            StreamId streamId,
-            Deadline deadline) {
+            ManagedLedgerProjectionKeyspace keyspace, StreamId streamId, Deadline deadline) {
         String key = keyspace.virtualLedgerProjectionKey(streamId);
-        Optional<PartitionedOxiaClient.VersionedValue> value = get(
-                key, keyspace.streamPartitionKey(streamId), deadline);
+        Optional<PartitionedOxiaClient.VersionedValue> value =
+                get(key, keyspace.streamPartitionKey(streamId), deadline);
         if (value.isEmpty()) {
             return Optional.empty();
         }
         PartitionedOxiaClient.VersionedValue stored = value.orElseThrow();
-        VirtualLedgerProjectionRecord record = decodeWire(
-                stored, VirtualLedgerProjectionRecord.class);
+        VirtualLedgerProjectionRecord record = decodeWire(stored, VirtualLedgerProjectionRecord.class);
         if (!record.identity().streamId().equals(streamId.value())) {
             throw invariant("virtual-ledger projection key/stream identity mismatch");
         }
-        return Optional.of(new VersionedVirtualLedgerProjection(
-                key,
-                record,
-                stored.version(),
-                sha256(stored.value())));
+        return Optional.of(new VersionedVirtualLedgerProjection(key, record, stored.version(), sha256(stored.value())));
     }
 
     private void requireNoOrphanDerivedRecords(
-            ManagedLedgerProjectionKeyspace keyspace,
-            ProjectionCreateRequest request,
-            Deadline deadline) {
+            ManagedLedgerProjectionKeyspace keyspace, ProjectionCreateRequest request, Deadline deadline) {
         com.nereusstream.api.StreamId streamId = request.emptyStream().streamId();
         PartitionKey partitionKey = keyspace.streamPartitionKey(streamId);
-        boolean derivedPresent = get(
-                        keyspace.virtualLedgerProjectionKey(streamId), partitionKey, deadline).isPresent()
-                || get(keyspace.positionIndexKey(streamId), partitionKey, deadline).isPresent();
+        boolean derivedPresent = get(keyspace.virtualLedgerProjectionKey(streamId), partitionKey, deadline)
+                        .isPresent()
+                || get(keyspace.positionIndexKey(streamId), partitionKey, deadline)
+                        .isPresent();
         if (!derivedPresent) {
             return;
         }
@@ -569,21 +543,16 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
     }
 
     private Optional<PartitionedOxiaClient.VersionedValue> get(
-            String key,
-            PartitionKey partitionKey,
-            Deadline deadline) {
+            String key, PartitionKey partitionKey, Deadline deadline) {
         return deadline.await(client.get(key, partitionKey));
     }
 
     private <T> Optional<Long> putIfAbsent(
-            String key,
-            PartitionKey partitionKey,
-            T candidate,
-            Class<T> recordClass,
-            Deadline deadline) {
+            String key, PartitionKey partitionKey, T candidate, Class<T> recordClass, Deadline deadline) {
         byte[] encoded = encode(candidate, recordClass);
         try {
-            return Optional.of(deadline.await(client.putIfAbsent(key, encoded, partitionKey)).version());
+            return Optional.of(deadline.await(client.putIfAbsent(key, encoded, partitionKey))
+                    .version());
         } catch (RuntimeException e) {
             if (isConditionFailure(e)) {
                 return Optional.empty();
@@ -601,8 +570,8 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
             Deadline deadline) {
         byte[] encoded = encode(candidate, recordClass);
         try {
-            return Optional.of(deadline.await(
-                    client.putIfVersion(key, encoded, expectedVersion, partitionKey)).version());
+            return Optional.of(deadline.await(client.putIfVersion(key, encoded, expectedVersion, partitionKey))
+                    .version());
         } catch (RuntimeException e) {
             if (isConditionFailure(e)) {
                 return Optional.empty();
@@ -614,8 +583,7 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
     private <T> byte[] encode(T candidate, Class<T> recordClass) {
         byte[] encoded = MetadataRecordCodecFactory.encodeEnvelope(candidate, recordClass);
         if (encoded.length > config.maxValueBytes()) {
-            throw new NereusException(
-                    ErrorCode.INVALID_ARGUMENT, false, "encoded F2 metadata exceeds maxValueBytes");
+            throw new NereusException(ErrorCode.INVALID_ARGUMENT, false, "encoded F2 metadata exceeds maxValueBytes");
         }
         return encoded;
     }
@@ -629,13 +597,11 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
         }
     }
 
-    private static <T> T decodeWire(
-            PartitionedOxiaClient.VersionedValue stored, Class<T> recordClass) {
+    private static <T> T decodeWire(PartitionedOxiaClient.VersionedValue stored, Class<T> recordClass) {
         try {
             return MetadataRecordCodecFactory.decodeEnvelope(stored.value(), recordClass);
         } catch (MetadataCodecException | IllegalArgumentException e) {
-            throw invariant(
-                    "invalid durable F2 metadata record: " + recordClass.getSimpleName(), e);
+            throw invariant("invalid durable F2 metadata record: " + recordClass.getSimpleName(), e);
         }
     }
 
@@ -643,8 +609,8 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(
-                            MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }
@@ -659,12 +625,20 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
             hydrated = withMetadataVersion(value, version);
         } else if (record instanceof VirtualLedgerProjectionRecord value) {
             hydrated = new VirtualLedgerProjectionRecord(
-                    value.managedLedgerName(), value.managedLedgerNameHash(), value.identity(), value.startOffset(),
-                    value.positionMappingVersion(), version);
+                    value.managedLedgerName(),
+                    value.managedLedgerNameHash(),
+                    value.identity(),
+                    value.startOffset(),
+                    value.positionMappingVersion(),
+                    version);
         } else if (record instanceof PositionIndexRecord value) {
             hydrated = new PositionIndexRecord(
-                    value.managedLedgerName(), value.managedLedgerNameHash(), value.identity(),
-                    value.positionMappingVersion(), value.formula(), version);
+                    value.managedLedgerName(),
+                    value.managedLedgerNameHash(),
+                    value.identity(),
+                    value.positionMappingVersion(),
+                    value.formula(),
+                    version);
         } else {
             throw new IllegalArgumentException("record does not carry F2 metadataVersion: " + recordClass.getName());
         }
@@ -691,15 +665,12 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
                 0);
     }
 
-    private static TopicProjectionRecord withProperties(
-            TopicProjectionRecord current,
-            Map<String, String> properties) {
+    private static TopicProjectionRecord withProperties(TopicProjectionRecord current, Map<String, String> properties) {
         return copyTopic(current, current.facadeState(), properties, current.stateVersion());
     }
 
     private static TopicProjectionRecord withFacadeState(
-            TopicProjectionRecord current,
-            ManagedLedgerFacadeState target) {
+            TopicProjectionRecord current, ManagedLedgerFacadeState target) {
         ManagedLedgerFacadeState source = current.parsedFacadeState();
         if (source == target) {
             return current;
@@ -719,41 +690,78 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
 
     private static TopicProjectionRecord withMetadataVersion(TopicProjectionRecord current, long version) {
         return new TopicProjectionRecord(
-                current.managedLedgerName(), current.managedLedgerNameHash(),
-                current.storageClassBindingGeneration(), current.incarnation(),
-                current.streamName(), current.streamId(), current.storageClass(), current.storageProfile(),
-                current.virtualLedgerId(), current.positionMappingVersion(), current.payloadMapping(),
-                current.facadeState(), current.properties(), current.createdAtMillis(), current.stateVersion(), version);
+                current.managedLedgerName(),
+                current.managedLedgerNameHash(),
+                current.storageClassBindingGeneration(),
+                current.incarnation(),
+                current.streamName(),
+                current.streamId(),
+                current.storageClass(),
+                current.storageProfile(),
+                current.virtualLedgerId(),
+                current.positionMappingVersion(),
+                current.payloadMapping(),
+                current.facadeState(),
+                current.properties(),
+                current.createdAtMillis(),
+                current.stateVersion(),
+                version);
     }
 
     private static TopicProjectionRecord copyTopic(
-            TopicProjectionRecord current,
-            String facadeState,
-            Map<String, String> properties,
-            long stateVersion) {
+            TopicProjectionRecord current, String facadeState, Map<String, String> properties, long stateVersion) {
         return new TopicProjectionRecord(
-                current.managedLedgerName(), current.managedLedgerNameHash(),
-                current.storageClassBindingGeneration(), current.incarnation(),
-                current.streamName(), current.streamId(), current.storageClass(), current.storageProfile(),
-                current.virtualLedgerId(), current.positionMappingVersion(), current.payloadMapping(),
-                facadeState, properties, current.createdAtMillis(), stateVersion, 0);
+                current.managedLedgerName(),
+                current.managedLedgerNameHash(),
+                current.storageClassBindingGeneration(),
+                current.incarnation(),
+                current.streamName(),
+                current.streamId(),
+                current.storageClass(),
+                current.storageProfile(),
+                current.virtualLedgerId(),
+                current.positionMappingVersion(),
+                current.payloadMapping(),
+                facadeState,
+                properties,
+                current.createdAtMillis(),
+                stateVersion,
+                0);
     }
 
     private static boolean equalIgnoringMetadataVersion(Object expected, Object actual) {
         if (expected instanceof VirtualLedgerProjectionRecord left
                 && actual instanceof VirtualLedgerProjectionRecord right) {
             return new VirtualLedgerProjectionRecord(
-                    left.managedLedgerName(), left.managedLedgerNameHash(), left.identity(), left.startOffset(),
-                    left.positionMappingVersion(), 0).equals(new VirtualLedgerProjectionRecord(
-                    right.managedLedgerName(), right.managedLedgerNameHash(), right.identity(), right.startOffset(),
-                    right.positionMappingVersion(), 0));
+                            left.managedLedgerName(),
+                            left.managedLedgerNameHash(),
+                            left.identity(),
+                            left.startOffset(),
+                            left.positionMappingVersion(),
+                            0)
+                    .equals(new VirtualLedgerProjectionRecord(
+                            right.managedLedgerName(),
+                            right.managedLedgerNameHash(),
+                            right.identity(),
+                            right.startOffset(),
+                            right.positionMappingVersion(),
+                            0));
         }
         if (expected instanceof PositionIndexRecord left && actual instanceof PositionIndexRecord right) {
             return new PositionIndexRecord(
-                    left.managedLedgerName(), left.managedLedgerNameHash(), left.identity(),
-                    left.positionMappingVersion(), left.formula(), 0).equals(new PositionIndexRecord(
-                    right.managedLedgerName(), right.managedLedgerNameHash(), right.identity(),
-                    right.positionMappingVersion(), right.formula(), 0));
+                            left.managedLedgerName(),
+                            left.managedLedgerNameHash(),
+                            left.identity(),
+                            left.positionMappingVersion(),
+                            left.formula(),
+                            0)
+                    .equals(new PositionIndexRecord(
+                            right.managedLedgerName(),
+                            right.managedLedgerNameHash(),
+                            right.identity(),
+                            right.positionMappingVersion(),
+                            right.formula(),
+                            0));
         }
         return false;
     }
@@ -764,14 +772,13 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
                 && record.incarnation() == request.incarnation()
                 && record.streamName().equals(request.emptyStream().streamName().value())
                 && record.streamId().equals(request.emptyStream().streamId().value())
-                && record.storageProfile().equals(
-                        request.emptyStream().profile().name())
+                && record.storageProfile()
+                        .equals(request.emptyStream().profile().name())
                 && record.parsedFacadeState() == ManagedLedgerFacadeState.OPEN;
     }
 
     private static void validateRecreationRequest(
-            ManagedLedgerProjectionIdentity deleted,
-            ProjectionCreateRequest request) {
+            ManagedLedgerProjectionIdentity deleted, ProjectionCreateRequest request) {
         if (request.storageClassBindingGeneration() <= deleted.storageClassBindingGeneration()
                 || request.incarnation() != Math.addExact(deleted.incarnation(), 1)) {
             throw new IllegalArgumentException(
@@ -779,9 +786,7 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
         }
     }
 
-    private static void requireIdentity(
-            ManagedLedgerProjectionIdentity expected,
-            TopicProjectionRecord actual) {
+    private static void requireIdentity(ManagedLedgerProjectionIdentity expected, TopicProjectionRecord actual) {
         if (!expected.equals(actual.projectionIdentity())) {
             throw new ManagedLedgerProjectionIdentityMismatchException(expected, actual.projectionIdentity());
         }
@@ -807,19 +812,21 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
         }
         Deadline deadline = Deadline.start(config.operationTimeout());
         try {
-            return CompletableFuture.supplyAsync(() -> {
-                try {
-                    if (closed.get()) {
-                        throw new NereusException(
-                                ErrorCode.STORAGE_CLOSED, false, "projection metadata store is closed");
-                    }
-                    return operation.call(deadline);
-                } catch (Throwable error) {
-                    throw normalize(error);
-                } finally {
-                    admission.release();
-                }
-            }, operationExecutor);
+            return CompletableFuture.supplyAsync(
+                    () -> {
+                        try {
+                            if (closed.get()) {
+                                throw new NereusException(
+                                        ErrorCode.STORAGE_CLOSED, false, "projection metadata store is closed");
+                            }
+                            return operation.call(deadline);
+                        } catch (Throwable error) {
+                            throw normalize(error);
+                        } finally {
+                            admission.release();
+                        }
+                    },
+                    operationExecutor);
         } catch (RejectedExecutionException e) {
             admission.release();
             return NereusException.failedFuture(
@@ -841,8 +848,7 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
         if (isConditionCause(cause)) {
             return conditionFailed("projection metadata condition failed", cause);
         }
-        return new NereusException(
-                ErrorCode.METADATA_UNAVAILABLE, true, "projection metadata operation failed", cause);
+        return new NereusException(ErrorCode.METADATA_UNAVAILABLE, true, "projection metadata operation failed", cause);
     }
 
     private static boolean isConditionFailure(Throwable error) {

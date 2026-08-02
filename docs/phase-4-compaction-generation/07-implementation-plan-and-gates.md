@@ -31,12 +31,14 @@ focused and real-service tests：
   generation-index/task create recovery with immutable identity checks；
 - `GenerationMetadataTransitions` guards closed index/task lifecycles、the publication-before-allocation task shape、
   monotonic checkpoint/registration/recovery progress and immutable retention boundaries；
-- 50 frozen F4 metadata envelope vectors cover every lifecycle/optional branch、retirement-journal、activation record and the task-V2 schema；focused real Oxia covers slash-aware
+- 50 frozen F4 metadata envelope vectors cover every lifecycle/optional branch、retirement-journal、activation record and
+  the task-V2 schema；focused real Oxia covers slash-aware
   fixed-depth ranges、restart、CAS、pagination and conditional metadata delete；
 - M1 contract/document/module/source-lock/guarded-PUT audits and the `phase4M1Check`/`phase4M1FinalCheck` tasks exist。
 
 `phase4M1Check`、`phase4M1FinalCheck --rerun-tasks`、`phase4M2Check`、
-`phase4M2FinalCheck --rerun-tasks`、`phase4M3Check` and `phase4M3FinalCheck --rerun-tasks` passed on 2026-07-15. M2 adds authoritative committed-generation resolve/read,
+`phase4M2FinalCheck --rerun-tasks`、`phase4M3Check` and `phase4M3FinalCheck --rerun-tasks` passed on 2026-07-15. M2 adds
+authoritative committed-generation resolve/read,
 restart-safe publication, pin-owned fallback/quarantine and a real Oxia/LocalStack independent-runtime fixture.
 F4-M1、F4-M2 and F4-M3 are complete/final-gated. F4-M3 has nine implementation checkpoints：the real compacted
 format/read path, the deterministic policy/planner/task-store/recovery/registered-stream-scan path, and the
@@ -75,7 +77,8 @@ target protection and the `GenerationReadResolver` terminal repair seam. Runtime
 remain. Checkpoint G now adds exact read-before-delete generation-zero source and Phase 1 object-audit metadata
 adapters、committed-marker capture、legacy/generic encoding separation and a borrowed get/delete-only shared-Oxia
 bridge. Checkpoint H adds strict GC configuration、ACTIVE-root candidates and bounded canonical plans whose complete
-domain/protection/metadata-key facts can be recomputed before destructive retirement. Checkpoint I adds canonical exact-domain
+domain/protection/metadata-key facts can be recomputed before destructive retirement. Checkpoint I adds canonical
+exact-domain
 aggregation、mandatory metadata-fact reload、recoverable ACTIVE/MARKED/DELETING fencing and full 256-shard metadata
 root enumeration. It stops at durable delete intent；no source/protection/audit/object delete path is enabled by
 checkpoints G–I. Checkpoint J adds query-bound stateless revalidation、exact reference-to-removal binding and the
@@ -97,7 +100,8 @@ final exact index/root reload. Checkpoint Q adds a shared replacement verifier�
 and response-loss-safe higher-generation `COMMITTED/QUARANTINED -> DRAINING`, with DRAINING plan-time reproof.
 Checkpoint R adds exact completed-trim eligibility for generation-zero and either higher view、current strictly newer
 TOPIC_COMPACTED/ACTIVE same-view replacement proof, and a pre-read source-retirement grace fence；all three higher
-eligibility branches are repeated at DRAINING plan time. Checkpoint S adds the durable cluster generation-activation record/codec/exact-key store、
+eligibility branches are repeated at DRAINING plan time. Checkpoint S adds the durable cluster generation-activation
+record/codec/exact-key store、
 read-only lookup、PREPARED bootstrap、monotonic CAS guard and frozen lifecycle/capability vectors. It is authority
 foundation only. Checkpoint T adds the future sentinel、activation/backfill/domain-set-gated 64-shard global scope and
 ownerless variants for all five concrete domains. Checkpoint U adds the persisted dual-absence DELETED-root pass、
@@ -215,7 +219,8 @@ pass through each runtime, and proves direct plus Pulsar-facade exact reads of s
 entries per topic with unchanged properties/`MessageIdAdv` and a stock BookKeeper control topic. The real fixture also
 forced and fixed compressed-physical versus returned-logical byte accounting. Checkpoint BJ closes protected-head
 ordering and abandoned protected-intent retirement. Checkpoint BK supplies the executable 52/52 scenario mapping、
-partitioned loaded/unloaded admin evidence and aggregate task composition；at BK the full rerun aggregate remained pending.
+partitioned loaded/unloaded admin evidence and aggregate task composition；at BK the full rerun aggregate remained
+pending.
 Checkpoint BL removes Hadoop's transitive reload4j backend from the embeddable ObjectStore runtime after the first
 aggregate run exposed an Oxia retry-path MDC incompatibility；classpath isolation、the storage audit and the real
 Phase 1 Oxia restart suite now pass；at BL a fresh full aggregate rerun remained required.
@@ -555,7 +560,8 @@ GenerationPublicationOxiaS3IntegrationTest             real-service final fixtur
 ```
 
 Required assertions：unique generations with valid gaps；allocation-response loss plus interleaving can burn only
-unattached gaps and exactly one task-attached G may create an index；PREPARED invisible；one CAS publication point；task/checkpoint
+unattached gaps and exactly one task-attached G may create an index；PREPARED invisible；one CAS publication
+point；task/checkpoint
 never visible；highest covering generation；same-view fallback only；exact index/root post-pin revalidation；unknown
 format fails closed；stale cache/watch loss cannot hide a higher generation or a fresh fallback；old generation-zero
 goldens still resolve.
@@ -567,7 +573,8 @@ goldens still resolve.
 ./gradlew phase4M2FinalCheck --rerun-tasks
 ```
 
-Final adds independent-runtime real Oxia allocation/publication/response-loss and LocalStack pin/fallback fixtures. Physical
+Final adds independent-runtime real Oxia allocation/publication/response-loss and LocalStack pin/fallback fixtures.
+Physical
 delete stays disabled and all source objects remain protected. Both gates passed on 2026-07-15；the final gate was
 also run with `--rerun-tasks` so the real-service evidence was not satisfied from Gradle cache.
 
@@ -735,7 +742,8 @@ upload/output/publish crash cut, all-shard registry pagination/watch loss, fresh
 stream whose committed head has no task, and full output byte comparison. It may publish higher generations only
 with the test activation guard；production rollout remains disabled by default.
 
-Both gates passed on 2026-07-15；the final gate was run with `--rerun-tasks`. `MaterializationWorkerOxiaS3IntegrationTest`
+Both gates passed on 2026-07-15；the final gate was run with `--rerun-tasks`.
+`MaterializationWorkerOxiaS3IntegrationTest`
 proves two independent worker runtimes converge on one durable attempt/output、a fresh process reuses the exact
 published Parquet bytes, and a lost `OUTPUT_READY` CAS response reloads the frozen output. Deterministic failure/model
 tests cover the remaining crash cuts, and `RegisteredMaterializationStreamScannerTest` forces page-size-one scans over
@@ -744,7 +752,8 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 
 ## 6. F4-M4 — Recovery Checkpoint, Retirement, and GC
 
-> Current status：complete/final-gated on 2026-07-19. Checkpoints A–R implement NRC1/protected append/recovery、checkpoint replay/index repair、
+> Current status：complete/final-gated on 2026-07-19. Checkpoints A–R implement NRC1/protected append/recovery、checkpoint
+> replay/index repair、
 > retirement metadata、bounded GC plan/root/journal fencing、root-authenticated destructive recovery、typed source
 > retirement and all view/trim eligibility paths. Checkpoint S implements durable generation activation metadata；
 > checkpoint T implements the future sentinel、activation-gated full registration scope and affected/ownerless variants
@@ -1342,7 +1351,8 @@ and checks that complete drift conditionally unmarks while uncertain inventory r
 `mark -> drain/final revalidation -> DELETING -> source retirement` adapter, restart from MARKED or DELETING, the exact
 six-domain registry、durable journal、empty cursor plan metadata-removal contract、typed physical-GC configuration and
 provider/managed-ledger ownership；checkpoint AN later extends the shared source-retirement runtime with all four
-generation-zero/higher-generation handlers. Focused tests complete the exact protection/object deletion path only under an
+generation-zero/higher-generation handlers. Focused tests complete the exact protection/object deletion path only under
+an
 explicit enabled non-dry-run test configuration and prove changed authority never deletes bytes. The production
 safe-default runtime schedules no scan, and the existing broker bridge still supplies `enabled=false, dryRun=true`；
 this gate does not publish coverage/delete bits, map broker GC knobs, inventory missing-root objects, retire stream
@@ -1359,7 +1369,8 @@ reports `WOULD_REGISTER` or creates one exact ACTIVE root with a second full orp
 converges only through equality with that complete desired root. Every listed value receives one outcome；malformed、
 young、stale、HEAD-mismatched and root-conflicting values cause no mutation. The scanner exposes no delete operation,
 is only owned—not scheduled—by `Phase4PhysicalGcRuntime`, and therefore does not enable production deletion. This
-ordinary gate does not include the later checkpoint-AM registration retirement, periodic lifecycle routing、broker physical-GC mapping/
+ordinary gate does not include the later checkpoint-AM registration retirement, periodic lifecycle routing、broker
+physical-GC mapping/
 activation or the real-service destructive final scenarios.
 The aggregate gate passed with `--rerun-tasks` on 2026-07-18 under Java 21 against locked Pulsar
 `master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`；the root build executed 131 actionable tasks and the inherited
@@ -2289,32 +2300,32 @@ compacted, checkpoint or cursor-snapshot writes once their F4 publication hook i
 
 ## 10. Requirement-to-Evidence Matrix
 
-| Requirement | Primary evidence when implemented |
-| --- | --- |
-| publication only switches physical target | generation publication/failure tests + head unchanged assertion |
-| exact Pulsar bytes/MessageIds | Parquet opaque round trip + real two-broker M6 method |
-| view separation | keyspace/codec/resolver isolation tests and source audit |
-| task not visibility owner | PREPARED/task/index model tests |
-| restart-safe stream work discovery | cold-topic coverage gate + registry shard/page/watch-loss tests + unloaded no-task fresh-process gate |
-| registry not correctness owner | stale/mismatched hint negative tests + authoritative projection/head reload |
-| registry cardinality retirement | full deleted-stream drain proof + same-name recreation/conditional-delete tests |
-| unique deterministic generation order | allocator concurrency + resolver property tests |
-| safe fallback | quarantine/fallback tests with retained lower target |
-| durable reader fence | handshake model + real process-death lease gate |
-| task/reference fence | protection model + mark race gate |
-| source deletion needs recovery checkpoint | GC negative gate before root + replay positive gate after deletion |
-| bounded Oxia/history cardinality | checkpoint/pruning + 10,000-root tombstone-retirement scale fixtures |
-| F3 pending lifecycle honored | cursor snapshot/data GC race methods |
-| policy trim uses owner coordinator | no-direct-trim audit + ownership-cut tests |
-| cursor snapshot inventory not delete authority | final version/domain revalidation tests |
-| async ack/read repair | async crash/restart real gate |
-| lag cannot discard acknowledged primary | backpressure/recovery tests |
-| rollout/downgrade fail closed | capability/marker/old-decoder broker tests |
-| future domains extend safely | sentinel/domain registry test |
-| object list is audit only | stale/empty list model tests |
-| GC lifecycle restart discovery | authoritative 256-shard root scan + empty-list DELETING recovery |
-| bounded DELETED-root audit without resurrection | tombstone-retirement scale/race tests + guarded-PUT source audit |
-| BookKeeper non-claim/coexistence | profile rejection + stock BK real topic |
+| Requirement                                     | Primary evidence when implemented                                                                     |
+|-------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| publication only switches physical target       | generation publication/failure tests + head unchanged assertion                                       |
+| exact Pulsar bytes/MessageIds                   | Parquet opaque round trip + real two-broker M6 method                                                 |
+| view separation                                 | keyspace/codec/resolver isolation tests and source audit                                              |
+| task not visibility owner                       | PREPARED/task/index model tests                                                                       |
+| restart-safe stream work discovery              | cold-topic coverage gate + registry shard/page/watch-loss tests + unloaded no-task fresh-process gate |
+| registry not correctness owner                  | stale/mismatched hint negative tests + authoritative projection/head reload                           |
+| registry cardinality retirement                 | full deleted-stream drain proof + same-name recreation/conditional-delete tests                       |
+| unique deterministic generation order           | allocator concurrency + resolver property tests                                                       |
+| safe fallback                                   | quarantine/fallback tests with retained lower target                                                  |
+| durable reader fence                            | handshake model + real process-death lease gate                                                       |
+| task/reference fence                            | protection model + mark race gate                                                                     |
+| source deletion needs recovery checkpoint       | GC negative gate before root + replay positive gate after deletion                                    |
+| bounded Oxia/history cardinality                | checkpoint/pruning + 10,000-root tombstone-retirement scale fixtures                                  |
+| F3 pending lifecycle honored                    | cursor snapshot/data GC race methods                                                                  |
+| policy trim uses owner coordinator              | no-direct-trim audit + ownership-cut tests                                                            |
+| cursor snapshot inventory not delete authority  | final version/domain revalidation tests                                                               |
+| async ack/read repair                           | async crash/restart real gate                                                                         |
+| lag cannot discard acknowledged primary         | backpressure/recovery tests                                                                           |
+| rollout/downgrade fail closed                   | capability/marker/old-decoder broker tests                                                            |
+| future domains extend safely                    | sentinel/domain registry test                                                                         |
+| object list is audit only                       | stale/empty list model tests                                                                          |
+| GC lifecycle restart discovery                  | authoritative 256-shard root scan + empty-list DELETING recovery                                      |
+| bounded DELETED-root audit without resurrection | tombstone-retirement scale/race tests + guarded-PUT source audit                                      |
+| BookKeeper non-claim/coexistence                | profile rejection + stock BK real topic                                                               |
 
 ## 11. Documentation Synchronization
 

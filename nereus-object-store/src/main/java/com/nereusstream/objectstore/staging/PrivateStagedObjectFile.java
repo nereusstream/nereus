@@ -38,7 +38,9 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.CRC32C;
 
-/** Owner-only staging file whose sealed bytes are replayed without whole-object aggregation. */
+/**
+ * Owner-only staging file whose sealed bytes are replayed without whole-object aggregation.
+ */
 public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedStagingFile {
     private enum State {
         OPEN,
@@ -51,6 +53,7 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
     private final int uploadChunkBytes;
     private final Executor objectIoExecutor;
     private final FileChannel writer;
+    private final Object openedFileKey;
     private final CRC32C crc32c = new CRC32C();
     private final MessageDigest sha256;
     private final StagingOutputStream output = new StagingOutputStream();
@@ -64,24 +67,35 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
     private Checksum sealedSha256;
     private AttemptPublisher activeAttempt;
 
-    PrivateStagedObjectFile(
-            StagingFileManager manager,
-            Path path,
-            int uploadChunkBytes,
-            Executor objectIoExecutor) throws IOException {
+    PrivateStagedObjectFile(StagingFileManager manager, Path path, int uploadChunkBytes, Executor objectIoExecutor)
+            throws IOException {
         this.manager = Objects.requireNonNull(manager, "manager");
         this.path = Objects.requireNonNull(path, "path");
         this.uploadChunkBytes = uploadChunkBytes;
         this.objectIoExecutor = Objects.requireNonNull(objectIoExecutor, "objectIoExecutor");
-        this.writer = FileChannel.open(path, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+        this.writer =
+                FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
         try {
-            this.sha256 = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException failure) {
-            throw new IllegalStateException("SHA-256 is unavailable", failure);
+            BasicFileAttributes attributes =
+                    Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            if (!attributes.isRegularFile() || attributes.isSymbolicLink() || attributes.fileKey() == null) {
+                throw new IOException("staging file identity is unavailable");
+            }
+            this.openedFileKey = attributes.fileKey();
+            this.sha256 = newSha256();
+        } catch (IOException | RuntimeException failure) {
+            try {
+                writer.close();
+            } catch (IOException ignored) {
+                failure.addSuppressed(ignored);
+            }
+            throw failure;
         }
     }
 
-    /** Returns the single writer stream. Closing it finishes writes but does not release the staged file. */
+    /**
+     * Returns the single writer stream. Closing it finishes writes but does not release the staged file.
+     */
     public OutputStream outputStream() {
         synchronized (this) {
             requireState(State.OPEN, "staging file is not writable");
@@ -92,20 +106,22 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
         }
     }
 
-    /** Seals exact length/checksums/file identity and makes the file eligible for upload replay. */
+    /**
+     * Seals exact length/checksums/file identity and makes the file eligible for upload replay.
+     */
     public synchronized PrivateStagedObjectFile seal() {
         requireState(State.OPEN, "staging file cannot be sealed");
         try {
-            closeWriter();
-            BasicFileAttributes attributes = Files.readAttributes(
-                    path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            finishWrites();
+            BasicFileAttributes attributes =
+                    Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             if (!attributes.isRegularFile()
                     || attributes.isSymbolicLink()
                     || attributes.size() != writtenBytes
-                    || attributes.fileKey() == null) {
+                    || !openedFileKey.equals(attributes.fileKey())) {
                 throw new IOException("staging file identity or length changed before seal");
             }
-            sealedFileKey = attributes.fileKey();
+            sealedFileKey = openedFileKey;
             sealedLength = writtenBytes;
             sealedCrc32c = Crc32cChecksums.checksum((int) crc32c.getValue());
             sealedSha256 = new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(sha256.digest()));
@@ -163,16 +179,12 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
             attempt = activeAttempt;
             activeAttempt = null;
             release = writtenBytes;
-            try {
-                writer.close();
-            } catch (IOException ignored) {
-                // Best-effort cleanup still releases the process-local budget.
-            }
         }
         if (attempt != null) {
             attempt.cancelFromOwner();
         }
         deleteQuietly();
+        closeWriterQuietly();
         manager.release(release);
         manager.unregister(this);
     }
@@ -215,18 +227,15 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
         }
     }
 
-    private synchronized void closeWriter() throws IOException {
-        if (writer.isOpen()) {
-            writer.force(true);
-            writer.close();
-        }
+    private synchronized void finishWrites() throws IOException {
+        writer.force(true);
         outputClosed = true;
     }
 
     private synchronized void validateSealedFile() {
         try {
-            BasicFileAttributes attributes = Files.readAttributes(
-                    path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            BasicFileAttributes attributes =
+                    Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             if (!attributes.isRegularFile()
                     || attributes.isSymbolicLink()
                     || attributes.size() != sealedLength
@@ -254,12 +263,8 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
         }
         long release = Math.addExact(writtenBytes, currentWriteReservation);
         state = State.CLOSED;
-        try {
-            writer.close();
-        } catch (IOException ignored) {
-            // Best-effort cleanup.
-        }
         deleteQuietly();
+        closeWriterQuietly();
         manager.release(release);
         manager.unregister(this);
     }
@@ -270,21 +275,29 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
         }
         long release = writtenBytes;
         state = State.CLOSED;
-        try {
-            writer.close();
-        } catch (IOException ignored) {
-            // Best-effort cleanup.
-        }
         deleteQuietly();
+        closeWriterQuietly();
         manager.release(release);
         manager.unregister(this);
     }
 
     private void deleteQuietly() {
         try {
-            Files.deleteIfExists(path);
+            BasicFileAttributes attributes =
+                    Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            if (openedFileKey.equals(attributes.fileKey())) {
+                Files.deleteIfExists(path);
+            }
         } catch (IOException ignored) {
             // Startup orphan cleanup owns any residue after a process-local cleanup failure.
+        }
+    }
+
+    private void closeWriterQuietly() {
+        try {
+            writer.close();
+        } catch (IOException ignored) {
+            // Best-effort cleanup still releases the process-local budget.
         }
     }
 
@@ -336,16 +349,9 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
                 attemptFinished(this);
                 return;
             }
-            try {
-                FileSubscription value = new FileSubscription(subscriber, FileChannel.open(
-                        path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS));
-                subscription = value;
-                subscriber.onSubscribe(value);
-            } catch (Throwable failure) {
-                subscriber.onSubscribe(EmptySubscription.INSTANCE);
-                subscriber.onError(failure);
-                attemptFinished(this);
-            }
+            FileSubscription value = new FileSubscription(subscriber);
+            subscription = value;
+            subscriber.onSubscribe(value);
         }
 
         private void cancelFromOwner() {
@@ -360,17 +366,13 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
 
         private final class FileSubscription implements Flow.Subscription {
             private final Flow.Subscriber<? super ByteBuffer> downstream;
-            private final FileChannel channel;
             private long demand;
             private long position;
             private boolean running;
             private boolean terminated;
 
-            private FileSubscription(
-                    Flow.Subscriber<? super ByteBuffer> downstream,
-                    FileChannel channel) {
+            private FileSubscription(Flow.Subscriber<? super ByteBuffer> downstream) {
                 this.downstream = downstream;
-                this.channel = channel;
             }
 
             @Override
@@ -431,7 +433,7 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
                     ByteBuffer chunk = ByteBuffer.allocate(length);
                     try {
                         while (chunk.hasRemaining()) {
-                            int read = channel.read(chunk, position + chunk.position());
+                            int read = writer.read(chunk, position + chunk.position());
                             if (read < 0) {
                                 throw new IOException("unexpected EOF in sealed staging file");
                             }
@@ -462,11 +464,6 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
                     }
                     terminated = true;
                 }
-                try {
-                    channel.close();
-                } catch (IOException ignored) {
-                    // Terminal cleanup.
-                }
                 attemptFinished(AttemptPublisher.this);
                 if (signal) {
                     if (failure == null) {
@@ -483,16 +480,22 @@ public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedS
         INSTANCE;
 
         @Override
-        public void request(long count) {
-        }
+        public void request(long count) {}
 
         @Override
-        public void cancel() {
-        }
+        public void cancel() {}
     }
 
     private static long addCap(long current, long increment) {
         long result = current + increment;
         return result < 0 ? Long.MAX_VALUE : result;
+    }
+
+    private static MessageDigest newSha256() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IllegalStateException("SHA-256 is unavailable", failure);
+        }
     }
 }

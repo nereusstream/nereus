@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -25,12 +25,12 @@ import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.metadata.oxia.CommitSliceRequest;
+import com.nereusstream.metadata.oxia.F4ScanKind;
+import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.GenerationIndexValidator;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.GenerationZeroIndexEncoding;
-import com.nereusstream.metadata.oxia.F4ScanKind;
-import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
@@ -44,8 +44,8 @@ import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
 import com.nereusstream.objectstore.wal.WalReadResult;
-import java.lang.reflect.Proxy;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -76,8 +76,7 @@ class GenerationReadResolverTest {
         TestPinManager pins = new TestPinManager();
         GenerationReadResolver resolver = resolver(store, pins, readers(true));
 
-        PinnedResolvedRange selected = resolver.resolve(
-                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+        PinnedResolvedRange selected = resolver.resolve(STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
                 .join()
                 .orElseThrow();
 
@@ -100,8 +99,8 @@ class GenerationReadResolverTest {
         VersionedGenerationZeroIndex zero = generationZero(1, target);
         GenerationStoreState store = new GenerationStoreState(List.of(zero));
         TestPinManager pins = new TestPinManager();
-        ReadTargetReaderRegistry readers = new ReadTargetReaderRegistry(List.of(
-                new NoopReader(ReadTargetReaderKey.from(target))));
+        ReadTargetReaderRegistry readers =
+                new ReadTargetReaderRegistry(List.of(new NoopReader(ReadTargetReaderKey.from(target))));
         GenerationReadResolver resolver = new GenerationReadResolver(
                 CLUSTER,
                 l0Store(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT),
@@ -114,8 +113,7 @@ class GenerationReadResolverTest {
                 CLOCK,
                 Runnable::run);
 
-        PinnedResolvedRange selected = resolver.resolve(
-                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+        PinnedResolvedRange selected = resolver.resolve(STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
                 .join()
                 .orElseThrow();
 
@@ -136,8 +134,8 @@ class GenerationReadResolverTest {
                 2,
                 BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
                 new Checksum(ChecksumType.SHA256, "b".repeat(64)));
-        ReadTargetReaderRegistry readers = new ReadTargetReaderRegistry(List.of(
-                new NoopReader(ReadTargetReaderKey.from(target))));
+        ReadTargetReaderRegistry readers =
+                new ReadTargetReaderRegistry(List.of(new NoopReader(ReadTargetReaderKey.from(target))));
         GenerationStoreState zeroOnly = new GenerationStoreState(List.of(generationZero(1, target)));
         GenerationReadResolver resolver = new GenerationReadResolver(
                 CLUSTER,
@@ -151,8 +149,7 @@ class GenerationReadResolverTest {
                 CLOCK,
                 Runnable::run);
 
-        PinnedResolvedRange selected = resolver.resolve(
-                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+        PinnedResolvedRange selected = resolver.resolve(STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
                 .join()
                 .orElseThrow();
 
@@ -174,27 +171,54 @@ class GenerationReadResolverTest {
                 1_000,
                 CLOCK,
                 Runnable::run);
-        assertThatThrownBy(() -> invalidResolver.resolve(
-                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
-                .join())
+        assertThatThrownBy(() -> invalidResolver
+                        .resolve(STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+                        .join())
                 .satisfies(error -> assertThat(unwrap(error))
-                        .isInstanceOfSatisfying(NereusException.class,
-                                nereus -> assertThat(nereus.code())
-                                        .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION)));
+                        .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                                .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION)));
+    }
+
+    @Test
+    void bookKeeperWalOnlyAdmitsHigherGenerationInTopicCompactedView() {
+        GenerationStoreState store = new GenerationStoreState(List.of(higher(
+                2,
+                GenerationLifecycle.COMMITTED,
+                "NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2",
+                ReadView.TOPIC_COMPACTED)));
+        GenerationReadResolver resolver = new GenerationReadResolver(
+                CLUSTER,
+                l0Store(StorageProfile.BOOKKEEPER_WAL_ONLY),
+                store.proxy(),
+                GenerationIndexValidator.phase15Targets(),
+                new ReadTargetReaderRegistry(List.of(new NoopReader(ReadTargetReaderRegistryTest.key(
+                        ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2")))),
+                GenerationReadResolverTest::identity,
+                new TestPinManager(),
+                1_000,
+                CLOCK,
+                Runnable::run);
+
+        PinnedResolvedRange selected = resolver.resolve(STREAM, 0, ReadView.TOPIC_COMPACTED, Duration.ofSeconds(5))
+                .join()
+                .orElseThrow();
+
+        assertThat(selected.resolvedRange().generation()).isEqualTo(2);
+        assertThat(selected.candidate().view()).isEqualTo(ReadView.TOPIC_COMPACTED);
+        selected.release().join();
     }
 
     @Test
     void staleHigherCandidateAtPinTimeFallsBackOnlyWithinCommittedView() {
         VersionedGenerationCandidate zero = generationZero(1);
-        VersionedGenerationCandidate higher = higher(
-                3, GenerationLifecycle.COMMITTED, "NEREUS_COMPACTED_PARQUET_V1", ReadView.COMMITTED);
+        VersionedGenerationCandidate higher =
+                higher(3, GenerationLifecycle.COMMITTED, "NEREUS_COMPACTED_PARQUET_V1", ReadView.COMMITTED);
         GenerationStoreState store = new GenerationStoreState(List.of(zero, higher));
         TestPinManager pins = new TestPinManager();
         pins.beforeFirstValidation = () -> store.exact.remove(identity(higher));
         GenerationReadResolver resolver = resolver(store, pins, readers(true));
 
-        PinnedResolvedRange selected = resolver.resolve(
-                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+        PinnedResolvedRange selected = resolver.resolve(STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
                 .join()
                 .orElseThrow();
 
@@ -206,16 +230,14 @@ class GenerationReadResolverTest {
     @Test
     void unknownHigherFormatFailsClosedInsteadOfFallingThroughToWalReader() {
         GenerationStoreState store = new GenerationStoreState(List.of(
-                generationZero(1),
-                higher(3, GenerationLifecycle.COMMITTED, "UNKNOWN_FORMAT", ReadView.COMMITTED)));
+                generationZero(1), higher(3, GenerationLifecycle.COMMITTED, "UNKNOWN_FORMAT", ReadView.COMMITTED)));
         GenerationReadResolver resolver = resolver(store, new TestPinManager(), readers(false));
 
-        assertThatThrownBy(() -> resolver.resolve(
-                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5)).join())
+        assertThatThrownBy(() -> resolver.resolve(STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+                        .join())
                 .satisfies(error -> assertThat(unwrap(error))
-                        .isInstanceOfSatisfying(NereusException.class,
-                                nereus -> assertThat(nereus.code())
-                                        .isEqualTo(ErrorCode.UNSUPPORTED_READ_TARGET)));
+                        .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                                .isEqualTo(ErrorCode.UNSUPPORTED_READ_TARGET)));
     }
 
     @Test
@@ -223,28 +245,44 @@ class GenerationReadResolverTest {
         VersionedGenerationCandidate zero = generationZero(1);
         GenerationStoreState store = new GenerationStoreState(List.of(
                 zero,
-                higher(9, GenerationLifecycle.COMMITTED,
-                        "NEREUS_COMPACTED_PARQUET_V1", ReadView.TOPIC_COMPACTED)));
+                higher(9, GenerationLifecycle.COMMITTED, "NEREUS_COMPACTED_PARQUET_V1", ReadView.TOPIC_COMPACTED)));
         GenerationReadResolver resolver = resolver(store, new TestPinManager(), readers(true));
 
-        PinnedResolvedRange first = resolver.resolve(
-                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
-                .join().orElseThrow();
+        PinnedResolvedRange first = resolver.resolve(STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+                .join()
+                .orElseThrow();
         assertThat(first.resolvedRange().generation()).isZero();
         first.release().join();
 
-        store.values.add(higher(
-                5, GenerationLifecycle.COMMITTED,
-                "NEREUS_COMPACTED_PARQUET_V1", ReadView.COMMITTED));
+        store.values.add(higher(5, GenerationLifecycle.COMMITTED, "NEREUS_COMPACTED_PARQUET_V1", ReadView.COMMITTED));
         store.rebuildExact();
-        PinnedResolvedRange second = resolver.resolve(
-                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
-                .join().orElseThrow();
+        PinnedResolvedRange second = resolver.resolve(STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+                .join()
+                .orElseThrow();
 
         assertThat(second.resolvedRange().generation()).isEqualTo(5);
         assertThat(store.scannedViews).containsOnly(ReadView.COMMITTED);
         assertThat(store.scanCalls).hasValue(2);
         second.release().join();
+    }
+
+    @Test
+    void resolvesSparseTopicCompactedGenerationWithZeroSurvivors() {
+        VersionedGenerationIndex sparse = sparseTopicCompacted(7);
+        GenerationStoreState store = new GenerationStoreState(List.of(sparse));
+        TestPinManager pins = new TestPinManager();
+        GenerationReadResolver resolver = resolver(store, pins, readers(true));
+
+        PinnedResolvedRange selected = resolver.resolve(STREAM, 0, ReadView.TOPIC_COMPACTED, Duration.ofSeconds(5))
+                .join()
+                .orElseThrow();
+
+        assertThat(selected.resolvedRange().offsetRange()).isEqualTo(new OffsetRange(0, 2));
+        assertThat(selected.resolvedRange().recordCount()).isEqualTo(2);
+        assertThat(selected.resolvedRange().entryCount()).isZero();
+        assertThat(selected.resolvedRange().logicalBytes()).isZero();
+        assertThat(selected.resolvedRange().payloadFormat()).isEqualTo(PayloadFormat.KAFKA_RECORD_BATCH);
+        selected.release().join();
     }
 
     @Test
@@ -264,15 +302,11 @@ class GenerationReadResolverTest {
                                                 GenerationLifecycle.COMMITTED,
                                                 "NEREUS_COMPACTED_PARQUET_V1",
                                                 ReadView.COMMITTED))
-                                        .sorted(Comparator.comparing(
-                                                VersionedGenerationCandidate::key))
+                                        .sorted(Comparator.comparing(VersionedGenerationCandidate::key))
                                         .toList()
                                 : List.of();
                         yield CompletableFuture.completedFuture(new GenerationScanPage(
-                                values,
-                                page < 8
-                                        ? Optional.of(continuation)
-                                        : Optional.empty()));
+                                values, page < 8 ? Optional.of(continuation) : Optional.empty()));
                     }
                     case "getCandidate" -> {
                         long generation = (long) args[4];
@@ -286,16 +320,14 @@ class GenerationReadResolverTest {
                     default -> throw new UnsupportedOperationException(method.getName());
                 });
         TestPinManager pins = new TestPinManager();
-        GenerationReadResolver resolver = resolver(
-                admitted, pins, readers(true));
+        GenerationReadResolver resolver = resolver(admitted, pins, readers(true));
 
-        PinnedResolvedRange selected = resolver.resolve(
-                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+        PinnedResolvedRange selected = resolver.resolve(STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
                 .join()
                 .orElseThrow();
 
-        assertThat(selected.resolvedRange().generation()).isEqualTo(
-                GenerationReadResolver.MAX_GENERATION_CANDIDATES_PER_RESOLVE);
+        assertThat(selected.resolvedRange().generation())
+                .isEqualTo(GenerationReadResolver.MAX_GENERATION_CANDIDATES_PER_RESOLVE);
         assertThat(pages).hasValue(9);
         assertThat(pins.validations).hasValue(1);
         selected.release().join();
@@ -314,54 +346,42 @@ class GenerationReadResolverTest {
                         int count = page < 8 ? 512 : 1;
                         int first = page * 512;
                         List<VersionedGenerationCandidate> values = java.util.stream.IntStream.range(0, count)
-                                .mapToObj(index -> (VersionedGenerationCandidate) generationZero(
-                                        first + index + 1L))
+                                .mapToObj(index -> (VersionedGenerationCandidate) generationZero(first + index + 1L))
                                 .toList();
                         yield CompletableFuture.completedFuture(new GenerationScanPage(
-                                values,
-                                page < 8 ? Optional.of(continuation) : Optional.empty()));
+                                values, page < 8 ? Optional.of(continuation) : Optional.empty()));
                     }
                     case "close" -> null;
                     default -> throw new UnsupportedOperationException(method.getName());
                 });
-        GenerationReadResolver resolver = resolver(
-                overflowing, new TestPinManager(), readers(true));
+        GenerationReadResolver resolver = resolver(overflowing, new TestPinManager(), readers(true));
 
-        assertThatThrownBy(() -> resolver.resolve(
-                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5)).join())
+        assertThatThrownBy(() -> resolver.resolve(STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+                        .join())
                 .satisfies(error -> assertThat(unwrap(error))
-                        .isInstanceOfSatisfying(NereusException.class,
-                                nereus -> assertThat(nereus.code())
-                                        .isEqualTo(ErrorCode.METADATA_LIMIT_EXCEEDED)));
+                        .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                                .isEqualTo(ErrorCode.METADATA_LIMIT_EXCEEDED)));
         assertThat(pages).hasValue(9);
     }
 
     @Test
     void checkpointRepairerRestoresAuthorityBeforeResolverRescans() {
         GenerationStoreState store = new GenerationStoreState(List.of());
-        VersionedGenerationIndex restored = higher(
-                3,
-                GenerationLifecycle.COMMITTED,
-                "NEREUS_COMPACTED_PARQUET_V1",
-                ReadView.COMMITTED);
+        VersionedGenerationIndex restored =
+                higher(3, GenerationLifecycle.COMMITTED, "NEREUS_COMPACTED_PARQUET_V1", ReadView.COMMITTED);
         AtomicInteger repairs = new AtomicInteger();
         GenerationIndexRepairer repairer = (streamId, targetOffset, timeout) -> {
             repairs.incrementAndGet();
             store.values.add(restored);
             store.rebuildExact();
             return CompletableFuture.completedFuture(
-                    GenerationIndexRepairResult.checkpoint(
-                            streamId, targetOffset, 0, restored));
+                    GenerationIndexRepairResult.checkpoint(streamId, targetOffset, 0, restored));
         };
-        GenerationReadResolver resolver = resolver(
-                store.proxy(),
-                new TestPinManager(),
-                readers(true),
-                repairer);
+        GenerationReadResolver resolver = resolver(store.proxy(), new TestPinManager(), readers(true), repairer);
 
-        PinnedResolvedRange selected = resolver.resolve(
-                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
-                .join().orElseThrow();
+        PinnedResolvedRange selected = resolver.resolve(STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+                .join()
+                .orElseThrow();
 
         assertThat(repairs).hasValue(1);
         assertThat(store.scanCalls).hasValue(2);
@@ -371,8 +391,7 @@ class GenerationReadResolverTest {
 
     @Test
     void asyncObjectWalProfileUsesTheSameCommittedGenerationResolver() {
-        GenerationStoreState store = new GenerationStoreState(
-                List.of(generationZero(1)));
+        GenerationStoreState store = new GenerationStoreState(List.of(generationZero(1)));
         GenerationReadResolver resolver = new GenerationReadResolver(
                 CLUSTER,
                 l0Store(StorageProfile.OBJECT_WAL_ASYNC_OBJECT),
@@ -385,11 +404,7 @@ class GenerationReadResolverTest {
                 CLOCK,
                 Runnable::run);
 
-        PinnedResolvedRange selected = resolver.resolve(
-                        STREAM,
-                        0,
-                        ReadView.COMMITTED,
-                        Duration.ofSeconds(5))
+        PinnedResolvedRange selected = resolver.resolve(STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
                 .join()
                 .orElseThrow();
 
@@ -398,16 +413,12 @@ class GenerationReadResolverTest {
     }
 
     private static GenerationReadResolver resolver(
-            GenerationStoreState store,
-            TestPinManager pins,
-            ReadTargetReaderRegistry readers) {
+            GenerationStoreState store, TestPinManager pins, ReadTargetReaderRegistry readers) {
         return resolver(store.proxy(), pins, readers);
     }
 
     private static GenerationReadResolver resolver(
-            GenerationMetadataStore store,
-            TestPinManager pins,
-            ReadTargetReaderRegistry readers) {
+            GenerationMetadataStore store, TestPinManager pins, ReadTargetReaderRegistry readers) {
         return new GenerationReadResolver(
                 CLUSTER,
                 l0Store(),
@@ -441,8 +452,8 @@ class GenerationReadResolverTest {
 
     private static ReadTargetReaderRegistry readers(boolean compacted) {
         List<ReadTargetReader> values = new ArrayList<>();
-        values.add(new NoopReader(ReadTargetReaderRegistryTest.key(
-                ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1")));
+        values.add(
+                new NoopReader(ReadTargetReaderRegistryTest.key(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1")));
         if (compacted) {
             values.add(new NoopReader(ReadTargetReaderRegistryTest.key(
                     ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1")));
@@ -478,8 +489,7 @@ class GenerationReadResolverTest {
                 });
     }
 
-    private static CompletableFuture<PhysicalObjectIdentity> identity(
-            ObjectSliceReadTarget target, ReadView view) {
+    private static CompletableFuture<PhysicalObjectIdentity> identity(ObjectSliceReadTarget target, ReadView view) {
         PhysicalObjectKind kind = target.objectType() == ObjectType.MULTI_STREAM_WAL_OBJECT
                 ? PhysicalObjectKind.OBJECT_WAL
                 : view == ReadView.COMMITTED
@@ -496,14 +506,13 @@ class GenerationReadResolverTest {
     }
 
     private static VersionedGenerationZeroIndex generationZero(long version) {
-        ObjectSliceReadTarget target = ReadTargetReaderRegistryTest.target(
-                ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
+        ObjectSliceReadTarget target =
+                ReadTargetReaderRegistryTest.target(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
         return generationZero(version, target);
     }
 
     private static VersionedGenerationZeroIndex generationZero(
-            long version,
-            com.nereusstream.api.target.ReadTarget target) {
+            long version, com.nereusstream.api.target.ReadTarget target) {
         long offsetEnd = Math.addExact(version, 1);
         OffsetIndexEntry entry = new OffsetIndexEntry(
                 STREAM,
@@ -529,18 +538,15 @@ class GenerationReadResolverTest {
     }
 
     private static VersionedGenerationIndex higher(
-            long generation,
-            GenerationLifecycle lifecycle,
-            String format,
-            ReadView view) {
-        ObjectSliceReadTarget target = ReadTargetReaderRegistryTest.target(
-                ObjectType.STREAM_COMPACTED_OBJECT, format);
+            long generation, GenerationLifecycle lifecycle, String format, ReadView view) {
+        ObjectSliceReadTarget target = ReadTargetReaderRegistryTest.target(ObjectType.STREAM_COMPACTED_OBJECT, format);
         var encoded = ReadTargetCodecRegistry.phase15().encode(target);
         long committedAt = lifecycle == GenerationLifecycle.COMMITTED ? 110 : 0;
-        String reason = switch (lifecycle) {
-            case QUARANTINED, DRAINING, RETIRED, ABORTED -> "reason";
-            default -> "";
-        };
+        String reason =
+                switch (lifecycle) {
+                    case QUARANTINED, DRAINING, RETIRED, ABORTED -> "reason";
+                    default -> "";
+                };
         long version = generation + 10;
         GenerationIndexRecord record = new GenerationIndexRecord(
                 1,
@@ -574,10 +580,46 @@ class GenerationReadResolverTest {
                 120,
                 version);
         return new VersionedGenerationIndex(
-                "/" + view.name() + "/index/2/" + generation,
-                record,
-                version,
-                sha(version));
+                "/" + view.name() + "/index/2/" + generation, record, version, sha(version));
+    }
+
+    private static VersionedGenerationIndex sparseTopicCompacted(long generation) {
+        ObjectSliceReadTarget target =
+                ReadTargetReaderRegistryTest.target(ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
+        var encoded = ReadTargetCodecRegistry.phase15().encode(target);
+        long version = generation + 10;
+        GenerationIndexRecord record = new GenerationIndexRecord(
+                1,
+                STREAM.value(),
+                ReadView.TOPIC_COMPACTED.wireId(),
+                0,
+                2,
+                generation,
+                publication(generation),
+                "task-" + generation,
+                GenerationLifecycle.COMMITTED,
+                "a".repeat(64),
+                "b".repeat(64),
+                encoded,
+                encoded.identityChecksumValue(),
+                "b".repeat(64),
+                PayloadFormat.KAFKA_RECORD_BATCH.name(),
+                2,
+                0,
+                0,
+                0,
+                0,
+                2,
+                1,
+                1,
+                List.of(),
+                CommitSliceRequest.emptyProjectionIdentity(),
+                100,
+                110,
+                "",
+                120,
+                version);
+        return new VersionedGenerationIndex("/TOPIC_COMPACTED/index/2/" + generation, record, version, sha(version));
     }
 
     private static Checksum sha(long seed) {
@@ -622,12 +664,7 @@ class GenerationReadResolverTest {
         Constructor<F4ScanToken> constructor = F4ScanToken.class.getDeclaredConstructor(
                 String.class, F4ScanKind.class, String.class, String.class, String.class);
         constructor.setAccessible(true);
-        return constructor.newInstance(
-                CLUSTER,
-                F4ScanKind.GENERATION_INDEX,
-                "a".repeat(64),
-                "/index/",
-                "/index/page");
+        return constructor.newInstance(CLUSTER, F4ScanKind.GENERATION_INDEX, "a".repeat(64), "/index/", "/index/page");
     }
 
     private static final class GenerationStoreState {
@@ -658,16 +695,17 @@ class GenerationReadResolverTest {
                             List<VersionedGenerationCandidate> selected = values.stream()
                                     .filter(value -> value instanceof VersionedGenerationZeroIndex
                                             ? view == ReadView.COMMITTED
-                                            : ReadView.fromWireId(
-                                                            ((VersionedGenerationIndex) value).value().readViewId())
+                                            : ReadView.fromWireId(((VersionedGenerationIndex) value)
+                                                            .value()
+                                                            .readViewId())
                                                     == view)
                                     .sorted(Comparator.comparing(VersionedGenerationCandidate::key))
                                     .toList();
-                            yield CompletableFuture.completedFuture(
-                                    new GenerationScanPage(selected, Optional.empty()));
+                            yield CompletableFuture.completedFuture(new GenerationScanPage(selected, Optional.empty()));
                         }
-                        case "getCandidate" -> CompletableFuture.completedFuture(Optional.ofNullable(
-                                exact.get(args[2] + ":" + args[3] + ":" + args[4])));
+                        case "getCandidate" ->
+                            CompletableFuture.completedFuture(
+                                    Optional.ofNullable(exact.get(args[2] + ":" + args[3] + ":" + args[4])));
                         case "close" -> null;
                         default -> throw new UnsupportedOperationException(method.getName());
                     });
@@ -693,18 +731,14 @@ class GenerationReadResolverTest {
 
         @Override
         public CompletableFuture<WalReadResult> readWithStats(
-                StreamId streamId,
-                long startOffset,
-                List<ResolvedRange> ranges,
-                ReadOptions options) {
+                StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
             return CompletableFuture.completedFuture(new WalReadResult(List.of(), List.of()));
         }
     }
 
     private static final class TestPinManager implements ObjectReadPinManager {
         private final AtomicInteger validations = new AtomicInteger();
-        private Runnable beforeFirstValidation = () -> {
-        };
+        private Runnable beforeFirstValidation = () -> {};
 
         @Override
         public CompletableFuture<ObjectReadLease> acquire(
@@ -715,13 +749,13 @@ class GenerationReadResolverTest {
                 beforeFirstValidation.run();
             }
             validations.incrementAndGet();
-            return selectionRevalidator.revalidate().thenApply(ignored -> new TestLease(
-                    object, maximumReadDeadlineMillis));
+            return selectionRevalidator
+                    .revalidate()
+                    .thenApply(ignored -> new TestLease(object, maximumReadDeadlineMillis));
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
     }
 
     private static final class TestLease implements ObjectReadLease {

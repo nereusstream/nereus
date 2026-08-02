@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.recovery;
 
 import com.nereusstream.api.Checksum;
@@ -10,7 +11,6 @@ import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
-import com.nereusstream.core.physical.ObjectProtection;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.materialization.MaterializationDeadline;
@@ -38,10 +38,11 @@ import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 
-/** Rebuilds every current-root permanent protection from immutable NRC1 bytes. */
+/**
+ * Rebuilds every current-root permanent protection from immutable NRC1 bytes.
+ */
 public final class RecoveryCheckpointRootReconciler {
-    private static final int PUBLICATION_PAGE_SIZE =
-            RecoveryCheckpointFormatV1.MAX_PUBLICATION_SCAN_PAGE_SIZE;
+    private static final int PUBLICATION_PAGE_SIZE = RecoveryCheckpointFormatV1.MAX_PUBLICATION_SCAN_PAGE_SIZE;
 
     private final String cluster;
     private final GenerationMetadataStore generationStore;
@@ -50,8 +51,7 @@ public final class RecoveryCheckpointRootReconciler {
     private final RecoveryCheckpointProtectionManager protections;
     private final Duration operationTimeout;
     private final ScheduledExecutorService scheduler;
-    private final GenerationIndexRecordCodecV1 generationCodec =
-            new GenerationIndexRecordCodecV1();
+    private final GenerationIndexRecordCodecV1 generationCodec = new GenerationIndexRecordCodecV1();
 
     public RecoveryCheckpointRootReconciler(
             String cluster,
@@ -71,8 +71,7 @@ public final class RecoveryCheckpointRootReconciler {
     }
 
     public CompletableFuture<Void> reconcile(VersionedRecoveryCheckpointRoot root) {
-        MaterializationDeadline deadline = new MaterializationDeadline(
-                operationTimeout, scheduler);
+        MaterializationDeadline deadline = new MaterializationDeadline(operationTimeout, scheduler);
         CompletableFuture<Void> result;
         try {
             result = reconcile(root, deadline);
@@ -83,56 +82,42 @@ public final class RecoveryCheckpointRootReconciler {
         return result.whenComplete((ignored, failure) -> deadline.close());
     }
 
-    CompletableFuture<Void> reconcile(
-            VersionedRecoveryCheckpointRoot root,
-            MaterializationDeadline deadline) {
+    CompletableFuture<Void> reconcile(VersionedRecoveryCheckpointRoot root, MaterializationDeadline deadline) {
         Objects.requireNonNull(root, "root");
         Objects.requireNonNull(deadline, "deadline");
         if (root.value().checkpoints().isEmpty()) {
             return requireExactRoot(root, deadline);
         }
-        return reconcileReference(root, deadline, 0)
-                .thenCompose(ignored -> requireExactRoot(root, deadline));
+        return reconcileReference(root, deadline, 0).thenCompose(ignored -> requireExactRoot(root, deadline));
     }
 
     private CompletableFuture<Void> reconcileReference(
-            VersionedRecoveryCheckpointRoot root,
-            MaterializationDeadline deadline,
-            int index) {
+            VersionedRecoveryCheckpointRoot root, MaterializationDeadline deadline, int index) {
         if (index == root.value().checkpoints().size()) {
             return CompletableFuture.completedFuture(null);
         }
-        RecoveryCheckpointReferenceRecord reference =
-                root.value().checkpoints().get(index);
+        RecoveryCheckpointReferenceRecord reference = root.value().checkpoints().get(index);
         ObjectKey key = new ObjectKey(reference.objectKey());
         CompletableFuture<HeadObjectResult> head = deadline.bound(
-                () -> objectStore.headObject(
-                        key, new HeadObjectOptions(deadline.remaining())),
+                () -> objectStore.headObject(key, new HeadObjectOptions(deadline.remaining())),
                 "HEAD recovery checkpoint during root reconciliation");
         return head.thenCompose(value -> {
                     PhysicalObjectIdentity object = checkpointIdentity(root, reference, value);
-                    return open(root, reference, deadline)
-                            .thenCompose(opened -> deadline.bound(
-                                            () -> protections.acquireCheckpointObject(root, object),
-                                            "acquire root-owned recovery checkpoint protection")
-                                    .thenCompose(checkpointProtection -> scanAndProtectTargets(
+                    return open(root, reference, deadline).thenCompose(opened -> deadline.bound(
+                                    () -> protections.acquireCheckpointObject(root, object),
+                                    "acquire root-owned recovery checkpoint protection")
+                            .thenCompose(checkpointProtection -> scanAndProtectTargets(
+                                            root, opened, deadline, OptionalInt.empty())
+                                    .thenCompose(ignored -> open(root, reference, deadline))
+                                    .thenCompose(reopened -> deadline.bound(
+                                            () -> protections.releasePublishedPending(
+                                                    reference,
                                                     root,
-                                                    opened,
-                                                    deadline,
-                                                    OptionalInt.empty())
-                                            .thenCompose(ignored -> open(root, reference, deadline))
-                                            .thenCompose(reopened -> deadline.bound(
-                                                    () -> protections.releasePublishedPending(
-                                                            reference,
-                                                            root,
-                                                            object,
-                                                            checkpointProtection,
-                                                            () -> scanAndProtectTargets(
-                                                                    root,
-                                                                    reopened,
-                                                                    deadline,
-                                                                    OptionalInt.empty())),
-                                                    "replace recovery checkpoint pending protection"))));
+                                                    object,
+                                                    checkpointProtection,
+                                                    () -> scanAndProtectTargets(
+                                                            root, reopened, deadline, OptionalInt.empty())),
+                                            "replace recovery checkpoint pending protection"))));
                 })
                 .thenCompose(ignored -> reconcileReference(root, deadline, index + 1));
     }
@@ -144,11 +129,7 @@ public final class RecoveryCheckpointRootReconciler {
         ObjectKey key = new ObjectKey(reference.objectKey());
         Checksum content = new Checksum(ChecksumType.SHA256, reference.contentSha256());
         return deadline.bound(
-                        () -> codec.openAndVerify(
-                                key,
-                                reference.objectLength(),
-                                content,
-                                deadline.remaining()),
+                        () -> codec.openAndVerify(key, reference.objectLength(), content, deadline.remaining()),
                         "open and verify recovery checkpoint during root reconciliation")
                 .thenApply(object -> {
                     requireExactReference(root, reference, object);
@@ -162,20 +143,11 @@ public final class RecoveryCheckpointRootReconciler {
             MaterializationDeadline deadline,
             OptionalInt continuation) {
         return deadline.bound(
-                        () -> codec.scanPublications(
-                                object,
-                                continuation,
-                                PUBLICATION_PAGE_SIZE,
-                                deadline.remaining()),
+                        () -> codec.scanPublications(object, continuation, PUBLICATION_PAGE_SIZE, deadline.remaining()),
                         "scan recovery checkpoint publication table")
-                .thenCompose(page -> protectPageTargets(
-                                root, page.values(), deadline, 0)
+                .thenCompose(page -> protectPageTargets(root, page.values(), deadline, 0)
                         .thenCompose(ignored -> page.continuation().isPresent()
-                                ? scanAndProtectTargets(
-                                        root,
-                                        object,
-                                        deadline,
-                                        page.continuation())
+                                ? scanAndProtectTargets(root, object, deadline, page.continuation())
                                 : CompletableFuture.completedFuture(null)));
     }
 
@@ -192,8 +164,7 @@ public final class RecoveryCheckpointRootReconciler {
                 .thenCompose(target -> deadline.bound(
                         () -> protections.acquireCheckpointTarget(root, target),
                         "acquire root-owned recovery checkpoint target protection"))
-                .thenCompose(ignored -> protectPageTargets(
-                        root, publications, deadline, index + 1));
+                .thenCompose(ignored -> protectPageTargets(root, publications, deadline, index + 1));
     }
 
     private CompletableFuture<VersionedGenerationIndex> loadExactIndex(
@@ -223,12 +194,11 @@ public final class RecoveryCheckpointRootReconciler {
                         () -> generationStore.getIndex(cluster, identity),
                         "load exact recovery checkpoint target index")
                 .thenApply(optional -> {
-                    VersionedGenerationIndex actual = optional.orElseThrow(() -> condition(
-                            "recovery checkpoint target index is absent"));
-                    if (!embedded.withMetadataVersion(actual.metadataVersion())
-                                    .equals(actual.value())
-                            || !actual.durableValueSha256().equals(sha256(
-                                    MetadataRecordCodecFactory.encodeEnvelope(
+                    VersionedGenerationIndex actual =
+                            optional.orElseThrow(() -> condition("recovery checkpoint target index is absent"));
+                    if (!embedded.withMetadataVersion(actual.metadataVersion()).equals(actual.value())
+                            || !actual.durableValueSha256()
+                                    .equals(sha256(MetadataRecordCodecFactory.encodeEnvelope(
                                             embedded, GenerationIndexRecord.class)))) {
                         throw condition("recovery checkpoint target index changed");
                     }
@@ -237,12 +207,10 @@ public final class RecoveryCheckpointRootReconciler {
     }
 
     private CompletableFuture<Void> requireExactRoot(
-            VersionedRecoveryCheckpointRoot root,
-            MaterializationDeadline deadline) {
+            VersionedRecoveryCheckpointRoot root, MaterializationDeadline deadline) {
         StreamId streamId = new StreamId(root.value().streamId());
         return deadline.bound(
-                        () -> generationStore.getRecoveryRoot(cluster, streamId),
-                        "revalidate recovery checkpoint root")
+                        () -> generationStore.getRecoveryRoot(cluster, streamId), "revalidate recovery checkpoint root")
                 .thenAccept(actual -> {
                     if (!actual.equals(Optional.of(root))) {
                         throw condition("recovery checkpoint root changed during reconciliation");
@@ -251,9 +219,7 @@ public final class RecoveryCheckpointRootReconciler {
     }
 
     private PhysicalObjectIdentity checkpointIdentity(
-            VersionedRecoveryCheckpointRoot root,
-            RecoveryCheckpointReferenceRecord reference,
-            HeadObjectResult head) {
+            VersionedRecoveryCheckpointRoot root, RecoveryCheckpointReferenceRecord reference, HeadObjectResult head) {
         ObjectKey key = new ObjectKey(reference.objectKey());
         Checksum storage = new Checksum(ChecksumType.CRC32C, reference.storageCrc32c());
         Checksum content = new Checksum(ChecksumType.SHA256, reference.contentSha256());
@@ -278,21 +244,16 @@ public final class RecoveryCheckpointRootReconciler {
     }
 
     private static boolean headMetadataMatches(
-            VersionedRecoveryCheckpointRoot root,
-            RecoveryCheckpointReferenceRecord reference,
-            HeadObjectResult head) {
+            VersionedRecoveryCheckpointRoot root, RecoveryCheckpointReferenceRecord reference, HeadObjectResult head) {
         if (head.metadata().isEmpty()) {
             return true;
         }
         return "NRC1".equals(head.metadata().get("nereus-format"))
-                && reference.contentSha256().equals(
-                        head.metadata().get("nereus-content-sha256"))
-                && root.value().streamId().equals(
-                        head.metadata().get("nereus-stream-id"))
-                && Long.toString(reference.checkpointSequence()).equals(
-                        head.metadata().get("nereus-checkpoint-sequence"))
-                && reference.checkpointAttemptId().equals(
-                        head.metadata().get("nereus-checkpoint-attempt-id"));
+                && reference.contentSha256().equals(head.metadata().get("nereus-content-sha256"))
+                && root.value().streamId().equals(head.metadata().get("nereus-stream-id"))
+                && Long.toString(reference.checkpointSequence())
+                        .equals(head.metadata().get("nereus-checkpoint-sequence"))
+                && reference.checkpointAttemptId().equals(head.metadata().get("nereus-checkpoint-attempt-id"));
     }
 
     private void requireExactReference(
@@ -314,8 +275,7 @@ public final class RecoveryCheckpointRootReconciler {
                 || !header.lastCommitId().equals(reference.lastCommitId())
                 || !header.sourceHeadCommitId().equals(reference.sourceHeadCommitId())
                 || header.sourceHeadCommitVersion() != reference.sourceHeadCommitVersion()
-                || !header.projectionIdentitySha256().value().equals(
-                        reference.projectionIdentitySha256())
+                || !header.projectionIdentitySha256().value().equals(reference.projectionIdentitySha256())
                 || header.expectedEntryCount() != reference.commitEntryCount()
                 || header.expectedPublicationCount() != reference.publicationCount()
                 || !object.objectId().value().equals(reference.objectId())
@@ -337,8 +297,8 @@ public final class RecoveryCheckpointRootReconciler {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    java.util.HexFormat.of().formatHex(
-                            java.security.MessageDigest.getInstance("SHA-256")
+                    java.util.HexFormat.of()
+                            .formatHex(java.security.MessageDigest.getInstance("SHA-256")
                                     .digest(value)));
         } catch (java.security.NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
@@ -370,7 +330,6 @@ public final class RecoveryCheckpointRootReconciler {
     }
 
     private static NereusException invariant(String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 }

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.Checksum;
@@ -19,44 +20,40 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Root-first identity resolution with a strict generation-zero manifest bootstrap path. */
+/**
+ * Root-first identity resolution with a strict generation-zero manifest bootstrap path.
+ */
 public final class MetadataPhysicalObjectIdentityResolver implements PhysicalObjectIdentityResolver {
     private final String cluster;
     private final OxiaMetadataStore l0Store;
     private final PhysicalObjectMetadataStore physicalStore;
 
     public MetadataPhysicalObjectIdentityResolver(
-            String cluster,
-            OxiaMetadataStore l0Store,
-            PhysicalObjectMetadataStore physicalStore) {
+            String cluster, OxiaMetadataStore l0Store, PhysicalObjectMetadataStore physicalStore) {
         this.cluster = requireText(cluster, "cluster");
         this.l0Store = Objects.requireNonNull(l0Store, "l0Store");
         this.physicalStore = Objects.requireNonNull(physicalStore, "physicalStore");
     }
 
     @Override
-    public CompletableFuture<PhysicalObjectIdentity> resolve(
-            ObjectSliceReadTarget target, ReadView view) {
+    public CompletableFuture<PhysicalObjectIdentity> resolve(ObjectSliceReadTarget target, ReadView view) {
         ObjectSliceReadTarget exactTarget = Objects.requireNonNull(target, "target");
         ReadView exactView = Objects.requireNonNull(view, "view");
         ObjectKeyHash hash = ObjectKeyHash.from(exactTarget.objectKey());
         return physicalStore.getRoot(cluster, hash).thenCompose(root -> {
             if (root.isPresent()) {
                 return CompletableFuture.completedFuture(validateTarget(
-                        exactTarget, exactView, PhysicalObjectIdentity.from(root.orElseThrow().value())));
+                        exactTarget,
+                        exactView,
+                        PhysicalObjectIdentity.from(root.orElseThrow().value())));
             }
-            if (exactTarget.objectType() != ObjectType.MULTI_STREAM_WAL_OBJECT
-                    || exactView != ReadView.COMMITTED) {
+            if (exactTarget.objectType() != ObjectType.MULTI_STREAM_WAL_OBJECT || exactView != ReadView.COMMITTED) {
                 return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.OBJECT_NOT_FOUND,
-                        true,
-                        "physical root is absent for a higher-generation target"));
+                        ErrorCode.OBJECT_NOT_FOUND, true, "physical root is absent for a higher-generation target"));
             }
             return l0Store.getObjectManifest(cluster, exactTarget.objectId()).thenApply(optional -> {
                 ObjectManifestRecord manifest = optional.orElseThrow(() -> new NereusException(
-                        ErrorCode.METADATA_INVARIANT_VIOLATION,
-                        false,
-                        "generation-zero object manifest is absent"));
+                        ErrorCode.METADATA_INVARIANT_VIOLATION, false, "generation-zero object manifest is absent"));
                 Phase1ObjectManifestValidator.validateStoredManifest(manifest);
                 PhysicalObjectIdentity identity = PhysicalObjectIdentity.create(
                         exactTarget.objectKey(),
@@ -77,19 +74,20 @@ public final class MetadataPhysicalObjectIdentityResolver implements PhysicalObj
     }
 
     private static PhysicalObjectIdentity validateTarget(
-            ObjectSliceReadTarget target,
-            ReadView view,
-            PhysicalObjectIdentity identity) {
-        boolean kindMatches = switch (target.objectType()) {
-            case MULTI_STREAM_WAL_OBJECT -> identity.kind() == PhysicalObjectKind.OBJECT_WAL
-                    && view == ReadView.COMMITTED;
-            case STREAM_COMPACTED_OBJECT -> identity.kind()
-                    == (view == ReadView.COMMITTED
-                            ? PhysicalObjectKind.COMMITTED_COMPACTED
-                            : PhysicalObjectKind.TOPIC_COMPACTED);
-            case INDEX_OBJECT -> identity.kind() == PhysicalObjectKind.INDEX_OBJECT;
-            case CURSOR_SNAPSHOT_OBJECT -> identity.kind() == PhysicalObjectKind.CURSOR_SNAPSHOT;
-        };
+            ObjectSliceReadTarget target, ReadView view, PhysicalObjectIdentity identity) {
+        boolean kindMatches =
+                switch (target.objectType()) {
+                    case MULTI_STREAM_WAL_OBJECT ->
+                        identity.kind() == PhysicalObjectKind.OBJECT_WAL && view == ReadView.COMMITTED;
+                    case STREAM_COMPACTED_OBJECT ->
+                        identity.kind()
+                                == (view == ReadView.COMMITTED
+                                        ? PhysicalObjectKind.COMMITTED_COMPACTED
+                                        : PhysicalObjectKind.TOPIC_COMPACTED);
+                    case INDEX_OBJECT -> identity.kind() == PhysicalObjectKind.INDEX_OBJECT;
+                    case CURSOR_SNAPSHOT_OBJECT -> identity.kind() == PhysicalObjectKind.CURSOR_SNAPSHOT;
+                    case KAFKA_PARTITION_CHECKPOINT -> identity.kind() == PhysicalObjectKind.KAFKA_PARTITION_CHECKPOINT;
+                };
         long targetEnd;
         try {
             targetEnd = Math.addExact(target.objectOffset(), target.objectLength());

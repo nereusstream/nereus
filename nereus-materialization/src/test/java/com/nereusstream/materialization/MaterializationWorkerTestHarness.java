@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.CLUSTER;
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.STREAM;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.OffsetRange;
@@ -34,29 +34,25 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.UnaryOperator;
 
-/** Shared deterministic worker fixture for failure-injection and claim-interleaving tests. */
+/**
+ * Shared deterministic worker fixture for failure-injection and claim-interleaving tests.
+ */
 final class MaterializationWorkerTestHarness {
     static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
 
-    private MaterializationWorkerTestHarness() {
-    }
+    private MaterializationWorkerTestHarness() {}
 
     static Scenario scenario(UnaryOperator<GenerationMetadataStore> decorator) {
         List<VersionedGenerationCandidate> candidates = List.of(
                 MaterializationPlannerTestSupport.zero("/index/harness-2", 0, 2, 0, 100, 2),
                 MaterializationPlannerTestSupport.zero("/index/harness-4", 2, 4, 100, 100, 4));
-        MaterializationTask task = MaterializationPlannerTestSupport.planner(
-                        candidates, List.of(), 0, 4)
-                .plan(
-                        STREAM,
-                        new OffsetRange(0, 4),
-                        MaterializationPlannerTestSupport.policy(),
-                        1)
+        MaterializationTask task = MaterializationPlannerTestSupport.planner(candidates, List.of(), 0, 4)
+                .plan(STREAM, new OffsetRange(0, 4), MaterializationPlannerTestSupport.policy(), 1)
                 .join()
                 .getFirst();
         GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(CLOCK);
-        GenerationMetadataStore composite = MaterializationPlannerTestSupport.generationStore(
-                candidates, List.of(), durable);
+        GenerationMetadataStore composite =
+                MaterializationPlannerTestSupport.generationStore(candidates, List.of(), durable);
         GenerationMetadataStore generations = decorator.apply(composite);
         MaterializationTaskStore tasks = new MaterializationTaskStore(CLUSTER, generations, CLOCK);
         tasks.create(task).join();
@@ -66,7 +62,7 @@ final class MaterializationWorkerTestHarness {
     static DefaultMaterializationWorker worker(
             String processRunId,
             Scenario scenario,
-            TrackingProtections protections,
+            ObjectProtectionManager protections,
             TrackingExactReader exactReader,
             CompactedObjectWriter writer,
             ObjectStore objectStore,
@@ -109,11 +105,7 @@ final class MaterializationWorkerTestHarness {
                 Optional.empty());
     }
 
-    record Scenario(
-            MaterializationTask task,
-            GenerationMetadataStore generations,
-            MaterializationTaskStore tasks) {
-    }
+    record Scenario(MaterializationTask task, GenerationMetadataStore generations, MaterializationTaskStore tasks) {}
 
     static final class TrackingExactReader implements ExactSourceRangeReader {
         private final AtomicInteger active = new AtomicInteger();
@@ -121,14 +113,11 @@ final class MaterializationWorkerTestHarness {
         private final AtomicInteger completedSources = new AtomicInteger();
 
         @Override
-        public CompletableFuture<ExactSourceRead> read(
-                SourceGeneration source,
-                ReadOptions options) {
+        public CompletableFuture<ExactSourceRead> read(SourceGeneration source, ReadOptions options) {
             int current = active.incrementAndGet();
             maximumActive.accumulateAndGet(current, Math::max);
             return CompletableFuture.completedFuture(new ExactSourceRead() {
-                private final CompletableFuture<ExactSourceReadSummary> completion =
-                        new CompletableFuture<>();
+                private final CompletableFuture<ExactSourceReadSummary> completion = new CompletableFuture<>();
 
                 @Override
                 public SourceGeneration source() {
@@ -155,8 +144,7 @@ final class MaterializationWorkerTestHarness {
                             while (!terminal
                                     && emitted < count
                                     && cursor < source.range().endOffset()) {
-                                ObjectSliceReadTarget target =
-                                        (ObjectSliceReadTarget) source.readTarget();
+                                ObjectSliceReadTarget target = (ObjectSliceReadTarget) source.readTarget();
                                 byte[] payload = new byte[50];
                                 java.util.Arrays.fill(payload, (byte) (cursor + 1));
                                 subscriber.onNext(new ReadBatch(
@@ -202,8 +190,7 @@ final class MaterializationWorkerTestHarness {
                 }
 
                 @Override
-                public void close() {
-                }
+                public void close() {}
             });
         }
 
@@ -224,54 +211,41 @@ final class MaterializationWorkerTestHarness {
 
         @Override
         public CompletableFuture<ObjectProtection> acquire(
-                ObjectProtectionRequest request,
-                OwnerRevalidator ownerRevalidator) {
+                ObjectProtectionRequest request, OwnerRevalidator ownerRevalidator) {
             return ownerRevalidator.revalidate(request.owner()).thenApply(ignored -> {
                 acquired.incrementAndGet();
-                return protection(
-                        request.object(), request.identity(), request.owner(), version.getAndIncrement());
+                return protection(request.object(), request.identity(), request.owner(), version.getAndIncrement());
             });
         }
 
         @Override
         public CompletableFuture<ObjectProtection> acquireOrTransfer(
-                ObjectProtectionRequest request,
-                OwnerRevalidator ownerRevalidator) {
+                ObjectProtectionRequest request, OwnerRevalidator ownerRevalidator) {
             return acquire(request, ownerRevalidator);
         }
 
         @Override
         public CompletableFuture<ObjectProtection> revalidate(
-                ObjectProtection protection,
-                OwnerRevalidator ownerRevalidator) {
+                ObjectProtection protection, OwnerRevalidator ownerRevalidator) {
             return ownerRevalidator.revalidate(protection.owner()).thenApply(ignored -> protection);
         }
 
         @Override
         public CompletableFuture<ObjectProtection> transfer(
-                ObjectProtection protection,
-                ObjectProtectionOwner newOwner,
-                OwnerRevalidator newOwnerRevalidator) {
+                ObjectProtection protection, ObjectProtectionOwner newOwner, OwnerRevalidator newOwnerRevalidator) {
             return newOwnerRevalidator.revalidate(newOwner).thenApply(ignored -> {
                 transferred.incrementAndGet();
-                return protection(
-                        protection.object(),
-                        protection.identity(),
-                        newOwner,
-                        version.getAndIncrement());
+                return protection(protection.object(), protection.identity(), newOwner, version.getAndIncrement());
             });
         }
 
         @Override
-        public CompletableFuture<Void> release(
-                ObjectProtection protection,
-                RemovalAuthorizer removalAuthorizer) {
+        public CompletableFuture<Void> release(ObjectProtection protection, RemovalAuthorizer removalAuthorizer) {
             return removalAuthorizer.authorizeRemoval(protection).thenRun(released::incrementAndGet);
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
 
         int acquired() {
             return acquired.get();
@@ -291,15 +265,7 @@ final class MaterializationWorkerTestHarness {
                 ObjectProtectionOwner owner,
                 long version) {
             return new ObjectProtection(
-                    object,
-                    identity,
-                    owner,
-                    1,
-                    1_000,
-                    0,
-                    version,
-                    new Checksum(ChecksumType.SHA256, "a".repeat(64)));
+                    object, identity, owner, 1, 1_000, 0, version, new Checksum(ChecksumType.SHA256, "a".repeat(64)));
         }
     }
-
 }

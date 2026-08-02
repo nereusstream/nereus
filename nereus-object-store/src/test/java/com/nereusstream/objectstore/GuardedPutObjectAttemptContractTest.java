@@ -16,7 +16,6 @@ package com.nereusstream.objectstore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
@@ -69,20 +68,18 @@ class GuardedPutObjectAttemptContractTest {
         AtomicInteger providerAttempts = new AtomicInteger();
         stub.put = (request, body) -> providerAttempts.incrementAndGet() == 1
                 ? CompletableFuture.failedFuture(service(503))
-                : CompletableFuture.completedFuture(PutObjectResponse.builder().eTag("etag").build());
+                : CompletableFuture.completedFuture(
+                        PutObjectResponse.builder().eTag("etag").build());
         store = store(stub);
         CountingUpload upload = new CountingUpload(PAYLOAD);
         List<Integer> guarded = new ArrayList<>();
 
-        PutObjectResult result = store.putObject(
-                KEY,
-                upload,
-                options(),
-                (key, attempt) -> {
+        PutObjectResult result = store.putObject(KEY, upload, options(), (key, attempt) -> {
                     assertThat(key).isEqualTo(KEY);
                     guarded.add(attempt);
                     return CompletableFuture.completedFuture(null);
-                }).join();
+                })
+                .join();
 
         assertThat(result.checksum()).isEqualTo(Crc32cChecksums.checksum(PAYLOAD));
         assertThat(guarded).containsExactly(1, 2);
@@ -101,19 +98,15 @@ class GuardedPutObjectAttemptContractTest {
         store = store(stub);
         CountingUpload upload = new CountingUpload(PAYLOAD);
         List<Integer> guarded = new ArrayList<>();
-        NereusException fenced = new NereusException(
-                ErrorCode.FENCED_APPEND, false, "durable output owner changed");
+        NereusException fenced = new NereusException(ErrorCode.FENCED_APPEND, false, "durable output owner changed");
 
-        assertThatThrownBy(() -> store.putObject(
-                        KEY,
-                        upload,
-                        options(),
-                        (key, attempt) -> {
+        assertThatThrownBy(() -> store.putObject(KEY, upload, options(), (key, attempt) -> {
                             guarded.add(attempt);
                             return attempt == 1
                                     ? CompletableFuture.completedFuture(null)
                                     : CompletableFuture.failedFuture(fenced);
-                        }).join())
+                        })
+                        .join())
                 .satisfies(error -> assertThat(unwrap(error)).isSameAs(fenced));
 
         assertThat(guarded).containsExactly(1, 2);
@@ -127,20 +120,22 @@ class GuardedPutObjectAttemptContractTest {
         AtomicInteger providerAttempts = new AtomicInteger();
         stub.put = (request, body) -> {
             providerAttempts.incrementAndGet();
-            return CompletableFuture.completedFuture(PutObjectResponse.builder().eTag("etag").build());
+            return CompletableFuture.completedFuture(
+                    PutObjectResponse.builder().eTag("etag").build());
         };
         store = store(stub);
         CountingUpload upload = new CountingUpload(PAYLOAD);
 
         assertThatThrownBy(() -> store.putObject(
-                        KEY,
-                        upload,
-                        options(),
-                        (key, attempt) -> CompletableFuture.failedFuture(new NereusException(
-                                ErrorCode.METADATA_CONDITION_FAILED, false, "root is no longer active"))).join())
+                                KEY,
+                                upload,
+                                options(),
+                                (key, attempt) -> CompletableFuture.failedFuture(new NereusException(
+                                        ErrorCode.METADATA_CONDITION_FAILED, false, "root is no longer active")))
+                        .join())
                 .satisfies(error -> assertThat(unwrap(error))
-                        .isInstanceOfSatisfying(NereusException.class, nereus ->
-                                assertThat(nereus.code()).isEqualTo(ErrorCode.METADATA_CONDITION_FAILED)));
+                        .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                                .isEqualTo(ErrorCode.METADATA_CONDITION_FAILED)));
         assertThat(providerAttempts.get()).isZero();
         assertThat(upload.openCount()).isZero();
     }
@@ -152,24 +147,22 @@ class GuardedPutObjectAttemptContractTest {
                 PutObjectResponse.builder().eTag("etag").build());
         store = store(stub);
         CompletableFuture<Void> waitingGuard = new CompletableFuture<>();
-        CompletableFuture<PutObjectResult> cancelled = store.putObject(
-                KEY, new CountingUpload(PAYLOAD), options(), (key, attempt) -> waitingGuard);
+        CompletableFuture<PutObjectResult> cancelled =
+                store.putObject(KEY, new CountingUpload(PAYLOAD), options(), (key, attempt) -> waitingGuard);
 
         assertThat(cancelled.cancel(true)).isTrue();
-        assertThatThrownBy(cancelled::join)
-                .satisfies(error -> assertThat(unwrap(error))
-                        .isInstanceOfSatisfying(NereusException.class, nereus ->
-                                assertThat(nereus.code()).isEqualTo(ErrorCode.CANCELLED)));
+        assertThatThrownBy(cancelled::join).satisfies(error -> assertThat(unwrap(error))
+                .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                        .isEqualTo(ErrorCode.CANCELLED)));
         assertThat(waitingGuard.isCancelled()).isTrue();
 
         CompletableFuture<Void> closeGuard = new CompletableFuture<>();
-        CompletableFuture<PutObjectResult> closed = store.putObject(
-                KEY, new CountingUpload(PAYLOAD), options(), (key, attempt) -> closeGuard);
+        CompletableFuture<PutObjectResult> closed =
+                store.putObject(KEY, new CountingUpload(PAYLOAD), options(), (key, attempt) -> closeGuard);
         store.close();
-        assertThatThrownBy(closed::join)
-                .satisfies(error -> assertThat(unwrap(error))
-                        .isInstanceOfSatisfying(NereusException.class, nereus ->
-                                assertThat(nereus.code()).isEqualTo(ErrorCode.STORAGE_CLOSED)));
+        assertThatThrownBy(closed::join).satisfies(error -> assertThat(unwrap(error))
+                .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                        .isEqualTo(ErrorCode.STORAGE_CLOSED)));
         assertThat(closeGuard.isCancelled()).isTrue();
     }
 
@@ -187,15 +180,14 @@ class GuardedPutObjectAttemptContractTest {
 
     private static PutObjectOptions options() {
         return new PutObjectOptions(
-                "application/octet-stream",
-                Crc32cChecksums.checksum(PAYLOAD),
-                true,
-                Map.of(),
-                Duration.ofSeconds(2));
+                "application/octet-stream", Crc32cChecksums.checksum(PAYLOAD), true, Map.of(), Duration.ofSeconds(2));
     }
 
     private static S3Exception service(int status) {
-        return (S3Exception) S3Exception.builder().statusCode(status).message("provider detail").build();
+        return (S3Exception) S3Exception.builder()
+                .statusCode(status)
+                .message("provider detail")
+                .build();
     }
 
     private static Throwable unwrap(Throwable supplied) {
@@ -243,15 +235,17 @@ class GuardedPutObjectAttemptContractTest {
         private BiFunction<PutObjectRequest, AsyncRequestBody, CompletableFuture<PutObjectResponse>> put;
 
         private S3AsyncClient proxy() {
-            return (S3AsyncClient) Proxy.newProxyInstance(
-                    getClass().getClassLoader(), new Class<?>[] {S3AsyncClient.class}, this);
+            return (S3AsyncClient)
+                    Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] {S3AsyncClient.class}, this);
         }
 
         @Override
         public Object invoke(Object proxy, Method method, Object[] arguments) {
             return switch (method.getName()) {
-                case "putObject" -> consume((AsyncRequestBody) arguments[1]).thenCompose(ignored ->
-                        put.apply((PutObjectRequest) arguments[0], (AsyncRequestBody) arguments[1]));
+                case "putObject" ->
+                    consume((AsyncRequestBody) arguments[1])
+                            .thenCompose(ignored ->
+                                    put.apply((PutObjectRequest) arguments[0], (AsyncRequestBody) arguments[1]));
                 case "serviceName" -> "S3";
                 case "close" -> null;
                 case "toString" -> "GuardedPutStubS3AsyncClient";
@@ -268,8 +262,7 @@ class GuardedPutObjectAttemptContractTest {
                 }
 
                 @Override
-                public void onNext(ByteBuffer ignored) {
-                }
+                public void onNext(ByteBuffer ignored) {}
 
                 @Override
                 public void onError(Throwable failure) {

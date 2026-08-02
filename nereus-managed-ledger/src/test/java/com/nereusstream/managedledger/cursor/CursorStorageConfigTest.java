@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import org.junit.jupiter.api.Test;
 
 class CursorStorageConfigTest {
@@ -36,25 +36,18 @@ class CursorStorageConfigTest {
         long largestPartialBytes = ((long) defaults.cursorBatchIndexesMax() + 63) / 64 * Long.BYTES;
         long exactSnapshotBound = largestPartialBytes + 512;
 
-        assertThat(copy(defaults, exactSnapshotBound).cursorSnapshotMaxBytes())
-                .isEqualTo(exactSnapshotBound);
+        assertThat(copy(defaults, exactSnapshotBound).cursorSnapshotMaxBytes()).isEqualTo(exactSnapshotBound);
         assertThatThrownBy(() -> copy(defaults, exactSnapshotBound - 1))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("admitted batch");
     }
 
-    private static CursorStorageConfig copy(
-            CursorStorageConfig value, int metadataMax, int protectionMax) {
+    private static CursorStorageConfig copy(CursorStorageConfig value, int metadataMax, int protectionMax) {
         return copy(value, metadataMax, protectionMax, value.cursorSnapshotMaxBytes());
     }
 
-    private static CursorStorageConfig copy(
-            CursorStorageConfig value, long snapshotMax) {
-        return copy(
-                value,
-                value.cursorMetadataValueMaxBytes(),
-                value.cursorProtectionIntentMaxBytes(),
-                snapshotMax);
+    private static CursorStorageConfig copy(CursorStorageConfig value, long snapshotMax) {
+        return copy(value, value.cursorMetadataValueMaxBytes(), value.cursorProtectionIntentMaxBytes(), snapshotMax);
     }
 
     private static CursorStorageConfig copy(

@@ -18,9 +18,7 @@ import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.StreamId;
 import java.util.Objects;
 
-public record WalStreamSliceInput(
-        StreamId streamId,
-        AppendBatch batch) {
+public record WalStreamSliceInput(StreamId streamId, AppendBatch batch) {
     public WalStreamSliceInput {
         Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(batch, "batch");

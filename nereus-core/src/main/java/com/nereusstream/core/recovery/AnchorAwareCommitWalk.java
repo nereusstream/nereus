@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.recovery;
 
 import com.nereusstream.metadata.oxia.AppendRecoveryAnchor;
@@ -10,7 +11,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Stable-root snapshot of a bounded live commit tail, ordered newest to oldest. */
+/**
+ * Stable-root snapshot of a bounded live commit tail, ordered newest to oldest.
+ */
 public record AnchorAwareCommitWalk(
         Optional<VersionedRecoveryCheckpointRoot> recoveryRoot,
         AppendRecoveryAnchor anchor,
@@ -22,20 +25,16 @@ public record AnchorAwareCommitWalk(
         recoveryRoot = Objects.requireNonNull(recoveryRoot, "recoveryRoot");
         Objects.requireNonNull(anchor, "anchor");
         Objects.requireNonNull(observedHead, "observedHead");
-        commitsNewestFirst = List.copyOf(Objects.requireNonNull(
-                commitsNewestFirst, "commitsNewestFirst"));
+        commitsNewestFirst = List.copyOf(Objects.requireNonNull(commitsNewestFirst, "commitsNewestFirst"));
         continuation = Objects.requireNonNull(continuation, "continuation");
-        if (!anchor.streamId().equals(observedHead.streamId())
-                || anchorReached == continuation.isPresent()) {
+        if (!anchor.streamId().equals(observedHead.streamId()) || anchorReached == continuation.isPresent()) {
             throw new IllegalArgumentException("anchor-aware commit walk terminal state is inconsistent");
         }
         requireRootAnchor(recoveryRoot, anchor);
         requireCommitOrder(anchor, observedHead, commitsNewestFirst, anchorReached, continuation);
     }
 
-    private static void requireRootAnchor(
-            Optional<VersionedRecoveryCheckpointRoot> root,
-            AppendRecoveryAnchor anchor) {
+    private static void requireRootAnchor(Optional<VersionedRecoveryCheckpointRoot> root, AppendRecoveryAnchor anchor) {
         if (root.isEmpty() || root.orElseThrow().value().checkpoints().isEmpty()) {
             if (!anchor.isGenesis()) {
                 throw new IllegalArgumentException("empty recovery root must select the genesis anchor");

@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Stable API error code for exceptional public futures. */
+/**
+ * Stable API error code for exceptional public futures.
+ */
 public enum ErrorCode {
     INVALID_ARGUMENT,
     CANCELLED,
@@ -45,5 +47,8 @@ public enum ErrorCode {
     UNSUPPORTED_STORAGE_PROFILE,
     UNSUPPORTED_DURABILITY_LEVEL,
     UNSUPPORTED_FORMAT,
-    METADATA_LIMIT_EXCEEDED
+    METADATA_LIMIT_EXCEEDED,
+    UNSUPPORTED_APPEND_PRECONDITION,
+    UNSUPPORTED_READ_SEMANTICS,
+    UNSUPPORTED_APPEND_AUTHORITY
 }

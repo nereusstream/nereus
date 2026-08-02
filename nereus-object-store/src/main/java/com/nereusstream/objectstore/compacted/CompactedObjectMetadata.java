@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -9,7 +10,9 @@ import com.nereusstream.api.StreamId;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Strictly decoded required NCP1/NTC1 file metadata. */
+/**
+ * Strictly decoded required NCP1/NTC1 file metadata.
+ */
 public record CompactedObjectMetadata(
         ReadView view,
         StreamId streamId,
@@ -38,8 +41,7 @@ public record CompactedObjectMetadata(
         Objects.requireNonNull(outputAttemptId, "outputAttemptId");
         Objects.requireNonNull(payloadFormat, "payloadFormat");
         Objects.requireNonNull(logicalFormat, "logicalFormat");
-        projectionIdentitySha256 = Objects.requireNonNull(
-                projectionIdentitySha256, "projectionIdentitySha256");
+        projectionIdentitySha256 = Objects.requireNonNull(projectionIdentitySha256, "projectionIdentitySha256");
         Objects.requireNonNull(writerBuild, "writerBuild");
         Objects.requireNonNull(compression, "compression");
         topicCompaction = Objects.requireNonNull(topicCompaction, "topicCompaction");

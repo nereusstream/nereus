@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -16,14 +16,19 @@ import com.nereusstream.api.ReadView;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.core.physical.ObjectProtectionOwner;
 import com.nereusstream.core.wal.DurablePrimaryAppend;
+import com.nereusstream.materialization.MaterializationFailure;
 import com.nereusstream.materialization.MaterializationSourceProtection;
+import com.nereusstream.materialization.MaterializationSourceRetiredException;
 import com.nereusstream.materialization.SourceGeneration;
+import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
 import com.nereusstream.metadata.oxia.CommitAppendRequest;
 import com.nereusstream.metadata.oxia.CommittedAppend;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.PreparedStableAppend;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperProtectionType;
 import com.nereusstream.metadata.oxia.records.ProtectionLifecycle;
+import com.nereusstream.metadata.oxia.records.TaskFailureClass;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,11 +42,10 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
 
     @Test
     void walRuntimeExportsOneMatchedMaterializationSourceProvider() {
-        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime =
-                new BookKeeperPrimaryWalAppenderTest.Runtime()) {
+        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
             BookKeeperMaterializationSourceProtectionAdapter adapter = adapter(runtime);
-            BookKeeperWalRuntime walRuntime = new BookKeeperWalRuntime(
-                    runtime.appender, runtime.reader, runtime.references);
+            BookKeeperWalRuntime walRuntime =
+                    new BookKeeperWalRuntime(runtime.appender, runtime.reader, runtime.references);
 
             var provider = walRuntime.materializationSourceProvider(adapter);
 
@@ -52,8 +56,7 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
 
     @Test
     void acquiresTransfersRevalidatesAndReleasesExactDynamicSlot() {
-        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime =
-                new BookKeeperPrimaryWalAppenderTest.Runtime()) {
+        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
             SourceFixture fixture = source(runtime);
             BookKeeperMaterializationSourceProtectionAdapter adapter = adapter(runtime);
             ObjectProtectionOwner claimed = owner("/tasks/task-a", 0, 'e');
@@ -70,12 +73,10 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
                                 return CompletableFuture.completedFuture(null);
                             })
                     .join();
-            var durable = acquired.requireProviderHandle(
-                            BookKeeperMaterializationSourceProtectionHandle.class)
+            var durable = acquired.requireProviderHandle(BookKeeperMaterializationSourceProtectionHandle.class)
                     .protection();
             assertThat(durable.value().protectionSlot()).isGreaterThanOrEqualTo(3);
-            assertThat(durable.value().protectionType())
-                    .isEqualTo(BookKeeperProtectionType.MATERIALIZATION_SOURCE);
+            assertThat(durable.value().protectionType()).isEqualTo(BookKeeperProtectionType.MATERIALIZATION_SOURCE);
             assertThat(durable.value().lifecycle()).isEqualTo(ProtectionLifecycle.ACTIVE);
             assertThat(durable.value().ownerMetadataVersion()).isZero();
             assertThatCode(() -> new BookKeeperProtectionRetirementProof(
@@ -92,6 +93,7 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
                     .doesNotThrowAnyException();
             assertThat(claimRevalidations).hasValueGreaterThanOrEqualTo(2);
 
+            retireGenerationZeroAnchor(runtime, fixture);
             MaterializationSourceProtection replay = adapter.acquireOrTransfer(
                             BookKeeperPrimaryWalAppenderTest.STREAM,
                             fixture.source(),
@@ -102,26 +104,21 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
             assertThat(replay.metadataVersion()).isEqualTo(acquired.metadataVersion());
             assertThat(replay.providerHandle()).isEqualTo(acquired.providerHandle());
             assertThat(adapter.findExisting(
-                            BookKeeperPrimaryWalAppenderTest.STREAM,
-                            fixture.source(),
-                            acquired.referenceId())
-                    .join()).contains(replay);
+                                    BookKeeperPrimaryWalAppenderTest.STREAM, fixture.source(), acquired.referenceId())
+                            .join())
+                    .contains(replay);
 
             ObjectProtectionOwner outputReady = owner("/tasks/task-a", 2, 'f');
-            MaterializationSourceProtection transferred = adapter.transfer(
-                            replay,
-                            outputReady,
-                            expected -> {
-                                assertThat(expected).isEqualTo(outputReady);
-                                return CompletableFuture.completedFuture(null);
-                            })
+            MaterializationSourceProtection transferred = adapter.transfer(replay, outputReady, expected -> {
+                        assertThat(expected).isEqualTo(outputReady);
+                        return CompletableFuture.completedFuture(null);
+                    })
                     .join();
             assertThat(transferred.owner()).isEqualTo(outputReady);
             assertThat(transferred.metadataVersion()).isGreaterThan(replay.metadataVersion());
-            assertThat(adapter.revalidate(
-                            transferred,
-                            expected -> CompletableFuture.completedFuture(null))
-                    .join()).isEqualTo(transferred);
+            assertThat(adapter.revalidate(transferred, expected -> CompletableFuture.completedFuture(null))
+                            .join())
+                    .isEqualTo(transferred);
 
             AtomicInteger releaseAuthorizations = new AtomicInteger();
             adapter.release(transferred, exact -> {
@@ -131,25 +128,25 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
                     })
                     .join();
             assertThat(releaseAuthorizations).hasValue(1);
-            assertThat(runtime.metadata.getProtection(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            runtime.configuration.providerScopeSha256(),
-                            fixture.target().ledgerId(),
-                            durable.value().ledgerRangeSlot(),
-                            durable.value().protectionSlot())
-                    .join()).isEmpty();
+            assertThat(runtime.metadata
+                            .getProtection(
+                                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                                    runtime.configuration.providerScopeSha256(),
+                                    fixture.target().ledgerId(),
+                                    durable.value().ledgerRangeSlot(),
+                                    durable.value().protectionSlot())
+                            .join())
+                    .isEmpty();
             assertThat(adapter.findExisting(
-                            BookKeeperPrimaryWalAppenderTest.STREAM,
-                            fixture.source(),
-                            acquired.referenceId())
-                    .join()).isEmpty();
+                                    BookKeeperPrimaryWalAppenderTest.STREAM, fixture.source(), acquired.referenceId())
+                            .join())
+                    .isEmpty();
         }
     }
 
     @Test
     void fixedDynamicSlotsRejectBeforeSourceIoWhenEverySlotIsOwned() {
-        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime =
-                new BookKeeperPrimaryWalAppenderTest.Runtime()) {
+        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
             SourceFixture fixture = source(runtime);
             BookKeeperMaterializationSourceProtectionAdapter adapter = adapter(runtime);
             List<MaterializationSourceProtection> acquired = new ArrayList<>();
@@ -164,21 +161,22 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
                                 expected -> CompletableFuture.completedFuture(null))
                         .join());
             }
-            assertThat(acquired).extracting(value -> value
-                            .requireProviderHandle(BookKeeperMaterializationSourceProtectionHandle.class)
-                            .protection()
-                            .value()
-                            .protectionSlot())
+            assertThat(acquired)
+                    .extracting(
+                            value -> value.requireProviderHandle(BookKeeperMaterializationSourceProtectionHandle.class)
+                                    .protection()
+                                    .value()
+                                    .protectionSlot())
                     .doesNotHaveDuplicates();
 
             ObjectProtectionOwner overflowOwner = owner("/tasks/task-overflow", 7, 'b');
             assertThatThrownBy(() -> adapter.acquireOrTransfer(
-                            BookKeeperPrimaryWalAppenderTest.STREAM,
-                            fixture.source(),
-                            "materialization-source-overflow",
-                            overflowOwner,
-                            expected -> CompletableFuture.completedFuture(null))
-                    .join())
+                                    BookKeeperPrimaryWalAppenderTest.STREAM,
+                                    fixture.source(),
+                                    "materialization-source-overflow",
+                                    overflowOwner,
+                                    expected -> CompletableFuture.completedFuture(null))
+                            .join())
                     .rootCause()
                     .isInstanceOf(NereusException.class)
                     .extracting(error -> ((NereusException) error).code())
@@ -186,16 +184,36 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
         }
     }
 
+    @Test
+    void exactRetiredGenerationZeroAnchorCancelsStaleMaterializationSource() {
+        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
+            SourceFixture fixture = source(runtime);
+            retireGenerationZeroAnchor(runtime, fixture);
+
+            assertThatThrownBy(() -> adapter(runtime)
+                            .acquireOrTransfer(
+                                    BookKeeperPrimaryWalAppenderTest.STREAM,
+                                    fixture.source(),
+                                    "stale-materialization-source",
+                                    owner("/tasks/stale", 0, 'f'),
+                                    expected -> CompletableFuture.completedFuture(null))
+                            .join())
+                    .rootCause()
+                    .isInstanceOf(MaterializationSourceRetiredException.class)
+                    .satisfies(failure -> assertThat(((MaterializationFailure) failure).failureClass())
+                            .isEqualTo(TaskFailureClass.SOURCE_RETIRED));
+        }
+    }
+
     private static SourceFixture source(BookKeeperPrimaryWalAppenderTest.Runtime runtime) {
         var session = BookKeeperPrimaryWalAppenderTest.session();
         DurablePrimaryAppend durable;
-        try (BookKeeperPreparedPrimaryAppend prepared = runtime.appender.prepare(
-                BookKeeperPrimaryWalAppenderTest.request(
+        try (BookKeeperPreparedPrimaryAppend prepared =
+                runtime.appender.prepare(BookKeeperPrimaryWalAppenderTest.request(
                         session, "attempt-materialization-source", 0, new byte[] {1}, new byte[] {2}))) {
             durable = runtime.appender.persist(prepared, TIMEOUT).join();
         }
-        BookKeeperEntryRangeReadTarget target =
-                (BookKeeperEntryRangeReadTarget) durable.readTarget();
+        BookKeeperEntryRangeReadTarget target = (BookKeeperEntryRangeReadTarget) durable.readTarget();
         CommitAppendRequest commit = new CommitAppendRequest(
                 BookKeeperPrimaryWalAppenderTest.STREAM,
                 session.writerId(),
@@ -238,8 +256,8 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
                 Optional.empty(),
                 1,
                 2);
-        MaterializedGenerationZero generationZero = new MaterializedGenerationZero(
-                committed, "/indexes/materialization-source", 0, sha('d'));
+        MaterializedGenerationZero generationZero =
+                new MaterializedGenerationZero(committed, "/indexes/materialization-source", 0, sha('d'));
         runtime.references.protectVisibleIndex(generationZero, target, TIMEOUT).join();
         SourceGeneration source = new SourceGeneration(
                 ReadView.COMMITTED,
@@ -276,12 +294,57 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
         return new ObjectProtectionOwner(key, version, sha(identity));
     }
 
+    private static void retireGenerationZeroAnchor(
+            BookKeeperPrimaryWalAppenderTest.Runtime runtime, SourceFixture fixture) {
+        BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> anchor = runtime.metadata
+                .getProtection(
+                        BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                        runtime.configuration.providerScopeSha256(),
+                        fixture.target().ledgerId(),
+                        0,
+                        1)
+                .join()
+                .orElseThrow();
+        runtime.metadata
+                .compareAndSetProtection(
+                        BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                        runtime.configuration.providerScopeSha256(),
+                        withLifecycle(anchor.value(), ProtectionLifecycle.RETIRED),
+                        anchor.metadataVersion())
+                .join();
+    }
+
+    private static BookKeeperLedgerProtectionRecord withLifecycle(
+            BookKeeperLedgerProtectionRecord value, ProtectionLifecycle lifecycle) {
+        return new BookKeeperLedgerProtectionRecord(
+                value.schemaVersion(),
+                value.ledgerIdentitySha256(),
+                value.clusterAlias(),
+                value.ledgerId(),
+                value.rootLifecycleEpoch(),
+                value.ledgerRangeSlot(),
+                value.protectionSlot(),
+                value.protectionTypeId(),
+                value.referenceId(),
+                value.firstEntryId(),
+                value.entryCount(),
+                value.rangeChecksumSha256(),
+                value.streamId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.commitVersion(),
+                value.ownerKey(),
+                value.ownerMetadataVersion(),
+                value.ownerIdentitySha256(),
+                lifecycle,
+                value.createdAtMillis(),
+                value.expiresAtMillis(),
+                0);
+    }
+
     private static Checksum sha(char value) {
         return new Checksum(ChecksumType.SHA256, Character.toString(value).repeat(64));
     }
 
-    private record SourceFixture(
-            BookKeeperEntryRangeReadTarget target,
-            SourceGeneration source) {
-    }
+    private record SourceFixture(BookKeeperEntryRangeReadTarget target, SourceGeneration source) {}
 }

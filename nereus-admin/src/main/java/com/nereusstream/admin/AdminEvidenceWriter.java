@@ -8,18 +8,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class AdminEvidenceWriter {
 
-    private AdminEvidenceWriter() {
-    }
+    private AdminEvidenceWriter() {}
 
     public static String namespaceReservationEvidence(
-            String command,
-            BookKeeperLedgerIdNamespaceReservation reservation) {
+            String command, BookKeeperLedgerIdNamespaceReservation reservation) {
         Map<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("schemaVersion", 1);
         evidence.put("command", command);
@@ -30,15 +27,14 @@ public final class AdminEvidenceWriter {
         evidence.put("ledgerIdPrefixBits", reservation.ledgerIdPrefixBits());
         evidence.put("ledgerIdPrefixValue", reservation.ledgerIdPrefixValue());
         evidence.put("reservationId", reservation.reservationId());
-        evidence.put("ledgerIdNamespaceSha256", reservation.ledgerIdNamespaceSha256().value());
+        evidence.put(
+                "ledgerIdNamespaceSha256", reservation.ledgerIdNamespaceSha256().value());
         evidence.put("metadataVersion", reservation.metadataVersion());
         evidence.put("completedAtEpochMillis", Clock.systemUTC().millis());
         return toJson(evidence);
     }
 
-    public static String activationReadEvidence(
-            String command,
-            BookKeeperProtocolActivation activation) {
+    public static String activationReadEvidence(String command, BookKeeperProtocolActivation activation) {
         Map<String, Object> evidence = new LinkedHashMap<>();
         evidence.put("schemaVersion", 1);
         evidence.put("command", command);
@@ -46,9 +42,7 @@ public final class AdminEvidenceWriter {
         evidence.put("lifecycle", activation.value().lifecycle().name());
         evidence.put("metadataVersion", activation.metadataVersion());
         evidence.put("readinessEpoch", activation.value().brokerReadinessEpoch());
-        evidence.put(
-                "readinessSha256",
-                activation.value().brokerReadinessSha256());
+        evidence.put("readinessSha256", activation.value().brokerReadinessSha256());
         evidence.put("walOnlyPublicationEnabled", activation.value().walOnlyPublicationEnabled());
         evidence.put("asyncPublicationEnabled", activation.value().asyncPublicationEnabled());
         evidence.put("syncPublicationEnabled", activation.value().syncPublicationEnabled());

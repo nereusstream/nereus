@@ -1,22 +1,22 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static com.nereusstream.metadata.oxia.F4MetadataTestValues.HASH_A;
 import static com.nereusstream.metadata.oxia.F4MetadataTestValues.HASH_B;
 import static com.nereusstream.metadata.oxia.F4MetadataTestValues.STREAM;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ReadView;
+import com.nereusstream.metadata.oxia.records.GcDomainSnapshotProofRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.GenerationBackfillProofRecord;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationLifecycle;
 import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
-import com.nereusstream.metadata.oxia.records.GcDomainSnapshotProofRecord;
-import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
-import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
-import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
@@ -48,29 +48,24 @@ class F4RecordValidationTest {
     @Test
     void rejectsTaskCheckpointStatsAndRecoveryStateContradictions() {
         MaterializationTaskRecord planned = F4MetadataTestValues.task(TaskLifecycle.PLANNED);
-        org.assertj.core.api.Assertions.assertThatCode(
-                        F4MetadataTestValues::publishingTaskWithoutGeneration)
+        org.assertj.core.api.Assertions.assertThatCode(F4MetadataTestValues::publishingTaskWithoutGeneration)
                 .doesNotThrowAnyException();
-        assertThatThrownBy(() -> taskAttempt(planned, 1))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new MaterializationCheckpointRecord(
-                        1, STREAM, "policy", 1, HASH_A, 0, 0, 1, "", 100, 0))
+        assertThatThrownBy(() -> taskAttempt(planned, 1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(
+                        () -> new MaterializationCheckpointRecord(1, STREAM, "policy", 1, HASH_A, 0, 0, 1, "", 100, 0))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new RangeRetentionStatsRecord(
-                        1, STREAM, 0, 2, 1, 0, 10, 200, 100,
-                        "/index", HASH_A, 1, "build", 300, 0))
+                        1, STREAM, 0, 2, 1, 0, 10, 200, 100, "/index", HASH_A, 1, "build", 300, 0))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new RecoveryCheckpointRootRecord(
-                        1, STREAM, 1, 0, 0, 0, 0, 0, 0,
-                        "", "", List.of(), "", "", 0, 0, 0))
+                        1, STREAM, 1, 0, 0, 0, 0, 0, 0, "", "", List.of(), "", "", 0, 0, 0))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void rejectsPhysicalRootLeaseAndProtectionSafetyContradictions() {
         PhysicalObjectRootRecord active = F4MetadataTestValues.physicalRoot(PhysicalObjectLifecycle.ACTIVE);
-        assertThatThrownBy(() -> activeWithTombstone(active))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> activeWithTombstone(active)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ObjectReaderLeaseRecord(
                         1,
                         active.objectKeyHash(),
@@ -197,8 +192,7 @@ class F4RecordValidationTest {
 
     @Test
     void rejectsMultipleProtocolVersionsForOneActivationDomainId() {
-        List<ReferenceDomainVersionRecord> domains = new java.util.ArrayList<>(
-                F4MetadataTestValues.referenceDomains());
+        List<ReferenceDomainVersionRecord> domains = new java.util.ArrayList<>(F4MetadataTestValues.referenceDomains());
         domains.add(1, new ReferenceDomainVersionRecord("append-recovery-v1", 2));
 
         assertThatThrownBy(() -> new GenerationProtocolActivationRecord(
@@ -224,40 +218,95 @@ class F4RecordValidationTest {
     }
 
     private static GenerationIndexRecord generationLifecycle(
-            GenerationIndexRecord value,
-            GenerationLifecycle lifecycle,
-            long committedAt,
-            String reason) {
+            GenerationIndexRecord value, GenerationLifecycle lifecycle, long committedAt, String reason) {
         return new GenerationIndexRecord(
-                value.schemaVersion(), value.streamId(), value.readViewId(), value.offsetStart(), value.offsetEnd(),
-                value.generation(), value.publicationId(), value.taskId(), lifecycle, value.sourceSetSha256(),
-                value.policySha256(), value.readTarget(), value.targetIdentitySha256(),
-                value.materializationPolicySha256(), value.payloadFormat(), value.sourceRecordCount(),
-                value.outputRecordCount(), value.entryCount(), value.logicalBytes(), value.cumulativeSizeAtStart(),
-                value.cumulativeSizeAtEnd(), value.firstCommitVersion(), value.lastCommitVersion(),
-                value.schemaRefs(), value.projectionRef(), value.createdAtMillis(), committedAt, reason,
-                value.stateChangedAtMillis(), 0);
+                value.schemaVersion(),
+                value.streamId(),
+                value.readViewId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.generation(),
+                value.publicationId(),
+                value.taskId(),
+                lifecycle,
+                value.sourceSetSha256(),
+                value.policySha256(),
+                value.readTarget(),
+                value.targetIdentitySha256(),
+                value.materializationPolicySha256(),
+                value.payloadFormat(),
+                value.sourceRecordCount(),
+                value.outputRecordCount(),
+                value.entryCount(),
+                value.logicalBytes(),
+                value.cumulativeSizeAtStart(),
+                value.cumulativeSizeAtEnd(),
+                value.firstCommitVersion(),
+                value.lastCommitVersion(),
+                value.schemaRefs(),
+                value.projectionRef(),
+                value.createdAtMillis(),
+                committedAt,
+                reason,
+                value.stateChangedAtMillis(),
+                0);
     }
 
-    private static MaterializationTaskRecord taskAttempt(
-            MaterializationTaskRecord value,
-            long attempt) {
+    private static MaterializationTaskRecord taskAttempt(MaterializationTaskRecord value, long attempt) {
         return new MaterializationTaskRecord(
-                value.schemaVersion(), value.taskId(), value.taskSequence(), value.streamId(), value.readViewId(),
-                value.taskKindId(), value.offsetStart(), value.offsetEnd(), value.sources(), value.sourceSetSha256(),
-                value.policyId(), value.policyVersion(), value.policySha256(), value.policy(), value.lifecycle(), attempt,
-                value.workerClaim(), value.output(), value.allocatedGeneration(), value.publicationId(),
-                value.failureClassId(), value.failureMessage(), value.retryNotBeforeMillis(), value.createdAtMillis(),
-                value.updatedAtMillis(), 0);
+                value.schemaVersion(),
+                value.taskId(),
+                value.taskSequence(),
+                value.streamId(),
+                value.readViewId(),
+                value.taskKindId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.sources(),
+                value.sourceSetSha256(),
+                value.policyId(),
+                value.policyVersion(),
+                value.policySha256(),
+                value.policy(),
+                value.lifecycle(),
+                attempt,
+                value.workerClaim(),
+                value.output(),
+                value.allocatedGeneration(),
+                value.publicationId(),
+                value.failureClassId(),
+                value.failureMessage(),
+                value.retryNotBeforeMillis(),
+                value.createdAtMillis(),
+                value.updatedAtMillis(),
+                0);
     }
 
     private static PhysicalObjectRootRecord activeWithTombstone(PhysicalObjectRootRecord value) {
         return new PhysicalObjectRootRecord(
-                value.schemaVersion(), value.objectKeyHash(), value.objectKey(), value.objectId(),
-                value.objectKindId(), value.objectLength(), value.storageChecksumType(), value.storageChecksumValue(),
-                value.contentSha256(), value.etag(), value.lifecycle(), value.lifecycleEpoch(),
-                value.createdAtMillis(), value.orphanNotBeforeMillis(), value.gcAttemptId(),
-                value.referenceSetSha256(), value.markedAtMillis(), value.deleteNotBeforeMillis(),
-                value.deleteStartedAtMillis(), value.deletedAtMillis(), 300, HASH_A, value.stateReason(), 0);
+                value.schemaVersion(),
+                value.objectKeyHash(),
+                value.objectKey(),
+                value.objectId(),
+                value.objectKindId(),
+                value.objectLength(),
+                value.storageChecksumType(),
+                value.storageChecksumValue(),
+                value.contentSha256(),
+                value.etag(),
+                value.lifecycle(),
+                value.lifecycleEpoch(),
+                value.createdAtMillis(),
+                value.orphanNotBeforeMillis(),
+                value.gcAttemptId(),
+                value.referenceSetSha256(),
+                value.markedAtMillis(),
+                value.deleteNotBeforeMillis(),
+                value.deleteStartedAtMillis(),
+                value.deletedAtMillis(),
+                300,
+                HASH_A,
+                value.stateReason(),
+                0);
     }
 }

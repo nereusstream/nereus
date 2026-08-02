@@ -17,10 +17,10 @@ package com.nereusstream.api;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Options for advancing a stream trim low-watermark. */
-public record TrimOptions(
-        Duration timeout,
-        String reason) {
+/**
+ * Options for advancing a stream trim low-watermark.
+ */
+public record TrimOptions(Duration timeout, String reason) {
     public TrimOptions {
         Objects.requireNonNull(timeout, "timeout");
         Objects.requireNonNull(reason, "reason");

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.retention;
 
 import java.nio.ByteBuffer;
@@ -7,11 +8,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-/** Exact versioned Pulsar retention values used by one planning attempt. */
-public record RetentionPolicySnapshot(
-        long policyVersion,
-        long retentionTimeMillis,
-        long retentionSizeBytes) {
+/**
+ * Exact versioned Pulsar retention values used by one planning attempt.
+ */
+public record RetentionPolicySnapshot(long policyVersion, long retentionTimeMillis, long retentionSizeBytes) {
     private static final long MEBIBYTE = 1L << 20;
     private static final byte[] POLICY_VERSION_DOMAIN =
             "nereus-retention-policy-v1".getBytes(StandardCharsets.US_ASCII);
@@ -29,24 +29,16 @@ public record RetentionPolicySnapshot(
     }
 
     public static RetentionPolicySnapshot fromMinutesAndMebibytes(
-            long policyVersion,
-            long retentionTimeMinutes,
-            long retentionSizeMebibytes) {
+            long policyVersion, long retentionTimeMinutes, long retentionSizeMebibytes) {
         requireRetentionValue(retentionTimeMinutes, "retentionTimeMinutes");
         requireRetentionValue(retentionSizeMebibytes, "retentionSizeMebibytes");
         final long timeMillis;
         final long sizeBytes;
         try {
-            timeMillis = retentionTimeMinutes == -1
-                    ? -1
-                    : Math.multiplyExact(retentionTimeMinutes, 60_000L);
-            sizeBytes = retentionSizeMebibytes == -1
-                    ? -1
-                    : Math.multiplyExact(retentionSizeMebibytes, MEBIBYTE);
+            timeMillis = retentionTimeMinutes == -1 ? -1 : Math.multiplyExact(retentionTimeMinutes, 60_000L);
+            sizeBytes = retentionSizeMebibytes == -1 ? -1 : Math.multiplyExact(retentionSizeMebibytes, MEBIBYTE);
         } catch (ArithmeticException failure) {
-            throw new IllegalArgumentException(
-                    "retention policy conversion overflows milliseconds or bytes",
-                    failure);
+            throw new IllegalArgumentException("retention policy conversion overflows milliseconds or bytes", failure);
         }
         return new RetentionPolicySnapshot(policyVersion, timeMillis, sizeBytes);
     }
@@ -58,12 +50,9 @@ public record RetentionPolicySnapshot(
      * version label rather than the sole equality proof.
      */
     public static RetentionPolicySnapshot fromCanonicalMinutesAndMebibytes(
-            long retentionTimeMinutes,
-            long retentionSizeMebibytes) {
+            long retentionTimeMinutes, long retentionSizeMebibytes) {
         return fromMinutesAndMebibytes(
-                canonicalPolicyVersion(
-                        retentionTimeMinutes,
-                        retentionSizeMebibytes),
+                canonicalPolicyVersion(retentionTimeMinutes, retentionSizeMebibytes),
                 retentionTimeMinutes,
                 retentionSizeMebibytes);
     }
@@ -82,23 +71,17 @@ public record RetentionPolicySnapshot(
         }
     }
 
-    private static long canonicalPolicyVersion(
-            long retentionTimeMinutes,
-            long retentionSizeMebibytes) {
+    private static long canonicalPolicyVersion(long retentionTimeMinutes, long retentionSizeMebibytes) {
         requireRetentionValue(retentionTimeMinutes, "retentionTimeMinutes");
         requireRetentionValue(retentionSizeMebibytes, "retentionSizeMebibytes");
-        ByteBuffer canonical = ByteBuffer.allocate(
-                        POLICY_VERSION_DOMAIN.length + Long.BYTES * 2)
+        ByteBuffer canonical = ByteBuffer.allocate(POLICY_VERSION_DOMAIN.length + Long.BYTES * 2)
                 .order(ByteOrder.BIG_ENDIAN);
         canonical.put(POLICY_VERSION_DOMAIN);
         canonical.putLong(retentionTimeMinutes);
         canonical.putLong(retentionSizeMebibytes);
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(canonical.array());
-            return ByteBuffer.wrap(digest)
-                    .order(ByteOrder.BIG_ENDIAN)
-                    .getLong() & Long.MAX_VALUE;
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(canonical.array());
+            return ByteBuffer.wrap(digest).order(ByteOrder.BIG_ENDIAN).getLong() & Long.MAX_VALUE;
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }

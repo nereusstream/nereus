@@ -1,9 +1,16 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** Exact owner class for a physical BookKeeper range protection. */
+/**
+ * Exact owner class for a physical BookKeeper range protection.
+ */
 public enum BookKeeperProtectionType {
-    REACHABLE_APPEND(1), VISIBLE_GENERATION(2), MATERIALIZATION_SOURCE(3), APPEND_RECOVERY(4), REPAIR(5);
+    REACHABLE_APPEND(1),
+    VISIBLE_GENERATION(2),
+    MATERIALIZATION_SOURCE(3),
+    APPEND_RECOVERY(4),
+    REPAIR(5);
 
     private final int wireId;
 

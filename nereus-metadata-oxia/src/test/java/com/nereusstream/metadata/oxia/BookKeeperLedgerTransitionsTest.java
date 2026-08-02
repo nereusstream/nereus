@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
@@ -14,13 +14,13 @@ import org.junit.jupiter.api.Test;
 class BookKeeperLedgerTransitionsTest {
     private static final String CLUSTER = BookKeeperMetadataStoreContractScenario.CLUSTER;
     private static final String PROVIDER_SCOPE = BookKeeperMetadataStoreContractScenario.PROVIDER_SCOPE;
-    private static final BookKeeperKeyspace KEYS = new BookKeeperMetadataStoreConfig(128, 4, 128, 256)
-            .keyspace(CLUSTER);
+    private static final BookKeeperKeyspace KEYS =
+            new BookKeeperMetadataStoreConfig(128, 4, 128, 256).keyspace(CLUSTER);
 
     @Test
     void rejectsIllegalTransitionsAndImmutableIdentityDrift() {
-        var prepared = BookKeeperMetadataStoreContractScenario.allocation(
-                LedgerAllocationLifecycle.PREPARED, false, "", 120);
+        var prepared =
+                BookKeeperMetadataStoreContractScenario.allocation(LedgerAllocationLifecycle.PREPARED, false, "", 120);
         var activated = BookKeeperMetadataStoreContractScenario.allocation(
                 LedgerAllocationLifecycle.ACTIVATED,
                 false,
@@ -36,17 +36,16 @@ class BookKeeperLedgerTransitionsTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("counters moved backward");
 
-        BookKeeperLedgerRootRecord active = BookKeeperMetadataStoreContractScenario.root(
-                KEYS, 101, BookKeeperLedgerLifecycle.ACTIVE, 2);
-        BookKeeperLedgerRootRecord drifted = root(
-                active, active.streamId() + "-drifted", BookKeeperLedgerLifecycle.SEALING, 3, false);
+        BookKeeperLedgerRootRecord active =
+                BookKeeperMetadataStoreContractScenario.root(KEYS, 101, BookKeeperLedgerLifecycle.ACTIVE, 2);
+        BookKeeperLedgerRootRecord drifted =
+                root(active, active.streamId() + "-drifted", BookKeeperLedgerLifecycle.SEALING, 3, false);
         assertThatThrownBy(() -> BookKeeperMetadataTransitions.root(active, drifted))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("identity drift");
 
-        BookKeeperLedgerProtectionRecord protection =
-                BookKeeperMetadataStoreContractScenario.protection(
-                        KEYS.ledgerIdentitySha256(PROVIDER_SCOPE, 101), ProtectionLifecycle.ACTIVE);
+        BookKeeperLedgerProtectionRecord protection = BookKeeperMetadataStoreContractScenario.protection(
+                KEYS.ledgerIdentitySha256(PROVIDER_SCOPE, 101), ProtectionLifecycle.ACTIVE);
         BookKeeperLedgerProtectionRecord retiredWithAnotherOwner = new BookKeeperLedgerProtectionRecord(
                 protection.schemaVersion(),
                 protection.ledgerIdentitySha256(),
@@ -71,8 +70,7 @@ class BookKeeperLedgerTransitionsTest {
                 protection.createdAtMillis(),
                 protection.expiresAtMillis(),
                 0);
-        assertThatThrownBy(() -> BookKeeperMetadataTransitions.protection(
-                        protection, retiredWithAnotherOwner))
+        assertThatThrownBy(() -> BookKeeperMetadataTransitions.protection(protection, retiredWithAnotherOwner))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exact historical owner");
     }
@@ -84,10 +82,9 @@ class BookKeeperLedgerTransitionsTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("pre-transmission allocation");
 
-        BookKeeperLedgerRootRecord active = BookKeeperMetadataStoreContractScenario.root(
-                KEYS, 101, BookKeeperLedgerLifecycle.ACTIVE, 2);
-        assertThatThrownBy(() -> root(
-                        active, active.streamId(), BookKeeperLedgerLifecycle.MARKED, 3, true))
+        BookKeeperLedgerRootRecord active =
+                BookKeeperMetadataStoreContractScenario.root(KEYS, 101, BookKeeperLedgerLifecycle.ACTIVE, 2);
+        assertThatThrownBy(() -> root(active, active.streamId(), BookKeeperLedgerLifecycle.MARKED, 3, true))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("lateCreateHazard permanently vetoes physical GC");
     }

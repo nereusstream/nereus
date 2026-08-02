@@ -1,9 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import org.apache.bookkeeper.client.api.DigestType;
 
-/** Stable Nereus configuration name mapped explicitly to the BookKeeper 4.18 client enum. */
+/**
+ * Stable Nereus configuration name mapped explicitly to the BookKeeper 4.18 client enum.
+ */
 public enum BookKeeperDigestType {
     CRC32,
     CRC32C,

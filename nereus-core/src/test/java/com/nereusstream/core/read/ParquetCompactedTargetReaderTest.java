@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectType;
@@ -20,7 +20,6 @@ import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.PutObjectOptions;
-import com.nereusstream.objectstore.compacted.CompactedObjectFormatV1;
 import com.nereusstream.objectstore.compacted.CompactedObjectRow;
 import com.nereusstream.objectstore.compacted.CompactedObjectWriteRequest;
 import com.nereusstream.objectstore.compacted.CompactedObjectWriteResult;
@@ -55,14 +54,15 @@ class ParquetCompactedTargetReaderTest {
         long logicalBytes = payloads.stream().mapToLong(bytes -> bytes.length).sum();
         CompactedObjectWriteRequest writeRequest = request(streamId, logicalBytes);
         try (StagingFileManager staging = staging();
-                LocalFileObjectStore store =
-                        new LocalFileObjectStore(temporaryDirectory.resolve("objects"));
+                LocalFileObjectStore store = new LocalFileObjectStore(temporaryDirectory.resolve("objects"));
                 CompactedObjectWriteResult written = new ParquetCompactedObjectWriter(staging, Runnable::run)
-                        .write(writeRequest, publisher(List.of(
-                                row(40, payloads.get(0)),
-                                row(41, payloads.get(1)),
-                                row(42, payloads.get(2)),
-                                row(43, payloads.get(3)))))
+                        .write(
+                                writeRequest,
+                                publisher(List.of(
+                                        row(40, payloads.get(0)),
+                                        row(41, payloads.get(1)),
+                                        row(42, payloads.get(2)),
+                                        row(43, payloads.get(3)))))
                         .join()) {
             store.putObject(
                             written.objectKey(),
@@ -95,11 +95,10 @@ class ParquetCompactedTargetReaderTest {
                     4,
                     logicalBytes,
                     List.of(),
-                    Optional.of(new ProjectionRef(
-                            ProjectionType.VIRTUAL_LEDGER, "nereus-ml-v1.core-test")),
+                    Optional.of(new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "nereus-ml-v1.core-test")),
                     9);
-            ParquetCompactedTargetReader reader = new ParquetCompactedTargetReader(
-                    new ParquetCompactedObjectReader(store, Runnable::run));
+            ParquetCompactedTargetReader reader =
+                    new ParquetCompactedTargetReader(new ParquetCompactedObjectReader(store, Runnable::run));
 
             WalReadResult read = reader.readWithStats(
                             streamId,
@@ -111,10 +110,11 @@ class ParquetCompactedTargetReaderTest {
                                     ReadIsolation.COMMITTED,
                                     Duration.ofSeconds(10)))
                     .join();
-            assertThat(read.batches()).extracting(batch -> batch.range().startOffset())
+            assertThat(read.batches())
+                    .extracting(batch -> batch.range().startOffset())
                     .containsExactly(41L, 42L);
-            assertThat(read.batches()).extracting(batch -> new String(
-                            batch.payload(), StandardCharsets.UTF_8))
+            assertThat(read.batches())
+                    .extracting(batch -> new String(batch.payload(), StandardCharsets.UTF_8))
                     .containsExactly("one", "two");
             assertThat(read.batches()).allSatisfy(batch -> {
                 assertThat(batch.sourceObjectId()).isEqualTo(written.objectId());
@@ -124,26 +124,23 @@ class ParquetCompactedTargetReaderTest {
             });
             assertThat(read.sliceStats()).singleElement().satisfies(stats -> {
                 assertThat(stats.fullSlicePayloadBytes()).isEqualTo(written.objectLength());
-                assertThat(stats.entryIndexBytes()).isEqualTo(written.entryIndexRef().length());
-                assertThat(stats.returnedPayloadBytes())
-                        .isEqualTo(payloads.get(1).length + payloads.get(2).length);
+                assertThat(stats.entryIndexBytes())
+                        .isEqualTo(written.entryIndexRef().length());
+                assertThat(stats.returnedPayloadBytes()).isEqualTo(payloads.get(1).length + payloads.get(2).length);
             });
-            assertThat(reader.reservationBytes(range)).isEqualTo(
-                    written.objectLength() + written.entryIndexRef().length());
-            assertThat(ReadTargetCodecRegistry.phase15().encode(target).targetVersion()).isEqualTo(1);
+            assertThat(reader.reservationBytes(range))
+                    .isEqualTo(written.objectLength() + written.entryIndexRef().length());
+            assertThat(ReadTargetCodecRegistry.phase15().encode(target).targetVersion())
+                    .isEqualTo(1);
 
             assertThatThrownBy(() -> reader.readWithStats(
                                     new StreamId("another-stream"),
                                     40,
                                     List.of(range),
-                                    new ReadOptions(
-                                            4,
-                                            1 << 20,
-                                            ReadIsolation.COMMITTED,
-                                            Duration.ofSeconds(10)))
+                                    new ReadOptions(4, 1 << 20, ReadIsolation.COMMITTED, Duration.ofSeconds(10)))
                             .join())
-                    .satisfies(failure -> assertThat(findNereus(failure).code())
-                            .isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH));
+                    .satisfies(failure ->
+                            assertThat(findNereus(failure).code()).isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH));
         }
     }
 
@@ -158,11 +155,10 @@ class ParquetCompactedTargetReaderTest {
                 LocalFileObjectStore store =
                         new LocalFileObjectStore(temporaryDirectory.resolve("compressed-objects"));
                 CompactedObjectWriteResult written = new ParquetCompactedObjectWriter(staging, Runnable::run)
-                        .write(writeRequest, publisher(List.of(
-                                row(40, payload),
-                                row(41, payload),
-                                row(42, payload),
-                                row(43, payload))))
+                        .write(
+                                writeRequest,
+                                publisher(List.of(
+                                        row(40, payload), row(41, payload), row(42, payload), row(43, payload))))
                         .join()) {
             store.putObject(
                             written.objectKey(),
@@ -195,38 +191,29 @@ class ParquetCompactedTargetReaderTest {
                     4,
                     logicalBytes,
                     List.of(),
-                    Optional.of(new ProjectionRef(
-                            ProjectionType.VIRTUAL_LEDGER, "nereus-ml-v1.core-compressed")),
+                    Optional.of(new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "nereus-ml-v1.core-compressed")),
                     9);
-            ParquetCompactedTargetReader reader = new ParquetCompactedTargetReader(
-                    new ParquetCompactedObjectReader(store, Runnable::run));
+            ParquetCompactedTargetReader reader =
+                    new ParquetCompactedTargetReader(new ParquetCompactedObjectReader(store, Runnable::run));
 
             WalReadResult read = reader.readWithStats(
                             streamId,
                             40,
                             List.of(range),
-                            new ReadOptions(
-                                    2,
-                                    payload.length * 2,
-                                    ReadIsolation.COMMITTED,
-                                    Duration.ofSeconds(10)))
+                            new ReadOptions(2, payload.length * 2, ReadIsolation.COMMITTED, Duration.ofSeconds(10)))
                     .join();
 
-            assertThat(read.batches()).hasSize(2).allSatisfy(batch ->
-                    assertThat(batch.payload()).containsExactly(payload));
+            assertThat(read.batches()).hasSize(2).allSatisfy(batch -> assertThat(batch.payload())
+                    .containsExactly(payload));
             assertThat(read.sliceStats()).singleElement().satisfies(stats -> {
-                assertThat(stats.fullSlicePayloadBytes())
-                        .isEqualTo(written.objectLength());
+                assertThat(stats.fullSlicePayloadBytes()).isEqualTo(written.objectLength());
                 assertThat(stats.entryIndexBytes())
                         .isEqualTo(written.entryIndexRef().length());
-                assertThat(stats.returnedPayloadBytes())
-                        .isEqualTo(payload.length * 2L);
-                assertThat(stats.physicalBytesRead())
-                        .isLessThan(stats.returnedPayloadBytes());
+                assertThat(stats.returnedPayloadBytes()).isEqualTo(payload.length * 2L);
+                assertThat(stats.physicalBytesRead()).isLessThan(stats.returnedPayloadBytes());
                 assertThat(stats.amplificationBytes()).isZero();
                 assertThat(stats.compressionSavingsBytes())
-                        .isEqualTo(stats.returnedPayloadBytes()
-                                - stats.physicalBytesRead());
+                        .isEqualTo(stats.returnedPayloadBytes() - stats.physicalBytesRead());
             });
         }
     }
@@ -235,11 +222,7 @@ class ParquetCompactedTargetReaderTest {
         Path directory = Files.createDirectory(temporaryDirectory.resolve("staging"));
         Files.setPosixFilePermissions(directory, PosixFilePermissions.fromString("rwx------"));
         return new StagingFileManager(
-                directory,
-                32L << 20,
-                StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
-                Duration.ofHours(1),
-                Runnable::run);
+                directory, 32L << 20, StagingFileManager.MIN_UPLOAD_CHUNK_BYTES, Duration.ofHours(1), Runnable::run);
     }
 
     private static CompactedObjectWriteRequest request(StreamId streamId, long logicalBytes) {
@@ -249,14 +232,12 @@ class ParquetCompactedTargetReaderTest {
                 streamId,
                 new OffsetRange(40, 44),
                 "c".repeat(26),
-                new com.nereusstream.api.Checksum(
-                        com.nereusstream.api.ChecksumType.SHA256, "1".repeat(64)),
-                new com.nereusstream.api.Checksum(
-                        com.nereusstream.api.ChecksumType.SHA256, "2".repeat(64)),
+                new com.nereusstream.api.Checksum(com.nereusstream.api.ChecksumType.SHA256, "1".repeat(64)),
+                new com.nereusstream.api.Checksum(com.nereusstream.api.ChecksumType.SHA256, "2".repeat(64)),
                 PayloadFormat.PULSAR_ENTRY_BATCH,
                 PayloadFormat.PULSAR_ENTRY_BATCH.name(),
-                Optional.of(new com.nereusstream.api.Checksum(
-                        com.nereusstream.api.ChecksumType.SHA256, "3".repeat(64))),
+                Optional.of(
+                        new com.nereusstream.api.Checksum(com.nereusstream.api.ChecksumType.SHA256, "3".repeat(64))),
                 4,
                 4,
                 4,

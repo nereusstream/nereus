@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.retention;
 
 import com.nereusstream.api.StreamId;
@@ -18,7 +19,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.function.Consumer;
 
-/** Process-owned production composition for per-ledger planners and the shared bounded execution lane. */
+/**
+ * Process-owned production composition for per-ledger planners and the shared bounded execution lane.
+ */
 public final class NereusRetentionRuntime implements AutoCloseable {
     private final String cluster;
     private final OxiaMetadataStore l0;
@@ -44,17 +47,11 @@ public final class NereusRetentionRuntime implements AutoCloseable {
         this.l0 = Objects.requireNonNull(l0, "l0");
         this.generations = Objects.requireNonNull(generations, "generations");
         this.cursors = Objects.requireNonNull(cursors, "cursors");
-        this.cursorRetention = Objects.requireNonNull(
-                cursorRetention,
-                "cursorRetention");
-        this.activationGuard = Objects.requireNonNull(
-                activationGuard,
-                "activationGuard");
+        this.cursorRetention = Objects.requireNonNull(cursorRetention, "cursorRetention");
+        this.activationGuard = Objects.requireNonNull(activationGuard, "activationGuard");
         this.config = Objects.requireNonNull(config, "config");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.lane = new NereusRetentionExecutionLane(
-                config,
-                Objects.requireNonNull(threadFactory, "threadFactory"));
+        this.lane = new NereusRetentionExecutionLane(config, Objects.requireNonNull(threadFactory, "threadFactory"));
     }
 
     public NereusManagedLedgerRetentionService createService(
@@ -65,18 +62,16 @@ public final class NereusRetentionRuntime implements AutoCloseable {
             CursorOwnerSession owner,
             Consumer<CursorRetentionView> completedTrimObserver) {
         StreamId exactStream = Objects.requireNonNull(streamId, "streamId");
-        RetentionPolicySnapshotProvider exactPolicies =
-                Objects.requireNonNull(policies, "policies");
-        DefaultRetentionCandidatePlanner planner =
-                new DefaultRetentionCandidatePlanner(
-                        cluster,
-                        l0,
-                        generations,
-                        cursors,
-                        Objects.requireNonNull(owner, "owner"),
-                        exactPolicies,
-                        config,
-                        clock);
+        RetentionPolicySnapshotProvider exactPolicies = Objects.requireNonNull(policies, "policies");
+        DefaultRetentionCandidatePlanner planner = new DefaultRetentionCandidatePlanner(
+                cluster,
+                l0,
+                generations,
+                cursors,
+                Objects.requireNonNull(owner, "owner"),
+                exactPolicies,
+                config,
+                clock);
         return new NereusManagedLedgerRetentionService(
                 exactStream,
                 Objects.requireNonNull(liveProjection, "liveProjection"),
@@ -86,25 +81,18 @@ public final class NereusRetentionRuntime implements AutoCloseable {
                 planner,
                 cursorRetention,
                 owner,
-                Objects.requireNonNull(
-                        completedTrimObserver,
-                        "completedTrimObserver"));
+                Objects.requireNonNull(completedTrimObserver, "completedTrimObserver"));
     }
 
     public CompletableFuture<Optional<RetentionCandidate>> trim(
-            StreamId streamId,
-            NereusManagedLedgerRetentionService service,
-            String reason) {
+            StreamId streamId, NereusManagedLedgerRetentionService service, String reason) {
         StreamId exactStream = Objects.requireNonNull(streamId, "streamId");
-        NereusManagedLedgerRetentionService exactService =
-                Objects.requireNonNull(service, "service");
+        NereusManagedLedgerRetentionService exactService = Objects.requireNonNull(service, "service");
         if (!exactService.streamId().equals(exactStream)) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "retention service and execution stream must agree"));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("retention service and execution stream must agree"));
         }
-        return lane.submit(
-                exactStream,
-                () -> exactService.trim(reason));
+        return lane.submit(exactStream, () -> exactService.trim(reason));
     }
 
     public NereusRetentionConfig config() {
@@ -119,8 +107,7 @@ public final class NereusRetentionRuntime implements AutoCloseable {
     private static String requireText(String value, String field) {
         Objects.requireNonNull(value, field);
         if (value.isBlank() || value.indexOf('\0') >= 0) {
-            throw new IllegalArgumentException(
-                    field + " cannot be blank or contain NUL");
+            throw new IllegalArgumentException(field + " cannot be blank or contain NUL");
         }
         return value;
     }

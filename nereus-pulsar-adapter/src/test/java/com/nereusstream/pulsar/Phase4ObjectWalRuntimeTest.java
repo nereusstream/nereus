@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
@@ -39,56 +39,30 @@ import org.junit.jupiter.api.io.TempDir;
 
 class Phase4ObjectWalRuntimeTest {
     private static final String CLUSTER = "cluster-runtime";
-    private static final String PROCESS_RUN_ID =
-            "a".repeat(26);
-    private static final Clock CLOCK = Clock.fixed(
-            Instant.parse("2026-07-16T08:00:00Z"),
-            ZoneOffset.UTC);
+    private static final String PROCESS_RUN_ID = "a".repeat(26);
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-07-16T08:00:00Z"), ZoneOffset.UTC);
 
     @TempDir
     Path root;
 
     @Test
     void composesReadReplayLagAndMaterializationAsOneOwnedRuntime() {
-        FakeOxiaMetadataStore l0 =
-                new FakeOxiaMetadataStore(CLOCK::millis);
-        GenerationMetadataStore generations =
-                GenerationMetadataStoreTestFactory.inMemory(CLOCK);
-        LocalFileObjectStore objects =
-                new LocalFileObjectStore(root.resolve("objects"));
+        FakeOxiaMetadataStore l0 = new FakeOxiaMetadataStore(CLOCK::millis);
+        GenerationMetadataStore generations = GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+        LocalFileObjectStore objects = new LocalFileObjectStore(root.resolve("objects"));
         var protections = new DefaultObjectProtectionManager(
-                CLUSTER,
-                l0,
-                Duration.ofMinutes(5),
-                Duration.ofSeconds(5),
-                Duration.ofDays(1),
-                CLOCK);
+                CLUSTER, l0, Duration.ofMinutes(5), Duration.ofSeconds(5), Duration.ofDays(1), CLOCK);
         var readPins = new DefaultObjectReadPinManager(
-                CLUSTER,
-                "a".repeat(26),
-                l0,
-                Duration.ofMinutes(2),
-                Duration.ofSeconds(5),
-                Duration.ofDays(1),
-                CLOCK);
-        var physicalReferences =
-                new DefaultGenerationZeroPhysicalReferencePublisher(
-                        CLUSTER,
-                        l0,
-                        l0,
-                        protections);
-        ScheduledExecutorService scheduler =
-                Executors.newSingleThreadScheduledExecutor();
-        ExecutorService workers =
-                Executors.newFixedThreadPool(4);
-        ExecutorService callbacks =
-                Executors.newSingleThreadExecutor();
+                CLUSTER, "a".repeat(26), l0, Duration.ofMinutes(2), Duration.ofSeconds(5), Duration.ofDays(1), CLOCK);
+        var physicalReferences = new DefaultGenerationZeroPhysicalReferencePublisher(CLUSTER, l0, l0, protections);
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        ExecutorService workers = Executors.newFixedThreadPool(4);
+        ExecutorService callbacks = Executors.newSingleThreadExecutor();
         Phase4ObjectWalRuntime runtime = new Phase4ObjectWalRuntime(
                 CLUSTER,
                 PROCESS_RUN_ID,
                 streamConfig(),
-                MaterializationConfig.defaults(
-                        root.resolve("staging").toAbsolutePath()),
+                MaterializationConfig.defaults(root.resolve("staging").toAbsolutePath()),
                 Duration.ofMinutes(1),
                 l0,
                 generations,
@@ -111,13 +85,11 @@ class Phase4ObjectWalRuntimeTest {
             assertThat(runtime.generationZeroRepairScanner()).isNotNull();
             assertThat(runtime.lagSnapshotReader()).isNotNull();
             assertThat(runtime.committedGenerationRetirementAuthority()).isNotNull();
-            assertThat(runtime.materializationService().isRunning())
-                    .isFalse();
+            assertThat(runtime.materializationService().isRunning()).isFalse();
 
             runtime.start();
 
-            assertThat(runtime.materializationService().isRunning())
-                    .isTrue();
+            assertThat(runtime.materializationService().isRunning()).isTrue();
         } finally {
             runtime.close();
             callbacks.shutdownNow();
@@ -130,8 +102,7 @@ class Phase4ObjectWalRuntimeTest {
         }
 
         assertThat(workers.isShutdown()).isTrue();
-        assertThat(runtime.materializationService().isRunning())
-                .isFalse();
+        assertThat(runtime.materializationService().isRunning()).isFalse();
     }
 
     private static MaterializationSourceProvider bookKeeperSourceProvider() {
@@ -139,10 +110,7 @@ class Phase4ObjectWalRuntimeTest {
             @Override
             public ReadTargetReaderKey key() {
                 return new ReadTargetReaderKey(
-                        ReadTargetType.BOOKKEEPER_ENTRY_RANGE,
-                        1,
-                        Optional.empty(),
-                        Optional.empty());
+                        ReadTargetType.BOOKKEEPER_ENTRY_RANGE, 1, Optional.empty(), Optional.empty());
             }
 
             @Override
@@ -174,8 +142,7 @@ class Phase4ObjectWalRuntimeTest {
 
                     @Override
                     public CompletableFuture<MaterializationSourceProtection> revalidate(
-                            MaterializationSourceProtection protection,
-                            OwnerRevalidator ownerRevalidator) {
+                            MaterializationSourceProtection protection, OwnerRevalidator ownerRevalidator) {
                         return unavailable();
                     }
 
@@ -189,8 +156,7 @@ class Phase4ObjectWalRuntimeTest {
 
                     @Override
                     public CompletableFuture<Void> release(
-                            MaterializationSourceProtection protection,
-                            RemovalAuthorizer removalAuthorizer) {
+                            MaterializationSourceProtection protection, RemovalAuthorizer removalAuthorizer) {
                         return unavailable();
                     }
 
@@ -237,29 +203,22 @@ class Phase4ObjectWalRuntimeTest {
                 2_048);
     }
 
-    private static GenerationProtocolActivationGuard
-            unavailableActivationGuard() {
+    private static GenerationProtocolActivationGuard unavailableActivationGuard() {
         return new GenerationProtocolActivationGuard() {
             @Override
-            public CompletableFuture<com.nereusstream.core.capability.GenerationActivationProof>
-                    requireReady(
-                            com.nereusstream.core.capability.GenerationOperation
-                                    operation,
-                            com.nereusstream.core.capability.GenerationActivationSubject
-                                    subject,
-                            boolean activateLiveProjectionIfAbsent) {
+            public CompletableFuture<com.nereusstream.core.capability.GenerationActivationProof> requireReady(
+                    com.nereusstream.core.capability.GenerationOperation operation,
+                    com.nereusstream.core.capability.GenerationActivationSubject subject,
+                    boolean activateLiveProjectionIfAbsent) {
                 return CompletableFuture.failedFuture(
-                        new AssertionError(
-                                "an empty registry scan must not request activation"));
+                        new AssertionError("an empty registry scan must not request activation"));
             }
 
             @Override
             public CompletableFuture<Void> revalidate(
-                    com.nereusstream.core.capability.GenerationActivationProof
-                            proof) {
+                    com.nereusstream.core.capability.GenerationActivationProof proof) {
                 return CompletableFuture.failedFuture(
-                        new AssertionError(
-                                "an empty registry scan must not revalidate activation"));
+                        new AssertionError("an empty registry scan must not revalidate activation"));
             }
         };
     }

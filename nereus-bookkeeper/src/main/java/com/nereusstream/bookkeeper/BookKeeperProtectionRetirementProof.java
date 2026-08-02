@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import java.util.Objects;
 
-/** Monotonic owner-retirement evidence produced by the existing trim/source-retirement authority. */
+/**
+ * Monotonic owner-retirement evidence produced by the existing trim/source-retirement authority.
+ */
 public record BookKeeperProtectionRetirementProof(
         String protectionKey,
         long protectionMetadataVersion,
@@ -17,7 +20,11 @@ public record BookKeeperProtectionRetirementProof(
         long authorityMetadataVersion,
         Checksum authorityRecordSha256,
         Reason reason) {
-    public enum Reason { LOGICAL_TRIM, HEALTHY_HIGHER_GENERATION, ABANDONED_APPEND }
+    public enum Reason {
+        LOGICAL_TRIM,
+        HEALTHY_HIGHER_GENERATION,
+        ABANDONED_APPEND
+    }
 
     public BookKeeperProtectionRetirementProof {
         protectionKey = text(protectionKey, "protectionKey");
@@ -42,7 +49,9 @@ public record BookKeeperProtectionRetirementProof(
 
     private static String text(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " cannot be blank");
+        }
         return value;
     }
 }

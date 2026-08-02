@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import java.util.Collections;
@@ -6,7 +7,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/** Unambiguous cursor-property mutation shapes used by the storage state machine. */
+/**
+ * Unambiguous cursor-property mutation shapes used by the storage state machine.
+ */
 public sealed interface CursorPropertyMutation {
     record Put(String key, String value) implements CursorPropertyMutation {
         public Put {

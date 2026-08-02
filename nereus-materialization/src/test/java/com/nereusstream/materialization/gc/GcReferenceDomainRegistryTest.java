@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -54,19 +54,21 @@ class GcReferenceDomainRegistryTest {
             calls.add("generation-v1");
             return clear(request, "generation-v1", "/generation");
         });
-        GcReferenceDomainRegistry registry = new GcReferenceDomainRegistry(
-                PhysicalGcConfig.defaults(), scheduler, List.of(projection, generation));
+        GcReferenceDomainRegistry registry =
+                new GcReferenceDomainRegistry(PhysicalGcConfig.defaults(), scheduler, List.of(projection, generation));
 
         GcReferenceCollection collection = registry.snapshotForDeletion(query).join();
 
-        assertThat(registry.requiredDomains()).containsExactly(
-                new GcReferenceDomainVersion("generation-v1", 1),
-                new GcReferenceDomainVersion("projection-generation-v1", 1));
+        assertThat(registry.requiredDomains())
+                .containsExactly(
+                        new GcReferenceDomainVersion("generation-v1", 1),
+                        new GcReferenceDomainVersion("projection-generation-v1", 1));
         assertThat(registry.contains("generation-v1", 1)).isTrue();
         assertThat(registry.contains("generation-v1", 2)).isFalse();
         assertThat(calls).containsExactly("generation-v1", "projection-generation-v1");
         assertThat(collection.status()).isEqualTo(GcReferenceCollectionStatus.CLEAR);
-        assertThat(collection.snapshots()).extracting(GcReferenceSnapshot::domainId)
+        assertThat(collection.snapshots())
+                .extracting(GcReferenceSnapshot::domainId)
                 .containsExactly("generation-v1", "projection-generation-v1");
         assertThat(collection.snapshot("projection-generation-v1")).isPresent();
     }
@@ -75,40 +77,65 @@ class GcReferenceDomainRegistryTest {
     void vetoIncompleteAndConfiguredLimitAreDistinctFailClosedResults() {
         GcReferenceQuery query = query();
 
-        GcReferenceCollection veto = registry(PhysicalGcConfig.defaults(), domain(
-                        "generation-v1",
-                        request -> GcReferenceSnapshot.create(
-                                "generation-v1", 1, request.queryIdentitySha256(),
-                                true, true, 1, 0,
-                                List.of(authority("/a", 1)), List.of())))
+        GcReferenceCollection veto = registry(
+                        PhysicalGcConfig.defaults(),
+                        domain(
+                                "generation-v1",
+                                request -> GcReferenceSnapshot.create(
+                                        "generation-v1",
+                                        1,
+                                        request.queryIdentitySha256(),
+                                        true,
+                                        true,
+                                        1,
+                                        0,
+                                        List.of(authority("/a", 1)),
+                                        List.of())))
                 .snapshotForDeletion(query)
                 .join();
         assertThat(veto.status()).isEqualTo(GcReferenceCollectionStatus.VETOED);
         assertThat(veto.blockingDomainId()).contains("generation-v1");
 
-        GcReferenceCollection incomplete = registry(PhysicalGcConfig.defaults(), domain(
-                        "generation-v1",
-                        request -> GcReferenceSnapshot.create(
-                                "generation-v1", 1, request.queryIdentitySha256(),
-                                false, true, 2, 0,
-                                List.of(authority("/a", 1)), List.of())))
+        GcReferenceCollection incomplete = registry(
+                        PhysicalGcConfig.defaults(),
+                        domain(
+                                "generation-v1",
+                                request -> GcReferenceSnapshot.create(
+                                        "generation-v1",
+                                        1,
+                                        request.queryIdentitySha256(),
+                                        false,
+                                        true,
+                                        2,
+                                        0,
+                                        List.of(authority("/a", 1)),
+                                        List.of())))
                 .snapshotForDeletion(query)
                 .join();
         assertThat(incomplete.status()).isEqualTo(GcReferenceCollectionStatus.INCOMPLETE);
 
         PhysicalGcConfig oneAuthority = config(1, 10, Duration.ofSeconds(1));
-        GcReferenceCollection oversized = registry(oneAuthority, domain(
-                        "generation-v1",
-                        request -> GcReferenceSnapshot.create(
-                                "generation-v1", 1, request.queryIdentitySha256(),
-                                true, false, 2, 0,
-                                List.of(authority("/a", 1), authority("/b", 2)), List.of())))
+        GcReferenceCollection oversized = registry(
+                        oneAuthority,
+                        domain(
+                                "generation-v1",
+                                request -> GcReferenceSnapshot.create(
+                                        "generation-v1",
+                                        1,
+                                        request.queryIdentitySha256(),
+                                        true,
+                                        false,
+                                        2,
+                                        0,
+                                        List.of(authority("/a", 1), authority("/b", 2)),
+                                        List.of())))
                 .snapshotForDeletion(query)
                 .join();
         assertThat(oversized.status()).isEqualTo(GcReferenceCollectionStatus.LIMIT_EXCEEDED);
 
-        assertThatThrownBy(() -> registry(PhysicalGcConfig.defaults(), domain(
-                        "generation-v1", request -> clear(request, "generation-v1", "/a")))
+        assertThatThrownBy(() -> registry(
+                                PhysicalGcConfig.defaults(),
+                                domain("generation-v1", request -> clear(request, "generation-v1", "/a")))
                         .stillMatches(veto)
                         .join())
                 .hasRootCauseInstanceOf(IllegalArgumentException.class);
@@ -117,42 +144,35 @@ class GcReferenceDomainRegistryTest {
     @Test
     void domainIdentityProtocolAndQueryMismatchAreInvariantFailures() {
         GcReferenceQuery query = query();
-        TestDomain wrongDomain = domain(
-                "generation-v1", request -> clear(request, "materialization-v1", "/a"));
+        TestDomain wrongDomain = domain("generation-v1", request -> clear(request, "materialization-v1", "/a"));
 
         assertThatThrownBy(() -> registry(PhysicalGcConfig.defaults(), wrongDomain)
                         .snapshotForDeletion(query)
                         .join())
                 .satisfies(failure -> assertThat(unwrap(failure))
-                        .isInstanceOfSatisfying(NereusException.class, error ->
-                                assertThat(error.code()).isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION)));
+                        .isInstanceOfSatisfying(NereusException.class, error -> assertThat(error.code())
+                                .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION)));
 
         GcReferenceQuery other = GcReferenceQuery.create(
-                GcReferenceQueryKind.REFERENCED_OBJECT,
-                query.object(),
-                List.of(new StreamId("stream-b")),
-                SHA_A);
-        TestDomain wrongQuery = domain(
-                "generation-v1", request -> clear(other, "generation-v1", "/a"));
+                GcReferenceQueryKind.REFERENCED_OBJECT, query.object(), List.of(new StreamId("stream-b")), SHA_A);
+        TestDomain wrongQuery = domain("generation-v1", request -> clear(other, "generation-v1", "/a"));
         assertThatThrownBy(() -> registry(PhysicalGcConfig.defaults(), wrongQuery)
                         .snapshotForDeletion(query)
                         .join())
                 .satisfies(failure -> assertThat(unwrap(failure))
-                        .isInstanceOfSatisfying(NereusException.class, error ->
-                                assertThat(error.code()).isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION)));
+                        .isInstanceOfSatisfying(NereusException.class, error -> assertThat(error.code())
+                                .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION)));
     }
 
     @Test
     void stillMatchesRevalidatesTheExactClearSetAndShortCircuitsOnDrift() {
         GcReferenceQuery query = query();
-        TestDomain first = domain(
-                "generation-v1", request -> clear(request, "generation-v1", "/a"));
-        TestDomain second = domain(
-                "projection-generation-v1",
-                request -> clear(request, "projection-generation-v1", "/b"));
+        TestDomain first = domain("generation-v1", request -> clear(request, "generation-v1", "/a"));
+        TestDomain second =
+                domain("projection-generation-v1", request -> clear(request, "projection-generation-v1", "/b"));
         second.stillMatches = false;
-        GcReferenceDomainRegistry registry = new GcReferenceDomainRegistry(
-                PhysicalGcConfig.defaults(), scheduler, List.of(second, first));
+        GcReferenceDomainRegistry registry =
+                new GcReferenceDomainRegistry(PhysicalGcConfig.defaults(), scheduler, List.of(second, first));
         GcReferenceCollection collection = registry.snapshotForDeletion(query).join();
 
         assertThat(registry.stillMatches(collection).join()).isFalse();
@@ -168,26 +188,22 @@ class GcReferenceDomainRegistryTest {
     @Test
     void everyDomainCallSharesOneBoundedOperationDeadline() {
         PhysicalGcConfig shortTimeout = config(10, 10, Duration.ofMillis(50));
-        TestDomain never = new TestDomain(
-                "generation-v1", 1, ignored -> new CompletableFuture<>());
+        TestDomain never = new TestDomain("generation-v1", 1, ignored -> new CompletableFuture<>());
 
         assertThatThrownBy(() -> registry(shortTimeout, never)
                         .snapshotForDeletion(query())
                         .join())
                 .satisfies(failure -> assertThat(unwrap(failure))
-                        .isInstanceOfSatisfying(NereusException.class, error ->
-                                assertThat(error.code()).isEqualTo(ErrorCode.TIMEOUT)));
+                        .isInstanceOfSatisfying(NereusException.class, error -> assertThat(error.code())
+                                .isEqualTo(ErrorCode.TIMEOUT)));
     }
 
     @Test
     void duplicateOrEmptyDomainRegistryIsRejected() {
-        TestDomain first = domain(
-                "generation-v1", request -> clear(request, "generation-v1", "/a"));
-        TestDomain duplicate = domain(
-                "generation-v1", request -> clear(request, "generation-v1", "/b"));
+        TestDomain first = domain("generation-v1", request -> clear(request, "generation-v1", "/a"));
+        TestDomain duplicate = domain("generation-v1", request -> clear(request, "generation-v1", "/b"));
 
-        assertThatThrownBy(() -> new GcReferenceDomainRegistry(
-                        PhysicalGcConfig.defaults(), scheduler, List.of()))
+        assertThatThrownBy(() -> new GcReferenceDomainRegistry(PhysicalGcConfig.defaults(), scheduler, List.of()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new GcReferenceDomainRegistry(
                         PhysicalGcConfig.defaults(), scheduler, List.of(first, duplicate)))
@@ -199,14 +215,11 @@ class GcReferenceDomainRegistryTest {
         return new GcReferenceDomainRegistry(config, scheduler, List.of(domain));
     }
 
-    private static TestDomain domain(
-            String domainId, Function<GcReferenceQuery, GcReferenceSnapshot> snapshots) {
-        return new TestDomain(
-                domainId, 1, query -> CompletableFuture.completedFuture(snapshots.apply(query)));
+    private static TestDomain domain(String domainId, Function<GcReferenceQuery, GcReferenceSnapshot> snapshots) {
+        return new TestDomain(domainId, 1, query -> CompletableFuture.completedFuture(snapshots.apply(query)));
     }
 
-    private static GcReferenceSnapshot clear(
-            GcReferenceQuery query, String domainId, String authorityKey) {
+    private static GcReferenceSnapshot clear(GcReferenceQuery query, String domainId, String authorityKey) {
         return GcReferenceSnapshot.create(
                 domainId,
                 1,
@@ -233,14 +246,10 @@ class GcReferenceDomainRegistryTest {
                 Optional.of(SHA_A),
                 Optional.of("etag"));
         return GcReferenceQuery.create(
-                GcReferenceQueryKind.REFERENCED_OBJECT,
-                object,
-                List.of(new StreamId("stream-a")),
-                SHA_A);
+                GcReferenceQueryKind.REFERENCED_OBJECT, object, List.of(new StreamId("stream-a")), SHA_A);
     }
 
-    private static PhysicalGcConfig config(
-            int maxAuthorities, int maxReferences, Duration operationTimeout) {
+    private static PhysicalGcConfig config(int maxAuthorities, int maxReferences, Duration operationTimeout) {
         PhysicalGcConfig defaults = PhysicalGcConfig.defaults();
         return new PhysicalGcConfig(
                 defaults.enabled(),
@@ -307,11 +316,9 @@ class GcReferenceDomainRegistryTest {
         }
 
         @Override
-        public CompletableFuture<Boolean> stillMatches(
-                GcReferenceQuery query, GcReferenceSnapshot snapshot) {
+        public CompletableFuture<Boolean> stillMatches(GcReferenceQuery query, GcReferenceSnapshot snapshot) {
             if (!query.queryIdentitySha256().equals(snapshot.queryIdentitySha256())) {
-                return CompletableFuture.failedFuture(
-                        new IllegalArgumentException("query does not match snapshot"));
+                return CompletableFuture.failedFuture(new IllegalArgumentException("query does not match snapshot"));
             }
             revalidationCalls.incrementAndGet();
             return CompletableFuture.completedFuture(stillMatches);

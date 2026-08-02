@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** View-scoped monotonic generation allocator root. */
+/**
+ * View-scoped monotonic generation allocator root.
+ */
 public record GenerationSequenceRecord(
         int schemaVersion,
         String streamId,
@@ -35,7 +38,13 @@ public record GenerationSequenceRecord(
 
     public GenerationSequenceRecord withMetadataVersion(long version) {
         return new GenerationSequenceRecord(
-                schemaVersion, streamId, readViewId, lastAllocatedGeneration, allocationSequence,
-                lastPublicationId, updatedAtMillis, version);
+                schemaVersion,
+                streamId,
+                readViewId,
+                lastAllocatedGeneration,
+                allocationSequence,
+                lastPublicationId,
+                updatedAtMillis,
+                version);
     }
 }

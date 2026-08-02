@@ -1,16 +1,22 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
+import com.nereusstream.api.EntryIndexRef;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.api.ObjectId;
+import com.nereusstream.api.ObjectKey;
+import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.SchemaRef;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.ObjectProtection;
 import com.nereusstream.core.physical.ObjectProtectionManager;
@@ -33,10 +39,15 @@ import com.nereusstream.objectstore.HeadObjectResult;
 import com.nereusstream.objectstore.ObjectAlreadyExistsException;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.PutObjectOptions;
+import com.nereusstream.objectstore.compacted.CompactedObjectFormatV2;
 import com.nereusstream.objectstore.compacted.CompactedObjectWriteRequest;
 import com.nereusstream.objectstore.compacted.CompactedObjectWriteResult;
 import com.nereusstream.objectstore.compacted.CompactedObjectWriter;
+import com.nereusstream.objectstore.compacted.RangedCompactedObjectWriteRequest;
+import com.nereusstream.objectstore.compacted.RangedCompactedObjectWriteResult;
+import com.nereusstream.objectstore.compacted.RangedCompactedObjectWriter;
 import com.nereusstream.objectstore.compacted.TopicCompactionFormatSpec;
+import com.nereusstream.objectstore.staging.StagedObjectFile;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -72,7 +83,8 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
     private final ObjectProtectionManager protections;
     private final MaterializationSourceProtectionRegistry sourceProtectionAdapters;
     private final ExactSourceRangeReaderFactory sourceReaders;
-    private final CompactedObjectWriter writer;
+    private final Optional<CompactedObjectWriter> writer;
+    private final Optional<RangedCompactedObjectWriter> rangedWriter;
     private final ObjectStore objectStore;
     private final MaterializationOutputVerifier outputVerifier;
     private final Optional<TopicCompactionEngine> topicCompactionEngine;
@@ -90,6 +102,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
     private final Executor callbackExecutor;
     private final Clock clock;
     private final F4Keyspace keyspace;
+    private final MaterializationStreamAuthorityMode authorityMode;
     private final ConcurrentMap<String, Operation> activeOperations = new ConcurrentHashMap<>();
 
     public DefaultMaterializationWorker(
@@ -187,6 +200,62 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 clock,
                 TopicSupport.disabled(),
                 sourceProtectionAdapters);
+    }
+
+    /**
+     * NCP2-only lossless worker used by Kafka profiles. NCP1 and NTC1 stay bound to the
+     * {@link CompactedObjectWriter} constructors above.
+     */
+    public DefaultMaterializationWorker(
+            String cluster,
+            String processRunId,
+            MaterializationTaskStore tasks,
+            GenerationMetadataStore generations,
+            PhysicalObjectIdentityResolver identities,
+            ObjectProtectionManager protections,
+            MaterializationSourceProtectionRegistry sourceProtectionAdapters,
+            ExactSourceRangeReaderFactory sourceReaders,
+            RangedCompactedObjectWriter rangedWriter,
+            ObjectStore objectStore,
+            MaterializationOutputVerifier outputVerifier,
+            int sourceReadPageRecords,
+            int sourceReadPageBytes,
+            Duration claimDuration,
+            Duration claimRenewInterval,
+            Duration retryDelay,
+            int maxTaskAttempts,
+            Duration operationTimeout,
+            String writerBuild,
+            ScheduledExecutorService scheduler,
+            Executor callbackExecutor,
+            Clock clock) {
+        this(
+                cluster,
+                processRunId,
+                tasks,
+                generations,
+                identities,
+                protections,
+                sourceReaders,
+                Optional.empty(),
+                Optional.of(Objects.requireNonNull(rangedWriter, "rangedWriter")),
+                objectStore,
+                outputVerifier,
+                new SecureWorkerClaimIdGenerator(),
+                sourceReadPageRecords,
+                sourceReadPageBytes,
+                claimDuration,
+                claimRenewInterval,
+                retryDelay,
+                maxTaskAttempts,
+                operationTimeout,
+                writerBuild,
+                scheduler,
+                callbackExecutor,
+                clock,
+                TopicSupport.disabled(),
+                sourceProtectionAdapters,
+                MaterializationStreamAuthorityMode.DIRECT_STREAM);
     }
 
     public DefaultMaterializationWorker(
@@ -387,9 +456,8 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 callbackExecutor,
                 clock,
                 topicSupport,
-                new MaterializationSourceProtectionRegistry(List.of(
-                        new ObjectMaterializationSourceProtectionAdapter(
-                                identities, protections))));
+                new MaterializationSourceProtectionRegistry(
+                        List.of(new ObjectMaterializationSourceProtectionAdapter(identities, protections))));
     }
 
     private DefaultMaterializationWorker(
@@ -417,16 +485,75 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             Clock clock,
             TopicSupport topicSupport,
             MaterializationSourceProtectionRegistry sourceProtectionAdapters) {
+        this(
+                cluster,
+                processRunId,
+                tasks,
+                generations,
+                identities,
+                protections,
+                sourceReaders,
+                Optional.of(Objects.requireNonNull(writer, "writer")),
+                Optional.empty(),
+                objectStore,
+                outputVerifier,
+                claimIds,
+                sourceReadPageRecords,
+                sourceReadPageBytes,
+                claimDuration,
+                claimRenewInterval,
+                retryDelay,
+                maxTaskAttempts,
+                operationTimeout,
+                writerBuild,
+                scheduler,
+                callbackExecutor,
+                clock,
+                topicSupport,
+                sourceProtectionAdapters,
+                MaterializationStreamAuthorityMode.PROJECTION_REQUIRED);
+    }
+
+    private DefaultMaterializationWorker(
+            String cluster,
+            String processRunId,
+            MaterializationTaskStore tasks,
+            GenerationMetadataStore generations,
+            PhysicalObjectIdentityResolver identities,
+            ObjectProtectionManager protections,
+            ExactSourceRangeReaderFactory sourceReaders,
+            Optional<CompactedObjectWriter> writer,
+            Optional<RangedCompactedObjectWriter> rangedWriter,
+            ObjectStore objectStore,
+            MaterializationOutputVerifier outputVerifier,
+            WorkerClaimIdGenerator claimIds,
+            int sourceReadPageRecords,
+            int sourceReadPageBytes,
+            Duration claimDuration,
+            Duration claimRenewInterval,
+            Duration retryDelay,
+            int maxTaskAttempts,
+            Duration operationTimeout,
+            String writerBuild,
+            ScheduledExecutorService scheduler,
+            Executor callbackExecutor,
+            Clock clock,
+            TopicSupport topicSupport,
+            MaterializationSourceProtectionRegistry sourceProtectionAdapters,
+            MaterializationStreamAuthorityMode authorityMode) {
         this.cluster = requireText(cluster, "cluster");
         this.processRunId = requireBase32(processRunId, "processRunId");
         this.tasks = Objects.requireNonNull(tasks, "tasks");
         this.generations = Objects.requireNonNull(generations, "generations");
         this.identities = Objects.requireNonNull(identities, "identities");
         this.protections = Objects.requireNonNull(protections, "protections");
-        this.sourceProtectionAdapters = Objects.requireNonNull(
-                sourceProtectionAdapters, "sourceProtectionAdapters");
+        this.sourceProtectionAdapters = Objects.requireNonNull(sourceProtectionAdapters, "sourceProtectionAdapters");
         this.sourceReaders = Objects.requireNonNull(sourceReaders, "sourceReaders");
         this.writer = Objects.requireNonNull(writer, "writer");
+        this.rangedWriter = Objects.requireNonNull(rangedWriter, "rangedWriter");
+        if (this.writer.isPresent() == this.rangedWriter.isPresent()) {
+            throw new IllegalArgumentException("exactly one NCP1/NTC1 or NCP2 writer must be installed");
+        }
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
         this.outputVerifier = Objects.requireNonNull(outputVerifier, "outputVerifier");
         TopicSupport exactTopicSupport = Objects.requireNonNull(topicSupport, "topicSupport");
@@ -442,11 +569,9 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         this.sourceReadPageRecords = sourceReadPageRecords;
         this.sourceReadPageBytes = sourceReadPageBytes;
         this.claimDurationMillis = requirePositiveMillis(claimDuration, "claimDuration");
-        this.claimRenewIntervalMillis = requirePositiveMillis(
-                claimRenewInterval, "claimRenewInterval");
+        this.claimRenewIntervalMillis = requirePositiveMillis(claimRenewInterval, "claimRenewInterval");
         if (claimRenewIntervalMillis > claimDurationMillis / 3) {
-            throw new IllegalArgumentException(
-                    "claimRenewInterval must be at most one third of claimDuration");
+            throw new IllegalArgumentException("claimRenewInterval must be at most one third of claimDuration");
         }
         this.retryDelayMillis = requirePositiveMillis(retryDelay, "retryDelay");
         if (maxTaskAttempts <= 0) {
@@ -462,6 +587,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.keyspace = new F4Keyspace(cluster);
+        this.authorityMode = Objects.requireNonNull(authorityMode, "authorityMode");
     }
 
     @Override
@@ -476,8 +602,9 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                         true,
                         "materialization task is already executing in this process"));
             }
-            return operation.run().whenComplete((ignored, failure) ->
-                    activeOperations.remove(exactTask.taskId(), operation));
+            return operation
+                    .run()
+                    .whenComplete((ignored, failure) -> activeOperations.remove(exactTask.taskId(), operation));
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -500,7 +627,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         private volatile VersionedMaterializationTask claimed;
         private ObjectProtection outputProtection;
         private Runnable rowsCloser;
-        private CompactedObjectWriteResult written;
+        private WrittenObject written;
         private ScheduledFuture<?> heartbeatSchedule;
         private CompletableFuture<Void> heartbeatTail = CompletableFuture.completedFuture(null);
         private boolean heartbeatStopped;
@@ -510,20 +637,23 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         private Operation(MaterializationTask task) {
             this.task = task;
             this.deadline = new MaterializationDeadline(operationTimeout, scheduler);
-            boolean lossless = task.taskKind() == TaskKind.LOSSLESS_REWRITE
-                    && task.policy().targetPhysicalFormat()
-                            .equals(MaterializationPolicy.COMMITTED_FORMAT);
+            boolean losslessNcp1 = task.taskKind() == TaskKind.LOSSLESS_REWRITE
+                    && task.policy().targetPhysicalFormat().equals(MaterializationPolicy.COMMITTED_FORMAT)
+                    && writer.isPresent();
+            boolean losslessNcp2 = task.taskKind() == TaskKind.LOSSLESS_REWRITE
+                    && task.policy().targetPhysicalFormat().equals(MaterializationPolicy.KAFKA_COMMITTED_FORMAT)
+                    && rangedWriter.isPresent();
             boolean topic = task.taskKind() == TaskKind.TOPIC_KEY_COMPACTION
-                    && task.policy().targetPhysicalFormat()
-                            .equals(MaterializationPolicy.TOPIC_COMPACTED_FORMAT)
+                    && task.policy().targetPhysicalFormat().equals(MaterializationPolicy.TOPIC_COMPACTED_FORMAT)
                     && task.policy().topicCompaction().isPresent()
-                    && topicCompactionEngine.isPresent();
-            if (!lossless && !topic) {
+                    && topicCompactionEngine.isPresent()
+                    && writer.isPresent();
+            if (!losslessNcp1 && !losslessNcp2 && !topic) {
                 throw execution(
                         TaskFailureClass.UNSUPPORTED_MAPPING,
                         ErrorCode.UNSUPPORTED_FORMAT,
                         false,
-                        "F4-M3 worker has no execution engine for the durable task policy",
+                        "materialization worker has no execution engine for the durable task policy",
                         null);
             }
         }
@@ -535,8 +665,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     .whenComplete((ignored, failure) -> cleanupLocal());
         }
 
-        private CompletableFuture<MaterializationOutput> reuseOrExecute(
-                VersionedMaterializationTask durable) {
+        private CompletableFuture<MaterializationOutput> reuseOrExecute(VersionedMaterializationTask durable) {
             if (durable.value().output().isPresent()
                     && (durable.value().lifecycle() == TaskLifecycle.OUTPUT_READY
                             || durable.value().lifecycle() == TaskLifecycle.PUBLISHING
@@ -561,18 +690,15 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     .exceptionallyCompose(this::failClaim);
         }
 
-        private CompletableFuture<VersionedMaterializationTask> claim(
-                String candidateClaimId,
-                int recoveryAttempt) {
+        private CompletableFuture<VersionedMaterializationTask> claim(String candidateClaimId, int recoveryAttempt) {
             if (recoveryAttempt >= MAX_CLAIM_RECOVERY_ATTEMPTS) {
                 return CompletableFuture.failedFuture(condition("worker claim recovery exhausted"));
             }
             return deadline.bound(
-                            () -> tasks.get(task.streamId(), task.taskId()),
-                            "load materialization task for claim")
+                            () -> tasks.get(task.streamId(), task.taskId()), "load materialization task for claim")
                     .thenCompose(optional -> {
-                        VersionedMaterializationTask current = optional.orElseThrow(() ->
-                                condition("materialization task is absent before worker claim"));
+                        VersionedMaterializationTask current = optional.orElseThrow(
+                                () -> condition("materialization task is absent before worker claim"));
                         requireTask(current);
                         TaskLifecycle lifecycle = current.value().lifecycle();
                         if (lifecycle == TaskLifecycle.OUTPUT_READY
@@ -586,23 +712,21 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                                     && claim.processRunId().equals(processRunId)) {
                                 return CompletableFuture.completedFuture(current);
                             }
-                            return CompletableFuture.failedFuture(condition(
-                                    "materialization task is already claimed by another worker"));
+                            return CompletableFuture.failedFuture(
+                                    condition("materialization task is already claimed by another worker"));
                         }
                         if (lifecycle != TaskLifecycle.PLANNED
                                 && (lifecycle != TaskLifecycle.RETRY_WAIT
                                         || clock.millis() < current.value().retryNotBeforeMillis())) {
                             return CompletableFuture.failedFuture(condition(
-                                    "materialization task lifecycle does not admit a worker claim: "
-                                            + lifecycle));
+                                    "materialization task lifecycle does not admit a worker claim: " + lifecycle));
                         }
                         long now = clock.millis();
                         long expiresAt = addTime(now, claimDurationMillis);
                         var replacement = MaterializationRecordMapper.claimed(
                                 current.value(), candidateClaimId, processRunId, now, expiresAt);
                         return deadline.bound(
-                                        () -> tasks.compareAndSet(
-                                                replacement, current.metadataVersion()),
+                                        () -> tasks.compareAndSet(replacement, current.metadataVersion()),
                                         "claim materialization task")
                                 .handle((updated, failure) -> failure == null
                                         ? CompletableFuture.completedFuture(updated)
@@ -615,28 +739,40 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             return deadline.bound(
                             () -> generations.getStreamRegistration(cluster, task.streamId()),
                             "load materialization registration for worker")
-                    .thenApply(optional -> validateRegistration(optional.orElseThrow(() ->
-                            condition("materialization stream registration is absent")), facts));
+                    .thenApply(optional -> validateRegistration(
+                            optional.orElseThrow(() -> condition("materialization stream registration is absent")),
+                            facts));
         }
 
         private Admission validateRegistration(
-                VersionedMaterializationStreamRegistration registration,
-                TaskFacts facts) {
+                VersionedMaterializationStreamRegistration registration, TaskFacts facts) {
             MaterializationStreamRegistrationRecord value = registration.value();
             Optional<ProjectionRef> projection;
+            StorageProfile profile;
             try {
                 projection = ProjectionIdentity.decode(value.projectionRef());
+                profile = StorageProfile.valueOf(value.storageProfile()).canonical();
             } catch (RuntimeException failure) {
-                throw invariant("materialization registration projection is malformed", failure);
+                throw invariant("materialization registration authority is malformed", failure);
             }
             if (!registration.key().equals(keyspace.materializationRegistryKey(task.streamId()))
                     || !value.streamId().equals(task.streamId().value())
-                    || projection.isEmpty()
-                    || !projection.equals(facts.projectionRef())) {
+                    || !profile.objectMaterializationEnabled()) {
+                throw condition("materialization registration no longer matches the task identity");
+            }
+            Checksum identity = new Checksum(ChecksumType.SHA256, value.projectionIdentitySha256());
+            if (authorityMode == MaterializationStreamAuthorityMode.DIRECT_STREAM) {
+                Checksum expected = DirectMaterializationStreamAuthority.identitySha256(task.streamId(), profile);
+                if (projection.isPresent()
+                        || facts.projectionRef().isPresent()
+                        || !value.projectionRef().equals(DirectMaterializationStreamAuthority.encodedProjectionRef())
+                        || !identity.equals(expected)) {
+                    throw condition("materialization registration no longer matches the task direct-stream authority");
+                }
+            } else if (projection.isEmpty() || !projection.equals(facts.projectionRef())) {
                 throw condition("materialization registration no longer matches the task projection");
             }
-            return new Admission(new Checksum(
-                    ChecksumType.SHA256, value.projectionIdentitySha256()));
+            return new Admission(identity);
         }
 
         private CompletableFuture<Void> acquireSources(int index) {
@@ -648,15 +784,13 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                             () -> sourceProtectionAdapters.acquireOrTransfer(
                                     task.streamId(),
                                     source,
-                                    MaterializationProtectionIdentities.sourceReferenceId(
-                                            cluster, task, source),
+                                    MaterializationProtectionIdentities.sourceReferenceId(cluster, task, source),
                                     MaterializationProtectionIdentities.taskOwner(claimed),
                                     this::revalidateClaimOwner),
                             "acquire materialization source protection")
                     .thenCompose(protection -> {
                         sourceProtections.add(protection);
-                        return revalidateSource(source)
-                                .thenCompose(ignored -> acquireSources(index + 1));
+                        return revalidateSource(source).thenCompose(ignored -> acquireSources(index + 1));
                     });
         }
 
@@ -683,20 +817,20 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     });
         }
 
-        private CompletableFuture<CompactedObjectWriteResult> write(
-                TaskFacts facts,
-                Admission admission) {
-            ExactSourceRangeReader exactReader = Objects.requireNonNull(
-                    sourceReaders.forStream(task.streamId()), "exact source reader");
+        private CompletableFuture<WrittenObject> write(TaskFacts facts, Admission admission) {
+            ExactSourceRangeReader exactReader =
+                    Objects.requireNonNull(sourceReaders.forStream(task.streamId()), "exact source reader");
             ReadOptions options = new ReadOptions(
-                    sourceReadPageRecords,
-                    sourceReadPageBytes,
-                    ReadIsolation.COMMITTED,
-                    deadline.remaining());
+                    sourceReadPageRecords, sourceReadPageBytes, ReadIsolation.COMMITTED, deadline.remaining());
             if (task.taskKind() == TaskKind.LOSSLESS_REWRITE) {
+                if (task.policy().targetPhysicalFormat().equals(MaterializationPolicy.KAFKA_COMMITTED_FORMAT)) {
+                    RangedLosslessMaterializationRowPublisher lossless =
+                            new RangedLosslessMaterializationRowPublisher(task, exactReader, options, callbackExecutor);
+                    rowsCloser = lossless::close;
+                    return writeRangedRows(rangedWriteRequest(facts), lossless);
+                }
                 LosslessMaterializationRowPublisher lossless =
-                        new LosslessMaterializationRowPublisher(
-                                task, exactReader, options, callbackExecutor);
+                        new LosslessMaterializationRowPublisher(task, exactReader, options, callbackExecutor);
                 rowsCloser = lossless::close;
                 return writeRows(
                         writeRequest(
@@ -707,31 +841,55 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             }
             TopicCompactionRegistry.Binding binding = resolveTopicBinding();
             return deadline.bound(
-                            () -> topicCompactionEngine.orElseThrow().prepare(
-                                    task,
-                                    exactReader,
-                                    options,
-                                    binding,
-                                    claimed.value().createdAtMillis()),
+                            () -> topicCompactionEngine
+                                    .orElseThrow()
+                                    .prepare(
+                                            task,
+                                            exactReader,
+                                            options,
+                                            binding,
+                                            claimed.value().createdAtMillis()),
                             "prepare two-pass topic compaction")
                     .thenCompose(plan -> {
                         rowsCloser = plan::close;
-                        return writeRows(
-                                writeRequest(facts, admission, plan.outputRecordCount()),
-                                plan);
+                        return writeRows(writeRequest(facts, admission, plan.outputRecordCount()), plan);
                     });
         }
 
-        private CompletableFuture<CompactedObjectWriteResult> writeRows(
+        private CompletableFuture<WrittenObject> writeRows(
                 CompactedObjectWriteRequest request,
                 java.util.concurrent.Flow.Publisher<com.nereusstream.objectstore.compacted.CompactedObjectRow>
                         publisher) {
             return deadline.bound(
-                            () -> writer.write(request, publisher),
-                            "write compacted Parquet output")
+                            () -> writer.orElseThrow().write(request, publisher), "write compacted Parquet output")
                     .thenApply(result -> {
-                        written = result;
-                        return result;
+                        WrittenObject exact = WrittenObject.from(result, request.logicalFormat(), request.entryCount());
+                        written = exact;
+                        return exact;
+                    });
+        }
+
+        private CompletableFuture<WrittenObject> writeRangedRows(
+                RangedCompactedObjectWriteRequest request,
+                java.util.concurrent.Flow.Publisher<com.nereusstream.objectstore.compacted.RangedCompactedObjectRow>
+                        publisher) {
+            return deadline.bound(
+                            () -> rangedWriter.orElseThrow().write(request, publisher),
+                            "write ranged compacted Parquet output")
+                    .thenApply(result -> {
+                        if (result.outputEntryCount() != request.entryCount()
+                                || result.outputRecordCount() != request.sourceRecordCount()) {
+                            result.close();
+                            throw execution(
+                                    TaskFailureClass.OUTPUT_INVARIANT,
+                                    ErrorCode.METADATA_INVARIANT_VIOLATION,
+                                    false,
+                                    "NCP2 writer output accounting differs from the durable task",
+                                    null);
+                        }
+                        WrittenObject exact = WrittenObject.from(result, request.logicalFormat());
+                        written = exact;
+                        return exact;
                     });
         }
 
@@ -750,9 +908,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         }
 
         private CompactedObjectWriteRequest writeRequest(
-                TaskFacts facts,
-                Admission admission,
-                int expectedOutputRecordCount) {
+                TaskFacts facts, Admission admission, int expectedOutputRecordCount) {
             return new CompactedObjectWriteRequest(
                     cluster,
                     task.view(),
@@ -774,14 +930,40 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     task.policy().targetRowGroupRecords(),
                     task.policy().compression(),
                     writerBuild,
-                    task.policy().topicCompaction().map(spec ->
-                            new TopicCompactionFormatSpec(
-                                    spec.strategyId(),
-                                    spec.strategyVersion(),
-                                    spec.keyCodecId())));
+                    task.policy()
+                            .topicCompaction()
+                            .map(spec -> new TopicCompactionFormatSpec(
+                                    spec.strategyId(), spec.strategyVersion(), spec.keyCodecId())));
         }
 
-        private CompletableFuture<HeadObjectResult> upload(CompactedObjectWriteResult result) {
+        private RangedCompactedObjectWriteRequest rangedWriteRequest(TaskFacts facts) {
+            if (facts.payloadFormat() != PayloadFormat.KAFKA_RECORD_BATCH) {
+                throw execution(
+                        TaskFailureClass.UNSUPPORTED_MAPPING,
+                        ErrorCode.UNSUPPORTED_FORMAT,
+                        false,
+                        "NCP2 lossless materialization requires Kafka record batches",
+                        null);
+            }
+            return new RangedCompactedObjectWriteRequest(
+                    cluster,
+                    task.streamId(),
+                    task.coverage(),
+                    claimed.value().workerClaim().orElseThrow().claimId(),
+                    task.sourceSetSha256(),
+                    task.policyDigestSha256(),
+                    facts.payloadFormat(),
+                    CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT,
+                    task.coverage().recordCount(),
+                    facts.entryCount(),
+                    facts.logicalBytes(),
+                    facts.cumulativeSizeAtEnd(),
+                    task.policy().targetRowGroupRecords(),
+                    task.policy().compression(),
+                    writerBuild);
+        }
+
+        private CompletableFuture<HeadObjectResult> upload(WrittenObject result) {
             PutObjectOptions options = new PutObjectOptions(
                     "application/vnd.apache.parquet",
                     result.storageCrc32c(),
@@ -792,13 +974,10 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     deadline.remaining());
             return deadline.bound(
                             () -> objectStore.putObject(
-                                    result.objectKey(),
-                                    result.stagingFile(),
-                                    options,
-                                    (key, attempt) -> {
+                                    result.objectKey(), result.stagingFile(), options, (key, attempt) -> {
                                         if (!key.equals(result.objectKey()) || attempt <= 0) {
-                                            return CompletableFuture.failedFuture(invariant(
-                                                    "guarded compacted upload identity is invalid", null));
+                                            return CompletableFuture.failedFuture(
+                                                    invariant("guarded compacted upload identity is invalid", null));
                                         }
                                         return revalidateClaim(claimed);
                                     }),
@@ -812,11 +991,10 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     .thenCompose(value -> value);
         }
 
-        private CompletableFuture<HeadObjectResult> head(CompactedObjectWriteResult result) {
+        private CompletableFuture<HeadObjectResult> head(WrittenObject result) {
             return deadline.bound(
                             () -> objectStore.headObject(
-                                    result.objectKey(),
-                                    new HeadObjectOptions(deadline.remaining())),
+                                    result.objectKey(), new HeadObjectOptions(deadline.remaining())),
                             "HEAD compacted Parquet output")
                     .thenApply(head -> {
                         if (!head.key().equals(result.objectKey())
@@ -833,17 +1011,14 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     });
         }
 
-        private MaterializationOutput output(
-                TaskFacts facts,
-                CompactedObjectWriteResult result,
-                HeadObjectResult head) {
+        private MaterializationOutput output(TaskFacts facts, WrittenObject result, HeadObjectResult head) {
             ObjectSliceReadTarget target = new ObjectSliceReadTarget(
                     1,
                     result.objectId(),
                     result.objectKey(),
                     ObjectType.STREAM_COMPACTED_OBJECT,
                     result.physicalFormat(),
-                    facts.payloadFormat().name(),
+                    result.logicalFormat(),
                     task.taskId(),
                     0,
                     result.objectLength(),
@@ -866,13 +1041,13 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     result.contentSha256(),
                     head.etag().orElse(""),
                     result.physicalFormat(),
-                    facts.payloadFormat().name(),
+                    result.logicalFormat(),
                     target,
                     targetIdentity,
                     result.entryIndexRef(),
                     Math.toIntExact(task.coverage().recordCount()),
-                    result.outputRecordCount(),
-                    facts.entryCount(),
+                    Math.toIntExact(result.outputRecordCount()),
+                    result.outputEntryCount(),
                     facts.logicalBytes(),
                     facts.schemaRefs(),
                     facts.cumulativeSizeAtStart(),
@@ -907,8 +1082,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         }
 
         private CompletableFuture<MaterializationOutput> freezeOutput(MaterializationOutput output) {
-            var ready = MaterializationRecordMapper.outputReady(
-                    claimed.value(), output, clock.millis());
+            var ready = MaterializationRecordMapper.outputReady(claimed.value(), output, clock.millis());
             return deadline.bound(
                             () -> tasks.compareAndSet(ready, claimed.metadataVersion()),
                             "freeze materialization OUTPUT_READY")
@@ -918,22 +1092,19 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                         }
                         Throwable original = unwrap(failure);
                         return tasks.get(task.streamId(), task.taskId()).thenCompose(optional -> {
-                            if (optional.isPresent()
-                                    && exactOutputReady(optional.orElseThrow(), output)) {
+                            if (optional.isPresent() && exactOutputReady(optional.orElseThrow(), output)) {
                                 return CompletableFuture.completedFuture(optional.orElseThrow());
                             }
                             return CompletableFuture.failedFuture(original);
                         });
                     })
                     .thenCompose(value -> value)
-                    .thenCompose(outputReady -> transferProtections(outputReady, output, 0)
-                            .thenApply(ignored -> output));
+                    .thenCompose(outputReady ->
+                            transferProtections(outputReady, output, 0).thenApply(ignored -> output));
         }
 
         private CompletableFuture<Void> transferProtections(
-                VersionedMaterializationTask outputReady,
-                MaterializationOutput output,
-                int index) {
+                VersionedMaterializationTask outputReady, MaterializationOutput output, int index) {
             int total = sourceProtections.size() + 1;
             if (index == total) {
                 claimed = outputReady;
@@ -1001,22 +1172,15 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 return CompletableFuture.completedFuture(null);
             }
             CompletableFuture<Void> release = index < sourceProtections.size()
-                    ? sourceProtectionAdapters.release(
-                            sourceProtections.get(index),
-                            exact -> revalidateClaim(claimed))
-                    : protections.release(
-                            outputProtection,
-                            exact -> revalidateClaim(claimed));
-            return release
-                    .thenCompose(ignored -> releaseProtections(index + 1));
+                    ? sourceProtectionAdapters.release(sourceProtections.get(index), exact -> revalidateClaim(claimed))
+                    : protections.release(outputProtection, exact -> revalidateClaim(claimed));
+            return release.thenCompose(ignored -> releaseProtections(index + 1));
         }
 
         private CompletableFuture<Void> persistFailure(Throwable failure) {
             FailureDecision decision = failureDecision(failure, claimed.value().attempt());
             long now = clock.millis();
-            long retryAt = decision.lifecycle() == TaskLifecycle.RETRY_WAIT
-                    ? addTime(now, retryDelayMillis)
-                    : 0;
+            long retryAt = decision.lifecycle() == TaskLifecycle.RETRY_WAIT ? addTime(now, retryDelayMillis) : 0;
             var replacement = MaterializationRecordMapper.failedClaim(
                     claimed.value(),
                     decision.lifecycle(),
@@ -1031,8 +1195,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                         }
                         return tasks.get(task.streamId(), task.taskId()).thenCompose(optional -> {
                             if (optional.isPresent()
-                                    && optional.orElseThrow().value().lifecycle()
-                                            == decision.lifecycle()
+                                    && optional.orElseThrow().value().lifecycle() == decision.lifecycle()
                                     && optional.orElseThrow().value().failureClassId()
                                             == decision.failureClass().wireId()) {
                                 return CompletableFuture.<Void>completedFuture(null);
@@ -1045,8 +1208,8 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
 
         private CompletableFuture<Void> revalidateClaimOwner(ObjectProtectionOwner expected) {
             if (!expected.equals(MaterializationProtectionIdentities.taskOwner(claimed))) {
-                return CompletableFuture.failedFuture(condition(
-                        "materialization protection owner differs from the active claim"));
+                return CompletableFuture.failedFuture(
+                        condition("materialization protection owner differs from the active claim"));
             }
             return revalidateClaim(claimed);
         }
@@ -1103,18 +1266,15 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             if (expected == null
                     || expected.value().lifecycle() != TaskLifecycle.CLAIMED
                     || expected.value().workerClaim().isEmpty()) {
-                return CompletableFuture.failedFuture(condition(
-                        "materialization heartbeat lost its active claim"));
+                return CompletableFuture.failedFuture(condition("materialization heartbeat lost its active claim"));
             }
             long now = clock.millis();
             long priorExpiry = expected.value().workerClaim().orElseThrow().expiresAtMillis();
             long requestedExpiry = addTime(now, claimDurationMillis);
             long expiresAt = Math.max(addTime(priorExpiry, 1), requestedExpiry);
-            var replacement = MaterializationRecordMapper.heartbeat(
-                    expected.value(), expiresAt, now);
+            var replacement = MaterializationRecordMapper.heartbeat(expected.value(), expiresAt, now);
             return deadline.bound(
-                            () -> tasks.compareAndSet(
-                                    replacement, expected.metadataVersion()),
+                            () -> tasks.compareAndSet(replacement, expected.metadataVersion()),
                             "renew materialization worker claim")
                     .thenCompose(updated -> {
                         claimed = updated;
@@ -1122,9 +1282,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     });
         }
 
-        private CompletableFuture<Void> transferHeartbeatProtections(
-                VersionedMaterializationTask updated,
-                int index) {
+        private CompletableFuture<Void> transferHeartbeatProtections(VersionedMaterializationTask updated, int index) {
             if (index == sourceProtections.size()) {
                 return CompletableFuture.completedFuture(null);
             }
@@ -1132,8 +1290,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                             () -> sourceProtectionAdapters.transfer(
                                     sourceProtections.get(index),
                                     MaterializationProtectionIdentities.taskOwner(updated),
-                                    expectedOwner -> revalidateHeartbeatOwner(
-                                            expectedOwner, updated)),
+                                    expectedOwner -> revalidateHeartbeatOwner(expectedOwner, updated)),
                             "transfer source protection to renewed claim")
                     .thenCompose(transferred -> {
                         sourceProtections.set(index, transferred);
@@ -1142,11 +1299,9 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         }
 
         private CompletableFuture<Void> revalidateHeartbeatOwner(
-                ObjectProtectionOwner expectedOwner,
-                VersionedMaterializationTask updated) {
+                ObjectProtectionOwner expectedOwner, VersionedMaterializationTask updated) {
             if (!expectedOwner.equals(MaterializationProtectionIdentities.taskOwner(updated))) {
-                return CompletableFuture.failedFuture(condition(
-                        "renewed source protection owner is inconsistent"));
+                return CompletableFuture.failedFuture(condition("renewed source protection owner is inconsistent"));
             }
             return revalidateClaim(updated);
         }
@@ -1156,19 +1311,19 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 VersionedMaterializationTask outputReady,
                 MaterializationOutput output) {
             if (!expected.equals(MaterializationProtectionIdentities.taskOwner(outputReady))) {
-                return CompletableFuture.failedFuture(condition(
-                        "materialization protection owner differs from OUTPUT_READY task"));
+                return CompletableFuture.failedFuture(
+                        condition("materialization protection owner differs from OUTPUT_READY task"));
             }
             return tasks.get(task.streamId(), task.taskId()).thenAccept(optional -> {
-                if (optional.isEmpty() || !sameVersioned(outputReady, optional.orElseThrow())
+                if (optional.isEmpty()
+                        || !sameVersioned(outputReady, optional.orElseThrow())
                         || !exactOutputReady(optional.orElseThrow(), output)) {
                     throw condition("OUTPUT_READY task changed during protection transfer");
                 }
             });
         }
 
-        private CompletableFuture<Void> revalidateClaim(
-                VersionedMaterializationTask expected) {
+        private CompletableFuture<Void> revalidateClaim(VersionedMaterializationTask expected) {
             return tasks.get(task.streamId(), task.taskId()).thenAccept(optional -> {
                 if (optional.isEmpty()
                         || !sameVersioned(expected, optional.orElseThrow())
@@ -1200,12 +1355,22 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 logicalBytes = Math.addExact(logicalBytes, source.logicalBytes());
                 cumulative = source.cumulativeSizeAtEnd();
             }
-            if (first.projectionRef().isEmpty()) {
+            if (authorityMode == MaterializationStreamAuthorityMode.PROJECTION_REQUIRED
+                    && first.projectionRef().isEmpty()) {
                 throw execution(
                         TaskFailureClass.UNSUPPORTED_MAPPING,
                         ErrorCode.UNSUPPORTED_FORMAT,
                         false,
                         "F4-M3 worker requires a registered projection identity",
+                        null);
+            }
+            if (authorityMode == MaterializationStreamAuthorityMode.DIRECT_STREAM
+                    && first.projectionRef().isPresent()) {
+                throw execution(
+                        TaskFailureClass.UNSUPPORTED_MAPPING,
+                        ErrorCode.UNSUPPORTED_FORMAT,
+                        false,
+                        "direct-stream worker rejects projection-bearing sources",
                         null);
             }
             return new TaskFacts(
@@ -1251,51 +1416,45 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             }
             cleanupLocal();
         }
-
     }
 
-    private static boolean sameVersioned(
-            VersionedMaterializationTask left,
-            VersionedMaterializationTask right) {
+    private static boolean sameVersioned(VersionedMaterializationTask left, VersionedMaterializationTask right) {
         return left.key().equals(right.key())
                 && left.metadataVersion() == right.metadataVersion()
                 && left.durableValueSha256().equals(right.durableValueSha256())
                 && left.value().equals(right.value());
     }
 
-    private static boolean exactOutputReady(
-            VersionedMaterializationTask durable,
-            MaterializationOutput output) {
+    private static boolean exactOutputReady(VersionedMaterializationTask durable, MaterializationOutput output) {
         return durable.value().lifecycle() == TaskLifecycle.OUTPUT_READY
                 && durable.value().output().isPresent()
-                && durable.value().output().orElseThrow()
-                        .equals(MaterializationRecordMapper.outputRecord(output));
+                && durable.value().output().orElseThrow().equals(MaterializationRecordMapper.outputRecord(output));
     }
 
     private FailureDecision failureDecision(Throwable failure, long attempt) {
         TaskFailureClass failureClass;
-        if (failure instanceof MaterializationExecutionException execution) {
-            failureClass = execution.failureClass();
+        if (failure instanceof MaterializationFailure materialization) {
+            failureClass = Objects.requireNonNull(materialization.failureClass(), "materialization failure class");
+            if (failureClass == TaskFailureClass.NONE) {
+                failureClass = TaskFailureClass.OUTPUT_INVARIANT;
+            }
         } else if (failure instanceof NereusException nereus) {
             failureClass = switch (nereus.code()) {
                 case OBJECT_UPLOAD_FAILED, OBJECT_READ_FAILED, OBJECT_NOT_FOUND, TIMEOUT ->
-                        TaskFailureClass.RETRYABLE_OBJECT_STORE;
-                case METADATA_UNAVAILABLE, METADATA_CONDITION_FAILED ->
-                        TaskFailureClass.RETRYABLE_METADATA;
+                    TaskFailureClass.RETRYABLE_OBJECT_STORE;
+                case METADATA_UNAVAILABLE, METADATA_CONDITION_FAILED -> TaskFailureClass.RETRYABLE_METADATA;
                 case BACKPRESSURE_REJECTED, METADATA_LIMIT_EXCEEDED, READ_LIMIT_TOO_SMALL ->
-                        TaskFailureClass.RETRYABLE_RESOURCE_LIMIT;
-                case OBJECT_CHECKSUM_MISMATCH, PRIMARY_WAL_CHECKSUM_MISMATCH ->
-                        TaskFailureClass.CORRUPT_SOURCE;
+                    TaskFailureClass.RETRYABLE_RESOURCE_LIMIT;
+                case OBJECT_CHECKSUM_MISMATCH, PRIMARY_WAL_CHECKSUM_MISMATCH -> TaskFailureClass.CORRUPT_SOURCE;
                 case UNSUPPORTED_FORMAT, UNSUPPORTED_READ_TARGET, UNSUPPORTED_STORAGE_PROFILE ->
-                        TaskFailureClass.UNSUPPORTED_MAPPING;
+                    TaskFailureClass.UNSUPPORTED_MAPPING;
                 default -> TaskFailureClass.OUTPUT_INVARIANT;
             };
         } else {
             failureClass = TaskFailureClass.OUTPUT_INVARIANT;
         }
         TaskLifecycle lifecycle;
-        if (failureClass == TaskFailureClass.SOURCE_CHANGED
-                || failureClass == TaskFailureClass.SOURCE_RETIRED) {
+        if (failureClass == TaskFailureClass.SOURCE_CHANGED || failureClass == TaskFailureClass.SOURCE_RETIRED) {
             lifecycle = TaskLifecycle.CANCELLED;
         } else if (failureClass == TaskFailureClass.UNSUPPORTED_MAPPING
                 || failureClass == TaskFailureClass.OUTPUT_INVARIANT
@@ -1365,31 +1524,96 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
     }
 
     private static NereusException invariant(String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static MaterializationExecutionException execution(
-            TaskFailureClass failureClass,
-            ErrorCode code,
-            boolean retriable,
-            String message,
-            Throwable cause) {
-        return new MaterializationExecutionException(
-                failureClass, code, retriable, message, cause);
+            TaskFailureClass failureClass, ErrorCode code, boolean retriable, String message, Throwable cause) {
+        return new MaterializationExecutionException(failureClass, code, retriable, message, cause);
     }
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while ((current instanceof CompletionException
-                        || current instanceof java.util.concurrent.ExecutionException)
+        while ((current instanceof CompletionException || current instanceof java.util.concurrent.ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
         return current;
     }
 
-    private record Admission(Checksum projectionIdentitySha256) { }
+    private record Admission(Checksum projectionIdentitySha256) {}
+
+    private record WrittenObject(
+            StagedObjectFile stagingFile,
+            ObjectId objectId,
+            ObjectKey objectKey,
+            ObjectKeyHash objectKeyHash,
+            long objectLength,
+            Checksum storageCrc32c,
+            Checksum contentSha256,
+            String physicalFormat,
+            String logicalFormat,
+            EntryIndexRef entryIndexRef,
+            int outputEntryCount,
+            long outputRecordCount,
+            Runnable closeAction) {
+        private WrittenObject {
+            Objects.requireNonNull(stagingFile, "stagingFile");
+            Objects.requireNonNull(objectId, "objectId");
+            Objects.requireNonNull(objectKey, "objectKey");
+            Objects.requireNonNull(objectKeyHash, "objectKeyHash");
+            Objects.requireNonNull(storageCrc32c, "storageCrc32c");
+            Objects.requireNonNull(contentSha256, "contentSha256");
+            physicalFormat = requireText(physicalFormat, "physicalFormat");
+            logicalFormat = requireText(logicalFormat, "logicalFormat");
+            Objects.requireNonNull(entryIndexRef, "entryIndexRef");
+            Objects.requireNonNull(closeAction, "closeAction");
+            if (objectLength <= 0 || outputEntryCount < 0 || outputRecordCount < 0) {
+                throw new IllegalArgumentException("written materialization output accounting is invalid");
+            }
+        }
+
+        private static WrittenObject from(
+                CompactedObjectWriteResult result, String logicalFormat, int outputEntryCount) {
+            Objects.requireNonNull(result, "result");
+            return new WrittenObject(
+                    result.stagingFile(),
+                    result.objectId(),
+                    result.objectKey(),
+                    result.objectKeyHash(),
+                    result.objectLength(),
+                    result.storageCrc32c(),
+                    result.contentSha256(),
+                    result.physicalFormat(),
+                    logicalFormat,
+                    result.entryIndexRef(),
+                    outputEntryCount,
+                    result.outputRecordCount(),
+                    result::close);
+        }
+
+        private static WrittenObject from(RangedCompactedObjectWriteResult result, String logicalFormat) {
+            Objects.requireNonNull(result, "result");
+            return new WrittenObject(
+                    result.stagingFile(),
+                    result.objectId(),
+                    result.objectKey(),
+                    result.objectKeyHash(),
+                    result.objectLength(),
+                    result.storageCrc32c(),
+                    result.contentSha256(),
+                    result.physicalFormat(),
+                    logicalFormat,
+                    result.entryIndexRef(),
+                    result.outputEntryCount(),
+                    result.outputRecordCount(),
+                    result::close);
+        }
+
+        private void close() {
+            closeAction.run();
+        }
+    }
 
     private record TaskFacts(
             PayloadFormat payloadFormat,
@@ -1404,13 +1628,9 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         }
     }
 
-    private record FailureDecision(
-            TaskLifecycle lifecycle,
-            TaskFailureClass failureClass) { }
+    private record FailureDecision(TaskLifecycle lifecycle, TaskFailureClass failureClass) {}
 
-    private record TopicSupport(
-            Optional<TopicCompactionEngine> engine,
-            TopicCompactionRegistry registry) {
+    private record TopicSupport(Optional<TopicCompactionEngine> engine, TopicCompactionRegistry registry) {
         private TopicSupport {
             engine = Objects.requireNonNull(engine, "engine");
             registry = Objects.requireNonNull(registry, "registry");
@@ -1420,9 +1640,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             return new TopicSupport(Optional.empty(), TopicCompactionRegistry.empty());
         }
 
-        private static TopicSupport enabled(
-                TopicCompactionEngine engine,
-                TopicCompactionRegistry registry) {
+        private static TopicSupport enabled(TopicCompactionEngine engine, TopicCompactionRegistry registry) {
             return new TopicSupport(
                     Optional.of(Objects.requireNonNull(engine, "engine")),
                     Objects.requireNonNull(registry, "registry"));

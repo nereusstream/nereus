@@ -24,10 +24,7 @@ public interface ObjectStore extends AutoCloseable {
      * Stores one object. When {@link PutObjectOptions#ifAbsent()} is true and the key already
      * exists, the future fails with {@link ObjectAlreadyExistsException}.
      */
-    default CompletableFuture<PutObjectResult> putObject(
-            ObjectKey key,
-            ByteBuffer payload,
-            PutObjectOptions options) {
+    default CompletableFuture<PutObjectResult> putObject(ObjectKey key, ByteBuffer payload, PutObjectOptions options) {
         ByteBufferObjectUpload source = new ByteBufferObjectUpload(payload);
         CompletableFuture<PutObjectResult> result;
         try {
@@ -41,9 +38,7 @@ public interface ObjectStore extends AutoCloseable {
     }
 
     default CompletableFuture<PutObjectResult> putObject(
-            ObjectKey key,
-            ReplayableObjectUpload source,
-            PutObjectOptions options) {
+            ObjectKey key, ReplayableObjectUpload source, PutObjectOptions options) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException(
                 "this ObjectStore implementation does not support replayable uploads"));
     }
@@ -56,29 +51,19 @@ public interface ObjectStore extends AutoCloseable {
         return attemptGuard.authorize(key, 1).thenCompose(ignored -> putObject(key, source, options));
     }
 
-    CompletableFuture<RangeReadResult> readRange(
-            ObjectKey key,
-            long offset,
-            long length,
-            RangeReadOptions options);
+    CompletableFuture<RangeReadResult> readRange(ObjectKey key, long offset, long length, RangeReadOptions options);
 
-    CompletableFuture<HeadObjectResult> headObject(
-            ObjectKey key,
-            HeadObjectOptions options);
+    CompletableFuture<HeadObjectResult> headObject(ObjectKey key, HeadObjectOptions options);
 
     default CompletableFuture<ListObjectsResult> listObjects(
-            ObjectKeyPrefix prefix,
-            Optional<String> continuationToken,
-            ListObjectsOptions options) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException(
-                "this ObjectStore implementation does not support object listing"));
+            ObjectKeyPrefix prefix, Optional<String> continuationToken, ListObjectsOptions options) {
+        return CompletableFuture.failedFuture(
+                new UnsupportedOperationException("this ObjectStore implementation does not support object listing"));
     }
 
-    default CompletableFuture<DeleteObjectResult> deleteObject(
-            ObjectKey key,
-            DeleteObjectOptions options) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException(
-                "this ObjectStore implementation does not support object deletion"));
+    default CompletableFuture<DeleteObjectResult> deleteObject(ObjectKey key, DeleteObjectOptions options) {
+        return CompletableFuture.failedFuture(
+                new UnsupportedOperationException("this ObjectStore implementation does not support object deletion"));
     }
 
     @Override

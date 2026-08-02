@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import com.nereusstream.api.ObjectKey;
@@ -6,11 +7,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
-public record ListedObject(
-        ObjectKey key,
-        long objectLength,
-        Optional<String> etag,
-        Optional<Instant> lastModified) {
+public record ListedObject(ObjectKey key, long objectLength, Optional<String> etag, Optional<Instant> lastModified) {
     public ListedObject {
         Objects.requireNonNull(key, "key");
         if (objectLength < 0) {

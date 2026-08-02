@@ -15,7 +15,6 @@
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
@@ -23,33 +22,13 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class StreamMetadataSnapshotTest {
-    private static final String STREAM_ID =
-            "0123456789abcdef0123456789abcdef";
+    private static final String STREAM_ID = "0123456789abcdef0123456789abcdef";
 
     @Test
     void versionedAuthorityIgnoresHydratedTrimObservationFields() {
-        StreamMetadataSnapshot first = snapshot(
-                "ACTIVE",
-                "OBJECT_WAL_SYNC_OBJECT",
-                3,
-                10,
-                100,
-                1,
-                0,
-                7,
-                "trim-response",
-                100);
-        StreamMetadataSnapshot reread = snapshot(
-                "ACTIVE",
-                "OBJECT_WAL_SYNC_OBJECT",
-                3,
-                10,
-                100,
-                1,
-                0,
-                7,
-                "",
-                999);
+        StreamMetadataSnapshot first =
+                snapshot("ACTIVE", "OBJECT_WAL_SYNC_OBJECT", 3, 10, 100, 1, 0, 7, "trim-response", 100);
+        StreamMetadataSnapshot reread = snapshot("ACTIVE", "OBJECT_WAL_SYNC_OBJECT", 3, 10, 100, 1, 0, 7, "", 999);
 
         assertThat(first).isNotEqualTo(reread);
         assertThat(first.sameVersionedAuthority(reread)).isTrue();
@@ -58,90 +37,26 @@ class StreamMetadataSnapshotTest {
 
     @Test
     void semanticAuthorityIgnoresOnlyVersionAndObservationDrift() {
-        StreamMetadataSnapshot expected = snapshot(
-                "ACTIVE",
-                "OBJECT_WAL_SYNC_OBJECT",
-                3,
-                10,
-                100,
-                1,
-                0,
-                7,
-                "",
-                100);
-        StreamMetadataSnapshot renewed = snapshot(
-                "ACTIVE",
-                "OBJECT_WAL_SYNC_OBJECT",
-                3,
-                10,
-                100,
-                1,
-                0,
-                8,
-                "another-observation",
-                200);
+        StreamMetadataSnapshot expected = snapshot("ACTIVE", "OBJECT_WAL_SYNC_OBJECT", 3, 10, 100, 1, 0, 7, "", 100);
+        StreamMetadataSnapshot renewed =
+                snapshot("ACTIVE", "OBJECT_WAL_SYNC_OBJECT", 3, 10, 100, 1, 0, 8, "another-observation", 200);
 
         assertThat(expected.sameSemanticAuthority(renewed)).isTrue();
         assertThat(expected.sameVersionedAuthority(renewed)).isFalse();
-        assertThat(expected.sameSemanticAuthority(snapshot(
-                        "SEALED",
-                        "OBJECT_WAL_SYNC_OBJECT",
-                        3,
-                        10,
-                        100,
-                        1,
-                        0,
-                        8,
-                        "",
-                        200)))
+        assertThat(expected.sameSemanticAuthority(
+                        snapshot("SEALED", "OBJECT_WAL_SYNC_OBJECT", 3, 10, 100, 1, 0, 8, "", 200)))
                 .isFalse();
-        assertThat(expected.sameSemanticAuthority(snapshot(
-                        "ACTIVE",
-                        "OBJECT_WAL_ASYNC_OBJECT",
-                        3,
-                        10,
-                        100,
-                        1,
-                        0,
-                        8,
-                        "",
-                        200)))
+        assertThat(expected.sameSemanticAuthority(
+                        snapshot("ACTIVE", "OBJECT_WAL_ASYNC_OBJECT", 3, 10, 100, 1, 0, 8, "", 200)))
                 .isFalse();
-        assertThat(expected.sameSemanticAuthority(snapshot(
-                        "ACTIVE",
-                        "OBJECT_WAL_SYNC_OBJECT",
-                        4,
-                        10,
-                        100,
-                        1,
-                        0,
-                        8,
-                        "",
-                        200)))
+        assertThat(expected.sameSemanticAuthority(
+                        snapshot("ACTIVE", "OBJECT_WAL_SYNC_OBJECT", 4, 10, 100, 1, 0, 8, "", 200)))
                 .isFalse();
-        assertThat(expected.sameSemanticAuthority(snapshot(
-                        "ACTIVE",
-                        "OBJECT_WAL_SYNC_OBJECT",
-                        3,
-                        11,
-                        110,
-                        2,
-                        0,
-                        8,
-                        "",
-                        200)))
+        assertThat(expected.sameSemanticAuthority(
+                        snapshot("ACTIVE", "OBJECT_WAL_SYNC_OBJECT", 3, 11, 110, 2, 0, 8, "", 200)))
                 .isFalse();
-        assertThat(expected.sameSemanticAuthority(snapshot(
-                        "ACTIVE",
-                        "OBJECT_WAL_SYNC_OBJECT",
-                        3,
-                        10,
-                        100,
-                        1,
-                        1,
-                        8,
-                        "",
-                        200)))
+        assertThat(expected.sameSemanticAuthority(
+                        snapshot("ACTIVE", "OBJECT_WAL_SYNC_OBJECT", 3, 10, 100, 1, 1, 8, "", 200)))
                 .isFalse();
         assertThat(expected.sameSemanticAuthority(null)).isFalse();
         assertThat(expected.sameVersionedAuthority(null)).isFalse();
@@ -170,16 +85,7 @@ class StreamMetadataSnapshotTest {
                         policyVersion,
                         metadataVersion),
                 new CommittedEndOffsetRecord(
-                        STREAM_ID,
-                        committedEndOffset,
-                        cumulativeSize,
-                        commitVersion,
-                        metadataVersion),
-                new TrimRecord(
-                        STREAM_ID,
-                        trimOffset,
-                        trimReason,
-                        observedAtMillis,
-                        metadataVersion));
+                        STREAM_ID, committedEndOffset, cumulativeSize, commitVersion, metadataVersion),
+                new TrimRecord(STREAM_ID, trimOffset, trimReason, observedAtMillis, metadataVersion));
     }
 }

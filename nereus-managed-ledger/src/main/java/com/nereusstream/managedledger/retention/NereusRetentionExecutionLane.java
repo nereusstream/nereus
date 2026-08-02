@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.retention;
 
 import com.nereusstream.api.ErrorCode;
@@ -21,17 +22,16 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
-/** Shared bounded lane that coalesces one active logical-retention plan per stream. */
+/**
+ * Shared bounded lane that coalesces one active logical-retention plan per stream.
+ */
 public final class NereusRetentionExecutionLane implements AutoCloseable {
     private final NereusRetentionConfig config;
     private final ThreadPoolExecutor executor;
-    private final ConcurrentMap<StreamId, PlanTask> flights =
-            new ConcurrentHashMap<>();
+    private final ConcurrentMap<StreamId, PlanTask> flights = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
-    public NereusRetentionExecutionLane(
-            NereusRetentionConfig config,
-            ThreadFactory threadFactory) {
+    public NereusRetentionExecutionLane(NereusRetentionConfig config, ThreadFactory threadFactory) {
         this.config = Objects.requireNonNull(config, "config");
         this.executor = new ThreadPoolExecutor(
                 config.maxConcurrentPlans(),
@@ -47,8 +47,7 @@ public final class NereusRetentionExecutionLane implements AutoCloseable {
      * Returns an independent completion for the caller while sharing one admitted execution for duplicate streams.
      */
     public CompletableFuture<Optional<RetentionCandidate>> submit(
-            StreamId streamId,
-            Supplier<CompletableFuture<Optional<RetentionCandidate>>> operation) {
+            StreamId streamId, Supplier<CompletableFuture<Optional<RetentionCandidate>>> operation) {
         StreamId exactStream = Objects.requireNonNull(streamId, "streamId");
         Supplier<CompletableFuture<Optional<RetentionCandidate>>> exactOperation =
                 Objects.requireNonNull(operation, "operation");
@@ -67,19 +66,19 @@ public final class NereusRetentionExecutionLane implements AutoCloseable {
             }
             try {
                 if (closed.get()) {
-                    throw new RejectedExecutionException(
-                            "logical-retention lane is closing");
+                    throw new RejectedExecutionException("logical-retention lane is closing");
                 }
                 executor.execute(created);
             } catch (RejectedExecutionException failure) {
                 flights.remove(exactStream, created);
-                created.reject(closed.get()
-                        ? closedFailure()
-                        : new NereusException(
-                                ErrorCode.BACKPRESSURE_REJECTED,
-                                true,
-                                "logical-retention plan queue is full",
-                                failure));
+                created.reject(
+                        closed.get()
+                                ? closedFailure()
+                                : new NereusException(
+                                        ErrorCode.BACKPRESSURE_REJECTED,
+                                        true,
+                                        "logical-retention plan queue is full",
+                                        failure));
             }
             return mirror(created.result());
         }
@@ -93,25 +92,18 @@ public final class NereusRetentionExecutionLane implements AutoCloseable {
         executor.shutdown();
         final boolean terminated;
         try {
-            terminated = executor.awaitTermination(
-                    config.closeTimeout().toNanos(),
-                    TimeUnit.NANOSECONDS);
+            terminated = executor.awaitTermination(config.closeTimeout().toNanos(), TimeUnit.NANOSECONDS);
         } catch (ArithmeticException failure) {
             forceClose();
-            throw new IllegalStateException(
-                    "logical-retention close timeout is not nanosecond-representable",
-                    failure);
+            throw new IllegalStateException("logical-retention close timeout is not nanosecond-representable", failure);
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             forceClose();
-            throw new IllegalStateException(
-                    "interrupted while closing logical-retention lane",
-                    failure);
+            throw new IllegalStateException("interrupted while closing logical-retention lane", failure);
         }
         if (!terminated) {
             forceClose();
-            throw new IllegalStateException(
-                    "logical-retention lane close deadline expired");
+            throw new IllegalStateException("logical-retention lane close deadline expired");
         }
     }
 
@@ -128,8 +120,7 @@ public final class NereusRetentionExecutionLane implements AutoCloseable {
 
     private static CompletableFuture<Optional<RetentionCandidate>> mirror(
             CompletableFuture<Optional<RetentionCandidate>> source) {
-        CompletableFuture<Optional<RetentionCandidate>> result =
-                new CompletableFuture<>();
+        CompletableFuture<Optional<RetentionCandidate>> result = new CompletableFuture<>();
         source.whenComplete((value, failure) -> {
             if (failure == null) {
                 result.complete(value);
@@ -145,24 +136,16 @@ public final class NereusRetentionExecutionLane implements AutoCloseable {
     }
 
     private static NereusException closedFailure() {
-        return new NereusException(
-                ErrorCode.STORAGE_CLOSED,
-                false,
-                "logical-retention lane is closed");
+        return new NereusException(ErrorCode.STORAGE_CLOSED, false, "logical-retention lane is closed");
     }
 
     private final class PlanTask implements Runnable {
         private final StreamId streamId;
-        private final Supplier<CompletableFuture<Optional<RetentionCandidate>>>
-                operation;
-        private final CompletableFuture<Optional<RetentionCandidate>> result =
-                new CompletableFuture<>();
+        private final Supplier<CompletableFuture<Optional<RetentionCandidate>>> operation;
+        private final CompletableFuture<Optional<RetentionCandidate>> result = new CompletableFuture<>();
         private volatile CompletableFuture<Optional<RetentionCandidate>> source;
 
-        private PlanTask(
-                StreamId streamId,
-                Supplier<CompletableFuture<Optional<RetentionCandidate>>>
-                        operation) {
+        private PlanTask(StreamId streamId, Supplier<CompletableFuture<Optional<RetentionCandidate>>> operation) {
             this.streamId = streamId;
             this.operation = operation;
         }
@@ -174,41 +157,30 @@ public final class NereusRetentionExecutionLane implements AutoCloseable {
         @Override
         public void run() {
             try {
-                source = Objects.requireNonNull(
-                        operation.get(),
-                        "logical-retention operation returned null future");
-                Optional<RetentionCandidate> value = source.get(
-                        config.operationTimeout().toMillis(),
-                        TimeUnit.MILLISECONDS);
-                result.complete(Objects.requireNonNull(
-                        value,
-                        "logical-retention operation returned null result"));
+                source = Objects.requireNonNull(operation.get(), "logical-retention operation returned null future");
+                Optional<RetentionCandidate> value =
+                        source.get(config.operationTimeout().toMillis(), TimeUnit.MILLISECONDS);
+                result.complete(Objects.requireNonNull(value, "logical-retention operation returned null result"));
             } catch (TimeoutException failure) {
                 cancelSource();
                 result.completeExceptionally(new NereusException(
-                        ErrorCode.TIMEOUT,
-                        true,
-                        "logical-retention operation deadline expired",
-                        failure));
+                        ErrorCode.TIMEOUT, true, "logical-retention operation deadline expired", failure));
             } catch (InterruptedException failure) {
                 Thread.currentThread().interrupt();
                 cancelSource();
-                result.completeExceptionally(closed.get()
-                        ? closedFailure()
-                        : new NereusException(
-                                ErrorCode.CANCELLED,
-                                true,
-                                "logical-retention execution was interrupted",
-                                failure));
-            } catch (ExecutionException failure) {
                 result.completeExceptionally(
-                        failure.getCause() == null ? failure : failure.getCause());
+                        closed.get()
+                                ? closedFailure()
+                                : new NereusException(
+                                        ErrorCode.CANCELLED,
+                                        true,
+                                        "logical-retention execution was interrupted",
+                                        failure));
+            } catch (ExecutionException failure) {
+                result.completeExceptionally(failure.getCause() == null ? failure : failure.getCause());
             } catch (CancellationException failure) {
                 result.completeExceptionally(new NereusException(
-                        ErrorCode.CANCELLED,
-                        true,
-                        "logical-retention operation was cancelled",
-                        failure));
+                        ErrorCode.CANCELLED, true, "logical-retention operation was cancelled", failure));
             } catch (Throwable failure) {
                 result.completeExceptionally(failure);
             } finally {

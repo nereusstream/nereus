@@ -1,6 +1,10 @@
 [versions]
 # Keep Java aligned with the current Pulsar source-build baseline.
 java = "21"
+# Code quality versions track the locked Pulsar fork where applicable.
+checkstyle = "13.3.0"
+palantir-java-format = "2.80.0"
+spotless = "8.4.0"
 # Source-composite selector only. This version is declared by the locked fork checkout but is not resolved from a
 # Maven snapshot repository; settings.gradle.kts fails source-bound tasks when the checkout is absent.
 pulsar = "5.0.0-M1-SNAPSHOT"
@@ -20,6 +24,8 @@ parquet = "1.15.2"
 hadoop = "3.4.1"
 zstd-jni = "1.5.7-3"
 bookkeeper = "4.18.0"
+# Test-only Kafka oracle aligned with the locked AutoMQ 3.9.0 reference baseline.
+kafka = "3.9.0"
 
 [libraries]
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
@@ -43,6 +49,7 @@ oxia-client = { module = "io.github.oxia-db:oxia-client", version.ref = "oxia" }
 oxia-testcontainers = { module = "io.github.oxia-db:oxia-testcontainers", version.ref = "oxia-testcontainers" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
 testcontainers-localstack = { module = "org.testcontainers:localstack", version.ref = "testcontainers" }
+testcontainers-toxiproxy = { module = "org.testcontainers:toxiproxy", version.ref = "testcontainers" }
 aws-sdk-v2-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk-v2" }
 aws-sdk-v2-s3 = { module = "software.amazon.awssdk:s3" }
 aws-sdk-v2-netty-client = { module = "software.amazon.awssdk:netty-nio-client" }
@@ -53,5 +60,7 @@ hadoop-common = { module = "org.apache.hadoop:hadoop-common", version.ref = "had
 hadoop-mapreduce-client-core = { module = "org.apache.hadoop:hadoop-mapreduce-client-core", version.ref = "hadoop" }
 zstd-jni = { module = "com.github.luben:zstd-jni", version.ref = "zstd-jni" }
 bookkeeper-server = { module = "org.apache.bookkeeper:bookkeeper-server", version.ref = "bookkeeper" }
+kafka-clients = { module = "org.apache.kafka:kafka-clients", version.ref = "kafka" }
 
 [plugins]
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

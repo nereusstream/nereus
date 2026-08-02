@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.testing;
 
 import com.nereusstream.api.StreamId;
@@ -22,46 +23,49 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletionException;
 
-/** Store-independent F3 metadata operation sequence shared by fake and real Oxia gates. */
+/**
+ * Store-independent F3 metadata operation sequence shared by fake and real Oxia gates.
+ */
 public final class CursorMetadataStoreContractScenario {
     private static final String OWNER = "00112233445566778899aabbccddeeff";
     private static final String ATTEMPT = "102132435465768798a9bacbdcedfe0f";
 
-    private CursorMetadataStoreContractScenario() {
-    }
+    private CursorMetadataStoreContractScenario() {}
 
-    public static Result run(
-            CursorMetadataStore store, String cluster, String managedLedgerName) {
+    public static Result run(CursorMetadataStore store, String cluster, String managedLedgerName) {
         ManagedLedgerProjectionIdentity projection = projection(managedLedgerName);
         StreamId streamId = new StreamId(projection.streamId());
         CursorStateRecord first = cursor(projection, "sub-a", 1);
         VersionedCursorState created = store.createCursor(cluster, first).join();
-        Class<? extends Throwable> duplicateCreateFailure = conditionFailure(
-                () -> store.createCursor(cluster, first).join());
+        Class<? extends Throwable> duplicateCreateFailure =
+                conditionFailure(() -> store.createCursor(cluster, first).join());
 
         CursorStateRecord updated = cursor(projection, "sub-a", 2);
-        VersionedCursorState replaced = store.compareAndSetCursor(
-                cluster, updated, created.metadataVersion()).join();
+        VersionedCursorState replaced = store.compareAndSetCursor(cluster, updated, created.metadataVersion())
+                .join();
         Class<? extends Throwable> staleCursorFailure = conditionFailure(
-                () -> store.compareAndSetCursor(cluster, cursor(projection, "sub-a", 3),
-                        created.metadataVersion()).join());
+                () -> store.compareAndSetCursor(cluster, cursor(projection, "sub-a", 3), created.metadataVersion())
+                        .join());
 
         CursorRetentionRecord initialRetention = retention(projection, 1, 0);
-        VersionedCursorRetention createdRetention = store.createRetention(
-                cluster, initialRetention).join();
+        VersionedCursorRetention createdRetention =
+                store.createRetention(cluster, initialRetention).join();
         CursorRetentionRecord updatedRetention = retention(projection, 2, 1);
         VersionedCursorRetention replacedRetention = store.compareAndSetRetention(
-                cluster, updatedRetention, createdRetention.metadataVersion()).join();
-        Class<? extends Throwable> staleRetentionFailure = conditionFailure(
-                () -> store.compareAndSetRetention(
-                        cluster, retention(projection, 3, 2), createdRetention.metadataVersion()).join());
+                        cluster, updatedRetention, createdRetention.metadataVersion())
+                .join();
+        Class<? extends Throwable> staleRetentionFailure = conditionFailure(() -> store.compareAndSetRetention(
+                        cluster, retention(projection, 3, 2), createdRetention.metadataVersion())
+                .join());
 
         store.createCursor(cluster, cursor(projection, "sub-b", 1)).join();
         List<CursorStateRecord> scanned = new ArrayList<>();
         Optional<CursorScanToken> continuation = Optional.empty();
         do {
-            CursorScanPage page = store.scanCursors(cluster, streamId, continuation, 1).join();
-            scanned.addAll(page.records().stream().map(VersionedCursorState::value).toList());
+            CursorScanPage page =
+                    store.scanCursors(cluster, streamId, continuation, 1).join();
+            scanned.addAll(
+                    page.records().stream().map(VersionedCursorState::value).toList());
             continuation = page.continuation();
         } while (continuation.isPresent());
 
@@ -94,8 +98,7 @@ public final class CursorMetadataStoreContractScenario {
                 ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID + 9);
     }
 
-    public static CursorStateRecord cursor(
-            ManagedLedgerProjectionIdentity projection, String name, long sequence) {
+    public static CursorStateRecord cursor(ManagedLedgerProjectionIdentity projection, String name, long sequence) {
         return new CursorStateRecord(
                 0,
                 projection,

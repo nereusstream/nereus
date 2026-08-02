@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.core.physical.ObjectProtection;
@@ -6,7 +7,9 @@ import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import java.util.Objects;
 
-/** Uploaded snapshot plus its exact current-root-owned pending physical protection. */
+/**
+ * Uploaded snapshot plus its exact current-root-owned pending physical protection.
+ */
 public record CursorSnapshotPublication(
         CursorSnapshotWriteRequest request,
         CursorSnapshotWriteAuthority authority,
@@ -23,13 +26,10 @@ public record CursorSnapshotPublication(
         if (!reference.objectKey().equals(object.objectKey())
                 || !reference.storageChecksum().equals(object.storageChecksum())
                 || reference.objectLength() != object.objectLength()
-                || pendingProtection.identity().type()
-                        != ObjectProtectionType.CURSOR_SNAPSHOT_PENDING
+                || pendingProtection.identity().type() != ObjectProtectionType.CURSOR_SNAPSHOT_PENDING
                 || !pendingProtection.object().equals(object)
-                || !pendingProtection.identity().referenceId().equals(
-                        reference.snapshotId())) {
-            throw new IllegalArgumentException(
-                    "cursor snapshot publication facts are inconsistent");
+                || !pendingProtection.identity().referenceId().equals(reference.snapshotId())) {
+            throw new IllegalArgumentException("cursor snapshot publication facts are inconsistent");
         }
     }
 }

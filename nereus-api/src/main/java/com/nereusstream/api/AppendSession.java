@@ -16,14 +16,11 @@ package com.nereusstream.api;
 
 import java.util.Objects;
 
-/** Fencing information for appends to one stream. */
+/**
+ * Fencing information for appends to one stream.
+ */
 public record AppendSession(
-        StreamId streamId,
-        String writerId,
-        long epoch,
-        String fencingToken,
-        long leaseVersion,
-        long expiresAtMillis) {
+        StreamId streamId, String writerId, long epoch, String fencingToken, long leaseVersion, long expiresAtMillis) {
     public AppendSession {
         Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(writerId, "writerId");

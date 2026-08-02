@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.StreamId;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +23,8 @@ class BookKeeperKeyspaceTest {
 
         String protection = keys.protectionKey(SCOPE, 123, 9, 7);
         assertThat(keys.parseProtectionKey(protection, SCOPE, 123))
-                .extracting(BookKeeperKeyspace.ProtectionKeyIdentity::rangeSlot,
+                .extracting(
+                        BookKeeperKeyspace.ProtectionKeyIdentity::rangeSlot,
                         BookKeeperKeyspace.ProtectionKeyIdentity::protectionSlot)
                 .containsExactly(9, 7);
 
@@ -48,10 +49,9 @@ class BookKeeperKeyspaceTest {
         String slot = keys.allocationSlotKey(17);
         assertThatThrownBy(() -> keys.parseAllocationSlotKey(slot.replace("/01/", "/02/")))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> keys.parseRootKey(keys.ledgerRootKey(SCOPE, 123)
-                        .replace("/cluster", "/other"), SCOPE, 123))
+        assertThatThrownBy(() ->
+                        keys.parseRootKey(keys.ledgerRootKey(SCOPE, 123).replace("/cluster", "/other"), SCOPE, 123))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> keys.protectionKey(SCOPE, 123, 100, 0))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> keys.protectionKey(SCOPE, 123, 100, 0)).isInstanceOf(IllegalArgumentException.class);
     }
 }

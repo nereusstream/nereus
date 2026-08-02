@@ -16,7 +16,6 @@ package com.nereusstream.managedledger.entry;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.PayloadFormat;

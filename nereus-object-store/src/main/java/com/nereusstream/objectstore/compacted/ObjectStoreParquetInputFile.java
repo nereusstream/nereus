@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.ErrorCode;
@@ -18,7 +19,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.parquet.io.InputFile;
 import org.apache.parquet.io.SeekableInputStream;
 
-/** Seekable Parquet input backed by bounded exact ObjectStore range reads. */
+/**
+ * Seekable Parquet input backed by bounded exact ObjectStore range reads.
+ */
 final class ObjectStoreParquetInputFile implements InputFile {
     private static final int MAX_SINGLE_RANGE_BYTES = 8 << 20;
 
@@ -29,11 +32,7 @@ final class ObjectStoreParquetInputFile implements InputFile {
     private final ReadBudget budget;
 
     ObjectStoreParquetInputFile(
-            ObjectStore objectStore,
-            ObjectKey objectKey,
-            long length,
-            ReadDeadline deadline,
-            ReadBudget budget) {
+            ObjectStore objectStore, ObjectKey objectKey, long length, ReadDeadline deadline, ReadBudget budget) {
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
         this.objectKey = Objects.requireNonNull(objectKey, "objectKey");
         if (length <= 0) {
@@ -94,9 +93,8 @@ final class ObjectStoreParquetInputFile implements InputFile {
             if (position == length) {
                 return -1;
             }
-            int count = Math.toIntExact(Math.min(
-                    Math.min((long) requested, length - position),
-                    MAX_SINGLE_RANGE_BYTES));
+            int count =
+                    Math.toIntExact(Math.min(Math.min((long) requested, length - position), MAX_SINGLE_RANGE_BYTES));
             ByteBuffer payload = readRange(position, count);
             payload.get(target, offset, count);
             position += count;
@@ -131,9 +129,8 @@ final class ObjectStoreParquetInputFile implements InputFile {
             if (position == length) {
                 return -1;
             }
-            int count = Math.toIntExact(Math.min(
-                    Math.min((long) target.remaining(), length - position),
-                    MAX_SINGLE_RANGE_BYTES));
+            int count = Math.toIntExact(
+                    Math.min(Math.min((long) target.remaining(), length - position), MAX_SINGLE_RANGE_BYTES));
             target.put(readRange(position, count));
             position += count;
             return count;
@@ -165,18 +162,14 @@ final class ObjectStoreParquetInputFile implements InputFile {
     private ByteBuffer readRange(long offset, int count) throws IOException {
         budget.reserve(count);
         try {
-            RangeReadResult read = objectStore.readRange(
-                            objectKey,
-                            offset,
-                            count,
-                            new RangeReadOptions(Optional.empty(), deadline.remaining()))
+            RangeReadResult read = objectStore
+                    .readRange(objectKey, offset, count, new RangeReadOptions(Optional.empty(), deadline.remaining()))
                     .join();
             if (!read.key().equals(objectKey)
                     || read.offset() != offset
                     || read.length() != count
                     || read.payload().remaining() != count) {
-                throw new CompactedObjectFormatException(
-                        "object store returned a mismatched Parquet range");
+                throw new CompactedObjectFormatException("object store returned a mismatched Parquet range");
             }
             return read.payload().asReadOnlyBuffer();
         } catch (CompletionException failure) {
@@ -240,8 +233,7 @@ final class ObjectStoreParquetInputFile implements InputFile {
         Duration remaining() {
             long value = deadlineNanos - System.nanoTime();
             if (value <= 0) {
-                throw new NereusException(
-                        ErrorCode.TIMEOUT, true, "compacted object read deadline expired");
+                throw new NereusException(ErrorCode.TIMEOUT, true, "compacted object read deadline expired");
             }
             return Duration.ofNanos(value);
         }

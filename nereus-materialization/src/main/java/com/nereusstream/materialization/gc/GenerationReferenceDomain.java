@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ErrorCode;
@@ -27,13 +28,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Exact generation-index reference domain for a query's complete affected-stream set. */
+/**
+ * Exact generation-index reference domain for a query's complete affected-stream set.
+ */
 public final class GenerationReferenceDomain implements GcReferenceDomain {
     public static final String DOMAIN_ID = "generation-v1";
     public static final int PROTOCOL_VERSION = 1;
 
-    private static final List<ReadView> VIEWS = List.of(
-            ReadView.COMMITTED, ReadView.TOPIC_COMPACTED);
+    private static final List<ReadView> VIEWS = List.of(ReadView.COMMITTED, ReadView.TOPIC_COMPACTED);
     private static final ReadTargetCodecRegistry TARGET_CODECS = ReadTargetCodecRegistry.phase15();
 
     private final String cluster;
@@ -41,15 +43,8 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
     private final PhysicalGcConfig config;
     private final GcGlobalReferenceScope globalScope;
 
-    public GenerationReferenceDomain(
-            String cluster,
-            GenerationMetadataStore metadataStore,
-            PhysicalGcConfig config) {
-        this(
-                cluster,
-                metadataStore,
-                config,
-                GcGlobalReferenceScope.unsupported());
+    public GenerationReferenceDomain(String cluster, GenerationMetadataStore metadataStore, PhysicalGcConfig config) {
+        this(cluster, metadataStore, config, GcGlobalReferenceScope.unsupported());
     }
 
     public GenerationReferenceDomain(
@@ -76,23 +71,14 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
     @Override
     public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
         Objects.requireNonNull(query, "query");
-        GcReferenceSnapshotBuilder accumulator = new GcReferenceSnapshotBuilder(
-                DOMAIN_ID, PROTOCOL_VERSION, query, config.referenceDomainConfig());
-        return GcGlobalReferenceScope.resolveStreams(
-                        query, accumulator, globalScope)
-                .thenCompose(streams -> scan(
-                        query,
-                        streams,
-                        accumulator,
-                        0,
-                        0,
-                        Optional.empty(),
-                        null));
+        GcReferenceSnapshotBuilder accumulator =
+                new GcReferenceSnapshotBuilder(DOMAIN_ID, PROTOCOL_VERSION, query, config.referenceDomainConfig());
+        return GcGlobalReferenceScope.resolveStreams(query, accumulator, globalScope)
+                .thenCompose(streams -> scan(query, streams, accumulator, 0, 0, Optional.empty(), null));
     }
 
     @Override
-    public CompletableFuture<Boolean> stillMatches(
-            GcReferenceQuery query, GcReferenceSnapshot snapshot) {
+    public CompletableFuture<Boolean> stillMatches(GcReferenceQuery query, GcReferenceSnapshot snapshot) {
         Objects.requireNonNull(query, "query");
         Objects.requireNonNull(snapshot, "snapshot");
         if (!snapshot.domainId().equals(DOMAIN_ID)
@@ -118,32 +104,17 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
             return CompletableFuture.completedFuture(accumulator.build());
         }
         if (viewIndex == VIEWS.size()) {
-            return scan(
-                    query,
-                    streams,
-                    accumulator,
-                    streamIndex + 1,
-                    0,
-                    Optional.empty(),
-                    null);
+            return scan(query, streams, accumulator, streamIndex + 1, 0, Optional.empty(), null);
         }
         StreamId streamId = streams.get(streamIndex);
         ReadView view = VIEWS.get(viewIndex);
-        return metadataStore.scanIndex(
-                        cluster,
-                        streamId,
-                        view,
-                        0,
-                        Long.MAX_VALUE,
-                        continuation,
-                        config.metadataScanPageSize())
+        return metadataStore
+                .scanIndex(cluster, streamId, view, 0, Long.MAX_VALUE, continuation, config.metadataScanPageSize())
                 .thenCompose(page -> {
                     requireProgress(page, previousKey);
                     for (VersionedGenerationCandidate candidate : page.values()) {
                         accumulator.addAuthority(new GcAuthorityToken(
-                                candidate.key(),
-                                candidate.metadataVersion(),
-                                candidate.durableValueSha256()));
+                                candidate.key(), candidate.metadataVersion(), candidate.durableValueSha256()));
                         ReferenceDisposition disposition = disposition(query, candidate);
                         if (disposition != ReferenceDisposition.NONE) {
                             accumulator.addReference(new GcReference(
@@ -170,19 +141,11 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
                                 page.continuation(),
                                 page.values().get(page.values().size() - 1).key());
                     }
-                    return scan(
-                            query,
-                            streams,
-                            accumulator,
-                            streamIndex,
-                            viewIndex + 1,
-                            Optional.empty(),
-                            null);
+                    return scan(query, streams, accumulator, streamIndex, viewIndex + 1, Optional.empty(), null);
                 });
     }
 
-    private static ReferenceDisposition disposition(
-            GcReferenceQuery query, VersionedGenerationCandidate candidate) {
+    private static ReferenceDisposition disposition(GcReferenceQuery query, VersionedGenerationCandidate candidate) {
         ReadTarget target;
         ReferenceDisposition matchingDisposition;
         if (candidate instanceof VersionedGenerationZeroIndex zero) {
@@ -193,8 +156,7 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
             matchingDisposition = ReferenceDisposition.REMOVABLE;
         } else if (candidate instanceof VersionedGenerationIndex higher) {
             GenerationLifecycle lifecycle = higher.value().lifecycle();
-            if (lifecycle == GenerationLifecycle.RETIRED
-                    || lifecycle == GenerationLifecycle.ABORTED) {
+            if (lifecycle == GenerationLifecycle.RETIRED || lifecycle == GenerationLifecycle.ABORTED) {
                 return ReferenceDisposition.NONE;
             }
             target = TARGET_CODECS.decode(higher.value().readTarget());
@@ -214,9 +176,7 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
     }
 
     private static String referenceType(VersionedGenerationCandidate candidate) {
-        return candidate instanceof VersionedGenerationZeroIndex
-                ? "generation-zero-index"
-                : "generation-index";
+        return candidate instanceof VersionedGenerationZeroIndex ? "generation-zero-index" : "generation-index";
     }
 
     private static void requireProgress(GenerationScanPage page, String previousKey) {
@@ -236,8 +196,7 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private enum ReferenceDisposition {

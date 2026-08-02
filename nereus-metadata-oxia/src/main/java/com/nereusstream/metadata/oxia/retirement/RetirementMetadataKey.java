@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.retirement;
 
 import com.nereusstream.metadata.oxia.PartitionKey;
 import java.util.Objects;
 
-/** Opaque exact-key capability constructible only by the focused retirement package. */
+/**
+ * Opaque exact-key capability constructible only by the focused retirement package.
+ */
 public final class RetirementMetadataKey {
     private final String key;
     private final PartitionKey partitionKey;

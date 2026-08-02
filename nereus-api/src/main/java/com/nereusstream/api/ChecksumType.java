@@ -14,7 +14,9 @@
 
 package com.nereusstream.api;
 
-/** Canonical checksum representation exposed by API values. */
+/**
+ * Canonical checksum representation exposed by API values.
+ */
 public enum ChecksumType {
     CRC32C,
     SHA256

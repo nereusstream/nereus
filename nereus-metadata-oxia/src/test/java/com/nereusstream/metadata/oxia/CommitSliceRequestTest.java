@@ -16,7 +16,6 @@ package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -47,11 +46,8 @@ class CommitSliceRequestTest {
         EntryIndexRef ref = indexObjectRef("index-object", "index-key");
         CommitSliceRequest base = request(ref, 1, 2, Optional.empty());
         CommitSliceRequest differentEventTime = request(ref, 2, 3, Optional.empty());
-        CommitSliceRequest projected = request(
-                ref,
-                1,
-                2,
-                Optional.of(new ProjectionRef(ProjectionType.PROTOCOL_HINT, "projection|value")));
+        CommitSliceRequest projected =
+                request(ref, 1, 2, Optional.of(new ProjectionRef(ProjectionType.PROTOCOL_HINT, "projection|value")));
 
         assertThat(base.commitId()).isNotEqualTo(differentEventTime.commitId());
         assertThat(base.commitId()).isNotEqualTo(projected.commitId());

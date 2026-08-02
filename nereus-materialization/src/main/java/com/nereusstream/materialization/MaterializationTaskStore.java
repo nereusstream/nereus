@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -11,6 +12,8 @@ import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
 import com.nereusstream.metadata.oxia.codec.F4MetadataCodecs;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
+import com.nereusstream.metadata.oxia.records.TaskFailureClass;
+import com.nereusstream.metadata.oxia.records.TaskLifecycle;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,7 +22,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
-/** Task-specific facade that freezes domain identities and revalidates every exact source before create. */
+/**
+ * Task-specific facade that freezes domain identities and revalidates every exact source before create.
+ */
 public final class MaterializationTaskStore {
     public static final int MAX_ENCODED_TASK_BYTES = 64 * 1024;
 
@@ -27,10 +32,7 @@ public final class MaterializationTaskStore {
     private final GenerationMetadataStore generations;
     private final Clock clock;
 
-    public MaterializationTaskStore(
-            String cluster,
-            GenerationMetadataStore generations,
-            Clock clock) {
+    public MaterializationTaskStore(String cluster, GenerationMetadataStore generations, Clock clock) {
         this.cluster = requireText(cluster, "cluster");
         this.generations = Objects.requireNonNull(generations, "generations");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -41,14 +43,11 @@ public final class MaterializationTaskStore {
     }
 
     public CompletableFuture<VersionedMaterializationTask> create(
-            MaterializationTask task,
-            MaterializationTaskMutationGuard mutationGuard) {
+            MaterializationTask task, MaterializationTaskMutationGuard mutationGuard) {
         return async(() -> {
             MaterializationTask exactTask = Objects.requireNonNull(task, "task");
-            MaterializationTaskMutationGuard exactGuard = Objects.requireNonNull(
-                    mutationGuard, "mutationGuard");
-            MaterializationTaskRecord planned = MaterializationRecordMapper.plannedTask(
-                    exactTask, clock.millis());
+            MaterializationTaskMutationGuard exactGuard = Objects.requireNonNull(mutationGuard, "mutationGuard");
+            MaterializationTaskRecord planned = MaterializationRecordMapper.plannedTask(exactTask, clock.millis());
             if (F4MetadataCodecs.encodeEnvelope(planned, MaterializationTaskRecord.class).length
                     > MAX_ENCODED_TASK_BYTES) {
                 return CompletableFuture.failedFuture(new NereusException(
@@ -56,9 +55,11 @@ public final class MaterializationTaskStore {
                         false,
                         "encoded materialization task exceeds the 64 KiB protocol limit"));
             }
-            List<CompletableFuture<Void>> sourceChecks = new ArrayList<>(exactTask.sources().size());
+            List<CompletableFuture<Void>> sourceChecks =
+                    new ArrayList<>(exactTask.sources().size());
             for (SourceGeneration source : exactTask.sources()) {
-                sourceChecks.add(generations.getCandidate(
+                sourceChecks.add(generations
+                        .getCandidate(
                                 cluster,
                                 exactTask.streamId(),
                                 source.view(),
@@ -79,19 +80,12 @@ public final class MaterializationTaskStore {
         });
     }
 
-    public CompletableFuture<Optional<VersionedMaterializationTask>> get(
-            StreamId streamId,
-            String taskId) {
+    public CompletableFuture<Optional<VersionedMaterializationTask>> get(StreamId streamId, String taskId) {
         return async(() -> generations.getTask(
-                cluster,
-                Objects.requireNonNull(streamId, "streamId"),
-                requireText(taskId, "taskId")));
+                cluster, Objects.requireNonNull(streamId, "streamId"), requireText(taskId, "taskId")));
     }
 
-    public CompletableFuture<TaskScanPage> scan(
-            StreamId streamId,
-            Optional<F4ScanToken> continuation,
-            int limit) {
+    public CompletableFuture<TaskScanPage> scan(StreamId streamId, Optional<F4ScanToken> continuation, int limit) {
         return async(() -> generations.scanTasks(
                 cluster,
                 Objects.requireNonNull(streamId, "streamId"),
@@ -100,32 +94,115 @@ public final class MaterializationTaskStore {
     }
 
     public CompletableFuture<VersionedMaterializationTask> compareAndSet(
-            MaterializationTaskRecord replacement,
-            long expectedVersion) {
+            MaterializationTaskRecord replacement, long expectedVersion) {
         return async(() -> generations.compareAndSetTask(
-                cluster,
-                Objects.requireNonNull(replacement, "replacement"),
-                expectedVersion));
+                cluster, Objects.requireNonNull(replacement, "replacement"), expectedVersion));
     }
 
-    public MaterializationTask requireTask(
-            VersionedMaterializationTask durable) {
+    public CompletableFuture<VersionedMaterializationTask> claim(
+            VersionedMaterializationTask expected, String claimId, String processRunId, long expiresAtMillis) {
+        return async(() -> {
+            VersionedMaterializationTask exact = Objects.requireNonNull(expected, "expected");
+            requireTask(exact);
+            MaterializationTaskRecord claimed = MaterializationRecordMapper.claimed(
+                    exact.value(),
+                    requireText(claimId, "claimId"),
+                    requireText(processRunId, "processRunId"),
+                    clock.millis(),
+                    expiresAtMillis);
+            return generations.compareAndSetTask(cluster, claimed, exact.metadataVersion());
+        });
+    }
+
+    public CompletableFuture<VersionedMaterializationTask> outputReady(
+            VersionedMaterializationTask expected, MaterializationOutput output) {
+        return async(() -> {
+            VersionedMaterializationTask exact = Objects.requireNonNull(expected, "expected");
+            MaterializationTask task = requireTask(exact);
+            MaterializationOutput exactOutput = Objects.requireNonNull(output, "output");
+            if (!task.taskId().equals(exactOutput.taskId())
+                    || !task.streamId().equals(exactOutput.streamId())
+                    || task.view() != exactOutput.view()
+                    || !task.coverage().equals(exactOutput.coverage())) {
+                throw new IllegalArgumentException("materialization task/output identity does not agree");
+            }
+            MaterializationTaskRecord ready =
+                    MaterializationRecordMapper.outputReady(exact.value(), exactOutput, clock.millis());
+            return generations.compareAndSetTask(cluster, ready, exact.metadataVersion());
+        });
+    }
+
+    public CompletableFuture<VersionedMaterializationTask> heartbeat(
+            VersionedMaterializationTask expected, long expiresAtMillis) {
+        return async(() -> {
+            VersionedMaterializationTask exact = Objects.requireNonNull(expected, "expected");
+            requireTask(exact);
+            MaterializationTaskRecord heartbeat =
+                    MaterializationRecordMapper.heartbeat(exact.value(), expiresAtMillis, clock.millis());
+            return generations.compareAndSetTask(cluster, heartbeat, exact.metadataVersion());
+        });
+    }
+
+    /**
+     * Persists the exact durable outcome of a claimed worker attempt.
+     *
+     * <p>This is intentionally narrower than arbitrary task CAS: callers may only move the exact
+     * claimed version to retry, cancelled, or terminal-failed. The failure class, message, and
+     * retry deadline are durable protocol facts and must not be inferred from exception text during
+     * recovery.
+     */
+    public CompletableFuture<VersionedMaterializationTask> failClaim(
+            VersionedMaterializationTask expected,
+            TaskLifecycle lifecycle,
+            TaskFailureClass failureClass,
+            String failureMessage,
+            long retryNotBeforeMillis) {
+        return async(() -> {
+            VersionedMaterializationTask exact = Objects.requireNonNull(expected, "expected");
+            requireTask(exact);
+            MaterializationTaskRecord failed = MaterializationRecordMapper.failedClaim(
+                    exact.value(),
+                    Objects.requireNonNull(lifecycle, "lifecycle"),
+                    Objects.requireNonNull(failureClass, "failureClass"),
+                    requireText(failureMessage, "failureMessage"),
+                    retryNotBeforeMillis,
+                    clock.millis());
+            return generations.compareAndSetTask(cluster, failed, exact.metadataVersion());
+        });
+    }
+
+    /**
+     * Deletes the exact durable task root represented by {@code expected}.
+     *
+     * <p>The caller owns all lifecycle and reference proofs. This facade only preserves the task's
+     * stream/id/version identity so an uncertain or stale cleanup cannot remove a replacement root.
+     */
+    public CompletableFuture<Void> delete(VersionedMaterializationTask expected) {
+        return async(() -> {
+            VersionedMaterializationTask exact = Objects.requireNonNull(expected, "expected");
+            MaterializationTask task = requireTask(exact);
+            return generations.deleteTask(cluster, task.streamId(), task.taskId(), exact.metadataVersion());
+        });
+    }
+
+    public MaterializationTask requireTask(VersionedMaterializationTask durable) {
         return MaterializationRecordMapper.domainTask(durable);
     }
 
-    public MaterializationTask requireTask(
-            VersionedMaterializationTask durable,
-            MaterializationPolicy policy) {
+    public MaterializationTask requireTask(VersionedMaterializationTask durable, MaterializationPolicy policy) {
         return MaterializationRecordMapper.domainTask(durable, policy);
     }
 
+    public Optional<MaterializationOutput> requireOutput(VersionedMaterializationTask durable) {
+        VersionedMaterializationTask exact = Objects.requireNonNull(durable, "durable");
+        MaterializationTask task = requireTask(exact);
+        return exact.value().output().map(value -> MaterializationRecordMapper.domainOutput(task, value));
+    }
+
     private static void requireExactSource(
-            Optional<VersionedGenerationCandidate> candidate,
-            StreamId streamId,
-            SourceGeneration expected) {
+            Optional<VersionedGenerationCandidate> candidate, StreamId streamId, SourceGeneration expected) {
         if (candidate.isEmpty()
-                || !MaterializationSourceMapper.matchesExactSource(
-                        candidate.orElseThrow(), streamId, expected)) {
+                || !MaterializationSourceMapper.matchesExactSource(candidate.orElseThrow(), streamId, expected)) {
             throw new NereusException(
                     ErrorCode.METADATA_CONDITION_FAILED,
                     true,

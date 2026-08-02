@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendAttemptId;
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendOptions;
@@ -29,9 +29,9 @@ import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.TrimOptions;
 import com.nereusstream.managedledger.config.ManagedLedgerConfigValidator;
 import com.nereusstream.managedledger.config.ManagedLedgerOpenConfigView;
+import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCandidate;
 import com.nereusstream.managedledger.integration.NereusCreationGuard;
 import com.nereusstream.managedledger.integration.NereusCreationPermit;
-import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCandidate;
 import com.nereusstream.metadata.oxia.FakeManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerFacadeState;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
@@ -42,7 +42,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
@@ -62,12 +61,13 @@ class NereusManagedLedgerOpenCoordinatorTest {
         FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         MutableGuard guard = new MutableGuard(3);
         try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections)) {
-            NereusManagedLedgerOpenCoordinator coordinator =
-                    new NereusManagedLedgerOpenCoordinator(runtime, guard);
+            NereusManagedLedgerOpenCoordinator coordinator = new NereusManagedLedgerOpenCoordinator(runtime, guard);
 
-            NereusLedgerOpenResult first = coordinator.open(NAME, openConfig(true)).join();
+            NereusLedgerOpenResult first =
+                    coordinator.open(NAME, openConfig(true)).join();
             int creates = streamStorage.createCalls.get();
-            NereusLedgerOpenResult reopened = coordinator.open(NAME, openConfig(true)).join();
+            NereusLedgerOpenResult reopened =
+                    coordinator.open(NAME, openConfig(true)).join();
 
             assertThat(first).isEqualTo(reopened);
             assertThat(first.streamMetadata().state()).isEqualTo(StreamState.ACTIVE);
@@ -82,30 +82,22 @@ class NereusManagedLedgerOpenCoordinatorTest {
     @Test
     void openDoesNotReturnBeforeExactMaterializationRegistration() {
         FakeStreamStorage streamStorage = new FakeStreamStorage();
-        FakeManagedLedgerProjectionMetadataStore projections =
-                new FakeManagedLedgerProjectionMetadataStore();
+        FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         CompletableFuture<Void> registration = new CompletableFuture<>();
-        CompletableFuture<Void> registrationInvoked =
-                new CompletableFuture<>();
+        CompletableFuture<Void> registrationInvoked = new CompletableFuture<>();
         AtomicReference<String> registeredName = new AtomicReference<>();
-        AtomicReference<ManagedLedgerProjectionIdentity> registeredIdentity =
-                new AtomicReference<>();
+        AtomicReference<ManagedLedgerProjectionIdentity> registeredIdentity = new AtomicReference<>();
         try (NereusManagedLedgerRuntime runtime =
-                ManagedLedgerRuntimeTestSupport.runtime(
-                        streamStorage,
-                        projections,
-                        (name, identity) -> {
-                            registeredName.set(name);
-                            registeredIdentity.set(identity);
-                            registrationInvoked.complete(null);
-                            return registration;
-                        })) {
+                ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections, (name, identity) -> {
+                    registeredName.set(name);
+                    registeredIdentity.set(identity);
+                    registrationInvoked.complete(null);
+                    return registration;
+                })) {
             NereusManagedLedgerOpenCoordinator coordinator =
-                    new NereusManagedLedgerOpenCoordinator(
-                            runtime, new MutableGuard(3));
+                    new NereusManagedLedgerOpenCoordinator(runtime, new MutableGuard(3));
 
-            CompletableFuture<NereusLedgerOpenResult> opened =
-                    coordinator.open(NAME, openConfig(true));
+            CompletableFuture<NereusLedgerOpenResult> opened = coordinator.open(NAME, openConfig(true));
 
             registrationInvoked.orTimeout(5, TimeUnit.SECONDS).join();
             assertThat(opened).isNotDone();
@@ -118,42 +110,32 @@ class NereusManagedLedgerOpenCoordinatorTest {
                             .projectionIdentity());
 
             registration.complete(null);
-            assertThat(opened.join().topicProjection().managedLedgerName())
-                    .isEqualTo(NAME);
+            assertThat(opened.join().topicProjection().managedLedgerName()).isEqualTo(NAME);
         }
     }
 
     @Test
     void unloadedBackfillCapturesExactLiveProjectionBeforeRegistration() {
         FakeStreamStorage streamStorage = new FakeStreamStorage();
-        FakeManagedLedgerProjectionMetadataStore projections =
-                new FakeManagedLedgerProjectionMetadataStore();
+        FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         AtomicInteger registrations = new AtomicInteger();
-        AtomicReference<ManagedLedgerProjectionIdentity> registered =
-                new AtomicReference<>();
+        AtomicReference<ManagedLedgerProjectionIdentity> registered = new AtomicReference<>();
         try (NereusManagedLedgerRuntime runtime =
-                ManagedLedgerRuntimeTestSupport.runtime(
-                        streamStorage,
-                        projections,
-                        (name, identity) -> {
-                            assertThat(name).isEqualTo(NAME);
-                            registered.set(identity);
-                            registrations.incrementAndGet();
-                            return CompletableFuture.completedFuture(null);
-                        })) {
+                ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections, (name, identity) -> {
+                    assertThat(name).isEqualTo(NAME);
+                    registered.set(identity);
+                    registrations.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                })) {
             NereusManagedLedgerOpenCoordinator coordinator =
-                    new NereusManagedLedgerOpenCoordinator(
-                            runtime, new MutableGuard(3));
+                    new NereusManagedLedgerOpenCoordinator(runtime, new MutableGuard(3));
             coordinator.open(NAME, openConfig(true)).join();
 
-            ManagedLedgerMaterializationRegistrationCandidate candidate =
-                    coordinator
-                            .inspectMaterializationRegistrationCandidate(
-                                    NAME, 3)
-                            .join();
+            ManagedLedgerMaterializationRegistrationCandidate candidate = coordinator
+                    .inspectMaterializationRegistrationCandidate(NAME, 3)
+                    .join();
             assertThat(candidate.managedLedgerName()).isEqualTo(NAME);
-            assertThat(candidate.storageClassBindingGeneration())
-                    .isEqualTo(3);
+            assertThat(candidate.storageClassBindingGeneration()).isEqualTo(3);
             assertThat(candidate.projectionIdentity())
                     .isEqualTo(projections
                             .getProjection(CLUSTER, NAME)
@@ -167,8 +149,7 @@ class NereusManagedLedgerOpenCoordinatorTest {
             assertThat(registered).hasValue(candidate.projectionIdentity());
             assertNereusFailure(
                     () -> coordinator
-                            .inspectMaterializationRegistrationCandidate(
-                                    NAME, 4)
+                            .inspectMaterializationRegistrationCandidate(NAME, 4)
                             .join(),
                     ErrorCode.METADATA_CONDITION_FAILED);
         }
@@ -180,12 +161,10 @@ class NereusManagedLedgerOpenCoordinatorTest {
         FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         MutableGuard guard = new MutableGuard(3);
         try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections)) {
-            NereusManagedLedgerOpenCoordinator coordinator =
-                    new NereusManagedLedgerOpenCoordinator(runtime, guard);
+            NereusManagedLedgerOpenCoordinator coordinator = new NereusManagedLedgerOpenCoordinator(runtime, guard);
 
             assertNereusFailure(() -> coordinator.open(NAME, openConfig(false)).join(), ErrorCode.STREAM_NOT_FOUND);
-            assertThat(coordinator.inspectStorageState(NAME).join())
-                    .isEqualTo(NereusStorageStateSnapshot.missing());
+            assertThat(coordinator.inspectStorageState(NAME).join()).isEqualTo(NereusStorageStateSnapshot.missing());
             assertThat(streamStorage.createCalls).hasValue(0);
             assertThat(guard.acquires).hasValue(1);
             assertThat(guard.validations).hasValue(0);
@@ -195,47 +174,42 @@ class NereusManagedLedgerOpenCoordinatorTest {
     @Test
     void firstCreateRequiresProfileCapabilityBeforeAnyL0MutationButExistingOpenDoesNot() {
         FakeStreamStorage streamStorage = new FakeStreamStorage();
-        FakeManagedLedgerProjectionMetadataStore projections =
-                new FakeManagedLedgerProjectionMetadataStore();
+        FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         MutableGuard admitting = new MutableGuard(3);
-        try (NereusManagedLedgerRuntime runtime =
-                ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections)) {
-            NereusCreationGuard blocking = name -> CompletableFuture.completedFuture(
-                    new NereusCreationPermit() {
-                        @Override
-                        public String persistenceName() {
-                            return name;
-                        }
+        try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections)) {
+            NereusCreationGuard blocking = name -> CompletableFuture.completedFuture(new NereusCreationPermit() {
+                @Override
+                public String persistenceName() {
+                    return name;
+                }
 
-                        @Override
-                        public long bindingGeneration() {
-                            return 3;
-                        }
+                @Override
+                public long bindingGeneration() {
+                    return 3;
+                }
 
-                        @Override
-                        public CompletableFuture<Void> validateStorageProfileBeforeCreate(
-                                StorageProfile profile) {
-                            return CompletableFuture.failedFuture(
-                                    new IllegalStateException("profile capability sentinel"));
-                        }
+                @Override
+                public CompletableFuture<Void> validateStorageProfileBeforeCreate(StorageProfile profile) {
+                    return CompletableFuture.failedFuture(new IllegalStateException("profile capability sentinel"));
+                }
 
-                        @Override
-                        public CompletableFuture<Void> validateBeforeProjectionPublish() {
-                            return CompletableFuture.completedFuture(null);
-                        }
-                    });
-            NereusManagedLedgerOpenCoordinator blocked =
-                    new NereusManagedLedgerOpenCoordinator(runtime, blocking);
+                @Override
+                public CompletableFuture<Void> validateBeforeProjectionPublish() {
+                    return CompletableFuture.completedFuture(null);
+                }
+            });
+            NereusManagedLedgerOpenCoordinator blocked = new NereusManagedLedgerOpenCoordinator(runtime, blocking);
 
             assertThatThrownBy(() -> blocked.open(NAME, openConfig(true)).join())
                     .hasRootCauseMessage("profile capability sentinel");
             assertThat(streamStorage.createCalls).hasValue(0);
             assertThat(projections.getProjection(CLUSTER, NAME).join()).isEmpty();
 
-            NereusManagedLedgerOpenCoordinator creator =
-                    new NereusManagedLedgerOpenCoordinator(runtime, admitting);
-            NereusLedgerOpenResult created = creator.open(NAME, openConfig(true)).join();
-            NereusLedgerOpenResult reopened = blocked.open(NAME, openConfig(true)).join();
+            NereusManagedLedgerOpenCoordinator creator = new NereusManagedLedgerOpenCoordinator(runtime, admitting);
+            NereusLedgerOpenResult created =
+                    creator.open(NAME, openConfig(true)).join();
+            NereusLedgerOpenResult reopened =
+                    blocked.open(NAME, openConfig(true)).join();
 
             assertThat(reopened).isEqualTo(created);
             assertThat(streamStorage.createCalls).hasValue(1);
@@ -245,55 +219,47 @@ class NereusManagedLedgerOpenCoordinatorTest {
     @Test
     void existingReadOnlyOpenSkipsLocalProfileAdmissionButWritableOpenRequiresIt() {
         FakeStreamStorage streamStorage = new FakeStreamStorage();
-        FakeManagedLedgerProjectionMetadataStore projections =
-                new FakeManagedLedgerProjectionMetadataStore();
+        FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         MutableGuard creatorGuard = new MutableGuard(3);
         AtomicInteger writableValidations = new AtomicInteger();
         AtomicReference<StorageProfile> observedProfile = new AtomicReference<>();
-        try (NereusManagedLedgerRuntime runtime =
-                ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections)) {
-            NereusManagedLedgerOpenCoordinator creator =
-                    new NereusManagedLedgerOpenCoordinator(runtime, creatorGuard);
-            NereusLedgerOpenResult created = creator.open(NAME, openConfig(true)).join();
-            NereusCreationGuard blocking = name -> CompletableFuture.completedFuture(
-                    new NereusCreationPermit() {
-                        @Override
-                        public String persistenceName() {
-                            return name;
-                        }
+        try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections)) {
+            NereusManagedLedgerOpenCoordinator creator = new NereusManagedLedgerOpenCoordinator(runtime, creatorGuard);
+            NereusLedgerOpenResult created =
+                    creator.open(NAME, openConfig(true)).join();
+            NereusCreationGuard blocking = name -> CompletableFuture.completedFuture(new NereusCreationPermit() {
+                @Override
+                public String persistenceName() {
+                    return name;
+                }
 
-                        @Override
-                        public long bindingGeneration() {
-                            return 3;
-                        }
+                @Override
+                public long bindingGeneration() {
+                    return 3;
+                }
 
-                        @Override
-                        public CompletableFuture<Void> validateStorageProfileBeforeWritableOpen(
-                                StorageProfile profile) {
-                            writableValidations.incrementAndGet();
-                            observedProfile.set(profile);
-                            return CompletableFuture.failedFuture(
-                                    new IllegalStateException("local profile capability sentinel"));
-                        }
+                @Override
+                public CompletableFuture<Void> validateStorageProfileBeforeWritableOpen(StorageProfile profile) {
+                    writableValidations.incrementAndGet();
+                    observedProfile.set(profile);
+                    return CompletableFuture.failedFuture(
+                            new IllegalStateException("local profile capability sentinel"));
+                }
 
-                        @Override
-                        public CompletableFuture<Void> validateBeforeProjectionPublish() {
-                            return CompletableFuture.completedFuture(null);
-                        }
-                    });
-            NereusManagedLedgerOpenCoordinator blocked =
-                    new NereusManagedLedgerOpenCoordinator(runtime, blocking);
+                @Override
+                public CompletableFuture<Void> validateBeforeProjectionPublish() {
+                    return CompletableFuture.completedFuture(null);
+                }
+            });
+            NereusManagedLedgerOpenCoordinator blocked = new NereusManagedLedgerOpenCoordinator(runtime, blocking);
 
             assertThat(blocked.open(NAME, openConfig(false)).join()).isEqualTo(created);
             assertThat(writableValidations).hasValue(0);
 
-            NereusManagedLedgerOwnershipGuard owned =
-                    NereusManagedLedgerOwnershipGuard.checked(
-                            () -> CompletableFuture.completedFuture(true),
-                            java.time.Duration.ofSeconds(1));
-            assertThatThrownBy(() -> blocked
-                            .openWritable(NAME, openConfig(false), owned)
-                            .join())
+            NereusManagedLedgerOwnershipGuard owned = NereusManagedLedgerOwnershipGuard.checked(
+                    () -> CompletableFuture.completedFuture(true), java.time.Duration.ofSeconds(1));
+            assertThatThrownBy(() ->
+                            blocked.openWritable(NAME, openConfig(false), owned).join())
                     .hasRootCauseMessage("local profile capability sentinel");
             assertThat(writableValidations).hasValue(1);
             assertThat(observedProfile).hasValue(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
@@ -301,8 +267,7 @@ class NereusManagedLedgerOpenCoordinatorTest {
             blocked.openForLogicalDelete(
                             NAME,
                             openConfig(false),
-                            NereusManagedLedgerOwnershipGuard.trustedDirect(
-                                    java.time.Duration.ofSeconds(1)))
+                            NereusManagedLedgerOwnershipGuard.trustedDirect(java.time.Duration.ofSeconds(1)))
                     .join();
             assertThat(writableValidations).hasValue(1);
         }
@@ -314,22 +279,18 @@ class NereusManagedLedgerOpenCoordinatorTest {
         FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         MutableGuard firstGuard = new MutableGuard(3);
         try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections)) {
-            NereusManagedLedgerOpenCoordinator first =
-                    new NereusManagedLedgerOpenCoordinator(runtime, firstGuard);
+            NereusManagedLedgerOpenCoordinator first = new NereusManagedLedgerOpenCoordinator(runtime, firstGuard);
             NereusLedgerOpenResult opened = first.open(NAME, openConfig(true)).join();
             int gets = streamStorage.getCalls.get();
 
             NereusManagedLedgerOpenCoordinator stale =
                     new NereusManagedLedgerOpenCoordinator(runtime, new MutableGuard(4));
             assertNereusFailure(
-                    () -> stale.open(NAME, openConfig(true)).join(),
-                    ErrorCode.METADATA_INVARIANT_VIOLATION);
+                    () -> stale.open(NAME, openConfig(true)).join(), ErrorCode.METADATA_INVARIANT_VIOLATION);
             assertThat(streamStorage.getCalls).hasValue(gets);
 
             streamStorage.remove(opened.streamMetadata().streamId());
-            assertNereusFailure(
-                    () -> first.inspectStorageState(NAME).join(),
-                    ErrorCode.METADATA_INVARIANT_VIOLATION);
+            assertNereusFailure(() -> first.inspectStorageState(NAME).join(), ErrorCode.METADATA_INVARIANT_VIOLATION);
             assertThat(streamStorage.createCalls).hasValue(1);
         }
     }
@@ -340,33 +301,50 @@ class NereusManagedLedgerOpenCoordinatorTest {
         FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         MutableGuard guard = new MutableGuard(3);
         try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections)) {
-            NereusManagedLedgerOpenCoordinator coordinator =
-                    new NereusManagedLedgerOpenCoordinator(runtime, guard);
-            NereusLedgerOpenResult open = coordinator.open(NAME, openConfig(true)).join();
-            streamStorage.seal(open.streamMetadata().streamId(), new SealOptions(
-                    java.time.Duration.ofSeconds(1), "test")).join();
+            NereusManagedLedgerOpenCoordinator coordinator = new NereusManagedLedgerOpenCoordinator(runtime, guard);
+            NereusLedgerOpenResult open =
+                    coordinator.open(NAME, openConfig(true)).join();
+            streamStorage
+                    .seal(open.streamMetadata().streamId(), new SealOptions(java.time.Duration.ofSeconds(1), "test"))
+                    .join();
 
-            NereusLedgerOpenResult sealed = coordinator.open(NAME, openConfig(true)).join();
+            NereusLedgerOpenResult sealed =
+                    coordinator.open(NAME, openConfig(true)).join();
             assertThat(sealed.streamMetadata().state()).isEqualTo(StreamState.SEALED);
             assertThat(sealed.topicProjection().parsedFacadeState()).isEqualTo(ManagedLedgerFacadeState.SEALED);
 
-            StreamMetadata deletedMetadata = streamStorage.delete(
-                    sealed.streamMetadata().streamId(),
-                    new DeleteOptions(java.time.Duration.ofSeconds(1), "test")).join();
-            TopicProjectionRecord deleting = projections.mirrorFacadeState(
-                    CLUSTER, NAME, sealed.topicProjection().projectionIdentity(),
-                    sealed.topicProjection().metadataVersion(), ManagedLedgerFacadeState.DELETING).join();
-            projections.mirrorFacadeState(
-                    CLUSTER, NAME, deleting.projectionIdentity(), deleting.metadataVersion(),
-                    ManagedLedgerFacadeState.DELETED).join();
+            StreamMetadata deletedMetadata = streamStorage
+                    .delete(
+                            sealed.streamMetadata().streamId(),
+                            new DeleteOptions(java.time.Duration.ofSeconds(1), "test"))
+                    .join();
+            TopicProjectionRecord deleting = projections
+                    .mirrorFacadeState(
+                            CLUSTER,
+                            NAME,
+                            sealed.topicProjection().projectionIdentity(),
+                            sealed.topicProjection().metadataVersion(),
+                            ManagedLedgerFacadeState.DELETING)
+                    .join();
+            projections
+                    .mirrorFacadeState(
+                            CLUSTER,
+                            NAME,
+                            deleting.projectionIdentity(),
+                            deleting.metadataVersion(),
+                            ManagedLedgerFacadeState.DELETED)
+                    .join();
             assertThat(deletedMetadata.state()).isEqualTo(StreamState.DELETED);
 
             guard.bindingGeneration = 4;
-            NereusLedgerOpenResult recreated = coordinator.open(NAME, openConfig(true)).join();
+            NereusLedgerOpenResult recreated =
+                    coordinator.open(NAME, openConfig(true)).join();
             assertThat(recreated.projection().incarnation()).isEqualTo(2);
             assertThat(recreated.projection().storageClassBindingGeneration()).isEqualTo(4);
-            assertThat(recreated.projection().streamId()).isNotEqualTo(open.projection().streamId());
-            assertThat(recreated.projection().virtualLedgerId()).isNotEqualTo(open.projection().virtualLedgerId());
+            assertThat(recreated.projection().streamId())
+                    .isNotEqualTo(open.projection().streamId());
+            assertThat(recreated.projection().virtualLedgerId())
+                    .isNotEqualTo(open.projection().virtualLedgerId());
         }
     }
 
@@ -387,12 +365,10 @@ class NereusManagedLedgerOpenCoordinatorTest {
         FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         MutableGuard guard = new MutableGuard(3);
         try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections)) {
-            NereusManagedLedgerOpenCoordinator coordinator =
-                    new NereusManagedLedgerOpenCoordinator(runtime, guard);
+            NereusManagedLedgerOpenCoordinator coordinator = new NereusManagedLedgerOpenCoordinator(runtime, guard);
 
             assertNereusFailure(
-                    () -> coordinator.open(NAME, openConfig(true)).join(),
-                    ErrorCode.METADATA_INVARIANT_VIOLATION);
+                    () -> coordinator.open(NAME, openConfig(true)).join(), ErrorCode.METADATA_INVARIANT_VIOLATION);
             assertThat(projections.getProjection(CLUSTER, NAME).join()).isEmpty();
             assertThat(guard.validations).hasValue(0);
         }
@@ -414,8 +390,8 @@ class NereusManagedLedgerOpenCoordinatorTest {
 
     private static void assertNereusFailure(Runnable operation, ErrorCode code) {
         assertThatThrownBy(operation::run).satisfies(error -> assertThat(rootCause(error))
-                .isInstanceOfSatisfying(NereusException.class,
-                        nereus -> assertThat(nereus.code()).isEqualTo(code)));
+                .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                        .isEqualTo(code)));
     }
 
     private static Throwable rootCause(Throwable error) {
@@ -455,8 +431,8 @@ class NereusManagedLedgerOpenCoordinatorTest {
                     validations.incrementAndGet();
                     return generation == bindingGeneration
                             ? CompletableFuture.completedFuture(null)
-                            : CompletableFuture.failedFuture(new NereusException(
-                                    ErrorCode.METADATA_CONDITION_FAILED, true, "binding changed"));
+                            : CompletableFuture.failedFuture(
+                                    new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, "binding changed"));
                 }
             });
         }
@@ -469,21 +445,22 @@ class NereusManagedLedgerOpenCoordinatorTest {
 
         @Override
         public synchronized CompletableFuture<StreamMetadata> createOrGetStream(
-                StreamName streamName,
-                StreamCreateOptions options) {
+                StreamName streamName, StreamCreateOptions options) {
             createCalls.incrementAndGet();
             StreamId streamId = com.nereusstream.api.keys.DeterministicIds.streamIdFor(streamName);
-            StreamMetadata metadata = streams.computeIfAbsent(streamId, ignored -> new StreamMetadata(
+            StreamMetadata metadata = streams.computeIfAbsent(
                     streamId,
-                    streamName,
-                    StreamState.ACTIVE,
-                    options.profile(),
-                    options.attributes(),
-                    CLOCK.millis(),
-                    0,
-                    0,
-                    0,
-                    0));
+                    ignored -> new StreamMetadata(
+                            streamId,
+                            streamName,
+                            StreamState.ACTIVE,
+                            options.profile(),
+                            options.attributes(),
+                            CLOCK.millis(),
+                            0,
+                            0,
+                            0,
+                            0));
             return CompletableFuture.completedFuture(metadata);
         }
 
@@ -492,8 +469,7 @@ class NereusManagedLedgerOpenCoordinatorTest {
             getCalls.incrementAndGet();
             StreamMetadata metadata = streams.get(streamId);
             return metadata == null
-                    ? CompletableFuture.failedFuture(new NereusException(
-                            ErrorCode.STREAM_NOT_FOUND, false, "missing"))
+                    ? CompletableFuture.failedFuture(new NereusException(ErrorCode.STREAM_NOT_FOUND, false, "missing"))
                     : CompletableFuture.completedFuture(metadata);
         }
 
@@ -501,8 +477,8 @@ class NereusManagedLedgerOpenCoordinatorTest {
         public synchronized CompletableFuture<StreamMetadata> seal(StreamId streamId, SealOptions options) {
             StreamMetadata current = streams.get(streamId);
             if (current == null) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.STREAM_NOT_FOUND, false, "missing"));
+                return CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.STREAM_NOT_FOUND, false, "missing"));
             }
             StreamMetadata sealed = copy(current, StreamState.SEALED);
             streams.put(streamId, sealed);
@@ -513,8 +489,8 @@ class NereusManagedLedgerOpenCoordinatorTest {
         public synchronized CompletableFuture<StreamMetadata> delete(StreamId streamId, DeleteOptions options) {
             StreamMetadata current = streams.get(streamId);
             if (current == null) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.STREAM_NOT_FOUND, false, "missing"));
+                return CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.STREAM_NOT_FOUND, false, "missing"));
             }
             StreamMetadata deleted = copy(current, StreamState.DELETED);
             streams.put(streamId, deleted);
@@ -530,14 +506,12 @@ class NereusManagedLedgerOpenCoordinatorTest {
         }
 
         @Override
-        public CompletableFuture<AppendSession> acquireAppendSession(
-                StreamId streamId, AppendSessionOptions options) {
+        public CompletableFuture<AppendSession> acquireAppendSession(StreamId streamId, AppendSessionOptions options) {
             return unsupported();
         }
 
         @Override
-        public CompletableFuture<AppendResult> append(
-                StreamId streamId, AppendBatch batch, AppendOptions options) {
+        public CompletableFuture<AppendResult> append(StreamId streamId, AppendBatch batch, AppendOptions options) {
             return unsupported();
         }
 
@@ -553,8 +527,7 @@ class NereusManagedLedgerOpenCoordinatorTest {
         }
 
         @Override
-        public CompletableFuture<ResolveResult> resolve(
-                StreamId streamId, long startOffset, ResolveOptions options) {
+        public CompletableFuture<ResolveResult> resolve(StreamId streamId, long startOffset, ResolveOptions options) {
             return unsupported();
         }
 
@@ -564,14 +537,20 @@ class NereusManagedLedgerOpenCoordinatorTest {
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
 
         private static StreamMetadata copy(StreamMetadata current, StreamState state) {
             return new StreamMetadata(
-                    current.streamId(), current.streamName(), state, current.profile(), current.attributes(),
-                    current.createdAtMillis(), current.metadataVersion() + 1,
-                    current.committedEndOffset(), current.cumulativeSize(), current.trimOffset());
+                    current.streamId(),
+                    current.streamName(),
+                    state,
+                    current.profile(),
+                    current.attributes(),
+                    current.createdAtMillis(),
+                    current.metadataVersion() + 1,
+                    current.committedEndOffset(),
+                    current.cumulativeSize(),
+                    current.trimOffset());
         }
 
         private static <T> CompletableFuture<T> unsupported() {

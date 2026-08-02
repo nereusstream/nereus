@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.CursorProtectionIntentRecord;
@@ -9,7 +10,9 @@ import com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-/** Explicit canonical binary V1 codec for {@link CursorRetentionRecord}. */
+/**
+ * Explicit canonical binary V1 codec for {@link CursorRetentionRecord}.
+ */
 public final class CursorRetentionRecordCodecV1 implements MetadataRecordCodec<CursorRetentionRecord> {
     private static final int VERSION = 1;
     private static final int MAX_PROTECTION_INTENT_BYTES = 48 * 1024;
@@ -42,10 +45,11 @@ public final class CursorRetentionRecordCodecV1 implements MetadataRecordCodec<C
             writer.writeLong(record.protectedFloorOffset());
             writer.writeLong(record.lastCompletedTrimOffset());
             switch (record.lifecycle()) {
-                case ACTIVE -> { }
+                case ACTIVE -> {}
                 case PROTECTION_PENDING -> {
                     F3Binary.Writer intentWriter = new F3Binary.Writer();
-                    writeProtectionIntent(intentWriter, record.pendingProtectionIntent().orElseThrow());
+                    writeProtectionIntent(
+                            intentWriter, record.pendingProtectionIntent().orElseThrow());
                     byte[] intent = intentWriter.toByteArray();
                     if (intent.length > MAX_PROTECTION_INTENT_BYTES) {
                         throw new MetadataCodecException("cursor protection intent exceeds the frozen byte cap");
@@ -76,8 +80,8 @@ public final class CursorRetentionRecordCodecV1 implements MetadataRecordCodec<C
             long metadataVersion = reader.readLong("metadataVersion");
             ManagedLedgerProjectionIdentity projection = CursorStateRecordCodecV1.readIdentity(reader);
             String owner = reader.readString("ownerSessionId");
-            CursorRetentionLifecycle lifecycle = CursorRetentionLifecycle.fromId(
-                    reader.readUnsignedByte("lifecycleId"));
+            CursorRetentionLifecycle lifecycle =
+                    CursorRetentionLifecycle.fromId(reader.readUnsignedByte("lifecycleId"));
             long sequence = reader.readLong("mutationSequence");
             long floor = reader.readLong("protectedFloorOffset");
             long trim = reader.readLong("lastCompletedTrimOffset");
@@ -116,8 +120,7 @@ public final class CursorRetentionRecordCodecV1 implements MetadataRecordCodec<C
         }
     }
 
-    private static void writeProtectionIntent(
-            F3Binary.Writer writer, CursorProtectionIntentRecord intent) {
+    private static void writeProtectionIntent(F3Binary.Writer writer, CursorProtectionIntentRecord intent) {
         writer.writeString(intent.attemptId());
         writer.writeByte(intent.kind().id());
         writer.writeString(intent.cursorName());
@@ -126,8 +129,7 @@ public final class CursorRetentionRecordCodecV1 implements MetadataRecordCodec<C
         writer.writeLong(intent.targetCursorGeneration());
         writer.writeLong(intent.targetMarkDeleteOffset());
         writer.writeByte(intent.targetPartialBatch().isPresent() ? 1 : 0);
-        intent.targetPartialBatch().ifPresent(partial ->
-                CursorStateRecordCodecV1.writePartial(writer, partial));
+        intent.targetPartialBatch().ifPresent(partial -> CursorStateRecordCodecV1.writePartial(writer, partial));
         F3Binary.writeLongMap(writer, intent.initialPositionProperties());
         F3Binary.writeStringMap(writer, intent.initialCursorProperties());
         writer.writeLong(intent.createdAtMillis());
@@ -135,19 +137,18 @@ public final class CursorRetentionRecordCodecV1 implements MetadataRecordCodec<C
 
     private static CursorProtectionIntentRecord readProtectionIntent(F3Binary.Reader reader) {
         String attempt = reader.readString("protectionAttemptId");
-        CursorProtectionKind kind = CursorProtectionKind.fromId(
-                reader.readUnsignedByte("protectionKindId"));
+        CursorProtectionKind kind = CursorProtectionKind.fromId(reader.readUnsignedByte("protectionKindId"));
         String name = reader.readString("cursorName");
         String hash = reader.readString("cursorNameHash");
         long expectedGeneration = reader.readLong("expectedCursorGeneration");
         long targetGeneration = reader.readLong("targetCursorGeneration");
         long targetMarkDelete = reader.readLong("targetMarkDeleteOffset");
-        Optional<com.nereusstream.metadata.oxia.records.CursorPartialBatchAckRecord> partial = switch (
-                reader.readUnsignedByte("targetPartialPresent")) {
-            case 0 -> Optional.empty();
-            case 1 -> Optional.of(CursorStateRecordCodecV1.readPartial(reader));
-            default -> throw new MetadataCodecException("invalid target-partial-present flag");
-        };
+        Optional<com.nereusstream.metadata.oxia.records.CursorPartialBatchAckRecord> partial =
+                switch (reader.readUnsignedByte("targetPartialPresent")) {
+                    case 0 -> Optional.empty();
+                    case 1 -> Optional.of(CursorStateRecordCodecV1.readPartial(reader));
+                    default -> throw new MetadataCodecException("invalid target-partial-present flag");
+                };
         var positionProperties = F3Binary.readLongMap(reader, "initialPositionProperties");
         var cursorProperties = F3Binary.readStringMap(reader, "initialCursorProperties");
         long createdAt = reader.readLong("intentCreatedAtMillis");

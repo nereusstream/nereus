@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.ErrorCode;
@@ -7,7 +8,9 @@ import com.nereusstream.api.ReadView;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** Explicit NTC1-only facade preventing sparse rows from crossing into the ordinary committed reader. */
+/**
+ * Explicit NTC1-only facade preventing sparse rows from crossing into the ordinary committed reader.
+ */
 public final class TopicCompactedObjectReader implements CompactedObjectReader {
     private final CompactedObjectReader delegate;
 

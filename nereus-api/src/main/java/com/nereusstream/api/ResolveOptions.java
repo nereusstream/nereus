@@ -14,11 +14,10 @@
 
 package com.nereusstream.api;
 
-/** Options for resolving offsets to object ranges. */
-public record ResolveOptions(
-        int maxRanges,
-        boolean allowCache,
-        boolean includeEntryIndex) {
+/**
+ * Options for resolving offsets to object ranges.
+ */
+public record ResolveOptions(int maxRanges, boolean allowCache, boolean includeEntryIndex) {
     public ResolveOptions {
         if (maxRanges <= 0) {
             throw new IllegalArgumentException("maxRanges must be positive");

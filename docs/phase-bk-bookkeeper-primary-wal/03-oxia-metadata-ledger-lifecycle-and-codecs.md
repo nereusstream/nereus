@@ -256,17 +256,17 @@ record BookKeeperLedgerRootRecord(
 
 Lifecycle wire ids are frozen and never derived from enum ordinals：
 
-| Wire id | Lifecycle | Physical meaning |
-| --- | --- | --- |
-| 1 | `ALLOCATING` | global exact-id reservation exists; physical create may be absent/unknown |
-| 2 | `ACTIVE` | exact matching ledger exists and belongs to one current segment owner |
-| 3 | `SEALING` | no new reservation/write allowed; recovery close/fence is in progress |
-| 4 | `SEALED` | BookKeeper metadata proves closed and freezes last entry/length |
-| 5 | `MARKED` | whole-ledger reference set frozen; drain grace in progress |
-| 6 | `DELETING` | exact delete intent durable; provider deletion/dual-absence proof in progress |
-| 7 | `DELETED` | two separated exact `NoSuchLedger` observations complete |
-| 8 | `ABORTED` | provider create was never transmitted; allocation cannot later create physical bytes |
-| 9 | `QUARANTINED` | identity/provider/metadata conflict; automatic mutation prohibited |
+| Wire id | Lifecycle     | Physical meaning                                                                     |
+|---------|---------------|--------------------------------------------------------------------------------------|
+| 1       | `ALLOCATING`  | global exact-id reservation exists; physical create may be absent/unknown            |
+| 2       | `ACTIVE`      | exact matching ledger exists and belongs to one current segment owner                |
+| 3       | `SEALING`     | no new reservation/write allowed; recovery close/fence is in progress                |
+| 4       | `SEALED`      | BookKeeper metadata proves closed and freezes last entry/length                      |
+| 5       | `MARKED`      | whole-ledger reference set frozen; drain grace in progress                           |
+| 6       | `DELETING`    | exact delete intent durable; provider deletion/dual-absence proof in progress        |
+| 7       | `DELETED`     | two separated exact `NoSuchLedger` observations complete                             |
+| 8       | `ABORTED`     | provider create was never transmitted; allocation cannot later create physical bytes |
+| 9       | `QUARANTINED` | identity/provider/metadata conflict; automatic mutation prohibited                   |
 
 Only `SEALED -> MARKED -> DELETING -> DELETED` can physically delete a previously active ledger. An allocation may
 reach `ABORTED` only when its durable slot never advanced beyond `CLAIMED`, which is the protocol proof that provider
@@ -378,13 +378,13 @@ record BookKeeperLedgerProtectionRecord(
 
 Frozen V1 types：
 
-| Wire id | Type | Durable owner |
-| --- | --- | --- |
-| 1 | `REACHABLE_APPEND` | generic commit intent, acquired before head CAS |
-| 2 | `VISIBLE_GENERATION` | exact generation-zero index |
-| 3 | `MATERIALIZATION_SOURCE` | nonterminal F4 task/checkpoint source |
-| 4 | `APPEND_RECOVERY` | append recovery root/checkpoint |
-| 5 | `REPAIR` | bounded repair intent; only type with expiry |
+| Wire id | Type                     | Durable owner                                   |
+|---------|--------------------------|-------------------------------------------------|
+| 1       | `REACHABLE_APPEND`       | generic commit intent, acquired before head CAS |
+| 2       | `VISIBLE_GENERATION`     | exact generation-zero index                     |
+| 3       | `MATERIALIZATION_SOURCE` | nonterminal F4 task/checkpoint source           |
+| 4       | `APPEND_RECOVERY`        | append recovery root/checkpoint                 |
+| 5       | `REPAIR`                 | bounded repair intent; only type with expiry    |
 
 Permanent types have `expiresAtMillis == 0`。Every owner release is metadata-first and conditional：prove a replacement
 or trim, persist/reload exact retirement evidence where required, then CAS the protection to `RETIRED` while retaining
@@ -433,7 +433,8 @@ record BookKeeperLedgerReaderLeaseRecord(
     long metadataVersion) { }
 ```
 
-One fixed slot per process/ledger is locally reference-counted. Renewal increments `leaseEpoch` by CAS. The read revalidates
+One fixed slot per process/ledger is locally reference-counted. Renewal increments `leaseEpoch` by CAS. The read
+revalidates
 the current lease/root after physical IO before exposing bytes. Release conditionally deletes the row only when the
 process-local reference count reaches zero. Expired leases still veto until the deletion coordinator has waited its
 drain grace and revalidated exact expiry/root state.

@@ -16,7 +16,9 @@ package com.nereusstream.metadata.oxia;
 
 import java.util.Objects;
 
-/** Opaque, process-local continuation bound to one exact Phase 4 scan scope. */
+/**
+ * Opaque, process-local continuation bound to one exact Phase 4 scan scope.
+ */
 public final class F4ScanToken {
     private final String cluster;
     private final F4ScanKind kind;
@@ -25,11 +27,7 @@ public final class F4ScanToken {
     private final String exclusiveLastKey;
 
     F4ScanToken(
-            String cluster,
-            F4ScanKind kind,
-            String scopeIdentitySha256,
-            String scanPrefix,
-            String exclusiveLastKey) {
+            String cluster, F4ScanKind kind, String scopeIdentitySha256, String scanPrefix, String exclusiveLastKey) {
         this.cluster = requireText(cluster, "cluster");
         this.kind = Objects.requireNonNull(kind, "kind");
         this.scopeIdentitySha256 = requireSha256(scopeIdentitySha256, "scopeIdentitySha256");

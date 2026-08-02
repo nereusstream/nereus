@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.managedledger.NereusManagedLedgerFactoryConfig;
 import com.nereusstream.managedledger.retention.NereusRetentionConfig;
@@ -19,12 +19,8 @@ class NereusRuntimeConfigurationRetentionTest {
     @Test
     void acceptsRetentionBoundsInsideTheManagedLedgerBudget() {
         NereusRuntimeConfiguration base = base();
-        NereusRetentionConfig retention = new NereusRetentionConfig(
-                32,
-                2,
-                512,
-                Duration.ofSeconds(20),
-                Duration.ofSeconds(30));
+        NereusRetentionConfig retention =
+                new NereusRetentionConfig(32, 2, 512, Duration.ofSeconds(20), Duration.ofSeconds(30));
 
         NereusRuntimeConfiguration checked = withRetention(base, retention);
 
@@ -35,13 +31,7 @@ class NereusRuntimeConfigurationRetentionTest {
     void rejectsOperationBeyondRetentionCloseBudget() {
         NereusRuntimeConfiguration base = base();
         assertThatThrownBy(() -> withRetention(
-                        base,
-                        new NereusRetentionConfig(
-                                32,
-                                2,
-                                512,
-                                Duration.ofSeconds(31),
-                                Duration.ofSeconds(30))))
+                        base, new NereusRetentionConfig(32, 2, 512, Duration.ofSeconds(31), Duration.ofSeconds(30))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("operation timeout");
     }
@@ -50,30 +40,17 @@ class NereusRuntimeConfigurationRetentionTest {
     void rejectsCloseAndQueueBeyondManagedLedgerBudgets() {
         NereusRuntimeConfiguration base = base();
         assertThatThrownBy(() -> withRetention(
-                        base,
-                        new NereusRetentionConfig(
-                                32,
-                                2,
-                                512,
-                                Duration.ofSeconds(30),
-                                Duration.ofSeconds(76))))
+                        base, new NereusRetentionConfig(32, 2, 512, Duration.ofSeconds(30), Duration.ofSeconds(76))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("close timeout");
         assertThatThrownBy(() -> withRetention(
-                        base,
-                        new NereusRetentionConfig(
-                                32,
-                                2,
-                                1_025,
-                                Duration.ofSeconds(30),
-                                Duration.ofSeconds(30))))
+                        base, new NereusRetentionConfig(32, 2, 1_025, Duration.ofSeconds(30), Duration.ofSeconds(30))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("callback capacity");
     }
 
     private static NereusRuntimeConfiguration withRetention(
-            NereusRuntimeConfiguration base,
-            NereusRetentionConfig retention) {
+            NereusRuntimeConfiguration base, NereusRetentionConfig retention) {
         return new NereusRuntimeConfiguration(
                 base.oxia(),
                 base.objectStore(),
@@ -118,29 +95,23 @@ class NereusRuntimeConfigurationRetentionTest {
                 Duration.ofMinutes(10),
                 1_024,
                 2_048);
-        NereusManagedLedgerFactoryConfig managed =
-                new NereusManagedLedgerFactoryConfig(
-                        "nereus",
-                        Duration.ofSeconds(30),
-                        Duration.ofSeconds(30),
-                        Duration.ofSeconds(30),
-                        Duration.ofSeconds(30),
-                        Duration.ofSeconds(75),
-                        Duration.ofSeconds(1),
-                        5 * 1024 * 1024,
-                        100,
-                        10_000,
-                        1_024,
-                        1_024,
-                        10_000);
+        NereusManagedLedgerFactoryConfig managed = new NereusManagedLedgerFactoryConfig(
+                "nereus",
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(75),
+                Duration.ofSeconds(1),
+                5 * 1024 * 1024,
+                100,
+                10_000,
+                1_024,
+                1_024,
+                10_000);
         return new NereusRuntimeConfiguration(
                 new OxiaClientConfiguration(
-                        "oxia:6648",
-                        "nereus/test",
-                        Duration.ofSeconds(30),
-                        Duration.ofSeconds(30),
-                        10_000,
-                        1_024),
+                        "oxia:6648", "nereus/test", Duration.ofSeconds(30), Duration.ofSeconds(30), 10_000, 1_024),
                 new ObjectStoreConfiguration(
                         "com.example.Provider",
                         URI.create("https://s3.example.com"),
@@ -156,8 +127,6 @@ class NereusRuntimeConfigurationRetentionTest {
                 stream,
                 managed,
                 new ProjectionMetadataStoreConfig(
-                        Duration.ofSeconds(30),
-                        1_024,
-                        ProjectionMetadataStoreConfig.F2_MAX_VALUE_BYTES));
+                        Duration.ofSeconds(30), 1_024, ProjectionMetadataStoreConfig.F2_MAX_VALUE_BYTES));
     }
 }

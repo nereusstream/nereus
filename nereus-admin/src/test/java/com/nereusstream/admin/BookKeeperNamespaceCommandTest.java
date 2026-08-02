@@ -2,7 +2,6 @@
 package com.nereusstream.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.bookkeeper.BookKeeperLedgerIdNamespaceReservation;
@@ -14,21 +13,16 @@ import org.junit.jupiter.api.io.TempDir;
 class BookKeeperNamespaceCommandTest {
 
     @Test
-    void acceptsTheExactReadOnlyVerificationResultAndWritesEvidence(
-            @TempDir Path tempDir) throws Exception {
+    void acceptsTheExactReadOnlyVerificationResultAndWritesEvidence(@TempDir Path tempDir) throws Exception {
         Path configPath = writeConfig(tempDir, "b".repeat(64));
         Path output = tempDir.resolve("verify.json");
         AdminConfiguration config = AdminConfiguration.load(configPath);
-        CommandLineArguments arguments = CommandLineArguments.parse(new String[]{
-                "bookkeeper", "namespace", "verify",
-                "--config", configPath.toString(),
-                "--output", output.toString()
+        CommandLineArguments arguments = CommandLineArguments.parse(new String[] {
+            "bookkeeper", "namespace", "verify", "--config", configPath.toString(), "--output", output.toString()
         });
 
-        AdminExitCode result = BookKeeperNamespaceCommand.evaluateVerify(
-                config,
-                reservation("b".repeat(64)),
-                arguments);
+        AdminExitCode result =
+                BookKeeperNamespaceCommand.evaluateVerify(config, reservation("b".repeat(64)), arguments);
 
         assertThat(result).isEqualTo(AdminExitCode.SUCCESS);
         assertThat(Files.readString(output))
@@ -37,25 +31,19 @@ class BookKeeperNamespaceCommandTest {
     }
 
     @Test
-    void rejectsOperatorEvidenceDrift(
-            @TempDir Path tempDir) throws Exception {
+    void rejectsOperatorEvidenceDrift(@TempDir Path tempDir) throws Exception {
         Path configPath = writeConfig(tempDir, "b".repeat(64));
         AdminConfiguration config = AdminConfiguration.load(configPath);
-        CommandLineArguments arguments = CommandLineArguments.parse(new String[]{
-                "bookkeeper", "namespace", "verify",
-                "--config", configPath.toString()
-        });
+        CommandLineArguments arguments = CommandLineArguments.parse(
+                new String[] {"bookkeeper", "namespace", "verify", "--config", configPath.toString()});
 
-        AdminExitCode result = BookKeeperNamespaceCommand.evaluateVerify(
-                config,
-                reservation("c".repeat(64)),
-                arguments);
+        AdminExitCode result =
+                BookKeeperNamespaceCommand.evaluateVerify(config, reservation("c".repeat(64)), arguments);
 
         assertThat(result).isEqualTo(AdminExitCode.CONDITION_FAILED);
     }
 
-    private static BookKeeperLedgerIdNamespaceReservation reservation(
-            String operatorEvidence) {
+    private static BookKeeperLedgerIdNamespaceReservation reservation(String operatorEvidence) {
         return new BookKeeperLedgerIdNamespaceReservation(
                 1,
                 "reservation-1",
@@ -74,11 +62,10 @@ class BookKeeperNamespaceCommandTest {
                 "/nereus/bookkeeper/namespace");
     }
 
-    private static Path writeConfig(
-            Path tempDir,
-            String operatorEvidence) throws Exception {
+    private static Path writeConfig(Path tempDir, String operatorEvidence) throws Exception {
         Path config = tempDir.resolve("admin.properties");
-        Files.writeString(config,
+        Files.writeString(
+                config,
                 "cluster=cluster-1\n"
                         + "oxia.serviceAddress=localhost:6648\n"
                         + "oxia.namespace=nereus\n"

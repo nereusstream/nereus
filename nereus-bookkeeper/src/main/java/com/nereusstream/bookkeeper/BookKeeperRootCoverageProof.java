@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import java.util.Objects;
 
-/** Complete binding-scoped root/protection/reader traversal under one broker-readiness fact. */
+/**
+ * Complete binding-scoped root/protection/reader traversal under one broker-readiness fact.
+ */
 public record BookKeeperRootCoverageProof(
         long brokerReadinessEpoch,
         Checksum brokerSetSha256,

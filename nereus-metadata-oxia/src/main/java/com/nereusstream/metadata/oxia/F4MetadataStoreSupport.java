@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -7,12 +8,19 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.metadata.oxia.codec.MetadataCodecException;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
-import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
-import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
-import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperAllocationSlotRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperAppendReservationRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerReaderLeaseRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperWriterStateRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
+import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
+import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
+import com.nereusstream.metadata.oxia.records.LedgerAllocationIntentRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
@@ -21,13 +29,6 @@ import com.nereusstream.metadata.oxia.records.ObjectReaderLeaseRecord;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.RangeRetentionStatsRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
-import com.nereusstream.metadata.oxia.records.BookKeeperAllocationSlotRecord;
-import com.nereusstream.metadata.oxia.records.BookKeeperAppendReservationRecord;
-import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
-import com.nereusstream.metadata.oxia.records.BookKeeperLedgerReaderLeaseRecord;
-import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
-import com.nereusstream.metadata.oxia.records.BookKeeperWriterStateRecord;
-import com.nereusstream.metadata.oxia.records.LedgerAllocationIntentRecord;
 import io.oxia.client.api.exceptions.KeyAlreadyExistsException;
 import io.oxia.client.api.exceptions.UnexpectedVersionIdException;
 import java.nio.charset.StandardCharsets;
@@ -42,7 +43,9 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Shared exact-byte codec/CAS helpers for the two focused Phase 4 metadata stores. */
+/**
+ * Shared exact-byte codec/CAS helpers for the two focused Phase 4 metadata stores.
+ */
 final class F4MetadataStoreSupport {
     private final PartitionedOxiaClient client;
     private final Clock clock;
@@ -63,18 +66,17 @@ final class F4MetadataStoreSupport {
         return clock.millis();
     }
 
-    <T> CompletableFuture<Optional<Decoded<T>>> get(
-            String key, PartitionKey partition, Class<T> type) {
+    <T> CompletableFuture<Optional<Decoded<T>>> get(String key, PartitionKey partition, Class<T> type) {
         ensureOpen();
         return client.get(key, partition).thenApply(optional -> optional.map(value -> decode(value, type)));
     }
 
-    <T> CompletableFuture<Decoded<T>> create(
-            String key, PartitionKey partition, T value, Class<T> type) {
+    <T> CompletableFuture<Decoded<T>> create(String key, PartitionKey partition, T value, Class<T> type) {
         ensureOpen();
         byte[] bytes = encodeForWrite(value, type);
         return client.putIfAbsent(key, bytes, partition)
-                .thenApply(result -> new Decoded<>(key, hydrate(value, result.version()), result.version(), sha256(bytes)));
+                .thenApply(result ->
+                        new Decoded<>(key, hydrate(value, result.version()), result.version(), sha256(bytes)));
     }
 
     <T> CompletableFuture<Decoded<T>> compareAndSet(
@@ -83,7 +85,8 @@ final class F4MetadataStoreSupport {
         requireVersion(expectedVersion);
         byte[] bytes = encodeForWrite(value, type);
         return client.putIfVersion(key, bytes, expectedVersion, partition)
-                .thenApply(result -> new Decoded<>(key, hydrate(value, result.version()), result.version(), sha256(bytes)));
+                .thenApply(result ->
+                        new Decoded<>(key, hydrate(value, result.version()), result.version(), sha256(bytes)));
     }
 
     CompletableFuture<Void> delete(String key, PartitionKey partition, long expectedVersion) {
@@ -116,17 +119,14 @@ final class F4MetadataStoreSupport {
     }
 
     F4ScanToken validateToken(
-            Optional<F4ScanToken> continuation,
-            String cluster,
-            F4ScanKind kind,
-            String scopeSha256,
-            String prefix) {
+            Optional<F4ScanToken> continuation, String cluster, F4ScanKind kind, String scopeSha256, String prefix) {
         Objects.requireNonNull(continuation, "continuation");
         if (continuation.isEmpty()) {
             return null;
         }
         F4ScanToken token = continuation.orElseThrow();
-        if (!token.cluster().equals(cluster) || token.kind() != kind
+        if (!token.cluster().equals(cluster)
+                || token.kind() != kind
                 || !token.scopeIdentitySha256().equals(scopeSha256)
                 || !token.scanPrefix().equals(prefix)
                 || !token.exclusiveLastKey().startsWith(prefix)) {
@@ -187,11 +187,13 @@ final class F4MetadataStoreSupport {
                 || cause instanceof F4MetadataConditionFailedException
                 || cause instanceof BookKeeperMetadataConditionFailedException
                 || cause instanceof CursorMetadataConditionFailedException
+                || cause instanceof KafkaMetadataConditionFailedException
                 || cause instanceof ProjectionMetadataConditionFailedException;
     }
 
     static F4MetadataConditionFailedException condition(String operation, Throwable failure) {
-        return new F4MetadataConditionFailedException(operation + " lost its exact single-key condition", unwrap(failure));
+        return new F4MetadataConditionFailedException(
+                operation + " lost its exact single-key condition", unwrap(failure));
     }
 
     static NereusException invariant(String message) {
@@ -335,7 +337,8 @@ final class F4MetadataStoreSupport {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }

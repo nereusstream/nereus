@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -9,7 +10,9 @@ import com.nereusstream.api.StreamId;
 import java.util.List;
 import java.util.Objects;
 
-/** Immutable logical materialization plan; workflow lifecycle lives in its durable task root. */
+/**
+ * Immutable logical materialization plan; workflow lifecycle lives in its durable task root.
+ */
 public record MaterializationTask(
         String taskId,
         StreamId streamId,
@@ -36,7 +39,8 @@ public record MaterializationTask(
         if (sources.isEmpty() || sources.size() > policy.maxSourceRanges()) {
             throw new IllegalArgumentException("task source count is outside policy limits");
         }
-        if (view != policy.view() || taskKind != policy.taskKind()
+        if (view != policy.view()
+                || taskKind != policy.taskKind()
                 || coverage.recordCount() > policy.maxRangeRecords()) {
             throw new IllegalArgumentException("task view/kind/coverage does not match policy");
         }
@@ -49,8 +53,7 @@ public record MaterializationTask(
             if (source.view() != taskKind.sourceView()
                     || source.range().startOffset() != cursor
                     || source.commitVersion() < previousCommitVersion) {
-                throw new IllegalArgumentException(
-                        "task sources must use the task-kind source view and be gap-free");
+                throw new IllegalArgumentException("task sources must use the task-kind source view and be gap-free");
             }
             cursor = source.range().endOffset();
             previousCommitVersion = source.commitVersion();
@@ -60,8 +63,7 @@ public record MaterializationTask(
         }
         Checksum expectedSourceSet = MaterializationCanonical.sourceSetDigest(sources);
         Checksum expectedPolicy = policy.digestSha256();
-        if (!sourceSetSha256.equals(expectedSourceSet)
-                || !policyDigestSha256.equals(expectedPolicy)) {
+        if (!sourceSetSha256.equals(expectedSourceSet) || !policyDigestSha256.equals(expectedPolicy)) {
             throw new IllegalArgumentException("task source/policy digest does not match canonical fields");
         }
         String expectedTaskId = MaterializationCanonical.taskId(
@@ -72,21 +74,13 @@ public record MaterializationTask(
     }
 
     public static MaterializationTask create(
-            StreamId streamId,
-            OffsetRange coverage,
-            List<SourceGeneration> sources,
-            MaterializationPolicy policy) {
+            StreamId streamId, OffsetRange coverage, List<SourceGeneration> sources, MaterializationPolicy policy) {
         Objects.requireNonNull(policy, "policy");
         List<SourceGeneration> canonical = MaterializationCanonical.canonicalSources(sources);
         Checksum sourceSet = MaterializationCanonical.sourceSetDigest(canonical);
         Checksum policyDigest = policy.digestSha256();
         String taskId = MaterializationCanonical.taskId(
-                streamId,
-                policy.view(),
-                policy.taskKind(),
-                coverage,
-                sourceSet,
-                policyDigest);
+                streamId, policy.view(), policy.taskKind(), coverage, sourceSet, policyDigest);
         return new MaterializationTask(
                 taskId,
                 streamId,

@@ -64,9 +64,7 @@ final class ReadOperationDeadline {
         }
     }
 
-    <T> CompletableFuture<T> bound(
-            Supplier<CompletableFuture<T>> operation,
-            String operationName) {
+    <T> CompletableFuture<T> bound(Supplier<CompletableFuture<T>> operation, String operationName) {
         check(operationName);
         CompletableFuture<T> source;
         try {

@@ -1,15 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
@@ -31,28 +30,26 @@ class ObjectStoreDeleteCapabilityProbeTest {
     void provesExactLifecycleAndProducesStableScopeIdentity() {
         ObjectStoreConfiguration configuration = configuration("bucket-a", "cluster-a");
         try (LocalFileObjectStore store = new LocalFileObjectStore(temporary.resolve("objects"))) {
-            var probe = new DefaultObjectStoreDeleteCapabilityProbe(
-                    store, configuration, Clock.systemUTC());
+            var probe = new DefaultObjectStoreDeleteCapabilityProbe(store, configuration, Clock.systemUTC());
 
-            ObjectStoreDeleteCapabilityProof first = probe.probe(
-                    new ObjectStoreDeleteCapabilityRequest(RUN_A, TIMEOUT)).join();
+            ObjectStoreDeleteCapabilityProof first = probe.probe(new ObjectStoreDeleteCapabilityRequest(RUN_A, TIMEOUT))
+                    .join();
             ObjectStoreDeleteCapabilityProof second = probe.probe(
-                    new ObjectStoreDeleteCapabilityRequest(RUN_B, TIMEOUT)).join();
+                            new ObjectStoreDeleteCapabilityRequest(RUN_B, TIMEOUT))
+                    .join();
 
             assertThat(first.protocolVersion()).isEqualTo(1);
             assertThat(first.capabilitySha256())
                     .isEqualTo(probe.expectedCapabilitySha256())
                     .isEqualTo(second.capabilitySha256());
-            assertThat(first.probeObjectKeySha256())
-                    .hasSize(64)
-                    .isNotEqualTo(second.probeObjectKeySha256());
+            assertThat(first.probeObjectKeySha256()).hasSize(64).isNotEqualTo(second.probeObjectKeySha256());
             assertThat(first.completedAtMillis()).isPositive();
             assertThat(store.listObjects(
-                            new ObjectKeyPrefix("__nereus_capability__/delete-v1/"),
-                            Optional.empty(),
-                            new ListObjectsOptions(10, TIMEOUT))
-                    .join()
-                    .objects())
+                                    new ObjectKeyPrefix("__nereus_capability__/delete-v1/"),
+                                    Optional.empty(),
+                                    new ListObjectsOptions(10, TIMEOUT))
+                            .join()
+                            .objects())
                     .isEmpty();
         }
     }
@@ -81,10 +78,9 @@ class ObjectStoreDeleteCapabilityProbeTest {
             var probe = new DefaultObjectStoreDeleteCapabilityProbe(
                     store, configuration("bucket-a", "cluster-a"), Clock.systemUTC());
 
-            assertThat(probe.probe(
-                            new ObjectStoreDeleteCapabilityRequest(RUN_A, TIMEOUT))
-                    .join()
-                    .capabilitySha256())
+            assertThat(probe.probe(new ObjectStoreDeleteCapabilityRequest(RUN_A, TIMEOUT))
+                            .join()
+                            .capabilitySha256())
                     .isEqualTo(probe.expectedCapabilitySha256());
             assertThat(store.lostPut.get()).isTrue();
             assertThat(store.lostDelete.get()).isTrue();
@@ -97,9 +93,7 @@ class ObjectStoreDeleteCapabilityProbeTest {
             ObjectStore store = new DelegatingObjectStore(delegate) {
                 @Override
                 public CompletableFuture<ListObjectsResult> listObjects(
-                        ObjectKeyPrefix prefix,
-                        Optional<String> continuationToken,
-                        ListObjectsOptions options) {
+                        ObjectKeyPrefix prefix, Optional<String> continuationToken, ListObjectsOptions options) {
                     return CompletableFuture.completedFuture(
                             new ListObjectsResult(prefix, java.util.List.of(), Optional.empty()));
                 }
@@ -107,17 +101,14 @@ class ObjectStoreDeleteCapabilityProbeTest {
             var probe = new DefaultObjectStoreDeleteCapabilityProbe(
                     store, configuration("bucket-a", "cluster-a"), Clock.systemUTC());
 
-            assertThatThrownBy(() -> probe.probe(
-                            new ObjectStoreDeleteCapabilityRequest(RUN_A, TIMEOUT))
-                    .join())
-                    .satisfies(error -> assertThat(unwrap(error).code())
-                            .isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH));
+            assertThatThrownBy(() -> probe.probe(new ObjectStoreDeleteCapabilityRequest(RUN_A, TIMEOUT))
+                            .join())
+                    .satisfies(error -> assertThat(unwrap(error).code()).isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH));
             assertThatThrownBy(() -> delegate.headObject(
-                            new ObjectKey("__nereus_capability__/delete-v1/" + RUN_A + "/probe"),
-                            new HeadObjectOptions(TIMEOUT))
-                    .join())
-                    .satisfies(error -> assertThat(unwrap(error).code())
-                            .isEqualTo(ErrorCode.OBJECT_NOT_FOUND));
+                                    new ObjectKey("__nereus_capability__/delete-v1/" + RUN_A + "/probe"),
+                                    new HeadObjectOptions(TIMEOUT))
+                            .join())
+                    .satisfies(error -> assertThat(unwrap(error).code()).isEqualTo(ErrorCode.OBJECT_NOT_FOUND));
         }
     }
 
@@ -177,22 +168,18 @@ class ObjectStoreDeleteCapabilityProbeTest {
         }
 
         @Override
-        public CompletableFuture<HeadObjectResult> headObject(
-                ObjectKey key, HeadObjectOptions options) {
+        public CompletableFuture<HeadObjectResult> headObject(ObjectKey key, HeadObjectOptions options) {
             return delegate.headObject(key, options);
         }
 
         @Override
         public CompletableFuture<ListObjectsResult> listObjects(
-                ObjectKeyPrefix prefix,
-                Optional<String> continuationToken,
-                ListObjectsOptions options) {
+                ObjectKeyPrefix prefix, Optional<String> continuationToken, ListObjectsOptions options) {
             return delegate.listObjects(prefix, continuationToken, options);
         }
 
         @Override
-        public CompletableFuture<DeleteObjectResult> deleteObject(
-                ObjectKey key, DeleteObjectOptions options) {
+        public CompletableFuture<DeleteObjectResult> deleteObject(ObjectKey key, DeleteObjectOptions options) {
             return delegate.deleteObject(key, options);
         }
 
@@ -216,25 +203,18 @@ class ObjectStoreDeleteCapabilityProbeTest {
             return super.putObject(key, source, options).thenCompose(result -> {
                 if (lostPut.compareAndSet(false, true)) {
                     return CompletableFuture.failedFuture(
-                            new NereusException(
-                                    ErrorCode.OBJECT_UPLOAD_FAILED,
-                                    true,
-                                    "lost probe PUT response"));
+                            new NereusException(ErrorCode.OBJECT_UPLOAD_FAILED, true, "lost probe PUT response"));
                 }
                 return CompletableFuture.completedFuture(result);
             });
         }
 
         @Override
-        public CompletableFuture<DeleteObjectResult> deleteObject(
-                ObjectKey key, DeleteObjectOptions options) {
+        public CompletableFuture<DeleteObjectResult> deleteObject(ObjectKey key, DeleteObjectOptions options) {
             return super.deleteObject(key, options).thenCompose(result -> {
                 if (lostDelete.compareAndSet(false, true)) {
                     return CompletableFuture.failedFuture(
-                            new NereusException(
-                                    ErrorCode.OBJECT_UPLOAD_FAILED,
-                                    true,
-                                    "lost probe DELETE response"));
+                            new NereusException(ErrorCode.OBJECT_UPLOAD_FAILED, true, "lost probe DELETE response"));
                 }
                 return CompletableFuture.completedFuture(result);
             });

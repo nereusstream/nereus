@@ -15,8 +15,7 @@
 package com.nereusstream.objectstore;
 
 public final class RangeChecks {
-    private RangeChecks() {
-    }
+    private RangeChecks() {}
 
     public static void requireNonNegativeNonOverflowingRange(long offset, long length, String label) {
         if (offset < 0 || length < 0) {

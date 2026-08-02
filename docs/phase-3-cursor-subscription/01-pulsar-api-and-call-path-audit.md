@@ -30,50 +30,51 @@ master source selector，不把它描述为已发布版本。
 重新执行 composite compile、loaded/unloaded/namespace route audit、focused/real-service tests、spotless and
 checkstyle gates。M0 的 blob 表不回写为后续实现文件 hash，以保留可复核的原始 gate evidence。
 
-| Source file | Git blob at locked commit |
-| --- | --- |
-| `managed-ledger/.../ManagedCursor.java` | `1e6ab76c80c939cd51a29a590a50b2d079fa1c80` |
-| `managed-ledger/.../ManagedLedger.java` | `0455f0efa8bb6d0ef248b870b1a68166cdcef2c8` |
-| `managed-ledger/.../ManagedLedgerFactory.java` | `b9adbe3b353fd92e541f9fd75b5c788b0468a859` |
-| `managed-ledger/.../AsyncCallbacks.java` | `70db427afce4f811670dd018c6dd98d44230d4bc` |
-| `managed-ledger/.../Position.java` | `d0d6d865c9558a7a02707c48fb19b09d7fc1014b` |
-| `managed-ledger/.../impl/AckSetState.java` | `03ff50c1c7fe5487812fbe6485eed66debfe4b74` |
-| `managed-ledger/.../impl/AckSetStateUtil.java` | `11ab520b68e925fdc0882ec6ef4be316b27489f3` |
-| `managed-ledger/.../impl/ManagedCursorImpl.java` | `00c2f4013796c50202bfa4814049572bcc03b1fd` |
-| `managed-ledger/.../impl/ManagedCursorContainerImpl.java` | `b632ee7f21c39b3649e81ccdbe6292d00a3fb110` |
-| `managed-ledger/.../impl/ManagedLedgerImpl.java` | `26fdb458a21b2edfcdbaed049681e69fd4b99077` |
-| `managed-ledger/.../mledger/ScanOutcome.java` | `c679c40e85e9174da793cc99ebd73009a55e7dfe` |
-| `managed-ledger/src/main/proto/MLDataFormats.proto` | `825da1e414cea2ad6955b44b8ccd3b5cf624b4e6` |
-| `pulsar-broker/.../service/Consumer.java` | `b6bbf68dfe50b27dcd072f3b8fb540cdbd696aea` |
+| Source file                                                | Git blob at locked commit                  |
+|------------------------------------------------------------|--------------------------------------------|
+| `managed-ledger/.../ManagedCursor.java`                    | `1e6ab76c80c939cd51a29a590a50b2d079fa1c80` |
+| `managed-ledger/.../ManagedLedger.java`                    | `0455f0efa8bb6d0ef248b870b1a68166cdcef2c8` |
+| `managed-ledger/.../ManagedLedgerFactory.java`             | `b9adbe3b353fd92e541f9fd75b5c788b0468a859` |
+| `managed-ledger/.../AsyncCallbacks.java`                   | `70db427afce4f811670dd018c6dd98d44230d4bc` |
+| `managed-ledger/.../Position.java`                         | `d0d6d865c9558a7a02707c48fb19b09d7fc1014b` |
+| `managed-ledger/.../impl/AckSetState.java`                 | `03ff50c1c7fe5487812fbe6485eed66debfe4b74` |
+| `managed-ledger/.../impl/AckSetStateUtil.java`             | `11ab520b68e925fdc0882ec6ef4be316b27489f3` |
+| `managed-ledger/.../impl/ManagedCursorImpl.java`           | `00c2f4013796c50202bfa4814049572bcc03b1fd` |
+| `managed-ledger/.../impl/ManagedCursorContainerImpl.java`  | `b632ee7f21c39b3649e81ccdbe6292d00a3fb110` |
+| `managed-ledger/.../impl/ManagedLedgerImpl.java`           | `26fdb458a21b2edfcdbaed049681e69fd4b99077` |
+| `managed-ledger/.../mledger/ScanOutcome.java`              | `c679c40e85e9174da793cc99ebd73009a55e7dfe` |
+| `managed-ledger/src/main/proto/MLDataFormats.proto`        | `825da1e414cea2ad6955b44b8ccd3b5cf624b4e6` |
+| `pulsar-broker/.../service/Consumer.java`                  | `b6bbf68dfe50b27dcd072f3b8fb540cdbd696aea` |
 | `pulsar-broker/.../persistent/PersistentSubscription.java` | `e77ced8da168faffa73f39eb3fc900c77a5fe6b6` |
-| `pulsar-broker/.../persistent/PersistentTopic.java` | `67a403584bed85e9be7d39e0edab150d5a5f10b2` |
-| `.../PersistentDispatcherMultipleConsumers.java` | `388536907b9aa667e3dff6099b29871d850c32e9` |
-| `.../PersistentDispatcherSingleActiveConsumer.java` | `08356f378335d135bb4a7da9ce1dd953be07971d` |
-| `.../AbstractBaseDispatcher.java` | `be33c8ced295c3fd893a698b00ade8132c9d9aeb` |
-| `pulsar-broker/.../admin/impl/PersistentTopicsBase.java` | `1a21a6295ccf14d2636f6d88666bb61caab45955` |
-| `pulsar-broker/.../admin/impl/NamespacesBase.java` | `a30d50a1ae8ec8c2492df7026e1c5deab6e711f6` |
-| `pulsar-broker/.../admin/v2/PersistentTopics.java` | `77b9a83f505d3205ae29be54e06cb9465736e5f2` |
-| `pulsar-broker/.../service/BrokerService.java` | `02abfa5f17ec761b5a08348ecb015712b71fa297` |
-| fork `NereusManagedLedgerStorage.java` | `74075fd08e049e93de0439843f450af5e73517d2` |
-| fork `NereusBrokerCapabilityCoordinator.java` | `4639aebb06e6915922b60b10112a6fec60632cf9` |
-| fork `NereusStorageBindingCapability.java` | `5a9659a57e5d8e96474bd0cecfbdc4a01f4ec243` |
-| fork `BrokerRegistryImpl.java` | `8a987add4adade315ac4dd784ca5a27ce04162d2` |
-| fork `NereusAcknowledgeValidator.java` | `d4fe15ffc5f5ce5884d7494afa38a7e175d22735` |
-| fork `NereusTopicFeatureValidator.java` | `10e06f4b56c08a64b945462b140f5f886760dc6a` |
-| fork `NereusAdminOperation.java` | `93d3e6383fc7efdabca7ff19a8b95e12b4c295ef` |
+| `pulsar-broker/.../persistent/PersistentTopic.java`        | `67a403584bed85e9be7d39e0edab150d5a5f10b2` |
+| `.../PersistentDispatcherMultipleConsumers.java`           | `388536907b9aa667e3dff6099b29871d850c32e9` |
+| `.../PersistentDispatcherSingleActiveConsumer.java`        | `08356f378335d135bb4a7da9ce1dd953be07971d` |
+| `.../AbstractBaseDispatcher.java`                          | `be33c8ced295c3fd893a698b00ade8132c9d9aeb` |
+| `pulsar-broker/.../admin/impl/PersistentTopicsBase.java`   | `1a21a6295ccf14d2636f6d88666bb61caab45955` |
+| `pulsar-broker/.../admin/impl/NamespacesBase.java`         | `a30d50a1ae8ec8c2492df7026e1c5deab6e711f6` |
+| `pulsar-broker/.../admin/v2/PersistentTopics.java`         | `77b9a83f505d3205ae29be54e06cb9465736e5f2` |
+| `pulsar-broker/.../service/BrokerService.java`             | `02abfa5f17ec761b5a08348ecb015712b71fa297` |
+| fork `NereusManagedLedgerStorage.java`                     | `74075fd08e049e93de0439843f450af5e73517d2` |
+| fork `NereusBrokerCapabilityCoordinator.java`              | `4639aebb06e6915922b60b10112a6fec60632cf9` |
+| fork `NereusStorageBindingCapability.java`                 | `5a9659a57e5d8e96474bd0cecfbdc4a01f4ec243` |
+| fork `BrokerRegistryImpl.java`                             | `8a987add4adade315ac4dd784ca5a27ce04162d2` |
+| fork `NereusAcknowledgeValidator.java`                     | `d4fe15ffc5f5ce5884d7494afa38a7e175d22735` |
+| fork `NereusTopicFeatureValidator.java`                    | `10e06f4b56c08a64b945462b140f5f886760dc6a` |
+| fork `NereusAdminOperation.java`                           | `93d3e6383fc7efdabca7ff19a8b95e12b4c295ef` |
 
 Relevant Nereus F2 downgrade-fence inputs at baseline `623662d9...`：
 
-| Source file | Git blob |
-| --- | --- |
-| `ProjectionCreateRequest.java` | `80015a798bae4017dfbc83b82c1939941807f860` |
-| `records/TopicProjectionRecord.java` | `f5621d099875d1b3fd7377eb1363bbb6c86d78a9` |
-| `ProjectionMetadataStoreCore.java` | `308f34fb8349cac2e291fed82f142a2cb6571e01` |
+| Source file                               | Git blob                                   |
+|-------------------------------------------|--------------------------------------------|
+| `ProjectionCreateRequest.java`            | `80015a798bae4017dfbc83b82c1939941807f860` |
+| `records/TopicProjectionRecord.java`      | `f5621d099875d1b3fd7377eb1363bbb6c86d78a9` |
+| `ProjectionMetadataStoreCore.java`        | `308f34fb8349cac2e291fed82f142a2cb6571e01` |
 | `NereusManagedLedgerOpenCoordinator.java` | `af90e404652f059e4de1b5ff5d72e0297942b12e` |
-| `NereusManagedLedgerFactory.java` | `c472545a28b5614ee0caa4c360202ef94e75f86a` |
+| `NereusManagedLedgerFactory.java`         | `c472545a28b5614ee0caa4c360202ef94e75f86a` |
 
 M0 对 checkout 中现有编译产物执行了 `javap -public`，确认 `ManagedCursor`、`ManagedLedger`、
-`ManagedLedgerFactory` 和 `AsyncCallbacks.ResetCursorCallback` 的 member surface 与 source 一致。该动作不生成或提交 F3 code。
+`ManagedLedgerFactory` 和 `AsyncCallbacks.ResetCursorCallback` 的 member surface 与 source 一致。该动作不生成或提交 F3
+code。
 
 ## 3. Exact ManagedLedger Cursor Surface
 
@@ -121,19 +122,19 @@ ensuring the collection at open completion already contains every hydrated durab
 
 F3 必须实现或继续保持下列锁定行为。完整逐方法合同在文档 02。
 
-| Family | Locked methods | F3 owner |
-| --- | --- | --- |
-| identity/local activity | `getName`, `getLastActive`, `updateLastActive`, active/inactive methods, `isDurable` | facade local state |
-| reads | sync/async `readEntries`, `readEntriesOrWait`, skip variants, cancel/hasMore | F2 resolver + local read offset |
-| durable cumulative ack | sync/async `markDelete` overloads | `CursorStorage` single-root CAS |
-| durable individual ack | sync/async `delete(Position/Iterable)` | `CursorStorage` single-root CAS |
-| positions | `getReadPosition`, `getMarkDeletedPosition`, `getPersistentMarkDeletedPosition`, `rewind`, `seek` | local read offset + durable mark-delete |
-| destructive progress | `resetCursor`, `asyncResetCursor`, clear backlog, skip entries | serialized durable transition |
-| random/read-only access | nth/find/scan/replay | F1 resolver, filtered by durable ack state |
-| properties | position-property and cursor-property methods | root record; position properties commit with next mark-delete |
-| stats/accounting | backlog/range/estimated-size/stats methods | exact entry count where available; documented estimates otherwise |
-| batch helpers | `trimDeletedEntries`, `getDeletedBatchIndexesAsLongArray`, `getBatchPositionAckSet` | effective ack state; defensive array copy |
-| lifecycle | sync/async close, `isClosed`, duplicate non-durable | facade lifecycle |
+| Family                  | Locked methods                                                                                    | F3 owner                                                          |
+|-------------------------|---------------------------------------------------------------------------------------------------|-------------------------------------------------------------------|
+| identity/local activity | `getName`, `getLastActive`, `updateLastActive`, active/inactive methods, `isDurable`              | facade local state                                                |
+| reads                   | sync/async `readEntries`, `readEntriesOrWait`, skip variants, cancel/hasMore                      | F2 resolver + local read offset                                   |
+| durable cumulative ack  | sync/async `markDelete` overloads                                                                 | `CursorStorage` single-root CAS                                   |
+| durable individual ack  | sync/async `delete(Position/Iterable)`                                                            | `CursorStorage` single-root CAS                                   |
+| positions               | `getReadPosition`, `getMarkDeletedPosition`, `getPersistentMarkDeletedPosition`, `rewind`, `seek` | local read offset + durable mark-delete                           |
+| destructive progress    | `resetCursor`, `asyncResetCursor`, clear backlog, skip entries                                    | serialized durable transition                                     |
+| random/read-only access | nth/find/scan/replay                                                                              | F1 resolver, filtered by durable ack state                        |
+| properties              | position-property and cursor-property methods                                                     | root record; position properties commit with next mark-delete     |
+| stats/accounting        | backlog/range/estimated-size/stats methods                                                        | exact entry count where available; documented estimates otherwise |
+| batch helpers           | `trimDeletedEntries`, `getDeletedBatchIndexesAsLongArray`, `getBatchPositionAckSet`               | effective ack state; defensive array copy                         |
+| lifecycle               | sync/async close, `isClosed`, duplicate non-durable                                               | facade lifecycle                                                  |
 
 Callbacks are exactly-once terminal pairs from `AsyncCallbacks`; `asyncResetCursor` uses
 `ResetCursorCallback.resetComplete(Object)` / `resetFailed(ManagedLedgerException,Object)`.
@@ -299,14 +300,14 @@ failure. Redelivery from durable ack truth is compatible；skip is not。
 
 ## 8. Existing Nereus Handoff
 
-| Existing component | F3 use | Forbidden reinterpretation |
-| --- | --- | --- |
-| `ManagedLedgerProjectionIdentity` | embeds stream/incarnation/virtual-ledger identity in cursor root | no new cursor virtual ledger |
-| `PositionProjection` | strict Position/offset validation and projection | no batch sub-offset |
-| `StreamStorage.getStreamMetadata/read/trim` | committed bounds, payload validation and idempotent trim operation | cursor cannot publish append visibility |
-| `ProjectionMetadataStore` / shared Oxia runtime | pattern for strict codec, CAS, range scan, watch | no multi-key atomicity assumption |
-| `ObjectStore` | immutable snapshot put/head/read | snapshot existence is not visibility |
-| F2 local `NereusManagedCursor` | read/wait/direct replay foundation | local map is not durable enumeration |
+| Existing component                              | F3 use                                                             | Forbidden reinterpretation              |
+|-------------------------------------------------|--------------------------------------------------------------------|-----------------------------------------|
+| `ManagedLedgerProjectionIdentity`               | embeds stream/incarnation/virtual-ledger identity in cursor root   | no new cursor virtual ledger            |
+| `PositionProjection`                            | strict Position/offset validation and projection                   | no batch sub-offset                     |
+| `StreamStorage.getStreamMetadata/read/trim`     | committed bounds, payload validation and idempotent trim operation | cursor cannot publish append visibility |
+| `ProjectionMetadataStore` / shared Oxia runtime | pattern for strict codec, CAS, range scan, watch                   | no multi-key atomicity assumption       |
+| `ObjectStore`                                   | immutable snapshot put/head/read                                   | snapshot existence is not visibility    |
+| F2 local `NereusManagedCursor`                  | read/wait/direct replay foundation                                 | local map is not durable enumeration    |
 
 No F3 cursor method is added to `nereus-api` or `StreamStorage`. Durable cursor state belongs to L1 modules；L0
 only exposes its existing committed metadata/read/trim contracts。
@@ -325,29 +326,29 @@ This source behavior is part of M0 and must be retested on baseline drift。
 
 ## 9. Repository Ownership
 
-| Repository/module | Owned F3 change |
-| --- | --- |
-| `nereus-metadata-oxia` | cursor keyspace、records、codec、single-key CAS/scan/watch、retention record |
-| `nereus-managed-ledger` | cursor domain/state machine、snapshot store、facade、ledger hydration、local read path |
-| `nereus-pulsar-adapter` | cursor config/runtime wiring and capability-ready view |
-| `nereus-object-store` | no generic API change；F3 adds snapshot codec/store consumer in managed-ledger |
-| `nereus-api` / `nereus-core` | no cursor API change；reuse existing L0 truth |
-| Pulsar fork | broker validation、ack completion ordering、admin allowlist、capability publication、integration gates |
+| Repository/module            | Owned F3 change                                                                                    |
+|------------------------------|----------------------------------------------------------------------------------------------------|
+| `nereus-metadata-oxia`       | cursor keyspace、records、codec、single-key CAS/scan/watch、retention record                           |
+| `nereus-managed-ledger`      | cursor domain/state machine、snapshot store、facade、ledger hydration、local read path                 |
+| `nereus-pulsar-adapter`      | cursor config/runtime wiring and capability-ready view                                             |
+| `nereus-object-store`        | no generic API change；F3 adds snapshot codec/store consumer in managed-ledger                      |
+| `nereus-api` / `nereus-core` | no cursor API change；reuse existing L0 truth                                                       |
+| Pulsar fork                  | broker validation、ack completion ordering、admin allowlist、capability publication、integration gates |
 
 Fork code must stay thin: it decides admission and composes Pulsar-private objects; cursor correctness remains in
 Nereus modules。
 
 ## 10. M0 Exit Decision
 
-| Question | Evidence-based answer |
-| --- | --- |
-| API surface known? | Yes；source blobs and `javap -public` locked |
-| broker durable reconstruction known? | Yes；synchronous `getCursors()` enumeration before subscription recreation |
-| batch semantics known? | Yes；remaining-bit `long[]`, AND merge, entry decode needed for batch size |
-| read-position recovery known? | Yes；normal dispatch position is local, durable ack truth drives restart |
-| F1/F2 ownership preserved? | Yes；no L0 cursor API or projection append authority added |
+| Question                                | Evidence-based answer                                                                  |
+|-----------------------------------------|----------------------------------------------------------------------------------------|
+| API surface known?                      | Yes；source blobs and `javap -public` locked                                            |
+| broker durable reconstruction known?    | Yes；synchronous `getCursors()` enumeration before subscription recreation              |
+| batch semantics known?                  | Yes；remaining-bit `long[]`, AND merge, entry decode needed for batch size              |
+| read-position recovery known?           | Yes；normal dispatch position is local, durable ack truth drives restart                |
+| F1/F2 ownership preserved?              | Yes；no L0 cursor API or projection append authority added                              |
 | Broker open ownership signal available? | Yes；the locked async factory overload already receives it，and F3 must stop dropping it |
-| implementation blocker remains? | No |
+| implementation blocker remains?         | No                                                                                     |
 
 **F3-M0：PASS。** Any Pulsar commit or relevant source-blob change invalidates this pass and requires rerunning the
 member and call-path audit before implementation continues。

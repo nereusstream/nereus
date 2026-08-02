@@ -19,7 +19,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Options for an append call. */
+/**
+ * Options for an append call.
+ */
 public record AppendOptions(
         Optional<AppendSession> appendSession,
         DurabilityLevel durabilityLevel,
@@ -33,8 +35,7 @@ public record AppendOptions(
             Duration timeout,
             boolean autoAcquireSession,
             Map<String, String> tags) {
-        this(appendSession, durabilityLevel, AppendCompletionPolicy.PROFILE_DEFAULT,
-                timeout, autoAcquireSession, tags);
+        this(appendSession, durabilityLevel, AppendCompletionPolicy.PROFILE_DEFAULT, timeout, autoAcquireSession, tags);
     }
 
     public AppendOptions {

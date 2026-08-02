@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.target.BookKeeperEntryMapping;
@@ -76,16 +76,15 @@ class BookKeeperMaterializationTaskCodecTest {
                 template.metadataVersion());
 
         byte[] envelope = F4MetadataCodecs.encodeEnvelope(task, MaterializationTaskRecord.class);
-        MaterializationTaskRecord recovered = F4MetadataCodecs.decodeEnvelope(
-                envelope, MaterializationTaskRecord.class);
+        MaterializationTaskRecord recovered =
+                F4MetadataCodecs.decodeEnvelope(envelope, MaterializationTaskRecord.class);
 
         assertThat(recovered).isEqualTo(task);
         assertThat(recovered.sources()).singleElement().satisfies(value -> {
             assertThat(value.readTarget().targetType()).isEqualTo("BOOKKEEPER_ENTRY_RANGE");
             assertThat(ReadTargetCodecRegistry.phase15().decode(value.readTarget()))
                     .isEqualTo(target);
-            assertThat(value.targetIdentitySha256())
-                    .isEqualTo(encodedTarget.identityChecksumValue());
+            assertThat(value.targetIdentitySha256()).isEqualTo(encodedTarget.identityChecksumValue());
         });
     }
 }

@@ -35,19 +35,11 @@ import java.util.Map;
 
 public final class MetadataCodecSamples {
     static final String ABSENT_PROJECTION_IDENTITY = "13:projectionRef6:absent";
-    static final String PRESENT_PROJECTION_IDENTITY =
-            "13:projectionRef7:present13:PROTOCOL_HINT16:projection-value";
+    static final String PRESENT_PROJECTION_IDENTITY = "13:projectionRef7:present13:PROTOCOL_HINT16:projection-value";
 
     private static final SchemaRef SCHEMA_REF = new SchemaRef("namespace", "schema", 1);
-    private static final EntryIndexReferenceRecord ENTRY_INDEX = new EntryIndexReferenceRecord(
-            "INLINE",
-            "",
-            "",
-            new byte[] {1, 2, 3},
-            0,
-            0,
-            "CRC32C",
-            "11111111");
+    private static final EntryIndexReferenceRecord ENTRY_INDEX =
+            new EntryIndexReferenceRecord("INLINE", "", "", new byte[] {1, 2, 3}, 0, 0, "CRC32C", "11111111");
     private static final StreamSliceManifestRecord SLICE_MANIFEST = new StreamSliceManifestRecord(
             0,
             "stream",
@@ -69,20 +61,20 @@ public final class MetadataCodecSamples {
     private static final AppendSessionSnapshotRecord SESSION =
             new AppendSessionSnapshotRecord("writer", 1, "token", 2, 3_000);
 
-    private MetadataCodecSamples() {
-    }
+    private MetadataCodecSamples() {}
 
     public static List<Sample<?>> samples() {
         return List.of(
-                new Sample<>(AppendSessionRecord.class,
-                        new AppendSessionRecord("stream", "writer", 1, "token", 2, 3_000)),
+                new Sample<>(
+                        AppendSessionRecord.class, new AppendSessionRecord("stream", "writer", 1, "token", 2, 3_000)),
                 new Sample<>(AppendSessionSnapshotRecord.class, SESSION),
-                new Sample<>(CommittedEndOffsetRecord.class,
-                        new CommittedEndOffsetRecord("stream", 10, 99, 2, 3)),
-                new Sample<>(CommittedSliceRecord.class,
+                new Sample<>(CommittedEndOffsetRecord.class, new CommittedEndOffsetRecord("stream", 10, 99, 2, 3)),
+                new Sample<>(
+                        CommittedSliceRecord.class,
                         new CommittedSliceRecord("stream", "object", "slice", 0, 10, 0, 2, 3)),
                 new Sample<>(EntryIndexReferenceRecord.class, ENTRY_INDEX),
-                new Sample<>(ObjectManifestRecord.class,
+                new Sample<>(
+                        ObjectManifestRecord.class,
                         new ObjectManifestRecord(
                                 "object",
                                 "object-key",
@@ -104,9 +96,11 @@ public final class MetadataCodecSamples {
                                 List.of(SLICE_MANIFEST),
                                 9_999,
                                 5)),
-                new Sample<>(ObjectReferenceRecord.class,
+                new Sample<>(
+                        ObjectReferenceRecord.class,
                         new ObjectReferenceRecord("object", List.of(VISIBLE_SLICE), 1_111, 6)),
-                new Sample<>(OffsetIndexRecord.class,
+                new Sample<>(
+                        OffsetIndexRecord.class,
                         new OffsetIndexRecord(
                                 "stream",
                                 0,
@@ -135,7 +129,8 @@ public final class MetadataCodecSamples {
                                 2,
                                 false,
                                 4)),
-                new Sample<>(StreamCommitRecord.class,
+                new Sample<>(
+                        StreamCommitRecord.class,
                         new StreamCommitRecord(
                                 "stream",
                                 "commit",
@@ -172,7 +167,8 @@ public final class MetadataCodecSamples {
                                 8,
                                 1_234,
                                 5)),
-                new Sample<>(StreamHeadRecord.class,
+                new Sample<>(
+                        StreamHeadRecord.class,
                         new StreamHeadRecord(
                                 "stream",
                                 "tenant/ns/topic",
@@ -189,7 +185,8 @@ public final class MetadataCodecSamples {
                                 "commit",
                                 SESSION,
                                 7)),
-                new Sample<>(StreamMetadataRecord.class,
+                new Sample<>(
+                        StreamMetadataRecord.class,
                         new StreamMetadataRecord(
                                 "stream",
                                 "tenant/ns/topic",
@@ -200,13 +197,13 @@ public final class MetadataCodecSamples {
                                 1_000,
                                 1,
                                 7)),
-                new Sample<>(StreamNameRecord.class,
+                new Sample<>(
+                        StreamNameRecord.class,
                         new StreamNameRecord("tenant/ns/topic", "stream", "stream-name-hash", 1_000, 7)),
                 new Sample<>(StreamSliceManifestRecord.class, SLICE_MANIFEST),
                 new Sample<>(TrimRecord.class, new TrimRecord("stream", 4, "", 1_200, 8)),
                 new Sample<>(VisibleSliceReferenceRecord.class, VISIBLE_SLICE));
     }
 
-    public record Sample<T>(Class<T> recordClass, T record) {
-    }
+    public record Sample<T>(Class<T> recordClass, T record) {}
 }

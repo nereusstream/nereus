@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,9 +42,8 @@ class NereusManagedLedgerOwnershipGuardTest {
     @Test
     void timeoutDoesNotCompleteOrCancelTheBrokerFuture() {
         CompletableFuture<Boolean> brokerFuture = new CompletableFuture<>();
-        NereusManagedLedgerOwnershipGuard guard = NereusManagedLedgerOwnershipGuard.checked(
-                () -> brokerFuture,
-                Duration.ofMillis(10));
+        NereusManagedLedgerOwnershipGuard guard =
+                NereusManagedLedgerOwnershipGuard.checked(() -> brokerFuture, Duration.ofMillis(10));
 
         assertThatThrownBy(() -> guard.requireOwned("timed check").join())
                 .hasCauseInstanceOf(ManagedLedgerException.ManagedLedgerFencedException.class);
@@ -62,11 +61,9 @@ class NereusManagedLedgerOwnershipGuardTest {
         assertThat(guard.isTrustedDirect()).isTrue();
     }
 
-    private static void assertFenced(
-            java.util.function.Supplier<CompletableFuture<Boolean>> checker) {
-        NereusManagedLedgerOwnershipGuard guard = NereusManagedLedgerOwnershipGuard.checked(
-                checker,
-                Duration.ofSeconds(1));
+    private static void assertFenced(java.util.function.Supplier<CompletableFuture<Boolean>> checker) {
+        NereusManagedLedgerOwnershipGuard guard =
+                NereusManagedLedgerOwnershipGuard.checked(checker, Duration.ofSeconds(1));
         assertThatThrownBy(() -> guard.requireOwned("test").join())
                 .hasCauseInstanceOf(ManagedLedgerException.ManagedLedgerFencedException.class);
     }

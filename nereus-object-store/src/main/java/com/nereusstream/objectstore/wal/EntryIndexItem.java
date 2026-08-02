@@ -29,9 +29,7 @@ public record EntryIndexItem(
         Map<String, String> attributes) {
     public EntryIndexItem {
         attributes = MetadataCanonicalizer.canonicalStringMap(
-                attributes,
-                ApiLimits.MAX_ENTRY_ATTRIBUTES_ENCODED_BYTES,
-                "attributes");
+                attributes, ApiLimits.MAX_ENTRY_ATTRIBUTES_ENCODED_BYTES, "attributes");
         RangeChecks.requireNonNegativeNonOverflowingRange(payloadOffset, payloadLength, "entry payload");
         if (entryOrdinal < 0 || relativeBaseOffset < 0 || recordCount <= 0 || eventTimeMillis < 0) {
             throw new IllegalArgumentException("entry index item numeric fields are invalid");

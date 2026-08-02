@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.api.ErrorCode;
@@ -120,35 +121,27 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
             LongSupplier nanoTime) {
         this.cluster = new OxiaKeyspace(cluster).cluster();
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
-        this.cursorMetadataStore = Objects.requireNonNull(
-                cursorMetadataStore, "cursorMetadataStore");
-        this.physicalMetadataStore = Objects.requireNonNull(
-                physicalMetadataStore, "physicalMetadataStore");
+        this.cursorMetadataStore = Objects.requireNonNull(cursorMetadataStore, "cursorMetadataStore");
+        this.physicalMetadataStore = Objects.requireNonNull(physicalMetadataStore, "physicalMetadataStore");
         this.protections = Objects.requireNonNull(protections, "protections");
         this.readPins = Objects.requireNonNull(readPins, "readPins");
         this.cursorConfig = Objects.requireNonNull(cursorConfig, "cursorConfig");
-        this.objectStoreRequestTimeout = requirePositive(
-                objectStoreRequestTimeout, "objectStoreRequestTimeout");
-        this.pendingProtectionDurationMillis = requirePositive(
-                        pendingProtectionDuration, "pendingProtectionDuration")
+        this.objectStoreRequestTimeout = requirePositive(objectStoreRequestTimeout, "objectStoreRequestTimeout");
+        this.pendingProtectionDurationMillis = requirePositive(pendingProtectionDuration, "pendingProtectionDuration")
                 .toMillis();
-        if (pendingProtectionDuration.compareTo(
-                        cursorConfig.cursorSnapshotOperationTimeout())
-                <= 0) {
+        if (pendingProtectionDuration.compareTo(cursorConfig.cursorSnapshotOperationTimeout()) <= 0) {
             throw new IllegalArgumentException(
                     "pendingProtectionDuration must exceed cursor snapshot operation timeout");
         }
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.snapshotIdSupplier = Objects.requireNonNull(
-                snapshotIdSupplier, "snapshotIdSupplier");
+        this.snapshotIdSupplier = Objects.requireNonNull(snapshotIdSupplier, "snapshotIdSupplier");
         this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
         this.cursorKeys = new CursorKeyspace(this.cluster);
     }
 
     @Override
     public CompletableFuture<CursorSnapshotPublication> prepareWrite(
-            CursorSnapshotWriteRequest request,
-            CursorSnapshotWriteAuthority authority) {
+            CursorSnapshotWriteRequest request, CursorSnapshotWriteAuthority authority) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(authority, "authority");
         if (closed.get()) {
@@ -156,8 +149,7 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
         }
         try {
             authority.requireMatches(request);
-            Deadline deadline = Deadline.start(
-                    cursorConfig.cursorSnapshotOperationTimeout(), nanoTime);
+            Deadline deadline = Deadline.start(cursorConfig.cursorSnapshotOperationTimeout(), nanoTime);
             return writeAttempt(request, authority, deadline, 0);
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
@@ -166,8 +158,7 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
 
     @Override
     public CompletableFuture<Void> completeWrite(
-            CursorSnapshotPublication publication,
-            VersionedCursorState publishedRoot) {
+            CursorSnapshotPublication publication, VersionedCursorState publishedRoot) {
         Objects.requireNonNull(publication, "publication");
         Objects.requireNonNull(publishedRoot, "publishedRoot");
         if (closed.get()) {
@@ -185,24 +176,19 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
                 publication.reference().snapshotId(),
                 owner,
                 0);
-        ObjectProtectionManager.OwnerRevalidator revalidator = expected ->
-                revalidatePublishedRoot(publication, publishedRoot, expected);
-        return protections.acquireOrTransfer(request, revalidator)
-                .thenCompose(permanent -> protections.revalidate(
-                        permanent, revalidator))
-                .thenCompose(permanent -> protections.release(
-                        publication.pendingProtection(),
-                        ignored -> protections.revalidate(permanent, revalidator)
-                                .thenCompose(revalidated -> revalidatePublishedRoot(
-                                        publication,
-                                        publishedRoot,
-                                        revalidated.owner()))));
+        ObjectProtectionManager.OwnerRevalidator revalidator =
+                expected -> revalidatePublishedRoot(publication, publishedRoot, expected);
+        return protections
+                .acquireOrTransfer(request, revalidator)
+                .thenCompose(permanent -> protections.revalidate(permanent, revalidator))
+                .thenCompose(permanent -> protections.release(publication.pendingProtection(), ignored -> protections
+                        .revalidate(permanent, revalidator)
+                        .thenCompose(revalidated ->
+                                revalidatePublishedRoot(publication, publishedRoot, revalidated.owner()))));
     }
 
     @Override
-    public CompletableFuture<CursorAckState> read(
-            CursorSnapshotReference reference,
-            CursorIdentity expectedIdentity) {
+    public CompletableFuture<CursorAckState> read(CursorSnapshotReference reference, CursorIdentity expectedIdentity) {
         Objects.requireNonNull(reference, "reference");
         Objects.requireNonNull(expectedIdentity, "expectedIdentity");
         if (closed.get()) {
@@ -211,55 +197,31 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
         final Deadline deadline;
         try {
             validateReferenceKey(reference, expectedIdentity);
-            deadline = Deadline.start(
-                    cursorConfig.cursorSnapshotOperationTimeout(), nanoTime);
+            deadline = Deadline.start(cursorConfig.cursorSnapshotOperationTimeout(), nanoTime);
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
         }
-        return head(reference, deadline)
-                .thenCompose(initialHead -> {
-                    PhysicalObjectIdentity object = physicalObject(
-                            reference, initialHead);
-                    long maximumReadDeadline = maximumReadDeadline();
-                    return protectLiveReference(
-                                    reference, expectedIdentity, object)
-                            .thenCompose(ignored -> readPins.acquire(
-                                    object,
-                                    maximumReadDeadline,
-                                    () -> revalidateLiveReference(
-                                            reference, expectedIdentity)))
-                            .thenCompose(lease -> readUnderLease(
-                                    reference,
-                                    expectedIdentity,
-                                    object,
-                                    lease,
-                                    deadline));
-                });
+        return head(reference, deadline).thenCompose(initialHead -> {
+            PhysicalObjectIdentity object = physicalObject(reference, initialHead);
+            long maximumReadDeadline = maximumReadDeadline();
+            return protectLiveReference(reference, expectedIdentity, object)
+                    .thenCompose(ignored -> readPins.acquire(
+                            object, maximumReadDeadline, () -> revalidateLiveReference(reference, expectedIdentity)))
+                    .thenCompose(lease -> readUnderLease(reference, expectedIdentity, object, lease, deadline));
+        });
     }
 
     private CompletableFuture<ObjectProtection> protectLiveReference(
-            CursorSnapshotReference reference,
-            CursorIdentity expectedIdentity,
-            PhysicalObjectIdentity object) {
-        return loadLiveReferenceRoot(reference, expectedIdentity)
-                .thenCompose(root -> {
-                    ObjectProtectionRequest request =
-                            new ObjectProtectionRequest(
-                                    object,
-                                    ObjectProtectionType.CURSOR_SNAPSHOT_ROOT,
-                                    reference.snapshotId(),
-                                    owner(root),
-                                    0);
-                    ObjectProtectionManager.OwnerRevalidator revalidator =
-                            expectedOwner -> revalidateLiveReferenceOwner(
-                                    reference,
-                                    expectedIdentity,
-                                    expectedOwner);
-                    return protections.acquireOrTransfer(request, revalidator)
-                            .thenCompose(protection ->
-                                    protections.revalidate(
-                                            protection, revalidator));
-                });
+            CursorSnapshotReference reference, CursorIdentity expectedIdentity, PhysicalObjectIdentity object) {
+        return loadLiveReferenceRoot(reference, expectedIdentity).thenCompose(root -> {
+            ObjectProtectionRequest request = new ObjectProtectionRequest(
+                    object, ObjectProtectionType.CURSOR_SNAPSHOT_ROOT, reference.snapshotId(), owner(root), 0);
+            ObjectProtectionManager.OwnerRevalidator revalidator =
+                    expectedOwner -> revalidateLiveReferenceOwner(reference, expectedIdentity, expectedOwner);
+            return protections
+                    .acquireOrTransfer(request, revalidator)
+                    .thenCompose(protection -> protections.revalidate(protection, revalidator));
+        });
     }
 
     @Override
@@ -282,16 +244,11 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
         try {
             if (attempt >= cursorConfig.cursorSnapshotIdMaxAttempts()) {
                 throw new NereusException(
-                        ErrorCode.OBJECT_UPLOAD_FAILED,
-                        false,
-                        "cursor snapshot ID collision retry bound is exhausted");
+                        ErrorCode.OBJECT_UPLOAD_FAILED, false, "cursor snapshot ID collision retry bound is exhausted");
             }
-            snapshotId = CursorIds.requireRandomId(
-                    snapshotIdSupplier.get(), "snapshotId");
-            objectKey = CursorSnapshotKeys.objectKey(
-                    cluster, request.identity(), snapshotId);
-            encoded = CursorSnapshotCodecV1.encode(
-                    request, snapshotId, cursorConfig);
+            snapshotId = CursorIds.requireRandomId(snapshotIdSupplier.get(), "snapshotId");
+            objectKey = CursorSnapshotKeys.objectKey(cluster, request.identity(), snapshotId);
+            encoded = CursorSnapshotCodecV1.encode(request, snapshotId, cursorConfig);
             metadata = metadata(snapshotId);
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
@@ -306,73 +263,50 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
                     true,
                     metadata,
                     deadline.callTimeout(objectStoreRequestTimeout));
-            attemptFuture = objectStore.putObject(
+            attemptFuture = objectStore
+                    .putObject(
                             objectKey,
                             source,
                             options,
-                            (key, providerAttempt) -> authorizeUpload(
-                                    request,
-                                    authority,
-                                    key,
-                                    encoded))
+                            (key, providerAttempt) -> authorizeUpload(request, authority, key, encoded))
                     .thenCompose(result -> {
-                        verifyPut(
-                                result,
-                                objectKey,
-                                encoded.objectLength(),
-                                encoded.storageChecksum());
+                        verifyPut(result, objectKey, encoded.objectLength(), encoded.storageChecksum());
                         return objectStore.headObject(
-                                objectKey,
-                                new HeadObjectOptions(
-                                        deadline.callTimeout(
-                                                objectStoreRequestTimeout)));
+                                objectKey, new HeadObjectOptions(deadline.callTimeout(objectStoreRequestTimeout)));
                     })
                     .thenCompose(head -> {
-                        verifyHead(
-                                head,
+                        verifyHead(head, objectKey, encoded.objectLength(), encoded.storageChecksum(), metadata);
+                        CursorSnapshotReference reference = new CursorSnapshotReference(
                                 objectKey,
+                                snapshotId,
+                                request.identity().cursorGeneration(),
+                                request.sourceMutationSequence(),
+                                request.fullState().markDeleteOffset(),
                                 encoded.objectLength(),
                                 encoded.storageChecksum(),
-                                metadata);
-                        CursorSnapshotReference reference =
-                                new CursorSnapshotReference(
-                                        objectKey,
-                                        snapshotId,
-                                        request.identity().cursorGeneration(),
-                                        request.sourceMutationSequence(),
-                                        request.fullState().markDeleteOffset(),
-                                        encoded.objectLength(),
-                                        encoded.storageChecksum(),
-                                        encoded.formatCrc32c(),
-                                        1,
-                                        request.createdAtMillis());
-                        PhysicalObjectIdentity object = physicalObject(
-                                reference, head);
-                        return acquirePending(
-                                request,
-                                authority,
-                                reference,
-                                object);
+                                encoded.formatCrc32c(),
+                                1,
+                                request.createdAtMillis());
+                        PhysicalObjectIdentity object = physicalObject(reference, head);
+                        return acquirePending(request, authority, reference, object);
                     });
         } catch (Throwable error) {
             attemptFuture = CompletableFuture.failedFuture(error);
         }
         attemptFuture.whenComplete((ignored, failure) -> source.close());
 
-        return attemptFuture.handle((result, error) -> {
-            if (error == null) {
-                return CompletableFuture.completedFuture(result);
-            }
-            Throwable cause = unwrap(error);
-            if (isIfAbsentCollision(cause)
-                    && attempt + 1
-                            < cursorConfig.cursorSnapshotIdMaxAttempts()) {
-                return writeAttempt(
-                        request, authority, deadline, attempt + 1);
-            }
-            return CompletableFuture
-                    .<CursorSnapshotPublication>failedFuture(cause);
-        }).thenCompose(Function.identity());
+        return attemptFuture
+                .handle((result, error) -> {
+                    if (error == null) {
+                        return CompletableFuture.completedFuture(result);
+                    }
+                    Throwable cause = unwrap(error);
+                    if (isIfAbsentCollision(cause) && attempt + 1 < cursorConfig.cursorSnapshotIdMaxAttempts()) {
+                        return writeAttempt(request, authority, deadline, attempt + 1);
+                    }
+                    return CompletableFuture.<CursorSnapshotPublication>failedFuture(cause);
+                })
+                .thenCompose(Function.identity());
     }
 
     private CompletableFuture<CursorSnapshotPublication> acquirePending(
@@ -383,43 +317,26 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
         ObjectProtectionOwner owner = owner(authority.currentRoot());
         long expiresAt;
         try {
-            expiresAt = Math.addExact(
-                    nonNegativeNow(), pendingProtectionDurationMillis);
+            expiresAt = Math.addExact(nonNegativeNow(), pendingProtectionDurationMillis);
         } catch (ArithmeticException overflow) {
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.METADATA_LIMIT_EXCEEDED,
-                    false,
-                    "cursor snapshot pending-protection deadline overflows"));
+                    ErrorCode.METADATA_LIMIT_EXCEEDED, false, "cursor snapshot pending-protection deadline overflows"));
         }
         ObjectProtectionRequest protectionRequest = new ObjectProtectionRequest(
-                object,
-                ObjectProtectionType.CURSOR_SNAPSHOT_PENDING,
-                reference.snapshotId(),
-                owner,
-                expiresAt);
-        ObjectProtectionManager.OwnerRevalidator revalidator = expected ->
-                revalidateWriteAuthority(request, authority, expected);
-        return protections.acquire(protectionRequest, revalidator)
-                .thenCompose(pending -> protections.revalidate(
-                        pending, revalidator))
-                .thenCompose(pending -> loadExactActiveRoot(object)
-                        .thenCompose(root -> revalidateWriteAuthority(
-                                        request,
-                                        authority,
-                                        pending.owner())
-                                .thenApply(ignored -> {
-                                    if (root.value().lifecycleEpoch()
-                                            != pending.rootLifecycleEpoch()) {
-                                        throw invariant(
-                                                "cursor pending protection root epoch changed");
-                                    }
-                                    return new CursorSnapshotPublication(
-                                            request,
-                                            authority,
-                                            reference,
-                                            object,
-                                            pending);
-                                })));
+                object, ObjectProtectionType.CURSOR_SNAPSHOT_PENDING, reference.snapshotId(), owner, expiresAt);
+        ObjectProtectionManager.OwnerRevalidator revalidator =
+                expected -> revalidateWriteAuthority(request, authority, expected);
+        return protections
+                .acquire(protectionRequest, revalidator)
+                .thenCompose(pending -> protections.revalidate(pending, revalidator))
+                .thenCompose(pending -> loadExactActiveRoot(object).thenCompose(root -> revalidateWriteAuthority(
+                                request, authority, pending.owner())
+                        .thenApply(ignored -> {
+                            if (root.value().lifecycleEpoch() != pending.rootLifecycleEpoch()) {
+                                throw invariant("cursor pending protection root epoch changed");
+                            }
+                            return new CursorSnapshotPublication(request, authority, reference, object, pending);
+                        })));
     }
 
     private CompletableFuture<Void> authorizeUpload(
@@ -427,21 +344,13 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
             CursorSnapshotWriteAuthority authority,
             ObjectKey key,
             CursorSnapshotCodecV1.EncodedSnapshot encoded) {
-        ObjectKey expected = CursorSnapshotKeys.objectKey(
-                cluster,
-                request.identity(),
-                keySnapshotId(key));
+        ObjectKey expected = CursorSnapshotKeys.objectKey(cluster, request.identity(), keySnapshotId(key));
         if (!expected.equals(key)) {
-            return CompletableFuture.failedFuture(invariant(
-                    "cursor snapshot guarded PUT received a different key"));
+            return CompletableFuture.failedFuture(invariant("cursor snapshot guarded PUT received a different key"));
         }
-        return revalidateWriteAuthority(
-                        request, authority, owner(authority.currentRoot()))
-                .thenCompose(ignored -> physicalMetadataStore.getRoot(
-                        cluster, ObjectKeyHash.from(key)))
-                .thenAccept(root -> root.ifPresent(value ->
-                        requireCompatiblePreUploadRoot(
-                                key, encoded, value)));
+        return revalidateWriteAuthority(request, authority, owner(authority.currentRoot()))
+                .thenCompose(ignored -> physicalMetadataStore.getRoot(cluster, ObjectKeyHash.from(key)))
+                .thenAccept(root -> root.ifPresent(value -> requireCompatiblePreUploadRoot(key, encoded, value)));
     }
 
     private CompletableFuture<Void> revalidateWriteAuthority(
@@ -450,19 +359,16 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
             ObjectProtectionOwner expectedOwner) {
         ObjectProtectionOwner canonical = owner(authority.currentRoot());
         if (!canonical.equals(expectedOwner)) {
-            return CompletableFuture.failedFuture(invariant(
-                    "cursor snapshot pending owner fields changed"));
+            return CompletableFuture.failedFuture(invariant("cursor snapshot pending owner fields changed"));
         }
-        return cursorMetadataStore.getCursor(
+        return cursorMetadataStore
+                .getCursor(
                         cluster,
                         streamId(request.identity()),
                         request.identity().cursorName())
                 .thenAccept(current -> {
-                    if (current.isEmpty()
-                            || !current.orElseThrow().equals(
-                                    authority.currentRoot())) {
-                        throw condition(
-                                "cursor snapshot write authority changed");
+                    if (current.isEmpty() || !current.orElseThrow().equals(authority.currentRoot())) {
+                        throw condition("cursor snapshot write authority changed");
                     }
                     authority.requireMatches(request);
                 });
@@ -474,68 +380,52 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
             ObjectProtectionOwner expectedOwner) {
         ObjectProtectionOwner canonical = owner(publishedRoot);
         if (!canonical.equals(expectedOwner)) {
-            return CompletableFuture.failedFuture(invariant(
-                    "cursor snapshot permanent owner fields changed"));
+            return CompletableFuture.failedFuture(invariant("cursor snapshot permanent owner fields changed"));
         }
-        return cursorMetadataStore.getCursor(
+        return cursorMetadataStore
+                .getCursor(
                         cluster,
                         streamId(publication.request().identity()),
                         publication.request().identity().cursorName())
                 .thenAccept(current -> {
-                    if (current.isEmpty()
-                            || !current.orElseThrow().equals(publishedRoot)) {
-                        throw condition(
-                                "published cursor snapshot root changed");
+                    if (current.isEmpty() || !current.orElseThrow().equals(publishedRoot)) {
+                        throw condition("published cursor snapshot root changed");
                     }
                     requirePublishedRoot(publication, publishedRoot);
                 });
     }
 
     private CompletableFuture<Void> revalidateLiveReference(
-            CursorSnapshotReference reference,
-            CursorIdentity expectedIdentity) {
-        return loadLiveReferenceRoot(reference, expectedIdentity)
-                .thenApply(ignored -> null);
+            CursorSnapshotReference reference, CursorIdentity expectedIdentity) {
+        return loadLiveReferenceRoot(reference, expectedIdentity).thenApply(ignored -> null);
     }
 
     private CompletableFuture<Void> revalidateLiveReferenceOwner(
-            CursorSnapshotReference reference,
-            CursorIdentity expectedIdentity,
-            ObjectProtectionOwner expectedOwner) {
-        return loadLiveReferenceRoot(reference, expectedIdentity)
-                .thenAccept(root -> {
-                    if (!owner(root).equals(expectedOwner)) {
-                        throw condition(
-                                "cursor snapshot read owner changed");
-                    }
-                });
+            CursorSnapshotReference reference, CursorIdentity expectedIdentity, ObjectProtectionOwner expectedOwner) {
+        return loadLiveReferenceRoot(reference, expectedIdentity).thenAccept(root -> {
+            if (!owner(root).equals(expectedOwner)) {
+                throw condition("cursor snapshot read owner changed");
+            }
+        });
     }
 
     private CompletableFuture<VersionedCursorState> loadLiveReferenceRoot(
-            CursorSnapshotReference reference,
-            CursorIdentity expectedIdentity) {
-        return cursorMetadataStore.getCursor(
-                        cluster,
-                        streamId(expectedIdentity),
-                        expectedIdentity.cursorName())
+            CursorSnapshotReference reference, CursorIdentity expectedIdentity) {
+        return cursorMetadataStore
+                .getCursor(cluster, streamId(expectedIdentity), expectedIdentity.cursorName())
                 .thenApply(current -> {
                     if (current.isEmpty()) {
-                        throw condition(
-                                "cursor snapshot read owner is absent");
+                        throw condition("cursor snapshot read owner is absent");
                     }
                     VersionedCursorState versioned = current.orElseThrow();
                     var root = versioned.value();
                     if (root.lifecycle() != CursorRecordLifecycle.ACTIVE
-                            || !root.projection().equals(
-                                    expectedIdentity.ledger().projection())
-                            || root.cursorGeneration()
-                                    != expectedIdentity.cursorGeneration()
+                            || !root.projection()
+                                    .equals(expectedIdentity.ledger().projection())
+                            || root.cursorGeneration() != expectedIdentity.cursorGeneration()
                             || root.snapshotReference().isEmpty()
-                            || !root.snapshotReference()
-                                    .orElseThrow()
-                                    .equals(reference.toMetadataRecord())) {
-                        throw condition(
-                                "cursor snapshot read selection changed");
+                            || !root.snapshotReference().orElseThrow().equals(reference.toMetadataRecord())) {
+                        throw condition("cursor snapshot read selection changed");
                     }
                     return versioned;
                 });
@@ -547,11 +437,9 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
             PhysicalObjectIdentity object,
             ObjectReadLease lease,
             Deadline deadline) {
-        CompletableFuture<CursorAckState> operation = objectStore.headObject(
-                        reference.objectKey(),
-                        new HeadObjectOptions(
-                                deadline.callTimeout(
-                                        objectStoreRequestTimeout)))
+        CompletableFuture<CursorAckState> operation = objectStore
+                .headObject(
+                        reference.objectKey(), new HeadObjectOptions(deadline.callTimeout(objectStoreRequestTimeout)))
                 .thenCompose(head -> {
                     verifyHead(
                             head,
@@ -560,8 +448,8 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
                             reference.storageChecksum(),
                             metadata(reference.snapshotId()));
                     if (!physicalObject(reference, head).equals(object)) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "cursor snapshot HEAD identity changed after read pin"));
+                        return CompletableFuture.failedFuture(
+                                invariant("cursor snapshot HEAD identity changed after read pin"));
                     }
                     return objectStore.readRange(
                             reference.objectKey(),
@@ -569,40 +457,31 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
                             reference.objectLength(),
                             new RangeReadOptions(
                                     Optional.of(reference.storageChecksum()),
-                                    deadline.callTimeout(
-                                            objectStoreRequestTimeout)));
+                                    deadline.callTimeout(objectStoreRequestTimeout)));
                 })
                 .thenApply(result -> {
                     verifyRead(result, reference);
-                    return CursorSnapshotCodecV1.decode(
-                            result.payload(), reference, expectedIdentity, cursorConfig);
+                    return CursorSnapshotCodecV1.decode(result.payload(), reference, expectedIdentity, cursorConfig);
                 });
         CompletableFuture<CursorAckState> result = new CompletableFuture<>();
-        operation.whenComplete((value, failure) -> lease.release()
-                .whenComplete((ignored, releaseFailure) -> {
-                    if (failure == null && releaseFailure == null) {
-                        result.complete(value);
-                        return;
-                    }
-                    Throwable exact = failure == null
-                            ? unwrap(releaseFailure)
-                            : unwrap(failure);
-                    if (releaseFailure != null && failure != null) {
-                        exact.addSuppressed(unwrap(releaseFailure));
-                    }
-                    result.completeExceptionally(exact);
-                }));
+        operation.whenComplete((value, failure) -> lease.release().whenComplete((ignored, releaseFailure) -> {
+            if (failure == null && releaseFailure == null) {
+                result.complete(value);
+                return;
+            }
+            Throwable exact = failure == null ? unwrap(releaseFailure) : unwrap(failure);
+            if (releaseFailure != null && failure != null) {
+                exact.addSuppressed(unwrap(releaseFailure));
+            }
+            result.completeExceptionally(exact);
+        }));
         return result;
     }
 
-    private CompletableFuture<HeadObjectResult> head(
-            CursorSnapshotReference reference,
-            Deadline deadline) {
-        return objectStore.headObject(
-                        reference.objectKey(),
-                        new HeadObjectOptions(
-                                deadline.callTimeout(
-                                        objectStoreRequestTimeout)))
+    private CompletableFuture<HeadObjectResult> head(CursorSnapshotReference reference, Deadline deadline) {
+        return objectStore
+                .headObject(
+                        reference.objectKey(), new HeadObjectOptions(deadline.callTimeout(objectStoreRequestTimeout)))
                 .thenApply(result -> {
                     verifyHead(
                             result,
@@ -614,94 +493,68 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
                 });
     }
 
-    private CompletableFuture<VersionedPhysicalObjectRoot> loadExactActiveRoot(
-            PhysicalObjectIdentity object) {
-        return physicalMetadataStore.getRoot(
-                        cluster, object.objectKeyHash())
-                .thenApply(optional -> {
-                    VersionedPhysicalObjectRoot root = optional.orElseThrow(() ->
-                            invariant(
-                                    "cursor snapshot physical root is absent after protection"));
-                    if (root.value().lifecycle()
-                                    != PhysicalObjectLifecycle.ACTIVE
-                            || !PhysicalObjectIdentity.from(root.value())
-                                    .equals(object)) {
-                        throw invariant(
-                                "cursor snapshot physical root changed after protection");
-                    }
-                    return root;
-                });
+    private CompletableFuture<VersionedPhysicalObjectRoot> loadExactActiveRoot(PhysicalObjectIdentity object) {
+        return physicalMetadataStore.getRoot(cluster, object.objectKeyHash()).thenApply(optional -> {
+            VersionedPhysicalObjectRoot root =
+                    optional.orElseThrow(() -> invariant("cursor snapshot physical root is absent after protection"));
+            if (root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
+                    || !PhysicalObjectIdentity.from(root.value()).equals(object)) {
+                throw invariant("cursor snapshot physical root changed after protection");
+            }
+            return root;
+        });
     }
 
-    private void validateReferenceKey(
-            CursorSnapshotReference reference,
-            CursorIdentity expectedIdentity) {
-        ObjectKey expected = CursorSnapshotKeys.objectKey(
-                cluster, expectedIdentity, reference.snapshotId());
+    private void validateReferenceKey(CursorSnapshotReference reference, CursorIdentity expectedIdentity) {
+        ObjectKey expected = CursorSnapshotKeys.objectKey(cluster, expectedIdentity, reference.snapshotId());
         if (!expected.equals(reference.objectKey())
-                || reference.cursorGeneration()
-                        != expectedIdentity.cursorGeneration()) {
+                || reference.cursorGeneration() != expectedIdentity.cursorGeneration()) {
             throw new CursorSnapshotCodecV1.CursorSnapshotCorruptionException(
                     "cursor snapshot reference key or generation does not match the expected identity");
         }
-        if (reference.objectLength()
-                > cursorConfig.cursorSnapshotMaxBytes()) {
+        if (reference.objectLength() > cursorConfig.cursorSnapshotMaxBytes()) {
             throw new CursorSnapshotCodecV1.CursorSnapshotCorruptionException(
                     "cursor snapshot reference exceeds the configured object bound");
         }
     }
 
     private static void requirePublishedRoot(
-            CursorSnapshotPublication publication,
-            VersionedCursorState publishedRoot) {
+            CursorSnapshotPublication publication, VersionedCursorState publishedRoot) {
         var request = publication.request();
         var value = publishedRoot.value();
         if (value.lifecycle() != CursorRecordLifecycle.ACTIVE
-                || !value.projection().equals(
-                        request.identity().ledger().projection())
-                || !value.cursorName().equals(
-                        request.identity().cursorName())
-                || !value.cursorNameHash().equals(
-                        request.identity().cursorNameHash())
-                || value.cursorGeneration()
-                        != request.identity().cursorGeneration()
-                || value.mutationSequence()
-                        < request.sourceMutationSequence()
+                || !value.projection().equals(request.identity().ledger().projection())
+                || !value.cursorName().equals(request.identity().cursorName())
+                || !value.cursorNameHash().equals(request.identity().cursorNameHash())
+                || value.cursorGeneration() != request.identity().cursorGeneration()
+                || value.mutationSequence() < request.sourceMutationSequence()
                 || value.snapshotReference().isEmpty()
                 || !value.snapshotReference()
                         .orElseThrow()
                         .equals(publication.reference().toMetadataRecord())) {
-            throw new IllegalArgumentException(
-                    "published cursor root does not match the prepared snapshot");
+            throw new IllegalArgumentException("published cursor root does not match the prepared snapshot");
         }
     }
 
     private static void requireCompatiblePreUploadRoot(
-            ObjectKey key,
-            CursorSnapshotCodecV1.EncodedSnapshot encoded,
-            VersionedPhysicalObjectRoot root) {
+            ObjectKey key, CursorSnapshotCodecV1.EncodedSnapshot encoded, VersionedPhysicalObjectRoot root) {
         var value = root.value();
         if (value.lifecycle() != PhysicalObjectLifecycle.ACTIVE
                 || !value.objectKey().equals(key.value())
-                || !value.objectKeyHash().equals(
-                        ObjectKeyHash.from(key).value())
+                || !value.objectKeyHash().equals(ObjectKeyHash.from(key).value())
                 || !value.objectId().isEmpty()
-                || value.objectKindId()
-                        != PhysicalObjectKind.CURSOR_SNAPSHOT.wireId()
+                || value.objectKindId() != PhysicalObjectKind.CURSOR_SNAPSHOT.wireId()
                 || value.objectLength() != encoded.objectLength()
-                || !value.storageChecksumType().equals(
-                        encoded.storageChecksum().type().name())
-                || !value.storageChecksumValue().equals(
-                        encoded.storageChecksum().value())
+                || !value.storageChecksumType()
+                        .equals(encoded.storageChecksum().type().name())
+                || !value.storageChecksumValue()
+                        .equals(encoded.storageChecksum().value())
                 || !value.contentSha256().isEmpty()) {
-            throw new ObjectAlreadyExistsException(
-                    "cursor snapshot ID already belongs to a conflicting physical root");
+            throw new ObjectAlreadyExistsException("cursor snapshot ID already belongs to a conflicting physical root");
         }
     }
 
-    private PhysicalObjectIdentity physicalObject(
-            CursorSnapshotReference reference,
-            HeadObjectResult head) {
+    private PhysicalObjectIdentity physicalObject(CursorSnapshotReference reference, HeadObjectResult head) {
         return PhysicalObjectIdentity.create(
                 reference.objectKey(),
                 Optional.empty(),
@@ -715,8 +568,7 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
     private ObjectProtectionOwner owner(VersionedCursorState root) {
         StreamId stream = new StreamId(root.value().projection().streamId());
         return new ObjectProtectionOwner(
-                cursorKeys.cursorStateKey(
-                        stream, root.value().cursorName()),
+                cursorKeys.cursorStateKey(stream, root.value().cursorName()),
                 root.metadataVersion(),
                 CursorMetadataDigests.durableValueSha256(root.value()));
     }
@@ -732,17 +584,14 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
                     cursorConfig.cursorSnapshotOperationTimeout().toMillis());
         } catch (ArithmeticException overflow) {
             throw new NereusException(
-                    ErrorCode.METADATA_LIMIT_EXCEEDED,
-                    false,
-                    "cursor snapshot read deadline overflows");
+                    ErrorCode.METADATA_LIMIT_EXCEEDED, false, "cursor snapshot read deadline overflows");
         }
     }
 
     private long nonNegativeNow() {
         long value = clock.millis();
         if (value < 0) {
-            throw new IllegalStateException(
-                    "cursor snapshot clock returned a negative epoch millisecond");
+            throw new IllegalStateException("cursor snapshot clock returned a negative epoch millisecond");
         }
         return value;
     }
@@ -757,16 +606,11 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
     }
 
     private static void verifyPut(
-            PutObjectResult result,
-            ObjectKey key,
-            long length,
-            com.nereusstream.api.Checksum checksum) {
+            PutObjectResult result, ObjectKey key, long length, com.nereusstream.api.Checksum checksum) {
         if (!result.key().equals(key)
                 || result.objectLength() != length
                 || !result.checksum().equals(checksum)) {
-            throw objectFailure(
-                    ErrorCode.OBJECT_UPLOAD_FAILED,
-                    "cursor snapshot PUT result mismatch");
+            throw objectFailure(ErrorCode.OBJECT_UPLOAD_FAILED, "cursor snapshot PUT result mismatch");
         }
     }
 
@@ -780,27 +624,18 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
                 || result.objectLength() != length
                 || !result.checksum().equals(checksum)
                 || !result.metadata().equals(metadata)) {
-            throw objectFailure(
-                    ErrorCode.OBJECT_CHECKSUM_MISMATCH,
-                    "cursor snapshot HEAD result mismatch");
+            throw objectFailure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, "cursor snapshot HEAD result mismatch");
         }
     }
 
-    private static void verifyRead(
-            RangeReadResult result,
-            CursorSnapshotReference reference) {
+    private static void verifyRead(RangeReadResult result, CursorSnapshotReference reference) {
         if (!result.key().equals(reference.objectKey())
                 || result.offset() != 0
                 || result.length() != reference.objectLength()
-                || result.payload().remaining()
-                        != reference.objectLength()
+                || result.payload().remaining() != reference.objectLength()
                 || result.checksum().isEmpty()
-                || !result.checksum()
-                        .orElseThrow()
-                        .equals(reference.storageChecksum())) {
-            throw objectFailure(
-                    ErrorCode.OBJECT_CHECKSUM_MISMATCH,
-                    "cursor snapshot range result mismatch");
+                || !result.checksum().orElseThrow().equals(reference.storageChecksum())) {
+            throw objectFailure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, "cursor snapshot range result mismatch");
         }
     }
 
@@ -820,48 +655,36 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
 
     private static Throwable unwrap(Throwable error) {
         Throwable current = error;
-        while ((current instanceof CompletionException
-                        || current instanceof ExecutionException)
+        while ((current instanceof CompletionException || current instanceof ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
         return current;
     }
 
-    private static NereusException objectFailure(
-            ErrorCode code,
-            String message) {
+    private static NereusException objectFailure(ErrorCode code, String message) {
         return new NereusException(code, false, message);
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static NereusException condition(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_CONDITION_FAILED, true, message);
+        return new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, message);
     }
 
     private static <T> CompletableFuture<T> closedFuture() {
-        return NereusException.failedFuture(
-                ErrorCode.STORAGE_CLOSED,
-                false,
-                "cursor snapshot store is closed");
+        return NereusException.failedFuture(ErrorCode.STORAGE_CLOSED, false, "cursor snapshot store is closed");
     }
 
-    private static Duration requirePositive(
-            Duration value,
-            String fieldName) {
+    private static Duration requirePositive(Duration value, String fieldName) {
         Objects.requireNonNull(value, fieldName);
         if (value.isZero()
                 || value.isNegative()
                 || value.toMillis() <= 0
                 || !value.equals(Duration.ofMillis(value.toMillis()))) {
-            throw new IllegalArgumentException(
-                    fieldName
-                            + " must be positive and exactly millisecond-representable");
+            throw new IllegalArgumentException(fieldName + " must be positive and exactly millisecond-representable");
         }
         return value;
     }
@@ -879,16 +702,12 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
         private final long deadlineNanos;
         private final LongSupplier nanoTime;
 
-        private Deadline(
-                long deadlineNanos,
-                LongSupplier nanoTime) {
+        private Deadline(long deadlineNanos, LongSupplier nanoTime) {
             this.deadlineNanos = deadlineNanos;
             this.nanoTime = nanoTime;
         }
 
-        static Deadline start(
-                Duration timeout,
-                LongSupplier nanoTime) {
+        static Deadline start(Duration timeout, LongSupplier nanoTime) {
             long now = nanoTime.getAsLong();
             long timeoutNanos;
             try {
@@ -909,10 +728,7 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
             long remaining = deadlineNanos - nanoTime.getAsLong();
             if (remaining <= 0) {
                 throw new NereusException(
-                        ErrorCode.TIMEOUT,
-                        true,
-                        "cursor snapshot operation deadline expired",
-                        new TimeoutException());
+                        ErrorCode.TIMEOUT, true, "cursor snapshot operation deadline expired", new TimeoutException());
             }
             long perCall;
             try {

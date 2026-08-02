@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import java.nio.ByteBuffer;
@@ -7,7 +8,9 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
-/** One protocol-neutral row supplied to the streaming compacted-object writer. */
+/**
+ * One protocol-neutral row supplied to the streaming compacted-object writer.
+ */
 public record CompactedObjectRow(
         long streamOffset,
         ByteBuffer exactPayload,

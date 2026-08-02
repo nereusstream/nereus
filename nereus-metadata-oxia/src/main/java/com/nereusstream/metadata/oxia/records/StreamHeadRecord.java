@@ -42,13 +42,16 @@ public record StreamHeadRecord(
         state = requireNonBlank(state, "state");
         profile = requireNonBlank(profile, "profile");
         attributes = MetadataCanonicalizer.canonicalStringMap(
-                attributes,
-                ApiLimits.MAX_STREAM_ATTRIBUTES_ENCODED_BYTES,
-                "attributes");
+                attributes, ApiLimits.MAX_STREAM_ATTRIBUTES_ENCODED_BYTES, "attributes");
         lastCommitId = Objects.requireNonNull(lastCommitId, "lastCommitId");
         Objects.requireNonNull(appendSession, "appendSession");
-        if (createdAtMillis < 0 || policyVersion < 0 || committedEndOffset < 0 || cumulativeSize < 0
-                || commitVersion < 0 || trimOffset < 0 || metadataVersion < 0) {
+        if (createdAtMillis < 0
+                || policyVersion < 0
+                || committedEndOffset < 0
+                || cumulativeSize < 0
+                || commitVersion < 0
+                || trimOffset < 0
+                || metadataVersion < 0) {
             throw new IllegalArgumentException("stream head numeric fields must be non-negative");
         }
         if (trimOffset > committedEndOffset) {

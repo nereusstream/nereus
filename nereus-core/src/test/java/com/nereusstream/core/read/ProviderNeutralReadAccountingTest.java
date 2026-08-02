@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -35,8 +35,9 @@ class ProviderNeutralReadAccountingTest {
                 List.of(range), new PhysicalReadResult(List.of(), List.of(exact, exact))));
         assertInvariant(() -> ProviderNeutralReadAccounting.validate(
                 List.of(range),
-                new PhysicalReadResult(List.of(), List.of(stats(
-                        ReadTargetIdentities.sha256(range(0, "22").readTarget()), 0)))));
+                new PhysicalReadResult(
+                        List.of(),
+                        List.of(stats(ReadTargetIdentities.sha256(range(0, "22").readTarget()), 0)))));
         assertInvariant(() -> ProviderNeutralReadAccounting.validate(
                 List.of(range), new PhysicalReadResult(List.of(), List.of(stats(identity, 1)))));
     }
@@ -96,9 +97,7 @@ class ProviderNeutralReadAccountingTest {
 
     private static void assertInvariant(Runnable operation) {
         assertThatThrownBy(operation::run)
-                .isInstanceOfSatisfying(
-                        NereusException.class,
-                        failure -> assertThat(failure.code())
-                                .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
+                .isInstanceOfSatisfying(NereusException.class, failure -> assertThat(failure.code())
+                        .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
     }
 }

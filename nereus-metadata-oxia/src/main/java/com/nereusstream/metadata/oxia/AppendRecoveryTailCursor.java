@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.StreamId;
 import java.util.Objects;
 
-/** Process-local continuation bound to one observed head and one recovery-root anchor. */
+/**
+ * Process-local continuation bound to one observed head and one recovery-root anchor.
+ */
 public record AppendRecoveryTailCursor(
         StreamId streamId,
         AppendRecoveryAnchor anchor,

@@ -16,7 +16,6 @@ package com.nereusstream.managedledger.entry;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.Checksum;
@@ -91,15 +90,15 @@ class PulsarEntryCodecTest {
             Checksum checksum = new Checksum(ChecksumType.CRC32C, "0c6e6f75");
             assertThat(encoded.appendBatch().checksum()).contains(checksum);
             assertThatThrownBy(() -> new AppendBatch(
-                    PayloadFormat.OPAQUE_RECORD_BATCH,
-                    List.of(new AppendEntry(new byte[] {14}, 1, 0, Map.of())),
-                    1,
-                    1,
-                    0,
-                    0,
-                    List.of(),
-                    Map.of(),
-                    Optional.of(checksum)))
+                            PayloadFormat.OPAQUE_RECORD_BATCH,
+                            List.of(new AppendEntry(new byte[] {14}, 1, 0, Map.of())),
+                            1,
+                            1,
+                            0,
+                            0,
+                            List.of(),
+                            Map.of(),
+                            Optional.of(checksum)))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("checksum mismatch");
         } finally {
@@ -160,8 +159,7 @@ class PulsarEntryCodecTest {
                 .setSequenceId(1)
                 .setPublishTime(1234);
         ByteBuf payload = Unpooled.wrappedBuffer(new byte[] {4, 5});
-        ByteBuf serialized = Commands.serializeMetadataAndPayload(
-                Commands.ChecksumType.Crc32c, metadata, payload);
+        ByteBuf serialized = Commands.serializeMetadataAndPayload(Commands.ChecksumType.Crc32c, metadata, payload);
         byte[] entryBytes = new byte[serialized.readableBytes()];
         serialized.getBytes(serialized.readerIndex(), entryBytes);
         serialized.release();
@@ -184,14 +182,13 @@ class PulsarEntryCodecTest {
         PulsarEntryCodec codec = new PulsarEntryCodec(2);
         ByteBuf oversized = Unpooled.wrappedBuffer(new byte[] {1, 2, 3});
         try {
-            assertThatThrownBy(() -> codec.encode(oversized, 1))
-                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> codec.encode(oversized, 1)).isInstanceOf(IllegalArgumentException.class);
         } finally {
             oversized.release();
         }
 
-        assertThatThrownBy(() -> codec.decode(position(42), new ReadResult(
-                STREAM_ID, 42, 44, List.of(readBatch(42, new byte[] {1})), false)))
+        assertThatThrownBy(() -> codec.decode(
+                        position(42), new ReadResult(STREAM_ID, 42, 44, List.of(readBatch(42, new byte[] {1})), false)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> codec.decode(PositionFactory.create(LEDGER_ID, -1), readResult(0, new byte[0])))
                 .isInstanceOf(IllegalArgumentException.class);

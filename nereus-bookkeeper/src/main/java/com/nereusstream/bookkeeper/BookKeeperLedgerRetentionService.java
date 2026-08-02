@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.ErrorCode;
@@ -13,7 +14,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-/** Non-overlapping fixed-delay owner for production BookKeeper retention passes. */
+/**
+ * Non-overlapping fixed-delay owner for production BookKeeper retention passes.
+ */
 public final class BookKeeperLedgerRetentionService implements AutoCloseable {
     private enum State {
         NEW,
@@ -87,9 +90,10 @@ public final class BookKeeperLedgerRetentionService implements AutoCloseable {
         CompletableFuture<BookKeeperLedgerRetentionScanResult> target;
         synchronized (monitor) {
             if (state != State.RUNNING) {
-                return CompletableFuture.failedFuture(state == State.NEW
-                        ? condition("BookKeeper retention service has not started")
-                        : closed("BookKeeper retention service is closing"));
+                return CompletableFuture.failedFuture(
+                        state == State.NEW
+                                ? condition("BookKeeper retention service has not started")
+                                : closed("BookKeeper retention service is closing"));
             }
             if (active != null) {
                 rescanRequested = true;
@@ -127,15 +131,18 @@ public final class BookKeeperLedgerRetentionService implements AutoCloseable {
             target = active;
             source = activeSource;
         }
-        CompletableFuture<Void> drained = target == null
-                ? CompletableFuture.completedFuture(null)
-                : target.handle((ignored, failure) -> null);
+        CompletableFuture<Void> drained =
+                target == null ? CompletableFuture.completedFuture(null) : target.handle((ignored, failure) -> null);
         drained.whenComplete((ignored, failure) -> execute(this::completeClose));
         try {
             ScheduledFuture<?> deadline = scheduler.schedule(
                     () -> {
-                        if (source != null) source.cancel(true);
-                        if (target != null) target.cancel(true);
+                        if (source != null) {
+                            source.cancel(true);
+                        }
+                        if (target != null) {
+                            target.cancel(true);
+                        }
                         completeClose();
                     },
                     closeTimeout.toNanos(),
@@ -148,8 +155,12 @@ public final class BookKeeperLedgerRetentionService implements AutoCloseable {
                 }
             }
         } catch (RejectedExecutionException failure) {
-            if (source != null) source.cancel(true);
-            if (target != null) target.cancel(true);
+            if (source != null) {
+                source.cancel(true);
+            }
+            if (target != null) {
+                target.cancel(true);
+            }
             completeClose();
         }
         return closeFuture;
@@ -164,7 +175,9 @@ public final class BookKeeperLedgerRetentionService implements AutoCloseable {
         CompletableFuture<BookKeeperLedgerRetentionScanResult> target;
         synchronized (monitor) {
             scheduled = null;
-            if (state != State.RUNNING) return;
+            if (state != State.RUNNING) {
+                return;
+            }
             if (active != null) {
                 rescanRequested = true;
                 return;
@@ -199,7 +212,9 @@ public final class BookKeeperLedgerRetentionService implements AutoCloseable {
             Throwable failure) {
         boolean runAgain;
         synchronized (monitor) {
-            if (active != target) return;
+            if (active != target) {
+                return;
+            }
             active = null;
             activeSource = null;
             runAgain = state == State.RUNNING && rescanRequested;
@@ -208,7 +223,9 @@ public final class BookKeeperLedgerRetentionService implements AutoCloseable {
                 try {
                     scheduleLocked(scanInterval);
                 } catch (RuntimeException scheduleFailure) {
-                    if (failure == null) failure = scheduleFailure;
+                    if (failure == null) {
+                        failure = scheduleFailure;
+                    }
                     state = State.CLOSED;
                 }
             }
@@ -221,7 +238,9 @@ public final class BookKeeperLedgerRetentionService implements AutoCloseable {
         if (runAgain) {
             CompletableFuture<BookKeeperLedgerRetentionScanResult> next;
             synchronized (monitor) {
-                if (state != State.RUNNING || active != null) return;
+                if (state != State.RUNNING || active != null) {
+                    return;
+                }
                 active = new CompletableFuture<>();
                 next = active;
             }
@@ -231,13 +250,17 @@ public final class BookKeeperLedgerRetentionService implements AutoCloseable {
 
     private void completeClose() {
         synchronized (monitor) {
-            if (state == State.CLOSED) return;
+            if (state == State.CLOSED) {
+                return;
+            }
             state = State.CLOSED;
             if (closeDeadline != null) {
                 closeDeadline.cancel(false);
                 closeDeadline = null;
             }
-            if (closeFuture != null) closeFuture.complete(null);
+            if (closeFuture != null) {
+                closeFuture.complete(null);
+            }
         }
     }
 

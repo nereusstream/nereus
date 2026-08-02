@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.StreamId;
@@ -15,9 +16,10 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Deterministic in-memory BookKeeper metadata adapter for lifecycle and recovery tests. */
-public final class FakeBookKeeperMetadataStore
-        implements BookKeeperWriterMetadataStore, BookKeeperLedgerMetadataStore {
+/**
+ * Deterministic in-memory BookKeeper metadata adapter for lifecycle and recovery tests.
+ */
+public final class FakeBookKeeperMetadataStore implements BookKeeperWriterMetadataStore, BookKeeperLedgerMetadataStore {
     private final OxiaJavaBookKeeperMetadataStore delegate;
     private int createProtectionCalls;
     private int failCreateProtectionCall;
@@ -31,18 +33,13 @@ public final class FakeBookKeeperMetadataStore
     }
 
     public FakeBookKeeperMetadataStore(
-            BookKeeperMetadataStoreConfig configuration,
-            Clock clock,
-            ResponseLossPartitionedOxiaBackend backend) {
+            BookKeeperMetadataStoreConfig configuration, Clock clock, ResponseLossPartitionedOxiaBackend backend) {
         this(configuration, clock, (PartitionedOxiaClient.Backend) backend);
     }
 
     private FakeBookKeeperMetadataStore(
-            BookKeeperMetadataStoreConfig configuration,
-            Clock clock,
-            PartitionedOxiaClient.Backend backend) {
-        this.delegate = new OxiaJavaBookKeeperMetadataStore(
-                new PartitionedOxiaClient(backend), clock, configuration);
+            BookKeeperMetadataStoreConfig configuration, Clock clock, PartitionedOxiaClient.Backend backend) {
+        this.delegate = new OxiaJavaBookKeeperMetadataStore(new PartitionedOxiaClient(backend), clock, configuration);
     }
 
     @Override
@@ -118,8 +115,7 @@ public final class FakeBookKeeperMetadataStore
 
     @Override
     public CompletableFuture<BookKeeperScanPage<BookKeeperVersionedValue<BookKeeperAllocationSlotRecord>>>
-            scanAllocationSlots(
-                    String cluster, int slotShard, Optional<BookKeeperScanToken> continuation, int limit) {
+            scanAllocationSlots(String cluster, int slotShard, Optional<BookKeeperScanToken> continuation, int limit) {
         return delegate.scanAllocationSlots(cluster, slotShard, continuation, limit);
     }
 
@@ -189,27 +185,32 @@ public final class FakeBookKeeperMetadataStore
         createProtectionCalls++;
         if (createProtectionCalls == failCreateProtectionCall) {
             failCreateProtectionCall = 0;
-            return CompletableFuture.failedFuture(new IllegalStateException(
-                    "injected BookKeeper protection create failure"));
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("injected BookKeeper protection create failure"));
         }
         return delegate.createProtection(cluster, providerScopeSha256, value);
     }
 
     public void failCreateProtectionCall(int call) {
-        if (call <= 0) throw new IllegalArgumentException("call must be positive");
+        if (call <= 0) {
+            throw new IllegalArgumentException("call must be positive");
+        }
         failCreateProtectionCall = call;
     }
 
     @Override
     public CompletableFuture<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> compareAndSetProtection(
-            String cluster, String providerScopeSha256, BookKeeperLedgerProtectionRecord value,
-            long expectedVersion) {
+            String cluster, String providerScopeSha256, BookKeeperLedgerProtectionRecord value, long expectedVersion) {
         return delegate.compareAndSetProtection(cluster, providerScopeSha256, value, expectedVersion);
     }
 
     @Override
     public CompletableFuture<Void> deleteProtection(
-            String cluster, String providerScopeSha256, long ledgerId, int rangeSlot, int protectionSlot,
+            String cluster,
+            String providerScopeSha256,
+            long ledgerId,
+            int rangeSlot,
+            int protectionSlot,
             long expectedVersion) {
         return delegate.deleteProtection(
                 cluster, providerScopeSha256, ledgerId, rangeSlot, protectionSlot, expectedVersion);
@@ -217,8 +218,12 @@ public final class FakeBookKeeperMetadataStore
 
     @Override
     public CompletableFuture<BookKeeperScanPage<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>>>
-            scanProtections(String cluster, String providerScopeSha256, long ledgerId,
-                    Optional<BookKeeperScanToken> continuation, int limit) {
+            scanProtections(
+                    String cluster,
+                    String providerScopeSha256,
+                    long ledgerId,
+                    Optional<BookKeeperScanToken> continuation,
+                    int limit) {
         return delegate.scanProtections(cluster, providerScopeSha256, ledgerId, continuation, limit);
     }
 
@@ -236,8 +241,7 @@ public final class FakeBookKeeperMetadataStore
 
     @Override
     public CompletableFuture<BookKeeperVersionedValue<BookKeeperLedgerReaderLeaseRecord>> compareAndSetReaderLease(
-            String cluster, String providerScopeSha256, BookKeeperLedgerReaderLeaseRecord value,
-            long expectedVersion) {
+            String cluster, String providerScopeSha256, BookKeeperLedgerReaderLeaseRecord value, long expectedVersion) {
         return delegate.compareAndSetReaderLease(cluster, providerScopeSha256, value, expectedVersion);
     }
 
@@ -249,8 +253,12 @@ public final class FakeBookKeeperMetadataStore
 
     @Override
     public CompletableFuture<BookKeeperScanPage<BookKeeperVersionedValue<BookKeeperLedgerReaderLeaseRecord>>>
-            scanReaderLeases(String cluster, String providerScopeSha256, long ledgerId,
-                    Optional<BookKeeperScanToken> continuation, int limit) {
+            scanReaderLeases(
+                    String cluster,
+                    String providerScopeSha256,
+                    long ledgerId,
+                    Optional<BookKeeperScanToken> continuation,
+                    int limit) {
         return delegate.scanReaderLeases(cluster, providerScopeSha256, ledgerId, continuation, limit);
     }
 

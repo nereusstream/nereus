@@ -16,7 +16,6 @@ package com.nereusstream.core.read;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamId;
@@ -66,26 +65,24 @@ class OffsetIndexCacheTest {
 
     @Test
     void conflictingBytesForOneOffsetGenerationKeyAreRejected() {
-        OffsetIndexCache cache = new OffsetIndexCache(
-                true, Duration.ofSeconds(5), new MutableClock());
+        OffsetIndexCache cache = new OffsetIndexCache(true, Duration.ofSeconds(5), new MutableClock());
         cache.putPositive(STREAM_ID, List.of(index(1, 10)), 0);
 
         assertThatThrownBy(() -> cache.putPositive(STREAM_ID, List.of(index(2, 11)), 0))
-                .isInstanceOfSatisfying(NereusException.class, error ->
-                        assertThat(error.code()).isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
+                .isInstanceOfSatisfying(NereusException.class, error -> assertThat(error.code())
+                        .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
     }
 
     @Test
     void boundsRecordsPerStreamAndEvictsOldestStream() {
         MutableClock clock = new MutableClock();
-        OffsetIndexCache cache = new OffsetIndexCache(
-                true, Duration.ofMinutes(1), clock, 1, 2);
+        OffsetIndexCache cache = new OffsetIndexCache(true, Duration.ofMinutes(1), clock, 1, 2);
         StreamId another = new StreamId("another");
 
-        cache.putPositive(STREAM_ID, List.of(
-                index(STREAM_ID, 0, 1, 10),
-                index(STREAM_ID, 1, 2, 11),
-                index(STREAM_ID, 2, 3, 12)), 0);
+        cache.putPositive(
+                STREAM_ID,
+                List.of(index(STREAM_ID, 0, 1, 10), index(STREAM_ID, 1, 2, 11), index(STREAM_ID, 2, 3, 12)),
+                0);
 
         assertThat(cache.lookup(STREAM_ID, 0, 0).orElseThrow()).hasSize(2);
         assertThat(cache.lookup(STREAM_ID, 2, 0)).isEmpty();
@@ -117,15 +114,7 @@ class OffsetIndexCacheTest {
                 1,
                 logicalBytes,
                 List.of(),
-                new EntryIndexReferenceRecord(
-                        "OBJECT_FOOTER",
-                        "",
-                        "",
-                        new byte[0],
-                        200,
-                        10,
-                        "CRC32C",
-                        "11111111"),
+                new EntryIndexReferenceRecord("OBJECT_FOOTER", "", "", new byte[0], 200, 10, "CRC32C", "11111111"),
                 CommitSliceRequest.emptyProjectionIdentity(),
                 "CRC32C",
                 "22222222",
@@ -136,11 +125,7 @@ class OffsetIndexCacheTest {
                 metadataVersion));
     }
 
-    private static OffsetIndexEntry index(
-            StreamId streamId,
-            long startOffset,
-            long endOffset,
-            long metadataVersion) {
+    private static OffsetIndexEntry index(StreamId streamId, long startOffset, long endOffset, long metadataVersion) {
         String suffix = Long.toString(endOffset);
         return OffsetIndexEntry.fromLegacy(new OffsetIndexRecord(
                 streamId.value(),
@@ -162,14 +147,7 @@ class OffsetIndexCacheTest {
                 1,
                 List.of(),
                 new EntryIndexReferenceRecord(
-                        "OBJECT_FOOTER",
-                        "",
-                        "",
-                        new byte[0],
-                        200 + startOffset,
-                        10,
-                        "CRC32C",
-                        "11111111"),
+                        "OBJECT_FOOTER", "", "", new byte[0], 200 + startOffset, 10, "CRC32C", "11111111"),
                 CommitSliceRequest.emptyProjectionIdentity(),
                 "CRC32C",
                 "22222222",

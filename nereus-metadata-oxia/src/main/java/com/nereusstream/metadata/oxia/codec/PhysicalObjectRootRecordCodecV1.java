@@ -1,11 +1,11 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 
-public final class PhysicalObjectRootRecordCodecV1
-        extends AbstractF4RecordCodecV1<PhysicalObjectRootRecord> {
+public final class PhysicalObjectRootRecordCodecV1 extends AbstractF4RecordCodecV1<PhysicalObjectRootRecord> {
     public PhysicalObjectRootRecordCodecV1() {
         super(PhysicalObjectRootRecord.class);
     }

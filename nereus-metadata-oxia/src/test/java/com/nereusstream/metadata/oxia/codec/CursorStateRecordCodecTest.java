@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.records.CursorStateRecord;
 import java.util.List;
 import java.util.Map;
@@ -31,25 +31,25 @@ class CursorStateRecordCodecTest {
     void rejectsNonzeroEncodedMetadataVersion() {
         CursorStateRecord sample = F3MetadataCodecSamples.minimalActive();
         assertThatThrownBy(() -> new CursorStateRecord(
-                1,
-                sample.projection(),
-                sample.ownerSessionId(),
-                sample.cursorName(),
-                sample.cursorNameHash(),
-                sample.cursorGeneration(),
-                sample.lifecycle(),
-                sample.mutationSequence(),
-                sample.ackStateEpoch(),
-                sample.lastProtectionAttemptId(),
-                sample.markDeleteOffset(),
-                Optional.empty(),
-                List.of(),
-                List.of(),
-                Map.of(),
-                Map.of(),
-                sample.createdAtMillis(),
-                sample.updatedAtMillis(),
-                OptionalLong.empty()))
+                        1,
+                        sample.projection(),
+                        sample.ownerSessionId(),
+                        sample.cursorName(),
+                        sample.cursorNameHash(),
+                        sample.cursorGeneration(),
+                        sample.lifecycle(),
+                        sample.mutationSequence(),
+                        sample.ackStateEpoch(),
+                        sample.lastProtectionAttemptId(),
+                        sample.markDeleteOffset(),
+                        Optional.empty(),
+                        List.of(),
+                        List.of(),
+                        Map.of(),
+                        Map.of(),
+                        sample.createdAtMillis(),
+                        sample.updatedAtMillis(),
+                        OptionalLong.empty()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("metadataVersion");
     }
@@ -71,7 +71,6 @@ class CursorStateRecordCodecTest {
         assertThat(decoded.positionProperties())
                 .containsEntry("a", Long.MAX_VALUE)
                 .containsEntry("z", Long.MIN_VALUE);
-        assertThat(decoded.inlinePartialAckOverrides().get(0).remainingWords())
-                .containsExactly(-2L, 1L);
+        assertThat(decoded.inlinePartialAckOverrides().get(0).remainingWords()).containsExactly(-2L, 1L);
     }
 }

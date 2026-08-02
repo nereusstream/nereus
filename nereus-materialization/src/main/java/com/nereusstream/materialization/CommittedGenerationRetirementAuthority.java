@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.OffsetRange;
@@ -6,12 +7,12 @@ import com.nereusstream.api.StreamId;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Narrow provider-neutral retirement seam for a healthy committed Object generation. */
+/**
+ * Narrow provider-neutral retirement seam for a healthy committed Object generation.
+ */
 public interface CommittedGenerationRetirementAuthority {
     CompletableFuture<Optional<CommittedGenerationRetirementProof>> proveRetirement(
-            StreamId streamId,
-            OffsetRange sourceRange,
-            long sourceCommitVersion);
+            StreamId streamId, OffsetRange sourceRange, long sourceCommitVersion);
 
     CompletableFuture<Optional<CommittedGenerationRetirementProof>> proveExactRetirement(
             StreamId streamId,

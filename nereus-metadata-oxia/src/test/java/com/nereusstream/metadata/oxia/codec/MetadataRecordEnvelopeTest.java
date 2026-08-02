@@ -16,7 +16,6 @@ package com.nereusstream.metadata.oxia.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -27,11 +26,7 @@ class MetadataRecordEnvelopeTest {
     @Test
     void envelopeRoundTripsPayloadAndRejectsChecksumMismatch() {
         byte[] encoded = MetadataRecordEnvelope.encode(
-                "StreamHeadRecord",
-                1,
-                1,
-                MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1,
-                new byte[] {1, 2, 3});
+                "StreamHeadRecord", 1, 1, MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1, new byte[] {1, 2, 3});
 
         MetadataRecordEnvelope.DecodedEnvelope decoded = MetadataRecordEnvelope.decode(encoded);
 
@@ -48,15 +43,10 @@ class MetadataRecordEnvelopeTest {
     @Test
     void envelopeRejectsTruncatedPayload() {
         byte[] encoded = MetadataRecordEnvelope.encode(
-                "OffsetIndexRecord",
-                1,
-                1,
-                MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1,
-                new byte[] {1, 2, 3});
+                "OffsetIndexRecord", 1, 1, MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1, new byte[] {1, 2, 3});
         byte[] truncated = java.util.Arrays.copyOf(encoded, encoded.length - 2);
 
-        assertThatThrownBy(() -> MetadataRecordEnvelope.decode(truncated))
-                .isInstanceOf(MetadataCodecException.class);
+        assertThatThrownBy(() -> MetadataRecordEnvelope.decode(truncated)).isInstanceOf(MetadataCodecException.class);
     }
 
     @Test
@@ -76,16 +66,15 @@ class MetadataRecordEnvelopeTest {
     @Test
     void registryRejectsUnknownAndDuplicateCodecs() {
         MetadataRecordCodec<String> codec = new StringCodec("TestRecord");
-        MapMetadataCodecRegistry registry = new MapMetadataCodecRegistry(List.of(
-                new MapMetadataCodecRegistry.RegisteredCodec<>(String.class, codec)));
+        MapMetadataCodecRegistry registry = new MapMetadataCodecRegistry(
+                List.of(new MapMetadataCodecRegistry.RegisteredCodec<>(String.class, codec)));
 
         assertThat(registry.<String>codecForType("TestRecord")).isSameAs(codec);
         assertThat(registry.codecForClass(String.class)).isSameAs(codec);
-        assertThatThrownBy(() -> registry.codecForType("MissingRecord"))
-                .isInstanceOf(MetadataCodecException.class);
+        assertThatThrownBy(() -> registry.codecForType("MissingRecord")).isInstanceOf(MetadataCodecException.class);
         assertThatThrownBy(() -> new MapMetadataCodecRegistry(List.of(
-                new MapMetadataCodecRegistry.RegisteredCodec<>(String.class, codec),
-                new MapMetadataCodecRegistry.RegisteredCodec<>(String.class, codec))))
+                        new MapMetadataCodecRegistry.RegisteredCodec<>(String.class, codec),
+                        new MapMetadataCodecRegistry.RegisteredCodec<>(String.class, codec))))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -112,21 +101,18 @@ class MetadataRecordEnvelopeTest {
     }
 
     private static byte[] rawEnvelope(
-            byte[] recordType,
-            int schemaVersion,
-            int minReaderSchemaVersion,
-            byte[] payloadEncoding,
-            byte[] payload) {
+            byte[] recordType, int schemaVersion, int minReaderSchemaVersion, byte[] payloadEncoding, byte[] payload) {
         byte[] magic = MetadataRecordEnvelope.MAGIC.getBytes(StandardCharsets.US_ASCII);
-        ByteBuffer buffer = ByteBuffer.allocate(
-                magic.length
-                        + Short.BYTES + recordType.length
-                        + Integer.BYTES
-                        + Integer.BYTES
-                        + Short.BYTES + payloadEncoding.length
-                        + Integer.BYTES
-                        + Integer.BYTES
-                        + payload.length);
+        ByteBuffer buffer = ByteBuffer.allocate(magic.length
+                + Short.BYTES
+                + recordType.length
+                + Integer.BYTES
+                + Integer.BYTES
+                + Short.BYTES
+                + payloadEncoding.length
+                + Integer.BYTES
+                + Integer.BYTES
+                + payload.length);
         buffer.put(magic);
         putShortBytes(buffer, recordType);
         buffer.putInt(schemaVersion);

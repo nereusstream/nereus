@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.StreamId;
@@ -58,12 +58,10 @@ class RecoveryCheckpointDomainValidationTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("expectedEntryCount");
 
-        assertThatThrownBy(() -> RecoveryCheckpointTestSupport.entry(
-                        5, 0, 1, 1, "commit-5", "commit-4", List.of()))
+        assertThatThrownBy(() -> RecoveryCheckpointTestSupport.entry(5, 0, 1, 1, "commit-5", "commit-4", List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("1..8");
-        assertThatThrownBy(() -> RecoveryCheckpointTestSupport.entry(
-                        5, 0, 1, 1, "commit-5", "commit-4", List.of(1, 1)))
+        assertThatThrownBy(() -> RecoveryCheckpointTestSupport.entry(5, 0, 1, 1, "commit-5", "commit-4", List.of(1, 1)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unique");
     }

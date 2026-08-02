@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamState;
@@ -28,49 +28,49 @@ class ProjectionMetadataModelTest {
 
         ProjectionCreateRequest request = new ProjectionCreateRequest(NAME, 3, 1, emptyStream(), properties);
 
-        assertThat(request.initialProperties()).containsExactly(
-                Map.entry("a", "1"), Map.entry("z", "2"));
+        assertThat(request.initialProperties()).containsExactly(Map.entry("a", "1"), Map.entry("z", "2"));
         assertThatThrownBy(() -> request.initialProperties().put("x", "y"))
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> new ProjectionCreateRequest(
-                        NAME, 3, 1, stream(StreamState.ACTIVE, StorageProfile.OBJECT_WAL_SYNC_OBJECT, 1, 0, 0,
-                                payloadAttributes()), Map.of()))
+                        NAME,
+                        3,
+                        1,
+                        stream(StreamState.ACTIVE, StorageProfile.OBJECT_WAL_SYNC_OBJECT, 1, 0, 0, payloadAttributes()),
+                        Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("canonical empty");
         ProjectionCreateRequest async = new ProjectionCreateRequest(
                 NAME,
                 3,
                 1,
-                stream(
-                        StreamState.ACTIVE,
-                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
-                        0,
-                        0,
-                        0,
-                        payloadAttributes()),
+                stream(StreamState.ACTIVE, StorageProfile.OBJECT_WAL_ASYNC_OBJECT, 0, 0, 0, payloadAttributes()),
                 Map.of());
-        assertThat(async.emptyStream().profile())
-                .isEqualTo(StorageProfile.OBJECT_WAL_ASYNC_OBJECT);
+        assertThat(async.emptyStream().profile()).isEqualTo(StorageProfile.OBJECT_WAL_ASYNC_OBJECT);
         assertThatThrownBy(() -> new ProjectionCreateRequest(
-                        NAME, 3, 1, stream(StreamState.ACTIVE, StorageProfile.OBJECT_WAL, 0, 0, 0,
-                                payloadAttributes()), Map.of()))
+                        NAME,
+                        3,
+                        1,
+                        stream(StreamState.ACTIVE, StorageProfile.OBJECT_WAL, 0, 0, 0, payloadAttributes()),
+                        Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("canonical empty");
         assertThatThrownBy(() -> new ProjectionCreateRequest(
-                        NAME, 3, 1, stream(StreamState.ACTIVE, StorageProfile.OBJECT_WAL_SYNC_OBJECT, 0, 0, 0,
-                                Map.of()), Map.of()))
+                        NAME,
+                        3,
+                        1,
+                        stream(StreamState.ACTIVE, StorageProfile.OBJECT_WAL_SYNC_OBJECT, 0, 0, 0, Map.of()),
+                        Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("canonical empty");
     }
 
     @Test
     void rejectsReservedPropertiesOnCreateAndRecordDecode() {
-        assertThatThrownBy(() -> new ProjectionCreateRequest(
-                        NAME, 1, 1, emptyStream(), Map.of("nereus.internal", "x")))
+        assertThatThrownBy(() -> new ProjectionCreateRequest(NAME, 1, 1, emptyStream(), Map.of("nereus.internal", "x")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("reserved");
-        assertThatThrownBy(() -> new ProjectionCreateRequest(
-                        NAME, 1, 1, emptyStream(), Map.of("PULSAR.SHADOW_SOURCE", "x")))
+        assertThatThrownBy(() ->
+                        new ProjectionCreateRequest(NAME, 1, 1, emptyStream(), Map.of("PULSAR.SHADOW_SOURCE", "x")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("reserved");
     }
@@ -80,12 +80,19 @@ class ProjectionMetadataModelTest {
         TopicProjectionRecord topic = topicRecord();
         ManagedLedgerProjectionIdentity identity = topic.projectionIdentity();
         VirtualLedgerProjectionRecord virtual = new VirtualLedgerProjectionRecord(
-                NAME, topic.managedLedgerNameHash(), identity, 0,
-                ManagedLedgerProjectionNames.POSITION_MAPPING_VERSION, 0);
-        PositionIndexRecord positions = new PositionIndexRecord(
-                NAME, topic.managedLedgerNameHash(), identity,
+                NAME,
+                topic.managedLedgerNameHash(),
+                identity,
+                0,
                 ManagedLedgerProjectionNames.POSITION_MAPPING_VERSION,
-                ManagedLedgerProjectionNames.POSITION_FORMULA_V1, 0);
+                0);
+        PositionIndexRecord positions = new PositionIndexRecord(
+                NAME,
+                topic.managedLedgerNameHash(),
+                identity,
+                ManagedLedgerProjectionNames.POSITION_MAPPING_VERSION,
+                ManagedLedgerProjectionNames.POSITION_FORMULA_V1,
+                0);
 
         assertThat(topic.parsedFacadeState()).isEqualTo(ManagedLedgerFacadeState.OPEN);
         assertThat(virtual.identity()).isEqualTo(identity);
@@ -93,13 +100,26 @@ class ProjectionMetadataModelTest {
         assertThatThrownBy(() -> new VirtualLedgerProjectionRecord(
                         "tenant/ns/other", topic.managedLedgerNameHash(), identity, 0, 1, 0))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new PositionIndexRecord(
-                        NAME, topic.managedLedgerNameHash(), identity, 1, "OFFSET_PLUS_ONE", 0))
+        assertThatThrownBy(() ->
+                        new PositionIndexRecord(NAME, topic.managedLedgerNameHash(), identity, 1, "OFFSET_PLUS_ONE", 0))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new TopicProjectionRecord(
-                        NAME, topic.managedLedgerNameHash(), 3, 1, topic.streamName(), topic.streamId(),
-                        "nereus", StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(), topic.virtualLedgerId(), 1,
-                        ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1, "UNKNOWN", Map.of(), 100, 0, 0))
+                        NAME,
+                        topic.managedLedgerNameHash(),
+                        3,
+                        1,
+                        topic.streamName(),
+                        topic.streamId(),
+                        "nereus",
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                        topic.virtualLedgerId(),
+                        1,
+                        ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1,
+                        "UNKNOWN",
+                        Map.of(),
+                        100,
+                        0,
+                        0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unknown");
     }
@@ -160,7 +180,8 @@ class ProjectionMetadataModelTest {
     }
 
     private static Map<String, String> payloadAttributes() {
-        return Map.of(ManagedLedgerProjectionNames.PAYLOAD_MAPPING_ATTRIBUTE,
+        return Map.of(
+                ManagedLedgerProjectionNames.PAYLOAD_MAPPING_ATTRIBUTE,
                 ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1);
     }
 }

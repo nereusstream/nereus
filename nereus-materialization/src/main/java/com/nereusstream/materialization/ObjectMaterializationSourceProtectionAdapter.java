@@ -1,27 +1,31 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
+import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.target.ReadTargetType;
-import com.nereusstream.api.StreamId;
 import com.nereusstream.core.physical.ObjectProtection;
 import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.core.physical.ObjectProtectionOwner;
 import com.nereusstream.core.physical.ObjectProtectionRequest;
 import com.nereusstream.core.read.PhysicalObjectIdentityResolver;
+import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Existing F4 object-protection protocol exposed through the provider-neutral source SPI. */
+/**
+ * Existing F4 object-protection protocol exposed through the provider-neutral source SPI.
+ */
 public final class ObjectMaterializationSourceProtectionAdapter
         implements MaterializationSourceProtectionAdapter<ObjectSliceReadTarget> {
     private final PhysicalObjectIdentityResolver identities;
     private final ObjectProtectionManager protections;
 
     public ObjectMaterializationSourceProtectionAdapter(
-            PhysicalObjectIdentityResolver identities,
-            ObjectProtectionManager protections) {
+            PhysicalObjectIdentityResolver identities, ObjectProtectionManager protections) {
         this.identities = Objects.requireNonNull(identities, "identities");
         this.protections = Objects.requireNonNull(protections, "protections");
     }
@@ -45,24 +49,38 @@ public final class ObjectMaterializationSourceProtectionAdapter
             OwnerRevalidator ownerRevalidator) {
         Objects.requireNonNull(streamId, "streamId");
         ObjectSliceReadTarget target = requireTarget(source);
-        return identities.resolve(target, source.view())
+        return identities
+                .resolve(target, source.view())
                 .thenCompose(identity -> protections.acquireOrTransfer(
                         new ObjectProtectionRequest(
-                                identity,
-                                ObjectProtectionType.MATERIALIZATION_SOURCE,
-                                referenceId,
-                                owner,
-                                0),
+                                identity, ObjectProtectionType.MATERIALIZATION_SOURCE, referenceId, owner, 0),
                         ownerRevalidator::revalidate))
                 .thenApply(value -> wrap(referenceId, value));
     }
 
     @Override
+    public CompletableFuture<Optional<MaterializationSourceProtection>> findExisting(
+            StreamId streamId, SourceGeneration source, String referenceId) {
+        Objects.requireNonNull(streamId, "streamId");
+        ObjectSliceReadTarget target = requireTarget(source);
+        String exactReferenceId = requireText(referenceId, "referenceId");
+        return identities
+                .resolve(target, source.view())
+                .thenCompose(identity -> protections.findExisting(
+                        identity,
+                        new ObjectProtectionIdentity(
+                                identity.objectKeyHash(),
+                                ObjectProtectionType.MATERIALIZATION_SOURCE,
+                                exactReferenceId)))
+                .thenApply(optional -> optional.map(value -> wrap(exactReferenceId, value)));
+    }
+
+    @Override
     public CompletableFuture<MaterializationSourceProtection> revalidate(
-            MaterializationSourceProtection protection,
-            OwnerRevalidator ownerRevalidator) {
+            MaterializationSourceProtection protection, OwnerRevalidator ownerRevalidator) {
         ObjectProtection exact = requireHandle(protection);
-        return protections.revalidate(exact, ownerRevalidator::revalidate)
+        return protections
+                .revalidate(exact, ownerRevalidator::revalidate)
                 .thenApply(value -> wrap(protection.referenceId(), value));
     }
 
@@ -72,17 +90,17 @@ public final class ObjectMaterializationSourceProtectionAdapter
             ObjectProtectionOwner newOwner,
             OwnerRevalidator newOwnerRevalidator) {
         ObjectProtection exact = requireHandle(protection);
-        return protections.transfer(exact, newOwner, newOwnerRevalidator::revalidate)
+        return protections
+                .transfer(exact, newOwner, newOwnerRevalidator::revalidate)
                 .thenApply(value -> wrap(protection.referenceId(), value));
     }
 
     @Override
     public CompletableFuture<Void> release(
-            MaterializationSourceProtection protection,
-            RemovalAuthorizer removalAuthorizer) {
+            MaterializationSourceProtection protection, RemovalAuthorizer removalAuthorizer) {
         ObjectProtection exact = requireHandle(protection);
-        return protections.release(exact, current -> removalAuthorizer.authorize(
-                wrap(protection.referenceId(), current)));
+        return protections.release(
+                exact, current -> removalAuthorizer.authorize(wrap(protection.referenceId(), current)));
     }
 
     private static ObjectSliceReadTarget requireTarget(SourceGeneration source) {
@@ -105,14 +123,16 @@ public final class ObjectMaterializationSourceProtectionAdapter
         return value;
     }
 
-    private static MaterializationSourceProtection wrap(
-            String referenceId,
-            ObjectProtection protection) {
+    private static MaterializationSourceProtection wrap(String referenceId, ObjectProtection protection) {
         return new MaterializationSourceProtection(
-                ReadTargetType.OBJECT_SLICE,
-                referenceId,
-                protection.owner(),
-                protection.metadataVersion(),
-                protection);
+                ReadTargetType.OBJECT_SLICE, referenceId, protection.owner(), protection.metadataVersion(), protection);
+    }
+
+    private static String requireText(String value, String field) {
+        Objects.requireNonNull(value, field);
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(field + " cannot be blank");
+        }
+        return value;
     }
 }

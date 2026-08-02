@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.BookKeeperAllocationSlotRecord;
@@ -11,7 +12,9 @@ import com.nereusstream.metadata.oxia.records.LedgerAllocationIntentRecord;
 import java.util.HexFormat;
 import java.util.List;
 
-/** Explicit V1 registry for BookKeeper primary-WAL metadata records. */
+/**
+ * Explicit V1 registry for BookKeeper primary-WAL metadata records.
+ */
 public final class BookKeeperMetadataCodecs {
     private static final MapMetadataCodecRegistry REGISTRY = new MapMetadataCodecRegistry(List.of(
             registered(BookKeeperWriterStateRecord.class, new BookKeeperWriterStateRecordCodecV1()),
@@ -22,14 +25,19 @@ public final class BookKeeperMetadataCodecs {
             registered(BookKeeperLedgerProtectionRecord.class, new BookKeeperLedgerProtectionRecordCodecV1()),
             registered(BookKeeperLedgerReaderLeaseRecord.class, new BookKeeperLedgerReaderLeaseRecordCodecV1())));
 
-    private BookKeeperMetadataCodecs() { }
+    private BookKeeperMetadataCodecs() {}
 
-    public static MetadataCodecRegistry registry() { return REGISTRY; }
+    public static MetadataCodecRegistry registry() {
+        return REGISTRY;
+    }
 
     public static <T> byte[] encodeEnvelope(T record, Class<T> type) {
         MetadataRecordCodec<T> codec = REGISTRY.codecForClass(type);
-        return MetadataRecordEnvelope.encode(codec.recordType(), codec.schemaVersion(record),
-                codec.minReaderSchemaVersion(record), MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1,
+        return MetadataRecordEnvelope.encode(
+                codec.recordType(),
+                codec.schemaVersion(record),
+                codec.minReaderSchemaVersion(record),
+                MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1,
                 codec.encode(record));
     }
 
@@ -53,7 +61,8 @@ public final class BookKeeperMetadataCodecs {
         return HexFormat.of().formatHex(encodeUnchecked(record, type));
     }
 
-    private static <T> MapMetadataCodecRegistry.RegisteredCodec<T> registered(Class<T> type, MetadataRecordCodec<T> codec) {
+    private static <T> MapMetadataCodecRegistry.RegisteredCodec<T> registered(
+            Class<T> type, MetadataRecordCodec<T> codec) {
         return new MapMetadataCodecRegistry.RegisteredCodec<>(type, codec);
     }
 

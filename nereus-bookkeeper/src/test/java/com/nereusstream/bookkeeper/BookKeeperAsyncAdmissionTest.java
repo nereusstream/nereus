@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
@@ -40,22 +40,15 @@ class BookKeeperAsyncAdmissionTest {
                     assertThat(timeout).isPositive();
                     return CompletableFuture.completedFuture(snapshots.remove());
                 },
-                new MaterializationLagThresholds(
-                        1,
-                        2,
-                        0,
-                        0,
-                        Duration.ZERO,
-                        Duration.ofMillis(1)),
+                new MaterializationLagThresholds(1, 2, 0, 0, Duration.ZERO, Duration.ofMillis(1)),
                 scheduler);
         BookKeeperAsyncAppendAdmissionGuard guard = new BookKeeperAsyncAppendAdmissionGuard(gate);
         try {
             guard.admit(request(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT)).join();
 
             assertThat(measurements).hasValue(2);
-            assertThatThrownBy(() -> guard.admit(
-                            request(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT))
-                    .join())
+            assertThatThrownBy(() -> guard.admit(request(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT))
+                            .join())
                     .hasRootCauseInstanceOf(NereusException.class)
                     .rootCause()
                     .extracting(failure -> ((NereusException) failure).code())
@@ -72,22 +65,10 @@ class BookKeeperAsyncAdmissionTest {
     }
 
     private static AppendAdmissionRequest request(StorageProfile profile) {
-        return new AppendAdmissionRequest(
-                STREAM,
-                profile,
-                DurabilityLevel.WAL_DURABLE,
-                Duration.ofSeconds(1));
+        return new AppendAdmissionRequest(STREAM, profile, DurabilityLevel.WAL_DURABLE, Duration.ofSeconds(1));
     }
 
     private static MaterializationLagSnapshot snapshot(long lagRecords) {
-        return new MaterializationLagSnapshot(
-                STREAM,
-                0,
-                lagRecords,
-                lagRecords,
-                lagRecords,
-                0,
-                1,
-                1);
+        return new MaterializationLagSnapshot(STREAM, 0, lagRecords, lagRecords, lagRecords, 0, 1, 1);
     }
 }

@@ -21,10 +21,11 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 
-/** Shared deterministic identity helpers used by metadata and object modules. */
+/**
+ * Shared deterministic identity helpers used by metadata and object modules.
+ */
 public final class DeterministicIds {
-    private DeterministicIds() {
-    }
+    private DeterministicIds() {}
 
     public static StreamId streamIdFor(StreamName name) {
         return new StreamId("s-" + streamNameHash(name));
@@ -40,7 +41,9 @@ public final class DeterministicIds {
         return sha256Base32(value.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Stable base32lower-no-pad SHA-256 of exact caller-supplied canonical bytes. */
+    /**
+     * Stable base32lower-no-pad SHA-256 of exact caller-supplied canonical bytes.
+     */
     public static String stableHashBytes(byte[] value) {
         Objects.requireNonNull(value, "value");
         return sha256Base32(value.clone());

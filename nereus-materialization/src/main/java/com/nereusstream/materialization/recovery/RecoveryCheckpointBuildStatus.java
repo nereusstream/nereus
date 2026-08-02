@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.recovery;
 
-/** Non-destructive result of proving one candidate recovery-checkpoint prefix. */
+/**
+ * Non-destructive result of proving one candidate recovery-checkpoint prefix.
+ */
 public enum RecoveryCheckpointBuildStatus {
     READY,
     NO_LIVE_TAIL,

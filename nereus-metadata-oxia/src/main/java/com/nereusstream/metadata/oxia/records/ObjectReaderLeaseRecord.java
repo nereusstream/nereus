@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** One process's durable, time-bounded read admission for a physical object. */
+/**
+ * One process's durable, time-bounded read admission for a physical object.
+ */
 public record ObjectReaderLeaseRecord(
         int schemaVersion,
         String objectKeyHash,
@@ -32,7 +35,15 @@ public record ObjectReaderLeaseRecord(
 
     public ObjectReaderLeaseRecord withMetadataVersion(long version) {
         return new ObjectReaderLeaseRecord(
-                schemaVersion, objectKeyHash, processRunId, leaseId, rootLifecycleEpoch,
-                acquiredAtMillis, expiresAtMillis, maximumReadDeadlineMillis, renewalSequence, version);
+                schemaVersion,
+                objectKeyHash,
+                processRunId,
+                leaseId,
+                rootLifecycleEpoch,
+                acquiredAtMillis,
+                expiresAtMillis,
+                maximumReadDeadlineMillis,
+                renewalSequence,
+                version);
     }
 }

@@ -24,15 +24,15 @@ membership、routing ring、health model、Pulsar lookup/Kafka metadata projecti
 
 ## 2. 核心概念
 
-| 概念 | 含义 |
-| --- | --- |
-| Broker session | broker 在 Oxia 中的 ephemeral session |
-| Broker zone | broker 所在 AZ/zone |
-| Preferred broker | 某 stream 在某 zone 下的推荐服务 broker |
-| Append session | Oxia-fenced append token |
-| Routing ring | zone-local consistent hash ring |
-| Brown-out | broker 未死亡但持续高延迟/低吞吐/错误率异常 |
-| Degraded broker | 被 routing 暂时摘除但 session 可能仍存在 |
+| 概念               | 含义                                 |
+|------------------|------------------------------------|
+| Broker session   | broker 在 Oxia 中的 ephemeral session |
+| Broker zone      | broker 所在 AZ/zone                  |
+| Preferred broker | 某 stream 在某 zone 下的推荐服务 broker     |
+| Append session   | Oxia-fenced append token           |
+| Routing ring     | zone-local consistent hash ring    |
+| Brown-out        | broker 未死亡但持续高延迟/低吞吐/错误率异常         |
+| Degraded broker  | 被 routing 暂时摘除但 session 可能仍存在      |
 
 ## 3. Oxia Routing Metadata
 
@@ -102,12 +102,12 @@ Kafka metadata response：
 
 Preferred broker 不等于 append owner。
 
-| 场景 | 行为 |
-| --- | --- |
-| preferred broker 有 append session | 正常写入，batch/cache locality 最佳 |
-| non-preferred broker 收到 produce | 可以转发，也可以获取 append session 后直接写 |
-| preferred broker brown-out | routing ring 摘除，client retry 到新 preferred broker |
-| append session stale | stream-head commit validation rejects the writer |
+| 场景                                | 行为                                               |
+|-----------------------------------|--------------------------------------------------|
+| preferred broker 有 append session | 正常写入，batch/cache locality 最佳                     |
+| non-preferred broker 收到 produce   | 可以转发，也可以获取 append session 后直接写                   |
+| preferred broker brown-out        | routing ring 摘除，client retry 到新 preferred broker |
+| append session stale              | stream-head commit validation rejects the writer |
 
 实现策略：
 
@@ -237,32 +237,32 @@ pulsar_nereus_cross_zone_lookup_total
 
 ## 11. Metrics
 
-| Metric | 含义 |
-| --- | --- |
-| `pulsar_nereus_routing_ring_version` | zone ring version |
-| `pulsar_nereus_broker_degraded` | broker degraded 状态 |
-| `pulsar_nereus_broker_degraded_total` | degraded 次数 |
-| `pulsar_nereus_broker_readmitted_total` | re-admission 次数 |
-| `pulsar_nereus_routing_changes_total` | routing ring 变化次数 |
-| `pulsar_nereus_preferred_broker_cache_hit_ratio` | request 命中 preferred broker 比例 |
-| `pulsar_nereus_cross_zone_produce_bytes` | 跨 zone produce bytes |
-| `pulsar_nereus_cross_zone_fetch_bytes` | 跨 zone fetch bytes |
-| `pulsar_nereus_append_session_transfer_total` | append session 切换次数 |
-| `pulsar_nereus_client_retry_after_routing_change_total` | routing 变化导致的 client retry |
+| Metric                                                  | 含义                             |
+|---------------------------------------------------------|--------------------------------|
+| `pulsar_nereus_routing_ring_version`                    | zone ring version              |
+| `pulsar_nereus_broker_degraded`                         | broker degraded 状态             |
+| `pulsar_nereus_broker_degraded_total`                   | degraded 次数                    |
+| `pulsar_nereus_broker_readmitted_total`                 | re-admission 次数                |
+| `pulsar_nereus_routing_changes_total`                   | routing ring 变化次数              |
+| `pulsar_nereus_preferred_broker_cache_hit_ratio`        | request 命中 preferred broker 比例 |
+| `pulsar_nereus_cross_zone_produce_bytes`                | 跨 zone produce bytes           |
+| `pulsar_nereus_cross_zone_fetch_bytes`                  | 跨 zone fetch bytes             |
+| `pulsar_nereus_append_session_transfer_total`           | append session 切换次数            |
+| `pulsar_nereus_client_retry_after_routing_change_total` | routing 变化导致的 client retry     |
 
 ## 12. Future 7 Design Gate
 
-| Design question | Required answer |
-| --- | --- |
-| Broker crash remap | 无数据搬迁，新 broker 从 stream head/session 和 read index 继续 |
-| Brown-out evict | degraded broker 从 active ring 移除，ring version 单调递增 |
-| Re-admission warmup | 恢复 broker 渐进承接流量，不立即接管 hot stream |
-| Same-zone routing | client 优先连本 zone broker |
-| Cross-zone fallback | 本 zone 无健康 broker 时仍可服务 |
-| Stale append session | degraded/stale broker commit 被 Oxia fencing 拒绝 |
-| KoP metadata refresh | Kafka leader projection 从同一 routing state 派生 |
-| Pulsar lookup refresh | Pulsar lookup 从同一 routing state 派生 |
-| Group coordinator remap | coordinator 是 locality role，group state 从 Oxia 恢复 |
+| Design question         | Required answer                                      |
+|-------------------------|------------------------------------------------------|
+| Broker crash remap      | 无数据搬迁，新 broker 从 stream head/session 和 read index 继续 |
+| Brown-out evict         | degraded broker 从 active ring 移除，ring version 单调递增   |
+| Re-admission warmup     | 恢复 broker 渐进承接流量，不立即接管 hot stream                    |
+| Same-zone routing       | client 优先连本 zone broker                              |
+| Cross-zone fallback     | 本 zone 无健康 broker 时仍可服务                              |
+| Stale append session    | degraded/stale broker commit 被 Oxia fencing 拒绝       |
+| KoP metadata refresh    | Kafka leader projection 从同一 routing state 派生         |
+| Pulsar lookup refresh   | Pulsar lookup 从同一 routing state 派生                   |
+| Group coordinator remap | coordinator 是 locality role，group state 从 Oxia 恢复    |
 
 ## 13. 与 Ursa 的目标设计对齐
 
@@ -282,7 +282,8 @@ pulsar_nereus_cross_zone_lookup_total
 
 仍弱于 Ursa：
 
-- Ursa 的 broker/routing 面向 Kafka-compatible engine 原生设计，Nereus 需要同时投影 Pulsar lookup 和 Kafka MetadataResponse；
+- Ursa 的 broker/routing 面向 Kafka-compatible engine 原生设计，Nereus 需要同时投影 Pulsar lookup 和 Kafka
+  MetadataResponse；
 - degraded 阈值和 readmission 策略在设计上只能给出状态机，实际阈值需要在后续产品 profile 中校准；
 - Preferred broker 与 append session 解耦会让实现复杂度高于单协议 broker；
 - KoP metadata projection 依赖 Kafka client 的 leader/coordinator 心智，错误码和 retry 语义需要在 Future 5/7 联合收敛。

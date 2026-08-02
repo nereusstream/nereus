@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ErrorCode;
@@ -38,12 +39,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 
-/** Safely fences matching higher-generation readers before physical-root MARK. */
+/**
+ * Safely fences matching higher-generation readers before physical-root MARK.
+ */
 public final class HigherGenerationPreDrainCoordinator {
-    private static final List<ReadView> VIEWS = List.of(
-            ReadView.COMMITTED, ReadView.TOPIC_COMPACTED);
-    private static final ReadTargetCodecRegistry TARGET_CODECS =
-            ReadTargetCodecRegistry.phase15();
+    private static final List<ReadView> VIEWS = List.of(ReadView.COMMITTED, ReadView.TOPIC_COMPACTED);
+    private static final ReadTargetCodecRegistry TARGET_CODECS = ReadTargetCodecRegistry.phase15();
     private static final String REASON_PREFIX = "physical-gc-pre-drain:";
 
     private final String cluster;
@@ -73,80 +74,41 @@ public final class HigherGenerationPreDrainCoordinator {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.keys = new F4Keyspace(cluster);
-        RecoveryReplacementVerifier replacements = new RecoveryReplacementVerifier(
-                cluster,
-                generations,
-                physicalObjects,
-                checkpoints,
-                config);
-        CompletedTrimRetirementVerifier trim = new CompletedTrimRetirementVerifier(
-                cluster,
-                l0,
-                generations);
+        RecoveryReplacementVerifier replacements =
+                new RecoveryReplacementVerifier(cluster, generations, physicalObjects, checkpoints, config);
+        CompletedTrimRetirementVerifier trim = new CompletedTrimRetirementVerifier(cluster, l0, generations);
         HigherGenerationRecoveryCoverageVerifier committed =
-                new HigherGenerationRecoveryCoverageVerifier(
-                        cluster,
-                        generations,
-                        checkpoints,
-                        replacements,
-                        config);
+                new HigherGenerationRecoveryCoverageVerifier(cluster, generations, checkpoints, replacements, config);
         TopicCompactedReplacementVerifier topicCompacted =
-                new TopicCompactedReplacementVerifier(
-                        cluster,
-                        generations,
-                        replacements,
-                        config);
-        this.eligibility = new HigherGenerationRetirementEligibilityVerifier(
-                trim,
-                committed,
-                topicCompacted);
+                new TopicCompactedReplacementVerifier(cluster, generations, replacements, config);
+        this.eligibility = new HigherGenerationRetirementEligibilityVerifier(trim, committed, topicCompacted);
     }
 
-    public CompletableFuture<HigherGenerationPreDrainResult> preDrain(
-            GcCandidate candidate) {
+    public CompletableFuture<HigherGenerationPreDrainResult> preDrain(GcCandidate candidate) {
         GcCandidate exact = Objects.requireNonNull(candidate, "candidate");
         if (exact.rootState() != GcCandidateRootState.ACTIVE_DISCOVERY) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "higher-generation pre-drain requires an ACTIVE_DISCOVERY candidate"));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("higher-generation pre-drain requires an ACTIVE_DISCOVERY candidate"));
         }
-        if (exact.referenceQuery().kind()
-                == GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE) {
-            return CompletableFuture.failedFuture(condition(
-                    "higher-generation pre-drain cannot infer ownerless stream authority"));
+        if (exact.referenceQuery().kind() == GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE) {
+            return CompletableFuture.failedFuture(
+                    condition("higher-generation pre-drain cannot infer ownerless stream authority"));
         }
         if (!config.mutationsAllowed()) {
-            return CompletableFuture.completedFuture(
-                    HigherGenerationPreDrainResult.disabled());
+            return CompletableFuture.completedFuture(HigherGenerationPreDrainResult.disabled());
         }
         if (nonNegativeNow() < exact.notBeforeMillis()) {
-            return CompletableFuture.completedFuture(
-                    HigherGenerationPreDrainResult.notEligibleYet());
+            return CompletableFuture.completedFuture(HigherGenerationPreDrainResult.notEligibleYet());
         }
-        MaterializationDeadline deadline = new MaterializationDeadline(
-                config.operationTimeout(), scheduler);
+        MaterializationDeadline deadline = new MaterializationDeadline(config.operationTimeout(), scheduler);
         CompletableFuture<HigherGenerationPreDrainResult> result;
         try {
             result = requireExactCandidateRoot(exact, deadline)
-                    .thenCompose(ignored -> scan(
-                            exact.referenceQuery(),
-                            0,
-                            0,
-                            Optional.empty(),
-                            null,
-                            new ArrayList<>(),
-                            0,
-                            deadline))
+                    .thenCompose(ignored ->
+                            scan(exact.referenceQuery(), 0, 0, Optional.empty(), null, new ArrayList<>(), 0, deadline))
                     .thenCompose(indexes -> indexes.isEmpty()
-                            ? CompletableFuture.completedFuture(
-                                    HigherGenerationPreDrainResult.noMatchingIndex())
-                            : drain(
-                                    exact,
-                                    indexes,
-                                    0,
-                                    new ArrayList<>(),
-                                    0,
-                                    0,
-                                    deadline));
+                            ? CompletableFuture.completedFuture(HigherGenerationPreDrainResult.noMatchingIndex())
+                            : drain(exact, indexes, 0, new ArrayList<>(), 0, 0, deadline));
         } catch (Throwable failure) {
             deadline.close();
             return CompletableFuture.failedFuture(failure);
@@ -167,39 +129,21 @@ public final class HigherGenerationPreDrainCoordinator {
             return CompletableFuture.completedFuture(List.copyOf(matching));
         }
         if (viewIndex == VIEWS.size()) {
-            return scan(
-                    query,
-                    streamIndex + 1,
-                    0,
-                    Optional.empty(),
-                    null,
-                    matching,
-                    observed,
-                    deadline);
+            return scan(query, streamIndex + 1, 0, Optional.empty(), null, matching, observed, deadline);
         }
         StreamId stream = query.affectedStreams().get(streamIndex);
         ReadView view = VIEWS.get(viewIndex);
         int remaining = config.maxAuthoritiesPerDomainSnapshot() - observed;
-        int limit = remaining == 0
-                ? 1
-                : Math.min(config.metadataScanPageSize(), remaining);
+        int limit = remaining == 0 ? 1 : Math.min(config.metadataScanPageSize(), remaining);
         return deadline.bound(
-                        () -> generations.scanIndex(
-                                cluster,
-                                stream,
-                                view,
-                                0,
-                                Long.MAX_VALUE,
-                                continuation,
-                                limit),
+                        () -> generations.scanIndex(cluster, stream, view, 0, Long.MAX_VALUE, continuation, limit),
                         "scan higher-generation pre-drain indexes")
                 .thenCompose(page -> {
                     requireProgress(page, previousKey);
-                    int nextObserved = Math.addExact(
-                            observed, page.values().size());
+                    int nextObserved = Math.addExact(observed, page.values().size());
                     if (nextObserved > config.maxAuthoritiesPerDomainSnapshot()) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "higher-generation pre-drain scan exceeded its authority bound"));
+                        return CompletableFuture.failedFuture(
+                                invariant("higher-generation pre-drain scan exceeded its authority bound"));
                     }
                     for (VersionedGenerationCandidate candidate : page.values()) {
                         if (candidate instanceof VersionedGenerationIndex higher) {
@@ -210,10 +154,9 @@ public final class HigherGenerationPreDrainCoordinator {
                         }
                     }
                     if (page.continuation().isPresent()) {
-                        if (nextObserved
-                                >= config.maxAuthoritiesPerDomainSnapshot()) {
-                            return CompletableFuture.failedFuture(invariant(
-                                    "higher-generation pre-drain scan exceeded its authority bound"));
+                        if (nextObserved >= config.maxAuthoritiesPerDomainSnapshot()) {
+                            return CompletableFuture.failedFuture(
+                                    invariant("higher-generation pre-drain scan exceeded its authority bound"));
                         }
                         return scan(
                                 query,
@@ -246,24 +189,20 @@ public final class HigherGenerationPreDrainCoordinator {
             int alreadyDraining,
             MaterializationDeadline deadline) {
         if (index == indexes.size()) {
-            return CompletableFuture.completedFuture(
-                    new HigherGenerationPreDrainResult(
-                            HigherGenerationPreDrainStatus.DRAINING_READY,
-                            draining,
-                            transitioned,
-                            alreadyDraining));
+            return CompletableFuture.completedFuture(new HigherGenerationPreDrainResult(
+                    HigherGenerationPreDrainStatus.DRAINING_READY, draining, transitioned, alreadyDraining));
         }
         VersionedGenerationIndex source = indexes.get(index);
         GenerationLifecycle lifecycle = source.value().lifecycle();
         if (lifecycle == GenerationLifecycle.PREPARED) {
-            return CompletableFuture.failedFuture(condition(
-                    "matching higher-generation PREPARED index vetoes pre-drain"));
+            return CompletableFuture.failedFuture(
+                    condition("matching higher-generation PREPARED index vetoes pre-drain"));
         }
         if (lifecycle != GenerationLifecycle.COMMITTED
                 && lifecycle != GenerationLifecycle.QUARANTINED
                 && lifecycle != GenerationLifecycle.DRAINING) {
-            return CompletableFuture.failedFuture(invariant(
-                    "matching higher-generation index has an unsupported pre-drain lifecycle"));
+            return CompletableFuture.failedFuture(
+                    invariant("matching higher-generation index has an unsupported pre-drain lifecycle"));
         }
         return deadline.bound(
                         () -> eligibility.prove(candidate.referenceQuery(), source),
@@ -287,12 +226,8 @@ public final class HigherGenerationPreDrainCoordinator {
                                 indexes,
                                 index + 1,
                                 draining,
-                                result.transitioned()
-                                        ? Math.addExact(transitioned, 1)
-                                        : transitioned,
-                                result.transitioned()
-                                        ? alreadyDraining
-                                        : Math.addExact(alreadyDraining, 1),
+                                result.transitioned() ? Math.addExact(transitioned, 1) : transitioned,
+                                result.transitioned() ? alreadyDraining : Math.addExact(alreadyDraining, 1),
                                 deadline);
                     });
                 });
@@ -303,85 +238,68 @@ public final class HigherGenerationPreDrainCoordinator {
             HigherGenerationRetirementEligibilityVerifier.EligibilityProof proof,
             MaterializationDeadline deadline) {
         VersionedGenerationIndex source = proof.source();
-        GenerationIndexRecord replacement = draining(
-                source.value(), candidate.candidateId(), nonNegativeNow());
+        GenerationIndexRecord replacement = draining(source.value(), candidate.candidateId(), nonNegativeNow());
         return requireExactCandidateRoot(candidate, deadline)
                 .thenCompose(ignored -> deadline.bound(
-                        () -> generations.compareAndSetIndex(
-                                cluster, replacement, source.metadataVersion()),
+                        () -> generations.compareAndSetIndex(cluster, replacement, source.metadataVersion()),
                         "CAS higher-generation source to DRAINING"))
                 .handle((drained, failure) -> {
                     if (failure == null) {
                         requireExactReplacement(drained, source.key(), replacement);
-                        return CompletableFuture.completedFuture(
-                                new TransitionResult(drained, true));
+                        return CompletableFuture.completedFuture(new TransitionResult(drained, true));
                     }
                     Throwable original = unwrap(failure);
                     return reload(source, deadline).thenCompose(reloaded -> {
                         if (reloaded.isEmpty()) {
-                            return CompletableFuture.failedFuture(condition(
-                                    "higher-generation source disappeared after uncertain pre-drain CAS"));
+                            return CompletableFuture.failedFuture(
+                                    condition("higher-generation source disappeared after uncertain pre-drain CAS"));
                         }
                         VersionedGenerationIndex current = reloaded.orElseThrow();
                         if (exactReplacement(current, source.key(), replacement)) {
-                            return CompletableFuture.completedFuture(
-                                    new TransitionResult(current, true));
+                            return CompletableFuture.completedFuture(new TransitionResult(current, true));
                         }
                         if (current.equals(source)) {
                             return CompletableFuture.failedFuture(original);
                         }
                         if (current.value().lifecycle() == GenerationLifecycle.DRAINING
-                                && sameImmutablePublication(
-                                        source.value(), current.value())) {
-                            return CompletableFuture.completedFuture(
-                                    new TransitionResult(current, false));
+                                && sameImmutablePublication(source.value(), current.value())) {
+                            return CompletableFuture.completedFuture(new TransitionResult(current, false));
                         }
-                        return CompletableFuture.failedFuture(invariant(
-                                "higher-generation source changed after uncertain pre-drain CAS"));
+                        return CompletableFuture.failedFuture(
+                                invariant("higher-generation source changed after uncertain pre-drain CAS"));
                     });
                 })
                 .thenCompose(Function.identity());
     }
 
     private CompletableFuture<Optional<VersionedGenerationIndex>> reload(
-            VersionedGenerationIndex source,
-            MaterializationDeadline deadline) {
+            VersionedGenerationIndex source, MaterializationDeadline deadline) {
         return deadline.bound(
                 () -> generations.getIndex(cluster, identity(source.value())),
                 "reload higher-generation source after uncertain pre-drain CAS");
     }
 
-    private CompletableFuture<Void> requireExactCandidateRoot(
-            GcCandidate candidate,
-            MaterializationDeadline deadline) {
+    private CompletableFuture<Void> requireExactCandidateRoot(GcCandidate candidate, MaterializationDeadline deadline) {
         ObjectKeyHash object = candidate.object().objectKeyHash();
         return deadline.bound(
                         () -> physicalObjects.getRoot(cluster, object),
                         "reload ACTIVE candidate root before higher-generation pre-drain")
                 .thenAccept(optional -> {
-                    VersionedPhysicalObjectRoot root = optional.orElseThrow(() -> condition(
-                            "candidate physical root is absent before higher-generation pre-drain"));
+                    VersionedPhysicalObjectRoot root = optional.orElseThrow(
+                            () -> condition("candidate physical root is absent before higher-generation pre-drain"));
                     if (!root.key().equals(keys.physicalRootKey(object))
-                            || root.value().lifecycle()
-                                    != PhysicalObjectLifecycle.ACTIVE
-                            || root.metadataVersion()
-                                    != candidate.rootMetadataVersion()
-                            || root.value().lifecycleEpoch()
-                                    != candidate.rootLifecycleEpoch()
-                            || !PhysicalObjectIdentity.from(root.value())
-                                    .equals(candidate.object())) {
-                        throw condition(
-                                "candidate physical root changed before higher-generation pre-drain");
+                            || root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
+                            || root.metadataVersion() != candidate.rootMetadataVersion()
+                            || root.value().lifecycleEpoch() != candidate.rootLifecycleEpoch()
+                            || !PhysicalObjectIdentity.from(root.value()).equals(candidate.object())) {
+                        throw condition("candidate physical root changed before higher-generation pre-drain");
                     }
                 });
     }
 
-    private static boolean matches(
-            GcReferenceQuery query,
-            VersionedGenerationIndex candidate) {
+    private static boolean matches(GcReferenceQuery query, VersionedGenerationIndex candidate) {
         GenerationLifecycle lifecycle = candidate.value().lifecycle();
-        if (lifecycle == GenerationLifecycle.RETIRED
-                || lifecycle == GenerationLifecycle.ABORTED) {
+        if (lifecycle == GenerationLifecycle.RETIRED || lifecycle == GenerationLifecycle.ABORTED) {
             return false;
         }
         ReadTarget decoded;
@@ -398,25 +316,17 @@ public final class HigherGenerationPreDrainCoordinator {
                 || query.object().objectId().orElseThrow().equals(target.objectId());
     }
 
-    private void requireScannedIdentity(
-            StreamId stream,
-            ReadView view,
-            VersionedGenerationIndex candidate) {
+    private void requireScannedIdentity(StreamId stream, ReadView view, VersionedGenerationIndex candidate) {
         GenerationIndexRecord value = candidate.value();
-        String expectedKey = keys.generationIndexKey(
-                stream, view, value.offsetEnd(), value.generation());
+        String expectedKey = keys.generationIndexKey(stream, view, value.offsetEnd(), value.generation());
         if (!value.streamId().equals(stream.value())
                 || value.readViewId() != view.wireId()
                 || !candidate.key().equals(expectedKey)) {
-            throw invariant(
-                    "higher-generation pre-drain scan returned a foreign index");
+            throw invariant("higher-generation pre-drain scan returned a foreign index");
         }
     }
 
-    private static GenerationIndexRecord draining(
-            GenerationIndexRecord current,
-            String candidateId,
-            long nowMillis) {
+    private static GenerationIndexRecord draining(GenerationIndexRecord current, String candidateId, long nowMillis) {
         long changedAt = Math.max(nowMillis, current.stateChangedAtMillis());
         return new GenerationIndexRecord(
                 current.schemaVersion(),
@@ -451,13 +361,9 @@ public final class HigherGenerationPreDrainCoordinator {
                 0);
     }
 
-    private static boolean sameImmutablePublication(
-            GenerationIndexRecord left,
-            GenerationIndexRecord right) {
-        GenerationIndexRecord normalized = draining(
-                left,
-                "a".repeat(52),
-                Math.max(left.stateChangedAtMillis(), right.stateChangedAtMillis()));
+    private static boolean sameImmutablePublication(GenerationIndexRecord left, GenerationIndexRecord right) {
+        GenerationIndexRecord normalized =
+                draining(left, "a".repeat(52), Math.max(left.stateChangedAtMillis(), right.stateChangedAtMillis()));
         GenerationIndexRecord actual = new GenerationIndexRecord(
                 right.schemaVersion(),
                 right.streamId(),
@@ -493,18 +399,14 @@ public final class HigherGenerationPreDrainCoordinator {
     }
 
     private static void requireExactReplacement(
-            VersionedGenerationIndex actual,
-            String expectedKey,
-            GenerationIndexRecord expected) {
+            VersionedGenerationIndex actual, String expectedKey, GenerationIndexRecord expected) {
         if (!exactReplacement(actual, expectedKey, expected)) {
             throw invariant("higher-generation pre-drain CAS returned another value");
         }
     }
 
     private static boolean exactReplacement(
-            VersionedGenerationIndex actual,
-            String expectedKey,
-            GenerationIndexRecord expected) {
+            VersionedGenerationIndex actual, String expectedKey, GenerationIndexRecord expected) {
         return actual.key().equals(expectedKey)
                 && actual.value().withMetadataVersion(0).equals(expected);
     }
@@ -517,12 +419,9 @@ public final class HigherGenerationPreDrainCoordinator {
                 value.generation());
     }
 
-    private static void requireProgress(
-            GenerationScanPage page,
-            String previousKey) {
+    private static void requireProgress(GenerationScanPage page, String previousKey) {
         if (page.continuation().isPresent() && page.values().isEmpty()) {
-            throw invariant(
-                    "higher-generation pre-drain scan returned an empty continuation page");
+            throw invariant("higher-generation pre-drain scan returned an empty continuation page");
         }
         if (previousKey != null
                 && !page.values().isEmpty()
@@ -534,16 +433,14 @@ public final class HigherGenerationPreDrainCoordinator {
     private long nonNegativeNow() {
         long value = clock.millis();
         if (value < 0) {
-            throw new IllegalStateException(
-                    "clock returned a negative epoch millisecond");
+            throw new IllegalStateException("clock returned a negative epoch millisecond");
         }
         return value;
     }
 
     private static Throwable unwrap(Throwable supplied) {
         Throwable current = supplied;
-        while ((current instanceof CompletionException
-                        || current instanceof ExecutionException)
+        while ((current instanceof CompletionException || current instanceof ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -559,22 +456,18 @@ public final class HigherGenerationPreDrainCoordinator {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static NereusException condition(String message) {
         return new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, message);
     }
 
-    private record TransitionResult(
-            VersionedGenerationIndex index,
-            boolean transitioned) {
+    private record TransitionResult(VersionedGenerationIndex index, boolean transitioned) {
         private TransitionResult {
             Objects.requireNonNull(index, "index");
             if (index.value().lifecycle() != GenerationLifecycle.DRAINING) {
-                throw new IllegalArgumentException(
-                        "pre-drain transition result is not DRAINING");
+                throw new IllegalArgumentException("pre-drain transition result is not DRAINING");
             }
         }
     }

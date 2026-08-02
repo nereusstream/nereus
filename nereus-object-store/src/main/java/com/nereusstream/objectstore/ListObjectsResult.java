@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import java.util.List;
@@ -6,9 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 public record ListObjectsResult(
-        ObjectKeyPrefix prefix,
-        List<ListedObject> objects,
-        Optional<String> continuationToken) {
+        ObjectKeyPrefix prefix, List<ListedObject> objects, Optional<String> continuationToken) {
     public ListObjectsResult {
         Objects.requireNonNull(prefix, "prefix");
         objects = List.copyOf(Objects.requireNonNull(objects, "objects"));

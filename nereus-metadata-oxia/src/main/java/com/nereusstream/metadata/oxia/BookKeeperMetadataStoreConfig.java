@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
-/** Immutable bounds that are also part of the BookKeeper profile binding. */
+/**
+ * Immutable bounds that are also part of the BookKeeper profile binding.
+ */
 public record BookKeeperMetadataStoreConfig(
         int maxAppendRangesPerLedger,
         int protectionSlotsPerRange,
@@ -26,7 +29,11 @@ public record BookKeeperMetadataStoreConfig(
     }
 
     public BookKeeperKeyspace keyspace(String cluster) {
-        return new BookKeeperKeyspace(cluster, maxAppendRangesPerLedger, protectionSlotsPerRange,
-                maxReaderLeasesPerLedger, maxUncertainAllocations);
+        return new BookKeeperKeyspace(
+                cluster,
+                maxAppendRangesPerLedger,
+                protectionSlotsPerRange,
+                maxReaderLeasesPerLedger,
+                maxUncertainAllocations);
     }
 }

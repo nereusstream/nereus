@@ -23,7 +23,9 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** The sole constructor for deterministic F2 managed-ledger projection identities. */
+/**
+ * The sole constructor for deterministic F2 managed-ledger projection identities.
+ */
 public final class ManagedLedgerProjectionNames {
     public static final int MAX_MANAGED_LEDGER_NAME_BYTES = 16 * 1024;
     public static final long MIN_VIRTUAL_LEDGER_ID = 1L << 62;
@@ -36,8 +38,7 @@ public final class ManagedLedgerProjectionNames {
     private static final String NAME_HASH_DOMAIN = "pulsar-managed-ledger-name-v1\0";
     private static final String STREAM_NAME_DOMAIN = "pulsar-ml-v1\0";
 
-    private ManagedLedgerProjectionNames() {
-    }
+    private ManagedLedgerProjectionNames() {}
 
     public static String requireManagedLedgerName(String managedLedgerName) {
         Objects.requireNonNull(managedLedgerName, "managedLedgerName");
@@ -49,7 +50,8 @@ public final class ManagedLedgerProjectionNames {
         }
         int encodedLength;
         try {
-            encodedLength = StandardCharsets.UTF_8.newEncoder()
+            encodedLength = StandardCharsets.UTF_8
+                    .newEncoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .encode(CharBuffer.wrap(managedLedgerName))

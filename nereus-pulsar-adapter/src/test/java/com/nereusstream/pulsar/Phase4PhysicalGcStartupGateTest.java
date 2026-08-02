@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.metadata.oxia.F4MetadataTestValues;
@@ -27,10 +27,8 @@ class Phase4PhysicalGcStartupGateTest {
     private static final String RUN_ID = "abcdefghijklmnopqrstuvwxyz";
     private static final long EPOCH = 7;
     private static final String CAPABILITY = F4MetadataTestValues.HASH_D;
-    private static final Clock CLOCK = Clock.fixed(
-            Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
-    private static final List<ReferenceDomainVersionRecord> DOMAINS =
-            F4MetadataTestValues.referenceDomains();
+    private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
+    private static final List<ReferenceDomainVersionRecord> DOMAINS = F4MetadataTestValues.referenceDomains();
 
     @Test
     void absentOrPublicationOnlyAuthorityDefersMutatingLifecycle() {
@@ -66,10 +64,7 @@ class Phase4PhysicalGcStartupGateTest {
         try (GenerationProtocolActivationStore store = store()) {
             seed(store, true, CAPABILITY);
 
-            assertInvariant(() -> gate(
-                            store,
-                            DOMAINS,
-                            F4MetadataTestValues.HASH_E)
+            assertInvariant(() -> gate(store, DOMAINS, F4MetadataTestValues.HASH_E)
                     .destructiveLifecycleAuthorized()
                     .join());
         }
@@ -79,13 +74,9 @@ class Phase4PhysicalGcStartupGateTest {
     void installedReferenceDomainDriftFailsStartupNonRetryably() {
         try (GenerationProtocolActivationStore store = store()) {
             seed(store, true, CAPABILITY);
-            ArrayList<ReferenceDomainVersionRecord> changed =
-                    new ArrayList<>(DOMAINS);
+            ArrayList<ReferenceDomainVersionRecord> changed = new ArrayList<>(DOMAINS);
             ReferenceDomainVersionRecord first = changed.get(0);
-            changed.set(
-                    0,
-                    new ReferenceDomainVersionRecord(
-                            first.domainId(), first.protocolVersion() + 1));
+            changed.set(0, new ReferenceDomainVersionRecord(first.domainId(), first.protocolVersion() + 1));
 
             assertInvariant(() -> gate(store, changed, CAPABILITY)
                     .destructiveLifecycleAuthorized()
@@ -94,62 +85,47 @@ class Phase4PhysicalGcStartupGateTest {
     }
 
     private static Phase4PhysicalGcStartupGate gate(
-            GenerationProtocolActivationStore store,
-            List<ReferenceDomainVersionRecord> domains,
-            String capability) {
-        return new Phase4PhysicalGcStartupGate(
-                CLUSTER, store, domains, capability);
+            GenerationProtocolActivationStore store, List<ReferenceDomainVersionRecord> domains, String capability) {
+        return new Phase4PhysicalGcStartupGate(CLUSTER, store, domains, capability);
     }
 
     private static GenerationProtocolActivationStore store() {
-        return GenerationProtocolActivationStoreTestFactory.inMemory(
-                CLOCK, F4MetadataTestValues.PROCESS, DOMAINS);
+        return GenerationProtocolActivationStoreTestFactory.inMemory(CLOCK, F4MetadataTestValues.PROCESS, DOMAINS);
     }
 
-    private static void seed(
-            GenerationProtocolActivationStore store,
-            boolean deletion,
-            String capability) {
+    private static void seed(GenerationProtocolActivationStore store, boolean deletion, String capability) {
         VersionedGenerationProtocolActivation current =
                 store.getOrCreate(CLUSTER).join();
-        GenerationBackfillProofRecord registration = complete(
-                F4MetadataTestValues.HASH_A, 1_101);
+        GenerationBackfillProofRecord registration = complete(F4MetadataTestValues.HASH_A, 1_101);
         GenerationBackfillProofRecord physical = deletion
                 ? complete(F4MetadataTestValues.HASH_B, 1_102)
                 : GenerationBackfillProofRecord.incomplete(EPOCH);
         GenerationBackfillProofRecord cursor = deletion
                 ? complete(F4MetadataTestValues.HASH_C, 1_103)
                 : GenerationBackfillProofRecord.incomplete(EPOCH);
-        GenerationProtocolActivationRecord replacement =
-                new GenerationProtocolActivationRecord(
-                        current.value().schemaVersion(),
-                        current.value().protocolVersion(),
-                        GenerationProtocolActivationLifecycle.ACTIVE,
-                        true,
-                        deletion,
-                        deletion,
-                        EPOCH,
-                        current.value().requiredReferenceDomains(),
-                        registration,
-                        physical,
-                        cursor,
-                        capability,
-                        current.value().activatingBrokerRunId(),
-                        current.value().preparedAtMillis(),
-                        Math.max(current.value().preparedAtMillis(), 1_050),
-                        Math.max(current.value().updatedAtMillis(), 1_104),
-                        0);
-        store.compareAndSet(
-                        CLUSTER,
-                        replacement,
-                        current.metadataVersion())
-                .join();
+        GenerationProtocolActivationRecord replacement = new GenerationProtocolActivationRecord(
+                current.value().schemaVersion(),
+                current.value().protocolVersion(),
+                GenerationProtocolActivationLifecycle.ACTIVE,
+                true,
+                deletion,
+                deletion,
+                EPOCH,
+                current.value().requiredReferenceDomains(),
+                registration,
+                physical,
+                cursor,
+                capability,
+                current.value().activatingBrokerRunId(),
+                current.value().preparedAtMillis(),
+                Math.max(current.value().preparedAtMillis(), 1_050),
+                Math.max(current.value().updatedAtMillis(), 1_104),
+                0);
+        store.compareAndSet(CLUSTER, replacement, current.metadataVersion()).join();
     }
 
-    private static GenerationBackfillProofRecord complete(
-            String coverage, long completedAtMillis) {
-        return new GenerationBackfillProofRecord(
-                RUN_ID, EPOCH, coverage, true, completedAtMillis);
+    private static GenerationBackfillProofRecord complete(String coverage, long completedAtMillis) {
+        return new GenerationBackfillProofRecord(RUN_ID, EPOCH, coverage, true, completedAtMillis);
     }
 
     private static void assertInvariant(Runnable operation) {

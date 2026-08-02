@@ -19,10 +19,10 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.objectstore.Crc32cChecksums;
-import com.nereusstream.objectstore.HeadObjectOptions;
-import com.nereusstream.objectstore.HeadObjectResult;
 import com.nereusstream.objectstore.DeleteObjectOptions;
 import com.nereusstream.objectstore.DeleteObjectResult;
+import com.nereusstream.objectstore.HeadObjectOptions;
+import com.nereusstream.objectstore.HeadObjectResult;
 import com.nereusstream.objectstore.ListObjectsOptions;
 import com.nereusstream.objectstore.ListObjectsResult;
 import com.nereusstream.objectstore.ListedObject;
@@ -44,8 +44,8 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.util.Comparator;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -57,7 +57,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.CRC32C;
 
-/** Test-fixture object store backed by a caller-supplied local directory. */
+/**
+ * Test-fixture object store backed by a caller-supplied local directory.
+ */
 public final class LocalFileObjectStore implements ObjectStore {
     private static final String INTERNAL_DIRECTORY = ".nereus-internal-v1";
     private final Path root;
@@ -82,9 +84,7 @@ public final class LocalFileObjectStore implements ObjectStore {
 
     @Override
     public CompletableFuture<PutObjectResult> putObject(
-            ObjectKey key,
-            ReplayableObjectUpload source,
-            PutObjectOptions options) {
+            ObjectKey key, ReplayableObjectUpload source, PutObjectOptions options) {
         return putObject(key, source, options, (ignored, attempt) -> CompletableFuture.completedFuture(null));
     }
 
@@ -99,23 +99,18 @@ public final class LocalFileObjectStore implements ObjectStore {
         Objects.requireNonNull(options, "options");
         Objects.requireNonNull(attemptGuard, "attemptGuard");
         if (closed) {
-            return CompletableFuture.failedFuture(failure(
-                    ErrorCode.STORAGE_CLOSED, false, "object store is closed"));
+            return CompletableFuture.failedFuture(failure(ErrorCode.STORAGE_CLOSED, false, "object store is closed"));
         }
         if (source.contentLength() < 0) {
-            return CompletableFuture.failedFuture(failure(
-                    ErrorCode.INVALID_ARGUMENT, false, "local upload length is outside the supported bound"));
+            return CompletableFuture.failedFuture(
+                    failure(ErrorCode.INVALID_ARGUMENT, false, "local upload length is outside the supported bound"));
         }
-        return attemptGuard.authorize(key, 1)
-                .thenCompose(ignored -> streamPut(key, source, options));
+        return attemptGuard.authorize(key, 1).thenCompose(ignored -> streamPut(key, source, options));
     }
 
     @Override
     public CompletableFuture<RangeReadResult> readRange(
-            ObjectKey key,
-            long offset,
-            long length,
-            RangeReadOptions options) {
+            ObjectKey key, long offset, long length, RangeReadOptions options) {
         Objects.requireNonNull(options, "options");
         return complete(() -> {
             ensureOpen();
@@ -144,22 +139,17 @@ public final class LocalFileObjectStore implements ObjectStore {
                 throw failure(ErrorCode.OBJECT_READ_FAILED, true, "local object read failed", e);
             }
             Checksum actual = Crc32cChecksums.checksum(bytes);
-            if (options.expectedChecksum().isPresent() && !actual.equals(options.expectedChecksum().get())) {
+            if (options.expectedChecksum().isPresent()
+                    && !actual.equals(options.expectedChecksum().get())) {
                 throw failure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "range checksum mismatch");
             }
             return new RangeReadResult(
-                    key,
-                    offset,
-                    length,
-                    ByteBuffer.wrap(bytes).asReadOnlyBuffer(),
-                    Optional.of(actual));
+                    key, offset, length, ByteBuffer.wrap(bytes).asReadOnlyBuffer(), Optional.of(actual));
         });
     }
 
     @Override
-    public CompletableFuture<HeadObjectResult> headObject(
-            ObjectKey key,
-            HeadObjectOptions options) {
+    public CompletableFuture<HeadObjectResult> headObject(ObjectKey key, HeadObjectOptions options) {
         Objects.requireNonNull(options, "options");
         return complete(() -> {
             ensureOpen();
@@ -170,20 +160,13 @@ public final class LocalFileObjectStore implements ObjectStore {
             }
             byte[] bytes = Files.readAllBytes(target);
             Checksum checksum = Crc32cChecksums.checksum(bytes);
-            return new HeadObjectResult(
-                    key,
-                    bytes.length,
-                    checksum,
-                    Optional.of(checksum.value()),
-                    Map.of());
+            return new HeadObjectResult(key, bytes.length, checksum, Optional.of(checksum.value()), Map.of());
         });
     }
 
     @Override
     public CompletableFuture<ListObjectsResult> listObjects(
-            ObjectKeyPrefix prefix,
-            Optional<String> continuationToken,
-            ListObjectsOptions options) {
+            ObjectKeyPrefix prefix, Optional<String> continuationToken, ListObjectsOptions options) {
         Objects.requireNonNull(prefix, "prefix");
         Objects.requireNonNull(continuationToken, "continuationToken");
         Objects.requireNonNull(options, "options");
@@ -195,7 +178,8 @@ public final class LocalFileObjectStore implements ObjectStore {
                 paths.filter(Files::isRegularFile)
                         .filter(path -> !Files.isSymbolicLink(path))
                         .filter(path -> !path.startsWith(internalRoot))
-                        .map(path -> new PathAndKey(path, root.relativize(path).toString().replace('\\', '/')))
+                        .map(path -> new PathAndKey(
+                                path, root.relativize(path).toString().replace('\\', '/')))
                         .filter(value -> value.key().startsWith(prefix.value()))
                         .filter(value -> after.isEmpty() || value.key().compareTo(after) > 0)
                         .sorted(Comparator.comparing(PathAndKey::key))
@@ -208,7 +192,8 @@ public final class LocalFileObjectStore implements ObjectStore {
                                         new ObjectKey(value.key()),
                                         bytes.length,
                                         Optional.of(checksum.value()),
-                                        Optional.of(Files.getLastModifiedTime(value.path()).toInstant())));
+                                        Optional.of(Files.getLastModifiedTime(value.path())
+                                                .toInstant())));
                             } catch (IOException failure) {
                                 throw new java.io.UncheckedIOException(failure);
                             }
@@ -228,8 +213,8 @@ public final class LocalFileObjectStore implements ObjectStore {
                             .anyMatch(key -> key.startsWith(prefix.value()) && key.compareTo(last) > 0);
                 }
             }
-            Optional<String> next = more
-                    ? Optional.of(all.get(all.size() - 1).key().value()) : Optional.empty();
+            Optional<String> next =
+                    more ? Optional.of(all.get(all.size() - 1).key().value()) : Optional.empty();
             if (next.isPresent() && next.equals(continuationToken)) {
                 throw failure(ErrorCode.OBJECT_READ_FAILED, false, "local list repeated a continuation token");
             }
@@ -238,9 +223,7 @@ public final class LocalFileObjectStore implements ObjectStore {
     }
 
     @Override
-    public CompletableFuture<DeleteObjectResult> deleteObject(
-            ObjectKey key,
-            DeleteObjectOptions options) {
+    public CompletableFuture<DeleteObjectResult> deleteObject(ObjectKey key, DeleteObjectOptions options) {
         Objects.requireNonNull(options, "options");
         return complete(() -> {
             ensureOpen();
@@ -253,7 +236,9 @@ public final class LocalFileObjectStore implements ObjectStore {
             Checksum checksum = Crc32cChecksums.checksum(bytes);
             if (bytes.length != options.expectedLength()
                     || !checksum.equals(options.expectedStorageChecksum())
-                    || options.expectedEtag().filter(value -> !value.equals(checksum.value())).isPresent()) {
+                    || options.expectedEtag()
+                            .filter(value -> !value.equals(checksum.value()))
+                            .isPresent()) {
                 throw failure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "delete identity mismatch");
             }
             Files.delete(target);
@@ -329,9 +314,7 @@ public final class LocalFileObjectStore implements ObjectStore {
     }
 
     private CompletableFuture<PutObjectResult> streamPut(
-            ObjectKey key,
-            ReplayableObjectUpload source,
-            PutObjectOptions options) {
+            ObjectKey key, ReplayableObjectUpload source, PutObjectOptions options) {
         CompletableFuture<PutObjectResult> result = new CompletableFuture<>();
         Path target;
         Path temporary;
@@ -344,10 +327,7 @@ public final class LocalFileObjectStore implements ObjectStore {
             rejectExistingSymlinkParent(target.getParent());
             temporary = internalRoot.resolve("upload-" + UUID.randomUUID() + ".tmp");
             channel = FileChannel.open(
-                    temporary,
-                    StandardOpenOption.CREATE_NEW,
-                    StandardOpenOption.WRITE,
-                    LinkOption.NOFOLLOW_LINKS);
+                    temporary, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -382,8 +362,7 @@ public final class LocalFileObjectStore implements ObjectStore {
                         received = Math.addExact(received, length);
                         if (received > source.contentLength()) {
                             throw failure(
-                                    ErrorCode.OBJECT_UPLOAD_FAILED, false,
-                                    "upload publisher exceeded declared length");
+                                    ErrorCode.OBJECT_UPLOAD_FAILED, false, "upload publisher exceeded declared length");
                         }
                         ByteBuffer checksumBytes = duplicate.asReadOnlyBuffer();
                         while (duplicate.hasRemaining()) {
@@ -409,14 +388,13 @@ public final class LocalFileObjectStore implements ObjectStore {
                     try {
                         if (received != source.contentLength()) {
                             throw failure(
-                                    ErrorCode.OBJECT_UPLOAD_FAILED, false,
+                                    ErrorCode.OBJECT_UPLOAD_FAILED,
+                                    false,
                                     "upload publisher ended before declared length");
                         }
                         Checksum actual = Crc32cChecksums.checksum((int) crc32c.getValue());
                         if (!actual.equals(options.expectedChecksum())) {
-                            throw failure(
-                                    ErrorCode.OBJECT_CHECKSUM_MISMATCH, false,
-                                    "putObject checksum mismatch");
+                            throw failure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "putObject checksum mismatch");
                         }
                         channel.force(true);
                         channel.close();
@@ -428,8 +406,7 @@ public final class LocalFileObjectStore implements ObjectStore {
                         } catch (AtomicMoveNotSupportedException unsupported) {
                             Files.move(temporary, target);
                         }
-                        result.complete(new PutObjectResult(
-                                key, received, actual, actual.value()));
+                        result.complete(new PutObjectResult(key, received, actual, actual.value()));
                     } catch (Throwable failure) {
                         cleanup();
                         result.completeExceptionally(mapUploadFailure(failure));
@@ -521,6 +498,5 @@ public final class LocalFileObjectStore implements ObjectStore {
         T get() throws Exception;
     }
 
-    private record PathAndKey(Path path, String key) {
-    }
+    private record PathAndKey(Path path, String key) {}
 }

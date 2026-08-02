@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.append;
 
 import com.nereusstream.api.Checksum;
 import java.util.Objects;
 
-/** Provider-neutral evidence returned only after the exact higher generation passes normal read admission. */
+/**
+ * Provider-neutral evidence returned only after the exact higher generation passes normal read admission.
+ */
 public record RequiredObjectGenerationProof(
         RequiredObjectGenerationRequest request,
         String taskId,

@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ReadView;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,15 +25,12 @@ class MaterializationConfigTest {
 
         assertThat(config.committedPolicy().view()).isEqualTo(ReadView.COMMITTED);
         assertThat(config.committedPolicy().taskKind()).isEqualTo(TaskKind.LOSSLESS_REWRITE);
-        assertThat(config.committedPolicy().targetPhysicalFormat())
-                .isEqualTo(MaterializationPolicy.COMMITTED_FORMAT);
-        assertThat(config.maxConcurrentWorkersPerStream())
-                .isLessThanOrEqualTo(config.maxConcurrentWorkers());
-        assertThat(config.operationTimeout().plus(config.maximumClockSkew()))
-                .isLessThan(config.workerClaimDuration());
-        assertThat(config.maxStagingBytes()).isGreaterThanOrEqualTo(Math.max(
-                config.committedPolicy().targetObjectBytes(),
-                config.recoveryCheckpointMaxBytes()));
+        assertThat(config.committedPolicy().targetPhysicalFormat()).isEqualTo(MaterializationPolicy.COMMITTED_FORMAT);
+        assertThat(config.maxConcurrentWorkersPerStream()).isLessThanOrEqualTo(config.maxConcurrentWorkers());
+        assertThat(config.operationTimeout().plus(config.maximumClockSkew())).isLessThan(config.workerClaimDuration());
+        assertThat(config.maxStagingBytes())
+                .isGreaterThanOrEqualTo(
+                        Math.max(config.committedPolicy().targetObjectBytes(), config.recoveryCheckpointMaxBytes()));
         assertThat(config.stagingDirectory()).isEqualTo(staging.toAbsolutePath().normalize());
     }
 
@@ -112,6 +109,24 @@ class MaterializationConfigTest {
         assertInvalid(fixture, "lossless COMMITTED");
     }
 
+    @Test
+    void acceptsKafkaNcp2AtTheLosslessCommittedServiceBoundary() throws Exception {
+        Fixture fixture = new Fixture(privateDirectory("kafka-ncp2-policy"));
+        fixture.policy = MaterializationPolicyFactory.kafkaLosslessCommitted(2, 16, 10_000, 256L << 20, 1_024, "ZSTD");
+
+        assertThat(fixture.build().committedPolicy()).isEqualTo(fixture.policy);
+    }
+
+    @Test
+    void exposesKafkaNcp2Defaults() throws Exception {
+        MaterializationConfig config = MaterializationConfig.kafkaDefaults(privateDirectory("kafka-defaults"));
+
+        assertThat(config.committedPolicy().policyId())
+                .isEqualTo(MaterializationPolicyFactory.KAFKA_LOSSLESS_COMMITTED_POLICY_ID);
+        assertThat(config.committedPolicy().targetPhysicalFormat())
+                .isEqualTo(MaterializationPolicy.KAFKA_COMMITTED_FORMAT);
+    }
+
     private Path privateDirectory(String name) throws Exception {
         Path path = Files.createDirectory(temporaryDirectory.resolve(name));
         Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
@@ -125,8 +140,8 @@ class MaterializationConfigTest {
     }
 
     private static final class Fixture {
-        private MaterializationPolicy policy = MaterializationPolicyFactory.losslessCommitted(
-                2, 16, 10_000, 256L << 20, 1_024, "ZSTD");
+        private MaterializationPolicy policy =
+                MaterializationPolicyFactory.losslessCommitted(2, 16, 10_000, 256L << 20, 1_024, "ZSTD");
         private final Path staging;
         private int maxConcurrentWorkers = 4;
         private int maxConcurrentWorkersPerStream = 1;

@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.RangeRetentionStatsRecord;
 
-public final class RangeRetentionStatsRecordCodecV1
-        extends AbstractF4RecordCodecV1<RangeRetentionStatsRecord> {
+public final class RangeRetentionStatsRecordCodecV1 extends AbstractF4RecordCodecV1<RangeRetentionStatsRecord> {
     public RangeRetentionStatsRecordCodecV1() {
         super(RangeRetentionStatsRecord.class);
     }

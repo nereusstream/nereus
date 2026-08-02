@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.capability;
 
 import com.nereusstream.core.physical.GcAuthorityToken;
@@ -23,17 +24,15 @@ public record GenerationProjectionAuthoritySnapshot(
         boolean live,
         Optional<ManagedLedgerProjectionIdentity> managedLedgerIdentity,
         List<GcAuthorityToken> authorities) {
-    private static final Comparator<GcAuthorityToken> AUTHORITY_ORDER = Comparator
-            .comparing(GcAuthorityToken::authorityKey)
+    private static final Comparator<GcAuthorityToken> AUTHORITY_ORDER = Comparator.comparing(
+                    GcAuthorityToken::authorityKey)
             .thenComparingLong(GcAuthorityToken::metadataVersion)
             .thenComparing(value -> value.identitySha256().value());
 
     public GenerationProjectionAuthoritySnapshot {
         Objects.requireNonNull(subject, "subject");
-        managedLedgerIdentity = Objects.requireNonNull(
-                managedLedgerIdentity, "managedLedgerIdentity");
-        ArrayList<GcAuthorityToken> canonical =
-                new ArrayList<>(Objects.requireNonNull(authorities, "authorities"));
+        managedLedgerIdentity = Objects.requireNonNull(managedLedgerIdentity, "managedLedgerIdentity");
+        ArrayList<GcAuthorityToken> canonical = new ArrayList<>(Objects.requireNonNull(authorities, "authorities"));
         if (canonical.isEmpty() || canonical.size() > 8 || canonical.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException(
                     "projection authority snapshot must contain between one and eight authorities");
@@ -42,8 +41,7 @@ public record GenerationProjectionAuthoritySnapshot(
         HashSet<String> keys = new HashSet<>();
         for (GcAuthorityToken authority : canonical) {
             if (!keys.add(authority.authorityKey())) {
-                throw new IllegalArgumentException(
-                        "projection authority snapshot contains duplicate authority keys");
+                throw new IllegalArgumentException("projection authority snapshot contains duplicate authority keys");
             }
         }
         authorities = List.copyOf(canonical);
@@ -53,8 +51,7 @@ public record GenerationProjectionAuthoritySnapshot(
         }
         managedLedgerIdentity.ifPresent(identity -> {
             if (!identity.streamId().equals(subject.streamId().value())) {
-                throw new IllegalArgumentException(
-                        "projection identity belongs to another stream");
+                throw new IllegalArgumentException("projection identity belongs to another stream");
             }
         });
     }

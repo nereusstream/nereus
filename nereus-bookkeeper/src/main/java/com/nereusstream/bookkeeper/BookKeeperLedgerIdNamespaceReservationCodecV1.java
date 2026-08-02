@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import java.io.ByteArrayInputStream;
@@ -11,13 +12,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Deterministic `NBLR1` binary codec for the separately provisioned namespace value. */
+/**
+ * Deterministic `NBLR1` binary codec for the separately provisioned namespace value.
+ */
 public final class BookKeeperLedgerIdNamespaceReservationCodecV1 {
     private static final byte[] MAGIC = "NBLR1".getBytes(StandardCharsets.US_ASCII);
     private static final int MAX_TEXT_BYTES = 16 * 1024;
 
-    private BookKeeperLedgerIdNamespaceReservationCodecV1() {
-    }
+    private BookKeeperLedgerIdNamespaceReservationCodecV1() {}
 
     public static byte[] encode(BookKeeperLedgerIdNamespaceReservationValue value) {
         BookKeeperLedgerIdNamespaceReservationValue exact = Objects.requireNonNull(value, "value");
@@ -32,8 +34,7 @@ public final class BookKeeperLedgerIdNamespaceReservationCodecV1 {
                 text(output, exact.bookKeeperProviderScopeSha256());
                 output.writeInt(exact.ledgerIdPrefixBits());
                 output.writeLong(exact.ledgerIdPrefixValue());
-                output.writeByte(exact.lifecycle()
-                        == BookKeeperLedgerIdNamespaceReservation.Lifecycle.ACTIVE ? 1 : 2);
+                output.writeByte(exact.lifecycle() == BookKeeperLedgerIdNamespaceReservation.Lifecycle.ACTIVE ? 1 : 2);
                 output.writeLong(exact.reservationEpoch());
                 output.writeLong(exact.createdAtMillis());
                 output.writeLong(exact.revokedAtMillis());
@@ -59,12 +60,14 @@ public final class BookKeeperLedgerIdNamespaceReservationCodecV1 {
             String providerScope = text(input);
             int prefixBits = input.readInt();
             long prefixValue = input.readLong();
-            BookKeeperLedgerIdNamespaceReservation.Lifecycle lifecycle = switch (input.readUnsignedByte()) {
-                case 1 -> BookKeeperLedgerIdNamespaceReservation.Lifecycle.ACTIVE;
-                case 2 -> BookKeeperLedgerIdNamespaceReservation.Lifecycle.REVOKED;
-                default -> throw new IllegalArgumentException(
-                        "unknown BookKeeper namespace reservation lifecycle wire id");
-            };
+            BookKeeperLedgerIdNamespaceReservation.Lifecycle lifecycle =
+                    switch (input.readUnsignedByte()) {
+                        case 1 -> BookKeeperLedgerIdNamespaceReservation.Lifecycle.ACTIVE;
+                        case 2 -> BookKeeperLedgerIdNamespaceReservation.Lifecycle.REVOKED;
+                        default ->
+                            throw new IllegalArgumentException(
+                                    "unknown BookKeeper namespace reservation lifecycle wire id");
+                    };
             long reservationEpoch = input.readLong();
             long createdAtMillis = input.readLong();
             long revokedAtMillis = input.readLong();

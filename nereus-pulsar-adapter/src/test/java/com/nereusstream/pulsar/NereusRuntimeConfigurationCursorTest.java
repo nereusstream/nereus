@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.managedledger.NereusManagedLedgerFactoryConfig;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
@@ -20,8 +20,8 @@ import org.junit.jupiter.api.Test;
 class NereusRuntimeConfigurationCursorTest {
     @Test
     void fiveArgumentBridgeUsesFrozenCursorDefaults() {
-        NereusRuntimeConfiguration configuration = new NereusRuntimeConfiguration(
-                oxia(), objectStore(), stream(), managed(), projection());
+        NereusRuntimeConfiguration configuration =
+                new NereusRuntimeConfiguration(oxia(), objectStore(), stream(), managed(), projection());
 
         assertThat(configuration.cursorMetadata()).isEqualTo(CursorMetadataStoreConfig.defaults());
         assertThat(configuration.cursorStorage()).isEqualTo(CursorStorageConfig.defaults());
@@ -74,15 +74,12 @@ class NereusRuntimeConfigurationCursorTest {
     }
 
     private static NereusRuntimeConfiguration configuration(
-            CursorMetadataStoreConfig cursorMetadata,
-            CursorStorageConfig cursorStorage) {
+            CursorMetadataStoreConfig cursorMetadata, CursorStorageConfig cursorStorage) {
         return new NereusRuntimeConfiguration(
                 oxia(), objectStore(), stream(), managed(), projection(), cursorMetadata, cursorStorage);
     }
 
-    private static CursorStorageConfig copyWithSnapshotTimeout(
-            CursorStorageConfig source,
-            Duration snapshotTimeout) {
+    private static CursorStorageConfig copyWithSnapshotTimeout(CursorStorageConfig source, Duration snapshotTimeout) {
         return new CursorStorageConfig(
                 source.cursorMetadataValueMaxBytes(),
                 source.cursorMetadataSafetyMarginBytes(),
@@ -109,12 +106,7 @@ class NereusRuntimeConfigurationCursorTest {
 
     private static OxiaClientConfiguration oxia() {
         return new OxiaClientConfiguration(
-                "oxia:6648",
-                "nereus/test",
-                Duration.ofSeconds(30),
-                Duration.ofSeconds(30),
-                10_000,
-                1_024);
+                "oxia:6648", "nereus/test", Duration.ofSeconds(30), Duration.ofSeconds(30), 10_000, 1_024);
     }
 
     private static ObjectStoreConfiguration objectStore() {
@@ -185,8 +177,6 @@ class NereusRuntimeConfigurationCursorTest {
 
     private static ProjectionMetadataStoreConfig projection() {
         return new ProjectionMetadataStoreConfig(
-                Duration.ofSeconds(30),
-                1_024,
-                ProjectionMetadataStoreConfig.F2_MAX_VALUE_BYTES);
+                Duration.ofSeconds(30), 1_024, ProjectionMetadataStoreConfig.F2_MAX_VALUE_BYTES);
     }
 }

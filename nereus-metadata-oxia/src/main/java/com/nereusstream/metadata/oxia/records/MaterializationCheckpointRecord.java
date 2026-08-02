@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** Advisory per-policy materialization progress; never a visibility record. */
+/**
+ * Advisory per-policy materialization progress; never a visibility record.
+ */
 public record MaterializationCheckpointRecord(
         int schemaVersion,
         String streamId,
@@ -33,7 +36,16 @@ public record MaterializationCheckpointRecord(
 
     public MaterializationCheckpointRecord withMetadataVersion(long version) {
         return new MaterializationCheckpointRecord(
-                schemaVersion, streamId, policyId, policyVersion, policySha256, contiguousCoveredOffset,
-                observedCommitVersion, lastTaskSequence, lastTaskId, updatedAtMillis, version);
+                schemaVersion,
+                streamId,
+                policyId,
+                policyVersion,
+                policySha256,
+                contiguousCoveredOffset,
+                observedCommitVersion,
+                lastTaskSequence,
+                lastTaskId,
+                updatedAtMillis,
+                version);
     }
 }

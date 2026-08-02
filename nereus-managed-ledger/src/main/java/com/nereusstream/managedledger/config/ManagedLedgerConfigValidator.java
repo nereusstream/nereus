@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.config;
 
 import com.nereusstream.api.ApiLimits;
@@ -8,10 +9,11 @@ import java.util.Objects;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.apache.bookkeeper.mledger.impl.NullLedgerOffloader;
 
-/** Captures one immutable F2 operation view from the mutable stock configuration object. */
+/**
+ * Captures one immutable F2 operation view from the mutable stock configuration object.
+ */
 public final class ManagedLedgerConfigValidator {
-    private ManagedLedgerConfigValidator() {
-    }
+    private ManagedLedgerConfigValidator() {}
 
     public static ManagedLedgerConfigView captureForOperation(ManagedLedgerConfig source) {
         ManagedLedgerConfig config = Objects.requireNonNull(source, "source");
@@ -25,8 +27,7 @@ public final class ManagedLedgerConfigValidator {
         if (config.getManagedLedgerInterceptor() != null) {
             throw new IllegalArgumentException("F2 does not support ManagedLedgerInterceptor");
         }
-        if (config.getLedgerOffloader() != NullLedgerOffloader.INSTANCE
-                || config.isTriggerOffloadOnTopicLoad()) {
+        if (config.getLedgerOffloader() != NullLedgerOffloader.INSTANCE || config.isTriggerOffloadOnTopicLoad()) {
             throw new IllegalArgumentException("F2 does not support Pulsar ledger offload");
         }
         if (config.getShadowSource() != null || config.getShadowSourceName() != null) {

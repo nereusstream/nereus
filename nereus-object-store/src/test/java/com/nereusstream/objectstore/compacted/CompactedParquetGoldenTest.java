@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.staging.StagingFileManager;
 import java.nio.charset.StandardCharsets;
@@ -26,13 +26,14 @@ class CompactedParquetGoldenTest {
         CompactedObjectWriteRequest request =
                 CompactedParquetTestSupport.committedRequest(3, logicalBytes, 2, "UNCOMPRESSED");
 
-        try (StagingFileManager staging =
-                        CompactedParquetTestSupport.staging(temporaryDirectory, 32L << 20);
+        try (StagingFileManager staging = CompactedParquetTestSupport.staging(temporaryDirectory, 32L << 20);
                 CompactedObjectWriteResult result = new ParquetCompactedObjectWriter(staging, Runnable::run)
-                        .write(request, CompactedParquetTestSupport.publisher(List.of(
-                                CompactedParquetTestSupport.denseRow(10, first),
-                                CompactedParquetTestSupport.denseRow(11, second),
-                                CompactedParquetTestSupport.denseRow(12, third))))
+                        .write(
+                                request,
+                                CompactedParquetTestSupport.publisher(List.of(
+                                        CompactedParquetTestSupport.denseRow(10, first),
+                                        CompactedParquetTestSupport.denseRow(11, second),
+                                        CompactedParquetTestSupport.denseRow(12, third))))
                         .join()) {
             byte[] bytes = CompactedParquetTestSupport.collect(result.stagingFile());
             assertThat(Arrays.copyOfRange(bytes, 0, 4)).containsExactly('P', 'A', 'R', '1');
@@ -45,18 +46,15 @@ class CompactedParquetGoldenTest {
                     .endsWith(result.contentSha256().value() + "-" + request.outputAttemptId() + ".parquet");
 
             byte[] footer = Arrays.copyOfRange(
-                    bytes,
-                    Math.toIntExact(result.entryIndexRef().offset()),
-                    bytes.length);
+                    bytes, Math.toIntExact(result.entryIndexRef().offset()), bytes.length);
             assertThat(result.entryIndexRef().checksum()).isEqualTo(Crc32cChecksums.checksum(footer));
 
-            try (ParquetFileReader reader =
-                    ParquetFileReader.open(CompactedParquetTestSupport.input(bytes))) {
-                assertThat(reader.getFileMetaData().getSchema())
-                        .isEqualTo(CompactedObjectFormatV1.COMMITTED_SCHEMA);
+            try (ParquetFileReader reader = ParquetFileReader.open(CompactedParquetTestSupport.input(bytes))) {
+                assertThat(reader.getFileMetaData().getSchema()).isEqualTo(CompactedObjectFormatV1.COMMITTED_SCHEMA);
                 assertThat(reader.getFileMetaData().getKeyValueMetaData())
                         .containsAllEntriesOf(CompactedObjectFormatV1.metadata(request));
-                assertThat(reader.getRowGroups()).extracting(group -> group.getRowCount())
+                assertThat(reader.getRowGroups())
+                        .extracting(group -> group.getRowCount())
                         .containsExactly(2L, 1L);
                 assertThat(reader.getRowGroups()).hasSize(2);
                 reader.getRowGroups().forEach(group -> {

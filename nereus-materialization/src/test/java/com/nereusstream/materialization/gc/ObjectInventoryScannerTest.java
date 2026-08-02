@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -24,11 +24,11 @@ import com.nereusstream.objectstore.ListObjectsResult;
 import com.nereusstream.objectstore.ListedObject;
 import com.nereusstream.objectstore.ObjectKeyPrefix;
 import com.nereusstream.objectstore.ObjectStore;
+import com.nereusstream.objectstore.PutObjectOptions;
+import com.nereusstream.objectstore.PutObjectResult;
 import com.nereusstream.objectstore.RangeReadOptions;
 import com.nereusstream.objectstore.RangeReadResult;
 import com.nereusstream.objectstore.ReplayableObjectUpload;
-import com.nereusstream.objectstore.PutObjectOptions;
-import com.nereusstream.objectstore.PutObjectResult;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -73,21 +73,19 @@ class ObjectInventoryScannerTest {
             objects.list(mismatch, 8, "etag-list", old);
             objects.head(mismatch, 9, "etag-head", CRC32C);
 
-            try (ObjectInventoryScanner scanner = scanner(
-                    enabledConfig(true, false), metadata, objects, scheduler)) {
+            try (ObjectInventoryScanner scanner = scanner(enabledConfig(true, false), metadata, objects, scheduler)) {
                 ObjectInventoryScanResult result = scanner.scan().join();
 
-                assertThat(result).isEqualTo(new ObjectInventoryScanResult(
-                        1, 5, 5, 0, 0, 1, 0, 1, 1, 1, 1, 0));
-                VersionedPhysicalObjectRoot root = metadata.getRoot(
-                                CLUSTER, ObjectKeyHash.from(valid))
-                        .join().orElseThrow();
+                assertThat(result).isEqualTo(new ObjectInventoryScanResult(1, 5, 5, 0, 0, 1, 0, 1, 1, 1, 1, 0));
+                VersionedPhysicalObjectRoot root = metadata.getRoot(CLUSTER, ObjectKeyHash.from(valid))
+                        .join()
+                        .orElseThrow();
                 assertThat(root.value().objectKey()).isEqualTo(valid.value());
-                assertThat(root.value().objectKindId())
-                        .isEqualTo(PhysicalObjectKind.INDEX_OBJECT.wireId());
+                assertThat(root.value().objectKindId()).isEqualTo(PhysicalObjectKind.INDEX_OBJECT.wireId());
                 assertThat(root.value().createdAtMillis()).isEqualTo(old.toEpochMilli());
-                assertThat(root.value().orphanNotBeforeMillis()).isEqualTo(
-                        NOW.plus(Duration.ofHours(2).plus(Duration.ofMillis(5))).toEpochMilli());
+                assertThat(root.value().orphanNotBeforeMillis())
+                        .isEqualTo(NOW.plus(Duration.ofHours(2).plus(Duration.ofMillis(5)))
+                                .toEpochMilli());
 
                 ObjectInventoryScanResult repeated = scanner.scan().join();
                 assertThat(repeated.alreadyRooted()).isEqualTo(1);
@@ -103,9 +101,7 @@ class ObjectInventoryScannerTest {
 
     @Test
     void disabledAndDryRunPassesReportWithoutCreatingMetadata() {
-        for (PhysicalGcConfig config : List.of(
-                enabledConfig(false, true),
-                enabledConfig(true, true))) {
+        for (PhysicalGcConfig config : List.of(enabledConfig(false, true), enabledConfig(true, true))) {
             FakePhysicalObjectMetadataStore metadata = new FakePhysicalObjectMetadataStore();
             InventoryObjectStore objects = new InventoryObjectStore();
             ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -113,12 +109,12 @@ class ObjectInventoryScannerTest {
                 ObjectKey key = key("dry-run.obj");
                 objects.list(key, 4, "etag", NOW.minus(Duration.ofHours(3)));
                 objects.head(key, 4, "etag", CRC32C);
-                try (ObjectInventoryScanner scanner = scanner(
-                        config, metadata, objects, scheduler)) {
+                try (ObjectInventoryScanner scanner = scanner(config, metadata, objects, scheduler)) {
                     ObjectInventoryScanResult result = scanner.scan().join();
                     assertThat(result.wouldRegister()).isEqualTo(1);
                     assertThat(result.rootsRegistered()).isZero();
-                    assertThat(metadata.getRoot(CLUSTER, ObjectKeyHash.from(key)).join())
+                    assertThat(metadata.getRoot(CLUSTER, ObjectKeyHash.from(key))
+                                    .join())
                             .isEmpty();
                 }
             } finally {
@@ -138,8 +134,7 @@ class ObjectInventoryScannerTest {
             ObjectKey key = key("lost-response.obj");
             objects.list(key, 12, "etag", NOW.minus(Duration.ofHours(3)));
             objects.head(key, 12, "etag", CRC32C);
-            try (ObjectInventoryScanner scanner = scanner(
-                    enabledConfig(true, false), metadata, objects, scheduler)) {
+            try (ObjectInventoryScanner scanner = scanner(enabledConfig(true, false), metadata, objects, scheduler)) {
                 ObjectInventoryScanResult result = scanner.scan().join();
                 assertThat(result.rootsConverged()).isEqualTo(1);
                 assertThat(result.rootsRegistered()).isZero();
@@ -162,8 +157,7 @@ class ObjectInventoryScannerTest {
             ObjectKey key = key("concurrent-root.obj");
             objects.list(key, 12, "etag", NOW.minus(Duration.ofHours(3)));
             objects.head(key, 12, "etag", CRC32C);
-            try (ObjectInventoryScanner scanner = scanner(
-                    enabledConfig(true, false), metadata, objects, scheduler)) {
+            try (ObjectInventoryScanner scanner = scanner(enabledConfig(true, false), metadata, objects, scheduler)) {
                 ObjectInventoryScanResult result = scanner.scan().join();
                 assertThat(result.rootConflicts()).isEqualTo(1);
                 assertThat(result.rootsRegistered()).isZero();
@@ -196,8 +190,7 @@ class ObjectInventoryScannerTest {
                             Clock.fixed(NOW, ZoneOffset.UTC),
                             scheduler))
                     .isInstanceOf(IllegalArgumentException.class);
-            ObjectInventoryScanner scanner = scanner(
-                    enabledConfig(false, true), metadata, objects, scheduler);
+            ObjectInventoryScanner scanner = scanner(enabledConfig(false, true), metadata, objects, scheduler);
             scanner.close();
             assertThatThrownBy(() -> scanner.scan().join())
                     .hasRootCauseInstanceOf(NereusException.class)
@@ -226,8 +219,7 @@ class ObjectInventoryScannerTest {
             objects.head(higher, 1, "etag-z", CRC32C);
             objects.pageInDescendingLogicalOrder();
 
-            try (ObjectInventoryScanner scanner = scanner(
-                    enabledConfig(true, false), metadata, objects, scheduler)) {
+            try (ObjectInventoryScanner scanner = scanner(enabledConfig(true, false), metadata, objects, scheduler)) {
                 ObjectInventoryScanResult result = scanner.scan().join();
                 assertThat(result.pagesScanned()).isEqualTo(2);
                 assertThat(result.objectsListed()).isEqualTo(2);
@@ -255,8 +247,7 @@ class ObjectInventoryScannerTest {
             objects.head(second, 1, "etag-b", CRC32C);
             objects.repeatOpaqueContinuation();
 
-            try (ObjectInventoryScanner scanner = scanner(
-                    enabledConfig(true, false), metadata, objects, scheduler)) {
+            try (ObjectInventoryScanner scanner = scanner(enabledConfig(true, false), metadata, objects, scheduler)) {
                 assertThatThrownBy(() -> scanner.scan().join())
                         .hasRootCauseInstanceOf(NereusException.class)
                         .hasRootCauseMessage(
@@ -275,13 +266,7 @@ class ObjectInventoryScannerTest {
             InventoryObjectStore objects,
             ScheduledExecutorService scheduler) {
         return new ObjectInventoryScanner(
-                CLUSTER,
-                config,
-                metadata,
-                objects,
-                List.of(family()),
-                Clock.fixed(NOW, ZoneOffset.UTC),
-                scheduler);
+                CLUSTER, config, metadata, objects, List.of(family()), Clock.fixed(NOW, ZoneOffset.UTC), scheduler);
     }
 
     private static ObjectInventoryFamily family() {
@@ -301,13 +286,10 @@ class ObjectInventoryScannerTest {
                 if (!key.value().startsWith(PREFIX.value()) || !key.value().endsWith(".obj")) {
                     throw new IllegalArgumentException("malformed test object key");
                 }
-                String id = key.value().substring(
-                        PREFIX.value().length(), key.value().length() - ".obj".length());
+                String id = key.value()
+                        .substring(PREFIX.value().length(), key.value().length() - ".obj".length());
                 return new ObjectInventoryKey(
-                        key,
-                        Optional.of(new ObjectId(id)),
-                        PhysicalObjectKind.INDEX_OBJECT,
-                        Optional.empty());
+                        key, Optional.of(new ObjectId(id)), PhysicalObjectKind.INDEX_OBJECT, Optional.empty());
             }
         };
     }
@@ -347,10 +329,7 @@ class ObjectInventoryScannerTest {
             CompletableFuture<VersionedPhysicalObjectRoot> created = super.createRoot(cluster, root);
             if (fail.compareAndSet(true, false)) {
                 return created.thenCompose(ignored -> CompletableFuture.failedFuture(
-                        new NereusException(
-                                ErrorCode.METADATA_UNAVAILABLE,
-                                true,
-                                "lost root create response")));
+                        new NereusException(ErrorCode.METADATA_UNAVAILABLE, true, "lost root create response")));
             }
             return created;
         }
@@ -363,14 +342,13 @@ class ObjectInventoryScannerTest {
         public synchronized CompletableFuture<VersionedPhysicalObjectRoot> createRoot(
                 String cluster, PhysicalObjectRootRecord root) {
             if (race.compareAndSet(true, false)) {
-                super.createRoot(cluster, withOrphanNotBefore(
-                        root, Math.addExact(root.orphanNotBeforeMillis(), 1))).join();
+                super.createRoot(cluster, withOrphanNotBefore(root, Math.addExact(root.orphanNotBeforeMillis(), 1)))
+                        .join();
             }
             return super.createRoot(cluster, root);
         }
 
-        private static PhysicalObjectRootRecord withOrphanNotBefore(
-                PhysicalObjectRootRecord root, long value) {
+        private static PhysicalObjectRootRecord withOrphanNotBefore(PhysicalObjectRootRecord root, long value) {
             return new PhysicalObjectRootRecord(
                     root.schemaVersion(),
                     root.objectKeyHash(),
@@ -419,95 +397,70 @@ class ObjectInventoryScannerTest {
             pagingMode = PagingMode.REPEATED_OPAQUE_TOKEN;
         }
 
-        private void list(
-                ObjectKey key,
-                long length,
-                String etag,
-                Instant lastModified) {
-            listed.add(new ListedObject(
-                    key, length, Optional.of(etag), Optional.of(lastModified)));
+        private void list(ObjectKey key, long length, String etag, Instant lastModified) {
+            listed.add(new ListedObject(key, length, Optional.of(etag), Optional.of(lastModified)));
             listed.sort(Comparator.comparing(value -> value.key().value()));
         }
 
-        private void head(
-                ObjectKey key,
-                long length,
-                String etag,
-                Checksum checksum) {
-            heads.put(key, new HeadObjectResult(
-                    key, length, checksum, Optional.of(etag), Map.of()));
+        private void head(ObjectKey key, long length, String etag, Checksum checksum) {
+            heads.put(key, new HeadObjectResult(key, length, checksum, Optional.of(etag), Map.of()));
         }
 
         @Override
         public CompletableFuture<ListObjectsResult> listObjects(
-                ObjectKeyPrefix prefix,
-                Optional<String> continuationToken,
-                ListObjectsOptions options) {
+                ObjectKeyPrefix prefix, Optional<String> continuationToken, ListObjectsOptions options) {
             ensureOpen();
             if (pagingMode == PagingMode.DESCENDING_OPAQUE) {
-                List<ListedObject> page = continuationToken.isEmpty()
-                        ? List.of(listed.getLast())
-                        : List.of(listed.getFirst());
-                Optional<String> next = continuationToken.isEmpty()
-                        ? Optional.of("opaque-descending-page-2")
-                        : Optional.empty();
-                return CompletableFuture.completedFuture(
-                        new ListObjectsResult(prefix, page, next));
+                List<ListedObject> page =
+                        continuationToken.isEmpty() ? List.of(listed.getLast()) : List.of(listed.getFirst());
+                Optional<String> next =
+                        continuationToken.isEmpty() ? Optional.of("opaque-descending-page-2") : Optional.empty();
+                return CompletableFuture.completedFuture(new ListObjectsResult(prefix, page, next));
             }
             if (pagingMode == PagingMode.REPEATED_OPAQUE_TOKEN) {
-                List<ListedObject> page = continuationToken.isEmpty()
-                        ? List.of(listed.getFirst())
-                        : List.of(listed.getLast());
-                return CompletableFuture.completedFuture(new ListObjectsResult(
-                        prefix, page, Optional.of("opaque-repeated-token")));
+                List<ListedObject> page =
+                        continuationToken.isEmpty() ? List.of(listed.getFirst()) : List.of(listed.getLast());
+                return CompletableFuture.completedFuture(
+                        new ListObjectsResult(prefix, page, Optional.of("opaque-repeated-token")));
             }
             List<ListedObject> remaining = listed.stream()
                     .filter(value -> value.key().value().startsWith(prefix.value()))
                     .filter(value -> continuationToken.isEmpty()
                             || value.key().value().compareTo(continuationToken.orElseThrow()) > 0)
                     .toList();
-            List<ListedObject> page = remaining.stream()
-                    .limit(options.maxKeys())
-                    .toList();
+            List<ListedObject> page =
+                    remaining.stream().limit(options.maxKeys()).toList();
             Optional<String> next = remaining.size() > page.size()
                     ? Optional.of(page.get(page.size() - 1).key().value())
                     : Optional.empty();
-            return CompletableFuture.completedFuture(
-                    new ListObjectsResult(prefix, page, next));
+            return CompletableFuture.completedFuture(new ListObjectsResult(prefix, page, next));
         }
 
         @Override
-        public CompletableFuture<HeadObjectResult> headObject(
-                ObjectKey key, HeadObjectOptions options) {
+        public CompletableFuture<HeadObjectResult> headObject(ObjectKey key, HeadObjectOptions options) {
             ensureOpen();
             HeadObjectResult head = heads.get(key);
             if (head == null) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.OBJECT_NOT_FOUND, true, "object not found"));
+                return CompletableFuture.failedFuture(
+                        new NereusException(ErrorCode.OBJECT_NOT_FOUND, true, "object not found"));
             }
             return CompletableFuture.completedFuture(head);
         }
 
         @Override
         public CompletableFuture<PutObjectResult> putObject(
-                ObjectKey key,
-                ReplayableObjectUpload source,
-                PutObjectOptions options) {
+                ObjectKey key, ReplayableObjectUpload source, PutObjectOptions options) {
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
         }
 
         @Override
         public CompletableFuture<RangeReadResult> readRange(
-                ObjectKey key,
-                long offset,
-                long length,
-                RangeReadOptions options) {
+                ObjectKey key, long offset, long length, RangeReadOptions options) {
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
         }
 
         @Override
-        public CompletableFuture<DeleteObjectResult> deleteObject(
-                ObjectKey key, DeleteObjectOptions options) {
+        public CompletableFuture<DeleteObjectResult> deleteObject(ObjectKey key, DeleteObjectOptions options) {
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
         }
 

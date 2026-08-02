@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import java.util.Objects;
 
-/** Reloaded durable rollout proof required in addition to local GC configuration. */
+/**
+ * Reloaded durable rollout proof required in addition to local GC configuration.
+ */
 public record BookKeeperProtocolActivationProof(
         int protocolVersion,
         String clusterAlias,
@@ -36,15 +39,16 @@ public record BookKeeperProtocolActivationProof(
     }
 
     public void requireExact(
-            BookKeeperWalConfiguration configuration,
-            BookKeeperLedgerIdNamespaceReservation namespace) {
+            BookKeeperWalConfiguration configuration, BookKeeperLedgerIdNamespaceReservation namespace) {
         Objects.requireNonNull(configuration, "configuration");
         Objects.requireNonNull(namespace, "namespace");
         if (protocolVersion != 1
                 || !clusterAlias.equals(configuration.clusterAlias())
                 || !providerScopeSha256.equals(configuration.providerScopeSha256())
-                || !configurationBindingSha256.equals(configuration.configurationBindingSha256().value())
-                || !ledgerIdNamespaceSha256.equals(namespace.ledgerIdNamespaceSha256().value())
+                || !configurationBindingSha256.equals(
+                        configuration.configurationBindingSha256().value())
+                || !ledgerIdNamespaceSha256.equals(
+                        namespace.ledgerIdNamespaceSha256().value())
                 || !ledgerDeletionEnabled) {
             throw new IllegalArgumentException(
                     "BookKeeper deletion activation does not match the exact WAL/namespace binding");
@@ -65,7 +69,9 @@ public record BookKeeperProtocolActivationProof(
 
     private static String text(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " cannot be blank");
+        }
         return value;
     }
 }

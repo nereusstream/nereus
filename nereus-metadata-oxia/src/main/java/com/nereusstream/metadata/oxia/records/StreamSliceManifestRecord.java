@@ -44,14 +44,11 @@ public record StreamSliceManifestRecord(
         sliceChecksumValue = requireNonBlank(sliceChecksumValue, "sliceChecksumValue");
         payloadFormat = requireNonBlank(payloadFormat, "payloadFormat");
         state = requireNonBlank(state, "state");
-        if (sliceOrdinal < 0 || writerEpoch < 0 || recordCount <= 0 || entryCount <= 0
-                || logicalBytes < 0) {
+        if (sliceOrdinal < 0 || writerEpoch < 0 || recordCount <= 0 || entryCount <= 0 || logicalBytes < 0) {
             throw new IllegalArgumentException("slice manifest numeric fields are invalid");
         }
         MetadataRecordValidation.requirePositiveNonOverflowingRange(
-                objectOffset,
-                objectLength,
-                "slice manifest object");
+                objectOffset, objectLength, "slice manifest object");
     }
 
     public StreamSliceManifestRecord withState(String newState) {

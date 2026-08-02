@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ProjectionRef;
@@ -33,16 +33,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class StreamRegistrationRetirementCoordinatorTest {
     private static final String CLUSTER = "cluster-registration-retirement";
-    private static final Clock CLOCK = Clock.fixed(
-            Instant.parse("2026-07-18T08:00:00Z"), ZoneOffset.UTC);
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-07-18T08:00:00Z"), ZoneOffset.UTC);
     private static final ProjectionRef PROJECTION =
             new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "retirement-projection");
 
@@ -52,8 +51,7 @@ class StreamRegistrationRetirementCoordinatorTest {
             StreamRegistrationRetirementResult result =
                     fixture.coordinator().retire(fixture.stream()).join();
 
-            assertThat(result.status()).isEqualTo(
-                    StreamRegistrationRetirementStatus.RETIRED);
+            assertThat(result.status()).isEqualTo(StreamRegistrationRetirementStatus.RETIRED);
             assertThat(result.registrationRetired()).isTrue();
             assertThat(fixture.generations()
                             .getStreamRegistration(CLUSTER, fixture.stream())
@@ -69,8 +67,7 @@ class StreamRegistrationRetirementCoordinatorTest {
             StreamRegistrationRetirementResult result =
                     fixture.coordinator().retire(fixture.stream()).join();
 
-            assertThat(result.status()).isEqualTo(
-                    StreamRegistrationRetirementStatus.RETIRED);
+            assertThat(result.status()).isEqualTo(StreamRegistrationRetirementStatus.RETIRED);
             assertThat(loseResponse).isFalse();
             assertThat(fixture.generations()
                             .getStreamRegistration(CLUSTER, fixture.stream())
@@ -82,13 +79,7 @@ class StreamRegistrationRetirementCoordinatorTest {
     @Test
     void emptyRecoveryRootDeleteResponseLossConvergesBeforeRegistrationRetirement() {
         AtomicBoolean loseRootResponse = new AtomicBoolean(true);
-        try (Fixture fixture = fixture(
-                true,
-                stableExternal(),
-                null,
-                loseRootResponse,
-                true,
-                false)) {
+        try (Fixture fixture = fixture(true, stableExternal(), null, loseRootResponse, true, false)) {
             fixture.generations()
                     .getOrCreateRecoveryRoot(CLUSTER, fixture.stream())
                     .join();
@@ -96,8 +87,7 @@ class StreamRegistrationRetirementCoordinatorTest {
             StreamRegistrationRetirementResult result =
                     fixture.coordinator().retire(fixture.stream()).join();
 
-            assertThat(result.status()).isEqualTo(
-                    StreamRegistrationRetirementStatus.RETIRED);
+            assertThat(result.status()).isEqualTo(StreamRegistrationRetirementStatus.RETIRED);
             assertThat(result.recoveryRootRetired()).isTrue();
             assertThat(loseRootResponse).isFalse();
             assertThat(fixture.generations()
@@ -114,24 +104,17 @@ class StreamRegistrationRetirementCoordinatorTest {
     @Test
     void finalExternalAuthorityDriftRetainsRegistration() {
         AtomicInteger captures = new AtomicInteger();
-        try (Fixture fixture = fixture(
-                true,
-                subject -> {
-                    int capture = captures.incrementAndGet();
-                    return CompletableFuture.completedFuture(
-                            StreamRetirementReferenceAuthoritySnapshot.complete(
-                                    subject,
-                                    0,
-                                    List.of(new GcAuthorityToken(
-                                            "/cursor/authority",
-                                            capture,
-                                            sha(capture == 1 ? '1' : '2')))));
-                })) {
+        try (Fixture fixture = fixture(true, subject -> {
+            int capture = captures.incrementAndGet();
+            return CompletableFuture.completedFuture(StreamRetirementReferenceAuthoritySnapshot.complete(
+                    subject,
+                    0,
+                    List.of(new GcAuthorityToken("/cursor/authority", capture, sha(capture == 1 ? '1' : '2')))));
+        })) {
             StreamRegistrationRetirementResult result =
                     fixture.coordinator().retire(fixture.stream()).join();
 
-            assertThat(result.status()).isEqualTo(
-                    StreamRegistrationRetirementStatus.VERSION_CHANGED);
+            assertThat(result.status()).isEqualTo(StreamRegistrationRetirementStatus.VERSION_CHANGED);
             assertThat(fixture.generations()
                             .getStreamRegistration(CLUSTER, fixture.stream())
                             .join())
@@ -145,8 +128,7 @@ class StreamRegistrationRetirementCoordinatorTest {
             StreamRegistrationRetirementResult result =
                     fixture.coordinator().retire(fixture.stream()).join();
 
-            assertThat(result.status()).isEqualTo(
-                    StreamRegistrationRetirementStatus.STREAM_NOT_DELETED);
+            assertThat(result.status()).isEqualTo(StreamRegistrationRetirementStatus.STREAM_NOT_DELETED);
             assertThat(fixture.generations()
                             .getStreamRegistration(CLUSTER, fixture.stream())
                             .join())
@@ -154,16 +136,13 @@ class StreamRegistrationRetirementCoordinatorTest {
         }
     }
 
-    private static com.nereusstream.core.capability.StreamRetirementReferenceAuthorityReader
-            stableExternal() {
+    private static com.nereusstream.core.capability.StreamRetirementReferenceAuthorityReader stableExternal() {
         return subject -> CompletableFuture.completedFuture(
-                StreamRetirementReferenceAuthoritySnapshot.complete(
-                        subject, 0, List.of()));
+                StreamRetirementReferenceAuthoritySnapshot.complete(subject, 0, List.of()));
     }
 
     private static Fixture fixture(
-            boolean enabled,
-            com.nereusstream.core.capability.StreamRetirementReferenceAuthorityReader external) {
+            boolean enabled, com.nereusstream.core.capability.StreamRetirementReferenceAuthorityReader external) {
         return fixture(enabled, external, null);
     }
 
@@ -185,28 +164,21 @@ class StreamRegistrationRetirementCoordinatorTest {
         StreamId stream = new StreamId(l0.createOrGetStream(
                         CLUSTER,
                         new StreamName("registration-retirement"),
-                        new StreamCreateOptions(
-                                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
-                                Map.of()))
+                        new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
                 .join()
                 .streamId());
         if (deleted) {
-            StreamMetadataSnapshot active = l0.getStreamSnapshot(CLUSTER, stream).join();
+            StreamMetadataSnapshot active =
+                    l0.getStreamSnapshot(CLUSTER, stream).join();
             StreamMetadataSnapshot deleting = l0.transitionStreamState(
                             CLUSTER,
                             new StreamStateTransitionRequest(
-                                    stream,
-                                    StreamState.ACTIVE,
-                                    StreamState.DELETING,
-                                    active.metadataVersion()))
+                                    stream, StreamState.ACTIVE, StreamState.DELETING, active.metadataVersion()))
                     .join();
             l0.transitionStreamState(
                             CLUSTER,
                             new StreamStateTransitionRequest(
-                                    stream,
-                                    StreamState.DELETING,
-                                    StreamState.DELETED,
-                                    deleting.metadataVersion()))
+                                    stream, StreamState.DELETING, StreamState.DELETED, deleting.metadataVersion()))
                     .join();
         }
 
@@ -224,44 +196,32 @@ class StreamRegistrationRetirementCoordinatorTest {
                                 1,
                                 0))
                 .join();
-        GenerationMetadataStore exposed = loseRegistrationResponse == null
-                        && loseRecoveryRootResponse == null
+        GenerationMetadataStore exposed = loseRegistrationResponse == null && loseRecoveryRootResponse == null
                 ? durable
-                : loseDeleteResponses(
-                        durable,
-                        loseRegistrationResponse,
-                        loseRecoveryRootResponse);
+                : loseDeleteResponses(durable, loseRegistrationResponse, loseRecoveryRootResponse);
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         var projectionReader = (com.nereusstream.core.capability.GenerationProjectionAuthorityReader)
-                subject -> CompletableFuture.completedFuture(
-                        new GenerationProjectionAuthoritySnapshot(
-                                subject,
-                                projectionLive,
-                                projectionLive
-                                        ? Optional.of(new com.nereusstream.metadata.oxia.records
-                                                .ManagedLedgerProjectionIdentity(
-                                                        1,
-                                                        1,
-                                                        stream.value(),
-                                                        1_000_000))
-                                        : Optional.empty(),
-                                List.of(new GcAuthorityToken(
-                                        "/projection/authority",
-                                        1,
-                                        sha('b')))));
-        StreamRegistrationRetirementCoordinator coordinator =
-                new StreamRegistrationRetirementCoordinator(
-                        CLUSTER,
-                        l0,
-                        exposed,
-                        l0,
-                        projectionReader,
-                        external,
-                        unavailableCheckpointCodec(),
-                        config(enabled),
-                        Duration.ofSeconds(1),
-                        CLOCK,
-                        scheduler);
+                subject -> CompletableFuture.completedFuture(new GenerationProjectionAuthoritySnapshot(
+                        subject,
+                        projectionLive,
+                        projectionLive
+                                ? Optional.of(
+                                        new com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity(
+                                                1, 1, stream.value(), 1_000_000))
+                                : Optional.empty(),
+                        List.of(new GcAuthorityToken("/projection/authority", 1, sha('b')))));
+        StreamRegistrationRetirementCoordinator coordinator = new StreamRegistrationRetirementCoordinator(
+                CLUSTER,
+                l0,
+                exposed,
+                l0,
+                projectionReader,
+                external,
+                unavailableCheckpointCodec(),
+                config(enabled),
+                Duration.ofSeconds(1),
+                CLOCK,
+                scheduler);
         return new Fixture(stream, l0, durable, scheduler, coordinator);
     }
 
@@ -303,8 +263,7 @@ class StreamRegistrationRetirementCoordinatorTest {
                 RecoveryCheckpointCodecV1.class.getClassLoader(),
                 new Class<?>[] {RecoveryCheckpointCodecV1.class},
                 (proxy, method, arguments) -> {
-                    throw new AssertionError(
-                            "an absent recovery root must not call " + method.getName());
+                    throw new AssertionError("an absent recovery root must not call " + method.getName());
                 });
     }
 
@@ -331,8 +290,7 @@ class StreamRegistrationRetirementCoordinatorTest {
     }
 
     private static Checksum sha(char value) {
-        return new Checksum(
-                ChecksumType.SHA256, String.valueOf(value).repeat(64));
+        return new Checksum(ChecksumType.SHA256, String.valueOf(value).repeat(64));
     }
 
     private record Fixture(

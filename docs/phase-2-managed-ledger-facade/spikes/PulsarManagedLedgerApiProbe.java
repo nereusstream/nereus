@@ -17,11 +17,13 @@ package com.nereusstream.spike;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 import io.opentelemetry.api.OpenTelemetry;
+
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
+
 import org.apache.bookkeeper.mledger.AsyncCallbacks.AddEntryCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.OpenCursorCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.OpenLedgerCallback;
@@ -41,7 +43,9 @@ import org.apache.pulsar.broker.storage.ManagedLedgerStorageClass;
 import org.apache.pulsar.common.api.proto.CommandSubscribe.InitialPosition;
 import org.apache.pulsar.metadata.api.extended.MetadataStoreExtended;
 
-/** Compile-only probe for the exact Pulsar interfaces used by Nereus Future 2. */
+/**
+ * Compile-only probe for the exact Pulsar interfaces used by Nereus Future 2.
+ */
 final class PulsarManagedLedgerApiProbe {
     private PulsarManagedLedgerApiProbe() {
     }

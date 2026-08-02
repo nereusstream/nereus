@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.api.StreamId;
@@ -17,14 +18,11 @@ public interface GcGlobalReferenceScope {
     CompletableFuture<GcGlobalReferenceScopeSnapshot> snapshot();
 
     static GcGlobalReferenceScope unsupported() {
-        return () -> CompletableFuture.completedFuture(
-                GcGlobalReferenceScopeSnapshot.incomplete());
+        return () -> CompletableFuture.completedFuture(GcGlobalReferenceScopeSnapshot.incomplete());
     }
 
     static CompletableFuture<List<StreamId>> resolveStreams(
-            GcReferenceQuery query,
-            GcReferenceSnapshotBuilder builder,
-            GcGlobalReferenceScope globalScope) {
+            GcReferenceQuery query, GcReferenceSnapshotBuilder builder, GcGlobalReferenceScope globalScope) {
         Objects.requireNonNull(query, "query");
         Objects.requireNonNull(builder, "builder");
         Objects.requireNonNull(globalScope, "globalScope");
@@ -33,9 +31,7 @@ public interface GcGlobalReferenceScope {
         }
         return globalScope.snapshot().thenApply(snapshot -> {
             snapshot.contributeTo(builder);
-            return snapshot.complete() && !builder.limitExceeded()
-                    ? snapshot.streams()
-                    : List.of();
+            return snapshot.complete() && !builder.limitExceeded() ? snapshot.streams() : List.of();
         });
     }
 }

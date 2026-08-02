@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.api.Checksum;
@@ -6,7 +7,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-/** Canonical complete-or-veto snapshot returned by one registered reference domain. */
+/**
+ * Canonical complete-or-veto snapshot returned by one registered reference domain.
+ */
 public record GcReferenceSnapshot(
         String domainId,
         int protocolVersion,
@@ -18,12 +21,11 @@ public record GcReferenceSnapshot(
         List<GcAuthorityToken> authorities,
         List<GcReference> references,
         Checksum snapshotSha256) {
-    private static final Comparator<GcAuthorityToken> AUTHORITY_ORDER = Comparator
-            .comparing(GcAuthorityToken::authorityKey)
+    private static final Comparator<GcAuthorityToken> AUTHORITY_ORDER = Comparator.comparing(
+                    GcAuthorityToken::authorityKey)
             .thenComparingLong(GcAuthorityToken::metadataVersion)
             .thenComparing(value -> value.identitySha256().value());
-    private static final Comparator<GcReference> REFERENCE_ORDER = Comparator
-            .comparing(GcReference::referenceType)
+    private static final Comparator<GcReference> REFERENCE_ORDER = Comparator.comparing(GcReference::referenceType)
             .thenComparing(GcReference::referenceId)
             .thenComparing(GcReference::ownerKey)
             .thenComparingLong(GcReference::ownerMetadataVersion)
@@ -34,8 +36,7 @@ public record GcReferenceSnapshot(
         if (protocolVersion <= 0) {
             throw new IllegalArgumentException("protocolVersion must be positive");
         }
-        queryIdentitySha256 = GcReferenceQuery.requireSha256(
-                queryIdentitySha256, "queryIdentitySha256");
+        queryIdentitySha256 = GcReferenceQuery.requireSha256(queryIdentitySha256, "queryIdentitySha256");
         if (authorityCount < 0 || referenceCount < 0) {
             throw new IllegalArgumentException("snapshot counts must be non-negative");
         }

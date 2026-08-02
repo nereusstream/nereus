@@ -1,18 +1,29 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
-import com.nereusstream.api.ReadBatch;
-import com.nereusstream.api.ReadOptions;
+
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.FirstEntryPolicy;
+import com.nereusstream.api.NereusException;
 import com.nereusstream.api.PhysicalReadResult;
 import com.nereusstream.api.PhysicalReadStats;
+import com.nereusstream.api.ReadBatch;
+import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
-/** Validates and dispatches maximal adjacent exact-reader-key runs without provider fall-through. */
+/**
+ * Validates and dispatches maximal adjacent exact-reader-key runs without provider fall-through.
+ */
 public final class ReadTargetDispatcher {
     private final ReadTargetReaderRegistry registry;
 
@@ -26,67 +37,129 @@ public final class ReadTargetDispatcher {
 
     public long reservationBytes(List<ResolvedRange> ranges) {
         validateAdapters(ranges);
-        return ranges.stream().mapToLong(range ->
-                registry.require(range.readTarget()).reservationBytes(range)).max().orElseThrow();
+        return ranges.stream()
+                .mapToLong(range -> registry.require(range.readTarget()).reservationBytes(range))
+                .max()
+                .orElseThrow();
     }
 
     public CompletableFuture<PhysicalReadResult> read(
-            StreamId streamId,
-            long startOffset,
-            List<ResolvedRange> ranges,
-            ReadOptions options) {
+            StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
+        return read(
+                streamId,
+                new ReadRequest(
+                        startOffset,
+                        com.nereusstream.api.ReadView.COMMITTED,
+                        com.nereusstream.api.ReadBoundaryMode.EXACT_START,
+                        FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                        options),
+                ranges);
+    }
+
+    public CompletableFuture<PhysicalReadResult> read(
+            StreamId streamId, ReadRequest request, List<ResolvedRange> ranges) {
         Objects.requireNonNull(streamId, "streamId");
+        Objects.requireNonNull(request, "request");
         validateAdapters(ranges);
         List<Run> runs = runs(ranges);
-        return readRun(
-                streamId,
-                runs,
-                0,
-                startOffset,
-                options,
-                new ArrayList<>(),
-                new ArrayList<>(),
-                0,
-                0);
+        return readRun(streamId, runs, 0, request, new ArrayList<>(), new ArrayList<>(), 0, 0, OptionalLong.empty());
     }
 
     private CompletableFuture<PhysicalReadResult> readRun(
             StreamId streamId,
-            List<Run> runs, int index, long startOffset, ReadOptions options,
-            List<ReadBatch> batches, List<PhysicalReadStats> stats, long records, long bytes) {
+            List<Run> runs,
+            int index,
+            ReadRequest request,
+            List<ReadBatch> batches,
+            List<PhysicalReadStats> stats,
+            long records,
+            long bytes,
+            OptionalLong sourceCoverageEndOffset) {
+        ReadOptions options = request.options();
         if (index >= runs.size() || records >= options.maxRecords() || bytes >= options.maxBytes()) {
-            return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats));
+            return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats, sourceCoverageEndOffset));
         }
         Run run = runs.get(index);
         ReadOptions remaining = new ReadOptions(
                 Math.toIntExact(options.maxRecords() - records), Math.toIntExact(options.maxBytes() - bytes),
                 options.isolation(), options.timeout());
+        ReadRequest remainingRequest = new ReadRequest(
+                request.startOffset(),
+                request.view(),
+                request.boundaryMode(),
+                batches.isEmpty() ? request.firstEntryPolicy() : FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                remaining);
         ReadTargetReader reader = registry.require(run.key());
-        return reader.readPhysicalWithStats(streamId, startOffset, run.ranges(), remaining).thenCompose(result -> {
-            batches.addAll(result.batches()); stats.addAll(result.rangeStats());
-            long next = startOffset;
-            long newRecords = records;
-            long newBytes = bytes;
-            for (ReadBatch batch : result.batches()) {
-                next = batch.range().endOffset();
-                newRecords = Math.addExact(newRecords, batch.range().recordCount());
-                newBytes = Math.addExact(newBytes, batch.payload().length);
-            }
-            if (result.batches().isEmpty()
-                    || next < run.ranges().get(run.ranges().size() - 1).offsetRange().endOffset()) {
-                return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats));
-            }
-            return readRun(
-                    streamId,
-                    runs,
-                    index + 1,
-                    next,
-                    options,
-                    batches,
-                    stats,
-                    newRecords,
-                    newBytes);
-        });
+        return reader.readPhysicalWithStats(streamId, remainingRequest, run.ranges())
+                .handle((result, failure) -> {
+                    if (failure == null) {
+                        return new RunRead(result, false);
+                    }
+                    Throwable cause = unwrap(failure);
+                    if (!batches.isEmpty()
+                            && cause instanceof NereusException nereus
+                            && nereus.code() == ErrorCode.READ_LIMIT_TOO_SMALL) {
+                        long lastBatchEnd =
+                                batches.get(batches.size() - 1).range().endOffset();
+                        long coverage = sourceCoverageEndOffset.isPresent()
+                                ? Math.max(sourceCoverageEndOffset.getAsLong(), lastBatchEnd)
+                                : lastBatchEnd;
+                        return new RunRead(new PhysicalReadResult(batches, stats, OptionalLong.of(coverage)), true);
+                    }
+                    throw new CompletionException(cause);
+                })
+                .thenCompose(runRead -> {
+                    if (runRead.terminal()) {
+                        return CompletableFuture.completedFuture(runRead.result());
+                    }
+                    PhysicalReadResult result = runRead.result();
+                    batches.addAll(result.batches());
+                    stats.addAll(result.rangeStats());
+                    long next = request.startOffset();
+                    long newRecords = records;
+                    long newBytes = bytes;
+                    for (ReadBatch batch : result.batches()) {
+                        next = batch.range().endOffset();
+                        newRecords = Math.addExact(newRecords, batch.range().recordCount());
+                        newBytes = Math.addExact(newBytes, batch.payload().length);
+                    }
+                    long runProgress = result.sourceCoverageEndOffset().orElse(next);
+                    OptionalLong coverage = OptionalLong.of(
+                            sourceCoverageEndOffset.isPresent()
+                                    ? Math.max(sourceCoverageEndOffset.getAsLong(), runProgress)
+                                    : runProgress);
+                    if (runProgress
+                            < run.ranges()
+                                    .get(run.ranges().size() - 1)
+                                    .offsetRange()
+                                    .endOffset()) {
+                        return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats, coverage));
+                    }
+                    return readRun(
+                            streamId,
+                            runs,
+                            index + 1,
+                            new ReadRequest(
+                                    runProgress,
+                                    request.view(),
+                                    request.boundaryMode(),
+                                    FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                                    options),
+                            batches,
+                            stats,
+                            newRecords,
+                            newBytes,
+                            coverage);
+                });
+    }
+
+    private static Throwable unwrap(Throwable failure) {
+        Throwable current = failure;
+        while ((current instanceof CompletionException || current instanceof ExecutionException)
+                && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
     }
 
     private void validateAdapters(List<ResolvedRange> ranges) {
@@ -105,5 +178,7 @@ public final class ReadTargetDispatcher {
         return result;
     }
 
-    private record Run(ReadTargetReaderKey key, List<ResolvedRange> ranges) { }
+    private record Run(ReadTargetReaderKey key, List<ResolvedRange> ranges) {}
+
+    private record RunRead(PhysicalReadResult result, boolean terminal) {}
 }

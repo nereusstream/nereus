@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.generation;
 
 import com.nereusstream.api.Checksum;
@@ -24,37 +25,32 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Linearizable F2 binding/topic implementation of the protocol-neutral authority reader. */
-public final class ManagedLedgerGenerationProjectionAuthorityReader
-        implements GenerationProjectionAuthorityReader {
-    private static final String ABSENCE_DOMAIN =
-            "managed-ledger-generation-projection-absence-v1";
+/**
+ * Linearizable F2 binding/topic implementation of the protocol-neutral authority reader.
+ */
+public final class ManagedLedgerGenerationProjectionAuthorityReader implements GenerationProjectionAuthorityReader {
+    private static final String ABSENCE_DOMAIN = "managed-ledger-generation-projection-absence-v1";
 
     private final String cluster;
     private final ManagedLedgerProjectionMetadataStore metadata;
     private final ManagedLedgerProjectionKeyspace keys;
 
     public ManagedLedgerGenerationProjectionAuthorityReader(
-            String cluster,
-            ManagedLedgerProjectionMetadataStore metadata) {
+            String cluster, ManagedLedgerProjectionMetadataStore metadata) {
         this.keys = new ManagedLedgerProjectionKeyspace(cluster);
         this.cluster = requireText(cluster, "cluster");
         this.metadata = Objects.requireNonNull(metadata, "metadata");
     }
 
     @Override
-    public CompletableFuture<GenerationProjectionAuthoritySnapshot> capture(
-            LiveProjectionSubject subject) {
+    public CompletableFuture<GenerationProjectionAuthoritySnapshot> capture(LiveProjectionSubject subject) {
         LiveProjectionSubject exact = Objects.requireNonNull(subject, "subject");
         final ManagedLedgerGenerationProjectionRefV1 decoded;
         try {
-            decoded =
-                    ManagedLedgerGenerationProjectionRefV1.from(exact.projectionRef());
+            decoded = ManagedLedgerGenerationProjectionRefV1.from(exact.projectionRef());
             if (!decoded.identity().streamId().equals(exact.streamId().value())
-                    || !decoded.projectionIdentitySha256()
-                            .equals(exact.projectionIdentitySha256())) {
-                throw new IllegalArgumentException(
-                        "projection subject does not match its NPR1 immutable identity");
+                    || !decoded.projectionIdentitySha256().equals(exact.projectionIdentitySha256())) {
+                throw new IllegalArgumentException("projection subject does not match its NPR1 immutable identity");
             }
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
@@ -68,57 +64,39 @@ public final class ManagedLedgerGenerationProjectionAuthorityReader
             ManagedLedgerGenerationProjectionRefV1 decoded,
             ManagedLedgerStreamProjection view) {
         if (!view.streamId().equals(subject.streamId())) {
-            throw new IllegalArgumentException(
-                    "projection lookup returned another stream");
+            throw new IllegalArgumentException("projection lookup returned another stream");
         }
         String bindingKey = keys.virtualLedgerProjectionKey(subject.streamId());
         if (view.streamBinding().isEmpty()) {
             return nonLive(subject, List.of(absence(bindingKey)));
         }
-        VersionedVirtualLedgerProjection binding =
-                view.streamBinding().orElseThrow();
-        GcAuthorityToken bindingAuthority = new GcAuthorityToken(
-                binding.key(),
-                binding.metadataVersion(),
-                binding.durableValueSha256());
-        String topicKey = keys.topicProjectionKey(
-                binding.value().managedLedgerName());
+        VersionedVirtualLedgerProjection binding = view.streamBinding().orElseThrow();
+        GcAuthorityToken bindingAuthority =
+                new GcAuthorityToken(binding.key(), binding.metadataVersion(), binding.durableValueSha256());
+        String topicKey = keys.topicProjectionKey(binding.value().managedLedgerName());
         if (view.currentTopic().isEmpty()) {
-            return nonLive(
-                    subject, List.of(bindingAuthority, absence(topicKey)));
+            return nonLive(subject, List.of(bindingAuthority, absence(topicKey)));
         }
         VersionedTopicProjection topic = view.currentTopic().orElseThrow();
-        GcAuthorityToken topicAuthority = new GcAuthorityToken(
-                topic.key(),
-                topic.metadataVersion(),
-                topic.durableValueSha256());
-        boolean exactIdentity = binding.value().managedLedgerName()
-                        .equals(decoded.managedLedgerName())
+        GcAuthorityToken topicAuthority =
+                new GcAuthorityToken(topic.key(), topic.metadataVersion(), topic.durableValueSha256());
+        boolean exactIdentity = binding.value().managedLedgerName().equals(decoded.managedLedgerName())
                 && binding.value().identity().equals(decoded.identity())
-                && topic.value().managedLedgerName()
-                        .equals(decoded.managedLedgerName())
-                && topic.value().projectionIdentity()
-                        .equals(decoded.identity());
+                && topic.value().managedLedgerName().equals(decoded.managedLedgerName())
+                && topic.value().projectionIdentity().equals(decoded.identity());
         ManagedLedgerFacadeState state = topic.value().parsedFacadeState();
-        boolean live = exactIdentity
-                && (state == ManagedLedgerFacadeState.OPEN
-                        || state == ManagedLedgerFacadeState.SEALED);
+        boolean live =
+                exactIdentity && (state == ManagedLedgerFacadeState.OPEN || state == ManagedLedgerFacadeState.SEALED);
         if (!live) {
-            return nonLive(
-                    subject, List.of(bindingAuthority, topicAuthority));
+            return nonLive(subject, List.of(bindingAuthority, topicAuthority));
         }
         return new GenerationProjectionAuthoritySnapshot(
-                subject,
-                true,
-                Optional.of(decoded.identity()),
-                List.of(bindingAuthority, topicAuthority));
+                subject, true, Optional.of(decoded.identity()), List.of(bindingAuthority, topicAuthority));
     }
 
     private static GenerationProjectionAuthoritySnapshot nonLive(
-            LiveProjectionSubject subject,
-            List<GcAuthorityToken> authorities) {
-        return new GenerationProjectionAuthoritySnapshot(
-                subject, false, Optional.empty(), authorities);
+            LiveProjectionSubject subject, List<GcAuthorityToken> authorities) {
+        return new GenerationProjectionAuthoritySnapshot(subject, false, Optional.empty(), authorities);
     }
 
     private static GcAuthorityToken absence(String key) {
@@ -126,11 +104,7 @@ public final class ManagedLedgerGenerationProjectionAuthorityReader
         add(digest, ABSENCE_DOMAIN);
         add(digest, key);
         return new GcAuthorityToken(
-                key,
-                0,
-                new Checksum(
-                        ChecksumType.SHA256,
-                        HexFormat.of().formatHex(digest.digest())));
+                key, 0, new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest())));
     }
 
     private static void add(MessageDigest digest, String value) {

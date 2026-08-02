@@ -17,18 +17,13 @@ package com.nereusstream.metadata.oxia.records;
 import java.util.Objects;
 
 public record CommittedEndOffsetRecord(
-        String streamId,
-        long committedEndOffset,
-        long cumulativeSize,
-        long commitVersion,
-        long metadataVersion) {
+        String streamId, long committedEndOffset, long cumulativeSize, long commitVersion, long metadataVersion) {
     public CommittedEndOffsetRecord {
         requireNonBlank(streamId, "streamId");
         if (committedEndOffset < 0 || cumulativeSize < 0 || commitVersion < 0 || metadataVersion < 0) {
             throw new IllegalArgumentException("committed-end numeric fields must be non-negative");
         }
-        if ((committedEndOffset == 0) != (commitVersion == 0)
-                || (committedEndOffset == 0 && cumulativeSize != 0)) {
+        if ((committedEndOffset == 0) != (commitVersion == 0) || (committedEndOffset == 0 && cumulativeSize != 0)) {
             throw new IllegalArgumentException("committed-end state is inconsistent");
         }
     }

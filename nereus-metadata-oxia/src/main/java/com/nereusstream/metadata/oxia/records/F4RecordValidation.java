@@ -27,8 +27,7 @@ final class F4RecordValidation {
     static final int MAX_TASK_SOURCES = 128;
     static final int MAX_RECOVERY_REFERENCES = 32;
 
-    private F4RecordValidation() {
-    }
+    private F4RecordValidation() {}
 
     static void requireSchemaVersion(int schemaVersion) {
         if (schemaVersion != SCHEMA_VERSION) {

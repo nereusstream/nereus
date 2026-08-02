@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
@@ -33,16 +33,14 @@ class MaterializationServiceCloseTest {
     @Test
     void keepsFullPassesNonOverlappingAndCoalescesAnInFlightHint() throws Exception {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        List<CompletableFuture<RegisteredMaterializationScanResult>> passes =
-                new CopyOnWriteArrayList<>();
+        List<CompletableFuture<RegisteredMaterializationScanResult>> passes = new CopyOnWriteArrayList<>();
         AtomicInteger active = new AtomicInteger();
         AtomicInteger maximumActive = new AtomicInteger();
         DefaultMaterializationService service = new DefaultMaterializationService(
                 () -> {
                     active.incrementAndGet();
                     maximumActive.accumulateAndGet(active.get(), Math::max);
-                    CompletableFuture<RegisteredMaterializationScanResult> pass =
-                            new CompletableFuture<>();
+                    CompletableFuture<RegisteredMaterializationScanResult> pass = new CompletableFuture<>();
                     passes.add(pass);
                     return pass.whenComplete((ignored, failure) -> active.decrementAndGet());
                 },
@@ -105,8 +103,8 @@ class MaterializationServiceCloseTest {
             assertThatThrownBy(() -> service.scanNow().join())
                     .hasRootCauseInstanceOf(NereusException.class)
                     .satisfies(failure -> assertThat(root(failure))
-                            .isInstanceOfSatisfying(NereusException.class, nereus ->
-                                    assertThat(nereus.code()).isEqualTo(ErrorCode.STORAGE_CLOSED)));
+                            .isInstanceOfSatisfying(NereusException.class, nereus -> assertThat(nereus.code())
+                                    .isEqualTo(ErrorCode.STORAGE_CLOSED)));
         } finally {
             scheduler.shutdownNow();
         }
@@ -120,15 +118,12 @@ class MaterializationServiceCloseTest {
         MaterializationTaskDispatcher dispatcher = new MaterializationTaskDispatcher() {
             @Override
             public CompletableFuture<Void> dispatch(
-                    VersionedMaterializationTask durableTask,
-                    MaterializationTask task) {
+                    VersionedMaterializationTask durableTask, MaterializationTask task) {
                 return CompletableFuture.completedFuture(null);
             }
 
             @Override
-            public CompletableFuture<Void> closeAsync(
-                    Duration timeout,
-                    ScheduledExecutorService ignored) {
+            public CompletableFuture<Void> closeAsync(Duration timeout, ScheduledExecutorService ignored) {
                 return dispatcherDrain;
             }
         };
@@ -159,14 +154,11 @@ class MaterializationServiceCloseTest {
         }
     }
 
-    private MaterializationConfig config(
-            String name,
-            Duration closeTimeout,
-            Duration scanInterval) throws Exception {
+    private MaterializationConfig config(String name, Duration closeTimeout, Duration scanInterval) throws Exception {
         Path staging = Files.createDirectory(temporaryDirectory.resolve(name));
         Files.setPosixFilePermissions(staging, PosixFilePermissions.fromString("rwx------"));
-        MaterializationPolicy policy = MaterializationPolicyFactory.losslessCommitted(
-                2, 16, 10_000, 64L << 20, 1_024, "ZSTD");
+        MaterializationPolicy policy =
+                MaterializationPolicyFactory.losslessCommitted(2, 16, 10_000, 64L << 20, 1_024, "ZSTD");
         return new MaterializationConfig(
                 policy,
                 16,

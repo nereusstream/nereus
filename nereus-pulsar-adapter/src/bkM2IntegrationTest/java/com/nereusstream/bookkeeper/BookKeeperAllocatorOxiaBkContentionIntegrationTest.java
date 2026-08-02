@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
@@ -39,14 +39,16 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-/** Real-service global ledger-id contention proof using the package-private deterministic candidate seam. */
+/**
+ * Real-service global ledger-id contention proof using the package-private deterministic candidate seam.
+ */
 @Testcontainers
 class BookKeeperAllocatorOxiaBkContentionIntegrationTest {
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
     @Container
-    private static final OxiaContainer OXIA = new OxiaContainer(
-            DockerImageName.parse("oxia/oxia:0.16.3")).withShards(4);
+    private static final OxiaContainer OXIA =
+            new OxiaContainer(DockerImageName.parse("oxia/oxia:0.16.3")).withShards(4);
 
     @Test
     void twoStreamsChoosingOneCandidateConvergeToTwoOwnedLedgersWithoutDelete() throws Exception {
@@ -73,12 +75,11 @@ class BookKeeperAllocatorOxiaBkContentionIntegrationTest {
                                 configuration.maxReaderLeasesPerLedger(),
                                 configuration.maxUncertainAllocations()));
                 BookKeeper client = bookKeeperCluster.newClient()) {
-            CountingOperations operations = new CountingOperations(
-                    new DefaultBookKeeperClientOperations(client));
+            CountingOperations operations = new CountingOperations(new DefaultBookKeeperClientOperations(client));
             BookKeeperLedgerIdNamespaceReservationVerifier namespaceVerifier =
                     new BookKeeperLedgerIdNamespaceReservationVerifier(
-                            (scope, bits, prefix, timeout) -> CompletableFuture.completedFuture(
-                                    Optional.of(reservation)),
+                            (scope, bits, prefix, timeout) ->
+                                    CompletableFuture.completedFuture(Optional.of(reservation)),
                             deployment);
             byte[] password = "bk-m2-secret".getBytes(StandardCharsets.UTF_8);
             StreamId streamA = new StreamId("stream-contention-a-" + suffix);
@@ -95,8 +96,7 @@ class BookKeeperAllocatorOxiaBkContentionIntegrationTest {
                     namespaceVerifier,
                     operations,
                     password,
-                    new BookKeeperWriterStateMachine(
-                            cluster, configuration, metadata, clock, "process-contention-a"),
+                    new BookKeeperWriterStateMachine(cluster, configuration, metadata, clock, "process-contention-a"),
                     clock,
                     new Random(seed),
                     () -> "allocation-a-" + allocationA.getAndIncrement());
@@ -107,16 +107,19 @@ class BookKeeperAllocatorOxiaBkContentionIntegrationTest {
                     namespaceVerifier,
                     operations,
                     password,
-                    new BookKeeperWriterStateMachine(
-                            cluster, configuration, metadata, clock, "process-contention-b"),
+                    new BookKeeperWriterStateMachine(cluster, configuration, metadata, clock, "process-contention-b"),
                     clock,
                     new Random(seed),
                     () -> "allocation-b-" + allocationB.getAndIncrement());
 
-            CompletableFuture<AllocatedBookKeeperLedger> allocationFutureA = CompletableFuture.supplyAsync(() ->
-                    allocatorA.allocate(new BookKeeperLedgerAllocationRequest(streamA, sessionA, TIMEOUT)).join());
-            CompletableFuture<AllocatedBookKeeperLedger> allocationFutureB = CompletableFuture.supplyAsync(() ->
-                    allocatorB.allocate(new BookKeeperLedgerAllocationRequest(streamB, sessionB, TIMEOUT)).join());
+            CompletableFuture<AllocatedBookKeeperLedger> allocationFutureA =
+                    CompletableFuture.supplyAsync(() -> allocatorA
+                            .allocate(new BookKeeperLedgerAllocationRequest(streamA, sessionA, TIMEOUT))
+                            .join());
+            CompletableFuture<AllocatedBookKeeperLedger> allocationFutureB =
+                    CompletableFuture.supplyAsync(() -> allocatorB
+                            .allocate(new BookKeeperLedgerAllocationRequest(streamB, sessionB, TIMEOUT))
+                            .join());
             CompletableFuture.allOf(allocationFutureA, allocationFutureB).join();
 
             AllocatedBookKeeperLedger allocatedA = allocationFutureA.join();
@@ -130,15 +133,17 @@ class BookKeeperAllocatorOxiaBkContentionIntegrationTest {
                 assertThat(allocatedA.root().value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.ACTIVE);
                 assertThat(allocatedB.root().value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.ACTIVE);
                 assertThat(metadata.getRoot(
-                                cluster,
-                                configuration.providerScopeSha256(),
-                                allocatedA.root().value().ledgerId())
-                        .join()).contains(allocatedA.root());
+                                        cluster,
+                                        configuration.providerScopeSha256(),
+                                        allocatedA.root().value().ledgerId())
+                                .join())
+                        .contains(allocatedA.root());
                 assertThat(metadata.getRoot(
-                                cluster,
-                                configuration.providerScopeSha256(),
-                                allocatedB.root().value().ledgerId())
-                        .join()).contains(allocatedB.root());
+                                        cluster,
+                                        configuration.providerScopeSha256(),
+                                        allocatedB.root().value().ledgerId())
+                                .join())
+                        .contains(allocatedB.root());
                 assertThat(operations.deletes()).isZero();
             } finally {
                 allocatedA.handle().closeAsync().join();
@@ -206,8 +211,7 @@ class BookKeeperAllocatorOxiaBkContentionIntegrationTest {
     }
 
     private static BookKeeperLedgerIdNamespaceReservation reservation(
-            BookKeeperWalConfiguration configuration,
-            String deployment) {
+            BookKeeperWalConfiguration configuration, String deployment) {
         return new BookKeeperLedgerIdNamespaceReservation(
                 1,
                 configuration.ledgerIdNamespaceReservationId(),
@@ -289,26 +293,18 @@ class BookKeeperAllocatorOxiaBkContentionIntegrationTest {
 
         @Override
         public CompletableFuture<Long> write(
-                WriteAdvHandle handle,
-                long entryId,
-                ByteBuf entry,
-                BookKeeperOperationDeadline deadline) {
+                WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
             return delegate.write(handle, entryId, entry, deadline);
         }
 
         @Override
         public CompletableFuture<LedgerEntries> readUnconfirmed(
-                ReadHandle handle,
-                long firstEntryId,
-                long lastEntryIdInclusive,
-                BookKeeperOperationDeadline deadline) {
+                ReadHandle handle, long firstEntryId, long lastEntryIdInclusive, BookKeeperOperationDeadline deadline) {
             return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
         }
 
         @Override
-        public CompletableFuture<LedgerMetadata> metadata(
-                long ledgerId,
-                BookKeeperOperationDeadline deadline) {
+        public CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline) {
             return delegate.metadata(ledgerId, deadline);
         }
 

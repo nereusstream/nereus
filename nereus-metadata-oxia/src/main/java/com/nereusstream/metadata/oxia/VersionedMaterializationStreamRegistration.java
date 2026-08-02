@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -6,10 +7,7 @@ import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationR
 import java.util.Objects;
 
 public record VersionedMaterializationStreamRegistration(
-        String key,
-        MaterializationStreamRegistrationRecord value,
-        long metadataVersion,
-        Checksum durableValueSha256) {
+        String key, MaterializationStreamRegistrationRecord value, long metadataVersion, Checksum durableValueSha256) {
     public VersionedMaterializationStreamRegistration {
         key = F4ValueValidation.text(key, "key");
         Objects.requireNonNull(value, "value");

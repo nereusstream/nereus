@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -14,25 +14,19 @@ class CursorStorageLimitExhaustionTest {
     @Test
     void marginAdjustedRootExhaustionFailsAckBeforeUploadAndLeavesTruthUnchanged() {
         CursorStorageConfig config = constrainedConfig(65_000, 4_096);
-        try (CursorStorageTestSupport.Context context =
-                new CursorStorageTestSupport.Context(0, 100, config)) {
+        try (CursorStorageTestSupport.Context context = new CursorStorageTestSupport.Context(0, 100, config)) {
             CursorOwnerSession owner = context.owner(CursorStorageTestSupport.OWNER_1);
-            CursorHandle handle = context.storage.open(
+            CursorHandle handle = context.storage
+                    .open(
                             owner,
                             "sub",
-                            new CursorOpenRequest(
-                                    new InitialCursorPosition.Earliest(),
-                                    Map.of(),
-                                    Map.of(),
-                                    0,
-                                    100))
+                            new CursorOpenRequest(new InitialCursorPosition.Earliest(), Map.of(), Map.of(), 0, 100))
                     .join();
             CursorState before = handle.state();
 
-            assertThatThrownBy(() -> context.storage.individualAck(
-                            handle,
-                            List.of(whole(1), whole(3)))
-                    .join())
+            assertThatThrownBy(() -> context.storage
+                            .individualAck(handle, List.of(whole(1), whole(3)))
+                            .join())
                     .hasRootCauseMessage(
                             "cursor root cannot fit the margin-adjusted metadata bound after snapshot spill");
 
@@ -47,28 +41,22 @@ class CursorStorageLimitExhaustionTest {
     @Test
     void snapshotCapExhaustionFailsAckWithoutTruncatingTheLastAdmittedState() {
         CursorStorageConfig config = constrainedConfig(4_096, 2_048);
-        try (CursorStorageTestSupport.Context context =
-                new CursorStorageTestSupport.Context(0, 2_000, config)) {
+        try (CursorStorageTestSupport.Context context = new CursorStorageTestSupport.Context(0, 2_000, config)) {
             CursorOwnerSession owner = context.owner(CursorStorageTestSupport.OWNER_1);
-            CursorHandle handle = context.storage.open(
+            CursorHandle handle = context.storage
+                    .open(
                             owner,
                             "sub",
-                            new CursorOpenRequest(
-                                    new InitialCursorPosition.Earliest(),
-                                    Map.of(),
-                                    Map.of(),
-                                    0,
-                                    2_000))
+                            new CursorOpenRequest(new InitialCursorPosition.Earliest(), Map.of(), Map.of(), 0, 2_000))
                     .join();
-            CursorMutationResult admitted = context.storage.individualAck(
-                            handle, disjoint(1, 4, 80))
-                    .join();
+            CursorMutationResult admitted =
+                    context.storage.individualAck(handle, disjoint(1, 4, 80)).join();
             assertThat(admitted.state().snapshotReference()).isPresent();
             assertThat(context.snapshotStore.objectCount()).isEqualTo(1);
 
-            assertThatThrownBy(() -> context.storage.individualAck(
-                            handle, disjoint(3, 4, 80))
-                    .join())
+            assertThatThrownBy(() -> context.storage
+                            .individualAck(handle, disjoint(3, 4, 80))
+                            .join())
                     .hasRootCauseMessage("cursor snapshot exceeds the configured object bound");
 
             assertThat(handle.state()).isEqualTo(admitted.state());
@@ -79,13 +67,11 @@ class CursorStorageLimitExhaustionTest {
                     .getFirst()
                     .state();
             assertThat(durable).isEqualTo(admitted.state());
-            disjoint(1, 4, 80).forEach(request -> assertThat(durable
-                            .acknowledgements()
-                            .isWholeEntryAcknowledged(request.entryOffset()))
+            disjoint(1, 4, 80).forEach(request -> assertThat(
+                            durable.acknowledgements().isWholeEntryAcknowledged(request.entryOffset()))
                     .isTrue());
-            disjoint(3, 4, 80).forEach(request -> assertThat(durable
-                            .acknowledgements()
-                            .isWholeEntryAcknowledged(request.entryOffset()))
+            disjoint(3, 4, 80).forEach(request -> assertThat(
+                            durable.acknowledgements().isWholeEntryAcknowledged(request.entryOffset()))
                     .isFalse());
         }
     }
@@ -102,8 +88,7 @@ class CursorStorageLimitExhaustionTest {
         return List.copyOf(requests);
     }
 
-    private static CursorStorageConfig constrainedConfig(
-            int metadataSafetyMargin, long snapshotMax) {
+    private static CursorStorageConfig constrainedConfig(int metadataSafetyMargin, long snapshotMax) {
         CursorStorageConfig source = CursorStorageConfig.defaults();
         return new CursorStorageConfig(
                 source.cursorMetadataValueMaxBytes(),

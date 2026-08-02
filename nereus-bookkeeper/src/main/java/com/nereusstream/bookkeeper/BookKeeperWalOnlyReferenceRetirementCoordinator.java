@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.ErrorCode;
@@ -17,7 +18,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Retires exact BK_ONLY range protections from completed trim/abandoned facts without choosing a trim offset. */
+/**
+ * Retires exact BK_ONLY range protections from completed trim/abandoned facts without choosing a trim offset.
+ */
 public final class BookKeeperWalOnlyReferenceRetirementCoordinator {
     private final String cluster;
     private final BookKeeperWalConfiguration configuration;
@@ -39,8 +42,7 @@ public final class BookKeeperWalOnlyReferenceRetirementCoordinator {
     }
 
     public CompletableFuture<BookKeeperWalReferenceRetirementResult> retireEligible(
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
-            Duration timeout) {
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root, Duration timeout) {
         BookKeeperVersionedValue<BookKeeperLedgerRootRecord> exact = Objects.requireNonNull(root, "root");
         if (exact.value().lifecycle() != BookKeeperLedgerLifecycle.SEALED) {
             return CompletableFuture.failedFuture(new NereusException(
@@ -48,20 +50,17 @@ public final class BookKeeperWalOnlyReferenceRetirementCoordinator {
                     false,
                     "BookKeeper reference retirement requires an exact SEALED root"));
         }
-        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(min(
-                Objects.requireNonNull(timeout, "timeout"), configuration.operationTimeout()));
+        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(
+                min(Objects.requireNonNull(timeout, "timeout"), configuration.operationTimeout()));
         return scan(exact.value().ledgerId(), deadline, Optional.empty(), new ArrayList<>())
-                .thenCompose(values -> retire(values, deadline, 0, 0)
-                        .thenCompose(newlyRetired -> scan(
-                                        exact.value().ledgerId(), deadline, Optional.empty(), new ArrayList<>())
-                                .thenApply(reloaded -> {
-                                    int remaining = Math.toIntExact(reloaded.stream()
-                                            .filter(value -> value.value().lifecycle()
-                                                    != ProtectionLifecycle.RETIRED)
-                                            .count());
-                                    return new BookKeeperWalReferenceRetirementResult(
-                                            reloaded.size(), newlyRetired, remaining);
-                                })));
+                .thenCompose(values -> retire(values, deadline, 0, 0).thenCompose(newlyRetired -> scan(
+                                exact.value().ledgerId(), deadline, Optional.empty(), new ArrayList<>())
+                        .thenApply(reloaded -> {
+                            int remaining = Math.toIntExact(reloaded.stream()
+                                    .filter(value -> value.value().lifecycle() != ProtectionLifecycle.RETIRED)
+                                    .count());
+                            return new BookKeeperWalReferenceRetirementResult(reloaded.size(), newlyRetired, remaining);
+                        })));
     }
 
     private CompletableFuture<Integer> retire(
@@ -69,7 +68,9 @@ public final class BookKeeperWalOnlyReferenceRetirementCoordinator {
             BookKeeperOperationDeadline deadline,
             int index,
             int newlyRetired) {
-        if (index >= protections.size()) return CompletableFuture.completedFuture(newlyRetired);
+        if (index >= protections.size()) {
+            return CompletableFuture.completedFuture(newlyRetired);
+        }
         BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> protection = protections.get(index);
         if (protection.value().lifecycle() == ProtectionLifecycle.RETIRED) {
             return retire(protections, deadline, index + 1, newlyRetired);
@@ -78,22 +79,25 @@ public final class BookKeeperWalOnlyReferenceRetirementCoordinator {
                 == com.nereusstream.metadata.oxia.records.BookKeeperProtectionType.MATERIALIZATION_SOURCE) {
             return retire(protections, deadline, index + 1, newlyRetired);
         }
-        CompletableFuture<Optional<BookKeeperProtectionRetirementProof>> proof =
-                authority.proveAbandonedAppend(protection, deadline.remaining()).thenCompose(abandoned -> {
-                    if (abandoned.isPresent()
-                            || protection.value().lifecycle() == ProtectionLifecycle.RESERVED) {
+        CompletableFuture<Optional<BookKeeperProtectionRetirementProof>> proof = authority
+                .proveAbandonedAppend(protection, deadline.remaining())
+                .thenCompose(abandoned -> {
+                    if (abandoned.isPresent() || protection.value().lifecycle() == ProtectionLifecycle.RESERVED) {
                         return CompletableFuture.completedFuture(abandoned);
                     }
-                    return authority.proveLogicalTrim(protection, deadline.remaining())
+                    return authority
+                            .proveLogicalTrim(protection, deadline.remaining())
                             .thenCompose(trimmed -> trimmed.isPresent()
                                     ? CompletableFuture.completedFuture(trimmed)
-                                    : authority.proveHealthyHigherGeneration(
-                                            protection, deadline.remaining()));
+                                    : authority.proveHealthyHigherGeneration(protection, deadline.remaining()));
                 });
         return proof.thenCompose(optional -> {
-            if (optional.isEmpty()) return retire(protections, deadline, index + 1, newlyRetired);
+            if (optional.isEmpty()) {
+                return retire(protections, deadline, index + 1, newlyRetired);
+            }
             BookKeeperProtectionRetirementProof exactProof = optional.orElseThrow();
-            return references.retire(
+            return references
+                    .retire(
                             protection.value().ledgerId(),
                             protection.value().ledgerRangeSlot(),
                             protection.value().protectionSlot(),
@@ -108,8 +112,8 @@ public final class BookKeeperWalOnlyReferenceRetirementCoordinator {
             BookKeeperOperationDeadline deadline,
             Optional<BookKeeperScanToken> continuation,
             List<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> values) {
-        int maximum = Math.multiplyExact(
-                configuration.maxAppendRangesPerLedger(), configuration.protectionSlotsPerRange());
+        int maximum =
+                Math.multiplyExact(configuration.maxAppendRangesPerLedger(), configuration.protectionSlotsPerRange());
         return deadline.bound(metadata.scanProtections(
                         cluster,
                         configuration.providerScopeSha256(),
@@ -136,7 +140,9 @@ public final class BookKeeperWalOnlyReferenceRetirementCoordinator {
 
     private static String text(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " cannot be blank");
+        }
         return value;
     }
 }

@@ -1,14 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import java.time.Duration;
 import java.util.Objects;
 
-/** Bounded retry/backoff policy for guarded provider PUT transmissions. */
-public record ObjectPutRetryPolicy(
-        int maxAttempts,
-        Duration minBackoff,
-        Duration maxBackoff) {
+/**
+ * Bounded retry/backoff policy for guarded provider PUT transmissions.
+ */
+public record ObjectPutRetryPolicy(int maxAttempts, Duration minBackoff, Duration maxBackoff) {
     public ObjectPutRetryPolicy {
         if (maxAttempts < 1 || maxAttempts > 10) {
             throw new IllegalArgumentException("maxAttempts must be in [1, 10]");
@@ -30,8 +30,8 @@ public record ObjectPutRetryPolicy(
         }
         int shifts = providerAttemptNumber - 2;
         long base = minBackoff.toMillis();
-        long exponential = shifts >= Long.SIZE - 1 || base > (Long.MAX_VALUE >> shifts)
-                ? Long.MAX_VALUE : base << shifts;
+        long exponential =
+                shifts >= Long.SIZE - 1 || base > (Long.MAX_VALUE >> shifts) ? Long.MAX_VALUE : base << shifts;
         return Math.min(maxBackoff.toMillis(), exponential);
     }
 

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.generation;
 
 import java.util.concurrent.CompletableFuture;

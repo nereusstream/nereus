@@ -323,14 +323,14 @@ encryptionInfoRef = empty
 
 Phase 1 binary ids:
 
-| Name | Id |
-| --- | --- |
+| Name                                 | Id  |
+|--------------------------------------|-----|
 | `ObjectType.MULTI_STREAM_WAL_OBJECT` | `1` |
-| `SectionType.WAL_OBJECT_HEADER` | `1` |
+| `SectionType.WAL_OBJECT_HEADER`      | `1` |
 | `SectionType.STREAM_SLICE_DIRECTORY` | `2` |
-| `SectionType.PAYLOAD_BLOCK` | `3` |
-| `SectionType.ENTRY_INDEX_SECTION` | `4` |
-| `SectionType.FOOTER` | `5` |
+| `SectionType.PAYLOAD_BLOCK`          | `3` |
+| `SectionType.ENTRY_INDEX_SECTION`    | `4` |
+| `SectionType.FOOTER`                 | `5` |
 
 The ids above are durable binary-format values. Java enum ordinal must never be used for object or section
 encoding.
@@ -485,11 +485,11 @@ Validation:
 
 Future storage policy:
 
-| Size | Location |
-| --- | --- |
-| `<= 16 KiB` | inline in offset index value |
-| `> 16 KiB` and `<= 4 MiB` | WAL object footer |
-| `> 4 MiB` | independent `INDEX_OBJECT` |
+| Size                      | Location                     |
+|---------------------------|------------------------------|
+| `<= 16 KiB`               | inline in offset index value |
+| `> 16 KiB` and `<= 4 MiB` | WAL object footer            |
+| `> 4 MiB`                 | independent `INDEX_OBJECT`   |
 
 Phase 1 supported storage policy:
 
@@ -648,11 +648,11 @@ NEW
 
 Failure handling:
 
-| State | Failure | Result |
-| --- | --- | --- |
-| `BUILD_LAYOUT` | invalid batch | append future fails, no object |
-| `PUT_OBJECT` | store timeout | retriable failure, no stream-head commit |
-| `VERIFY_CHECKSUM` | mismatch | non-retriable failure, no stream-head commit |
+| State                     | Failure                             | Result                                                          |
+|---------------------------|-------------------------------------|-----------------------------------------------------------------|
+| `BUILD_LAYOUT`            | invalid batch                       | append future fails, no object                                  |
+| `PUT_OBJECT`              | store timeout                       | retriable failure, no stream-head commit                        |
+| `VERIFY_CHECKSUM`         | mismatch                            | non-retriable failure, no stream-head commit                    |
 | `WRITTEN` before manifest | object may exist but is not visible | metadata layer may write manifest or orphan scanner handles TTL |
 
 ## 10. WAL Reader API

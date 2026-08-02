@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.recovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -24,7 +24,6 @@ import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.capability.GenerationActivationProof;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
-import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.core.physical.ObjectReadLease;
 import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
@@ -34,8 +33,6 @@ import com.nereusstream.core.read.GenerationIndexRepairSource;
 import com.nereusstream.metadata.oxia.AppendRecoveryAnchor;
 import com.nereusstream.metadata.oxia.AppendRecoveryHead;
 import com.nereusstream.metadata.oxia.AppendRecoveryTailPage;
-import com.nereusstream.metadata.oxia.CommitSliceRequest;
-import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationIndexDigests;
 import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
@@ -96,63 +93,61 @@ import org.junit.jupiter.api.io.TempDir;
 
 class CheckpointDerivedIndexRepairTest {
     private static final String CLUSTER = "checkpoint-index-repair-cluster";
-    private static final StreamId STREAM =
-            new StreamId("checkpoint-index-repair-stream");
-    private static final Clock CLOCK = Clock.fixed(
-            Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
+    private static final StreamId STREAM = new StreamId("checkpoint-index-repair-stream");
+    private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
-    private static final ProjectionRef PROJECTION = new ProjectionRef(
-            ProjectionType.PROTOCOL_HINT, "checkpoint-index-repair");
-    private static final String PROJECTION_IDENTITY =
-            projectionIdentity(PROJECTION);
+    private static final ProjectionRef PROJECTION =
+            new ProjectionRef(ProjectionType.PROTOCOL_HINT, "checkpoint-index-repair");
+    private static final String PROJECTION_IDENTITY = projectionIdentity(PROJECTION);
     private static final Checksum PROJECTION_SHA = sha(PROJECTION_IDENTITY);
 
     @TempDir
     Path temporaryDirectory;
 
     @Test
-    void restoresHighestHealthyPublicationAfterIndexRetirementAndProtectsTarget()
-            throws Exception {
+    void restoresHighestHealthyPublicationAfterIndexRetirementAndProtectsTarget() throws Exception {
         try (Fixture fixture = fixture(false)) {
-            GenerationIndexRepairResult result = fixture.repairer().repair(
-                    STREAM, 0, TIMEOUT).join();
+            GenerationIndexRepairResult result =
+                    fixture.repairer().repair(STREAM, 0, TIMEOUT).join();
 
-            assertThat(result.source())
-                    .isEqualTo(GenerationIndexRepairSource.RECOVERY_CHECKPOINT);
+            assertThat(result.source()).isEqualTo(GenerationIndexRepairSource.RECOVERY_CHECKPOINT);
             VersionedGenerationIndex restored = result.restoredIndex().orElseThrow();
             assertThat(restored.value().generation()).isOne();
-            assertThat(fixture.generations().getIndex(
-                            CLUSTER, fixture.lowIdentity()).join())
+            assertThat(fixture.generations()
+                            .getIndex(CLUSTER, fixture.lowIdentity())
+                            .join())
                     .contains(restored);
-            assertThat(fixture.generations().getIndex(
-                            CLUSTER, fixture.highIdentity()).join())
+            assertThat(fixture.generations()
+                            .getIndex(CLUSTER, fixture.highIdentity())
+                            .join())
                     .isEmpty();
             assertThat(fixture.targetProtection(restored)).isPresent();
             assertThat(fixture.pins().acquired()).hasValue(1);
             assertThat(fixture.pins().released()).hasValue(1);
-            assertThat(fixture.activation().revalidations())
-                    .hasValueGreaterThanOrEqualTo(3);
+            assertThat(fixture.activation().revalidations()).hasValueGreaterThanOrEqualTo(3);
         }
     }
 
     @Test
-    void restartsWholeProofWhenRootChangesDuringCheckpointPin()
-            throws Exception {
+    void restartsWholeProofWhenRootChangesDuringCheckpointPin() throws Exception {
         try (Fixture fixture = fixture(true)) {
             fixture.pins().beforeFirstValidation(fixture::publishNextRoot);
 
-            GenerationIndexRepairResult result = fixture.repairer().repair(
-                    STREAM, 0, TIMEOUT).join();
+            GenerationIndexRepairResult result =
+                    fixture.repairer().repair(STREAM, 0, TIMEOUT).join();
 
             assertThat(result.restoredIndex().orElseThrow().value().generation())
                     .isEqualTo(2);
-            assertThat(fixture.generations().getRecoveryRoot(CLUSTER, STREAM)
-                            .join().orElseThrow().value().checkpointSequence())
+            assertThat(fixture.generations()
+                            .getRecoveryRoot(CLUSTER, STREAM)
+                            .join()
+                            .orElseThrow()
+                            .value()
+                            .checkpointSequence())
                     .isEqualTo(2);
             assertThat(fixture.pins().acquired()).hasValue(1);
             assertThat(fixture.pins().released()).hasValue(1);
-            assertThat(fixture.pins().validationAttempts())
-                    .hasValueGreaterThanOrEqualTo(2);
+            assertThat(fixture.pins().validationAttempts()).hasValueGreaterThanOrEqualTo(2);
         }
     }
 
@@ -161,56 +156,49 @@ class CheckpointDerivedIndexRepairTest {
         try (Fixture fixture = fixture(true)) {
             fixture.trimOffset().set(1);
 
-            GenerationIndexRepairResult result = fixture.repairer().repair(
-                    STREAM, 0, TIMEOUT).join();
+            GenerationIndexRepairResult result =
+                    fixture.repairer().repair(STREAM, 0, TIMEOUT).join();
 
-            assertThat(result.source())
-                    .isEqualTo(GenerationIndexRepairSource.TRIMMED);
-            assertThat(fixture.generations().getIndex(
-                            CLUSTER, fixture.lowIdentity()).join())
+            assertThat(result.source()).isEqualTo(GenerationIndexRepairSource.TRIMMED);
+            assertThat(fixture.generations()
+                            .getIndex(CLUSTER, fixture.lowIdentity())
+                            .join())
                     .isEmpty();
-            assertThat(fixture.generations().getIndex(
-                            CLUSTER, fixture.highIdentity()).join())
+            assertThat(fixture.generations()
+                            .getIndex(CLUSTER, fixture.highIdentity())
+                            .join())
                     .isEmpty();
             assertThat(fixture.pins().acquired()).hasValue(0);
         }
     }
 
     private Fixture fixture(boolean highTargetHealthy) throws Exception {
-        LocalFileObjectStore objects = new LocalFileObjectStore(
-                temporaryDirectory.resolve(
-                        "objects-" + highTargetHealthy));
-        StagingFileManager staging = staging(temporaryDirectory.resolve(
-                "staging-" + highTargetHealthy));
+        LocalFileObjectStore objects =
+                new LocalFileObjectStore(temporaryDirectory.resolve("objects-" + highTargetHealthy));
+        StagingFileManager staging = staging(temporaryDirectory.resolve("staging-" + highTargetHealthy));
         DefaultRecoveryCheckpointCodecV1 codec =
-                new DefaultRecoveryCheckpointCodecV1(
-                        objects,
-                        staging,
-                        Runnable::run,
-                        verifier());
+                new DefaultRecoveryCheckpointCodecV1(objects, staging, Runnable::run, verifier());
         GenerationIndexRecord low = generation(1, "b".repeat(26), "low");
         GenerationIndexRecord high = generation(2, "c".repeat(26), "high");
         StreamCommitTargetRecord commit = commit(low);
-        byte[] canonicalCommit = MetadataRecordCodecFactory.encodeEnvelope(
-                commit, StreamCommitTargetRecord.class);
-        RecoveryCheckpointWriteRequest header =
-                new RecoveryCheckpointWriteRequest(
-                        CLUSTER,
-                        STREAM,
-                        1,
-                        "a".repeat(26),
-                        new OffsetRange(0, 1),
-                        1,
-                        1,
-                        0,
-                        7,
-                        commit.commitId(),
-                        commit.commitId(),
-                        commit.commitId(),
-                        1,
-                        PROJECTION_SHA,
-                        1,
-                        2);
+        byte[] canonicalCommit = MetadataRecordCodecFactory.encodeEnvelope(commit, StreamCommitTargetRecord.class);
+        RecoveryCheckpointWriteRequest header = new RecoveryCheckpointWriteRequest(
+                CLUSTER,
+                STREAM,
+                1,
+                "a".repeat(26),
+                new OffsetRange(0, 1),
+                1,
+                1,
+                0,
+                7,
+                commit.commitId(),
+                commit.commitId(),
+                commit.commitId(),
+                1,
+                PROJECTION_SHA,
+                1,
+                2);
         RecoveryCheckpointPublication lowPublication = publication(low);
         RecoveryCheckpointPublication highPublication = publication(high);
         RecoveryCheckpointEntry entry = new RecoveryCheckpointEntry(
@@ -223,9 +211,7 @@ class CheckpointDerivedIndexRepairTest {
                 sha(canonicalCommit),
                 List.of(0, 1));
         RecoveryCheckpointWriteResult written = codec.write(
-                        header,
-                        publisher(List.of(lowPublication, highPublication)),
-                        publisher(List.of(entry)))
+                        header, publisher(List.of(lowPublication, highPublication)), publisher(List.of(entry)))
                 .join();
         objects.putObject(
                         written.objectKey(),
@@ -238,67 +224,55 @@ class CheckpointDerivedIndexRepairTest {
                                 TIMEOUT))
                 .join();
 
-        GenerationMetadataStore generations =
-                GenerationMetadataStoreTestFactory.inMemory(CLOCK);
-        generations.createOrVerifyStreamRegistration(
-                CLUSTER,
-                new MaterializationStreamRegistrationRecord(
-                        1,
-                        STREAM.value(),
-                        PROJECTION_IDENTITY,
-                        PROJECTION_SHA.value(),
-                        StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
-                        1,
-                        1,
-                        1,
-                        0)).join();
-        RecoveryCheckpointReferenceRecord reference = reference(header, written);
-        VersionedRecoveryCheckpointRoot bootstrap = generations
-                .getOrCreateRecoveryRoot(CLUSTER, STREAM).join();
-        VersionedRecoveryCheckpointRoot root = generations
-                .compareAndSetRecoveryRoot(
+        GenerationMetadataStore generations = GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+        generations
+                .createOrVerifyStreamRegistration(
                         CLUSTER,
-                        rootRecord(reference, 1, 2),
-                        bootstrap.metadataVersion())
+                        new MaterializationStreamRegistrationRecord(
+                                1,
+                                STREAM.value(),
+                                PROJECTION_IDENTITY,
+                                PROJECTION_SHA.value(),
+                                StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                                1,
+                                1,
+                                1,
+                                0))
+                .join();
+        RecoveryCheckpointReferenceRecord reference = reference(header, written);
+        VersionedRecoveryCheckpointRoot bootstrap =
+                generations.getOrCreateRecoveryRoot(CLUSTER, STREAM).join();
+        VersionedRecoveryCheckpointRoot root = generations
+                .compareAndSetRecoveryRoot(CLUSTER, rootRecord(reference, 1, 2), bootstrap.metadataVersion())
                 .join();
 
         seedAndDelete(generations, low);
         seedAndDelete(generations, high);
 
-        FakePhysicalObjectMetadataStore physical =
-                new FakePhysicalObjectMetadataStore();
+        FakePhysicalObjectMetadataStore physical = new FakePhysicalObjectMetadataStore();
         createPhysicalRoot(physical, low);
         if (highTargetHealthy) {
             createPhysicalRoot(physical, high);
         }
-        DefaultObjectProtectionManager protections =
-                new DefaultObjectProtectionManager(
-                        CLUSTER,
-                        physical,
-                        Duration.ofMinutes(1),
-                        Duration.ofSeconds(1),
-                        Duration.ofMinutes(5),
-                        CLOCK);
+        DefaultObjectProtectionManager protections = new DefaultObjectProtectionManager(
+                CLUSTER, physical, Duration.ofMinutes(1), Duration.ofSeconds(1), Duration.ofMinutes(5), CLOCK);
         AtomicLong trim = new AtomicLong();
         OxiaMetadataStore l0 = l0Store(trim);
         TrackingPinManager pins = new TrackingPinManager();
-        TrackingActivationGuard activation =
-                new TrackingActivationGuard();
-        CheckpointDerivedIndexRepairer repairer =
-                new CheckpointDerivedIndexRepairer(
-                        CLUSTER,
-                        l0,
-                        generations,
-                        physical,
-                        new AnchorAwareCommitWalker(
-                                CLUSTER, l0, generations),
-                        codec,
-                        pins,
-                        protections,
-                        activation,
-                        16,
-                        4,
-                        CLOCK);
+        TrackingActivationGuard activation = new TrackingActivationGuard();
+        CheckpointDerivedIndexRepairer repairer = new CheckpointDerivedIndexRepairer(
+                CLUSTER,
+                l0,
+                generations,
+                physical,
+                new AnchorAwareCommitWalker(CLUSTER, l0, generations),
+                codec,
+                pins,
+                protections,
+                activation,
+                16,
+                4,
+                CLOCK);
         return new Fixture(
                 objects,
                 staging,
@@ -316,53 +290,46 @@ class CheckpointDerivedIndexRepairTest {
                 high);
     }
 
-    private static void seedAndDelete(
-            GenerationMetadataStore generations,
-            GenerationIndexRecord record) {
+    private static void seedAndDelete(GenerationMetadataStore generations, GenerationIndexRecord record) {
         VersionedGenerationIndex seeded = generations
-                .restoreCommittedFromCheckpoint(
-                        CLUSTER,
-                        record,
-                        GenerationIndexDigests.canonicalRecordSha256(record))
+                .restoreCommittedFromCheckpoint(CLUSTER, record, GenerationIndexDigests.canonicalRecordSha256(record))
                 .join();
-        generations.deleteIndex(
-                CLUSTER,
-                identity(record),
-                seeded.metadataVersion()).join();
+        generations
+                .deleteIndex(CLUSTER, identity(record), seeded.metadataVersion())
+                .join();
     }
 
-    private static void createPhysicalRoot(
-            FakePhysicalObjectMetadataStore store,
-            GenerationIndexRecord record) {
-        ObjectSliceReadTarget target = (ObjectSliceReadTarget)
-                ReadTargetCodecRegistry.phase15().decode(record.readTarget());
+    private static void createPhysicalRoot(FakePhysicalObjectMetadataStore store, GenerationIndexRecord record) {
+        ObjectSliceReadTarget target =
+                (ObjectSliceReadTarget) ReadTargetCodecRegistry.phase15().decode(record.readTarget());
         store.createRoot(
-                CLUSTER,
-                new PhysicalObjectRootRecord(
-                        1,
-                        ObjectKeyHash.from(target.objectKey()).value(),
-                        target.objectKey().value(),
-                        target.objectId().value(),
-                        PhysicalObjectKind.COMMITTED_COMPACTED.wireId(),
-                        256,
-                        ChecksumType.CRC32C.name(),
-                        "01020304",
-                        sha("content-" + record.generation()).value(),
-                        "etag-" + record.generation(),
-                        PhysicalObjectLifecycle.ACTIVE,
-                        1,
-                        1,
-                        2,
-                        "",
-                        "",
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        "",
-                        "",
-                        0)).join();
+                        CLUSTER,
+                        new PhysicalObjectRootRecord(
+                                1,
+                                ObjectKeyHash.from(target.objectKey()).value(),
+                                target.objectKey().value(),
+                                target.objectId().value(),
+                                PhysicalObjectKind.COMMITTED_COMPACTED.wireId(),
+                                256,
+                                ChecksumType.CRC32C.name(),
+                                "01020304",
+                                sha("content-" + record.generation()).value(),
+                                "etag-" + record.generation(),
+                                PhysicalObjectLifecycle.ACTIVE,
+                                1,
+                                1,
+                                2,
+                                "",
+                                "",
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                "",
+                                "",
+                                0))
+                .join();
     }
 
     private static OxiaMetadataStore l0Store(AtomicLong trimOffset) {
@@ -370,12 +337,9 @@ class CheckpointDerivedIndexRepairTest {
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class},
                 (proxy, method, arguments) -> switch (method.getName()) {
-                    case "getStreamSnapshot" ->
-                            CompletableFuture.completedFuture(
-                                    snapshot(trimOffset.get()));
+                    case "getStreamSnapshot" -> CompletableFuture.completedFuture(snapshot(trimOffset.get()));
                     case "readAppendRecoveryTail" -> {
-                        AppendRecoveryAnchor anchor =
-                                (AppendRecoveryAnchor) arguments[2];
+                        AppendRecoveryAnchor anchor = (AppendRecoveryAnchor) arguments[2];
                         AppendRecoveryHead head = new AppendRecoveryHead(
                                 STREAM,
                                 anchor.lastCommitId(),
@@ -384,17 +348,11 @@ class CheckpointDerivedIndexRepairTest {
                                 anchor.commitVersion(),
                                 20);
                         yield CompletableFuture.completedFuture(
-                                new AppendRecoveryTailPage(
-                                        anchor,
-                                        head,
-                                        List.of(),
-                                        true,
-                                        Optional.empty()));
+                                new AppendRecoveryTailPage(anchor, head, List.of(), true, Optional.empty()));
                     }
                     case "close" -> null;
                     case "toString" -> "checkpoint-index-repair-l0";
-                    default -> throw new UnsupportedOperationException(
-                            method.getName());
+                    default -> throw new UnsupportedOperationException(method.getName());
                 });
     }
 
@@ -410,14 +368,11 @@ class CheckpointDerivedIndexRepairTest {
                         1,
                         1,
                         7),
-                new CommittedEndOffsetRecord(
-                        STREAM.value(), 1, 7, 1, 7),
-                new TrimRecord(
-                        STREAM.value(), trimOffset, "", 1, 7));
+                new CommittedEndOffsetRecord(STREAM.value(), 1, 7, 1, 7),
+                new TrimRecord(STREAM.value(), trimOffset, "", 1, 7));
     }
 
-    private static GenerationIndexRecord generation(
-            long generation, String publicationId, String suffix) {
+    private static GenerationIndexRecord generation(long generation, String publicationId, String suffix) {
         ObjectId objectId = new ObjectId("object-" + suffix);
         ObjectKey objectKey = new ObjectKey("objects/" + suffix);
         EntryIndexRef index = new EntryIndexRef(
@@ -474,10 +429,8 @@ class CheckpointDerivedIndexRepairTest {
                 0);
     }
 
-    private static RecoveryCheckpointPublication publication(
-            GenerationIndexRecord record) {
-        byte[] canonical = new com.nereusstream.metadata.oxia.codec
-                .GenerationIndexRecordCodecV1().encode(record);
+    private static RecoveryCheckpointPublication publication(GenerationIndexRecord record) {
+        byte[] canonical = new com.nereusstream.metadata.oxia.codec.GenerationIndexRecordCodecV1().encode(record);
         return new RecoveryCheckpointPublication(
                 record.generation(),
                 new PublicationId(record.publicationId()),
@@ -486,8 +439,7 @@ class CheckpointDerivedIndexRepairTest {
                 GenerationIndexDigests.canonicalRecordSha256(record));
     }
 
-    private static StreamCommitTargetRecord commit(
-            GenerationIndexRecord source) {
+    private static StreamCommitTargetRecord commit(GenerationIndexRecord source) {
         return new StreamCommitTargetRecord(
                 STREAM.value(),
                 "commit-1",
@@ -515,8 +467,7 @@ class CheckpointDerivedIndexRepairTest {
     }
 
     private static RecoveryCheckpointReferenceRecord reference(
-            RecoveryCheckpointWriteRequest header,
-            RecoveryCheckpointWriteResult written) {
+            RecoveryCheckpointWriteRequest header, RecoveryCheckpointWriteResult written) {
         return new RecoveryCheckpointReferenceRecord(
                 header.checkpointSequence(),
                 header.checkpointAttemptId(),
@@ -533,8 +484,7 @@ class CheckpointDerivedIndexRepairTest {
                 header.projectionIdentitySha256().value(),
                 written.objectId().value(),
                 written.objectKey().value(),
-                RecoveryCheckpointFormatV1.objectKeyHash(
-                        written.objectKey()).value(),
+                RecoveryCheckpointFormatV1.objectKeyHash(written.objectKey()).value(),
                 written.objectLength(),
                 written.storageCrc32c().value(),
                 written.contentSha256().value(),
@@ -543,9 +493,7 @@ class CheckpointDerivedIndexRepairTest {
     }
 
     private static RecoveryCheckpointRootRecord rootRecord(
-            RecoveryCheckpointReferenceRecord reference,
-            long sequence,
-            long publishedAt) {
+            RecoveryCheckpointReferenceRecord reference, long sequence, long publishedAt) {
         return new RecoveryCheckpointRootRecord(
                 1,
                 STREAM.value(),
@@ -559,51 +507,34 @@ class CheckpointDerivedIndexRepairTest {
                 reference.firstCommitId(),
                 reference.lastCommitId(),
                 List.of(reference),
-                RecoveryCheckpointRootDigests.checkpointSetSha256(
-                        List.of(reference)).value(),
+                RecoveryCheckpointRootDigests.checkpointSetSha256(List.of(reference))
+                        .value(),
                 reference.sourceHeadCommitId(),
                 reference.sourceHeadCommitVersion(),
                 publishedAt,
                 0);
     }
 
-    private static GenerationIndexIdentity identity(
-            GenerationIndexRecord record) {
-        return new GenerationIndexIdentity(
-                STREAM,
-                ReadView.COMMITTED,
-                record.offsetEnd(),
-                record.generation());
+    private static GenerationIndexIdentity identity(GenerationIndexRecord record) {
+        return new GenerationIndexIdentity(STREAM, ReadView.COMMITTED, record.offsetEnd(), record.generation());
     }
 
     private static RecoveryCheckpointVerifier verifier() {
         return new RecoveryCheckpointVerifier() {
             @Override
             public void verifyPublication(
-                    RecoveryCheckpointWriteRequest header,
-                    RecoveryCheckpointPublication publication) {
-            }
+                    RecoveryCheckpointWriteRequest header, RecoveryCheckpointPublication publication) {}
 
             @Override
-            public void verifyEntry(
-                    RecoveryCheckpointWriteRequest header,
-                    RecoveryCheckpointEntry entry) {
-            }
+            public void verifyEntry(RecoveryCheckpointWriteRequest header, RecoveryCheckpointEntry entry) {}
         };
     }
 
-    private static StagingFileManager staging(Path directory)
-            throws Exception {
+    private static StagingFileManager staging(Path directory) throws Exception {
         Files.createDirectory(directory);
-        Files.setPosixFilePermissions(
-                directory,
-                PosixFilePermissions.fromString("rwx------"));
+        Files.setPosixFilePermissions(directory, PosixFilePermissions.fromString("rwx------"));
         return new StagingFileManager(
-                directory,
-                32L << 20,
-                StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
-                Duration.ofHours(1),
-                Runnable::run);
+                directory, 32L << 20, StagingFileManager.MIN_UPLOAD_CHUNK_BYTES, Duration.ofHours(1), Runnable::run);
     }
 
     private static <T> Flow.Publisher<T> publisher(List<T> values) {
@@ -618,8 +549,7 @@ class CheckpointDerivedIndexRepairTest {
                 }
                 if (count != 1) {
                     complete = true;
-                    subscriber.onError(new AssertionError(
-                            "checkpoint writer demand must be one"));
+                    subscriber.onError(new AssertionError("checkpoint writer demand must be one"));
                     return;
                 }
                 subscriber.onNext(values.get(index++));
@@ -659,22 +589,19 @@ class CheckpointDerivedIndexRepairTest {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(
-                            MessageDigest.getInstance("SHA-256")
-                                    .digest(value)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
         } catch (Exception failure) {
             throw new AssertionError(failure);
         }
     }
 
-    private static final class TrackingPinManager
-            implements ObjectReadPinManager {
+    private static final class TrackingPinManager implements ObjectReadPinManager {
         private final AtomicInteger validationAttempts = new AtomicInteger();
         private final AtomicInteger acquired = new AtomicInteger();
         private final AtomicInteger released = new AtomicInteger();
         private final AtomicBoolean first = new AtomicBoolean(true);
-        private Runnable beforeFirstValidation = () -> {
-        };
+        private Runnable beforeFirstValidation = () -> {};
 
         private void beforeFirstValidation(Runnable action) {
             beforeFirstValidation = action;
@@ -726,8 +653,7 @@ class CheckpointDerivedIndexRepairTest {
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
 
         private AtomicInteger validationAttempts() {
             return validationAttempts;
@@ -742,8 +668,7 @@ class CheckpointDerivedIndexRepairTest {
         }
     }
 
-    private static final class TrackingActivationGuard
-            implements GenerationProtocolActivationGuard {
+    private static final class TrackingActivationGuard implements GenerationProtocolActivationGuard {
         private final AtomicInteger revalidations = new AtomicInteger();
 
         @Override
@@ -751,22 +676,12 @@ class CheckpointDerivedIndexRepairTest {
                 com.nereusstream.core.capability.GenerationOperation operation,
                 com.nereusstream.core.capability.GenerationActivationSubject subject,
                 boolean activateLiveProjectionIfAbsent) {
-            return CompletableFuture.completedFuture(
-                    GenerationActivationProof.create(
-                            operation,
-                            subject,
-                            1,
-                            1,
-                            1,
-                            sha("reference-domains"),
-                            true,
-                            false,
-                            CLOCK.millis()));
+            return CompletableFuture.completedFuture(GenerationActivationProof.create(
+                    operation, subject, 1, 1, 1, sha("reference-domains"), true, false, CLOCK.millis()));
         }
 
         @Override
-        public CompletableFuture<Void> revalidate(
-                GenerationActivationProof proof) {
+        public CompletableFuture<Void> revalidate(GenerationActivationProof proof) {
             revalidations.incrementAndGet();
             return CompletableFuture.completedFuture(null);
         }
@@ -790,7 +705,8 @@ class CheckpointDerivedIndexRepairTest {
             RecoveryCheckpointReferenceRecord reference,
             VersionedRecoveryCheckpointRoot initialRoot,
             GenerationIndexRecord low,
-            GenerationIndexRecord high) implements AutoCloseable {
+            GenerationIndexRecord high)
+            implements AutoCloseable {
         private GenerationIndexIdentity lowIdentity() {
             return identity(low);
         }
@@ -799,11 +715,10 @@ class CheckpointDerivedIndexRepairTest {
             return identity(high);
         }
 
-        private Optional<com.nereusstream.metadata.oxia.VersionedObjectProtection>
-                targetProtection(VersionedGenerationIndex index) {
+        private Optional<com.nereusstream.metadata.oxia.VersionedObjectProtection> targetProtection(
+                VersionedGenerationIndex index) {
             ObjectSliceReadTarget target = (ObjectSliceReadTarget)
-                    ReadTargetCodecRegistry.phase15().decode(
-                            index.value().readTarget());
+                    ReadTargetCodecRegistry.phase15().decode(index.value().readTarget());
             PhysicalObjectIdentity object = PhysicalObjectIdentity.create(
                     target.objectKey(),
                     Optional.of(target.objectId()),
@@ -815,22 +730,18 @@ class CheckpointDerivedIndexRepairTest {
             ObjectProtectionIdentity protection = new ObjectProtectionIdentity(
                     object.objectKeyHash(),
                     ObjectProtectionType.RECOVERY_CHECKPOINT_TARGET,
-                    RecoveryCheckpointProtectionIdentities
-                            .checkpointTargetReferenceId(
-                                    currentRoot(), index, object));
+                    RecoveryCheckpointProtectionIdentities.checkpointTargetReferenceId(currentRoot(), index, object));
             return physical.protection(CLUSTER, protection);
         }
 
         private VersionedRecoveryCheckpointRoot currentRoot() {
-            return generations.getRecoveryRoot(CLUSTER, STREAM)
-                    .join().orElseThrow();
+            return generations.getRecoveryRoot(CLUSTER, STREAM).join().orElseThrow();
         }
 
         private void publishNextRoot() {
-            generations.compareAndSetRecoveryRoot(
-                    CLUSTER,
-                    rootRecord(reference, 2, 3),
-                    initialRoot.metadataVersion()).join();
+            generations
+                    .compareAndSetRecoveryRoot(CLUSTER, rootRecord(reference, 2, 3), initialRoot.metadataVersion())
+                    .join();
         }
 
         @Override

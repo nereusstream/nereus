@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.generation;
 
 import com.nereusstream.api.Checksum;
@@ -36,8 +37,7 @@ public final class DefaultManagedLedgerMaterializationRegistrationCoordinator
         implements ManagedLedgerMaterializationRegistrationCoordinator {
     private static final int MAX_REFRESH_ATTEMPTS = 32;
     private static final Map<String, String> PAYLOAD_ATTRIBUTES = Map.of(
-            ManagedLedgerProjectionNames.PAYLOAD_MAPPING_ATTRIBUTE,
-            ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1);
+            ManagedLedgerProjectionNames.PAYLOAD_MAPPING_ATTRIBUTE, ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1);
 
     private final String cluster;
     private final ManagedLedgerProjectionMetadataStore projections;
@@ -60,48 +60,33 @@ public final class DefaultManagedLedgerMaterializationRegistrationCoordinator
 
     @Override
     public CompletableFuture<Void> ensureRegistered(
-            String managedLedgerName,
-            ManagedLedgerProjectionIdentity expectedProjectionIdentity) {
+            String managedLedgerName, ManagedLedgerProjectionIdentity expectedProjectionIdentity) {
         final String exactName;
         try {
-            exactName = ManagedLedgerProjectionNames.requireManagedLedgerName(
-                    managedLedgerName);
-            Objects.requireNonNull(
-                    expectedProjectionIdentity,
-                    "expectedProjectionIdentity");
+            exactName = ManagedLedgerProjectionNames.requireManagedLedgerName(managedLedgerName);
+            Objects.requireNonNull(expectedProjectionIdentity, "expectedProjectionIdentity");
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return capture(exactName, expectedProjectionIdentity)
-                .thenCompose(authority -> createOrRefresh(authority, 0)
-                        .thenCompose(registered -> finalRevalidate(
-                                authority, registered)));
+        return capture(exactName, expectedProjectionIdentity).thenCompose(authority -> createOrRefresh(authority, 0)
+                .thenCompose(registered -> finalRevalidate(authority, registered)));
     }
 
     private CompletableFuture<RegistrationAuthority> capture(
-            String managedLedgerName,
-            ManagedLedgerProjectionIdentity expectedProjectionIdentity) {
-        return projections.getProjection(cluster, managedLedgerName)
-                .thenCompose(optional -> {
-                    TopicProjectionRecord projection = optional.orElseThrow(() ->
-                            notReady("authoritative topic projection is absent"));
-                    requireExpectedProjection(
-                            projection, expectedProjectionIdentity);
-                    StreamId streamId = new StreamId(projection.streamId());
-                    return l0.getStreamSnapshot(cluster, streamId)
-                            .thenApply(snapshot -> authority(
-                                    projection, snapshot));
-                });
+            String managedLedgerName, ManagedLedgerProjectionIdentity expectedProjectionIdentity) {
+        return projections.getProjection(cluster, managedLedgerName).thenCompose(optional -> {
+            TopicProjectionRecord projection =
+                    optional.orElseThrow(() -> notReady("authoritative topic projection is absent"));
+            requireExpectedProjection(projection, expectedProjectionIdentity);
+            StreamId streamId = new StreamId(projection.streamId());
+            return l0.getStreamSnapshot(cluster, streamId).thenApply(snapshot -> authority(projection, snapshot));
+        });
     }
 
-    private RegistrationAuthority authority(
-            TopicProjectionRecord projection,
-            StreamMetadataSnapshot stream) {
+    private RegistrationAuthority authority(TopicProjectionRecord projection, StreamMetadataSnapshot stream) {
         requireLiveAndCompatible(projection, stream);
-        ManagedLedgerGenerationProjectionRefV1 reference =
-                new ManagedLedgerGenerationProjectionRefV1(
-                        projection.managedLedgerName(),
-                        projection.projectionIdentity());
+        ManagedLedgerGenerationProjectionRefV1 reference = new ManagedLedgerGenerationProjectionRefV1(
+                projection.managedLedgerName(), projection.projectionIdentity());
         ProjectionRef projectionRef = reference.toProjectionRef();
         Checksum projectionDigest = reference.projectionIdentitySha256();
         return new RegistrationAuthority(
@@ -114,10 +99,8 @@ public final class DefaultManagedLedgerMaterializationRegistrationCoordinator
                 stream.committedEnd().commitVersion());
     }
 
-    private CompletableFuture<VersionedMaterializationStreamRegistration>
-            createOrRefresh(
-                    RegistrationAuthority authority,
-                    int attempt) {
+    private CompletableFuture<VersionedMaterializationStreamRegistration> createOrRefresh(
+            RegistrationAuthority authority, int attempt) {
         if (attempt >= MAX_REFRESH_ATTEMPTS) {
             return CompletableFuture.failedFuture(new NereusException(
                     ErrorCode.METADATA_CONDITION_FAILED,
@@ -125,77 +108,56 @@ public final class DefaultManagedLedgerMaterializationRegistrationCoordinator
                     "materialization registration refresh retry budget exhausted"));
         }
         long now = clock.millis();
-        MaterializationStreamRegistrationRecord candidate =
-                new MaterializationStreamRegistrationRecord(
-                        1,
-                        authority.streamId().value(),
-                        authority.projectionRef(),
-                        authority.projectionIdentitySha256().value(),
-                        authority.storageProfile(),
-                        now,
-                        authority.commitVersionHint(),
-                        now,
-                        0);
-        return generations.createOrVerifyStreamRegistration(
-                        cluster, candidate)
-                .thenCompose(current -> refresh(
-                        authority, current, attempt));
+        MaterializationStreamRegistrationRecord candidate = new MaterializationStreamRegistrationRecord(
+                1,
+                authority.streamId().value(),
+                authority.projectionRef(),
+                authority.projectionIdentitySha256().value(),
+                authority.storageProfile(),
+                now,
+                authority.commitVersionHint(),
+                now,
+                0);
+        return generations
+                .createOrVerifyStreamRegistration(cluster, candidate)
+                .thenCompose(current -> refresh(authority, current, attempt));
     }
 
-    private CompletableFuture<VersionedMaterializationStreamRegistration>
-            refresh(
-                    RegistrationAuthority authority,
-                    VersionedMaterializationStreamRegistration current,
-                    int attempt) {
+    private CompletableFuture<VersionedMaterializationStreamRegistration> refresh(
+            RegistrationAuthority authority, VersionedMaterializationStreamRegistration current, int attempt) {
         requireRegistrationIdentity(authority, current);
-        if (current.value().lastHintCommitVersion()
-                >= authority.commitVersionHint()) {
+        if (current.value().lastHintCommitVersion() >= authority.commitVersionHint()) {
             return CompletableFuture.completedFuture(current);
         }
-        MaterializationStreamRegistrationRecord replacement =
-                new MaterializationStreamRegistrationRecord(
-                        current.value().schemaVersion(),
-                        current.value().streamId(),
-                        current.value().projectionRef(),
-                        current.value().projectionIdentitySha256(),
-                        current.value().storageProfile(),
-                        current.value().registeredAtMillis(),
-                        authority.commitVersionHint(),
-                        Math.max(
-                                current.value().updatedAtMillis(),
-                                clock.millis()),
-                        0);
+        MaterializationStreamRegistrationRecord replacement = new MaterializationStreamRegistrationRecord(
+                current.value().schemaVersion(),
+                current.value().streamId(),
+                current.value().projectionRef(),
+                current.value().projectionIdentitySha256(),
+                current.value().storageProfile(),
+                current.value().registeredAtMillis(),
+                authority.commitVersionHint(),
+                Math.max(current.value().updatedAtMillis(), clock.millis()),
+                0);
         CompletableFuture<VersionedMaterializationStreamRegistration> write =
-                generations.compareAndSetStreamRegistration(
-                        cluster,
-                        replacement,
-                        current.metadataVersion());
+                generations.compareAndSetStreamRegistration(cluster, replacement, current.metadataVersion());
         return write.handle((updated, error) -> {
                     if (error == null) {
                         return CompletableFuture.completedFuture(updated);
                     }
                     Throwable cause = unwrap(error);
-                    return generations.getStreamRegistration(
-                                    cluster, authority.streamId())
+                    return generations
+                            .getStreamRegistration(cluster, authority.streamId())
                             .thenCompose(reloaded -> {
                                 if (reloaded.isPresent()) {
-                                    VersionedMaterializationStreamRegistration
-                                            actual = reloaded.orElseThrow();
-                                    requireRegistrationIdentity(
-                                            authority, actual);
-                                    if (actual.value()
-                                                    .lastHintCommitVersion()
-                                            >= authority
-                                                    .commitVersionHint()) {
-                                        return CompletableFuture
-                                                .completedFuture(actual);
+                                    VersionedMaterializationStreamRegistration actual = reloaded.orElseThrow();
+                                    requireRegistrationIdentity(authority, actual);
+                                    if (actual.value().lastHintCommitVersion() >= authority.commitVersionHint()) {
+                                        return CompletableFuture.completedFuture(actual);
                                     }
                                 }
-                                if (cause
-                                        instanceof
-                                        F4MetadataConditionFailedException) {
-                                    return createOrRefresh(
-                                            authority, attempt + 1);
+                                if (cause instanceof F4MetadataConditionFailedException) {
+                                    return createOrRefresh(authority, attempt + 1);
                                 }
                                 return CompletableFuture.failedFuture(cause);
                             });
@@ -204,65 +166,45 @@ public final class DefaultManagedLedgerMaterializationRegistrationCoordinator
     }
 
     private CompletableFuture<Void> finalRevalidate(
-            RegistrationAuthority expected,
-            VersionedMaterializationStreamRegistration registered) {
+            RegistrationAuthority expected, VersionedMaterializationStreamRegistration registered) {
         requireRegistrationIdentity(expected, registered);
-        return capture(
-                        expected.managedLedgerName(),
-                        expected.projectionIdentity())
+        return capture(expected.managedLedgerName(), expected.projectionIdentity())
                 .thenCompose(current -> {
                     if (!current.sameImmutableIdentity(expected)) {
-                        return CompletableFuture.failedFuture(notReady(
-                                "projection or L0 registration authority changed"));
+                        return CompletableFuture.failedFuture(
+                                notReady("projection or L0 registration authority changed"));
                     }
-                    return generations.getStreamRegistration(
-                                    cluster, expected.streamId())
+                    return generations
+                            .getStreamRegistration(cluster, expected.streamId())
                             .thenAccept(optional -> {
-                                VersionedMaterializationStreamRegistration
-                                        finalRegistration =
-                                                optional.orElseThrow(() ->
-                                                        notReady(
-                                                                "materialization registration disappeared"));
-                                requireRegistrationIdentity(
-                                        expected, finalRegistration);
-                                if (finalRegistration.value()
-                                                .lastHintCommitVersion()
-                                        < expected.commitVersionHint()) {
-                                    throw notReady(
-                                            "materialization registration hint moved backward");
+                                VersionedMaterializationStreamRegistration finalRegistration = optional.orElseThrow(
+                                        () -> notReady("materialization registration disappeared"));
+                                requireRegistrationIdentity(expected, finalRegistration);
+                                if (finalRegistration.value().lastHintCommitVersion() < expected.commitVersionHint()) {
+                                    throw notReady("materialization registration hint moved backward");
                                 }
                             });
                 });
     }
 
     private static void requireExpectedProjection(
-            TopicProjectionRecord projection,
-            ManagedLedgerProjectionIdentity expected) {
+            TopicProjectionRecord projection, ManagedLedgerProjectionIdentity expected) {
         if (!projection.projectionIdentity().equals(expected)) {
-            throw notReady(
-                    "authoritative topic projection identity changed");
+            throw notReady("authoritative topic projection identity changed");
         }
     }
 
-    private static void requireLiveAndCompatible(
-            TopicProjectionRecord projection,
-            StreamMetadataSnapshot stream) {
+    private static void requireLiveAndCompatible(TopicProjectionRecord projection, StreamMetadataSnapshot stream) {
         ManagedLedgerFacadeState facade = projection.parsedFacadeState();
-        if (facade != ManagedLedgerFacadeState.OPEN
-                && facade != ManagedLedgerFacadeState.SEALED) {
+        if (facade != ManagedLedgerFacadeState.OPEN && facade != ManagedLedgerFacadeState.SEALED) {
             throw notReady("topic projection is not live");
         }
         if (!stream.metadata().streamId().equals(projection.streamId())
-                || !stream.metadata().streamName()
-                        .equals(projection.streamName())
-                || !stream.metadata().profile()
-                        .equals(projection.storageProfile())
-                || !stream.metadata().attributes()
-                        .equals(PAYLOAD_ATTRIBUTES)
-                || stream.metadata().createdAtMillis()
-                        != projection.createdAtMillis()) {
-            throw invariant(
-                    "L0 stream identity/profile differs from topic projection");
+                || !stream.metadata().streamName().equals(projection.streamName())
+                || !stream.metadata().profile().equals(projection.storageProfile())
+                || !stream.metadata().attributes().equals(PAYLOAD_ATTRIBUTES)
+                || stream.metadata().createdAtMillis() != projection.createdAtMillis()) {
+            throw invariant("L0 stream identity/profile differs from topic projection");
         }
         final StorageProfile profile;
         final StreamState state;
@@ -270,71 +212,45 @@ public final class DefaultManagedLedgerMaterializationRegistrationCoordinator
             profile = StorageProfile.valueOf(stream.metadata().profile());
             state = StreamState.valueOf(stream.metadata().state());
         } catch (IllegalArgumentException failure) {
-            throw invariant(
-                    "L0 stream has an unknown profile or lifecycle",
-                    failure);
+            throw invariant("L0 stream has an unknown profile or lifecycle", failure);
         }
         if (profile.canonical()
-                        != StorageProfile.valueOf(
-                                        projection.storageProfile())
-                                .canonical()
-                || (state != StreamState.ACTIVE
-                        && state != StreamState.SEALED)) {
-            throw notReady(
-                    "L0 stream is not live under the projection profile");
+                        != StorageProfile.valueOf(projection.storageProfile()).canonical()
+                || (state != StreamState.ACTIVE && state != StreamState.SEALED)) {
+            throw notReady("L0 stream is not live under the projection profile");
         }
-        if (facade == ManagedLedgerFacadeState.SEALED
-                && state != StreamState.SEALED) {
-            throw invariant(
-                    "topic projection lifecycle leads L0 stream truth");
+        if (facade == ManagedLedgerFacadeState.SEALED && state != StreamState.SEALED) {
+            throw invariant("topic projection lifecycle leads L0 stream truth");
         }
     }
 
     private static void requireRegistrationIdentity(
-            RegistrationAuthority expected,
-            VersionedMaterializationStreamRegistration actual) {
+            RegistrationAuthority expected, VersionedMaterializationStreamRegistration actual) {
         MaterializationStreamRegistrationRecord value = actual.value();
         if (!value.streamId().equals(expected.streamId().value())
-                || !value.projectionRef()
-                        .equals(expected.projectionRef())
+                || !value.projectionRef().equals(expected.projectionRef())
                 || !value.projectionIdentitySha256()
-                        .equals(expected
-                                .projectionIdentitySha256()
-                                .value())
-                || !value.storageProfile()
-                        .equals(expected.storageProfile())) {
-            throw invariant(
-                    "materialization registration identity conflicts with projection");
+                        .equals(expected.projectionIdentitySha256().value())
+                || !value.storageProfile().equals(expected.storageProfile())) {
+            throw invariant("materialization registration identity conflicts with projection");
         }
     }
 
     private static NereusException notReady(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_CONDITION_FAILED,
-                true,
-                message);
+        return new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, message);
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
-    private static NereusException invariant(
-            String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message,
-                cause);
+    private static NereusException invariant(String message, Throwable cause) {
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static Throwable unwrap(Throwable error) {
         Throwable current = error;
-        while (current instanceof CompletionException
-                && current.getCause() != null) {
+        while (current instanceof CompletionException && current.getCause() != null) {
             current = current.getCause();
         }
         return current;
@@ -349,31 +265,23 @@ public final class DefaultManagedLedgerMaterializationRegistrationCoordinator
             String storageProfile,
             long commitVersionHint) {
         private RegistrationAuthority {
-            Objects.requireNonNull(
-                    managedLedgerName, "managedLedgerName");
-            Objects.requireNonNull(
-                    projectionIdentity, "projectionIdentity");
+            Objects.requireNonNull(managedLedgerName, "managedLedgerName");
+            Objects.requireNonNull(projectionIdentity, "projectionIdentity");
             Objects.requireNonNull(streamId, "streamId");
             Objects.requireNonNull(projectionRef, "projectionRef");
-            Objects.requireNonNull(
-                    projectionIdentitySha256,
-                    "projectionIdentitySha256");
+            Objects.requireNonNull(projectionIdentitySha256, "projectionIdentitySha256");
             Objects.requireNonNull(storageProfile, "storageProfile");
             if (commitVersionHint < 0) {
-                throw new IllegalArgumentException(
-                        "commitVersionHint must be non-negative");
+                throw new IllegalArgumentException("commitVersionHint must be non-negative");
             }
         }
 
-        private boolean sameImmutableIdentity(
-                RegistrationAuthority other) {
+        private boolean sameImmutableIdentity(RegistrationAuthority other) {
             return managedLedgerName.equals(other.managedLedgerName)
-                    && projectionIdentity.equals(
-                            other.projectionIdentity)
+                    && projectionIdentity.equals(other.projectionIdentity)
                     && streamId.equals(other.streamId)
                     && projectionRef.equals(other.projectionRef)
-                    && projectionIdentitySha256.equals(
-                            other.projectionIdentitySha256)
+                    && projectionIdentitySha256.equals(other.projectionIdentitySha256)
                     && storageProfile.equals(other.storageProfile);
         }
     }

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -12,7 +13,9 @@ import com.nereusstream.api.target.ObjectSliceReadTarget;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Immutable physical identity and logical selection required for full compacted-object verification. */
+/**
+ * Immutable physical identity and logical selection required for full compacted-object verification.
+ */
 public record CompactedObjectVerificationRequest(
         StreamId streamId,
         ReadView view,
@@ -39,8 +42,7 @@ public record CompactedObjectVerificationRequest(
                 || !target.sliceChecksum().equals(storageCrc32c)
                 || !target.physicalFormat().equals(CompactedObjectFormatV1.physicalFormat(view))
                 || !target.logicalFormat().equals(payloadFormat.name())) {
-            throw new IllegalArgumentException(
-                    "verification target does not match the frozen compacted identity");
+            throw new IllegalArgumentException("verification target does not match the frozen compacted identity");
         }
         Objects.requireNonNull(timeout, "timeout");
         if (timeout.isZero() || timeout.isNegative()) {
@@ -48,21 +50,11 @@ public record CompactedObjectVerificationRequest(
         }
         // Reuse the strict read request constructor for all footer/reference invariants.
         new CompactedObjectReadRequest(
-                streamId,
-                view,
-                sourceCoverage,
-                sourceCoverage.startOffset(),
-                target,
-                payloadFormat,
-                1,
-                1,
-                timeout);
+                streamId, view, sourceCoverage, sourceCoverage.startOffset(), target, payloadFormat, 1, 1, timeout);
     }
 
     public static CompactedObjectVerificationRequest from(
-            CompactedObjectWriteRequest request,
-            CompactedObjectWriteResult result,
-            Duration timeout) {
+            CompactedObjectWriteRequest request, CompactedObjectWriteResult result, Duration timeout) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(result, "result");
         ObjectSliceReadTarget target = new ObjectSliceReadTarget(
@@ -72,7 +64,8 @@ public record CompactedObjectVerificationRequest(
                 ObjectType.STREAM_COMPACTED_OBJECT,
                 result.physicalFormat(),
                 request.logicalFormat(),
-                request.sourceCoverage().startOffset() + "-" + request.sourceCoverage().endOffset(),
+                request.sourceCoverage().startOffset() + "-"
+                        + request.sourceCoverage().endOffset(),
                 0,
                 result.objectLength(),
                 result.storageCrc32c(),
@@ -88,10 +81,7 @@ public record CompactedObjectVerificationRequest(
                 timeout);
     }
 
-    private static void requireChecksum(
-            Checksum checksum,
-            ChecksumType expected,
-            String field) {
+    private static void requireChecksum(Checksum checksum, ChecksumType expected, String field) {
         Objects.requireNonNull(checksum, field);
         if (checksum.type() != expected) {
             throw new IllegalArgumentException(field + " must use " + expected);

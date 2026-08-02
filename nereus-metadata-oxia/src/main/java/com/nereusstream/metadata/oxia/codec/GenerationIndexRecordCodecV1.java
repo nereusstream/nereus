@@ -1,11 +1,11 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 
-public final class GenerationIndexRecordCodecV1
-        extends AbstractF4RecordCodecV1<GenerationIndexRecord> {
+public final class GenerationIndexRecordCodecV1 extends AbstractF4RecordCodecV1<GenerationIndexRecord> {
     public GenerationIndexRecordCodecV1() {
         super(GenerationIndexRecord.class);
     }

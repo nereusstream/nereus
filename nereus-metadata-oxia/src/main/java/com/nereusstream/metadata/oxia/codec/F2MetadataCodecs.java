@@ -1,16 +1,19 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.LedgerIdAllocatorRecord;
 import com.nereusstream.metadata.oxia.records.PositionIndexRecord;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import com.nereusstream.metadata.oxia.records.VirtualLedgerProjectionRecord;
-import java.util.List;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.ToLongFunction;
 
-/** Third explicit metadata record family for F2 projection records. */
+/**
+ * Third explicit metadata record family for F2 projection records.
+ */
 public final class F2MetadataCodecs {
     private static final MapMetadataCodecRegistry REGISTRY = new MapMetadataCodecRegistry(List.of(
             registered(LedgerIdAllocatorRecord.class, LedgerIdAllocatorRecord::metadataVersion),
@@ -18,8 +21,7 @@ public final class F2MetadataCodecs {
             registered(VirtualLedgerProjectionRecord.class, VirtualLedgerProjectionRecord::metadataVersion),
             registered(PositionIndexRecord.class, PositionIndexRecord::metadataVersion)));
 
-    private F2MetadataCodecs() {
-    }
+    private F2MetadataCodecs() {}
 
     public static MetadataCodecRegistry registry() {
         return REGISTRY;
@@ -57,21 +59,16 @@ public final class F2MetadataCodecs {
     }
 
     private static <T extends Record> MapMetadataCodecRegistry.RegisteredCodec<T> registered(
-            Class<T> type,
-            ToLongFunction<T> metadataVersion) {
+            Class<T> type, ToLongFunction<T> metadataVersion) {
         return new MapMetadataCodecRegistry.RegisteredCodec<>(
-                type,
-                new ZeroMetadataVersionCodec<>(
-                        Phase1MetadataCodecs.recordCodec(type), metadataVersion));
+                type, new ZeroMetadataVersionCodec<>(Phase1MetadataCodecs.recordCodec(type), metadataVersion));
     }
 
     private static final class ZeroMetadataVersionCodec<T extends Record> implements MetadataRecordCodec<T> {
         private final MetadataRecordCodec<T> delegate;
         private final ToLongFunction<T> metadataVersion;
 
-        private ZeroMetadataVersionCodec(
-                MetadataRecordCodec<T> delegate,
-                ToLongFunction<T> metadataVersion) {
+        private ZeroMetadataVersionCodec(MetadataRecordCodec<T> delegate, ToLongFunction<T> metadataVersion) {
             this.delegate = Objects.requireNonNull(delegate, "delegate");
             this.metadataVersion = Objects.requireNonNull(metadataVersion, "metadataVersion");
         }

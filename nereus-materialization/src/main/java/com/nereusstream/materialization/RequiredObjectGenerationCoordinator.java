@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.AppendOutcome;
@@ -15,9 +16,11 @@ import com.nereusstream.core.append.RequiredObjectGenerationCompletion;
 import com.nereusstream.core.append.RequiredObjectGenerationProof;
 import com.nereusstream.core.append.RequiredObjectGenerationRequest;
 import com.nereusstream.core.capability.GenerationActivationProof;
+import com.nereusstream.core.capability.GenerationActivationSubject;
 import com.nereusstream.core.capability.GenerationOperation;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.capability.LiveProjectionSubject;
+import com.nereusstream.core.capability.LiveStreamSubject;
 import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
@@ -39,8 +42,7 @@ import java.util.concurrent.ScheduledExecutorService;
  * <p>The coordinator first converges one deterministic task for the exact committed append, then waits for the
  * ordinary worker and checkpoint path, and finally requires the same normal-read proof used by source retirement.
  */
-public final class RequiredObjectGenerationCoordinator
-        implements RequiredObjectGenerationCompletion {
+public final class RequiredObjectGenerationCoordinator implements RequiredObjectGenerationCompletion {
     private static final int MAX_SCANNED_TASKS = 4_096;
 
     private final String cluster;
@@ -55,6 +57,7 @@ public final class RequiredObjectGenerationCoordinator
     private final MaterializationPolicy policy;
     private final int taskScanPageSize;
     private final ScheduledExecutorService scheduler;
+    private final MaterializationStreamAuthorityMode authorityMode;
 
     public RequiredObjectGenerationCoordinator(
             String cluster,
@@ -69,6 +72,36 @@ public final class RequiredObjectGenerationCoordinator
             MaterializationPolicy policy,
             int taskScanPageSize,
             ScheduledExecutorService scheduler) {
+        this(
+                cluster,
+                l0,
+                generations,
+                activation,
+                planner,
+                tasks,
+                recovery,
+                service,
+                authority,
+                policy,
+                taskScanPageSize,
+                scheduler,
+                MaterializationStreamAuthorityMode.PROJECTION_REQUIRED);
+    }
+
+    public RequiredObjectGenerationCoordinator(
+            String cluster,
+            OxiaMetadataStore l0,
+            GenerationMetadataStore generations,
+            GenerationProtocolActivationGuard activation,
+            MaterializationPlanner planner,
+            MaterializationTaskStore tasks,
+            MaterializationTaskRecovery recovery,
+            MaterializationService service,
+            CommittedObjectGenerationAuthority authority,
+            MaterializationPolicy policy,
+            int taskScanPageSize,
+            ScheduledExecutorService scheduler,
+            MaterializationStreamAuthorityMode authorityMode) {
         this.cluster = text(cluster, "cluster");
         this.l0 = Objects.requireNonNull(l0, "l0");
         this.generations = Objects.requireNonNull(generations, "generations");
@@ -84,24 +117,23 @@ public final class RequiredObjectGenerationCoordinator
         }
         this.taskScanPageSize = taskScanPageSize;
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.authorityMode = Objects.requireNonNull(authorityMode, "authorityMode");
     }
 
     @Override
     public CompletableFuture<RequiredObjectGenerationProof> complete(
-            RequiredObjectGenerationRequest request,
-            Duration timeout) {
+            RequiredObjectGenerationRequest request, Duration timeout) {
         try {
             RequiredObjectGenerationRequest exact = Objects.requireNonNull(request, "request");
-            MaterializationDeadline deadline = new MaterializationDeadline(
-                    Objects.requireNonNull(timeout, "timeout"), scheduler);
+            MaterializationDeadline deadline =
+                    new MaterializationDeadline(Objects.requireNonNull(timeout, "timeout"), scheduler);
             CompletableFuture<RequiredObjectGenerationProof> result = proveCurrent(exact, deadline)
                     .thenCompose(existing -> existing.isPresent()
                             ? CompletableFuture.completedFuture(existing.orElseThrow())
                             : admit(exact, deadline)
                                     .thenCompose(admission -> convergeTask(exact, admission, deadline))
                                     .thenCompose(ignored -> deadline.bound(
-                                            service::scanNow,
-                                            "reconcile required Object-generation checkpoint"))
+                                            service::scanNow, "reconcile required Object-generation checkpoint"))
                                     .thenCompose(ignored -> proveCurrent(exact, deadline))
                                     .thenApply(proof -> proof.orElseThrow(() -> failure(
                                             ErrorCode.METADATA_CONDITION_FAILED,
@@ -115,11 +147,9 @@ public final class RequiredObjectGenerationCoordinator
     }
 
     private CompletableFuture<Admission> admit(
-            RequiredObjectGenerationRequest request,
-            MaterializationDeadline deadline) {
+            RequiredObjectGenerationRequest request, MaterializationDeadline deadline) {
         CompletableFuture<StreamMetadataSnapshot> snapshot = deadline.bound(
-                () -> l0.getStreamSnapshot(cluster, request.streamId()),
-                "load sync-profile stream snapshot");
+                () -> l0.getStreamSnapshot(cluster, request.streamId()), "load sync-profile stream snapshot");
         CompletableFuture<Optional<VersionedMaterializationStreamRegistration>> registration = deadline.bound(
                 () -> generations.getStreamRegistration(cluster, request.streamId()),
                 "load sync-profile materialization registration");
@@ -128,29 +158,24 @@ public final class RequiredObjectGenerationCoordinator
                             ErrorCode.METADATA_CONDITION_FAILED,
                             true,
                             "sync-profile materialization registration is absent"));
-                    ProjectionRef projection = requireAdmission(request, stream, registered);
-                    return new LiveProjectionSubject(
-                            request.streamId(),
-                            projection,
-                            new Checksum(
-                                    ChecksumType.SHA256,
-                                    registered.value().projectionIdentitySha256()));
+                    return requireAdmission(request, stream, registered);
                 })
                 .thenCompose(subject -> deadline.bound(
                         () -> activation.requireReady(
                                 GenerationOperation.GENERATION_PUBLISH,
                                 subject,
-                                true),
+                                authorityMode == MaterializationStreamAuthorityMode.PROJECTION_REQUIRED),
                         "admit required Object-generation publication"))
                 .thenApply(Admission::new);
     }
 
-    private ProjectionRef requireAdmission(
+    private GenerationActivationSubject requireAdmission(
             RequiredObjectGenerationRequest request,
             StreamMetadataSnapshot snapshot,
             VersionedMaterializationStreamRegistration registration) {
         if (!snapshot.metadata().streamId().equals(request.streamId().value())
-                || snapshot.committedEnd().committedEndOffset() < request.sourceRange().endOffset()
+                || snapshot.committedEnd().committedEndOffset()
+                        < request.sourceRange().endOffset()
                 || snapshot.committedEnd().commitVersion() < request.sourceCommitVersion()) {
             throw invariant("required Object-generation stream head does not contain the source append");
         }
@@ -161,8 +186,8 @@ public final class RequiredObjectGenerationCoordinator
         try {
             state = StreamState.valueOf(snapshot.metadata().state());
             profile = StorageProfile.valueOf(snapshot.metadata().profile()).canonical();
-            registeredProfile = StorageProfile.valueOf(
-                    registration.value().storageProfile()).canonical();
+            registeredProfile = StorageProfile.valueOf(registration.value().storageProfile())
+                    .canonical();
             projection = ProjectionIdentity.decode(registration.value().projectionRef());
         } catch (RuntimeException failure) {
             throw invariant("sync-profile materialization admission identity is invalid", failure);
@@ -170,20 +195,40 @@ public final class RequiredObjectGenerationCoordinator
         if (state != StreamState.ACTIVE
                 || profile != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT
                 || registeredProfile != profile
-                || !registration.value().streamId().equals(request.streamId().value())
-                || projection.isEmpty()) {
+                || !registration.value().streamId().equals(request.streamId().value())) {
             throw failure(
                     ErrorCode.METADATA_CONDITION_FAILED,
                     true,
                     "stream no longer admits synchronous BookKeeper Object publication");
         }
-        return projection.orElseThrow();
+        Checksum identity =
+                new Checksum(ChecksumType.SHA256, registration.value().projectionIdentitySha256());
+        if (authorityMode == MaterializationStreamAuthorityMode.DIRECT_STREAM) {
+            Checksum expected = DirectMaterializationStreamAuthority.identitySha256(request.streamId(), profile);
+            if (projection.isPresent()
+                    || !registration
+                            .value()
+                            .projectionRef()
+                            .equals(DirectMaterializationStreamAuthority.encodedProjectionRef())
+                    || !identity.equals(expected)) {
+                throw failure(
+                        ErrorCode.METADATA_CONDITION_FAILED,
+                        true,
+                        "sync-profile materialization registration has stale direct-stream authority");
+            }
+            return new LiveStreamSubject(request.streamId(), expected);
+        }
+        return new LiveProjectionSubject(
+                request.streamId(),
+                projection.orElseThrow(() -> failure(
+                        ErrorCode.METADATA_CONDITION_FAILED,
+                        true,
+                        "sync-profile materialization registration has no live projection")),
+                identity);
     }
 
     private CompletableFuture<Void> convergeTask(
-            RequiredObjectGenerationRequest request,
-            Admission admission,
-            MaterializationDeadline deadline) {
+            RequiredObjectGenerationRequest request, Admission admission, MaterializationDeadline deadline) {
         MaterializationTaskMutationGuard guard = () -> activation.revalidate(admission.proof());
         return deadline.bound(
                         () -> planner.plan(request.streamId(), request.sourceRange(), policy, 1),
@@ -192,16 +237,15 @@ public final class RequiredObjectGenerationCoordinator
                     if (!planned.isEmpty()) {
                         MaterializationTask task = requireExactTask(request, planned.get(0));
                         return deadline.bound(
-                                        () -> tasks.create(task, guard),
-                                        "create exact required Object-generation task")
+                                        () -> tasks.create(task, guard), "create exact required Object-generation task")
                                 .thenCompose(durable -> recover(durable, guard, deadline));
                     }
                     return findExistingTask(request, Optional.empty(), new ArrayList<>(), 0, deadline)
                             .thenCompose(existing -> existing.isPresent()
                                     ? recover(existing.orElseThrow(), guard, deadline)
                                     : deadline.bound(
-                                            service::scanNow,
-                                            "recover already-published required Object generation")
+                                                    service::scanNow,
+                                                    "recover already-published required Object generation")
                                             .thenApply(ignored -> null));
                 });
     }
@@ -236,8 +280,7 @@ public final class RequiredObjectGenerationCoordinator
                     }
                     for (VersionedMaterializationTask durable : page.values()) {
                         MaterializationTask task = tasks.requireTask(durable);
-                        if (task.policyDigestSha256().equals(policy.digestSha256())
-                                && matches(request, task)) {
+                        if (task.policyDigestSha256().equals(policy.digestSha256()) && matches(request, task)) {
                             matches.add(durable);
                         }
                     }
@@ -245,25 +288,20 @@ public final class RequiredObjectGenerationCoordinator
                         throw invariant("multiple deterministic tasks own one required append range");
                     }
                     if (page.continuation().isPresent()) {
-                        return findExistingTask(
-                                request, page.continuation(), matches, nextObserved, deadline);
+                        return findExistingTask(request, page.continuation(), matches, nextObserved, deadline);
                     }
                     return CompletableFuture.completedFuture(matches.stream().findFirst());
                 });
     }
 
-    private MaterializationTask requireExactTask(
-            RequiredObjectGenerationRequest request,
-            MaterializationTask task) {
+    private MaterializationTask requireExactTask(RequiredObjectGenerationRequest request, MaterializationTask task) {
         if (!matches(request, task)) {
             throw invariant("planner did not return the exact single-source required task");
         }
         return task;
     }
 
-    private boolean matches(
-            RequiredObjectGenerationRequest request,
-            MaterializationTask task) {
+    private boolean matches(RequiredObjectGenerationRequest request, MaterializationTask task) {
         return task.streamId().equals(request.streamId())
                 && task.coverage().equals(request.sourceRange())
                 && task.policyDigestSha256().equals(policy.digestSha256())
@@ -275,29 +313,25 @@ public final class RequiredObjectGenerationCoordinator
     }
 
     private CompletableFuture<Optional<RequiredObjectGenerationProof>> proveCurrent(
-            RequiredObjectGenerationRequest request,
-            MaterializationDeadline deadline) {
+            RequiredObjectGenerationRequest request, MaterializationDeadline deadline) {
         return deadline.bound(
-                        () -> authority.prove(
-                                request.streamId(),
-                                request.sourceRange(),
-                                request.sourceCommitVersion()),
+                        () -> authority.prove(request.streamId(), request.sourceRange(), request.sourceCommitVersion()),
                         "prove required Object generation through normal read path")
-                .thenApply(optional -> optional
-                        .filter(this::usesCurrentPolicy)
-                        .map(proof -> toProof(request, proof)));
+                .thenApply(optional -> optional.filter(this::usesCurrentPolicy).map(proof -> toProof(request, proof)));
     }
 
     private boolean usesCurrentPolicy(CommittedObjectGenerationProof proof) {
         return proof.index().value().generation() > 0
-                && proof.index().value().policySha256().equals(policy.digestSha256().value())
+                && proof.index()
+                        .value()
+                        .policySha256()
+                        .equals(policy.digestSha256().value())
                 && proof.checkpoint().value().policyId().equals(policy.policyId())
                 && proof.checkpoint().value().policyVersion() == policy.policyVersion();
     }
 
     private static RequiredObjectGenerationProof toProof(
-            RequiredObjectGenerationRequest request,
-            CommittedObjectGenerationProof proof) {
+            RequiredObjectGenerationRequest request, CommittedObjectGenerationProof proof) {
         return new RequiredObjectGenerationProof(
                 request,
                 proof.index().value().taskId(),
@@ -308,15 +342,8 @@ public final class RequiredObjectGenerationCoordinator
                 ReadTargetIdentities.sha256(proof.target()));
     }
 
-    private static NereusException failure(
-            ErrorCode code,
-            boolean retriable,
-            String message) {
-        return new NereusException(
-                code,
-                retriable,
-                message,
-                AppendOutcome.KNOWN_COMMITTED);
+    private static NereusException failure(ErrorCode code, boolean retriable, String message) {
+        return new NereusException(code, retriable, message, AppendOutcome.KNOWN_COMMITTED);
     }
 
     private static NereusException invariant(String message) {
@@ -325,11 +352,7 @@ public final class RequiredObjectGenerationCoordinator
 
     private static NereusException invariant(String message, Throwable cause) {
         return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message,
-                cause,
-                AppendOutcome.KNOWN_COMMITTED);
+                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause, AppendOutcome.KNOWN_COMMITTED);
     }
 
     private static String text(String value, String field) {

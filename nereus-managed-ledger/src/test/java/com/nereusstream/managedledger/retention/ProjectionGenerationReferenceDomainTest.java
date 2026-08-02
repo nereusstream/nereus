@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.retention;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectKey;
@@ -34,17 +34,15 @@ import org.junit.jupiter.api.Test;
 class ProjectionGenerationReferenceDomainTest {
     private static final String CLUSTER = "cluster/a";
     private static final String NAME = "tenant/ns/persistent/projection-domain";
-    private static final ProjectionPublishGuard ALLOW =
-            () -> CompletableFuture.completedFuture(null);
-    private static final GcReferenceDomainConfig CONFIG =
-            new GcReferenceDomainConfig(1, 100, 100);
+    private static final ProjectionPublishGuard ALLOW = () -> CompletableFuture.completedFuture(null);
+    private static final GcReferenceDomainConfig CONFIG = new GcReferenceDomainConfig(1, 100, 100);
 
     @Test
     void liveProjectionRequiresMarkerAndQueryBoundRevalidationDetectsTopicDrift() {
         var state = new FakeManagedLedgerProjectionMetadataStore.DurableState();
         try (var store = projectionStore(state)) {
-            TopicProjectionRecord created = store.createFirstProjection(
-                    CLUSTER, request(NAME, 3, 1), ALLOW).join();
+            TopicProjectionRecord created = store.createFirstProjection(CLUSTER, request(NAME, 3, 1), ALLOW)
+                    .join();
             GcReferenceQuery query = query(new StreamId(created.streamId()));
             var domain = new ProjectionGenerationReferenceDomain(CLUSTER, store, CONFIG);
 
@@ -54,10 +52,8 @@ class ProjectionGenerationReferenceDomainTest {
             assertThat(blocked.authorities()).hasSize(2);
 
             TopicProjectionRecord activated = store.activateGenerationProtocol(
-                    CLUSTER,
-                    NAME,
-                    created.projectionIdentity(),
-                    created.metadataVersion()).join();
+                            CLUSTER, NAME, created.projectionIdentity(), created.metadataVersion())
+                    .join();
             assertThat(ManagedLedgerGenerationProtocol.isActivated(activated)).isTrue();
             var clear = domain.snapshot(query).join();
             assertThat(clear.complete()).isTrue();
@@ -65,11 +61,12 @@ class ProjectionGenerationReferenceDomainTest {
             assertThat(domain.stillMatches(query, clear).join()).isTrue();
 
             store.updateProperties(
-                    CLUSTER,
-                    NAME,
-                    activated.projectionIdentity(),
-                    activated.metadataVersion(),
-                    Map.of("owner", "changed")).join();
+                            CLUSTER,
+                            NAME,
+                            activated.projectionIdentity(),
+                            activated.metadataVersion(),
+                            Map.of("owner", "changed"))
+                    .join();
             assertThat(domain.stillMatches(query, clear).join()).isFalse();
         }
     }
@@ -78,33 +75,38 @@ class ProjectionGenerationReferenceDomainTest {
     void strictlyNewerCurrentIncarnationProvesOldStreamUnaddressable() {
         var state = new FakeManagedLedgerProjectionMetadataStore.DurableState();
         try (var store = projectionStore(state)) {
-            TopicProjectionRecord original = store.createFirstProjection(
-                    CLUSTER, request(NAME, 3, 1), ALLOW).join();
+            TopicProjectionRecord original = store.createFirstProjection(CLUSTER, request(NAME, 3, 1), ALLOW)
+                    .join();
             TopicProjectionRecord deleting = store.mirrorFacadeState(
-                    CLUSTER,
-                    NAME,
-                    original.projectionIdentity(),
-                    original.metadataVersion(),
-                    ManagedLedgerFacadeState.DELETING).join();
+                            CLUSTER,
+                            NAME,
+                            original.projectionIdentity(),
+                            original.metadataVersion(),
+                            ManagedLedgerFacadeState.DELETING)
+                    .join();
             TopicProjectionRecord deleted = store.mirrorFacadeState(
-                    CLUSTER,
-                    NAME,
-                    deleting.projectionIdentity(),
-                    deleting.metadataVersion(),
-                    ManagedLedgerFacadeState.DELETED).join();
+                            CLUSTER,
+                            NAME,
+                            deleting.projectionIdentity(),
+                            deleting.metadataVersion(),
+                            ManagedLedgerFacadeState.DELETED)
+                    .join();
             var domain = new ProjectionGenerationReferenceDomain(CLUSTER, store, CONFIG);
-            var deletedView = domain.snapshot(query(new StreamId(original.streamId()))).join();
+            var deletedView =
+                    domain.snapshot(query(new StreamId(original.streamId()))).join();
             assertThat(deletedView.complete()).isTrue();
             assertThat(deletedView.veto()).isFalse();
             TopicProjectionRecord recreated = store.recreateDeletedProjection(
-                    CLUSTER,
-                    deleted.projectionIdentity(),
-                    deleted.metadataVersion(),
-                    request(NAME, 4, 2),
-                    ALLOW).join();
+                            CLUSTER,
+                            deleted.projectionIdentity(),
+                            deleted.metadataVersion(),
+                            request(NAME, 4, 2),
+                            ALLOW)
+                    .join();
 
             var old = domain.snapshot(query(new StreamId(original.streamId()))).join();
-            var current = domain.snapshot(query(new StreamId(recreated.streamId()))).join();
+            var current =
+                    domain.snapshot(query(new StreamId(recreated.streamId()))).join();
             assertThat(old.complete()).isTrue();
             assertThat(old.veto()).isFalse();
             assertThat(current.complete()).isTrue();
@@ -125,10 +127,8 @@ class ProjectionGenerationReferenceDomainTest {
 
             long before = state.backendCalls();
             var ownerless = domain.snapshot(GcReferenceQuery.create(
-                    GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
-                    object(),
-                    List.of(),
-                    sha256('2'))).join();
+                            GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE, object(), List.of(), sha256('2')))
+                    .join();
             assertThat(ownerless.complete()).isFalse();
             assertThat(ownerless.veto()).isTrue();
             assertThat(state.backendCalls()).isEqualTo(before);
@@ -139,15 +139,14 @@ class ProjectionGenerationReferenceDomainTest {
     void topicPublishedBeforeDerivedBindingRepairCannotAuthorizeDeletion() {
         var state = new FakeManagedLedgerProjectionMetadataStore.DurableState();
         try (var store = projectionStore(state)) {
-            store.failNext(
-                    FakeManagedLedgerProjectionMetadataStore.FailurePoint.AFTER_TOPIC_WRITE);
-            assertThatThrownBy(() -> store.createFirstProjection(
-                            CLUSTER, request(NAME, 3, 1), ALLOW).join())
+            store.failNext(FakeManagedLedgerProjectionMetadataStore.FailurePoint.AFTER_TOPIC_WRITE);
+            assertThatThrownBy(() -> store.createFirstProjection(CLUSTER, request(NAME, 3, 1), ALLOW)
+                            .join())
                     .isInstanceOf(RuntimeException.class);
 
             var domain = new ProjectionGenerationReferenceDomain(CLUSTER, store, CONFIG);
-            var blocked = domain.snapshot(query(
-                    ManagedLedgerProjectionNames.streamId(NAME, 1))).join();
+            var blocked = domain.snapshot(query(ManagedLedgerProjectionNames.streamId(NAME, 1)))
+                    .join();
             assertThat(blocked.complete()).isTrue();
             assertThat(blocked.veto()).isTrue();
             assertThat(blocked.authorities()).hasSize(1);
@@ -158,24 +157,16 @@ class ProjectionGenerationReferenceDomainTest {
     void ownerlessGlobalScopeReusesExactProjectionAuthoritiesWithoutMaterializationDependency() {
         var state = new FakeManagedLedgerProjectionMetadataStore.DurableState();
         try (var store = projectionStore(state)) {
-            TopicProjectionRecord created = store.createFirstProjection(
-                    CLUSTER, request(NAME, 3, 1), ALLOW).join();
+            TopicProjectionRecord created = store.createFirstProjection(CLUSTER, request(NAME, 3, 1), ALLOW)
+                    .join();
             TopicProjectionRecord activated = store.activateGenerationProtocol(
-                    CLUSTER,
-                    NAME,
-                    created.projectionIdentity(),
-                    created.metadataVersion()).join();
+                            CLUSTER, NAME, created.projectionIdentity(), created.metadataVersion())
+                    .join();
             StreamId streamId = new StreamId(created.streamId());
             var domain = new ProjectionGenerationReferenceDomain(
-                    CLUSTER,
-                    store,
-                    CONFIG,
-                    ManagedLedgerGlobalScopeTestSupport.complete(streamId));
+                    CLUSTER, store, CONFIG, ManagedLedgerGlobalScopeTestSupport.complete(streamId));
             GcReferenceQuery ownerless = GcReferenceQuery.create(
-                    GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
-                    object(),
-                    List.of(),
-                    sha256('2'));
+                    GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE, object(), List.of(), sha256('2'));
 
             var clear = domain.snapshot(ownerless).join();
 
@@ -188,11 +179,12 @@ class ProjectionGenerationReferenceDomainTest {
             assertThat(domain.stillMatches(ownerless, clear).join()).isTrue();
 
             store.updateProperties(
-                    CLUSTER,
-                    NAME,
-                    activated.projectionIdentity(),
-                    activated.metadataVersion(),
-                    Map.of("owner", "global-change")).join();
+                            CLUSTER,
+                            NAME,
+                            activated.projectionIdentity(),
+                            activated.metadataVersion(),
+                            Map.of("owner", "global-change"))
+                    .join();
             assertThat(domain.stillMatches(ownerless, clear).join()).isFalse();
         }
     }
@@ -205,10 +197,7 @@ class ProjectionGenerationReferenceDomainTest {
 
     private static GcReferenceQuery query(StreamId streamId) {
         return GcReferenceQuery.create(
-                GcReferenceQueryKind.REFERENCED_OBJECT,
-                object(),
-                List.of(streamId),
-                sha256('1'));
+                GcReferenceQueryKind.REFERENCED_OBJECT, object(), List.of(streamId), sha256('1'));
     }
 
     private static PhysicalObjectIdentity object() {
@@ -222,8 +211,7 @@ class ProjectionGenerationReferenceDomainTest {
                 Optional.empty());
     }
 
-    private static ProjectionCreateRequest request(
-            String name, long binding, long incarnation) {
+    private static ProjectionCreateRequest request(String name, long binding, long incarnation) {
         return new ProjectionCreateRequest(
                 name,
                 binding,

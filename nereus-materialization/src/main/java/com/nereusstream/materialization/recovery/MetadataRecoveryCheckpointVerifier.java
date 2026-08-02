@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.recovery;
 
 import com.nereusstream.api.ReadView;
@@ -15,14 +16,14 @@ import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointWriteRequest;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-/** Authoritative F4 metadata-codec verifier for NRC1 embedded repair evidence. */
+/**
+ * Authoritative F4 metadata-codec verifier for NRC1 embedded repair evidence.
+ */
 public final class MetadataRecoveryCheckpointVerifier implements RecoveryCheckpointVerifier {
     private final GenerationIndexRecordCodecV1 generationCodec = new GenerationIndexRecordCodecV1();
 
     @Override
-    public void verifyPublication(
-            RecoveryCheckpointWriteRequest header,
-            RecoveryCheckpointPublication publication) {
+    public void verifyPublication(RecoveryCheckpointWriteRequest header, RecoveryCheckpointPublication publication) {
         try {
             byte[] canonical = bytes(publication.canonicalGenerationIndexRecord());
             GenerationIndexRecord record = generationCodec.decode(canonical);
@@ -34,7 +35,8 @@ public final class MetadataRecoveryCheckpointVerifier implements RecoveryCheckpo
                     || record.lifecycle() != GenerationLifecycle.COMMITTED
                     || !record.streamId().equals(header.streamId().value())
                     || record.generation() != publication.generation()
-                    || !record.publicationId().equals(publication.publicationId().value())
+                    || !record.publicationId()
+                            .equals(publication.publicationId().value())
                     || record.offsetStart() != publication.coverage().startOffset()
                     || record.offsetEnd() != publication.coverage().endOffset()
                     || record.firstCommitVersion() < header.firstCommitVersion()
@@ -46,22 +48,18 @@ public final class MetadataRecoveryCheckpointVerifier implements RecoveryCheckpo
         } catch (RecoveryCheckpointFormatException failure) {
             throw failure;
         } catch (RuntimeException failure) {
-            throw new RecoveryCheckpointFormatException(
-                    "cannot strictly decode embedded generation index", failure);
+            throw new RecoveryCheckpointFormatException("cannot strictly decode embedded generation index", failure);
         }
     }
 
     @Override
-    public void verifyEntry(
-            RecoveryCheckpointWriteRequest header,
-            RecoveryCheckpointEntry entry) {
+    public void verifyEntry(RecoveryCheckpointWriteRequest header, RecoveryCheckpointEntry entry) {
         try {
             byte[] canonical = bytes(entry.canonicalCommitRecord());
-            StreamCommitTargetRecord record = MetadataRecordCodecFactory.decodeEnvelope(
-                    canonical, StreamCommitTargetRecord.class);
+            StreamCommitTargetRecord record =
+                    MetadataRecordCodecFactory.decodeEnvelope(canonical, StreamCommitTargetRecord.class);
             if (!Arrays.equals(
-                    canonical,
-                    MetadataRecordCodecFactory.encodeEnvelope(record, StreamCommitTargetRecord.class))) {
+                    canonical, MetadataRecordCodecFactory.encodeEnvelope(record, StreamCommitTargetRecord.class))) {
                 throw corrupt("embedded generic commit envelope is not canonically encoded");
             }
             if (record.metadataVersion() != 0
@@ -78,8 +76,7 @@ public final class MetadataRecoveryCheckpointVerifier implements RecoveryCheckpo
         } catch (RecoveryCheckpointFormatException failure) {
             throw failure;
         } catch (RuntimeException failure) {
-            throw new RecoveryCheckpointFormatException(
-                    "cannot strictly decode embedded generic commit", failure);
+            throw new RecoveryCheckpointFormatException("cannot strictly decode embedded generic commit", failure);
         }
     }
 

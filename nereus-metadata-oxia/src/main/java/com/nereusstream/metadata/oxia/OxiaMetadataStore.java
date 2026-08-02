@@ -16,8 +16,13 @@ package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
+import com.nereusstream.api.AppendSessionRequest;
 import com.nereusstream.api.Checksum;
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
+import com.nereusstream.api.StableStreamHeadSnapshot;
+import com.nereusstream.api.StreamCommitAnchor;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
@@ -25,7 +30,6 @@ import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
 import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
 import com.nereusstream.metadata.oxia.records.ObjectReferenceRecord;
-import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
 import java.time.Duration;
@@ -35,66 +39,61 @@ import java.util.concurrent.CompletableFuture;
 
 public interface OxiaMetadataStore extends AutoCloseable {
     CompletableFuture<StreamMetadataRecord> createOrGetStream(
-            String cluster,
-            StreamName streamName,
-            StreamCreateOptions options);
+            String cluster, StreamName streamName, StreamCreateOptions options);
 
-    CompletableFuture<StreamMetadataRecord> getStream(
-            String cluster,
-            StreamId streamId);
+    CompletableFuture<StreamMetadataRecord> getStream(String cluster, StreamId streamId);
 
-    CompletableFuture<StreamMetadataSnapshot> getStreamSnapshot(
-            String cluster,
-            StreamId streamId);
+    CompletableFuture<StreamMetadataSnapshot> getStreamSnapshot(String cluster, StreamId streamId);
 
-    /** Read-only proof that the captured append session still owns the active stream head. */
-    CompletableFuture<Void> revalidateAppendSession(
-            String cluster,
-            AppendSession session);
+    CompletableFuture<StableStreamHeadSnapshot> getStableStreamHeadSnapshot(String cluster, StreamId streamId);
+
+    CompletableFuture<Boolean> isCommitReachable(
+            String cluster, StreamCommitAnchor descendant, String ancestorCommitId, long ancestorCommitVersion);
+
+    /**
+     * Read-only proof that the captured append session still owns the active stream head.
+     */
+    CompletableFuture<Void> revalidateAppendSession(String cluster, AppendSession session);
 
     CompletableFuture<AppendSessionRecord> acquireAppendSession(
-            String cluster,
-            StreamId streamId,
-            AppendSessionOptions options);
+            String cluster, StreamId streamId, AppendSessionOptions options);
+
+    default CompletableFuture<AppendSessionRecord> acquireAppendSession(
+            String cluster, StreamId streamId, AppendSessionRequest request) {
+        if (request == null) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT, false, "append session request is required");
+        }
+        if (request.authority().isEmpty()) {
+            return acquireAppendSession(cluster, streamId, request.options());
+        }
+        return NereusException.failedFuture(
+                ErrorCode.UNSUPPORTED_APPEND_AUTHORITY,
+                false,
+                "metadata provider does not support external append authority");
+    }
 
     CompletableFuture<AppendSessionRecord> renewAppendSession(
-            String cluster,
-            StreamId streamId,
-            String writerId,
-            long epoch,
-            String fencingToken,
-            Duration ttl);
+            String cluster, StreamId streamId, String writerId, long epoch, String fencingToken, Duration ttl);
 
-    CompletableFuture<Void> putObjectManifest(
-            String cluster,
-            ObjectManifestRecord manifest);
+    CompletableFuture<Void> putObjectManifest(String cluster, ObjectManifestRecord manifest);
 
-    CompletableFuture<Optional<ObjectManifestRecord>> getObjectManifest(
-            String cluster,
-            ObjectId objectId);
+    CompletableFuture<Optional<ObjectManifestRecord>> getObjectManifest(String cluster, ObjectId objectId);
 
-    CompletableFuture<Optional<ObjectReferenceRecord>> getObjectReferences(
-            String cluster,
-            ObjectId objectId);
+    CompletableFuture<Optional<ObjectReferenceRecord>> getObjectReferences(String cluster, ObjectId objectId);
 
-    CompletableFuture<ObjectReferenceRecord> repairObjectReferences(
-            String cluster,
-            ObjectId objectId);
+    CompletableFuture<ObjectReferenceRecord> repairObjectReferences(String cluster, ObjectId objectId);
 
-    CompletableFuture<CommitSliceResult> commitStreamSlice(
-            String cluster,
-            CommitSliceRequest request);
+    CompletableFuture<CommitSliceResult> commitStreamSlice(String cluster, CommitSliceRequest request);
 
-    CompletableFuture<PreparedStableAppend> prepareStableAppend(
-            String cluster,
-            CommitAppendRequest request);
+    CompletableFuture<PreparedStableAppend> prepareStableAppend(String cluster, CommitAppendRequest request);
 
     CompletableFuture<StableAppendResult> commitPreparedStableAppend(
-            String cluster,
-            PreparedStableAppend prepared,
-            PhysicalReferenceProof protectionProof);
+            String cluster, PreparedStableAppend prepared, PhysicalReferenceProof protectionProof);
 
-    /** Object-WAL compatibility entry point retained while callers migrate to provider-neutral proofs. */
+    /**
+     * Object-WAL compatibility entry point retained while callers migrate to provider-neutral proofs.
+     */
     @Deprecated(forRemoval = true)
     default CompletableFuture<StableAppendResult> commitPreparedStableAppend(
             String cluster,
@@ -118,12 +117,10 @@ public interface OxiaMetadataStore extends AutoCloseable {
     }
 
     CompletableFuture<MaterializedGenerationZero> materializeGenerationZero(
-            String cluster,
-            ReachableCommittedAppend reachableAppend);
+            String cluster, ReachableCommittedAppend reachableAppend);
 
     CompletableFuture<Void> revalidateMaterializedGenerationZero(
-            String cluster,
-            MaterializedGenerationZero materialized);
+            String cluster, MaterializedGenerationZero materialized);
 
     CompletableFuture<AppendReplaySearchResult> searchAppendReplay(
             String cluster,
@@ -139,8 +136,7 @@ public interface OxiaMetadataStore extends AutoCloseable {
             int maxCommitsToScan);
 
     CompletableFuture<StreamMetadataSnapshot> transitionStreamState(
-            String cluster,
-            StreamStateTransitionRequest request);
+            String cluster, StreamStateTransitionRequest request);
 
     CompletableFuture<DerivedIndexRepairResult> repairDerivedStreamIndexes(
             String cluster,
@@ -150,42 +146,20 @@ public interface OxiaMetadataStore extends AutoCloseable {
             int maxCommitsToScan);
 
     default CompletableFuture<DerivedIndexRepairResult> repairDerivedStreamIndexes(
-            String cluster,
-            StreamId streamId,
-            long targetOffset,
-            int maxCommitsToScan) {
-        return repairDerivedStreamIndexes(
-                cluster,
-                streamId,
-                targetOffset,
-                Optional.empty(),
-                maxCommitsToScan);
+            String cluster, StreamId streamId, long targetOffset, int maxCommitsToScan) {
+        return repairDerivedStreamIndexes(cluster, streamId, targetOffset, Optional.empty(), maxCommitsToScan);
     }
 
     CompletableFuture<List<OffsetIndexEntry>> scanOffsetIndex(
-            String cluster,
-            StreamId streamId,
-            long startOffset,
-            int limit);
+            String cluster, StreamId streamId, long startOffset, int limit);
 
-    CompletableFuture<CommittedEndOffsetRecord> getCommittedEndOffset(
-            String cluster,
-            StreamId streamId);
+    CompletableFuture<CommittedEndOffsetRecord> getCommittedEndOffset(String cluster, StreamId streamId);
 
-    CompletableFuture<TrimRecord> updateTrim(
-            String cluster,
-            StreamId streamId,
-            long beforeOffset,
-            String reason);
+    CompletableFuture<TrimRecord> updateTrim(String cluster, StreamId streamId, long beforeOffset, String reason);
 
-    CompletableFuture<TrimRecord> getTrim(
-            String cluster,
-            StreamId streamId);
+    CompletableFuture<TrimRecord> getTrim(String cluster, StreamId streamId);
 
-    WatchRegistration watchStream(
-            String cluster,
-            StreamId streamId,
-            MetadataWatcher watcher);
+    WatchRegistration watchStream(String cluster, StreamId streamId, MetadataWatcher watcher);
 
     @Override
     void close();

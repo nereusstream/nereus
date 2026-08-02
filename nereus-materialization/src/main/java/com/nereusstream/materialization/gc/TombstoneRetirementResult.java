@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ObjectKeyHash;
 import java.util.Objects;
 
-/** Exact mutation summary for one DELETED-root retirement attempt. */
+/**
+ * Exact mutation summary for one DELETED-root retirement attempt.
+ */
 public record TombstoneRetirementResult(
         ObjectKeyHash object,
         long rootMetadataVersion,
@@ -24,10 +27,7 @@ public record TombstoneRetirementResult(
     }
 
     public static TombstoneRetirementResult simple(
-            ObjectKeyHash object,
-            long rootMetadataVersion,
-            TombstoneRetirementStatus status) {
-        return new TombstoneRetirementResult(
-                object, rootMetadataVersion, status, false, false, false);
+            ObjectKeyHash object, long rootMetadataVersion, TombstoneRetirementStatus status) {
+        return new TombstoneRetirementResult(object, rootMetadataVersion, status, false, false, false);
     }
 }

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -27,16 +28,16 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
-/** Oxia-backed, manifest-last GC retirement journal. */
+/**
+ * Oxia-backed, manifest-last GC retirement journal.
+ */
 public final class DefaultGcRetirementJournal implements GcRetirementJournal {
     private final String cluster;
     private final PhysicalObjectMetadataStore metadataStore;
     private final PhysicalGcConfig config;
 
     public DefaultGcRetirementJournal(
-            String cluster,
-            PhysicalObjectMetadataStore metadataStore,
-            PhysicalGcConfig config) {
+            String cluster, PhysicalObjectMetadataStore metadataStore, PhysicalGcConfig config) {
         this.cluster = requireText(cluster, "cluster");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         this.config = Objects.requireNonNull(config, "config");
@@ -67,54 +68,51 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
             return CompletableFuture.failedFuture(failure);
         }
         return load(preparation.object(), preparation.gcAttemptId(), deadline)
-                .thenCompose(existing -> existing
-                        .<CompletableFuture<GcRetirementJournalSnapshot>>map(snapshot ->
-                                requireExpected(snapshot, preparation))
+                .thenCompose(existing -> existing.<CompletableFuture<GcRetirementJournalSnapshot>>map(
+                                snapshot -> requireExpected(snapshot, preparation))
                         .orElseGet(() -> writeAndSeal(preparation, deadline)));
     }
 
     @Override
     public CompletableFuture<Optional<GcRetirementJournalSnapshot>> load(
-            ObjectKeyHash object,
-            String gcAttemptId,
-            MaterializationDeadline deadline) {
+            ObjectKeyHash object, String gcAttemptId, MaterializationDeadline deadline) {
         ObjectKeyHash exactObject = Objects.requireNonNull(object, "object");
         String exactAttempt = GcPlanValidation.requireBase32Id(gcAttemptId, "gcAttemptId");
         Objects.requireNonNull(deadline, "deadline");
         return deadline.bound(
-                        () -> metadataStore.getRetirementManifest(
-                                cluster, exactObject, exactAttempt),
+                        () -> metadataStore.getRetirementManifest(cluster, exactObject, exactAttempt),
                         "load GC retirement-journal manifest")
-                .thenCompose(optional -> optional
-                        .<CompletableFuture<Optional<GcRetirementJournalSnapshot>>>map(manifest -> {
-                            if (!manifest.value().objectKeyHash().equals(exactObject.value())
-                                    || !manifest.value().gcAttemptId().equals(exactAttempt)) {
-                                return CompletableFuture.failedFuture(invariant(
-                                        "GC retirement manifest escaped its object/attempt key"));
-                            }
-                            CompletableFuture<List<VersionedGcRetirementProtection>> protections =
-                                    scanProtectionEntries(
-                                            exactObject,
-                                            exactAttempt,
-                                            manifest.value().protectionCount(),
-                                            deadline);
-                            CompletableFuture<List<VersionedGcRetirementRemoval>> removals =
-                                    scanRemovalEntries(
+                .thenCompose(
+                        optional -> optional.<CompletableFuture<Optional<GcRetirementJournalSnapshot>>>map(manifest -> {
+                                    if (!manifest.value().objectKeyHash().equals(exactObject.value())
+                                            || !manifest.value().gcAttemptId().equals(exactAttempt)) {
+                                        return CompletableFuture.failedFuture(
+                                                invariant("GC retirement manifest escaped its object/attempt key"));
+                                    }
+                                    CompletableFuture<List<VersionedGcRetirementProtection>> protections =
+                                            scanProtectionEntries(
+                                                    exactObject,
+                                                    exactAttempt,
+                                                    manifest.value().protectionCount(),
+                                                    deadline);
+                                    CompletableFuture<List<VersionedGcRetirementRemoval>> removals = scanRemovalEntries(
                                             exactObject,
                                             exactAttempt,
                                             manifest.value().metadataRemovalCount(),
                                             deadline);
-                            return protections.thenCombine(removals, (protectionValues, removalValues) ->
-                                            new GcRetirementJournalSnapshot(
-                                                    manifest, protectionValues, removalValues))
-                                    .thenApply(Optional::of);
-                        })
-                        .orElseGet(() -> CompletableFuture.completedFuture(Optional.empty())));
+                                    return protections
+                                            .thenCombine(
+                                                    removals,
+                                                    (protectionValues, removalValues) ->
+                                                            new GcRetirementJournalSnapshot(
+                                                                    manifest, protectionValues, removalValues))
+                                            .thenApply(Optional::of);
+                                })
+                                .orElseGet(() -> CompletableFuture.completedFuture(Optional.empty())));
     }
 
     private CompletableFuture<GcRetirementJournalSnapshot> writeAndSeal(
-            Preparation preparation,
-            MaterializationDeadline deadline) {
+            Preparation preparation, MaterializationDeadline deadline) {
         List<Throwable> writeFailures = Collections.synchronizedList(new ArrayList<>());
         CompletableFuture<Void> writes = writeBatches(
                         preparation.protectionRecords(),
@@ -144,8 +142,7 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
     }
 
     private CompletableFuture<GcRetirementJournalSnapshot> sealManifest(
-            Preparation preparation,
-            MaterializationDeadline deadline) {
+            Preparation preparation, MaterializationDeadline deadline) {
         GcRetirementManifestRecord manifest = new GcRetirementManifestRecord(
                 1,
                 preparation.object().value(),
@@ -164,8 +161,7 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
                         () -> metadataStore.createRetirementManifest(cluster, manifest),
                         "seal GC retirement-journal manifest")
                 .handle((ignored, failure) -> failure)
-                .thenCompose(createFailure -> load(
-                                preparation.object(), preparation.gcAttemptId(), deadline)
+                .thenCompose(createFailure -> load(preparation.object(), preparation.gcAttemptId(), deadline)
                         .thenCompose(optional -> {
                             if (optional.isPresent()) {
                                 return requireExpected(optional.orElseThrow(), preparation);
@@ -173,20 +169,17 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
                             if (createFailure != null) {
                                 return CompletableFuture.failedFuture(unwrap(createFailure));
                             }
-                            return CompletableFuture.failedFuture(invariant(
-                                    "sealed GC retirement manifest disappeared on reload"));
+                            return CompletableFuture.failedFuture(
+                                    invariant("sealed GC retirement manifest disappeared on reload"));
                         }));
     }
 
-    private CompletableFuture<EntrySet> scanExactEntries(
-            Preparation preparation,
-            MaterializationDeadline deadline) {
-        CompletableFuture<List<VersionedGcRetirementProtection>> protections =
-                scanProtectionEntries(
-                        preparation.object(),
-                        preparation.gcAttemptId(),
-                        preparation.protections().size(),
-                        deadline);
+    private CompletableFuture<EntrySet> scanExactEntries(Preparation preparation, MaterializationDeadline deadline) {
+        CompletableFuture<List<VersionedGcRetirementProtection>> protections = scanProtectionEntries(
+                preparation.object(),
+                preparation.gcAttemptId(),
+                preparation.protections().size(),
+                deadline);
         CompletableFuture<List<VersionedGcRetirementRemoval>> removals = scanRemovalEntries(
                 preparation.object(),
                 preparation.gcAttemptId(),
@@ -213,19 +206,13 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
                     GcPlanValidation.METADATA_ORDER,
                     GcRetirementManifestRecord.MAX_PLAN_ENTRIES,
                     "journalRemovals");
-            if (!protections.equals(preparation.protections())
-                    || !removals.equals(preparation.removals())) {
-                return invariant(
-                        "GC retirement journal entries differ from the exact source plan");
+            if (!protections.equals(preparation.protections()) || !removals.equals(preparation.removals())) {
+                return invariant("GC retirement journal entries differ from the exact source plan");
             }
             Checksum digest = GcPlanValidation.referenceSetSha256(
-                    preparation.queryIdentitySha256(),
-                    preparation.domainProofs(),
-                    protections,
-                    removals);
+                    preparation.queryIdentitySha256(), preparation.domainProofs(), protections, removals);
             if (!digest.equals(preparation.referenceSetSha256())) {
-                return invariant(
-                        "GC retirement journal entries do not reproduce the reference-set digest");
+                return invariant("GC retirement journal entries do not reproduce the reference-set digest");
             }
             return null;
         } catch (Throwable failure) {
@@ -234,18 +221,9 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
     }
 
     private CompletableFuture<List<VersionedGcRetirementProtection>> scanProtectionEntries(
-            ObjectKeyHash object,
-            String gcAttemptId,
-            int expectedCount,
-            MaterializationDeadline deadline) {
+            ObjectKeyHash object, String gcAttemptId, int expectedCount, MaterializationDeadline deadline) {
         return scanProtectionEntries(
-                object,
-                gcAttemptId,
-                expectedCount,
-                Optional.empty(),
-                new ArrayList<>(),
-                null,
-                deadline);
+                object, gcAttemptId, expectedCount, Optional.empty(), new ArrayList<>(), null, deadline);
     }
 
     private CompletableFuture<List<VersionedGcRetirementProtection>> scanProtectionEntries(
@@ -258,11 +236,7 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
             MaterializationDeadline deadline) {
         return deadline.bound(
                         () -> metadataStore.scanRetirementProtections(
-                                cluster,
-                                object,
-                                gcAttemptId,
-                                continuation,
-                                config.metadataScanPageSize()),
+                                cluster, object, gcAttemptId, continuation, config.metadataScanPageSize()),
                         "scan GC retirement-journal protections")
                 .thenCompose(page -> {
                     requireIncreasing(page, lastKey);
@@ -274,42 +248,28 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
                                 value.value().gcAttemptId());
                         values.add(value);
                         if (values.size() > expectedCount) {
-                            return CompletableFuture.failedFuture(invariant(
-                                    "GC retirement journal has extra protection entries"));
+                            return CompletableFuture.failedFuture(
+                                    invariant("GC retirement journal has extra protection entries"));
                         }
                     }
                     if (page.continuation().isEmpty()) {
                         if (values.size() != expectedCount) {
-                            return CompletableFuture.failedFuture(invariant(
-                                    "GC retirement journal is missing protection entries"));
+                            return CompletableFuture.failedFuture(
+                                    invariant("GC retirement journal is missing protection entries"));
                         }
                         return CompletableFuture.completedFuture(List.copyOf(values));
                     }
-                    String nextLast = page.values().get(page.values().size() - 1).key();
+                    String nextLast =
+                            page.values().get(page.values().size() - 1).key();
                     return scanProtectionEntries(
-                            object,
-                            gcAttemptId,
-                            expectedCount,
-                            page.continuation(),
-                            values,
-                            nextLast,
-                            deadline);
+                            object, gcAttemptId, expectedCount, page.continuation(), values, nextLast, deadline);
                 });
     }
 
     private CompletableFuture<List<VersionedGcRetirementRemoval>> scanRemovalEntries(
-            ObjectKeyHash object,
-            String gcAttemptId,
-            int expectedCount,
-            MaterializationDeadline deadline) {
+            ObjectKeyHash object, String gcAttemptId, int expectedCount, MaterializationDeadline deadline) {
         return scanRemovalEntries(
-                object,
-                gcAttemptId,
-                expectedCount,
-                Optional.empty(),
-                new ArrayList<>(),
-                null,
-                deadline);
+                object, gcAttemptId, expectedCount, Optional.empty(), new ArrayList<>(), null, deadline);
     }
 
     private CompletableFuture<List<VersionedGcRetirementRemoval>> scanRemovalEntries(
@@ -322,11 +282,7 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
             MaterializationDeadline deadline) {
         return deadline.bound(
                         () -> metadataStore.scanRetirementRemovals(
-                                cluster,
-                                object,
-                                gcAttemptId,
-                                continuation,
-                                config.metadataScanPageSize()),
+                                cluster, object, gcAttemptId, continuation, config.metadataScanPageSize()),
                         "scan GC retirement-journal removals")
                 .thenCompose(page -> {
                     requireIncreasing(page, lastKey);
@@ -338,33 +294,26 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
                                 value.value().gcAttemptId());
                         values.add(value);
                         if (values.size() > expectedCount) {
-                            return CompletableFuture.failedFuture(invariant(
-                                    "GC retirement journal has extra removal entries"));
+                            return CompletableFuture.failedFuture(
+                                    invariant("GC retirement journal has extra removal entries"));
                         }
                     }
                     if (page.continuation().isEmpty()) {
                         if (values.size() != expectedCount) {
-                            return CompletableFuture.failedFuture(invariant(
-                                    "GC retirement journal is missing removal entries"));
+                            return CompletableFuture.failedFuture(
+                                    invariant("GC retirement journal is missing removal entries"));
                         }
                         return CompletableFuture.completedFuture(List.copyOf(values));
                     }
-                    String nextLast = page.values().get(page.values().size() - 1).key();
+                    String nextLast =
+                            page.values().get(page.values().size() - 1).key();
                     return scanRemovalEntries(
-                            object,
-                            gcAttemptId,
-                            expectedCount,
-                            page.continuation(),
-                            values,
-                            nextLast,
-                            deadline);
+                            object, gcAttemptId, expectedCount, page.continuation(), values, nextLast, deadline);
                 });
     }
 
     private <T> CompletableFuture<Void> writeBatches(
-            List<T> values,
-            Function<T, CompletableFuture<?>> operation,
-            List<Throwable> failures) {
+            List<T> values, Function<T, CompletableFuture<?>> operation, List<Throwable> failures) {
         int batchSize = Math.min(config.maxConcurrentDeletes(), 1_000);
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         for (int start = 0; start < values.size(); start += batchSize) {
@@ -375,8 +324,7 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
                 for (T value : values.subList(from, to)) {
                     CompletableFuture<?> future;
                     try {
-                        future = Objects.requireNonNull(
-                                operation.apply(value), "journal write future");
+                        future = Objects.requireNonNull(operation.apply(value), "journal write future");
                     } catch (Throwable failure) {
                         failures.add(failure);
                         continue;
@@ -422,15 +370,12 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
                 GcPlanValidation.METADATA_ORDER,
                 config.maxReferencesPerDomainSnapshot(),
                 "plannedMetadataRemovals");
-        Checksum computed = GcPlan.computeReferenceSetSha256(
-                config, exactCandidate, snapshots, protections, removals);
+        Checksum computed = GcPlan.computeReferenceSetSha256(config, exactCandidate, snapshots, protections, removals);
         if (!computed.equals(referenceSetSha256)) {
-            throw new IllegalArgumentException(
-                    "referenceSetSha256 does not match the journal source plan");
+            throw new IllegalArgumentException("referenceSetSha256 does not match the journal source plan");
         }
-        List<GcDomainSnapshotProof> proofs = snapshots.stream()
-                .map(GcDomainSnapshotProof::from)
-                .toList();
+        List<GcDomainSnapshotProof> proofs =
+                snapshots.stream().map(GcDomainSnapshotProof::from).toList();
         List<GcRetirementProtectionRecord> protectionRecords = protections.stream()
                 .map(value -> protectionRecord(attempt, exactCandidate.object().objectKeyHash(), value))
                 .toList();
@@ -451,8 +396,7 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
     }
 
     private static CompletableFuture<GcRetirementJournalSnapshot> requireExpected(
-            GcRetirementJournalSnapshot snapshot,
-            Preparation expected) {
+            GcRetirementJournalSnapshot snapshot, Preparation expected) {
         if (!snapshot.object().equals(expected.object())
                 || !snapshot.gcAttemptId().equals(expected.gcAttemptId())
                 || !snapshot.queryIdentitySha256().equals(expected.queryIdentitySha256())
@@ -460,16 +404,14 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
                 || !snapshot.plannedProtectionRemovals().equals(expected.protections())
                 || !snapshot.plannedMetadataRemovals().equals(expected.removals())
                 || !snapshot.referenceSetSha256().equals(expected.referenceSetSha256())) {
-            return CompletableFuture.failedFuture(invariant(
-                    "existing GC retirement journal conflicts with the exact source plan"));
+            return CompletableFuture.failedFuture(
+                    invariant("existing GC retirement journal conflicts with the exact source plan"));
         }
         return CompletableFuture.completedFuture(snapshot);
     }
 
     private static GcRetirementProtectionRecord protectionRecord(
-            String attempt,
-            ObjectKeyHash object,
-            GcPlannedProtectionRemoval removal) {
+            String attempt, ObjectKeyHash object, GcPlannedProtectionRemoval removal) {
         return new GcRetirementProtectionRecord(
                 1,
                 object.value(),
@@ -482,9 +424,7 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
     }
 
     private static GcRetirementRemovalRecord removalRecord(
-            String attempt,
-            ObjectKeyHash object,
-            GcPlannedMetadataRemoval removal) {
+            String attempt, ObjectKeyHash object, GcPlannedMetadataRemoval removal) {
         return new GcRetirementRemovalRecord(
                 1,
                 object.value(),
@@ -504,26 +444,24 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
                 proof.snapshotSha256().value());
     }
 
-    private static void requireIncreasing(
-            GcRetirementProtectionScanPage page, String lastKey) {
-        if (lastKey != null && !page.values().isEmpty()
+    private static void requireIncreasing(GcRetirementProtectionScanPage page, String lastKey) {
+        if (lastKey != null
+                && !page.values().isEmpty()
                 && page.values().get(0).key().compareTo(lastKey) <= 0) {
             throw invariant("GC retirement-protection scan did not advance monotonically");
         }
     }
 
     private static void requireIncreasing(GcRetirementRemovalScanPage page, String lastKey) {
-        if (lastKey != null && !page.values().isEmpty()
+        if (lastKey != null
+                && !page.values().isEmpty()
                 && page.values().get(0).key().compareTo(lastKey) <= 0) {
             throw invariant("GC retirement-removal scan did not advance monotonically");
         }
     }
 
     private static void requireEntryIdentity(
-            ObjectKeyHash object,
-            String attempt,
-            String entryObject,
-            String entryAttempt) {
+            ObjectKeyHash object, String attempt, String entryObject, String entryAttempt) {
         if (!object.value().equals(entryObject) || !attempt.equals(entryAttempt)) {
             throw invariant("GC retirement scan escaped its object/attempt identity");
         }
@@ -538,8 +476,7 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static Throwable unwrap(Throwable supplied) {
@@ -572,8 +509,7 @@ public final class DefaultGcRetirementJournal implements GcRetirementJournal {
     }
 
     private record EntrySet(
-            List<VersionedGcRetirementProtection> protections,
-            List<VersionedGcRetirementRemoval> removals) {
+            List<VersionedGcRetirementProtection> protections, List<VersionedGcRetirementRemoval> removals) {
         private EntrySet {
             protections = List.copyOf(protections);
             removals = List.copyOf(removals);

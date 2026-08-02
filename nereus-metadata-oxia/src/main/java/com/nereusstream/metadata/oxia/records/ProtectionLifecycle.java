@@ -1,9 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** A reserved row already vetoes GC; ACTIVE additionally names a durable owner. */
+/**
+ * A reserved row already vetoes GC; ACTIVE additionally names a durable owner.
+ */
 public enum ProtectionLifecycle {
-    RESERVED(1), ACTIVE(2), RETIRED(3);
+    RESERVED(1),
+    ACTIVE(2),
+    RETIRED(3);
 
     private final int wireId;
 

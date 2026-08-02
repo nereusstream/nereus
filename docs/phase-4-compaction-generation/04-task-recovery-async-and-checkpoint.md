@@ -78,7 +78,8 @@ cuts, including a hung scan、deadline-forced cancellation and borrowed-executor
 active scanner source separately from its exposed pass future；at the deadline it cancels the source first, so
 `closeAsync()` completion cannot overtake cancellation propagation to a hung scanner.
 
-At the F4-M3 boundary this was still not the production materialization gate. The Pulsar Entry/NCP1 opaque-byte round trip passes. The
+At the F4-M3 boundary this was still not the production materialization gate. The Pulsar Entry/NCP1 opaque-byte round
+trip passes. The
 protocol-neutral topic-compaction decoder/strategy SPI、exact frozen-identity registry、COMMITTED-source bootstrap、
 shared-budget sorted-spill two-pass engine and NTC1 worker/publication path are implemented. The proof-driven terminal
 workflow-metadata retirer is also wired after checkpoint reconciliation. `phase4M3Check` and the real Oxia/LocalStack
@@ -1008,12 +1009,12 @@ does not perform those side effects.
 
 ### 9.1 Supported matrix after F4-M5
 
-| Profile | Durability accepted | Success boundary | Secondary work |
-| --- | --- | --- | --- |
-| `OBJECT_WAL_SYNC_OBJECT` | `WAL_DURABLE_AND_INDEX_COMMITTED` | protected head + protected generation-zero index | higher generation async |
-| `OBJECT_WAL_ASYNC_OBJECT` | `WAL_DURABLE` | primary Object WAL + protected commit intent + head | gen-0 repair + higher generation async |
-| `OBJECT_WAL_ASYNC_OBJECT` | `WAL_DURABLE_AND_INDEX_COMMITTED` | protected head + protected generation-zero index | higher generation async |
-| all BookKeeper profiles | none until BK adapter gate | rejected before IO | F4 machinery remains reusable |
+| Profile                   | Durability accepted               | Success boundary                                    | Secondary work                         |
+|---------------------------|-----------------------------------|-----------------------------------------------------|----------------------------------------|
+| `OBJECT_WAL_SYNC_OBJECT`  | `WAL_DURABLE_AND_INDEX_COMMITTED` | protected head + protected generation-zero index    | higher generation async                |
+| `OBJECT_WAL_ASYNC_OBJECT` | `WAL_DURABLE`                     | primary Object WAL + protected commit intent + head | gen-0 repair + higher generation async |
+| `OBJECT_WAL_ASYNC_OBJECT` | `WAL_DURABLE_AND_INDEX_COMMITTED` | protected head + protected generation-zero index    | higher generation async                |
+| all BookKeeper profiles   | none until BK adapter gate        | rejected before IO                                  | F4 machinery remains reusable          |
 
 `OBJECT_WAL_ASYNC_OBJECT` still uploads its primary Object WAL to object storage before success. It removes secondary
 index/read-optimized publication from the ack path；it is not a local-WAL latency claim. The full
@@ -1180,31 +1181,31 @@ handled like an async failure and completes every admitted future exactly once.
 
 ## 11. Failure Matrix
 
-| Failure | Durable state | Recovery/outcome |
-| --- | --- | --- |
-| duplicate planners create same task | one deterministic key | compare identical and share task |
-| registration create/refresh response lost | one versioned shard key | reload exact identity；never create a second route |
-| topic unload/restart with no task | registration + committed head | shard scan recreates deterministic task from head/index gap |
-| registration stale/missing/mismatched | never stream truth | skip mutation；broker activation/async admission fails closed |
-| worker dies after claim | expired `CLAIMED` | new claim after skew-safe expiry |
-| source GC marks during protection acquisition | root epoch/state changes | protection post-check fails；cancel/replan |
-| source changes after protection | immutable bytes + protection | task remains valid；publish admission may replan for efficiency |
-| worker uploads before output CAS | unreferenced content-verified attempt object | attach on same-claim retry or orphan GC |
-| worker loses claim before a provider retry | exact guard reload fails | no retry bytes sent；new claim uses a fresh output key |
-| output CAS succeeds, response lost | `OUTPUT_READY` | reload exact output |
-| generation allocated, process dies | counter gap/task may record G | gap safe；reconcile task before new allocation |
-| PREPARED index, worker dies | invisible PREPARED | recovery commits or aborts |
-| COMMITTED index, task still PUBLISHING | visible index | repair task/checkpoint from index |
-| terminal task delete races checkpoint/index change | expected-version/final revalidation loses | retain and retry；visibility unchanged |
-| checkpoint upload, root CAS loses | old root authoritative | reuse identical bytes or orphan GC |
-| checkpoint owner/root changes before provider retry | guarded transmission is rejected | rebuild with a fresh checkpoint attempt id |
-| root CAS succeeds before commit-key retirement | new checkpoint authoritative | idempotent retirement resumes |
-| commit key deleted while old replay scan runs | old scan fails final root version check | restart against checkpoint |
-| append intent stored before physical protection | head unchanged | retry root/protection handshake；no acknowledgement |
-| protected head commits before gen-0 index | head/commit + `REACHABLE_APPEND` authoritative | async ack legal；read repair or retriable timeout, never false EOS |
-| gen-0 index exists before index protection | reachable protection remains | repair `VISIBLE_GENERATION` before strict success or commit retirement |
-| object store unavailable | tasks retry；primary Object WAL reads may also fail | backpressure, no metadata visibility change |
-| shutdown during publish response loss | task/index may have committed | next process exact reconciliation |
+| Failure                                             | Durable state                                      | Recovery/outcome                                                       |
+|-----------------------------------------------------|----------------------------------------------------|------------------------------------------------------------------------|
+| duplicate planners create same task                 | one deterministic key                              | compare identical and share task                                       |
+| registration create/refresh response lost           | one versioned shard key                            | reload exact identity；never create a second route                      |
+| topic unload/restart with no task                   | registration + committed head                      | shard scan recreates deterministic task from head/index gap            |
+| registration stale/missing/mismatched               | never stream truth                                 | skip mutation；broker activation/async admission fails closed           |
+| worker dies after claim                             | expired `CLAIMED`                                  | new claim after skew-safe expiry                                       |
+| source GC marks during protection acquisition       | root epoch/state changes                           | protection post-check fails；cancel/replan                              |
+| source changes after protection                     | immutable bytes + protection                       | task remains valid；publish admission may replan for efficiency         |
+| worker uploads before output CAS                    | unreferenced content-verified attempt object       | attach on same-claim retry or orphan GC                                |
+| worker loses claim before a provider retry          | exact guard reload fails                           | no retry bytes sent；new claim uses a fresh output key                  |
+| output CAS succeeds, response lost                  | `OUTPUT_READY`                                     | reload exact output                                                    |
+| generation allocated, process dies                  | counter gap/task may record G                      | gap safe；reconcile task before new allocation                          |
+| PREPARED index, worker dies                         | invisible PREPARED                                 | recovery commits or aborts                                             |
+| COMMITTED index, task still PUBLISHING              | visible index                                      | repair task/checkpoint from index                                      |
+| terminal task delete races checkpoint/index change  | expected-version/final revalidation loses          | retain and retry；visibility unchanged                                  |
+| checkpoint upload, root CAS loses                   | old root authoritative                             | reuse identical bytes or orphan GC                                     |
+| checkpoint owner/root changes before provider retry | guarded transmission is rejected                   | rebuild with a fresh checkpoint attempt id                             |
+| root CAS succeeds before commit-key retirement      | new checkpoint authoritative                       | idempotent retirement resumes                                          |
+| commit key deleted while old replay scan runs       | old scan fails final root version check            | restart against checkpoint                                             |
+| append intent stored before physical protection     | head unchanged                                     | retry root/protection handshake；no acknowledgement                     |
+| protected head commits before gen-0 index           | head/commit + `REACHABLE_APPEND` authoritative     | async ack legal；read repair or retriable timeout, never false EOS      |
+| gen-0 index exists before index protection          | reachable protection remains                       | repair `VISIBLE_GENERATION` before strict success or commit retirement |
+| object store unavailable                            | tasks retry；primary Object WAL reads may also fail | backpressure, no metadata visibility change                            |
+| shutdown during publish response loss               | task/index may have committed                      | next process exact reconciliation                                      |
 
 ## 12. Deterministic Test Contract
 

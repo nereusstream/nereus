@@ -17,7 +17,8 @@ Current Phase 1 values encode an object slice in common result fields：
 - `EntryIndexRef` sits beside the result even though it is part of object-slice decoding；
 - error/result validation assumes every physical target is an object。
 
-Putting a BookKeeper ledger ID into `ObjectId` or fabricating an `ObjectKey` is forbidden。The Phase 1.5 target replaces the
+Putting a BookKeeper ledger ID into `ObjectId` or fabricating an `ObjectKey` is forbidden。The Phase 1.5 target replaces
+the
 common physical fields with one tagged `ReadTarget` while retaining logical range/payload/projection fields outside
 the target。
 
@@ -261,13 +262,13 @@ public Optional<AppendAttemptId> appendAttemptId();
 
 Constructor/factory validation enforces：
 
-| Append state | Outcome | Attempt ID |
-| --- | --- | --- |
-| no head request was submitted | `KNOWN_NOT_COMMITTED` | empty |
-| head request submitted, response uncertain | `MAY_HAVE_COMMITTED` | required |
-| head known reachable but result/index failed | `KNOWN_COMMITTED` | required |
-| recovery completely proves absence | `KNOWN_NOT_COMMITTED` | empty in terminal returned failure |
-| non-append failure | empty outcome | empty |
+| Append state                                 | Outcome               | Attempt ID                         |
+|----------------------------------------------|-----------------------|------------------------------------|
+| no head request was submitted                | `KNOWN_NOT_COMMITTED` | empty                              |
+| head request submitted, response uncertain   | `MAY_HAVE_COMMITTED`  | required                           |
+| head known reachable but result/index failed | `KNOWN_COMMITTED`     | required                           |
+| recovery completely proves absence           | `KNOWN_NOT_COMMITTED` | empty in terminal returned failure |
+| non-append failure                           | empty outcome         | empty                              |
 
 The `StreamStorage` boundary never exposes `MAY_HAVE_COMMITTED`/`KNOWN_COMMITTED` without an ID, or an attempt ID
 without an append outcome。Metadata/provider-internal compatibility exceptions may begin without a process-local ID；

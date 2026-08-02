@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import io.netty.buffer.ByteBuf;
@@ -15,7 +16,9 @@ import org.apache.bookkeeper.client.api.ReadHandle;
 import org.apache.bookkeeper.client.api.WriteAdvHandle;
 import org.apache.bookkeeper.client.api.WriteFlag;
 
-/** BookKeeper 4.18 public-client implementation. The borrowed client is deliberately never closed here. */
+/**
+ * BookKeeper 4.18 public-client implementation. The borrowed client is deliberately never closed here.
+ */
 public final class DefaultBookKeeperClientOperations implements BookKeeperClientOperations {
     private final BookKeeper client;
 
@@ -51,72 +54,84 @@ public final class DefaultBookKeeperClientOperations implements BookKeeperClient
                     .whenComplete((ignored, failure) -> Arrays.fill(secret, (byte) 0));
         } catch (Throwable failure) {
             Arrays.fill(secret, (byte) 0);
-            return CompletableFuture.failedFuture(BookKeeperExceptionMapper.map(
-                    failure, BookKeeperExceptionMapper.Operation.WRITE));
+            return CompletableFuture.failedFuture(
+                    BookKeeperExceptionMapper.map(failure, BookKeeperExceptionMapper.Operation.WRITE));
         }
     }
 
     @Override
     public CompletableFuture<ReadHandle> open(
-            long ledgerId, BookKeeperDigestType digestType, byte[] password, boolean recovery,
+            long ledgerId,
+            BookKeeperDigestType digestType,
+            byte[] password,
+            boolean recovery,
             BookKeeperOperationDeadline deadline) {
         byte[] secret = Objects.requireNonNull(password, "password").clone();
         try {
             CompletableFuture<ReadHandle> result = client.newOpenLedgerOp()
                     .withLedgerId(ledgerId)
                     .withRecovery(recovery)
-                    .withDigestType(Objects.requireNonNull(digestType, "digestType").toClientType())
+                    .withDigestType(
+                            Objects.requireNonNull(digestType, "digestType").toClientType())
                     .withPassword(secret)
                     .execute();
             return mapped(deadline.bound(result), BookKeeperExceptionMapper.Operation.READ)
                     .whenComplete((ignored, failure) -> Arrays.fill(secret, (byte) 0));
         } catch (Throwable failure) {
             Arrays.fill(secret, (byte) 0);
-            return CompletableFuture.failedFuture(BookKeeperExceptionMapper.map(
-                    failure, BookKeeperExceptionMapper.Operation.READ));
+            return CompletableFuture.failedFuture(
+                    BookKeeperExceptionMapper.map(failure, BookKeeperExceptionMapper.Operation.READ));
         }
     }
 
-    @Override public CompletableFuture<Long> write(
+    @Override
+    public CompletableFuture<Long> write(
             WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
         // BookKeeper's WriteAdvHandle consumes/releases the reference passed to writeAsync. Keep the
         // provider-neutral SPI caller-owned by transmitting a separate retained reference.
         ByteBuf transmitted = Objects.requireNonNull(entry, "entry").retainedDuplicate();
         try {
             return mapped(
-                    deadline.bound(handle.writeAsync(entryId, transmitted)),
-                    BookKeeperExceptionMapper.Operation.WRITE);
+                    deadline.bound(handle.writeAsync(entryId, transmitted)), BookKeeperExceptionMapper.Operation.WRITE);
         } catch (Throwable failure) {
             ReferenceCountUtil.safeRelease(transmitted);
-            return CompletableFuture.failedFuture(BookKeeperExceptionMapper.map(
-                    failure, BookKeeperExceptionMapper.Operation.WRITE));
+            return CompletableFuture.failedFuture(
+                    BookKeeperExceptionMapper.map(failure, BookKeeperExceptionMapper.Operation.WRITE));
         }
     }
-    @Override public CompletableFuture<LedgerEntries> readUnconfirmed(
+
+    @Override
+    public CompletableFuture<LedgerEntries> readUnconfirmed(
             ReadHandle handle, long first, long last, BookKeeperOperationDeadline deadline) {
-        return mapped(deadline.bound(handle.readUnconfirmedAsync(first, last)),
-                BookKeeperExceptionMapper.Operation.READ);
+        return mapped(
+                deadline.bound(handle.readUnconfirmedAsync(first, last)), BookKeeperExceptionMapper.Operation.READ);
     }
-    @Override public CompletableFuture<LedgerMetadata> metadata(
-            long ledgerId, BookKeeperOperationDeadline deadline) {
-        return mapped(deadline.bound(client.getLedgerMetadata(ledgerId)),
-                BookKeeperExceptionMapper.Operation.METADATA);
+
+    @Override
+    public CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline) {
+        return mapped(deadline.bound(client.getLedgerMetadata(ledgerId)), BookKeeperExceptionMapper.Operation.METADATA);
     }
-    @Override public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
-        return mapped(deadline.bound(client.newDeleteLedgerOp().withLedgerId(ledgerId).execute()),
+
+    @Override
+    public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
+        return mapped(
+                deadline.bound(client.newDeleteLedgerOp().withLedgerId(ledgerId).execute()),
                 BookKeeperExceptionMapper.Operation.DELETE);
     }
 
     private static Map<String, byte[]> immutableMetadata(Map<String, byte[]> source) {
         Objects.requireNonNull(source, "customMetadata");
-        return source.entrySet().stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
-                Map.Entry::getKey, entry -> entry.getValue().clone()));
+        return source.entrySet().stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        Map.Entry::getKey, entry -> entry.getValue().clone()));
     }
+
     private static <T> CompletableFuture<T> mapped(
             CompletableFuture<T> source, BookKeeperExceptionMapper.Operation operation) {
         return source.handle((value, failure) -> {
-            if (failure != null) throw new java.util.concurrent.CompletionException(
-                    BookKeeperExceptionMapper.map(failure, operation));
+            if (failure != null) {
+                throw new java.util.concurrent.CompletionException(BookKeeperExceptionMapper.map(failure, operation));
+            }
             return value;
         });
     }

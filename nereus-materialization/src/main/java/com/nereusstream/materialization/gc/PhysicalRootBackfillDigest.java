@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -14,7 +15,9 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
-/** Small canonical SHA-256 writer for hierarchical backfill coverage proofs. */
+/**
+ * Small canonical SHA-256 writer for hierarchical backfill coverage proofs.
+ */
 final class PhysicalRootBackfillDigest {
     private final MessageDigest digest = sha256();
 
@@ -97,15 +100,11 @@ final class PhysicalRootBackfillDigest {
     }
 
     Checksum finish() {
-        return new Checksum(
-                ChecksumType.SHA256,
-                HexFormat.of().formatHex(digest.digest()));
+        return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest()));
     }
 
     static String resourceIdentity(String domain, String resource) {
-        PhysicalRootBackfillDigest writer =
-                new PhysicalRootBackfillDigest(
-                        "physical-root-backfill-resource-v1");
+        PhysicalRootBackfillDigest writer = new PhysicalRootBackfillDigest("physical-root-backfill-resource-v1");
         writer.text(domain);
         writer.text(resource);
         return writer.finish().value();

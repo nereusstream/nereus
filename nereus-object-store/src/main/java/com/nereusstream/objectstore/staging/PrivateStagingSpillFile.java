@@ -1,11 +1,11 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.staging;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
-import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -22,7 +22,9 @@ import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.Objects;
 
-/** Owner-only, checksum-verified temporary run file sharing the process staging-byte permit. */
+/**
+ * Owner-only, checksum-verified temporary run file sharing the process staging-byte permit.
+ */
 public final class PrivateStagingSpillFile implements ManagedStagingFile {
     private enum State {
         OPEN,
@@ -33,6 +35,7 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
     private final StagingFileManager manager;
     private final Path path;
     private final FileChannel writer;
+    private final Object openedFileKey;
     private final MessageDigest sha256;
     private final SpillOutputStream output = new SpillOutputStream();
     private State state = State.OPEN;
@@ -47,8 +50,23 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
     PrivateStagingSpillFile(StagingFileManager manager, Path path) throws IOException {
         this.manager = Objects.requireNonNull(manager, "manager");
         this.path = Objects.requireNonNull(path, "path");
-        this.writer = FileChannel.open(path, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
-        this.sha256 = newDigest();
+        this.writer =
+                FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+        try {
+            BasicFileAttributes attributes = attributes();
+            if (!attributes.isRegularFile() || attributes.isSymbolicLink() || attributes.fileKey() == null) {
+                throw new IOException("spill file identity is unavailable");
+            }
+            this.openedFileKey = attributes.fileKey();
+            this.sha256 = newDigest();
+        } catch (IOException | RuntimeException failure) {
+            try {
+                writer.close();
+            } catch (IOException ignored) {
+                failure.addSuppressed(ignored);
+            }
+            throw failure;
+        }
     }
 
     public synchronized OutputStream outputStream() {
@@ -63,17 +81,16 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
     public synchronized PrivateStagingSpillFile seal() {
         requireState(State.OPEN, "spill file cannot be sealed");
         try {
-            closeWriter();
+            finishWrites();
             BasicFileAttributes attributes = attributes();
             if (!attributes.isRegularFile()
                     || attributes.isSymbolicLink()
                     || attributes.size() != writtenBytes
-                    || attributes.fileKey() == null) {
+                    || !openedFileKey.equals(attributes.fileKey())) {
                 throw new IOException("spill file identity or length changed before seal");
             }
-            sealedFileKey = attributes.fileKey();
-            sealedSha256 = new Checksum(
-                    ChecksumType.SHA256, HexFormat.of().formatHex(sha256.digest()));
+            sealedFileKey = openedFileKey;
+            sealedSha256 = new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(sha256.digest()));
             state = State.SEALED;
             return this;
         } catch (IOException | RuntimeException failure) {
@@ -102,32 +119,21 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
             throw new IllegalStateException("spill file already has an active reader");
         }
         validateSealedFile();
-        try {
-            activeReader = new VerifiedInputStream(Files.newInputStream(
-                    path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS));
-            return activeReader;
-        } catch (IOException failure) {
-            throw new NereusException(
-                    ErrorCode.OBJECT_READ_FAILED, true, "failed to open private spill file", failure);
-        }
+        activeReader = new VerifiedInputStream();
+        return activeReader;
     }
 
-    /** Opens one identity-checked random reader for fixed-width checksum-protected run records. */
+    /**
+     * Opens one identity-checked random reader for fixed-width checksum-protected run records.
+     */
     public synchronized RandomAccessReader openRandomAccessReader() {
         requireState(State.SEALED, "spill file is not sealed");
         if (activeReader != null || activeRandomReader != null) {
             throw new IllegalStateException("spill file already has an active reader");
         }
         validateSealedFile();
-        try {
-            activeRandomReader = new RandomAccessReader(
-                    FileChannel.open(path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS),
-                    writtenBytes);
-            return activeRandomReader;
-        } catch (IOException failure) {
-            throw new NereusException(
-                    ErrorCode.OBJECT_READ_FAILED, true, "failed to open private spill random reader", failure);
-        }
+        activeRandomReader = new RandomAccessReader(writtenBytes);
+        return activeRandomReader;
     }
 
     @Override
@@ -145,21 +151,15 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
             randomReader = activeRandomReader;
             activeRandomReader = null;
             release = writtenBytes;
-            try {
-                writer.close();
-            } catch (IOException ignored) {
-            }
         }
         if (reader != null) {
-            try {
-                reader.close();
-            } catch (IOException ignored) {
-            }
+            reader.close();
         }
         if (randomReader != null) {
             randomReader.closeFromOwner();
         }
         deleteQuietly();
+        closeWriterQuietly();
         manager.release(release);
         manager.unregister(this);
     }
@@ -198,11 +198,8 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
         }
     }
 
-    private synchronized void closeWriter() throws IOException {
-        if (writer.isOpen()) {
-            writer.force(true);
-            writer.close();
-        }
+    private synchronized void finishWrites() throws IOException {
+        writer.force(true);
         outputClosed = true;
     }
 
@@ -213,8 +210,7 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
                     || attributes.isSymbolicLink()
                     || attributes.size() != writtenBytes
                     || !sealedFileKey.equals(attributes.fileKey())) {
-                throw new NereusException(
-                        ErrorCode.OBJECT_READ_FAILED, false, "sealed spill file identity changed");
+                throw new NereusException(ErrorCode.OBJECT_READ_FAILED, false, "sealed spill file identity changed");
             }
         } catch (IOException failure) {
             throw new NereusException(
@@ -244,8 +240,8 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
         }
         long release = Math.addExact(writtenBytes, currentReservation);
         state = State.CLOSED;
-        closeWriterQuietly();
         deleteQuietly();
+        closeWriterQuietly();
         manager.release(release);
         manager.unregister(this);
     }
@@ -256,8 +252,8 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
         }
         long release = writtenBytes;
         state = State.CLOSED;
-        closeWriterQuietly();
         deleteQuietly();
+        closeWriterQuietly();
         manager.release(release);
         manager.unregister(this);
     }
@@ -271,7 +267,10 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
 
     private void deleteQuietly() {
         try {
-            Files.deleteIfExists(path);
+            BasicFileAttributes attributes = attributes();
+            if (openedFileKey.equals(attributes.fileKey())) {
+                Files.deleteIfExists(path);
+            }
         } catch (IOException ignored) {
         }
     }
@@ -312,40 +311,57 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
         }
     }
 
-    private final class VerifiedInputStream extends FilterInputStream {
+    private final class VerifiedInputStream extends InputStream {
         private final MessageDigest digest = newDigest();
+        private final byte[] one = new byte[1];
+        private long position;
         private boolean verified;
         private boolean closed;
 
-        private VerifiedInputStream(InputStream input) {
-            super(input);
+        @Override
+        public synchronized int read() throws IOException {
+            int read = read(one, 0, 1);
+            return read < 0 ? -1 : Byte.toUnsignedInt(one[0]);
         }
 
         @Override
-        public int read() throws IOException {
-            int value = super.read();
-            if (value >= 0) {
-                digest.update((byte) value);
-            } else {
-                verifyDigest();
+        public synchronized int read(byte[] bytes, int offset, int length) throws IOException {
+            Objects.checkFromIndexSize(offset, length, bytes.length);
+            if (closed) {
+                throw new IOException("private spill input is closed");
             }
-            return value;
-        }
-
-        @Override
-        public int read(byte[] bytes, int offset, int length) throws IOException {
-            int read = super.read(bytes, offset, length);
-            if (read > 0) {
-                digest.update(bytes, offset, read);
-            } else if (read < 0) {
-                verifyDigest();
+            if (length == 0) {
+                return 0;
             }
-            return read;
+            if (position == writtenBytes) {
+                verifyDigest();
+                return -1;
+            }
+            int requested = Math.toIntExact(Math.min(length, writtenBytes - position));
+            ByteBuffer target = ByteBuffer.wrap(bytes, offset, requested).slice();
+            int total = 0;
+            while (target.hasRemaining()) {
+                int read = writer.read(target, position + total);
+                if (read < 0) {
+                    throw new IOException("unexpected EOF in sealed spill file");
+                }
+                if (read == 0) {
+                    Thread.onSpinWait();
+                } else {
+                    total += read;
+                }
+            }
+            position = Math.addExact(position, total);
+            digest.update(bytes, offset, total);
+            return total;
         }
 
         private void verifyDigest() throws IOException {
             if (!verified) {
                 verified = true;
+                if (writer.size() != writtenBytes) {
+                    throw new IOException("private spill file length changed");
+                }
                 byte[] expected = HexFormat.of().parseHex(sealedSha256.value());
                 if (!Arrays.equals(expected, digest.digest())) {
                     throw new IOException("private spill file SHA-256 mismatch");
@@ -354,27 +370,23 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
         }
 
         @Override
-        public void close() throws IOException {
+        public synchronized void close() {
             if (closed) {
                 return;
             }
             closed = true;
-            try {
-                super.close();
-            } finally {
-                readerClosed(this);
-            }
+            readerClosed(this);
         }
     }
 
-    /** Single-owner bounded random reader. Each caller-owned record must carry its own checksum. */
+    /**
+     * Single-owner bounded random reader. Each caller-owned record must carry its own checksum.
+     */
     public final class RandomAccessReader implements AutoCloseable {
-        private final FileChannel channel;
         private final long length;
         private boolean closed;
 
-        private RandomAccessReader(FileChannel channel, long length) {
-            this.channel = channel;
+        private RandomAccessReader(long length) {
             this.length = length;
         }
 
@@ -388,7 +400,7 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
             ByteBuffer result = ByteBuffer.allocate(length);
             try {
                 while (result.hasRemaining()) {
-                    int read = channel.read(result, offset + result.position());
+                    int read = writer.read(result, offset + result.position());
                     if (read < 0) {
                         throw new IOException("unexpected EOF in sealed spill file");
                     }
@@ -418,10 +430,6 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
                 return;
             }
             closed = true;
-            try {
-                channel.close();
-            } catch (IOException ignored) {
-            }
             if (notifyOwner) {
                 randomReaderClosed(this);
             }

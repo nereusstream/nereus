@@ -1,11 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.entry;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
-import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ProjectionRef;
@@ -61,20 +60,21 @@ import org.apache.pulsar.common.protocol.Commands;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Cross-layer proof that lossless materialization never parses or rewrites Pulsar Entry bytes. */
+/**
+ * Cross-layer proof that lossless materialization never parses or rewrites Pulsar Entry bytes.
+ */
 class PulsarEntryOpaqueRoundTripTest {
     private static final StreamId STREAM_ID = new StreamId("pulsar-entry-round-trip");
     private static final OffsetRange COVERAGE = new OffsetRange(40, 42);
     private static final long VIRTUAL_LEDGER_ID = VirtualLedgerProjection.MIN_VIRTUAL_LEDGER_ID + 17;
-    private static final ProjectionRef PROJECTION = new ProjectionRef(
-            ProjectionType.VIRTUAL_LEDGER, "nereus-ml-v1.round-trip");
+    private static final ProjectionRef PROJECTION =
+            new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "nereus-ml-v1.round-trip");
 
     @TempDir
     Path temporaryDirectory;
 
     @Test
-    void preservesUnbatchedAndCompressedBatchBytesPropertiesOrderingKeyAndMiddleBatchMessageId()
-            throws Exception {
+    void preservesUnbatchedAndCompressedBatchBytesPropertiesOrderingKeyAndMiddleBatchMessageId() throws Exception {
         byte[] unbatched = unbatchedEntry();
         byte[] compressedBatch = compressedBatchEntry();
         List<byte[]> source = List.of(unbatched, compressedBatch);
@@ -82,22 +82,19 @@ class PulsarEntryOpaqueRoundTripTest {
         CompactedObjectWriteRequest request = request(logicalBytes);
 
         Path stagingDirectory = Files.createDirectory(temporaryDirectory.resolve("staging"));
-        Files.setPosixFilePermissions(
-                stagingDirectory, PosixFilePermissions.fromString("rwx------"));
+        Files.setPosixFilePermissions(stagingDirectory, PosixFilePermissions.fromString("rwx------"));
         try (StagingFileManager staging = new StagingFileManager(
                         stagingDirectory,
                         32L << 20,
                         StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
                         Duration.ofHours(1),
                         Runnable::run);
-                LocalFileObjectStore objectStore =
-                        new LocalFileObjectStore(temporaryDirectory.resolve("objects"));
-                CompactedObjectWriteResult written = new ParquetCompactedObjectWriter(
-                                staging, Runnable::run)
-                        .write(request, publisher(List.of(
-                                row(40, unbatched), row(41, compressedBatch))))
+                LocalFileObjectStore objectStore = new LocalFileObjectStore(temporaryDirectory.resolve("objects"));
+                CompactedObjectWriteResult written = new ParquetCompactedObjectWriter(staging, Runnable::run)
+                        .write(request, publisher(List.of(row(40, unbatched), row(41, compressedBatch))))
                         .join()) {
-            objectStore.putObject(
+            objectStore
+                    .putObject(
                             written.objectKey(),
                             written.stagingFile(),
                             new PutObjectOptions(
@@ -110,6 +107,10 @@ class PulsarEntryOpaqueRoundTripTest {
             ObjectSliceReadTarget target = CompactedObjectVerificationRequest.from(
                             request, written, Duration.ofSeconds(10))
                     .target();
+            // F2 deliberately persists exact Pulsar Entry bytes through Phase 1's durable
+            // opaque mapping. Relabeling this fixture as PULSAR_ENTRY_BATCH would hide the
+            // legacy NCP1 compatibility regression.
+            assertThat(target.logicalFormat()).isEqualTo(PayloadFormat.OPAQUE_RECORD_BATCH.name());
             ResolvedRange range = new ResolvedRange(
                     COVERAGE,
                     3,
@@ -127,15 +128,11 @@ class PulsarEntryOpaqueRoundTripTest {
                             STREAM_ID,
                             COVERAGE.startOffset(),
                             List.of(range),
-                            new ReadOptions(
-                                    2,
-                                    1 << 20,
-                                    ReadIsolation.COMMITTED,
-                                    Duration.ofSeconds(10)))
+                            new ReadOptions(2, 1 << 20, ReadIsolation.COMMITTED, Duration.ofSeconds(10)))
                     .join();
 
-            assertThat(materialized.batches()).hasSize(2).allSatisfy(batch ->
-                    assertThat(batch.projectionRef()).isEmpty());
+            assertThat(materialized.batches()).hasSize(2).allSatisfy(batch -> assertThat(batch.projectionRef())
+                    .isEmpty());
             PulsarEntryCodec codec = new PulsarEntryCodec(1 << 20);
             List<Entry> recovered = decode(codec, materialized.batches());
             try {
@@ -148,31 +145,20 @@ class PulsarEntryOpaqueRoundTripTest {
                 assertThat(ordinaryMetadata.getOrderingKey())
                         .containsExactly("ordinary-order".getBytes(StandardCharsets.UTF_8));
 
-                SingleMessageMetadata middle = middleBatchMetadata(recovered.get(1).getData());
+                SingleMessageMetadata middle =
+                        middleBatchMetadata(recovered.get(1).getData());
                 assertThat(middle.getPartitionKey()).isEqualTo("batch-key-1");
                 assertThat(middle.getPropertyAt(0).getKey()).isEqualTo("batch-property");
                 assertThat(middle.getPropertyAt(0).getValue()).isEqualTo("value-1");
-                assertThat(middle.getOrderingKey())
-                        .containsExactly("batch-order-1".getBytes(StandardCharsets.UTF_8));
+                assertThat(middle.getOrderingKey()).containsExactly("batch-order-1".getBytes(StandardCharsets.UTF_8));
 
                 Position originalPosition = position(41);
                 Position recoveredPosition = recovered.get(1).getPosition();
                 BatchMessageIdImpl originalMiddle = new BatchMessageIdImpl(
-                        originalPosition.getLedgerId(),
-                        originalPosition.getEntryId(),
-                        2,
-                        1,
-                        3,
-                        null);
+                        originalPosition.getLedgerId(), originalPosition.getEntryId(), 2, 1, 3, null);
                 BatchMessageIdImpl recoveredMiddle = new BatchMessageIdImpl(
-                        recoveredPosition.getLedgerId(),
-                        recoveredPosition.getEntryId(),
-                        2,
-                        1,
-                        3,
-                        null);
-                assertThat(recoveredMiddle.toByteArray())
-                        .containsExactly(originalMiddle.toByteArray());
+                        recoveredPosition.getLedgerId(), recoveredPosition.getEntryId(), 2, 1, 3, null);
+                assertThat(recoveredMiddle.toByteArray()).containsExactly(originalMiddle.toByteArray());
                 MessageId decodedId = MessageIdImpl.fromByteArray(recoveredMiddle.toByteArray());
                 assertThat(decodedId).isEqualTo(originalMiddle);
             } finally {
@@ -186,13 +172,7 @@ class PulsarEntryOpaqueRoundTripTest {
         for (ReadBatch batch : batches) {
             long offset = batch.range().startOffset();
             entries.add(codec.decode(
-                    position(offset),
-                    new ReadResult(
-                            STREAM_ID,
-                            offset,
-                            offset + 1,
-                            List.of(batch),
-                            false)));
+                    position(offset), new ReadResult(STREAM_ID, offset, offset + 1, List.of(batch), false)));
         }
         return entries;
     }
@@ -251,12 +231,9 @@ class PulsarEntryOpaqueRoundTripTest {
                 .setEventTime(1_235)
                 .setPartitionKey("ordinary-key")
                 .setOrderingKey("ordinary-order".getBytes(StandardCharsets.UTF_8));
-        metadata.addProperty()
-                .setKey("ordinary-property")
-                .setValue("ordinary-value");
+        metadata.addProperty().setKey("ordinary-property").setValue("ordinary-value");
         ByteBuf payload = Unpooled.wrappedBuffer("ordinary-payload".getBytes(StandardCharsets.UTF_8));
-        ByteBuf serialized = Commands.serializeMetadataAndPayload(
-                Commands.ChecksumType.Crc32c, metadata, payload);
+        ByteBuf serialized = Commands.serializeMetadataAndPayload(Commands.ChecksumType.Crc32c, metadata, payload);
         try {
             return bytes(serialized);
         } finally {
@@ -273,21 +250,16 @@ class PulsarEntryOpaqueRoundTripTest {
                     .setOrderingKey(("batch-order-" + index).getBytes(StandardCharsets.UTF_8))
                     .setEventTime(2_000 + index)
                     .setSequenceId(20 + index);
-            metadata.addProperty()
-                    .setKey("batch-property")
-                    .setValue("value-" + index);
-            ByteBuf payload = Unpooled.wrappedBuffer(
-                    ("batch-payload-" + index).getBytes(StandardCharsets.UTF_8));
+            metadata.addProperty().setKey("batch-property").setValue("value-" + index);
+            ByteBuf payload = Unpooled.wrappedBuffer(("batch-payload-" + index).getBytes(StandardCharsets.UTF_8));
             try {
-                Commands.serializeSingleMessageInBatchWithPayload(
-                        metadata, payload, uncompressed);
+                Commands.serializeSingleMessageInBatchWithPayload(metadata, payload, uncompressed);
             } finally {
                 payload.release();
             }
         }
         int uncompressedSize = uncompressed.readableBytes();
-        CompressionCodec compression = CompressionCodecProvider.getCompressionCodec(
-                CompressionType.ZSTD);
+        CompressionCodec compression = CompressionCodecProvider.getCompressionCodec(CompressionType.ZSTD);
         ByteBuf compressed = compression.encode(uncompressed);
         MessageMetadata metadata = new MessageMetadata()
                 .setProducerName("batch-producer")
@@ -297,8 +269,7 @@ class PulsarEntryOpaqueRoundTripTest {
                 .setNumMessagesInBatch(3)
                 .setCompression(CompressionType.ZSTD)
                 .setUncompressedSize(uncompressedSize);
-        ByteBuf serialized = Commands.serializeMetadataAndPayload(
-                Commands.ChecksumType.Crc32c, metadata, compressed);
+        ByteBuf serialized = Commands.serializeMetadataAndPayload(Commands.ChecksumType.Crc32c, metadata, compressed);
         try {
             return bytes(serialized);
         } finally {

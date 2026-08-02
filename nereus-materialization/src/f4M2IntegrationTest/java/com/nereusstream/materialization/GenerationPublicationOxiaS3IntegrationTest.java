@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
@@ -21,7 +21,6 @@ import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.ResolvedRange;
-import com.nereusstream.api.SchemaRef;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
@@ -44,7 +43,6 @@ import com.nereusstream.core.read.GenerationReadResolver;
 import com.nereusstream.core.read.GenerationReadRetryPolicy;
 import com.nereusstream.core.read.MetadataGenerationReadFailureHandler;
 import com.nereusstream.core.read.MetadataPhysicalObjectIdentityResolver;
-import com.nereusstream.core.read.PinnedResolvedRange;
 import com.nereusstream.core.read.ReadCoordinator;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.read.ReadResolver;
@@ -61,9 +59,6 @@ import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaGenerationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaPhysicalObjectMetadataStore;
-import com.nereusstream.metadata.oxia.OxiaMetadataStore;
-import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
-import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import com.nereusstream.metadata.oxia.StableAppendResult;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
@@ -78,8 +73,8 @@ import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.MaterializationOutputRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
-import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.StreamSliceManifestRecord;
@@ -135,23 +130,21 @@ class GenerationPublicationOxiaS3IntegrationTest {
     private static final Clock CLOCK = Clock.systemUTC();
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
     private static final DockerImageName OXIA_IMAGE = DockerImageName.parse("oxia/oxia:0.16.3");
-    private static final DockerImageName LOCALSTACK_IMAGE =
-            DockerImageName.parse("localstack/localstack:4.14.0");
+    private static final DockerImageName LOCALSTACK_IMAGE = DockerImageName.parse("localstack/localstack:4.14.0");
 
     @Container
     private static final OxiaContainer OXIA = new OxiaContainer(OXIA_IMAGE).withShards(4);
 
     @Container
-    private static final LocalStackContainer LOCALSTACK = new LocalStackContainer(LOCALSTACK_IMAGE)
-            .withServices(LocalStackContainer.Service.S3);
+    private static final LocalStackContainer LOCALSTACK =
+            new LocalStackContainer(LOCALSTACK_IMAGE).withServices(LocalStackContainer.Service.S3);
 
     @Test
     void lostCommittedResponseConvergesAfterIndependentOxiaRuntimeRestart() {
         try (Fixture fixture = Fixture.create()) {
             GenerationCommitResult first;
             try (Process process = fixture.openProcess()) {
-                first = process.committer(
-                                loseFirstCommittedResponse(process.generations), fixture)
+                first = process.committer(loseFirstCommittedResponse(process.generations), fixture)
                         .publish(fixture.task, fixture.output)
                         .join();
                 assertThat(first.committedByThisCall()).isFalse();
@@ -175,88 +168,98 @@ class GenerationPublicationOxiaS3IntegrationTest {
         try (Fixture fixture = Fixture.create()) {
             GenerationCommitResult left;
             GenerationCommitResult right;
-            try (Process first = fixture.openProcess(); Process second = fixture.openProcess()) {
+            try (Process first = fixture.openProcess();
+                    Process second = fixture.openProcess()) {
                 CompletableFuture<GenerationCommitResult> firstCall =
-                        first.committer(first.generations, fixture)
-                                .publish(fixture.task, fixture.output);
+                        first.committer(first.generations, fixture).publish(fixture.task, fixture.output);
                 CompletableFuture<GenerationCommitResult> secondCall =
-                        second.committer(second.generations, fixture)
-                                .publish(fixture.task, fixture.output);
+                        second.committer(second.generations, fixture).publish(fixture.task, fixture.output);
                 CompletableFuture.allOf(firstCall, secondCall).join();
                 left = firstCall.join();
                 right = secondCall.join();
                 assertThat(right.generation()).isEqualTo(left.generation());
                 assertThat(right.publicationId()).isEqualTo(left.publicationId());
-                assertThat(List.of(left, right).stream()
-                                .filter(GenerationCommitResult::committedByThisCall))
+                assertThat(List.of(left, right).stream().filter(GenerationCommitResult::committedByThisCall))
                         .hasSize(1);
             }
 
-            DeleteObjectResult deleted = fixture.objectStore.deleteObject(
-                    fixture.output.objectKey(),
-                    new DeleteObjectOptions(
-                            fixture.output.objectLength(),
-                            fixture.output.storageCrc32c(),
-                            Optional.of(fixture.output.etag()),
-                            TIMEOUT)).join();
+            DeleteObjectResult deleted = fixture.objectStore
+                    .deleteObject(
+                            fixture.output.objectKey(),
+                            new DeleteObjectOptions(
+                                    fixture.output.objectLength(),
+                                    fixture.output.storageCrc32c(),
+                                    Optional.of(fixture.output.etag()),
+                                    TIMEOUT))
+                    .join();
             assertThat(deleted.status()).isEqualTo(DeleteObjectResult.Status.DELETED);
 
             try (Process restarted = fixture.openProcess()) {
                 byte[] payload = readWithProductionPinAndFallback(fixture, restarted);
                 assertThat(payload).isEqualTo(fixture.sourcePayloads.getFirst());
 
-                VersionedGenerationIndex quarantined = restarted.generations.getIndex(
+                VersionedGenerationIndex quarantined = restarted
+                        .generations
+                        .getIndex(
                                 fixture.cluster,
                                 new GenerationIndexIdentity(
                                         fixture.stream,
                                         ReadView.COMMITTED,
                                         left.coverage().endOffset(),
                                         left.generation().value()))
-                        .join().orElseThrow();
-                assertThat(quarantined.value().lifecycle())
-                        .isEqualTo(GenerationLifecycle.QUARANTINED);
-                assertThat(restarted.physical.getRoot(
-                                fixture.cluster, fixture.output.objectKeyHash())
-                        .join().orElseThrow().value().lifecycle())
+                        .join()
+                        .orElseThrow();
+                assertThat(quarantined.value().lifecycle()).isEqualTo(GenerationLifecycle.QUARANTINED);
+                assertThat(restarted
+                                .physical
+                                .getRoot(fixture.cluster, fixture.output.objectKeyHash())
+                                .join()
+                                .orElseThrow()
+                                .value()
+                                .lifecycle())
                         .isEqualTo(PhysicalObjectLifecycle.QUARANTINED);
-                assertThat(restarted.physical.scanReaderLeases(
-                                fixture.cluster,
-                                fixture.output.objectKeyHash(),
-                                Optional.empty(),
-                                10).join().values())
+                assertThat(restarted
+                                .physical
+                                .scanReaderLeases(fixture.cluster, fixture.output.objectKeyHash(), Optional.empty(), 10)
+                                .join()
+                                .values())
                         .isEmpty();
-                assertThat(restarted.physical.scanReaderLeases(
-                                fixture.cluster,
-                                ObjectKeyHash.from(fixture.sourceTargets.getFirst().objectKey()),
-                                Optional.empty(),
-                                10).join().values())
+                assertThat(restarted
+                                .physical
+                                .scanReaderLeases(
+                                        fixture.cluster,
+                                        ObjectKeyHash.from(
+                                                fixture.sourceTargets.getFirst().objectKey()),
+                                        Optional.empty(),
+                                        10)
+                                .join()
+                                .values())
                         .isEmpty();
             }
         }
     }
 
     private static void assertPublishedAndIndexOwned(
-            Fixture fixture,
-            Process process,
-            GenerationCommitResult committed) {
-        VersionedGenerationIndex index = process.generations.getIndex(
+            Fixture fixture, Process process, GenerationCommitResult committed) {
+        VersionedGenerationIndex index = process.generations
+                .getIndex(
                         fixture.cluster,
                         new GenerationIndexIdentity(
                                 fixture.stream,
                                 ReadView.COMMITTED,
                                 committed.coverage().endOffset(),
                                 committed.generation().value()))
-                .join().orElseThrow();
+                .join()
+                .orElseThrow();
         assertThat(index.value().lifecycle()).isEqualTo(GenerationLifecycle.COMMITTED);
-        VersionedMaterializationTask task = process.generations.getTask(
-                        fixture.cluster, fixture.stream, fixture.task.taskId())
-                .join().orElseThrow();
+        VersionedMaterializationTask task = process.generations
+                .getTask(fixture.cluster, fixture.stream, fixture.task.taskId())
+                .join()
+                .orElseThrow();
         assertThat(task.value().lifecycle()).isEqualTo(TaskLifecycle.PUBLISHED);
-        ObjectProtectionScanPage protections = process.physical.scanProtections(
-                        fixture.cluster,
-                        fixture.output.objectKeyHash(),
-                        Optional.empty(),
-                        10).join();
+        ObjectProtectionScanPage protections = process.physical
+                .scanProtections(fixture.cluster, fixture.output.objectKeyHash(), Optional.empty(), 10)
+                .join();
         assertThat(protections.values()).hasSize(2);
         assertThat(protections.values()).anySatisfy(protection -> {
             assertThat(protection.value().protectionTypeId())
@@ -277,9 +280,7 @@ class GenerationPublicationOxiaS3IntegrationTest {
         });
     }
 
-    private static byte[] readWithProductionPinAndFallback(
-            Fixture fixture,
-            Process process) {
+    private static byte[] readWithProductionPinAndFallback(Fixture fixture, Process process) {
         List<ReadTargetReader> exactReaders = List.of(
                 new S3SliceReader(fixture.objectStore, fixture.outputTarget),
                 new S3SliceReader(fixture.objectStore, fixture.sourceTargets.getFirst()));
@@ -293,20 +294,15 @@ class GenerationPublicationOxiaS3IntegrationTest {
                 Duration.ofMinutes(5),
                 CLOCK);
         StreamStorageConfig config = StreamStorageConfig.defaults(fixture.cluster, "reader-m2");
-        ReadResolver l0Resolver = new ReadResolver(
-                config,
-                process.l0,
-                CLOCK,
-                ReadMetricsObserver.noop(),
-                Runnable::run);
+        ReadResolver l0Resolver =
+                new ReadResolver(config, process.l0, CLOCK, ReadMetricsObserver.noop(), Runnable::run);
         GenerationReadResolver generations = new GenerationReadResolver(
                 fixture.cluster,
                 process.l0,
                 process.generations,
                 GenerationIndexValidator.phase15Targets(),
                 registry,
-                new MetadataPhysicalObjectIdentityResolver(
-                        fixture.cluster, process.l0, process.physical),
+                new MetadataPhysicalObjectIdentityResolver(fixture.cluster, process.l0, process.physical),
                 pins,
                 10_000,
                 CLOCK,
@@ -316,18 +312,22 @@ class GenerationPublicationOxiaS3IntegrationTest {
                 l0Resolver,
                 generations,
                 registry,
-                new MetadataGenerationReadFailureHandler(
-                        fixture.cluster, process.generations, process.physical, CLOCK),
+                new MetadataGenerationReadFailureHandler(fixture.cluster, process.generations, process.physical, CLOCK),
                 new GenerationReadRetryPolicy(0),
                 ReadMetricsObserver.noop(),
                 Runnable::run);
         try {
-            return coordinator.read(
+            return coordinator
+                    .read(
                             fixture.stream,
                             0,
                             ReadView.COMMITTED,
                             new ReadOptions(16, 1 << 20, ReadIsolation.COMMITTED, TIMEOUT))
-                    .join().result().batches().getFirst().payload();
+                    .join()
+                    .result()
+                    .batches()
+                    .getFirst()
+                    .payload();
         } finally {
             coordinator.close();
             pins.close();
@@ -335,8 +335,7 @@ class GenerationPublicationOxiaS3IntegrationTest {
         }
     }
 
-    private static GenerationMetadataStore loseFirstCommittedResponse(
-            GenerationMetadataStore delegate) {
+    private static GenerationMetadataStore loseFirstCommittedResponse(GenerationMetadataStore delegate) {
         AtomicBoolean lose = new AtomicBoolean(true);
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
@@ -359,8 +358,7 @@ class GenerationPublicationOxiaS3IntegrationTest {
                         CompletableFuture<VersionedGenerationIndex> write =
                                 (CompletableFuture<VersionedGenerationIndex>) result;
                         return write.thenCompose(ignored -> CompletableFuture.failedFuture(
-                                new F4MetadataConditionFailedException(
-                                        "injected lost COMMITTED response")));
+                                new F4MetadataConditionFailedException("injected lost COMMITTED response")));
                     }
                     return result;
                 });
@@ -438,9 +436,7 @@ class GenerationPublicationOxiaS3IntegrationTest {
             S3CompatibleObjectStoreProvider provider = new S3CompatibleObjectStoreProvider();
             ObjectStore objectStore;
             try {
-                objectStore = provider.create(
-                        objectStoreConfiguration(bucket),
-                        secretResolver());
+                objectStore = provider.create(objectStoreConfiguration(bucket), secretResolver());
             } catch (Exception failure) {
                 provider.close();
                 throw new IllegalStateException("cannot create LocalStack object store", failure);
@@ -455,53 +451,41 @@ class GenerationPublicationOxiaS3IntegrationTest {
         }
 
         private static Fixture createDomain(
-                String cluster,
-                String suffix,
-                ObjectStore objectStore,
-                S3CompatibleObjectStoreProvider provider) {
+                String cluster, String suffix, ObjectStore objectStore, S3CompatibleObjectStoreProvider provider) {
             OxiaClientConfiguration configuration = oxiaConfiguration();
             List<byte[]> sourcePayloads = List.of(
-                    "source-zero".getBytes(StandardCharsets.UTF_8),
-                    "source-one".getBytes(StandardCharsets.UTF_8));
-            byte[] outputPayload = ByteBuffer.allocate(
-                            sourcePayloads.stream().mapToInt(value -> value.length).sum())
+                    "source-zero".getBytes(StandardCharsets.UTF_8), "source-one".getBytes(StandardCharsets.UTF_8));
+            byte[] outputPayload = ByteBuffer.allocate(sourcePayloads.stream()
+                            .mapToInt(value -> value.length)
+                            .sum())
                     .put(sourcePayloads.get(0))
                     .put(sourcePayloads.get(1))
                     .array();
-            ProjectionRef projection = new ProjectionRef(
-                    ProjectionType.VIRTUAL_LEDGER, "projection-" + suffix);
-            try (SharedOxiaClientRuntime runtime =
-                            SharedOxiaClientRuntime.connect(configuration, CLOCK);
+            ProjectionRef projection = new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "projection-" + suffix);
+            try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, CLOCK);
                     OxiaJavaClientMetadataStore l0 =
-                            OxiaJavaClientMetadataStore.usingSharedRuntime(
-                                    configuration, runtime, CLOCK);
+                            OxiaJavaClientMetadataStore.usingSharedRuntime(configuration, runtime, CLOCK);
                     OxiaJavaGenerationMetadataStore generations =
-                            OxiaJavaGenerationMetadataStore.usingSharedRuntime(
-                                    configuration, runtime, CLOCK);
+                            OxiaJavaGenerationMetadataStore.usingSharedRuntime(configuration, runtime, CLOCK);
                     OxiaJavaPhysicalObjectMetadataStore physical =
-                            OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
-                                    configuration, runtime, CLOCK);
-                    DefaultObjectProtectionManager appendProtections =
-                            new DefaultObjectProtectionManager(
-                                    cluster,
-                                    physical,
-                                    Duration.ofMinutes(2),
-                                    Duration.ofSeconds(1),
-                                    Duration.ofMinutes(5),
-                                    CLOCK)) {
+                            OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(configuration, runtime, CLOCK);
+                    DefaultObjectProtectionManager appendProtections = new DefaultObjectProtectionManager(
+                            cluster,
+                            physical,
+                            Duration.ofMinutes(2),
+                            Duration.ofSeconds(1),
+                            Duration.ofMinutes(5),
+                            CLOCK)) {
                 GenerationZeroPhysicalReferencePublisher appendReferences =
-                        new DefaultGenerationZeroPhysicalReferencePublisher(
-                                cluster, l0, physical, appendProtections);
+                        new DefaultGenerationZeroPhysicalReferencePublisher(cluster, l0, physical, appendProtections);
                 StreamId stream = new StreamId(l0.createOrGetStream(
                                 cluster,
                                 new StreamName("stream-" + suffix),
-                                new StreamCreateOptions(
-                                        StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
-                        .join().streamId());
+                                new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of()))
+                        .join()
+                        .streamId());
                 AppendSessionRecord session = l0.acquireAppendSession(
-                        cluster,
-                        stream,
-                        new AppendSessionOptions("writer-m2", Duration.ofMinutes(2), false))
+                                cluster, stream, new AppendSessionOptions("writer-m2", Duration.ofMinutes(2), false))
                         .join();
                 List<ObjectSliceReadTarget> targets = new ArrayList<>();
                 List<SourceGeneration> sources = new ArrayList<>();
@@ -509,8 +493,7 @@ class GenerationPublicationOxiaS3IntegrationTest {
                 for (int index = 0; index < sourcePayloads.size(); index++) {
                     byte[] payload = sourcePayloads.get(index);
                     ObjectId objectId = new ObjectId("source-" + index + "-" + suffix);
-                    ObjectKey objectKey = new ObjectKey(
-                            "f4-m2/" + suffix + "/source-" + index);
+                    ObjectKey objectKey = new ObjectKey("f4-m2/" + suffix + "/source-" + index);
                     PutObjectResult put = put(objectStore, objectKey, payload);
                     ObjectSliceReadTarget target = target(
                             objectId,
@@ -545,21 +528,15 @@ class GenerationPublicationOxiaS3IntegrationTest {
                             index + 1L,
                             index + 1L,
                             Optional.of(projection));
-                    l0.putObjectManifest(
-                            cluster,
-                            appendManifest(appendRequest, target, sourceIdentity))
+                    l0.putObjectManifest(cluster, appendManifest(appendRequest, target, sourceIdentity))
                             .join();
-                    StableAppendResult stable = commitProtectedGenerationZero(
-                            cluster, l0, appendReferences, appendRequest);
-                    VersionedGenerationCandidate candidate = generations.getCandidate(
-                                    cluster,
-                                    stream,
-                                    ReadView.COMMITTED,
-                                    index + 1L,
-                                    0)
-                            .join().orElseThrow();
-                    VersionedGenerationZeroIndex zero =
-                            (VersionedGenerationZeroIndex) candidate;
+                    StableAppendResult stable =
+                            commitProtectedGenerationZero(cluster, l0, appendReferences, appendRequest);
+                    VersionedGenerationCandidate candidate = generations
+                            .getCandidate(cluster, stream, ReadView.COMMITTED, index + 1L, 0)
+                            .join()
+                            .orElseThrow();
+                    VersionedGenerationZeroIndex zero = (VersionedGenerationZeroIndex) candidate;
                     long nextCumulative = Math.addExact(cumulative, payload.length);
                     sources.add(new SourceGeneration(
                             ReadView.COMMITTED,
@@ -596,8 +573,7 @@ class GenerationPublicationOxiaS3IntegrationTest {
                         65_536,
                         "ZSTD",
                         Optional.empty());
-                MaterializationTask task = MaterializationTask.create(
-                        stream, new OffsetRange(0, 2), sources, policy);
+                MaterializationTask task = MaterializationTask.create(stream, new OffsetRange(0, 2), sources, policy);
                 ObjectId outputId = new ObjectId("output-" + suffix);
                 ObjectKey outputKey = new ObjectKey("f4-m2/" + suffix + "/output");
                 PutObjectResult outputPut = put(objectStore, outputKey, outputPayload);
@@ -637,20 +613,22 @@ class GenerationPublicationOxiaS3IntegrationTest {
                         Optional.of(projection));
                 createOutputReadyTask(cluster, generations, task, output);
                 long now = CLOCK.millis();
-                String projectionIdentity = MaterializationRecordMapper.projectionIdentity(
-                        Optional.of(projection));
-                generations.createOrVerifyStreamRegistration(
-                        cluster,
-                        new MaterializationStreamRegistrationRecord(
-                                1,
-                                stream.value(),
-                                projectionIdentity,
-                                sha256(projectionIdentity.getBytes(StandardCharsets.UTF_8)).value(),
-                                StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
-                                now,
-                                task.taskSequence(),
-                                now,
-                                0)).join();
+                String projectionIdentity = MaterializationRecordMapper.projectionIdentity(Optional.of(projection));
+                generations
+                        .createOrVerifyStreamRegistration(
+                                cluster,
+                                new MaterializationStreamRegistrationRecord(
+                                        1,
+                                        stream.value(),
+                                        projectionIdentity,
+                                        sha256(projectionIdentity.getBytes(StandardCharsets.UTF_8))
+                                                .value(),
+                                        StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                                        now,
+                                        task.taskSequence(),
+                                        now,
+                                        0))
+                        .join();
                 return new Fixture(
                         cluster,
                         stream,
@@ -702,17 +680,13 @@ class GenerationPublicationOxiaS3IntegrationTest {
 
         private static Process open(Fixture fixture) {
             OxiaClientConfiguration configuration = oxiaConfiguration();
-            SharedOxiaClientRuntime runtime =
-                    SharedOxiaClientRuntime.connect(configuration, CLOCK);
+            SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, CLOCK);
             OxiaJavaClientMetadataStore l0 =
-                    OxiaJavaClientMetadataStore.usingSharedRuntime(
-                            configuration, runtime, CLOCK);
+                    OxiaJavaClientMetadataStore.usingSharedRuntime(configuration, runtime, CLOCK);
             OxiaJavaGenerationMetadataStore generations =
-                    OxiaJavaGenerationMetadataStore.usingSharedRuntime(
-                            configuration, runtime, CLOCK);
+                    OxiaJavaGenerationMetadataStore.usingSharedRuntime(configuration, runtime, CLOCK);
             OxiaJavaPhysicalObjectMetadataStore physical =
-                    OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
-                            configuration, runtime, CLOCK);
+                    OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(configuration, runtime, CLOCK);
             ObjectProtectionManager protections = new DefaultObjectProtectionManager(
                     fixture.cluster,
                     physical,
@@ -724,24 +698,20 @@ class GenerationPublicationOxiaS3IntegrationTest {
             return new Process(runtime, l0, generations, physical, protections, scheduler);
         }
 
-        private DefaultGenerationCommitter committer(
-                GenerationMetadataStore store,
-                Fixture fixture) {
-            MaterializationFormatVerifier formatVerifier = (task, output, timeout) ->
-                    fixture.objectStore.readRange(
-                                    output.objectKey(),
-                                    0,
-                                    output.objectLength(),
-                                    new RangeReadOptions(
-                                            Optional.of(output.storageCrc32c()), timeout))
-                            .thenAccept(read -> {
-                                byte[] bytes = bytes(read.payload());
-                                if (!Arrays.equals(bytes, fixture.outputPayload)
-                                        || !sha256(bytes).equals(output.contentSha256())) {
-                                    throw new IllegalStateException(
-                                            "materialization output content mismatch");
-                                }
-                            });
+        private DefaultGenerationCommitter committer(GenerationMetadataStore store, Fixture fixture) {
+            MaterializationFormatVerifier formatVerifier = (task, output, timeout) -> fixture.objectStore
+                    .readRange(
+                            output.objectKey(),
+                            0,
+                            output.objectLength(),
+                            new RangeReadOptions(Optional.of(output.storageCrc32c()), timeout))
+                    .thenAccept(read -> {
+                        byte[] bytes = bytes(read.payload());
+                        if (!Arrays.equals(bytes, fixture.outputPayload)
+                                || !sha256(bytes).equals(output.contentSha256())) {
+                            throw new IllegalStateException("materialization output content mismatch");
+                        }
+                    });
             return new DefaultGenerationCommitter(
                     fixture.cluster,
                     l0,
@@ -749,8 +719,7 @@ class GenerationPublicationOxiaS3IntegrationTest {
                     physical,
                     protections,
                     activationGuard(),
-                    new DefaultMaterializationOutputVerifier(
-                            fixture.objectStore, formatVerifier),
+                    new DefaultMaterializationOutputVerifier(fixture.objectStore, formatVerifier),
                     TIMEOUT,
                     scheduler,
                     CLOCK);
@@ -788,23 +757,20 @@ class GenerationPublicationOxiaS3IntegrationTest {
 
         @Override
         public CompletableFuture<WalReadResult> readWithStats(
-                StreamId streamId,
-                long startOffset,
-                List<ResolvedRange> ranges,
-                ReadOptions options) {
+                StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
             if (ranges.size() != 1
                     || startOffset != ranges.getFirst().offsetRange().startOffset()) {
-                return CompletableFuture.failedFuture(new IllegalArgumentException(
-                        "F4-M2 fixture reader expects one complete resolved range"));
+                return CompletableFuture.failedFuture(
+                        new IllegalArgumentException("F4-M2 fixture reader expects one complete resolved range"));
             }
             ResolvedRange range = ranges.getFirst();
             ObjectSliceReadTarget target = (ObjectSliceReadTarget) range.readTarget();
-            return objectStore.readRange(
+            return objectStore
+                    .readRange(
                             target.objectKey(),
                             target.objectOffset(),
                             target.objectLength(),
-                            new RangeReadOptions(
-                                    Optional.of(target.sliceChecksum()), options.timeout()))
+                            new RangeReadOptions(Optional.of(target.sliceChecksum()), options.timeout()))
                     .thenApply(read -> {
                         byte[] payload = bytes(read.payload());
                         ReadBatch batch = new ReadBatch(
@@ -829,10 +795,7 @@ class GenerationPublicationOxiaS3IntegrationTest {
     }
 
     private static void createOutputReadyTask(
-            String cluster,
-            GenerationMetadataStore store,
-            MaterializationTask task,
-            MaterializationOutput output) {
+            String cluster, GenerationMetadataStore store, MaterializationTask task, MaterializationOutput output) {
         long now = CLOCK.millis();
         MaterializationTaskRecord planned = new MaterializationTaskRecord(
                 1,
@@ -843,7 +806,9 @@ class GenerationPublicationOxiaS3IntegrationTest {
                 task.taskKind().wireId(),
                 task.coverage().startOffset(),
                 task.coverage().endOffset(),
-                task.sources().stream().map(MaterializationRecordMapper::sourceRecord).toList(),
+                task.sources().stream()
+                        .map(MaterializationRecordMapper::sourceRecord)
+                        .toList(),
                 task.sourceSetSha256().value(),
                 task.policy().policyId(),
                 task.policy().policyVersion(),
@@ -861,16 +826,16 @@ class GenerationPublicationOxiaS3IntegrationTest {
                 now,
                 now,
                 0);
-        VersionedMaterializationTask created = store.createTask(cluster, planned).join();
+        VersionedMaterializationTask created =
+                store.createTask(cluster, planned).join();
         MaterializationTaskRecord claimed = taskState(
                 planned,
                 TaskLifecycle.CLAIMED,
-                Optional.of(new WorkerClaimRecord(
-                        "c".repeat(26), "d".repeat(26), 1, now + 1, now + 60_000)),
+                Optional.of(new WorkerClaimRecord("c".repeat(26), "d".repeat(26), 1, now + 1, now + 60_000)),
                 Optional.empty(),
                 now + 1);
-        VersionedMaterializationTask claimedValue = store.compareAndSetTask(
-                cluster, claimed, created.metadataVersion()).join();
+        VersionedMaterializationTask claimedValue = store.compareAndSetTask(cluster, claimed, created.metadataVersion())
+                .join();
         MaterializationTaskRecord ready = taskState(
                 claimed,
                 TaskLifecycle.OUTPUT_READY,
@@ -915,20 +880,14 @@ class GenerationPublicationOxiaS3IntegrationTest {
                 0);
     }
 
-    private static PutObjectResult put(
-            ObjectStore objectStore,
-            ObjectKey key,
-            byte[] payload) {
+    private static PutObjectResult put(ObjectStore objectStore, ObjectKey key, byte[] payload) {
         Checksum checksum = Crc32cChecksums.checksum(payload);
-        return objectStore.putObject(
+        return objectStore
+                .putObject(
                         key,
                         ByteBuffer.wrap(payload),
                         new PutObjectOptions(
-                                "application/octet-stream",
-                                checksum,
-                                true,
-                                Map.of("phase", "f4-m2"),
-                                TIMEOUT))
+                                "application/octet-stream", checksum, true, Map.of("phase", "f4-m2"), TIMEOUT))
                 .join();
     }
 
@@ -968,7 +927,8 @@ class GenerationPublicationOxiaS3IntegrationTest {
             GenerationZeroPhysicalReferencePublisher references,
             CommitAppendRequest request) {
         var prepared = metadata.prepareStableAppend(cluster, request).join();
-        ProtectedStableAppend protectedAppend = references.protectBeforeHead(prepared, TIMEOUT).join();
+        ProtectedStableAppend protectedAppend =
+                references.protectBeforeHead(prepared, TIMEOUT).join();
         StableAppendResult stable = metadata.commitPreparedStableAppend(
                         cluster,
                         prepared,
@@ -978,17 +938,14 @@ class GenerationPublicationOxiaS3IntegrationTest {
                         protectedAppend.protectionMetadataVersion(),
                         protectedAppend.protectionRecordSha256())
                 .join();
-        var materialized = metadata.materializeGenerationZero(
-                        cluster, stable.reachableAppend())
+        var materialized = metadata.materializeGenerationZero(cluster, stable.reachableAppend())
                 .join();
         references.protectVisibleIndex(materialized, TIMEOUT).join();
         return stable;
     }
 
     private static ObjectManifestRecord appendManifest(
-            CommitAppendRequest request,
-            ObjectSliceReadTarget target,
-            PhysicalObjectIdentity identity) {
+            CommitAppendRequest request, ObjectSliceReadTarget target, PhysicalObjectIdentity identity) {
         long now = CLOCK.millis();
         Checksum contentSha256 = identity.contentSha256().orElseThrow();
         return new ObjectManifestRecord(
@@ -1032,9 +989,7 @@ class GenerationPublicationOxiaS3IntegrationTest {
     private static Checksum targetIdentity(ObjectSliceReadTarget target) {
         return new Checksum(
                 ChecksumType.SHA256,
-                ReadTargetCodecRegistry.phase15()
-                        .encode(target)
-                        .identityChecksumValue());
+                ReadTargetCodecRegistry.phase15().encode(target).identityChecksumValue());
     }
 
     private static PhysicalObjectRootRecord activeRoot(PhysicalObjectIdentity identity) {
@@ -1070,8 +1025,8 @@ class GenerationPublicationOxiaS3IntegrationTest {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(
-                            MessageDigest.getInstance("SHA-256").digest(value)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
         } catch (java.security.NoSuchAlgorithmException impossible) {
             throw new IllegalStateException(impossible);
         }
@@ -1086,17 +1041,13 @@ class GenerationPublicationOxiaS3IntegrationTest {
 
     private static OxiaClientConfiguration oxiaConfiguration() {
         return new OxiaClientConfiguration(
-                OXIA.getServiceAddress(),
-                "default",
-                Duration.ofSeconds(10),
-                TIMEOUT,
-                100,
-                1_024);
+                OXIA.getServiceAddress(), "default", Duration.ofSeconds(10), TIMEOUT, 100, 1_024);
     }
 
     private static void createBucket(String bucket) {
         try (S3AsyncClient admin = adminClient()) {
-            admin.createBucket(CreateBucketRequest.builder().bucket(bucket).build()).join();
+            admin.createBucket(CreateBucketRequest.builder().bucket(bucket).build())
+                    .join();
         }
     }
 
@@ -1104,12 +1055,10 @@ class GenerationPublicationOxiaS3IntegrationTest {
         return S3AsyncClient.builder()
                 .endpointOverride(LOCALSTACK.getEndpointOverride(LocalStackContainer.Service.S3))
                 .region(Region.of(LOCALSTACK.getRegion()))
-                .serviceConfiguration(S3Configuration.builder()
-                        .pathStyleAccessEnabled(true)
-                        .build())
+                .serviceConfiguration(
+                        S3Configuration.builder().pathStyleAccessEnabled(true).build())
                 .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(
-                                LOCALSTACK.getAccessKey(), LOCALSTACK.getSecretKey())))
+                        AwsBasicCredentials.create(LOCALSTACK.getAccessKey(), LOCALSTACK.getSecretKey())))
                 .build();
     }
 

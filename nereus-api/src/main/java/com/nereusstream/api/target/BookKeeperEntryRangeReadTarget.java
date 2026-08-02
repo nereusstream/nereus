@@ -5,6 +5,7 @@
  *
  *   https://www.apache.org/licenses/LICENSE-2.0
  */
+
 package com.nereusstream.api.target;
 
 import com.nereusstream.api.Checksum;
@@ -12,7 +13,9 @@ import com.nereusstream.api.ChecksumType;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-/** Durable reservation for a contiguous BookKeeper entry range. Phase 1.5 installs no BookKeeper IO adapter. */
+/**
+ * Durable reservation for a contiguous BookKeeper entry range. Phase 1.5 installs no BookKeeper IO adapter.
+ */
 public record BookKeeperEntryRangeReadTarget(
         int version,
         String clusterAlias,
@@ -20,7 +23,8 @@ public record BookKeeperEntryRangeReadTarget(
         long firstEntryId,
         int entryCount,
         BookKeeperEntryMapping entryMapping,
-        Checksum rangeChecksum) implements ReadTarget {
+        Checksum rangeChecksum)
+        implements ReadTarget {
     public BookKeeperEntryRangeReadTarget {
         if (version != 1) {
             throw new IllegalArgumentException("BookKeeper target version must be 1");

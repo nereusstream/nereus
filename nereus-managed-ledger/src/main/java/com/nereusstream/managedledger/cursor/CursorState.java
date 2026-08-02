@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.metadata.oxia.CursorIds;
@@ -8,7 +9,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Coherent hydrated cursor root plus effective snapshot-backed acknowledgement state. */
+/**
+ * Coherent hydrated cursor root plus effective snapshot-backed acknowledgement state.
+ */
 public record CursorState(
         CursorIdentity identity,
         String ownerSessionId,
@@ -30,8 +33,7 @@ public record CursorState(
         if (mutationSequence < 1 || ackStateEpoch < 1) {
             throw new IllegalArgumentException("cursor sequence and ack epoch must be positive");
         }
-        lastProtectionAttemptId = CursorIds.requireRandomId(
-                lastProtectionAttemptId, "lastProtectionAttemptId");
+        lastProtectionAttemptId = CursorIds.requireRandomId(lastProtectionAttemptId, "lastProtectionAttemptId");
         Objects.requireNonNull(acknowledgements, "acknowledgements");
         positionProperties = immutableMap(positionProperties, "positionProperties");
         cursorProperties = immutableMap(cursorProperties, "cursorProperties");

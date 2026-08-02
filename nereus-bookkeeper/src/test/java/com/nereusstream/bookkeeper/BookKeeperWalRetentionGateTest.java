@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.OffsetRange;
@@ -43,8 +43,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.Test;
 
@@ -57,7 +57,8 @@ class BookKeeperWalRetentionGateTest {
             StableLedger ledger = appendCommitAndSeal(runtime);
             BookKeeperWalRetentionGate gate = gate(runtime, activation(runtime));
 
-            BookKeeperRetentionEvaluation activeReferences = gate.evaluate(ledger.sealedRoot(), TIMEOUT).join();
+            BookKeeperRetentionEvaluation activeReferences =
+                    gate.evaluate(ledger.sealedRoot(), TIMEOUT).join();
             assertThat(activeReferences.blockers()).contains(BookKeeperRetentionBlocker.PROTECTION_PRESENT);
 
             BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
@@ -66,27 +67,33 @@ class BookKeeperWalRetentionGateTest {
                     runtime.metadata,
                     (proof, protection, timeout) -> CompletableFuture.completedFuture(null));
             for (int protectionSlot = 0; protectionSlot < 3; protectionSlot++) {
-                var protection = runtime.metadata.getProtection(
+                var protection = runtime.metadata
+                        .getProtection(
                                 BookKeeperPrimaryWalAppenderTest.CLUSTER,
                                 runtime.configuration.providerScopeSha256(),
                                 ledger.target().ledgerId(),
                                 0,
                                 protectionSlot)
-                        .join().orElseThrow();
-                var retired = references.retire(
-                        ledger.target().ledgerId(), 0, protectionSlot, proof(protection), TIMEOUT).join();
+                        .join()
+                        .orElseThrow();
+                var retired = references
+                        .retire(ledger.target().ledgerId(), 0, protectionSlot, proof(protection), TIMEOUT)
+                        .join();
                 assertThat(retired.value().lifecycle()).isEqualTo(ProtectionLifecycle.RETIRED);
-                assertThat(retired.value().ownerKey()).isEqualTo(protection.value().ownerKey());
+                assertThat(retired.value().ownerKey())
+                        .isEqualTo(protection.value().ownerKey());
             }
 
-            BookKeeperReaderLeaseManager.Lease lease = runtime.readerLeases.claim(
-                    ledger.sealedRoot(), TIMEOUT).join();
+            BookKeeperReaderLeaseManager.Lease lease =
+                    runtime.readerLeases.claim(ledger.sealedRoot(), TIMEOUT).join();
             assertThat(gate.evaluate(ledger.sealedRoot(), TIMEOUT).join().blockers())
                     .contains(BookKeeperRetentionBlocker.READER_LEASE_PRESENT);
             lease.release().join();
 
-            BookKeeperRetentionEvaluation first = gate.evaluate(ledger.sealedRoot(), TIMEOUT).join();
-            BookKeeperRetentionEvaluation second = gate.evaluate(ledger.sealedRoot(), TIMEOUT).join();
+            BookKeeperRetentionEvaluation first =
+                    gate.evaluate(ledger.sealedRoot(), TIMEOUT).join();
+            BookKeeperRetentionEvaluation second =
+                    gate.evaluate(ledger.sealedRoot(), TIMEOUT).join();
             assertThat(first.blockers()).isEmpty();
             assertThat(first.candidate()).isPresent();
             assertThat(first.candidate().orElseThrow().retiredProtections()).hasSize(3);
@@ -99,31 +106,37 @@ class BookKeeperWalRetentionGateTest {
     void retirementAuthorityFailureLeavesTheActiveProtectionUntouched() {
         try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
             StableLedger ledger = appendCommitAndSeal(runtime);
-            var protection = runtime.metadata.getProtection(
+            var protection = runtime.metadata
+                    .getProtection(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
                             runtime.configuration.providerScopeSha256(),
                             ledger.target().ledgerId(),
                             0,
                             0)
-                    .join().orElseThrow();
+                    .join()
+                    .orElseThrow();
             BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
                     BookKeeperPrimaryWalAppenderTest.CLUSTER,
                     runtime.configuration,
                     runtime.metadata,
-                    (proof, current, timeout) -> CompletableFuture.failedFuture(
-                            new IllegalStateException("retirement authority rejected")));
+                    (proof, current, timeout) ->
+                            CompletableFuture.failedFuture(new IllegalStateException("retirement authority rejected")));
 
-            assertThatThrownBy(() -> references.retire(
-                            ledger.target().ledgerId(), 0, 0, proof(protection), TIMEOUT).join())
+            assertThatThrownBy(() -> references
+                            .retire(ledger.target().ledgerId(), 0, 0, proof(protection), TIMEOUT)
+                            .join())
                     .hasRootCauseMessage("retirement authority rejected");
-            assertThat(runtime.metadata.getProtection(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            runtime.configuration.providerScopeSha256(),
-                            ledger.target().ledgerId(),
-                            0,
-                            0)
-                    .join()).get().satisfies(current ->
-                            assertThat(current.value().lifecycle()).isEqualTo(ProtectionLifecycle.ACTIVE));
+            assertThat(runtime.metadata
+                            .getProtection(
+                                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                                    runtime.configuration.providerScopeSha256(),
+                                    ledger.target().ledgerId(),
+                                    0,
+                                    0)
+                            .join())
+                    .get()
+                    .satisfies(
+                            current -> assertThat(current.value().lifecycle()).isEqualTo(ProtectionLifecycle.ACTIVE));
         }
     }
 
@@ -132,49 +145,49 @@ class BookKeeperWalRetentionGateTest {
         try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
             runtime.operations.failWriteCall = 2;
             assertThatThrownBy(() -> {
-                try (BookKeeperPreparedPrimaryAppend prepared = runtime.appender.prepare(
-                        BookKeeperPrimaryWalAppenderTest.request(
-                                BookKeeperPrimaryWalAppenderTest.session(),
-                                "attempt-abandoned-retirement",
-                                0,
-                                new byte[] {1},
-                                new byte[] {2}))) {
-                    runtime.appender.persist(prepared, TIMEOUT).join();
-                }
-            }).hasRootCauseInstanceOf(com.nereusstream.api.NereusException.class);
-            var reservation = runtime.metadata.scanReservations(
+                        try (BookKeeperPreparedPrimaryAppend prepared =
+                                runtime.appender.prepare(BookKeeperPrimaryWalAppenderTest.request(
+                                        BookKeeperPrimaryWalAppenderTest.session(),
+                                        "attempt-abandoned-retirement",
+                                        0,
+                                        new byte[] {1},
+                                        new byte[] {2}))) {
+                            runtime.appender.persist(prepared, TIMEOUT).join();
+                        }
+                    })
+                    .hasRootCauseInstanceOf(com.nereusstream.api.NereusException.class);
+            var reservation = runtime.metadata
+                    .scanReservations(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
                             BookKeeperPrimaryWalAppenderTest.STREAM,
                             Optional.empty(),
                             10)
-                    .join().values().get(0);
+                    .join()
+                    .values()
+                    .get(0);
             assertThat(reservation.value().lifecycle()).isEqualTo(AppendReservationLifecycle.ABANDONED);
-            var protection = runtime.metadata.getProtection(
+            var protection = runtime.metadata
+                    .getProtection(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
                             runtime.configuration.providerScopeSha256(),
                             reservation.value().ledgerId(),
                             reservation.value().ledgerRangeSlot(),
                             0)
-                    .join().orElseThrow();
+                    .join()
+                    .orElseThrow();
             assertThat(protection.value().lifecycle()).isEqualTo(ProtectionLifecycle.RESERVED);
             BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
                     BookKeeperPrimaryWalAppenderTest.CLUSTER,
                     l0(new AtomicReference<>(snapshot(0, 7))),
                     runtime.metadata);
-            BookKeeperProtectionRetirementProof proof = authority.proveAbandonedAppend(protection, TIMEOUT)
-                    .join().orElseThrow();
+            BookKeeperProtectionRetirementProof proof =
+                    authority.proveAbandonedAppend(protection, TIMEOUT).join().orElseThrow();
             BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
-                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                    runtime.configuration,
-                    runtime.metadata,
-                    authority);
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER, runtime.configuration, runtime.metadata, authority);
 
-            var retired = references.retire(
-                    reservation.value().ledgerId(),
-                    reservation.value().ledgerRangeSlot(),
-                    0,
-                    proof,
-                    TIMEOUT).join();
+            var retired = references
+                    .retire(reservation.value().ledgerId(), reservation.value().ledgerRangeSlot(), 0, proof, TIMEOUT)
+                    .join();
             assertThat(retired.value().lifecycle()).isEqualTo(ProtectionLifecycle.RETIRED);
             assertThat(retired.value().ownerKey()).isEqualTo(reservation.key());
             assertThat(retired.value().ownerIdentitySha256())
@@ -187,39 +200,48 @@ class BookKeeperWalRetentionGateTest {
         try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
             runtime.metadata.failCreateProtectionCall(2);
             assertThatThrownBy(() -> {
-                try (BookKeeperPreparedPrimaryAppend prepared = runtime.appender.prepare(
-                        BookKeeperPrimaryWalAppenderTest.request(
-                                BookKeeperPrimaryWalAppenderTest.session(),
-                                "attempt-protection-cut",
-                                0,
-                                new byte[] {1}))) {
-                    runtime.appender.persist(prepared, TIMEOUT).join();
-                }
-            }).hasRootCauseMessage("injected BookKeeper protection create failure");
-            var reservation = runtime.metadata.scanReservations(
+                        try (BookKeeperPreparedPrimaryAppend prepared =
+                                runtime.appender.prepare(BookKeeperPrimaryWalAppenderTest.request(
+                                        BookKeeperPrimaryWalAppenderTest.session(),
+                                        "attempt-protection-cut",
+                                        0,
+                                        new byte[] {1}))) {
+                            runtime.appender.persist(prepared, TIMEOUT).join();
+                        }
+                    })
+                    .hasRootCauseMessage("injected BookKeeper protection create failure");
+            var reservation = runtime.metadata
+                    .scanReservations(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
                             BookKeeperPrimaryWalAppenderTest.STREAM,
                             Optional.empty(),
                             10)
-                    .join().values().get(0);
+                    .join()
+                    .values()
+                    .get(0);
             assertThat(reservation.value().lifecycle()).isEqualTo(AppendReservationLifecycle.ABANDONED);
             for (int slot = 0; slot < 3; slot++) {
-                assertThat(runtime.metadata.getProtection(
-                                BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                                runtime.configuration.providerScopeSha256(),
-                                reservation.value().ledgerId(),
-                                reservation.value().ledgerRangeSlot(),
-                                slot)
-                        .join()).get().satisfies(protection -> {
+                assertThat(runtime.metadata
+                                .getProtection(
+                                        BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                                        runtime.configuration.providerScopeSha256(),
+                                        reservation.value().ledgerId(),
+                                        reservation.value().ledgerRangeSlot(),
+                                        slot)
+                                .join())
+                        .get()
+                        .satisfies(protection -> {
                             assertThat(protection.value().lifecycle()).isEqualTo(ProtectionLifecycle.RESERVED);
                             assertThat(protection.value().referenceId())
                                     .isEqualTo(reservation.value().reservationId());
                         });
             }
-            assertThat(runtime.metadata.getWriter(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            BookKeeperPrimaryWalAppenderTest.STREAM)
-                    .join()).get().satisfies(writer -> {
+            assertThat(runtime.metadata
+                            .getWriter(
+                                    BookKeeperPrimaryWalAppenderTest.CLUSTER, BookKeeperPrimaryWalAppenderTest.STREAM)
+                            .join())
+                    .get()
+                    .satisfies(writer -> {
                         assertThat(writer.value().activeReservationId()).isEmpty();
                         assertThat(writer.value().lifecycle())
                                 .isEqualTo(com.nereusstream.metadata.oxia.records.BookKeeperWriterLifecycle.IDLE);
@@ -231,43 +253,45 @@ class BookKeeperWalRetentionGateTest {
     void completedLogicalTrimProofIsExactRefreshableAndRetiresTheProtection() {
         try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
             StableLedger ledger = appendCommitAndSeal(runtime);
-            var protection = runtime.metadata.getProtection(
+            var protection = runtime.metadata
+                    .getProtection(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
                             runtime.configuration.providerScopeSha256(),
                             ledger.target().ledgerId(),
                             0,
                             0)
-                    .join().orElseThrow();
+                    .join()
+                    .orElseThrow();
             AtomicReference<StreamMetadataSnapshot> snapshot = new AtomicReference<>(snapshot(12, 7));
             BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
-                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                    l0(snapshot),
-                    runtime.metadata);
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER, l0(snapshot), runtime.metadata);
             BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
-                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                    runtime.configuration,
-                    runtime.metadata,
-                    authority);
-            BookKeeperProtectionRetirementProof stale = authority.proveLogicalTrim(protection, TIMEOUT)
-                    .join().orElseThrow();
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER, runtime.configuration, runtime.metadata, authority);
+            BookKeeperProtectionRetirementProof stale =
+                    authority.proveLogicalTrim(protection, TIMEOUT).join().orElseThrow();
             snapshot.set(snapshot(12, 8));
 
-            assertThatThrownBy(() -> references.retire(
-                            ledger.target().ledgerId(), 0, 0, stale, TIMEOUT).join())
+            assertThatThrownBy(() -> references
+                            .retire(ledger.target().ledgerId(), 0, 0, stale, TIMEOUT)
+                            .join())
                     .hasRootCauseInstanceOf(com.nereusstream.api.NereusException.class);
-            assertThat(runtime.metadata.getProtection(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            runtime.configuration.providerScopeSha256(),
-                            ledger.target().ledgerId(),
-                            0,
-                            0)
-                    .join()).get().satisfies(current ->
-                            assertThat(current.value().lifecycle()).isEqualTo(ProtectionLifecycle.ACTIVE));
+            assertThat(runtime.metadata
+                            .getProtection(
+                                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                                    runtime.configuration.providerScopeSha256(),
+                                    ledger.target().ledgerId(),
+                                    0,
+                                    0)
+                            .join())
+                    .get()
+                    .satisfies(
+                            current -> assertThat(current.value().lifecycle()).isEqualTo(ProtectionLifecycle.ACTIVE));
 
-            BookKeeperProtectionRetirementProof refreshed = authority.proveLogicalTrim(protection, TIMEOUT)
-                    .join().orElseThrow();
-            var retired = references.retire(
-                    ledger.target().ledgerId(), 0, 0, refreshed, TIMEOUT).join();
+            BookKeeperProtectionRetirementProof refreshed =
+                    authority.proveLogicalTrim(protection, TIMEOUT).join().orElseThrow();
+            var retired = references
+                    .retire(ledger.target().ledgerId(), 0, 0, refreshed, TIMEOUT)
+                    .join();
             assertThat(retired.value().lifecycle()).isEqualTo(ProtectionLifecycle.RETIRED);
         }
     }
@@ -279,61 +303,51 @@ class BookKeeperWalRetentionGateTest {
             AtomicInteger proveCalls = new AtomicInteger();
             AtomicInteger exactCalls = new AtomicInteger();
             Checksum indexSha = sha('9');
-            CommittedGenerationRetirementAuthority replacements =
-                    new CommittedGenerationRetirementAuthority() {
-                        @Override
-                        public CompletableFuture<Optional<CommittedGenerationRetirementProof>> proveRetirement(
-                                com.nereusstream.api.StreamId streamId,
-                                OffsetRange sourceRange,
-                                long sourceCommitVersion) {
-                            proveCalls.incrementAndGet();
-                            return CompletableFuture.completedFuture(Optional.of(
-                                    replacementProof(
-                                            streamId, sourceRange, sourceCommitVersion, indexSha)));
-                        }
+            CommittedGenerationRetirementAuthority replacements = new CommittedGenerationRetirementAuthority() {
+                @Override
+                public CompletableFuture<Optional<CommittedGenerationRetirementProof>> proveRetirement(
+                        com.nereusstream.api.StreamId streamId, OffsetRange sourceRange, long sourceCommitVersion) {
+                    proveCalls.incrementAndGet();
+                    return CompletableFuture.completedFuture(
+                            Optional.of(replacementProof(streamId, sourceRange, sourceCommitVersion, indexSha)));
+                }
 
-                        @Override
-                        public CompletableFuture<Optional<CommittedGenerationRetirementProof>>
-                                proveExactRetirement(
-                                        com.nereusstream.api.StreamId streamId,
-                                        OffsetRange sourceRange,
-                                        long sourceCommitVersion,
-                                        String indexKey,
-                                        long indexMetadataVersion,
-                                        Checksum indexSha256) {
-                            exactCalls.incrementAndGet();
-                            CommittedGenerationRetirementProof proof = replacementProof(
-                                    streamId, sourceRange, sourceCommitVersion, indexSha);
-                            return CompletableFuture.completedFuture(
-                                    proof.indexKey().equals(indexKey)
-                                                    && proof.indexMetadataVersion() == indexMetadataVersion
-                                                    && proof.indexSha256().equals(indexSha256)
-                                            ? Optional.of(proof)
-                                            : Optional.empty());
-                        }
+                @Override
+                public CompletableFuture<Optional<CommittedGenerationRetirementProof>> proveExactRetirement(
+                        com.nereusstream.api.StreamId streamId,
+                        OffsetRange sourceRange,
+                        long sourceCommitVersion,
+                        String indexKey,
+                        long indexMetadataVersion,
+                        Checksum indexSha256) {
+                    exactCalls.incrementAndGet();
+                    CommittedGenerationRetirementProof proof =
+                            replacementProof(streamId, sourceRange, sourceCommitVersion, indexSha);
+                    return CompletableFuture.completedFuture(
+                            proof.indexKey().equals(indexKey)
+                                            && proof.indexMetadataVersion() == indexMetadataVersion
+                                            && proof.indexSha256().equals(indexSha256)
+                                    ? Optional.of(proof)
+                                    : Optional.empty());
+                }
 
-                        @Override
-                        public CompletableFuture<Void> revalidateRetirement(
-                                CommittedGenerationRetirementProof expected) {
-                            return CompletableFuture.completedFuture(null);
-                        }
-                    };
+                @Override
+                public CompletableFuture<Void> revalidateRetirement(CommittedGenerationRetirementProof expected) {
+                    return CompletableFuture.completedFuture(null);
+                }
+            };
             BookKeeperWalOnlyRetirementAuthority common = new BookKeeperWalOnlyRetirementAuthority(
                     BookKeeperPrimaryWalAppenderTest.CLUSTER,
                     l0(new AtomicReference<>(snapshot(0, 7))),
                     runtime.metadata);
-            BookKeeperAsyncObjectRetirementAuthority authority =
-                    new BookKeeperAsyncObjectRetirementAuthority(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            runtime.configuration,
-                            common,
-                            replacements,
-                            runtime.metadata);
-            BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
+            BookKeeperAsyncObjectRetirementAuthority authority = new BookKeeperAsyncObjectRetirementAuthority(
                     BookKeeperPrimaryWalAppenderTest.CLUSTER,
                     runtime.configuration,
-                    runtime.metadata,
-                    authority);
+                    common,
+                    replacements,
+                    runtime.metadata);
+            BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER, runtime.configuration, runtime.metadata, authority);
             BookKeeperWalOnlyReferenceRetirementCoordinator coordinator =
                     new BookKeeperWalOnlyReferenceRetirementCoordinator(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
@@ -342,16 +356,18 @@ class BookKeeperWalRetentionGateTest {
                             authority,
                             references);
 
-            BookKeeperWalReferenceRetirementResult result = coordinator.retireEligible(
-                    ledger.sealedRoot(), TIMEOUT).join();
+            BookKeeperWalReferenceRetirementResult result =
+                    coordinator.retireEligible(ledger.sealedRoot(), TIMEOUT).join();
 
             assertThat(result.scannedProtections()).isEqualTo(3);
             assertThat(result.newlyRetiredProtections()).isEqualTo(3);
             assertThat(result.fullyRetired()).isTrue();
             assertThat(proveCalls).hasValue(3);
             assertThat(exactCalls).hasValue(6);
-            assertThat(gate(runtime, activation(runtime)).evaluate(ledger.sealedRoot(), TIMEOUT)
-                            .join().blockers())
+            assertThat(gate(runtime, activation(runtime))
+                            .evaluate(ledger.sealedRoot(), TIMEOUT)
+                            .join()
+                            .blockers())
                     .isEmpty();
         }
     }
@@ -361,23 +377,21 @@ class BookKeeperWalRetentionGateTest {
         try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
             StableLedger ledger = appendCommitAndSeal(runtime);
             AtomicReference<com.nereusstream.api.StreamId> triggered = new AtomicReference<>();
-            BookKeeperSealedLedgerMaterializationTrigger trigger =
-                    new BookKeeperSealedLedgerMaterializationTrigger(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            runtime.configuration,
-                            runtime.metadata,
-                            streamId -> {
-                                triggered.set(streamId);
-                                return CompletableFuture.completedFuture(null);
-                            });
+            BookKeeperSealedLedgerMaterializationTrigger trigger = new BookKeeperSealedLedgerMaterializationTrigger(
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER, runtime.configuration, runtime.metadata, streamId -> {
+                        triggered.set(streamId);
+                        return CompletableFuture.completedFuture(null);
+                    });
 
             trigger.trigger(ledger.sealedRoot(), TIMEOUT).join();
 
             assertThat(triggered).hasValue(BookKeeperPrimaryWalAppenderTest.STREAM);
-            assertThat(runtime.metadata.getRoot(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            runtime.configuration.providerScopeSha256(),
-                            ledger.target().ledgerId()).join())
+            assertThat(runtime.metadata
+                            .getRoot(
+                                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                                    runtime.configuration.providerScopeSha256(),
+                                    ledger.target().ledgerId())
+                            .join())
                     .contains(ledger.sealedRoot());
         }
     }
@@ -388,12 +402,7 @@ class BookKeeperWalRetentionGateTest {
             long sourceCommitVersion,
             Checksum indexSha) {
         return new CommittedGenerationRetirementProof(
-                streamId,
-                sourceRange,
-                sourceCommitVersion,
-                "/f4/committed-object-index",
-                0,
-                indexSha);
+                streamId, sourceRange, sourceCommitVersion, "/f4/committed-object-index", 0, indexSha);
     }
 
     @Test
@@ -401,13 +410,15 @@ class BookKeeperWalRetentionGateTest {
         try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
             StableLedger ledger = appendCommitAndSeal(runtime);
             retireAll(runtime, ledger);
-            var canonical = runtime.metadata.getProtection(
+            var canonical = runtime.metadata
+                    .getProtection(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
                             runtime.configuration.providerScopeSha256(),
                             ledger.target().ledgerId(),
                             0,
                             0)
-                    .join().orElseThrow();
+                    .join()
+                    .orElseThrow();
             BookKeeperLedgerProtectionRecord outsideCartesian = copyProtection(
                     canonical.value(),
                     runtime.configuration.maxAppendRangesPerLedger(),
@@ -415,19 +426,21 @@ class BookKeeperWalRetentionGateTest {
                     BookKeeperProtectionType.REACHABLE_APPEND,
                     ProtectionLifecycle.RETIRED);
 
-            assertThatThrownBy(() -> runtime.metadata.createProtection(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            runtime.configuration.providerScopeSha256(),
-                            outsideCartesian)
-                    .join())
+            assertThatThrownBy(() -> runtime.metadata
+                            .createProtection(
+                                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                                    runtime.configuration.providerScopeSha256(),
+                                    outsideCartesian)
+                            .join())
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("rangeSlot is outside its configured bound");
 
-            BookKeeperLedgerMetadataStore missingInventory = protectionScanView(
-                    runtime,
-                    values -> values.subList(0, values.size() - 1));
+            BookKeeperLedgerMetadataStore missingInventory =
+                    protectionScanView(runtime, values -> values.subList(0, values.size() - 1));
             assertThat(gate(runtime, activation(runtime), runtime.configuration, missingInventory, runtime.metadata)
-                            .evaluate(ledger.sealedRoot(), TIMEOUT).join().blockers())
+                            .evaluate(ledger.sealedRoot(), TIMEOUT)
+                            .join()
+                            .blockers())
                     .containsExactly(BookKeeperRetentionBlocker.PROTECTION_PRESENT);
 
             BookKeeperWalConfiguration narrowInventory = withInventoryBounds(runtime.configuration, 1, 4);
@@ -435,7 +448,9 @@ class BookKeeperWalRetentionGateTest {
                     runtime,
                     values -> List.of(values.get(0), values.get(0), values.get(1), values.get(1), values.get(2)));
             assertThat(gate(runtime, activation(narrowInventory), narrowInventory, oversizedInventory, runtime.metadata)
-                            .evaluate(ledger.sealedRoot(), TIMEOUT).join().blockers())
+                            .evaluate(ledger.sealedRoot(), TIMEOUT)
+                            .join()
+                            .blockers())
                     .contains(
                             BookKeeperRetentionBlocker.INVENTORY_LIMIT_EXCEEDED,
                             BookKeeperRetentionBlocker.PROTECTION_PRESENT);
@@ -448,8 +463,10 @@ class BookKeeperWalRetentionGateTest {
             try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
                 StableLedger ledger = appendCommitAndSeal(runtime);
                 retireMandatoryExcept(runtime, ledger, activeMandatorySlot);
-                assertThat(gate(runtime, activation(runtime)).evaluate(ledger.sealedRoot(), TIMEOUT)
-                                .join().blockers())
+                assertThat(gate(runtime, activation(runtime))
+                                .evaluate(ledger.sealedRoot(), TIMEOUT)
+                                .join()
+                                .blockers())
                         .containsExactly(BookKeeperRetentionBlocker.PROTECTION_PRESENT);
             }
         }
@@ -460,9 +477,12 @@ class BookKeeperWalRetentionGateTest {
         try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
             StableLedger ledger = appendCommitAndSeal(runtime);
             retireAll(runtime, ledger);
-            BookKeeperReaderLeaseManager.Lease lease = runtime.readerLeases.claim(ledger.sealedRoot(), TIMEOUT).join();
-            assertThat(gate(runtime, activation(runtime)).evaluate(ledger.sealedRoot(), TIMEOUT)
-                            .join().blockers())
+            BookKeeperReaderLeaseManager.Lease lease =
+                    runtime.readerLeases.claim(ledger.sealedRoot(), TIMEOUT).join();
+            assertThat(gate(runtime, activation(runtime))
+                            .evaluate(ledger.sealedRoot(), TIMEOUT)
+                            .join()
+                            .blockers())
                     .containsExactly(BookKeeperRetentionBlocker.READER_LEASE_PRESENT);
             lease.release().join();
         }
@@ -472,7 +492,9 @@ class BookKeeperWalRetentionGateTest {
             retireAll(runtime, ledger);
             BookKeeperWriterMetadataStore selectedWriter = writerView(runtime, ledger.activeWriter());
             assertThat(gate(runtime, activation(runtime), runtime.configuration, runtime.metadata, selectedWriter)
-                            .evaluate(ledger.sealedRoot(), TIMEOUT).join().blockers())
+                            .evaluate(ledger.sealedRoot(), TIMEOUT)
+                            .join()
+                            .blockers())
                     .containsExactly(BookKeeperRetentionBlocker.WRITER_SELECTS_LEDGER);
         }
     }
@@ -484,12 +506,7 @@ class BookKeeperWalRetentionGateTest {
             retireAll(runtime, ledger);
             MutableClock clock = new MutableClock(1_000);
             BookKeeperLedgerGcConfiguration gc = new BookKeeperLedgerGcConfiguration(
-                    1,
-                    Duration.ZERO,
-                    Duration.ofMinutes(2),
-                    Duration.ofSeconds(10),
-                    true,
-                    false);
+                    1, Duration.ZERO, Duration.ofMinutes(2), Duration.ofSeconds(10), true, false);
             BookKeeperProtocolActivationProof activation = activation(runtime);
             BookKeeperWalRetentionGate gate = new BookKeeperWalRetentionGate(
                     BookKeeperPrimaryWalAppenderTest.CLUSTER,
@@ -511,7 +528,10 @@ class BookKeeperWalRetentionGateTest {
                     runtime.operations,
                     gate,
                     clock);
-            var candidate = gate.evaluate(ledger.sealedRoot(), TIMEOUT).join().candidate().orElseThrow();
+            var candidate = gate.evaluate(ledger.sealedRoot(), TIMEOUT)
+                    .join()
+                    .candidate()
+                    .orElseThrow();
             var marked = manager.mark(candidate, TIMEOUT).join();
             assertThat(marked.action()).isEqualTo(BookKeeperLedgerGcAction.MARKED);
 
@@ -526,20 +546,24 @@ class BookKeeperWalRetentionGateTest {
                     1_000,
                     301_000,
                     0);
-            runtime.metadata.createReaderLease(
+            runtime.metadata
+                    .createReaderLease(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
                             runtime.configuration.providerScopeSha256(),
                             lateReader)
                     .join();
 
             clock.setMillis(121_001);
-            var unmarked = manager.converge(marked.root().orElseThrow(), TIMEOUT).join();
+            var unmarked =
+                    manager.converge(marked.root().orElseThrow(), TIMEOUT).join();
             assertThat(unmarked.action()).isEqualTo(BookKeeperLedgerGcAction.UNMARKED);
             assertThat(unmarked.root().orElseThrow().value().lifecycle())
                     .isEqualTo(com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle.SEALED);
-            assertThat(runtime.operations.metadata(
-                            ledger.target().ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
-                    .join().getLedgerId()).isEqualTo(ledger.target().ledgerId());
+            assertThat(runtime.operations
+                            .metadata(ledger.target().ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .getLedgerId())
+                    .isEqualTo(ledger.target().ledgerId());
         }
     }
 
@@ -550,7 +574,10 @@ class BookKeeperWalRetentionGateTest {
             retireAll(runtime, ledger);
             BookKeeperProtocolActivationProof activation = activation(runtime);
             BookKeeperWalRetentionGate gate = gate(runtime, activation);
-            var candidate = gate.evaluate(ledger.sealedRoot(), TIMEOUT).join().candidate().orElseThrow();
+            var candidate = gate.evaluate(ledger.sealedRoot(), TIMEOUT)
+                    .join()
+                    .candidate()
+                    .orElseThrow();
             int providerCalls = runtime.operations.providerCalls();
 
             BookKeeperLedgerGcConfiguration disabled = BookKeeperLedgerGcConfiguration.safeDefault();
@@ -566,16 +593,14 @@ class BookKeeperWalRetentionGateTest {
                     BookKeeperPrimaryWalAppenderTest.CLOCK);
             assertThat(disabledManager.mark(candidate, TIMEOUT).join().action())
                     .isEqualTo(BookKeeperLedgerGcAction.DISABLED);
-            assertThat(disabledManager.converge(ledger.sealedRoot(), TIMEOUT).join().action())
+            assertThat(disabledManager
+                            .converge(ledger.sealedRoot(), TIMEOUT)
+                            .join()
+                            .action())
                     .isEqualTo(BookKeeperLedgerGcAction.DISABLED);
 
             BookKeeperLedgerGcConfiguration dryRun = new BookKeeperLedgerGcConfiguration(
-                    1,
-                    Duration.ZERO,
-                    Duration.ofMinutes(2),
-                    Duration.ofSeconds(10),
-                    true,
-                    true);
+                    1, Duration.ZERO, Duration.ofMinutes(2), Duration.ofSeconds(10), true, true);
             BookKeeperLedgerRetentionManager dryRunManager = new BookKeeperLedgerRetentionManager(
                     BookKeeperPrimaryWalAppenderTest.CLUSTER,
                     runtime.configuration,
@@ -588,18 +613,25 @@ class BookKeeperWalRetentionGateTest {
                     BookKeeperPrimaryWalAppenderTest.CLOCK);
             assertThat(dryRunManager.mark(candidate, TIMEOUT).join().action())
                     .isEqualTo(BookKeeperLedgerGcAction.DRY_RUN_ADMITTED);
-            assertThat(dryRunManager.converge(ledger.sealedRoot(), TIMEOUT).join().action())
+            assertThat(dryRunManager
+                            .converge(ledger.sealedRoot(), TIMEOUT)
+                            .join()
+                            .action())
                     .isEqualTo(BookKeeperLedgerGcAction.DRY_RUN_ADMITTED);
 
             assertThat(runtime.operations.providerCalls()).isEqualTo(providerCalls);
-            assertThat(runtime.metadata.getRoot(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            runtime.configuration.providerScopeSha256(),
-                            ledger.target().ledgerId())
-                    .join()).contains(ledger.sealedRoot());
-            assertThat(runtime.operations.metadata(
-                            ledger.target().ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
-                    .join().getLedgerId()).isEqualTo(ledger.target().ledgerId());
+            assertThat(runtime.metadata
+                            .getRoot(
+                                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                                    runtime.configuration.providerScopeSha256(),
+                                    ledger.target().ledgerId())
+                            .join())
+                    .contains(ledger.sealedRoot());
+            assertThat(runtime.operations
+                            .metadata(ledger.target().ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .getLedgerId())
+                    .isEqualTo(ledger.target().ledgerId());
         }
     }
 
@@ -610,12 +642,7 @@ class BookKeeperWalRetentionGateTest {
             retireAll(runtime, ledger);
             MutableClock clock = new MutableClock(1_000);
             BookKeeperLedgerGcConfiguration gc = new BookKeeperLedgerGcConfiguration(
-                    1,
-                    Duration.ZERO,
-                    Duration.ofMinutes(2),
-                    Duration.ofSeconds(10),
-                    true,
-                    false);
+                    1, Duration.ZERO, Duration.ofMinutes(2), Duration.ofSeconds(10), true, false);
             BookKeeperProtocolActivationProof activation = activation(runtime);
             BookKeeperWalRetentionGate gate = new BookKeeperWalRetentionGate(
                     BookKeeperPrimaryWalAppenderTest.CLUSTER,
@@ -637,25 +664,36 @@ class BookKeeperWalRetentionGateTest {
                     runtime.operations,
                     gate,
                     clock);
-            var candidate = gate.evaluate(ledger.sealedRoot(), TIMEOUT).join().candidate().orElseThrow();
+            var candidate = gate.evaluate(ledger.sealedRoot(), TIMEOUT)
+                    .join()
+                    .candidate()
+                    .orElseThrow();
 
             var marked = manager.mark(candidate, TIMEOUT).join();
             assertThat(marked.action()).isEqualTo(BookKeeperLedgerGcAction.MARKED);
-            assertThat(manager.converge(marked.root().orElseThrow(), TIMEOUT).join().action())
+            assertThat(manager.converge(marked.root().orElseThrow(), TIMEOUT)
+                            .join()
+                            .action())
                     .isEqualTo(BookKeeperLedgerGcAction.WAITING_DRAIN);
 
             clock.setMillis(121_000);
-            var deleting = manager.converge(marked.root().orElseThrow(), TIMEOUT).join();
+            var deleting =
+                    manager.converge(marked.root().orElseThrow(), TIMEOUT).join();
             assertThat(deleting.action()).isEqualTo(BookKeeperLedgerGcAction.DELETING);
             runtime.operations.failDeleteAfterRemoval = true;
-            var firstAbsent = manager.converge(deleting.root().orElseThrow(), TIMEOUT).join();
+            var firstAbsent =
+                    manager.converge(deleting.root().orElseThrow(), TIMEOUT).join();
             assertThat(firstAbsent.action()).isEqualTo(BookKeeperLedgerGcAction.FIRST_ABSENCE_RECORDED);
-            assertThat(firstAbsent.root().orElseThrow().value().firstAbsentAtMillis()).isEqualTo(121_000);
-            assertThat(manager.converge(firstAbsent.root().orElseThrow(), TIMEOUT).join().action())
+            assertThat(firstAbsent.root().orElseThrow().value().firstAbsentAtMillis())
+                    .isEqualTo(121_000);
+            assertThat(manager.converge(firstAbsent.root().orElseThrow(), TIMEOUT)
+                            .join()
+                            .action())
                     .isEqualTo(BookKeeperLedgerGcAction.WAITING_SECOND_ABSENCE);
 
             clock.setMillis(131_001);
-            var deleted = manager.converge(firstAbsent.root().orElseThrow(), TIMEOUT).join();
+            var deleted =
+                    manager.converge(firstAbsent.root().orElseThrow(), TIMEOUT).join();
             assertThat(deleted.action()).isEqualTo(BookKeeperLedgerGcAction.DELETED);
             assertThat(deleted.root().orElseThrow().value().lifecycle())
                     .isEqualTo(com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle.DELETED);
@@ -672,12 +710,7 @@ class BookKeeperWalRetentionGateTest {
                 retireAll(runtime, ledger);
                 MutableClock clock = new MutableClock(1_000);
                 BookKeeperLedgerGcConfiguration gc = new BookKeeperLedgerGcConfiguration(
-                        1,
-                        Duration.ZERO,
-                        Duration.ofMinutes(2),
-                        Duration.ofSeconds(10),
-                        true,
-                        false);
+                        1, Duration.ZERO, Duration.ofMinutes(2), Duration.ofSeconds(10), true, false);
                 BookKeeperProtocolActivationProof activation = activation(runtime);
                 BookKeeperWalRetentionGate gate = new BookKeeperWalRetentionGate(
                         BookKeeperPrimaryWalAppenderTest.CLUSTER,
@@ -699,19 +732,25 @@ class BookKeeperWalRetentionGateTest {
                         runtime.operations,
                         gate,
                         clock);
-                var candidate = gate.evaluate(ledger.sealedRoot(), TIMEOUT).join().candidate().orElseThrow();
+                var candidate = gate.evaluate(ledger.sealedRoot(), TIMEOUT)
+                        .join()
+                        .candidate()
+                        .orElseThrow();
                 backend.loseResponse(ResponseLossPartitionedOxiaBackend.Operation.PUT_IF_VERSION, lostRootCas);
 
                 var marked = manager.mark(candidate, TIMEOUT).join();
                 assertThat(marked.action()).isEqualTo(BookKeeperLedgerGcAction.MARKED);
                 clock.setMillis(121_001);
-                var deleting = manager.converge(marked.root().orElseThrow(), TIMEOUT).join();
+                var deleting =
+                        manager.converge(marked.root().orElseThrow(), TIMEOUT).join();
                 assertThat(deleting.action()).isEqualTo(BookKeeperLedgerGcAction.DELETING);
-                var firstAbsent = manager.converge(deleting.root().orElseThrow(), TIMEOUT).join();
+                var firstAbsent =
+                        manager.converge(deleting.root().orElseThrow(), TIMEOUT).join();
                 assertThat(firstAbsent.action()).isEqualTo(BookKeeperLedgerGcAction.FIRST_ABSENCE_RECORDED);
 
                 clock.setMillis(131_002);
-                var deleted = manager.converge(firstAbsent.root().orElseThrow(), TIMEOUT).join();
+                var deleted = manager.converge(firstAbsent.root().orElseThrow(), TIMEOUT)
+                        .join();
                 assertThat(deleted.action()).isEqualTo(BookKeeperLedgerGcAction.DELETED);
                 assertThat(deleted.root().orElseThrow().value().lifecycle())
                         .isEqualTo(com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle.DELETED);
@@ -723,8 +762,8 @@ class BookKeeperWalRetentionGateTest {
     private static StableLedger appendCommitAndSeal(BookKeeperPrimaryWalAppenderTest.Runtime runtime) {
         var session = BookKeeperPrimaryWalAppenderTest.session();
         DurablePrimaryAppend durable;
-        try (BookKeeperPreparedPrimaryAppend prepared = runtime.appender.prepare(
-                BookKeeperPrimaryWalAppenderTest.request(
+        try (BookKeeperPreparedPrimaryAppend prepared =
+                runtime.appender.prepare(BookKeeperPrimaryWalAppenderTest.request(
                         session, "attempt-retention", 10, new byte[] {1, 2}, new byte[] {3}))) {
             durable = runtime.appender.persist(prepared, TIMEOUT).join();
         }
@@ -771,30 +810,28 @@ class BookKeeperWalRetentionGateTest {
                 Optional.empty(),
                 1,
                 2);
-        runtime.references.protectVisibleIndex(
-                new MaterializedGenerationZero(committed, "/index/retention-generation-zero", 8, sha('d')),
-                target,
-                TIMEOUT).join();
-        BookKeeperVersionedValue<BookKeeperWriterStateRecord> activeWriter = runtime.metadata.getWriter(
-                        BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                        BookKeeperPrimaryWalAppenderTest.STREAM)
-                .join().orElseThrow();
-        var sealed = runtime.recovery.recoverWriter(session, TIMEOUT, "retention test seal").join().sealedRoot();
+        runtime.references
+                .protectVisibleIndex(
+                        new MaterializedGenerationZero(committed, "/index/retention-generation-zero", 8, sha('d')),
+                        target,
+                        TIMEOUT)
+                .join();
+        BookKeeperVersionedValue<BookKeeperWriterStateRecord> activeWriter = runtime.metadata
+                .getWriter(BookKeeperPrimaryWalAppenderTest.CLUSTER, BookKeeperPrimaryWalAppenderTest.STREAM)
+                .join()
+                .orElseThrow();
+        var sealed = runtime.recovery
+                .recoverWriter(session, TIMEOUT, "retention test seal")
+                .join()
+                .sealedRoot();
         return new StableLedger(target, sealed, activeWriter);
     }
 
-    private static void retireAll(
-            BookKeeperPrimaryWalAppenderTest.Runtime runtime,
-            StableLedger ledger) {
+    private static void retireAll(BookKeeperPrimaryWalAppenderTest.Runtime runtime, StableLedger ledger) {
         BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
-                BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                l0(new AtomicReference<>(snapshot(12, 7))),
-                runtime.metadata);
+                BookKeeperPrimaryWalAppenderTest.CLUSTER, l0(new AtomicReference<>(snapshot(12, 7))), runtime.metadata);
         BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
-                BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                runtime.configuration,
-                runtime.metadata,
-                authority);
+                BookKeeperPrimaryWalAppenderTest.CLUSTER, runtime.configuration, runtime.metadata, authority);
         BookKeeperWalOnlyReferenceRetirementCoordinator coordinator =
                 new BookKeeperWalOnlyReferenceRetirementCoordinator(
                         BookKeeperPrimaryWalAppenderTest.CLUSTER,
@@ -802,16 +839,15 @@ class BookKeeperWalRetentionGateTest {
                         runtime.metadata,
                         authority,
                         references);
-        BookKeeperWalReferenceRetirementResult result = coordinator.retireEligible(
-                ledger.sealedRoot(), TIMEOUT).join();
+        BookKeeperWalReferenceRetirementResult result =
+                coordinator.retireEligible(ledger.sealedRoot(), TIMEOUT).join();
         assertThat(result.scannedProtections()).isEqualTo(3);
         assertThat(result.newlyRetiredProtections()).isEqualTo(3);
         assertThat(result.fullyRetired()).isTrue();
     }
 
     private static BookKeeperWalRetentionGate gate(
-            BookKeeperPrimaryWalAppenderTest.Runtime runtime,
-            BookKeeperProtocolActivationProof activation) {
+            BookKeeperPrimaryWalAppenderTest.Runtime runtime, BookKeeperProtocolActivationProof activation) {
         return gate(runtime, activation, runtime.configuration, runtime.metadata, runtime.metadata);
     }
 
@@ -833,8 +869,7 @@ class BookKeeperWalRetentionGateTest {
                 BookKeeperPrimaryWalAppenderTest.CLOCK);
     }
 
-    private static BookKeeperProtocolActivationProof activation(
-            BookKeeperPrimaryWalAppenderTest.Runtime runtime) {
+    private static BookKeeperProtocolActivationProof activation(BookKeeperPrimaryWalAppenderTest.Runtime runtime) {
         return activation(runtime.configuration);
     }
 
@@ -857,24 +892,28 @@ class BookKeeperWalRetentionGateTest {
     }
 
     private static void retireMandatoryExcept(
-            BookKeeperPrimaryWalAppenderTest.Runtime runtime,
-            StableLedger ledger,
-            int retainedSlot) {
+            BookKeeperPrimaryWalAppenderTest.Runtime runtime, StableLedger ledger, int retainedSlot) {
         BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
                 BookKeeperPrimaryWalAppenderTest.CLUSTER,
                 runtime.configuration,
                 runtime.metadata,
                 (retirementProof, protection, timeout) -> CompletableFuture.completedFuture(null));
         for (int slot = 0; slot < 3; slot++) {
-            if (slot == retainedSlot) continue;
-            var protection = runtime.metadata.getProtection(
+            if (slot == retainedSlot) {
+                continue;
+            }
+            var protection = runtime.metadata
+                    .getProtection(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
                             runtime.configuration.providerScopeSha256(),
                             ledger.target().ledgerId(),
                             0,
                             slot)
-                    .join().orElseThrow();
-            references.retire(ledger.target().ledgerId(), 0, slot, proof(protection), TIMEOUT).join();
+                    .join()
+                    .orElseThrow();
+            references
+                    .retire(ledger.target().ledgerId(), 0, slot, proof(protection), TIMEOUT)
+                    .join();
         }
     }
 
@@ -882,21 +921,26 @@ class BookKeeperWalRetentionGateTest {
         try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
             StableLedger ledger = appendCommitAndSeal(runtime);
             retireAll(runtime, ledger);
-            var canonical = runtime.metadata.getProtection(
+            var canonical = runtime.metadata
+                    .getProtection(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
                             runtime.configuration.providerScopeSha256(),
                             ledger.target().ledgerId(),
                             0,
                             0)
-                    .join().orElseThrow();
-            runtime.metadata.createProtection(
+                    .join()
+                    .orElseThrow();
+            runtime.metadata
+                    .createProtection(
                             BookKeeperPrimaryWalAppenderTest.CLUSTER,
                             runtime.configuration.providerScopeSha256(),
                             copyProtection(canonical.value(), 0, slot, type, ProtectionLifecycle.ACTIVE))
                     .join();
 
-            assertThat(gate(runtime, activation(runtime)).evaluate(ledger.sealedRoot(), TIMEOUT)
-                            .join().blockers())
+            assertThat(gate(runtime, activation(runtime))
+                            .evaluate(ledger.sealedRoot(), TIMEOUT)
+                            .join()
+                            .blockers())
                     .containsExactly(BookKeeperRetentionBlocker.PROTECTION_PRESENT);
         }
     }
@@ -907,31 +951,64 @@ class BookKeeperWalRetentionGateTest {
             int protectionSlot,
             BookKeeperProtectionType type,
             ProtectionLifecycle lifecycle) {
-        long expiresAtMillis = type == BookKeeperProtectionType.REPAIR
-                ? Math.addExact(value.createdAtMillis(), 60_000)
-                : 0;
+        long expiresAtMillis =
+                type == BookKeeperProtectionType.REPAIR ? Math.addExact(value.createdAtMillis(), 60_000) : 0;
         return new BookKeeperLedgerProtectionRecord(
-                value.schemaVersion(), value.ledgerIdentitySha256(), value.clusterAlias(), value.ledgerId(),
-                value.rootLifecycleEpoch(), rangeSlot, protectionSlot, type.wireId(),
-                type.name().toLowerCase() + "-retention-veto", value.firstEntryId(), value.entryCount(),
-                value.rangeChecksumSha256(), value.streamId(), value.offsetStart(), value.offsetEnd(),
-                value.commitVersion(), "/retention-owner/" + type.name().toLowerCase(), 17,
-                sha('e').value(), lifecycle, value.createdAtMillis(), expiresAtMillis, 0);
+                value.schemaVersion(),
+                value.ledgerIdentitySha256(),
+                value.clusterAlias(),
+                value.ledgerId(),
+                value.rootLifecycleEpoch(),
+                rangeSlot,
+                protectionSlot,
+                type.wireId(),
+                type.name().toLowerCase() + "-retention-veto",
+                value.firstEntryId(),
+                value.entryCount(),
+                value.rangeChecksumSha256(),
+                value.streamId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.commitVersion(),
+                "/retention-owner/" + type.name().toLowerCase(),
+                17,
+                sha('e').value(),
+                lifecycle,
+                value.createdAtMillis(),
+                expiresAtMillis,
+                0);
     }
 
     private static BookKeeperWalConfiguration withInventoryBounds(
-            BookKeeperWalConfiguration value,
-            int maxAppendRanges,
-            int protectionSlots) {
+            BookKeeperWalConfiguration value, int maxAppendRanges, int protectionSlots) {
         return new BookKeeperWalConfiguration(
-                value.clusterAlias(), value.providerScopeSha256(), value.ledgerIdPrefixBits(),
-                value.ledgerIdPrefixValue(), value.ledgerIdNamespaceReservationId(), value.ensembleSize(),
-                value.writeQuorumSize(), value.ackQuorumSize(), value.digestType(), value.passwordRef(),
-                value.maxEntriesPerLedger(), value.maxBytesPerLedger(), maxAppendRanges, protectionSlots,
-                value.maxReaderLeasesPerLedger(), value.maxUncertainAllocations(), value.maxLedgerAge(),
-                value.maxWritesInFlight(), value.maxReadsInFlight(), value.maxReadBytesInFlight(),
-                value.operationTimeout(), value.allocationTimeout(), value.sealTimeout(), value.deleteTimeout(),
-                value.readerLeaseTtl(), value.readerLeaseRenewInterval(), value.retentionScanInterval(),
+                value.clusterAlias(),
+                value.providerScopeSha256(),
+                value.ledgerIdPrefixBits(),
+                value.ledgerIdPrefixValue(),
+                value.ledgerIdNamespaceReservationId(),
+                value.ensembleSize(),
+                value.writeQuorumSize(),
+                value.ackQuorumSize(),
+                value.digestType(),
+                value.passwordRef(),
+                value.maxEntriesPerLedger(),
+                value.maxBytesPerLedger(),
+                maxAppendRanges,
+                protectionSlots,
+                value.maxReaderLeasesPerLedger(),
+                value.maxUncertainAllocations(),
+                value.maxLedgerAge(),
+                value.maxWritesInFlight(),
+                value.maxReadsInFlight(),
+                value.maxReadBytesInFlight(),
+                value.operationTimeout(),
+                value.allocationTimeout(),
+                value.sealTimeout(),
+                value.deleteTimeout(),
+                value.readerLeaseTtl(),
+                value.readerLeaseRenewInterval(),
+                value.retentionScanInterval(),
                 value.retentionPageSize());
     }
 
@@ -944,11 +1021,15 @@ class BookKeeperWalRetentionGateTest {
                 new Class<?>[] {BookKeeperLedgerMetadataStore.class},
                 (proxy, method, args) -> {
                     Object result = invoke(runtime.metadata, method, args);
-                    if (!method.getName().equals("scanProtections")) return result;
-                    return ((CompletableFuture<BookKeeperScanPage<
-                                    BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>>>) result)
-                            .thenApply(page -> new BookKeeperScanPage<>(
-                                    transformation.apply(page.values()), page.continuation()));
+                    if (!method.getName().equals("scanProtections")) {
+                        return result;
+                    }
+                    return ((CompletableFuture<
+                                            BookKeeperScanPage<
+                                                    BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>>>)
+                                    result)
+                            .thenApply(page ->
+                                    new BookKeeperScanPage<>(transformation.apply(page.values()), page.continuation()));
                 });
     }
 
@@ -1026,9 +1107,8 @@ class BookKeeperWalRetentionGateTest {
 
     private record StableLedger(
             BookKeeperEntryRangeReadTarget target,
-            BookKeeperVersionedValue<com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord>
-                    sealedRoot,
-            BookKeeperVersionedValue<BookKeeperWriterStateRecord> activeWriter) { }
+            BookKeeperVersionedValue<com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord> sealedRoot,
+            BookKeeperVersionedValue<BookKeeperWriterStateRecord> activeWriter) {}
 
     private static final class MutableClock extends Clock {
         private long millis;
@@ -1048,7 +1128,9 @@ class BookKeeperWalRetentionGateTest {
 
         @Override
         public Clock withZone(ZoneId zone) {
-            if (!ZoneOffset.UTC.equals(zone)) throw new IllegalArgumentException("test clock is UTC");
+            if (!ZoneOffset.UTC.equals(zone)) {
+                throw new IllegalArgumentException("test clock is UTC");
+            }
             return this;
         }
 

@@ -14,22 +14,29 @@
 
 package com.nereusstream.core;
 
-import com.nereusstream.api.AppendBatch;
+import com.nereusstream.api.AcquiredAppendSession;
 import com.nereusstream.api.AppendAttemptId;
-import com.nereusstream.api.AppendRecoveryOptions;
+import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendOptions;
+import com.nereusstream.api.AppendPrecondition;
+import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
-import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.AppendSessionRequest;
 import com.nereusstream.api.DeleteOptions;
+import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ResolveOptions;
 import com.nereusstream.api.ResolveResult;
 import com.nereusstream.api.SealOptions;
+import com.nereusstream.api.SemanticReadResult;
+import com.nereusstream.api.StableStreamHeadSnapshot;
 import com.nereusstream.api.StorageProfile;
+import com.nereusstream.api.StreamCommitAnchor;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
@@ -43,14 +50,16 @@ import com.nereusstream.core.append.AppendSessionManager;
 import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.append.RequiredObjectGenerationCompletion;
-import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.lifecycle.StreamLifecycleCoordinator;
+import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.profile.Phase15StorageProfileResolver;
 import com.nereusstream.core.profile.StorageProfileResolver;
+import com.nereusstream.core.read.ConstrainedSemanticStreamReader;
+import com.nereusstream.core.read.GenerationReadConstraint;
+import com.nereusstream.core.read.Phase4ReadComponents;
 import com.nereusstream.core.read.ReadCoordinator;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.read.ReadResolver;
-import com.nereusstream.core.read.Phase4ReadComponents;
 import com.nereusstream.core.recovery.AppendRecoverySearcher;
 import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
 import com.nereusstream.core.trim.TrimCoordinator;
@@ -69,8 +78,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Phase 1 stream-storage facade. M4 implements the strict Object WAL append path. */
-public final class DefaultStreamStorage implements StreamStorage {
+/**
+ * Phase 1 stream-storage facade. M4 implements the strict Object WAL append path.
+ */
+public final class DefaultStreamStorage implements StreamStorage, ConstrainedSemanticStreamReader {
     private final StreamStorageConfig config;
     private final OxiaMetadataStore metadataStore;
     private final AppendSessionManager appendSessionManager;
@@ -80,7 +91,9 @@ public final class DefaultStreamStorage implements StreamStorage {
     private final StreamLifecycleCoordinator lifecycleCoordinator;
     private final AtomicBoolean closed = new AtomicBoolean();
 
-    /** Complete generation-zero-only provider-neutral composition used by additional primary-WAL modules. */
+    /**
+     * Complete generation-zero-only provider-neutral composition used by additional primary-WAL modules.
+     */
     public DefaultStreamStorage(
             StreamStorageConfig config,
             OxiaMetadataStore metadataStore,
@@ -125,17 +138,15 @@ public final class DefaultStreamStorage implements StreamStorage {
                 readMetricsObserver,
                 callbackExecutor);
         this.readCoordinator = new ReadCoordinator(
-                config,
-                readResolver,
-                registry.readerRegistry(),
-                readMetricsObserver,
-                callbackExecutor);
+                config, readResolver, registry.readerRegistry(), readMetricsObserver, callbackExecutor);
         this.trimCoordinator = new TrimCoordinator(
                 config, metadataStore, readCoordinator::invalidate, trimMetricsObserver, callbackExecutor);
         this.lifecycleCoordinator = new StreamLifecycleCoordinator(config, metadataStore, appendCoordinator);
     }
 
-    /** Complete provider-neutral generation-aware seam used by primary WALs whose higher generations are Objects. */
+    /**
+     * Complete provider-neutral generation-aware seam used by primary WALs whose higher generations are Objects.
+     */
     public DefaultStreamStorage(
             StreamStorageConfig config,
             OxiaMetadataStore metadataStore,
@@ -165,7 +176,9 @@ public final class DefaultStreamStorage implements StreamStorage {
                 trimMetricsObserver);
     }
 
-    /** Generation-aware composition whose producer may wait for an exact higher Object generation. */
+    /**
+     * Generation-aware composition whose producer may wait for an exact higher Object generation.
+     */
     public DefaultStreamStorage(
             StreamStorageConfig config,
             OxiaMetadataStore metadataStore,
@@ -223,11 +236,7 @@ public final class DefaultStreamStorage implements StreamStorage {
                 readMetricsObserver,
                 callbackExecutor);
         this.trimCoordinator = new TrimCoordinator(
-                config,
-                metadataStore,
-                readCoordinator::invalidate,
-                trimMetricsObserver,
-                callbackExecutor);
+                config, metadataStore, readCoordinator::invalidate, trimMetricsObserver, callbackExecutor);
         this.lifecycleCoordinator = new StreamLifecycleCoordinator(config, metadataStore, appendCoordinator);
     }
 
@@ -309,6 +318,31 @@ public final class DefaultStreamStorage implements StreamStorage {
                 callbackExecutor,
                 readMetricsObserver,
                 trimMetricsObserver);
+    }
+
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            WalObjectReader walObjectReader,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            Phase4ReadComponents readComponents,
+            Clock clock,
+            Executor callbackExecutor) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                walObjectReader,
+                physicalReferences,
+                new MetadataAppendRecoverySearcher(config.cluster(), metadataStore),
+                new Phase15StorageProfileResolver(),
+                AppendAdmissionGuard.noOp(),
+                readComponents,
+                clock,
+                callbackExecutor,
+                ReadMetricsObserver.noop(),
+                TrimMetricsObserver.noop());
     }
 
     public DefaultStreamStorage(
@@ -449,8 +483,7 @@ public final class DefaultStreamStorage implements StreamStorage {
                 recoverySearcher,
                 profileResolver,
                 appendAdmissionGuard,
-                Optional.of(Objects.requireNonNull(
-                        readComponents, "readComponents")),
+                Optional.of(Objects.requireNonNull(readComponents, "readComponents")),
                 clock,
                 callbackExecutor,
                 readMetricsObserver,
@@ -515,38 +548,27 @@ public final class DefaultStreamStorage implements StreamStorage {
                         readMetricsObserver,
                         callbackExecutor))
                 .orElseGet(() -> new ReadCoordinator(
-                        config,
-                        readResolver,
-                        walObjectReader,
-                        readMetricsObserver,
-                        callbackExecutor));
+                        config, readResolver, walObjectReader, readMetricsObserver, callbackExecutor));
         this.trimCoordinator = new TrimCoordinator(
-                config,
-                metadataStore,
-                readCoordinator::invalidate,
-                trimMetricsObserver,
-                callbackExecutor);
+                config, metadataStore, readCoordinator::invalidate, trimMetricsObserver, callbackExecutor);
         this.lifecycleCoordinator = new StreamLifecycleCoordinator(config, metadataStore, appendCoordinator);
     }
 
     @Override
-    public CompletableFuture<StreamMetadata> createOrGetStream(
-            StreamName streamName,
-            StreamCreateOptions options) {
+    public CompletableFuture<StreamMetadata> createOrGetStream(StreamName streamName, StreamCreateOptions options) {
         Objects.requireNonNull(streamName, "streamName");
         Objects.requireNonNull(options, "options");
         CompletableFuture<StreamMetadata> rejection = rejectIfClosed();
         if (rejection != null) {
             return rejection;
         }
-        return metadataStore.createOrGetStream(config.cluster(), streamName, options)
+        return metadataStore
+                .createOrGetStream(config.cluster(), streamName, options)
                 .thenCompose(record -> loadStreamMetadata(new StreamId(record.streamId())));
     }
 
     @Override
-    public CompletableFuture<AppendSession> acquireAppendSession(
-            StreamId streamId,
-            AppendSessionOptions options) {
+    public CompletableFuture<AppendSession> acquireAppendSession(StreamId streamId, AppendSessionOptions options) {
         Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(options, "options");
         CompletableFuture<AppendSession> rejection = rejectIfClosed();
@@ -554,11 +576,31 @@ public final class DefaultStreamStorage implements StreamStorage {
     }
 
     @Override
-    public CompletableFuture<AppendResult> append(
-            StreamId streamId,
-            AppendBatch batch,
-            AppendOptions options) {
+    public CompletableFuture<AcquiredAppendSession> acquireAppendSession(
+            StreamId streamId, AppendSessionRequest request) {
+        Objects.requireNonNull(streamId, "streamId");
+        Objects.requireNonNull(request, "request");
+        CompletableFuture<AcquiredAppendSession> rejection = rejectIfClosed();
+        return rejection != null ? rejection : appendSessionManager.acquire(streamId, request);
+    }
+
+    @Override
+    public CompletableFuture<AppendSession> renewAppendSession(AppendSession session, Duration ttl) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(ttl, "ttl");
+        CompletableFuture<AppendSession> rejection = rejectIfClosed();
+        return rejection != null ? rejection : appendSessionManager.renew(session, ttl);
+    }
+
+    @Override
+    public CompletableFuture<AppendResult> append(StreamId streamId, AppendBatch batch, AppendOptions options) {
         return appendCoordinator.append(streamId, batch, options);
+    }
+
+    @Override
+    public CompletableFuture<AppendResult> append(
+            StreamId streamId, AppendBatch batch, AppendOptions options, AppendPrecondition precondition) {
+        return appendCoordinator.append(streamId, batch, options, precondition);
     }
 
     @Override
@@ -568,26 +610,28 @@ public final class DefaultStreamStorage implements StreamStorage {
     }
 
     @Override
-    public CompletableFuture<ReadResult> read(
-            StreamId streamId,
-            long startOffset,
-            ReadOptions options) {
+    public CompletableFuture<ReadResult> read(StreamId streamId, long startOffset, ReadOptions options) {
         return readCoordinator.read(streamId, startOffset, options);
     }
 
     @Override
-    public CompletableFuture<ResolveResult> resolve(
-            StreamId streamId,
-            long startOffset,
-            ResolveOptions options) {
+    public CompletableFuture<SemanticReadResult> read(StreamId streamId, ReadRequest request) {
+        return readCoordinator.read(streamId, request);
+    }
+
+    @Override
+    public CompletableFuture<SemanticReadResult> read(
+            StreamId streamId, ReadRequest request, GenerationReadConstraint constraint) {
+        return readCoordinator.read(streamId, request, constraint);
+    }
+
+    @Override
+    public CompletableFuture<ResolveResult> resolve(StreamId streamId, long startOffset, ResolveOptions options) {
         return readCoordinator.resolve(streamId, startOffset, options);
     }
 
     @Override
-    public CompletableFuture<Void> trim(
-            StreamId streamId,
-            long beforeOffset,
-            TrimOptions options) {
+    public CompletableFuture<Void> trim(StreamId streamId, long beforeOffset, TrimOptions options) {
         return trimCoordinator.trim(streamId, beforeOffset, options);
     }
 
@@ -596,6 +640,25 @@ public final class DefaultStreamStorage implements StreamStorage {
         Objects.requireNonNull(streamId, "streamId");
         CompletableFuture<StreamMetadata> rejection = rejectIfClosed();
         return rejection != null ? rejection : loadStreamMetadata(streamId);
+    }
+
+    @Override
+    public CompletableFuture<StableStreamHeadSnapshot> getStableHeadSnapshot(StreamId streamId) {
+        Objects.requireNonNull(streamId, "streamId");
+        CompletableFuture<StableStreamHeadSnapshot> rejection = rejectIfClosed();
+        return rejection != null ? rejection : metadataStore.getStableStreamHeadSnapshot(config.cluster(), streamId);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> isCommitReachable(
+            StreamCommitAnchor descendant, String ancestorCommitId, long ancestorCommitVersion) {
+        Objects.requireNonNull(descendant, "descendant");
+        Objects.requireNonNull(ancestorCommitId, "ancestorCommitId");
+        CompletableFuture<Boolean> rejection = rejectIfClosed();
+        return rejection != null
+                ? rejection
+                : metadataStore.isCommitReachable(
+                        config.cluster(), descendant, ancestorCommitId, ancestorCommitVersion);
     }
 
     @Override
@@ -672,24 +735,14 @@ public final class DefaultStreamStorage implements StreamStorage {
     }
 
     private static GenerationZeroPhysicalReferencePublisher inferredPhysicalReferences(
-            StreamStorageConfig config,
-            OxiaMetadataStore metadataStore,
-            Clock clock) {
+            StreamStorageConfig config, OxiaMetadataStore metadataStore, Clock clock) {
         if (!(metadataStore instanceof PhysicalObjectMetadataStore physicalStore)) {
             throw new IllegalArgumentException(
                     "GenerationZeroPhysicalReferencePublisher is required for this metadata-store composition");
         }
         DefaultObjectProtectionManager protections = new DefaultObjectProtectionManager(
-                config.cluster(),
-                physicalStore,
-                Duration.ofMinutes(10),
-                Duration.ZERO,
-                Duration.ofHours(24),
-                clock);
+                config.cluster(), physicalStore, Duration.ofMinutes(10), Duration.ZERO, Duration.ofHours(24), clock);
         return new DefaultGenerationZeroPhysicalReferencePublisher(
-                config.cluster(),
-                metadataStore,
-                physicalStore,
-                protections);
+                config.cluster(), metadataStore, physicalStore, protections);
     }
 }

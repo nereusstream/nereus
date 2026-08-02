@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -9,7 +10,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Durable recovery evidence sealed before a physical root may enter MARKED. */
+/**
+ * Durable recovery evidence sealed before a physical root may enter MARKED.
+ */
 public interface GcRetirementJournal {
     CompletableFuture<GcRetirementJournalSnapshot> prepare(
             String gcAttemptId,
@@ -22,7 +25,5 @@ public interface GcRetirementJournal {
             MaterializationDeadline deadline);
 
     CompletableFuture<Optional<GcRetirementJournalSnapshot>> load(
-            ObjectKeyHash object,
-            String gcAttemptId,
-            MaterializationDeadline deadline);
+            ObjectKeyHash object, String gcAttemptId, MaterializationDeadline deadline);
 }

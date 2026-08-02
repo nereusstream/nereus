@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import java.io.ByteArrayOutputStream;
@@ -15,12 +16,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Strict bounded primitive reader/writer for the two explicit F3 payload codecs. */
+/**
+ * Strict bounded primitive reader/writer for the two explicit F3 payload codecs.
+ */
 final class F3Binary {
     static final int MAX_PAYLOAD_BYTES = 64 * 1024;
 
-    private F3Binary() {
-    }
+    private F3Binary() {}
 
     static final class Writer {
         private final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -68,8 +70,7 @@ final class F3Binary {
         void writeRaw(byte[] bytes) {
             out.writeBytes(Objects.requireNonNull(bytes, "bytes"));
             if (out.size() > MAX_PAYLOAD_BYTES) {
-                throw new MetadataValueTooLargeException(
-                        "F3 metadata payload exceeds the fixed value bound");
+                throw new MetadataValueTooLargeException("F3 metadata payload exceeds the fixed value bound");
             }
         }
     }
@@ -80,8 +81,7 @@ final class F3Binary {
         Reader(byte[] bytes) {
             Objects.requireNonNull(bytes, "bytes");
             if (bytes.length > MAX_PAYLOAD_BYTES) {
-                throw new MetadataValueTooLargeException(
-                        "F3 metadata payload exceeds the fixed value bound");
+                throw new MetadataValueTooLargeException("F3 metadata payload exceeds the fixed value bound");
             }
             buffer = ByteBuffer.wrap(bytes);
         }
@@ -208,8 +208,10 @@ final class F3Binary {
         if (cause instanceof MetadataCodecException codec) {
             return codec;
         }
-        if (cause instanceof BufferUnderflowException || cause instanceof IllegalArgumentException
-                || cause instanceof ArithmeticException || cause instanceof NullPointerException) {
+        if (cause instanceof BufferUnderflowException
+                || cause instanceof IllegalArgumentException
+                || cause instanceof ArithmeticException
+                || cause instanceof NullPointerException) {
             return new MetadataCodecException("invalid " + recordType + " payload", cause);
         }
         return new MetadataCodecException("failed to decode " + recordType + " payload", cause);
@@ -236,7 +238,8 @@ final class F3Binary {
 
     private static byte[] strictEncode(String value) {
         try {
-            ByteBuffer encoded = StandardCharsets.UTF_8.newEncoder()
+            ByteBuffer encoded = StandardCharsets.UTF_8
+                    .newEncoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .encode(CharBuffer.wrap(value));
@@ -250,7 +253,8 @@ final class F3Binary {
 
     private static String strictDecode(byte[] bytes, String fieldName) {
         try {
-            return StandardCharsets.UTF_8.newDecoder()
+            return StandardCharsets.UTF_8
+                    .newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .decode(ByteBuffer.wrap(bytes))

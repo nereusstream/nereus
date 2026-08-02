@@ -16,11 +16,10 @@ package com.nereusstream.api;
 
 import java.util.Objects;
 
-/** Slice-level schema reference carried through append, WAL, offset index, and read. */
-public record SchemaRef(
-        String namespace,
-        String id,
-        long version) {
+/**
+ * Slice-level schema reference carried through append, WAL, offset index, and read.
+ */
+public record SchemaRef(String namespace, String id, long version) {
     public SchemaRef {
         Objects.requireNonNull(namespace, "namespace");
         Objects.requireNonNull(id, "id");

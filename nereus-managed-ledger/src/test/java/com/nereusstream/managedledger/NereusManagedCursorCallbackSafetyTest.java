@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.managedledger.cursor.TestCursorStorage;
@@ -47,8 +47,7 @@ class NereusManagedCursorCallbackSafetyTest {
         Clock clock = Clock.systemUTC();
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
-        FakeManagedLedgerProjectionMetadataStore projections =
-                new FakeManagedLedgerProjectionMetadataStore();
+        FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         DefaultStreamStorage streamStorage = new DefaultStreamStorage(
                 StreamStorageConfig.defaults("cluster/a", "cursor-callback-safety-test"),
                 metadata,
@@ -56,22 +55,14 @@ class NereusManagedCursorCallbackSafetyTest {
                 new DefaultWalObjectReader(objectStore),
                 clock,
                 Runnable::run);
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
-                runnable -> new Thread(runnable, "cursor-safety-scheduler"));
-        ExecutorService callbacks = Executors.newSingleThreadExecutor(
-                runnable -> new Thread(runnable, "cursor-safety-callback"));
+        ScheduledExecutorService scheduler =
+                Executors.newSingleThreadScheduledExecutor(runnable -> new Thread(runnable, "cursor-safety-scheduler"));
+        ExecutorService callbacks =
+                Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "cursor-safety-callback"));
         try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(
-                streamStorage,
-                projections,
-                new TestCursorStorage(),
-                scheduler,
-                callbacks)) {
+                streamStorage, projections, new TestCursorStorage(), scheduler, callbacks)) {
             NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
-                    runtime,
-                    fixedGuard(1),
-                    config(),
-                    new ManagedLedgerFactoryConfig(),
-                    false);
+                    runtime, fixedGuard(1), config(), new ManagedLedgerFactoryConfig(), false);
             NereusManagedLedger ledger = (NereusManagedLedger) factory.open(NAME, config());
             Position first = ledger.addEntry(new byte[] {0});
             ledger.addEntry(new byte[] {1});
@@ -79,40 +70,48 @@ class NereusManagedCursorCallbackSafetyTest {
 
             AtomicInteger invalidReadCalls = new AtomicInteger();
             CompletableFuture<String> invalidRead = new CompletableFuture<>();
-            cursor.asyncReadEntries(0, new AsyncCallbacks.ReadEntriesCallback() {
-                @Override
-                public void readEntriesComplete(List<Entry> entries, Object ctx) {
-                    invalidRead.completeExceptionally(new AssertionError("unexpected read success"));
-                }
+            cursor.asyncReadEntries(
+                    0,
+                    new AsyncCallbacks.ReadEntriesCallback() {
+                        @Override
+                        public void readEntriesComplete(List<Entry> entries, Object ctx) {
+                            invalidRead.completeExceptionally(new AssertionError("unexpected read success"));
+                        }
 
-                @Override
-                public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
-                    invalidReadCalls.incrementAndGet();
-                    invalidRead.complete(Thread.currentThread().getName());
-                }
-            }, null, null);
+                        @Override
+                        public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
+                            invalidReadCalls.incrementAndGet();
+                            invalidRead.complete(Thread.currentThread().getName());
+                        }
+                    },
+                    null,
+                    null);
             assertThat(invalidRead.join()).isEqualTo("cursor-safety-callback");
             assertThat(invalidReadCalls).hasValue(1);
 
             AtomicInteger readCalls = new AtomicInteger();
             AtomicReference<Entry> callbackEntry = new AtomicReference<>();
             CompletableFuture<String> readCallback = new CompletableFuture<>();
-            cursor.asyncReadEntries(1, new AsyncCallbacks.ReadEntriesCallback() {
-                @Override
-                public void readEntriesComplete(List<Entry> entries, Object ctx) {
-                    readCalls.incrementAndGet();
-                    callbackEntry.set(entries.getFirst());
-                    readCallback.complete(Thread.currentThread().getName());
-                    throw new IllegalStateException("caller read callback failure");
-                }
+            cursor.asyncReadEntries(
+                    1,
+                    new AsyncCallbacks.ReadEntriesCallback() {
+                        @Override
+                        public void readEntriesComplete(List<Entry> entries, Object ctx) {
+                            readCalls.incrementAndGet();
+                            callbackEntry.set(entries.getFirst());
+                            readCallback.complete(Thread.currentThread().getName());
+                            throw new IllegalStateException("caller read callback failure");
+                        }
 
-                @Override
-                public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
-                    readCallback.completeExceptionally(exception);
-                }
-            }, null, null);
+                        @Override
+                        public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
+                            readCallback.completeExceptionally(exception);
+                        }
+                    },
+                    null,
+                    null);
             assertThat(readCallback.join()).isEqualTo("cursor-safety-callback");
-            callbacks.submit(() -> { }).get(5, TimeUnit.SECONDS);
+            callbacks.submit(() -> {}).get(5, TimeUnit.SECONDS);
             assertThat(readCalls).hasValue(1);
             assertThat(callbackEntry.get().release()).isFalse();
 
@@ -130,83 +129,93 @@ class NereusManagedCursorCallbackSafetyTest {
                         }
 
                         @Override
-                        public void readEntryFailed(
-                                ManagedLedgerException exception,
-                                Object ctx) {
+                        public void readEntryFailed(ManagedLedgerException exception, Object ctx) {
                             nthCallback.completeExceptionally(exception);
                         }
                     },
                     null);
             assertThat(nthCallback.join()).isEqualTo("cursor-safety-callback");
-            callbacks.submit(() -> { }).get(5, TimeUnit.SECONDS);
+            callbacks.submit(() -> {}).get(5, TimeUnit.SECONDS);
             assertThat(nthEntry.get().release()).isFalse();
 
             AtomicInteger markDeleteCalls = new AtomicInteger();
             CompletableFuture<String> markDelete = new CompletableFuture<>();
-            cursor.asyncMarkDelete(first, new AsyncCallbacks.MarkDeleteCallback() {
-                @Override
-                public void markDeleteComplete(Object ctx) {
-                    markDeleteCalls.incrementAndGet();
-                    assertThat(cursor.putProperty("callback", 1L)).isTrue();
-                    markDelete.complete(Thread.currentThread().getName());
-                }
+            cursor.asyncMarkDelete(
+                    first,
+                    new AsyncCallbacks.MarkDeleteCallback() {
+                        @Override
+                        public void markDeleteComplete(Object ctx) {
+                            markDeleteCalls.incrementAndGet();
+                            assertThat(cursor.putProperty("callback", 1L)).isTrue();
+                            markDelete.complete(Thread.currentThread().getName());
+                        }
 
-                @Override
-                public void markDeleteFailed(ManagedLedgerException exception, Object ctx) {
-                    markDelete.completeExceptionally(exception);
-                }
-            }, null);
+                        @Override
+                        public void markDeleteFailed(ManagedLedgerException exception, Object ctx) {
+                            markDelete.completeExceptionally(exception);
+                        }
+                    },
+                    null);
             assertThat(markDelete.join()).isEqualTo("cursor-safety-callback");
             assertThat(markDeleteCalls).hasValue(1);
 
             AtomicInteger invalidDeleteCalls = new AtomicInteger();
             CompletableFuture<String> invalidDelete = new CompletableFuture<>();
-            cursor.asyncDelete((Position) null, new AsyncCallbacks.DeleteCallback() {
-                @Override
-                public void deleteComplete(Object ctx) {
-                    invalidDelete.completeExceptionally(new AssertionError("unexpected delete success"));
-                }
+            cursor.asyncDelete(
+                    (Position) null,
+                    new AsyncCallbacks.DeleteCallback() {
+                        @Override
+                        public void deleteComplete(Object ctx) {
+                            invalidDelete.completeExceptionally(new AssertionError("unexpected delete success"));
+                        }
 
-                @Override
-                public void deleteFailed(ManagedLedgerException exception, Object ctx) {
-                    invalidDeleteCalls.incrementAndGet();
-                    invalidDelete.complete(Thread.currentThread().getName());
-                }
-            }, null);
+                        @Override
+                        public void deleteFailed(ManagedLedgerException exception, Object ctx) {
+                            invalidDeleteCalls.incrementAndGet();
+                            invalidDelete.complete(Thread.currentThread().getName());
+                        }
+                    },
+                    null);
             assertThat(invalidDelete.join()).isEqualTo("cursor-safety-callback");
             assertThat(invalidDeleteCalls).hasValue(1);
 
             ManagedCursor waiter = ledger.openCursor("waiter", InitialPosition.Latest);
             AtomicInteger pendingCalls = new AtomicInteger();
             CompletableFuture<String> pending = new CompletableFuture<>();
-            waiter.asyncReadEntriesOrWait(1, new AsyncCallbacks.ReadEntriesCallback() {
-                @Override
-                public void readEntriesComplete(List<Entry> entries, Object ctx) {
-                    pending.completeExceptionally(new AssertionError("unexpected pending read success"));
-                }
+            waiter.asyncReadEntriesOrWait(
+                    1,
+                    new AsyncCallbacks.ReadEntriesCallback() {
+                        @Override
+                        public void readEntriesComplete(List<Entry> entries, Object ctx) {
+                            pending.completeExceptionally(new AssertionError("unexpected pending read success"));
+                        }
 
-                @Override
-                public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
-                    pendingCalls.incrementAndGet();
-                    pending.complete(Thread.currentThread().getName());
-                }
-            }, null, null);
-            scheduler.submit(() -> { }).get(5, TimeUnit.SECONDS);
+                        @Override
+                        public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
+                            pendingCalls.incrementAndGet();
+                            pending.complete(Thread.currentThread().getName());
+                        }
+                    },
+                    null,
+                    null);
+            scheduler.submit(() -> {}).get(5, TimeUnit.SECONDS);
 
             AtomicInteger closeCalls = new AtomicInteger();
             CompletableFuture<String> close = new CompletableFuture<>();
-            waiter.asyncClose(new AsyncCallbacks.CloseCallback() {
-                @Override
-                public void closeComplete(Object ctx) {
-                    closeCalls.incrementAndGet();
-                    close.complete(Thread.currentThread().getName());
-                }
+            waiter.asyncClose(
+                    new AsyncCallbacks.CloseCallback() {
+                        @Override
+                        public void closeComplete(Object ctx) {
+                            closeCalls.incrementAndGet();
+                            close.complete(Thread.currentThread().getName());
+                        }
 
-                @Override
-                public void closeFailed(ManagedLedgerException exception, Object ctx) {
-                    close.completeExceptionally(exception);
-                }
-            }, null);
+                        @Override
+                        public void closeFailed(ManagedLedgerException exception, Object ctx) {
+                            close.completeExceptionally(exception);
+                        }
+                    },
+                    null);
             assertThat(pending.join()).isEqualTo("cursor-safety-callback");
             assertThat(close.join()).isEqualTo("cursor-safety-callback");
             assertThat(pendingCalls).hasValue(1);
@@ -221,13 +230,11 @@ class NereusManagedCursorCallbackSafetyTest {
     }
 
     @Test
-    void cancellationCloseAndReadCompletionSurviveCallbackExecutorRejectionWithoutLeaks()
-            throws Exception {
+    void cancellationCloseAndReadCompletionSurviveCallbackExecutorRejectionWithoutLeaks() throws Exception {
         Clock clock = Clock.systemUTC();
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("rejected-callbacks"));
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
-        FakeManagedLedgerProjectionMetadataStore projections =
-                new FakeManagedLedgerProjectionMetadataStore();
+        FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         DefaultStreamStorage streamStorage = new DefaultStreamStorage(
                 StreamStorageConfig.defaults("cluster/a", "cursor-rejected-callback-test"),
                 metadata,
@@ -238,19 +245,10 @@ class NereusManagedCursorCallbackSafetyTest {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         ExecutorService callbacks = Executors.newSingleThreadExecutor();
         try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(
-                streamStorage,
-                projections,
-                new TestCursorStorage(),
-                scheduler,
-                callbacks)) {
+                streamStorage, projections, new TestCursorStorage(), scheduler, callbacks)) {
             NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
-                    runtime,
-                    fixedGuard(1),
-                    config(),
-                    new ManagedLedgerFactoryConfig(),
-                    false);
-            NereusManagedLedger ledger = (NereusManagedLedger) factory.open(
-                    NAME + "-rejected", config());
+                    runtime, fixedGuard(1), config(), new ManagedLedgerFactoryConfig(), false);
+            NereusManagedLedger ledger = (NereusManagedLedger) factory.open(NAME + "-rejected", config());
             ledger.addEntry(new byte[] {7});
             ManagedCursor reader = ledger.openCursor("reader");
             ManagedCursor waiter = ledger.openCursor("waiter", InitialPosition.Latest);
@@ -259,62 +257,72 @@ class NereusManagedCursorCallbackSafetyTest {
             AtomicInteger readCalls = new AtomicInteger();
             AtomicReference<Entry> rejectedEntry = new AtomicReference<>();
             CompletableFuture<Void> read = new CompletableFuture<>();
-            reader.asyncReadEntries(1, new AsyncCallbacks.ReadEntriesCallback() {
-                @Override
-                public void readEntriesComplete(List<Entry> entries, Object ctx) {
-                    readCalls.incrementAndGet();
-                    rejectedEntry.set(entries.getFirst());
-                    read.complete(null);
-                    throw new IllegalStateException("caller rejected-executor callback failure");
-                }
+            reader.asyncReadEntries(
+                    1,
+                    new AsyncCallbacks.ReadEntriesCallback() {
+                        @Override
+                        public void readEntriesComplete(List<Entry> entries, Object ctx) {
+                            readCalls.incrementAndGet();
+                            rejectedEntry.set(entries.getFirst());
+                            read.complete(null);
+                            throw new IllegalStateException("caller rejected-executor callback failure");
+                        }
 
-                @Override
-                public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
-                    read.completeExceptionally(exception);
-                }
-            }, null, null);
+                        @Override
+                        public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
+                            read.completeExceptionally(exception);
+                        }
+                    },
+                    null,
+                    null);
             read.get(5, TimeUnit.SECONDS);
-            scheduler.submit(() -> { }).get(5, TimeUnit.SECONDS);
+            scheduler.submit(() -> {}).get(5, TimeUnit.SECONDS);
             assertThat(readCalls).hasValue(1);
             assertThat(rejectedEntry.get().release()).isFalse();
 
             AtomicInteger cancellationCalls = new AtomicInteger();
             CompletableFuture<Void> cancelled = new CompletableFuture<>();
-            waiter.asyncReadEntriesOrWait(1, new AsyncCallbacks.ReadEntriesCallback() {
-                @Override
-                public void readEntriesComplete(List<Entry> entries, Object ctx) {
-                    entries.forEach(Entry::release);
-                    cancelled.completeExceptionally(new AssertionError("unexpected waiter success"));
-                }
+            waiter.asyncReadEntriesOrWait(
+                    1,
+                    new AsyncCallbacks.ReadEntriesCallback() {
+                        @Override
+                        public void readEntriesComplete(List<Entry> entries, Object ctx) {
+                            entries.forEach(Entry::release);
+                            cancelled.completeExceptionally(new AssertionError("unexpected waiter success"));
+                        }
 
-                @Override
-                public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
-                    cancellationCalls.incrementAndGet();
-                    cancelled.complete(null);
-                }
-            }, null, null);
-            scheduler.submit(() -> { }).get(5, TimeUnit.SECONDS);
+                        @Override
+                        public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
+                            cancellationCalls.incrementAndGet();
+                            cancelled.complete(null);
+                        }
+                    },
+                    null,
+                    null);
+            scheduler.submit(() -> {}).get(5, TimeUnit.SECONDS);
             assertThat(waiter.cancelPendingReadRequest()).isTrue();
-            scheduler.submit(() -> { }).get(5, TimeUnit.SECONDS);
+            scheduler.submit(() -> {}).get(5, TimeUnit.SECONDS);
             assertThat(cancelled).isNotDone();
             assertThat(cancellationCalls).hasValue(0);
             assertThat(waiter.cancelPendingReadRequest()).isFalse();
 
             AtomicInteger closeCalls = new AtomicInteger();
             CompletableFuture<Void> closed = new CompletableFuture<>();
-            waiter.asyncClose(new AsyncCallbacks.CloseCallback() {
-                @Override
-                public void closeComplete(Object ctx) {
-                    closeCalls.incrementAndGet();
-                    closed.complete(null);
-                }
+            waiter.asyncClose(
+                    new AsyncCallbacks.CloseCallback() {
+                        @Override
+                        public void closeComplete(Object ctx) {
+                            closeCalls.incrementAndGet();
+                            closed.complete(null);
+                        }
 
-                @Override
-                public void closeFailed(ManagedLedgerException exception, Object ctx) {
-                    closeCalls.incrementAndGet();
-                    closed.completeExceptionally(exception);
-                }
-            }, null);
+                        @Override
+                        public void closeFailed(ManagedLedgerException exception, Object ctx) {
+                            closeCalls.incrementAndGet();
+                            closed.completeExceptionally(exception);
+                        }
+                    },
+                    null);
             closed.get(5, TimeUnit.SECONDS);
             assertThat(closeCalls).hasValue(1);
 

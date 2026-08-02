@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -14,18 +15,18 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Immutable exact-target registry for materialization source protection providers. */
+/**
+ * Immutable exact-target registry for materialization source protection providers.
+ */
 public final class MaterializationSourceProtectionRegistry {
     private final Map<ReadTargetType, MaterializationSourceProtectionAdapter<?>> adapters;
 
     public MaterializationSourceProtectionRegistry(
             Collection<? extends MaterializationSourceProtectionAdapter<?>> adapters) {
         Objects.requireNonNull(adapters, "adapters");
-        EnumMap<ReadTargetType, MaterializationSourceProtectionAdapter<?>> values =
-                new EnumMap<>(ReadTargetType.class);
+        EnumMap<ReadTargetType, MaterializationSourceProtectionAdapter<?>> values = new EnumMap<>(ReadTargetType.class);
         for (MaterializationSourceProtectionAdapter<?> adapter : adapters) {
-            MaterializationSourceProtectionAdapter<?> exact = Objects.requireNonNull(
-                    adapter, "adapter");
+            MaterializationSourceProtectionAdapter<?> exact = Objects.requireNonNull(adapter, "adapter");
             if (values.putIfAbsent(exact.targetType(), exact) != null) {
                 throw new IllegalArgumentException(
                         "duplicate materialization source protection adapter for " + exact.targetType());
@@ -41,31 +42,31 @@ public final class MaterializationSourceProtectionRegistry {
             ObjectProtectionOwner owner,
             MaterializationSourceProtectionAdapter.OwnerRevalidator ownerRevalidator) {
         SourceGeneration exact = Objects.requireNonNull(source, "source");
-        return require(exact.readTarget()).acquireOrTransfer(
-                Objects.requireNonNull(streamId, "streamId"),
-                exact,
-                referenceId,
-                Objects.requireNonNull(owner, "owner"),
-                Objects.requireNonNull(ownerRevalidator, "ownerRevalidator"));
+        return require(exact.readTarget())
+                .acquireOrTransfer(
+                        Objects.requireNonNull(streamId, "streamId"),
+                        exact,
+                        referenceId,
+                        Objects.requireNonNull(owner, "owner"),
+                        Objects.requireNonNull(ownerRevalidator, "ownerRevalidator"));
     }
 
     public CompletableFuture<Optional<MaterializationSourceProtection>> findExisting(
-            StreamId streamId,
-            SourceGeneration source,
-            String referenceId) {
+            StreamId streamId, SourceGeneration source, String referenceId) {
         SourceGeneration exact = Objects.requireNonNull(source, "source");
-        return require(exact.readTarget()).findExisting(
-                Objects.requireNonNull(streamId, "streamId"),
-                exact,
-                Objects.requireNonNull(referenceId, "referenceId"));
+        return require(exact.readTarget())
+                .findExisting(
+                        Objects.requireNonNull(streamId, "streamId"),
+                        exact,
+                        Objects.requireNonNull(referenceId, "referenceId"));
     }
 
     public CompletableFuture<MaterializationSourceProtection> revalidate(
             MaterializationSourceProtection protection,
             MaterializationSourceProtectionAdapter.OwnerRevalidator ownerRevalidator) {
         MaterializationSourceProtection exact = Objects.requireNonNull(protection, "protection");
-        return require(exact.targetType()).revalidate(
-                exact, Objects.requireNonNull(ownerRevalidator, "ownerRevalidator"));
+        return require(exact.targetType())
+                .revalidate(exact, Objects.requireNonNull(ownerRevalidator, "ownerRevalidator"));
     }
 
     public CompletableFuture<MaterializationSourceProtection> transfer(
@@ -73,18 +74,19 @@ public final class MaterializationSourceProtectionRegistry {
             ObjectProtectionOwner newOwner,
             MaterializationSourceProtectionAdapter.OwnerRevalidator newOwnerRevalidator) {
         MaterializationSourceProtection exact = Objects.requireNonNull(protection, "protection");
-        return require(exact.targetType()).transfer(
-                exact,
-                Objects.requireNonNull(newOwner, "newOwner"),
-                Objects.requireNonNull(newOwnerRevalidator, "newOwnerRevalidator"));
+        return require(exact.targetType())
+                .transfer(
+                        exact,
+                        Objects.requireNonNull(newOwner, "newOwner"),
+                        Objects.requireNonNull(newOwnerRevalidator, "newOwnerRevalidator"));
     }
 
     public CompletableFuture<Void> release(
             MaterializationSourceProtection protection,
             MaterializationSourceProtectionAdapter.RemovalAuthorizer removalAuthorizer) {
         MaterializationSourceProtection exact = Objects.requireNonNull(protection, "protection");
-        return require(exact.targetType()).release(
-                exact, Objects.requireNonNull(removalAuthorizer, "removalAuthorizer"));
+        return require(exact.targetType())
+                .release(exact, Objects.requireNonNull(removalAuthorizer, "removalAuthorizer"));
     }
 
     public boolean supports(ReadTargetType targetType) {

@@ -93,6 +93,63 @@ tasks.register<Test>("f4OxiaIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9MetadataTest") {
+    group = "verification"
+    description = "Run the F9-M2 Kafka key, codec, binding, and authority deterministic contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.Kafka*")
+        includeTestsMatching("com.nereusstream.metadata.oxia.codec.Kafka*")
+        includeTestsMatching("com.nereusstream.metadata.oxia.codec.StreamHeadV2CodecTest")
+        includeTestsMatching("com.nereusstream.metadata.oxia.testing.Kafka*")
+    }
+}
+
+tasks.register<Test>("f9OxiaIntegrationTest") {
+    group = "verification"
+    description =
+        "Run the F9 Kafka binding CAS, registry scan, and checkpoint-quarantine reconnect gate against real Oxia."
+    testClassesDirs = oxiaIntegrationTest.output.classesDirs
+    classpath = oxiaIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test, tasks.named("f9MetadataTest"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.KafkaPartitionMetadataOxiaIntegrationTest")
+    }
+}
+
+tasks.register<Test>("f9BindingScaleOxiaIntegrationTest") {
+    group = "verification"
+    description =
+        "Run the F9-M7 16,384-binding, 64-shard pagination and reconnect gate against real Oxia."
+    testClassesDirs = oxiaIntegrationTest.output.classesDirs
+    classpath = oxiaIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test, tasks.named("f9OxiaIntegrationTest"))
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.KafkaBindingScaleIntegrationTest",
+        )
+    }
+}
+
+tasks.register<Test>("f9ActivationOxiaIntegrationTest") {
+    group = "verification"
+    description = "Run the F9-M6 Kafka activation/capability/readiness CAS gate against real Oxia."
+    testClassesDirs = oxiaIntegrationTest.output.classesDirs
+    classpath = oxiaIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test, tasks.named("f9MetadataTest"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataOxiaIntegrationTest",
+        )
+    }
+}
+
 val oxiaCapabilitySpikeReportDir = layout.buildDirectory.dir("reports/oxia-capability-spike")
 
 tasks.register<Test>("oxiaCapabilitySpike") {

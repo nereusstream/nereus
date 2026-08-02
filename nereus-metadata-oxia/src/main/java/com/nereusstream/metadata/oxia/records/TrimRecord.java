@@ -16,12 +16,7 @@ package com.nereusstream.metadata.oxia.records;
 
 import java.util.Objects;
 
-public record TrimRecord(
-        String streamId,
-        long trimOffset,
-        String reason,
-        long updatedAtMillis,
-        long metadataVersion) {
+public record TrimRecord(String streamId, long trimOffset, String reason, long updatedAtMillis, long metadataVersion) {
     public TrimRecord {
         requireNonBlank(streamId, "streamId");
         Objects.requireNonNull(reason, "reason");

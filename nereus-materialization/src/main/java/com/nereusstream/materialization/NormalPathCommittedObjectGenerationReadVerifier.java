@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -19,14 +20,14 @@ import com.nereusstream.core.read.ReadTargetReaderRegistry;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ScheduledExecutorService;
 
-/** Acquires the normal durable Object pin and reads every record in the exact retirement source range. */
-public final class NormalPathCommittedObjectGenerationReadVerifier
-        implements CommittedObjectGenerationReadVerifier {
+/**
+ * Acquires the normal durable Object pin and reads every record in the exact retirement source range.
+ */
+public final class NormalPathCommittedObjectGenerationReadVerifier implements CommittedObjectGenerationReadVerifier {
     private final GenerationReadResolver resolver;
     private final ReadTargetDispatcher dispatcher;
     private final int pageRecords;
@@ -50,14 +51,12 @@ public final class NormalPathCommittedObjectGenerationReadVerifier
     }
 
     @Override
-    public CompletableFuture<Boolean> verify(
-            CommittedObjectGenerationProof proof,
-            Duration timeout) {
+    public CompletableFuture<Boolean> verify(CommittedObjectGenerationProof proof, Duration timeout) {
         try {
             CommittedObjectGenerationProof expected = Objects.requireNonNull(proof, "proof");
             MaterializationDeadline deadline = new MaterializationDeadline(timeout, scheduler);
-            CompletableFuture<Boolean> result = verifyPage(
-                    expected, expected.sourceRange().startOffset(), deadline);
+            CompletableFuture<Boolean> result =
+                    verifyPage(expected, expected.sourceRange().startOffset(), deadline);
             result.whenComplete((ignored, failure) -> deadline.close());
             return result;
         } catch (Throwable failure) {
@@ -66,18 +65,12 @@ public final class NormalPathCommittedObjectGenerationReadVerifier
     }
 
     private CompletableFuture<Boolean> verifyPage(
-            CommittedObjectGenerationProof proof,
-            long offset,
-            MaterializationDeadline deadline) {
+            CommittedObjectGenerationProof proof, long offset, MaterializationDeadline deadline) {
         if (offset == proof.sourceRange().endOffset()) {
             return CompletableFuture.completedFuture(true);
         }
         return deadline.bound(
-                        () -> resolver.resolve(
-                                proof.streamId(),
-                                offset,
-                                ReadView.COMMITTED,
-                                deadline.remaining()),
+                        () -> resolver.resolve(proof.streamId(), offset, ReadView.COMMITTED, deadline.remaining()),
                         "resolve committed Object retirement read")
                 .thenCompose(optional -> {
                     if (optional.isEmpty()) {
@@ -87,20 +80,12 @@ public final class NormalPathCommittedObjectGenerationReadVerifier
                     if (!isExact(proof, pinned.candidate())) {
                         return pinned.release().thenApply(ignored -> false);
                     }
-                    int records = Math.toIntExact(Math.min(
-                            pageRecords,
-                            proof.sourceRange().endOffset() - offset));
-                    ReadOptions options = new ReadOptions(
-                            records,
-                            pageBytes,
-                            ReadIsolation.COMMITTED,
-                            deadline.remaining());
+                    int records = Math.toIntExact(
+                            Math.min(pageRecords, proof.sourceRange().endOffset() - offset));
+                    ReadOptions options =
+                            new ReadOptions(records, pageBytes, ReadIsolation.COMMITTED, deadline.remaining());
                     CompletableFuture<PhysicalReadResult> read = deadline.bound(
-                            () -> dispatcher.read(
-                                    proof.streamId(),
-                                    offset,
-                                    List.of(pinned.resolvedRange()),
-                                    options),
+                            () -> dispatcher.read(proof.streamId(), offset, List.of(pinned.resolvedRange()), options),
                             "read committed Object retirement range");
                     return releaseAfter(read, pinned).thenCompose(result -> {
                         long next = validatePage(proof, offset, records, pinned.candidate(), result);
@@ -109,9 +94,7 @@ public final class NormalPathCommittedObjectGenerationReadVerifier
                 });
     }
 
-    private static boolean isExact(
-            CommittedObjectGenerationProof proof,
-            GenerationReadCandidate candidate) {
+    private static boolean isExact(CommittedObjectGenerationProof proof, GenerationReadCandidate candidate) {
         var value = proof.index().value();
         return !candidate.generationZero()
                 && candidate.view() == ReadView.COMMITTED
@@ -121,8 +104,10 @@ public final class NormalPathCommittedObjectGenerationReadVerifier
                 && candidate.resolvedRange().generation() == value.generation()
                 && candidate.resolvedRange().commitVersion() == value.lastCommitVersion()
                 && candidate.resolvedRange().readTarget().equals(proof.target())
-                && candidate.resolvedRange().offsetRange().startOffset() <= proof.sourceRange().startOffset()
-                && candidate.resolvedRange().offsetRange().endOffset() >= proof.sourceRange().endOffset();
+                && candidate.resolvedRange().offsetRange().startOffset()
+                        <= proof.sourceRange().startOffset()
+                && candidate.resolvedRange().offsetRange().endOffset()
+                        >= proof.sourceRange().endOffset();
     }
 
     private static long validatePage(
@@ -141,9 +126,12 @@ public final class NormalPathCommittedObjectGenerationReadVerifier
         for (ReadBatch batch : result.batches()) {
             if (batch.range().startOffset() != next
                     || batch.range().endOffset() > proof.sourceRange().endOffset()
-                    || !batch.source().resolvedRange().equals(candidate.resolvedRange().offsetRange())
+                    || !batch.source()
+                            .resolvedRange()
+                            .equals(candidate.resolvedRange().offsetRange())
                     || batch.source().generation() != candidate.resolvedRange().generation()
-                    || batch.source().commitVersion() != candidate.resolvedRange().commitVersion()
+                    || batch.source().commitVersion()
+                            != candidate.resolvedRange().commitVersion()
                     || !batch.source().target().equals(proof.target())
                     || !batch.source().targetIdentity().equals(targetIdentity)) {
                 throw invariant("committed Object retirement read escaped its exact generation identity");
@@ -157,19 +145,19 @@ public final class NormalPathCommittedObjectGenerationReadVerifier
         return next;
     }
 
-    private static <T> CompletableFuture<T> releaseAfter(
-            CompletableFuture<T> operation,
-            PinnedResolvedRange pinned) {
-        return operation.handle((value, failure) -> pinned.release().handle((ignored, releaseFailure) -> {
-            if (failure == null && releaseFailure == null) {
-                return value;
-            }
-            Throwable cause = failure == null ? unwrap(releaseFailure) : unwrap(failure);
-            if (failure != null && releaseFailure != null) {
-                cause.addSuppressed(unwrap(releaseFailure));
-            }
-            throw new CompletionException(cause);
-        })).thenCompose(value -> value);
+    private static <T> CompletableFuture<T> releaseAfter(CompletableFuture<T> operation, PinnedResolvedRange pinned) {
+        return operation
+                .handle((value, failure) -> pinned.release().handle((ignored, releaseFailure) -> {
+                    if (failure == null && releaseFailure == null) {
+                        return value;
+                    }
+                    Throwable cause = failure == null ? unwrap(releaseFailure) : unwrap(failure);
+                    if (failure != null && releaseFailure != null) {
+                        cause.addSuppressed(unwrap(releaseFailure));
+                    }
+                    throw new CompletionException(cause);
+                }))
+                .thenCompose(value -> value);
     }
 
     private static Throwable unwrap(Throwable failure) {

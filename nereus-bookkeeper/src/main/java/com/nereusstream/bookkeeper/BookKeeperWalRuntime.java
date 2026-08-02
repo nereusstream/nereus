@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.target.ReadTargetType;
@@ -6,8 +7,8 @@ import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.append.AppendAdmissionGuard;
 import com.nereusstream.core.append.RequiredObjectGenerationCompletion;
-import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.read.Phase4ReadComponents;
+import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.recovery.AppendRecoverySearcher;
 import com.nereusstream.core.trim.TrimMetricsObserver;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
@@ -19,7 +20,9 @@ import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Owns the BK-M2 provider adapters while leaving the caller-owned BookKeeper client untouched. */
+/**
+ * Owns the BK-M2 provider adapters while leaving the caller-owned BookKeeper client untouched.
+ */
 public final class BookKeeperWalRuntime implements AutoCloseable {
     private final BookKeeperPrimaryWalAppender appender;
     private final BookKeeperPrimaryWalReader reader;
@@ -48,18 +51,27 @@ public final class BookKeeperWalRuntime implements AutoCloseable {
         return registry;
     }
 
+    /**
+     * Returns the owned exact BookKeeper read-target reader for provider-level registry composition.
+     */
+    public BookKeeperPrimaryWalReader primaryWalReader() {
+        ensureOpen();
+        return reader;
+    }
+
     public BookKeeperStorageProfileResolver profileResolver() {
         ensureOpen();
         return profileResolver;
     }
 
-    /** Pairs the owned BK reader with its durable F4 source-protection authority. */
+    /**
+     * Pairs the owned BK reader with its durable F4 source-protection authority.
+     */
     public MaterializationSourceProvider materializationSourceProvider(
             BookKeeperMaterializationSourceProtectionAdapter sourceProtections) {
         ensureOpen();
         return new MaterializationSourceProvider(
-                reader,
-                Objects.requireNonNull(sourceProtections, "sourceProtections"));
+                reader, Objects.requireNonNull(sourceProtections, "sourceProtections"));
     }
 
     public BookKeeperGenerationZeroPhysicalReferencePublisher generationZeroPhysicalReferences() {
@@ -91,7 +103,9 @@ public final class BookKeeperWalRuntime implements AutoCloseable {
                 trimMetricsObserver);
     }
 
-    /** Composes BK generation zero with the shared higher-Object generation resolver and readers. */
+    /**
+     * Composes BK generation zero with the shared higher-Object generation resolver and readers.
+     */
     public DefaultStreamStorage newGenerationAwareStorage(
             StreamStorageConfig configuration,
             OxiaMetadataStore metadata,
@@ -118,7 +132,9 @@ public final class BookKeeperWalRuntime implements AutoCloseable {
                 trimMetricsObserver);
     }
 
-    /** Composes BK generation zero with F4 reads and the exact BK-sync producer completion barrier. */
+    /**
+     * Composes BK generation zero with F4 reads and the exact BK-sync producer completion barrier.
+     */
     public DefaultStreamStorage newGenerationAwareStorage(
             StreamStorageConfig configuration,
             OxiaMetadataStore metadata,

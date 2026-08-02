@@ -25,16 +25,19 @@
 
 Nereus shared data plane 需要多类 immutable objects：
 
-| Family | Purpose | Visibility/reference authority | Status |
-| --- | --- | --- | --- |
-| Multi-stream WAL object | primary Object WAL bytes | reachable append + generation-0 index | Implemented v1 |
-| Index object | large entry/projection index | offset-index reference | Reserved |
-| Stream compacted object (`NCP1`) | per-stream lossless higher-generation `COMMITTED` target | generation index `PREPARED -> COMMITTED` CAS | F4-M3 writer/reader/full verifier/core adapter + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar exact-byte round trip + terminal metadata retirement implemented/final-gated；real Oxia/LocalStack two-worker/restart/full-byte evidence passed |
-| Topic-compacted object (`NTC1`) | sparse lossy `TOPIC_COMPACTED` target | separate view generation index CAS | F4-M3 schema/writer/strict-reader/full verifier + neutral SPI/registry + COMMITTED-source planner bootstrap + tagged-v1 key encoding + sorted-spill two-pass engine/worker/publication implemented/final-gated；broker admission remains F8 |
-| Recovery checkpoint (`NRC1` + `NRF1`) | replace append-replay/index-repair role of a committed prefix | recovery-root CAS | Designed / F4-M0 frozen |
-| Cursor snapshot | large ack state | cursor-state CAS ref | Implemented/final-gated through F3-M6 |
-| Transaction snapshot | large txn/pending-ack state | txn-state ref | Designed |
-| SBT/SDT table file | analytical/table projection | catalog snapshot/delivery lineage | Designed |
+| Family                                    | Purpose                                                                                       | Visibility/reference authority                                      | Status                                                                                                                                                                                                                                                                          |
+|-------------------------------------------|-----------------------------------------------------------------------------------------------|---------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Multi-stream WAL object                   | primary Object WAL bytes                                                                      | reachable append + generation-0 index                               | Implemented v1                                                                                                                                                                                                                                                                  |
+| Index object                              | large entry/projection index                                                                  | offset-index reference                                              | Reserved                                                                                                                                                                                                                                                                        |
+| Stream compacted object (`NCP1`)          | per-stream lossless higher-generation `COMMITTED` target                                      | generation index `PREPARED -> COMMITTED` CAS                        | F4-M3 writer/reader/full verifier/core adapter + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar exact-byte round trip + terminal metadata retirement implemented/final-gated；real Oxia/LocalStack two-worker/restart/full-byte evidence passed |
+| Topic-compacted object (`NTC1`)           | sparse lossy `TOPIC_COMPACTED` target                                                         | separate view generation index CAS                                  | F4-M3 schema/writer/strict-reader/full verifier + neutral SPI/registry + COMMITTED-source planner bootstrap + tagged-v1 key encoding + sorted-spill two-pass engine/worker/publication implemented/final-gated；broker admission remains F8                                      |
+| Ranged stream compacted object (`NCP2`)   | lossless higher generation preserving multi-record entry ranges                               | generation index `PREPARED -> COMMITTED` CAS                        | F9 implemented/final-gated for the recorded exact-source tuple；distinct magic/version，never reinterpret `NCP1`                                                                                                                                                                  |
+| Ranged topic-compacted object (`NTC2`)    | sparse Kafka-key compaction with explicit source/coverage ranges                              | topic-compacted generation CAS plus irreversible binding coverage   | F9 implemented/final-gated for the recorded exact-source tuple；distinct magic/version，never reinterpret `NTC1`                                                                                                                                                                  |
+| Native Kafka recovery checkpoint (`NKC1`) | immutable derived producer/txn/epoch/virtual-segment/time/byte indexes at an exact stable end | versioned F9 partition binding reference；up to three retained roots | F9 implemented/final-gated for the recorded exact-source tuple；acceleration only，never append/coordinator truth                                                                                                                                                                 |
+| Recovery checkpoint (`NRC1` + `NRF1`)     | replace append-replay/index-repair role of a committed prefix                                 | recovery-root CAS                                                   | Designed / F4-M0 frozen                                                                                                                                                                                                                                                         |
+| Cursor snapshot                           | large ack state                                                                               | cursor-state CAS ref                                                | Implemented/final-gated through F3-M6                                                                                                                                                                                                                                           |
+| Transaction snapshot                      | large txn/pending-ack state                                                                   | txn-state ref                                                       | Designed                                                                                                                                                                                                                                                                        |
+| SBT/SDT table file                        | analytical/table projection                                                                   | catalog snapshot/delivery lineage                                   | Designed                                                                                                                                                                                                                                                                        |
 
 Object existence never makes a logical range visible。Object keys are placement identities，not ownership or
 ordering truth。
@@ -67,29 +70,29 @@ WALObject
 
 ### 3.1 Constants
 
-| Field | v1 value |
-| --- | --- |
-| magic | ASCII `NRS1` |
-| format major/minor | `1 / 0` |
-| object type id | `1` (`MULTI_STREAM_WAL_OBJECT`) |
-| fixed-width byte order | little endian |
-| common header length | 48 bytes |
-| section header length | 16 bytes |
-| checksum | CRC32C |
-| compression | `NONE` only |
-| encryption info | empty only |
-| payload format | `OPAQUE_RECORD_BATCH` only |
-| entry-index location | `OBJECT_FOOTER` only |
+| Field                  | v1 value                        |
+|------------------------|---------------------------------|
+| magic                  | ASCII `NRS1`                    |
+| format major/minor     | `1 / 0`                         |
+| object type id         | `1` (`MULTI_STREAM_WAL_OBJECT`) |
+| fixed-width byte order | little endian                   |
+| common header length   | 48 bytes                        |
+| section header length  | 16 bytes                        |
+| checksum               | CRC32C                          |
+| compression            | `NONE` only                     |
+| encryption info        | empty only                      |
+| payload format         | `OPAQUE_RECORD_BATCH` only      |
+| entry-index location   | `OBJECT_FOOTER` only            |
 
 Durable section ids：
 
-| Section | Id |
-| --- | --- |
-| `WAL_OBJECT_HEADER` | 1 |
-| `STREAM_SLICE_DIRECTORY` | 2 |
-| `PAYLOAD_BLOCK` | 3 |
-| `ENTRY_INDEX` | 4 |
-| `FOOTER` | 5 |
+| Section                  | Id |
+|--------------------------|----|
+| `WAL_OBJECT_HEADER`      | 1  |
+| `STREAM_SLICE_DIRECTORY` | 2  |
+| `PAYLOAD_BLOCK`          | 3  |
+| `ENTRY_INDEX`            | 4  |
+| `FOOTER`                 | 5  |
 
 ### 3.2 Common header
 
@@ -277,7 +280,8 @@ commitVersion
 ```
 
 Generation 0 is repairable from reachable append commit。F4 higher generations become visible only through a
-final generation-index key's same-key `PREPARED -> COMMITTED` CAS。Phase 1.5 implements the tagged target union and dual-read/new-write generic metadata while retaining the
+final generation-index key's same-key `PREPARED -> COMMITTED` CAS。Phase 1.5 implements the tagged target union and
+dual-read/new-write generic metadata while retaining the
 object-specific legacy decoder/adapter boundary。This does not alter Object WAL bytes or
 implement BookKeeper IO。
 
@@ -327,7 +331,8 @@ lookup strictly decodes the selected canonical generation-index or generic commi
 does not publish a recovery root and therefore does not yet authorize source/index retirement.
 
 Output keys contain exact content SHA-256 plus a durable worker output-attempt id；generation is deliberately absent
-from object bytes and object identity, and a deleted key is never reused。Exact columns、field order、limits、checksum coverage、reader
+from object bytes and object identity, and a deleted key is never reused。Exact columns、field order、limits、checksum
+coverage、reader
 validation and golden tests are in
 `../phase-4-compaction-generation/02-domain-api-and-object-format.md`。
 
@@ -393,7 +398,36 @@ catalog snapshot or delivery id
 SBT may reuse compacted objects。SDT can create target-specific files。Catalog commits never change stream
 offsets or producer acknowledgement。
 
-## 13. Format evolution
+## 13. F9 ranged and checkpoint families（exact-source final-gated）
+
+F9 does not alter or heuristically reinterpret any existing bytes. `NCP1`/`NTC1` retain their one-record-per-row
+contract；ranged entries require the new `NCP2`/`NTC2` major families，and native Kafka recovery uses a separate
+`NKC1` checkpoint family. Exact field order、limits、checksums、golden vectors and corruption cases are normative in
+`../phase-9-kafka-native-storage/02-ranged-entry-api-and-object-format.md` and
+`../phase-9-kafka-native-storage/04-oxia-binding-session-checkpoint-and-lifecycle.md`.
+
+Common F9 format invariants：
+
+- every row/entry carries enough information to prove `[baseOffset,endOffset)` and positive `recordCount`；the reader
+  rejects overflow、overlap、non-dense lossless ranges and payload/header count disagreement；
+- `NCP2` preserves full exact Kafka batch bytes and entry range identity for `COMMITTED` reads；it is a physical
+  replacement only and cannot change logical offsets；
+- `NTC2` may be sparse but records explicit source and coverage ranges. Once its coverage is activated for a partition，
+  reads may only fallback within the same `TOPIC_COMPACTED` view；falling back to `COMMITTED` would resurrect deleted
+  keys and is forbidden；
+- `NKC1` is content-addressed/immutable and binds cluster/topic UUID/partition、stream/incarnation、stable end、source
+  generation and checksums. Publication revalidates the binding and head；loading rejects checkpoints ahead of or from
+  another incarnation；
+- unknown major/minor/enum/required flag fails closed，and no magic/version collision with `NCP1`、`NTC1`、`NRC1` or
+  snapshot families is allowed；
+- implementing any writer requires its strict reader、whole-file verifier、golden bytes、truncation/bit-flip/limit
+  matrix and legacy compatibility suite in the same milestone.
+
+These families are implemented/final-gated by F9-M1–M7 for the exact source tuple recorded in the 2026-07-30 clean
+final receipt。They remain versioned cross-document boundaries rather than permission to decode one family as another；
+later product source changes require a fresh final receipt before inheriting current-source PASS.
+
+## 14. Format evolution
 
 - Major version changes incompatible required semantics。
 - Minor version may add optional sections only after reader skip/compatibility rules are implemented and tested。
@@ -403,7 +437,7 @@ offsets or producer acknowledgement。
 - New entry-index location needs writer、metadata codec、resolver、reader and migration tests together。
 - Golden bytes are required for every durable encoder change。
 
-## 14. GC reference model
+## 15. GC reference model
 
 An object can be protected by：
 
@@ -441,7 +475,7 @@ page；the continuation is opaque because canonical base64url S3 prefixes do not
 physical-prefix pages. Inventory validates exact prefix and token progress but never treats cross-page key order or
 LIST absence as deletion/recovery authority.
 
-## 15. Implementation sources
+## 16. Implementation sources
 
 - Object WAL code：`../../nereus-object-store/src/main/java/com/nereusstream/objectstore/wal/`
 - Exact Phase 1 design：`../phase-1-core-stream-storage/03-object-wal-and-index.md`
@@ -454,3 +488,4 @@ LIST absence as deletion/recovery authority.
 - F4 target：`nereus-future4-compaction-generation.md`
 - F3 cursor snapshot target：`../phase-3-cursor-subscription/03-oxia-metadata-and-snapshot-format.md`
 - F6 target：`nereus-future6-lakehouse-sbt-sdt.md`
+- F9 ranged/checkpoint target：`../phase-9-kafka-native-storage/README.md`

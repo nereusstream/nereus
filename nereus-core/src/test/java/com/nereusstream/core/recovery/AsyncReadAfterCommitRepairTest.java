@@ -15,7 +15,6 @@
 package com.nereusstream.core.recovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.core.read.GenerationIndexRepairSource;
 import com.nereusstream.core.read.ReadAfterStableCommitRepair;
 import org.junit.jupiter.api.Test;
@@ -23,19 +22,13 @@ import org.junit.jupiter.api.Test;
 class AsyncReadAfterCommitRepairTest {
     @Test
     void committedIndexGapIsRepairedWithVisibleGenerationProtection() {
-        GenerationZeroRepairTestSupport.Fixture fixture =
-                GenerationZeroRepairTestSupport.fixture(0);
-        ReadAfterStableCommitRepair repair =
-                new ReadAfterStableCommitRepair(fixture.scanner());
+        GenerationZeroRepairTestSupport.Fixture fixture = GenerationZeroRepairTestSupport.fixture(0);
+        ReadAfterStableCommitRepair repair = new ReadAfterStableCommitRepair(fixture.scanner());
 
-        var result = repair.repair(
-                        GenerationZeroRepairTestSupport.STREAM,
-                        0,
-                        GenerationZeroRepairTestSupport.TIMEOUT)
+        var result = repair.repair(GenerationZeroRepairTestSupport.STREAM, 0, GenerationZeroRepairTestSupport.TIMEOUT)
                 .join();
 
-        assertThat(result.source())
-                .isEqualTo(GenerationIndexRepairSource.LIVE_COMMIT);
+        assertThat(result.source()).isEqualTo(GenerationIndexRepairSource.LIVE_COMMIT);
         assertThat(result.scannedRecords()).isOne();
         assertThat(fixture.materializations()).hasValue(1);
         assertThat(fixture.protections()).hasValue(1);
@@ -43,19 +36,13 @@ class AsyncReadAfterCommitRepairTest {
 
     @Test
     void trimWinsBeforeRepairAndCreatesNoPhysicalReference() {
-        GenerationZeroRepairTestSupport.Fixture fixture =
-                GenerationZeroRepairTestSupport.fixture(1);
-        ReadAfterStableCommitRepair repair =
-                new ReadAfterStableCommitRepair(fixture.scanner());
+        GenerationZeroRepairTestSupport.Fixture fixture = GenerationZeroRepairTestSupport.fixture(1);
+        ReadAfterStableCommitRepair repair = new ReadAfterStableCommitRepair(fixture.scanner());
 
-        var result = repair.repair(
-                        GenerationZeroRepairTestSupport.STREAM,
-                        0,
-                        GenerationZeroRepairTestSupport.TIMEOUT)
+        var result = repair.repair(GenerationZeroRepairTestSupport.STREAM, 0, GenerationZeroRepairTestSupport.TIMEOUT)
                 .join();
 
-        assertThat(result.source())
-                .isEqualTo(GenerationIndexRepairSource.TRIMMED);
+        assertThat(result.source()).isEqualTo(GenerationIndexRepairSource.TRIMMED);
         assertThat(fixture.tailReads()).hasValue(0);
         assertThat(fixture.materializations()).hasValue(0);
         assertThat(fixture.protections()).hasValue(0);

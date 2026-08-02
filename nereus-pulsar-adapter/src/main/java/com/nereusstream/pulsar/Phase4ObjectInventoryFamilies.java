@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import com.nereusstream.api.ObjectKey;
@@ -16,78 +17,51 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
-/** Exact V1 object-key families written by the currently installed Nereus runtime. */
+/**
+ * Exact V1 object-key families written by the currently installed Nereus runtime.
+ */
 final class Phase4ObjectInventoryFamilies {
-    private Phase4ObjectInventoryFamilies() {
-    }
+    private Phase4ObjectInventoryFamilies() {}
 
     static List<ObjectInventoryFamily> currentV1(String cluster) {
         String exactCluster = requireText(cluster, "cluster");
         return List.of(
-                family(
-                        "wal-object-v1",
-                        WalObjectKeys.prefix(exactCluster),
-                        key -> {
-                            var parsed = WalObjectKeys.parse(exactCluster, key);
-                            return new ObjectInventoryKey(
-                                    key,
-                                    Optional.of(parsed.objectId()),
-                                    PhysicalObjectKind.OBJECT_WAL,
-                                    Optional.empty());
-                        }),
+                family("wal-object-v1", WalObjectKeys.prefix(exactCluster), key -> {
+                    var parsed = WalObjectKeys.parse(exactCluster, key);
+                    return new ObjectInventoryKey(
+                            key, Optional.of(parsed.objectId()), PhysicalObjectKind.OBJECT_WAL, Optional.empty());
+                }),
                 compacted(exactCluster, ReadView.COMMITTED),
                 compacted(exactCluster, ReadView.TOPIC_COMPACTED),
-                family(
-                        "recovery-checkpoint-v1",
-                        RecoveryCheckpointFormatV1.prefix(exactCluster),
-                        key -> {
-                            var parsed = RecoveryCheckpointFormatV1.parseObjectKey(
-                                    exactCluster, key);
-                            return new ObjectInventoryKey(
-                                    key,
-                                    Optional.of(parsed.objectId()),
-                                    PhysicalObjectKind.RECOVERY_CHECKPOINT,
-                                    Optional.of(parsed.contentSha256()));
-                        }),
-                family(
-                        "cursor-snapshot-v1",
-                        CursorSnapshotKeys.clusterPrefix(exactCluster),
-                        key -> {
-                            CursorSnapshotKeys.parseOwnerless(exactCluster, key);
-                            return new ObjectInventoryKey(
-                                    key,
-                                    Optional.empty(),
-                                    PhysicalObjectKind.CURSOR_SNAPSHOT,
-                                    Optional.empty());
-                        }));
-    }
-
-    private static ObjectInventoryFamily compacted(
-            String cluster, ReadView view) {
-        String id = view == ReadView.COMMITTED
-                ? "committed-compacted-v1"
-                : "topic-compacted-v1";
-        PhysicalObjectKind kind = view == ReadView.COMMITTED
-                ? PhysicalObjectKind.COMMITTED_COMPACTED
-                : PhysicalObjectKind.TOPIC_COMPACTED;
-        return family(
-                id,
-                CompactedObjectFormatV1.prefix(cluster, view),
-                key -> {
-                    var parsed = CompactedObjectFormatV1.parseObjectKey(
-                            cluster, view, key);
+                family("recovery-checkpoint-v1", RecoveryCheckpointFormatV1.prefix(exactCluster), key -> {
+                    var parsed = RecoveryCheckpointFormatV1.parseObjectKey(exactCluster, key);
                     return new ObjectInventoryKey(
                             key,
                             Optional.of(parsed.objectId()),
-                            kind,
+                            PhysicalObjectKind.RECOVERY_CHECKPOINT,
                             Optional.of(parsed.contentSha256()));
-                });
+                }),
+                family("cursor-snapshot-v1", CursorSnapshotKeys.clusterPrefix(exactCluster), key -> {
+                    CursorSnapshotKeys.parseOwnerless(exactCluster, key);
+                    return new ObjectInventoryKey(
+                            key, Optional.empty(), PhysicalObjectKind.CURSOR_SNAPSHOT, Optional.empty());
+                }));
+    }
+
+    private static ObjectInventoryFamily compacted(String cluster, ReadView view) {
+        String id = view == ReadView.COMMITTED ? "committed-compacted-v1" : "topic-compacted-v1";
+        PhysicalObjectKind kind = view == ReadView.COMMITTED
+                ? PhysicalObjectKind.COMMITTED_COMPACTED
+                : PhysicalObjectKind.TOPIC_COMPACTED;
+        return family(id, CompactedObjectFormatV1.prefix(cluster, view), key -> {
+            var parsed = CompactedObjectFormatV1.parseObjectKey(cluster, view, key);
+            return new ObjectInventoryKey(
+                    key, Optional.of(parsed.objectId()), kind, Optional.of(parsed.contentSha256()));
+        });
     }
 
     private static ObjectInventoryFamily family(
-            String id,
-            ObjectKeyPrefix prefix,
-            Function<ObjectKey, ObjectInventoryKey> parser) {
+            String id, ObjectKeyPrefix prefix, Function<ObjectKey, ObjectInventoryKey> parser) {
         return new Family(id, prefix, parser);
     }
 
@@ -99,10 +73,7 @@ final class Phase4ObjectInventoryFamilies {
         return value;
     }
 
-    private record Family(
-            String familyId,
-            ObjectKeyPrefix prefix,
-            Function<ObjectKey, ObjectInventoryKey> parser)
+    private record Family(String familyId, ObjectKeyPrefix prefix, Function<ObjectKey, ObjectInventoryKey> parser)
             implements ObjectInventoryFamily {
         private Family {
             familyId = requireText(familyId, "familyId");

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -6,7 +7,9 @@ import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.StreamId;
 import java.util.Objects;
 
-/** Immutable facts copied into the NRC1 header and deterministic object key. */
+/**
+ * Immutable facts copied into the NRC1 header and deterministic object key.
+ */
 public record RecoveryCheckpointWriteRequest(
         String cluster,
         StreamId streamId,
@@ -31,8 +34,7 @@ public record RecoveryCheckpointWriteRequest(
         if (checkpointSequence <= 0) {
             throw new IllegalArgumentException("checkpointSequence must be positive");
         }
-        checkpointAttemptId = RecoveryCheckpointValidation.requireBase32Id(
-                checkpointAttemptId, "checkpointAttemptId");
+        checkpointAttemptId = RecoveryCheckpointValidation.requireBase32Id(checkpointAttemptId, "checkpointAttemptId");
         Objects.requireNonNull(coverage, "coverage");
         if (coverage.isEmpty()) {
             throw new IllegalArgumentException("checkpoint coverage cannot be empty");
@@ -55,8 +57,8 @@ public record RecoveryCheckpointWriteRequest(
         if (sourceHeadCommitVersion < lastCommitVersion) {
             throw new IllegalArgumentException("source head cannot precede checkpoint commit coverage");
         }
-        projectionIdentitySha256 = RecoveryCheckpointValidation.requireSha256(
-                projectionIdentitySha256, "projectionIdentitySha256");
+        projectionIdentitySha256 =
+                RecoveryCheckpointValidation.requireSha256(projectionIdentitySha256, "projectionIdentitySha256");
         if (expectedEntryCount <= 0
                 || expectedEntryCount > RecoveryCheckpointFormatV1.MAX_ENTRY_COUNT
                 || expectedEntryCount != versionCount) {

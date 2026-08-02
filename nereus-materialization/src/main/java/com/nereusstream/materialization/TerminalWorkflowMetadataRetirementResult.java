@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
-/** Accounting for one bounded per-stream terminal workflow-metadata retirement pass. */
+/**
+ * Accounting for one bounded per-stream terminal workflow-metadata retirement pass.
+ */
 public record TerminalWorkflowMetadataRetirementResult(
         int tasksScanned,
         int tasksEligible,
@@ -24,8 +27,7 @@ public record TerminalWorkflowMetadataRetirementResult(
                 || tasksRetired > tasksEligible
                 || retentionStatsRetired > retentionStatsScanned
                 || checkpointsRetired > checkpointsScanned) {
-            throw new IllegalArgumentException(
-                    "terminal workflow-metadata retirement accounting is invalid");
+            throw new IllegalArgumentException("terminal workflow-metadata retirement accounting is invalid");
         }
     }
 

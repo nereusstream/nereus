@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
@@ -16,13 +16,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.http.SdkHttpResponse;
@@ -55,16 +57,24 @@ class S3CompatibleObjectStoreTest {
         StubClient stub = new StubClient();
         stub.put = request -> {
             captured.set(request);
-            return CompletableFuture.completedFuture(PutObjectResponse.builder().eTag("opaque-etag").build());
+            return CompletableFuture.completedFuture(
+                    PutObjectResponse.builder().eTag("opaque-etag").build());
         };
         store = store(stub);
         ByteBuffer payload = ByteBuffer.wrap("x0123y".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         payload.position(1).limit(5);
         var checksum = Crc32cChecksums.checksum("0123".getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
-        PutObjectResult result = store.putObject(new ObjectKey("wal/raw/key"), payload,
-                new PutObjectOptions("application/octet-stream", checksum, true,
-                        Map.of("Owner", "nereus"), Duration.ofSeconds(1))).join();
+        PutObjectResult result = store.putObject(
+                        new ObjectKey("wal/raw/key"),
+                        payload,
+                        new PutObjectOptions(
+                                "application/octet-stream",
+                                checksum,
+                                true,
+                                Map.of("Owner", "nereus"),
+                                Duration.ofSeconds(1)))
+                .join();
 
         assertThat(payload.position()).isEqualTo(1);
         assertThat(payload.limit()).isEqualTo(5);
@@ -92,16 +102,14 @@ class S3CompatibleObjectStoreTest {
         CompletableFuture<PutObjectResult> result = store.putObject(
                 new ObjectKey("wal/deferred"),
                 ByteBuffer.wrap(payload),
-                new PutObjectOptions(
-                        "application/octet-stream", checksum, true, Map.of(), Duration.ofSeconds(1)));
+                new PutObjectOptions("application/octet-stream", checksum, true, Map.of(), Duration.ofSeconds(1)));
 
         assertThat(result).isNotDone();
         stub.completeDeferredPutBody().join();
-        assertThat(result.join())
-                .satisfies(value -> {
-                    assertThat(value.checksum()).isEqualTo(checksum);
-                    assertThat(value.etag()).isEqualTo("response-before-body");
-                });
+        assertThat(result.join()).satisfies(value -> {
+            assertThat(value.checksum()).isEqualTo(checksum);
+            assertThat(value.etag()).isEqualTo("response-before-body");
+        });
     }
 
     @Test
@@ -119,8 +127,12 @@ class S3CompatibleObjectStoreTest {
         store = store(stub);
         byte[] expected = "2345".getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
-        RangeReadResult result = store.readRange(new ObjectKey("key"), 2, 4,
-                new RangeReadOptions(Optional.of(Crc32cChecksums.checksum(expected)), Duration.ofSeconds(1))).join();
+        RangeReadResult result = store.readRange(
+                        new ObjectKey("key"),
+                        2,
+                        4,
+                        new RangeReadOptions(Optional.of(Crc32cChecksums.checksum(expected)), Duration.ofSeconds(1)))
+                .join();
 
         assertThat(result.payload()).isEqualByComparingTo(ByteBuffer.wrap(expected));
     }
@@ -132,21 +144,21 @@ class S3CompatibleObjectStoreTest {
         timeoutStub.head = ignored -> timeoutSdk;
         store = store(timeoutStub);
 
-        CompletableFuture<HeadObjectResult> timed = store.headObject(
-                new ObjectKey("timeout-key"), new HeadObjectOptions(Duration.ofMillis(10)));
+        CompletableFuture<HeadObjectResult> timed =
+                store.headObject(new ObjectKey("timeout-key"), new HeadObjectOptions(Duration.ofMillis(10)));
         assertCode(() -> timed.join(), ErrorCode.TIMEOUT);
-        assertThat(timeoutSdk.isCancelled()).isTrue();
+        assertCancelled(timeoutSdk);
         store.close();
 
         StubClient cancelStub = new StubClient();
         CompletableFuture<HeadObjectResponse> cancelSdk = new CompletableFuture<>();
         cancelStub.head = ignored -> cancelSdk;
         store = store(cancelStub);
-        CompletableFuture<HeadObjectResult> cancelled = store.headObject(
-                new ObjectKey("cancel-key"), new HeadObjectOptions(Duration.ofSeconds(1)));
+        CompletableFuture<HeadObjectResult> cancelled =
+                store.headObject(new ObjectKey("cancel-key"), new HeadObjectOptions(Duration.ofSeconds(1)));
         assertThat(cancelled.cancel(true)).isTrue();
         assertCode(() -> cancelled.join(), ErrorCode.CANCELLED);
-        assertThat(cancelSdk.isCancelled()).isTrue();
+        assertCancelled(cancelSdk);
     }
 
     @Test
@@ -160,8 +172,8 @@ class S3CompatibleObjectStoreTest {
                 .build());
         store = store(stub);
 
-        assertThatThrownBy(() -> store.headObject(
-                        new ObjectKey(rawKey), new HeadObjectOptions(Duration.ofSeconds(1))).join())
+        assertThatThrownBy(() -> store.headObject(new ObjectKey(rawKey), new HeadObjectOptions(Duration.ofSeconds(1)))
+                        .join())
                 .satisfies(error -> {
                     NereusException nereus = unwrap(error);
                     assertThat(nereus.code()).isEqualTo(ErrorCode.OBJECT_READ_FAILED);
@@ -177,8 +189,15 @@ class S3CompatibleObjectStoreTest {
     }
 
     private static void assertCode(Runnable operation, ErrorCode code) {
-        assertThatThrownBy(operation::run).satisfies(error ->
-                assertThat(unwrap(error).code()).isEqualTo(code));
+        assertThatThrownBy(operation::run)
+                .satisfies(error -> assertThat(unwrap(error).code()).isEqualTo(code));
+    }
+
+    private static void assertCancelled(CompletableFuture<?> future) throws InterruptedException {
+        CountDownLatch completed = new CountDownLatch(1);
+        future.whenComplete((ignored, failure) -> completed.countDown());
+        assertThat(completed.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(future.isCancelled()).isTrue();
     }
 
     private static NereusException unwrap(Throwable error) {
@@ -198,8 +217,8 @@ class S3CompatibleObjectStoreTest {
         private boolean deferPutBody;
 
         private S3AsyncClient proxy() {
-            return (S3AsyncClient) Proxy.newProxyInstance(
-                    getClass().getClassLoader(), new Class<?>[] {S3AsyncClient.class}, this);
+            return (S3AsyncClient)
+                    Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] {S3AsyncClient.class}, this);
         }
 
         @Override
@@ -241,8 +260,7 @@ class S3CompatibleObjectStoreTest {
                 }
 
                 @Override
-                public void onNext(ByteBuffer ignored) {
-                }
+                public void onNext(ByteBuffer ignored) {}
 
                 @Override
                 public void onError(Throwable failure) {

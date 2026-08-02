@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.OffsetRange;
@@ -10,7 +11,9 @@ import com.nereusstream.metadata.oxia.VersionedObjectProtection;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import java.util.Objects;
 
-/** Exact metadata authority proving that one logical source range has a healthy committed Object replacement. */
+/**
+ * Exact metadata authority proving that one logical source range has a healthy committed Object replacement.
+ */
 public record CommittedObjectGenerationProof(
         StreamId streamId,
         OffsetRange sourceRange,

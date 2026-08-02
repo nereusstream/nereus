@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.StreamId;
@@ -16,7 +17,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** Restartable codec-backed fake for the complete F3 cursor metadata contract. */
+/**
+ * Restartable codec-backed fake for the complete F3 cursor metadata contract.
+ */
 public final class FakeCursorMetadataStore implements CursorMetadataStore {
     public record StoredValue(String key, String partitionKey, byte[] envelope, long version) {
         public StoredValue {
@@ -34,7 +37,9 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
         }
     }
 
-    /** Durable bytes and versions survive construction of a new fake adapter instance. */
+    /**
+     * Durable bytes and versions survive construction of a new fake adapter instance.
+     */
     public static final class DurableState {
         private final Map<String, StoredValue> values = new HashMap<>();
         private final AtomicLong nextVersion = new AtomicLong();
@@ -62,8 +67,7 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
             watchDeliveryEnabled = enabled;
         }
 
-        private synchronized Optional<PartitionedOxiaClient.VersionedValue> get(
-                String key, PartitionKey partitionKey) {
+        private synchronized Optional<PartitionedOxiaClient.VersionedValue> get(String key, PartitionKey partitionKey) {
             StoredValue value = values.get(key);
             requirePartition(value, partitionKey, key);
             return Optional.ofNullable(value == null ? null : versioned(value));
@@ -91,8 +95,7 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
             return new PartitionedOxiaClient.WriteResult(version);
         }
 
-        private synchronized void deleteIfVersion(
-                String key, long expectedVersion, PartitionKey partitionKey) {
+        private synchronized void deleteIfVersion(String key, long expectedVersion, PartitionKey partitionKey) {
             StoredValue current = values.get(key);
             if (current == null || current.version() != expectedVersion) {
                 throw new F4MetadataConditionFailedException("unexpected version for key: " + key);
@@ -103,8 +106,8 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
 
         private synchronized List<String> list(String fromInclusive, String toExclusive) {
             return values.keySet().stream()
-                    .filter(key -> compareHierarchical(key, fromInclusive) >= 0
-                            && compareHierarchical(key, toExclusive) < 0)
+                    .filter(key ->
+                            compareHierarchical(key, fromInclusive) >= 0 && compareHierarchical(key, toExclusive) < 0)
                     .sorted(DurableState::compareHierarchical)
                     .toList();
         }
@@ -154,8 +157,7 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
         }
 
         private static PartitionedOxiaClient.VersionedValue versioned(StoredValue value) {
-            return new PartitionedOxiaClient.VersionedValue(
-                    value.key(), value.envelope(), value.version());
+            return new PartitionedOxiaClient.VersionedValue(value.key(), value.envelope(), value.version());
         }
 
         private static StoredValue copy(StoredValue value) {
@@ -191,9 +193,7 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
         }
     }
 
-    private record FakeWatch(
-            String prefix, String partitionKey, Runnable callback, AtomicBoolean active) {
-    }
+    private record FakeWatch(String prefix, String partitionKey, Runnable callback, AtomicBoolean active) {}
 
     private final CursorMetadataStoreCore core;
     private final DurableState durableState;
@@ -202,11 +202,9 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
         this(new DurableState(), CursorMetadataStoreConfig.defaults());
     }
 
-    public FakeCursorMetadataStore(
-            DurableState durableState, CursorMetadataStoreConfig config) {
+    public FakeCursorMetadataStore(DurableState durableState, CursorMetadataStoreConfig config) {
         this.durableState = Objects.requireNonNull(durableState, "durableState");
-        this.core = new CursorMetadataStoreCore(
-                new PartitionedOxiaClient(new FakeBackend(durableState)), config);
+        this.core = new CursorMetadataStoreCore(new PartitionedOxiaClient(new FakeBackend(durableState)), config);
     }
 
     public DurableState durableState() {
@@ -220,8 +218,7 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
     }
 
     @Override
-    public CompletableFuture<VersionedCursorState> createCursor(
-            String cluster, CursorStateRecord value) {
+    public CompletableFuture<VersionedCursorState> createCursor(String cluster, CursorStateRecord value) {
         return core.createCursor(cluster, value);
     }
 
@@ -233,22 +230,17 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
 
     @Override
     public CompletableFuture<CursorScanPage> scanCursors(
-            String cluster,
-            StreamId streamId,
-            Optional<CursorScanToken> continuation,
-            int pageSize) {
+            String cluster, StreamId streamId, Optional<CursorScanToken> continuation, int pageSize) {
         return core.scanCursors(cluster, streamId, continuation, pageSize);
     }
 
     @Override
-    public CompletableFuture<Optional<VersionedCursorRetention>> getRetention(
-            String cluster, StreamId streamId) {
+    public CompletableFuture<Optional<VersionedCursorRetention>> getRetention(String cluster, StreamId streamId) {
         return core.getRetention(cluster, streamId);
     }
 
     @Override
-    public CompletableFuture<VersionedCursorRetention> createRetention(
-            String cluster, CursorRetentionRecord value) {
+    public CompletableFuture<VersionedCursorRetention> createRetention(String cluster, CursorRetentionRecord value) {
         return core.createRetention(cluster, value);
     }
 
@@ -259,8 +251,7 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
     }
 
     @Override
-    public WatchRegistration watchStreamCursors(
-            String cluster, StreamId streamId, Runnable invalidation) {
+    public WatchRegistration watchStreamCursors(String cluster, StreamId streamId, Runnable invalidation) {
         return core.watchStreamCursors(cluster, streamId, invalidation);
     }
 
@@ -296,16 +287,15 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
         public CompletableFuture<PartitionedOxiaClient.WriteResult> putIfVersion(
                 String key, byte[] value, long expectedVersion, PartitionKey partitionKey) {
             return invoke(() -> {
-                PartitionedOxiaClient.WriteResult result = state.putIfVersion(
-                        key, value, expectedVersion, partitionKey);
+                PartitionedOxiaClient.WriteResult result =
+                        state.putIfVersion(key, value, expectedVersion, partitionKey);
                 state.notifyWatches(key, partitionKey);
                 return result;
             });
         }
 
         @Override
-        public CompletableFuture<Void> deleteIfVersion(
-                String key, long expectedVersion, PartitionKey partitionKey) {
+        public CompletableFuture<Void> deleteIfVersion(String key, long expectedVersion, PartitionKey partitionKey) {
             return invoke(() -> {
                 state.deleteIfVersion(key, expectedVersion, partitionKey);
                 state.notifyWatches(key, partitionKey);
@@ -326,8 +316,7 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
         }
 
         @Override
-        public WatchRegistration watchPrefix(
-                String prefix, PartitionKey partitionKey, Runnable invalidationCallback) {
+        public WatchRegistration watchPrefix(String prefix, PartitionKey partitionKey, Runnable invalidationCallback) {
             return state.watch(prefix, partitionKey, invalidationCallback);
         }
 

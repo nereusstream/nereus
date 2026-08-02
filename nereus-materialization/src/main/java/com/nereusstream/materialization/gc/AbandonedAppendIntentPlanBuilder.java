@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -46,8 +47,7 @@ import java.util.concurrent.ScheduledExecutorService;
  * reachability remain owned by the registered global reference domains.
  */
 public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRevalidator {
-    private static final ReadTargetCodecRegistry TARGET_CODECS =
-            ReadTargetCodecRegistry.phase15();
+    private static final ReadTargetCodecRegistry TARGET_CODECS = ReadTargetCodecRegistry.phase15();
 
     private final String cluster;
     private final PhysicalObjectMetadataStore physicalMetadata;
@@ -66,100 +66,84 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
             PhysicalGcConfig config,
             ScheduledExecutorService scheduler) {
         this.cluster = requireText(cluster, "cluster");
-        this.physicalMetadata = Objects.requireNonNull(
-                physicalMetadata, "physicalMetadata");
+        this.physicalMetadata = Objects.requireNonNull(physicalMetadata, "physicalMetadata");
         this.sourceMetadata = Objects.requireNonNull(sourceMetadata, "sourceMetadata");
-        this.protectionManager = Objects.requireNonNull(
-                protectionManager, "protectionManager");
+        this.protectionManager = Objects.requireNonNull(protectionManager, "protectionManager");
         this.config = Objects.requireNonNull(config, "config");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.l0Keys = new OxiaKeyspace(this.cluster);
         this.abandonmentGraceMillis = checkedAdd(
-                config.orphanGrace().toMillis(),
-                config.maximumClockSkew().toMillis());
+                config.orphanGrace().toMillis(), config.maximumClockSkew().toMillis());
     }
 
-    /** Inspects one ACTIVE root and epoch-rebinds only stale, exactly revalidated append protections. */
-    public CompletableFuture<Inspection> inspectActive(
-            VersionedPhysicalObjectRoot activeRoot) {
-        VersionedPhysicalObjectRoot active = Objects.requireNonNull(
-                activeRoot, "activeRoot");
+    /**
+     * Inspects one ACTIVE root and epoch-rebinds only stale, exactly revalidated append protections.
+     */
+    public CompletableFuture<Inspection> inspectActive(VersionedPhysicalObjectRoot activeRoot) {
+        VersionedPhysicalObjectRoot active = Objects.requireNonNull(activeRoot, "activeRoot");
         if (active.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "abandoned append inspection requires an exact ACTIVE root"));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("abandoned append inspection requires an exact ACTIVE root"));
         }
         return inspect(active, true);
     }
 
-    /** Reconstructs the same exact append-intent plan for a MARKED root without performing mutation. */
-    public CompletableFuture<Inspection> inspectMarked(
-            VersionedPhysicalObjectRoot markedRoot) {
-        VersionedPhysicalObjectRoot marked = Objects.requireNonNull(
-                markedRoot, "markedRoot");
+    /**
+     * Reconstructs the same exact append-intent plan for a MARKED root without performing mutation.
+     */
+    public CompletableFuture<Inspection> inspectMarked(VersionedPhysicalObjectRoot markedRoot) {
+        VersionedPhysicalObjectRoot marked = Objects.requireNonNull(markedRoot, "markedRoot");
         if (marked.value().lifecycle() != PhysicalObjectLifecycle.MARKED) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "abandoned append recovery requires an exact MARKED root"));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("abandoned append recovery requires an exact MARKED root"));
         }
         return inspect(marked, false);
     }
 
-    /** Reloads all current append-protection owners so owner appearance/absence is plan drift. */
+    /**
+     * Reloads all current append-protection owners so owner appearance/absence is plan drift.
+     */
     @Override
     public CompletableFuture<List<GcPlannedMetadataRemoval>> reload(
-            GcCandidate candidate,
-            List<GcPlannedMetadataRemoval> expectedRemovals) {
+            GcCandidate candidate, List<GcPlannedMetadataRemoval> expectedRemovals) {
         GcCandidate exact = Objects.requireNonNull(candidate, "candidate");
         GcPlanValidation.canonicalAllowEmpty(
                 expectedRemovals,
                 GcPlanValidation.METADATA_ORDER,
                 config.maxReferencesPerDomainSnapshot(),
                 "expectedRemovals");
-        MaterializationDeadline deadline = new MaterializationDeadline(
-                config.operationTimeout(), scheduler);
-        CompletableFuture<List<GcPlannedMetadataRemoval>> result = scanProtections(
-                        exact.object(), deadline)
-                .thenCompose(protections -> resolve(
-                        exact.object(),
-                        exact.activeRootLifecycleEpoch(),
-                        protections,
-                        deadline))
+        MaterializationDeadline deadline = new MaterializationDeadline(config.operationTimeout(), scheduler);
+        CompletableFuture<List<GcPlannedMetadataRemoval>> result = scanProtections(exact.object(), deadline)
+                .thenCompose(
+                        protections -> resolve(exact.object(), exact.activeRootLifecycleEpoch(), protections, deadline))
                 .thenCompose(resolved -> resolved.blocked()
-                        ? CompletableFuture.failedFuture(condition(
-                                "ownerless metadata revalidation found a non-removable protection"))
+                        ? CompletableFuture.failedFuture(
+                                condition("ownerless metadata revalidation found a non-removable protection"))
                         : CompletableFuture.completedFuture(resolved.metadataRemovals()));
         result.whenComplete((ignored, failure) -> deadline.close());
         return result;
     }
 
-    private CompletableFuture<Inspection> inspect(
-            VersionedPhysicalObjectRoot root,
-            boolean allowEpochRebind) {
+    private CompletableFuture<Inspection> inspect(VersionedPhysicalObjectRoot root, boolean allowEpochRebind) {
         PhysicalObjectIdentity object = PhysicalObjectIdentity.from(root.value());
         long activeEpoch = root.value().lifecycle() == PhysicalObjectLifecycle.ACTIVE
                 ? root.value().lifecycleEpoch()
                 : Math.subtractExact(root.value().lifecycleEpoch(), 1);
-        MaterializationDeadline deadline = new MaterializationDeadline(
-                config.operationTimeout(), scheduler);
+        MaterializationDeadline deadline = new MaterializationDeadline(config.operationTimeout(), scheduler);
         CompletableFuture<Inspection> result = scanProtections(object, deadline)
-                .thenCompose(protections -> resolve(
-                        object, activeEpoch, protections, deadline))
+                .thenCompose(protections -> resolve(object, activeEpoch, protections, deadline))
                 .thenCompose(resolved -> {
                     if (resolved.blocked()) {
                         return CompletableFuture.completedFuture(
                                 Inspection.blocked(root.value().orphanNotBeforeMillis()));
                     }
                     List<ResolvedProtection> stale = resolved.protections().stream()
-                            .filter(value -> value.protection()
-                                            .protection()
-                                            .value()
-                                            .rootLifecycleEpoch()
-                                    != activeEpoch)
+                            .filter(value ->
+                                    value.protection().protection().value().rootLifecycleEpoch() != activeEpoch)
                             .toList();
                     if (stale.isEmpty()) {
                         return CompletableFuture.completedFuture(Inspection.eligible(
-                                Math.max(
-                                        root.value().orphanNotBeforeMillis(),
-                                        resolved.notBeforeMillis()),
+                                Math.max(root.value().orphanNotBeforeMillis(), resolved.notBeforeMillis()),
                                 resolved.protectionRemovals(),
                                 resolved.metadataRemovals()));
                     }
@@ -167,10 +151,9 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
                         return CompletableFuture.completedFuture(
                                 Inspection.blocked(root.value().orphanNotBeforeMillis()));
                     }
-                    return rebindStale(
-                                    object, stale, 0, deadline)
-                            .thenApply(ignored -> Inspection.rebound(
-                                    root.value().orphanNotBeforeMillis()));
+                    return rebindStale(object, stale, 0, deadline)
+                            .thenApply(
+                                    ignored -> Inspection.rebound(root.value().orphanNotBeforeMillis()));
                 });
         result.whenComplete((ignored, failure) -> deadline.close());
         return result;
@@ -182,28 +165,18 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
             List<GcPlannedProtectionRemoval> protections,
             MaterializationDeadline deadline) {
         if (protections.isEmpty()) {
-            return CompletableFuture.completedFuture(ResolvedInspection.clear(
-                    List.of(), List.of(), List.of(), 0));
+            return CompletableFuture.completedFuture(ResolvedInspection.clear(List.of(), List.of(), List.of(), 0));
         }
         if (object.kind() != PhysicalObjectKind.OBJECT_WAL) {
-            boolean hasReachableAppend = protections.stream().anyMatch(value ->
-                    value.identity().type() == ObjectProtectionType.REACHABLE_APPEND);
+            boolean hasReachableAppend = protections.stream()
+                    .anyMatch(value -> value.identity().type() == ObjectProtectionType.REACHABLE_APPEND);
             if (hasReachableAppend) {
-                return CompletableFuture.failedFuture(invariant(
-                        "REACHABLE_APPEND protects a non-Object-WAL physical root"));
+                return CompletableFuture.failedFuture(
+                        invariant("REACHABLE_APPEND protects a non-Object-WAL physical root"));
             }
-            return CompletableFuture.completedFuture(
-                    ResolvedInspection.blockedInspection());
+            return CompletableFuture.completedFuture(ResolvedInspection.blockedInspection());
         }
-        return resolveOne(
-                object,
-                activeEpoch,
-                protections,
-                0,
-                new ArrayList<>(),
-                new ArrayList<>(),
-                0,
-                deadline);
+        return resolveOne(object, activeEpoch, protections, 0, new ArrayList<>(), new ArrayList<>(), 0, deadline);
     }
 
     private CompletableFuture<ResolvedInspection> resolveOne(
@@ -219,54 +192,42 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
             List<GcPlannedMetadataRemoval> canonicalMetadata = metadataRemovals.stream()
                     .sorted(Comparator.comparing(GcPlannedMetadataRemoval::key))
                     .toList();
-            return CompletableFuture.completedFuture(ResolvedInspection.clear(
-                    protections,
-                    resolved,
-                    canonicalMetadata,
-                    notBeforeMillis));
+            return CompletableFuture.completedFuture(
+                    ResolvedInspection.clear(protections, resolved, canonicalMetadata, notBeforeMillis));
         }
         GcPlannedProtectionRemoval planned = protections.get(index);
         VersionedObjectProtection protection = planned.protection();
         ObjectProtectionRecord value = protection.value();
         if (planned.identity().type() != ObjectProtectionType.REACHABLE_APPEND) {
-            return CompletableFuture.completedFuture(
-                    ResolvedInspection.blockedInspection());
+            return CompletableFuture.completedFuture(ResolvedInspection.blockedInspection());
         }
         if (value.rootLifecycleEpoch() > activeEpoch) {
-            return CompletableFuture.failedFuture(invariant(
-                    "REACHABLE_APPEND lifecycle epoch is ahead of its root"));
+            return CompletableFuture.failedFuture(invariant("REACHABLE_APPEND lifecycle epoch is ahead of its root"));
         }
         StreamCommitKeyIdentity ownerIdentity;
         try {
             ownerIdentity = l0Keys.parseStreamCommitKey(value.ownerKey());
         } catch (IllegalArgumentException malformed) {
-            return CompletableFuture.failedFuture(invariant(
-                    "REACHABLE_APPEND owner key is not canonical", malformed));
+            return CompletableFuture.failedFuture(invariant("REACHABLE_APPEND owner key is not canonical", malformed));
         }
-        String expectedReferenceId =
-                GenerationZeroProtectionIdentities.reachableAppendReferenceId(
-                        ownerIdentity.streamId(),
-                        ownerIdentity.commitId(),
-                        object.objectKeyHash());
+        String expectedReferenceId = GenerationZeroProtectionIdentities.reachableAppendReferenceId(
+                ownerIdentity.streamId(), ownerIdentity.commitId(), object.objectKeyHash());
         if (!value.referenceId().equals(expectedReferenceId)) {
-            return CompletableFuture.failedFuture(invariant(
-                    "REACHABLE_APPEND reference id does not match its exact owner/object"));
+            return CompletableFuture.failedFuture(
+                    invariant("REACHABLE_APPEND reference id does not match its exact owner/object"));
         }
         long protectionBoundary = abandonmentBoundary(value.createdAtMillis());
         return deadline.bound(
-                        () -> sourceMetadata.getCommitNodeByKey(
-                                cluster, value.ownerKey()),
+                        () -> sourceMetadata.getCommitNodeByKey(cluster, value.ownerKey()),
                         "load exact REACHABLE_APPEND owner")
                 .thenCompose(optionalOwner -> {
                     Optional<VersionedGenerationZeroCommit> owner = optionalOwner.map(commit -> {
-                        requireCommitMatches(
-                                object, ownerIdentity, protection, commit);
+                        requireCommitMatches(object, ownerIdentity, protection, commit);
                         metadataRemovals.add(removal(commit));
                         return commit;
                     });
-                    long ownerBoundary = owner
-                            .map(commit -> abandonmentBoundary(
-                                    commit.canonicalCommit().preparedAtMillis()))
+                    long ownerBoundary = owner.map(commit ->
+                                    abandonmentBoundary(commit.canonicalCommit().preparedAtMillis()))
                             .orElse(0L);
                     resolved.add(new ResolvedProtection(planned, owner));
                     return resolveOne(
@@ -276,9 +237,7 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
                             index + 1,
                             resolved,
                             metadataRemovals,
-                            Math.max(
-                                    notBeforeMillis,
-                                    Math.max(protectionBoundary, ownerBoundary)),
+                            Math.max(notBeforeMillis, Math.max(protectionBoundary, ownerBoundary)),
                             deadline);
                 });
     }
@@ -306,16 +265,9 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
                 versioned.durableValueSha256());
         return deadline.bound(
                         () -> protectionManager.transfer(
-                                handle,
-                                owner,
-                                expected -> revalidateOwnerState(
-                                        object,
-                                        resolved,
-                                        expected,
-                                        deadline)),
+                                handle, owner, expected -> revalidateOwnerState(object, resolved, expected, deadline)),
                         "rebind abandoned REACHABLE_APPEND to the current ACTIVE root epoch")
-                .thenCompose(ignored -> rebindStale(
-                        object, stale, index + 1, deadline));
+                .thenCompose(ignored -> rebindStale(object, stale, index + 1, deadline));
     }
 
     private CompletableFuture<Void> revalidateOwnerState(
@@ -327,51 +279,38 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
         ObjectProtectionRecord value = protection.value();
         ObjectProtectionOwner plannedOwner = owner(value);
         if (!plannedOwner.equals(expectedOwner)) {
-            return CompletableFuture.failedFuture(condition(
-                    "REACHABLE_APPEND epoch rebind received another owner"));
+            return CompletableFuture.failedFuture(condition("REACHABLE_APPEND epoch rebind received another owner"));
         }
         StreamCommitKeyIdentity ownerIdentity;
         try {
             ownerIdentity = l0Keys.parseStreamCommitKey(value.ownerKey());
         } catch (IllegalArgumentException malformed) {
-            return CompletableFuture.failedFuture(invariant(
-                    "REACHABLE_APPEND owner key changed during epoch rebind", malformed));
+            return CompletableFuture.failedFuture(
+                    invariant("REACHABLE_APPEND owner key changed during epoch rebind", malformed));
         }
         return deadline.bound(
-                        () -> sourceMetadata.getCommitNodeByKey(
-                                cluster, value.ownerKey()),
+                        () -> sourceMetadata.getCommitNodeByKey(cluster, value.ownerKey()),
                         "revalidate REACHABLE_APPEND owner during epoch rebind")
                 .thenCompose(current -> {
                     if (resolved.owner().isEmpty()) {
                         return current.isEmpty()
                                 ? CompletableFuture.completedFuture(null)
-                                : CompletableFuture.failedFuture(condition(
-                                        "previously absent append owner appeared during epoch rebind"));
+                                : CompletableFuture.failedFuture(
+                                        condition("previously absent append owner appeared during epoch rebind"));
                     }
                     if (current.isEmpty()
-                            || !current.orElseThrow().equals(
-                                    resolved.owner().orElseThrow())) {
-                        return CompletableFuture.failedFuture(condition(
-                                "append owner changed during protection epoch rebind"));
+                            || !current.orElseThrow().equals(resolved.owner().orElseThrow())) {
+                        return CompletableFuture.failedFuture(
+                                condition("append owner changed during protection epoch rebind"));
                     }
-                    requireCommitMatches(
-                            object,
-                            ownerIdentity,
-                            protection,
-                            current.orElseThrow());
+                    requireCommitMatches(object, ownerIdentity, protection, current.orElseThrow());
                     return CompletableFuture.completedFuture(null);
                 });
     }
 
     private CompletableFuture<List<GcPlannedProtectionRemoval>> scanProtections(
-            PhysicalObjectIdentity object,
-            MaterializationDeadline deadline) {
-        return scanProtections(
-                object,
-                Optional.empty(),
-                new ArrayList<>(),
-                null,
-                deadline);
+            PhysicalObjectIdentity object, MaterializationDeadline deadline) {
+        return scanProtections(object, Optional.empty(), new ArrayList<>(), null, deadline);
     }
 
     private CompletableFuture<List<GcPlannedProtectionRemoval>> scanProtections(
@@ -382,37 +321,30 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
             MaterializationDeadline deadline) {
         return deadline.bound(
                         () -> physicalMetadata.scanProtections(
-                                cluster,
-                                object.objectKeyHash(),
-                                continuation,
-                                config.metadataScanPageSize()),
+                                cluster, object.objectKeyHash(), continuation, config.metadataScanPageSize()),
                         "scan append-intent physical protections")
                 .thenCompose(page -> {
                     requireProgress(page, previousKey);
                     for (VersionedObjectProtection protection : page.values()) {
-                        if (!protection.value().objectKeyHash().equals(
-                                object.objectKeyHash().value())) {
-                            return CompletableFuture.failedFuture(invariant(
-                                    "append-intent protection scan escaped its object"));
+                        if (!protection
+                                .value()
+                                .objectKeyHash()
+                                .equals(object.objectKeyHash().value())) {
+                            return CompletableFuture.failedFuture(
+                                    invariant("append-intent protection scan escaped its object"));
                         }
                         values.add(new GcPlannedProtectionRemoval(protection));
                         if (values.size() > config.maxReferencesPerDomainSnapshot()) {
-                            return CompletableFuture.failedFuture(invariant(
-                                    "append-intent protection scan exceeded its configured bound"));
+                            return CompletableFuture.failedFuture(
+                                    invariant("append-intent protection scan exceeded its configured bound"));
                         }
                     }
                     if (page.continuation().isEmpty()) {
                         return CompletableFuture.completedFuture(List.copyOf(values));
                     }
-                    String nextPrevious = page.values()
-                            .get(page.values().size() - 1)
-                            .key();
-                    return scanProtections(
-                            object,
-                            page.continuation(),
-                            values,
-                            nextPrevious,
-                            deadline);
+                    String nextPrevious =
+                            page.values().get(page.values().size() - 1).key();
+                    return scanProtections(object, page.continuation(), values, nextPrevious, deadline);
                 });
     }
 
@@ -422,31 +354,25 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
             VersionedObjectProtection protection,
             VersionedGenerationZeroCommit commit) {
         ObjectProtectionRecord value = protection.value();
-        if (commit.sourceEncoding()
-                        != AppendRecoveryCommitEncoding.GENERIC_STREAM_COMMIT_TARGET_V1
+        if (commit.sourceEncoding() != AppendRecoveryCommitEncoding.GENERIC_STREAM_COMMIT_TARGET_V1
                 || !commit.key().equals(value.ownerKey())
                 || !commit.streamId().equals(ownerIdentity.streamId())
                 || !commit.commitId().equals(ownerIdentity.commitId())
                 || commit.metadataVersion() != value.ownerMetadataVersion()
-                || !commit.durableValueSha256().value().equals(
-                        value.ownerIdentitySha256())) {
+                || !commit.durableValueSha256().value().equals(value.ownerIdentitySha256())) {
             throw invariant("REACHABLE_APPEND owner version/SHA/identity changed");
         }
-        ReadTarget target = TARGET_CODECS.decode(
-                commit.canonicalCommit().readTarget());
+        ReadTarget target = TARGET_CODECS.decode(commit.canonicalCommit().readTarget());
         if (!(target instanceof ObjectSliceReadTarget objectTarget)
-                || objectTarget.objectType()
-                        != ObjectType.MULTI_STREAM_WAL_OBJECT
+                || objectTarget.objectType() != ObjectType.MULTI_STREAM_WAL_OBJECT
                 || !objectTarget.objectKey().equals(object.objectKey())
                 || (object.objectId().isPresent()
-                        && !object.objectId().orElseThrow().equals(
-                                objectTarget.objectId()))) {
+                        && !object.objectId().orElseThrow().equals(objectTarget.objectId()))) {
             throw invariant("REACHABLE_APPEND owner does not identify the protected Object WAL");
         }
     }
 
-    private static GcPlannedMetadataRemoval removal(
-            VersionedGenerationZeroCommit commit) {
+    private static GcPlannedMetadataRemoval removal(VersionedGenerationZeroCommit commit) {
         return new GcPlannedMetadataRemoval(
                 GenerationZeroCommitRetirementHandler.REMOVAL_TYPE,
                 commit.key(),
@@ -458,9 +384,7 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
         return new ObjectProtectionOwner(
                 value.ownerKey(),
                 value.ownerMetadataVersion(),
-                new Checksum(
-                        ChecksumType.SHA256,
-                        value.ownerIdentitySha256()));
+                new Checksum(ChecksumType.SHA256, value.ownerIdentitySha256()));
     }
 
     private long abandonmentBoundary(long timestamp) {
@@ -475,8 +399,7 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
         }
     }
 
-    private static void requireProgress(
-            ObjectProtectionScanPage page, String previousKey) {
+    private static void requireProgress(ObjectProtectionScanPage page, String previousKey) {
         if (previousKey != null
                 && !page.values().isEmpty()
                 && page.values().get(0).key().compareTo(previousKey) <= 0) {
@@ -496,24 +419,19 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
-    private static NereusException invariant(
-            String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+    private static NereusException invariant(String message, Throwable cause) {
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static NereusException condition(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_CONDITION_FAILED, true, message);
+        return new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, message);
     }
 
     private record ResolvedProtection(
-            GcPlannedProtectionRemoval protection,
-            Optional<VersionedGenerationZeroCommit> owner) {
+            GcPlannedProtectionRemoval protection, Optional<VersionedGenerationZeroCommit> owner) {
         private ResolvedProtection {
             Objects.requireNonNull(protection, "protection");
             owner = Objects.requireNonNull(owner, "owner");
@@ -527,12 +445,9 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
             List<GcPlannedMetadataRemoval> metadataRemovals,
             long notBeforeMillis) {
         private ResolvedInspection {
-            protectionRemovals = List.copyOf(Objects.requireNonNull(
-                    protectionRemovals, "protectionRemovals"));
-            protections = List.copyOf(Objects.requireNonNull(
-                    protections, "protections"));
-            metadataRemovals = List.copyOf(Objects.requireNonNull(
-                    metadataRemovals, "metadataRemovals"));
+            protectionRemovals = List.copyOf(Objects.requireNonNull(protectionRemovals, "protectionRemovals"));
+            protections = List.copyOf(Objects.requireNonNull(protections, "protections"));
+            metadataRemovals = List.copyOf(Objects.requireNonNull(metadataRemovals, "metadataRemovals"));
             if (notBeforeMillis < 0) {
                 throw new IllegalArgumentException("notBeforeMillis must be non-negative");
             }
@@ -543,17 +458,11 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
                 List<ResolvedProtection> protections,
                 List<GcPlannedMetadataRemoval> metadataRemovals,
                 long notBeforeMillis) {
-            return new ResolvedInspection(
-                    false,
-                    protectionRemovals,
-                    protections,
-                    metadataRemovals,
-                    notBeforeMillis);
+            return new ResolvedInspection(false, protectionRemovals, protections, metadataRemovals, notBeforeMillis);
         }
 
         private static ResolvedInspection blockedInspection() {
-            return new ResolvedInspection(
-                    true, List.of(), List.of(), List.of(), 0);
+            return new ResolvedInspection(true, List.of(), List.of(), List.of(), 0);
         }
     }
 
@@ -563,7 +472,9 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
         REBOUND
     }
 
-    /** Exact local append-intent facts admitted to, or conservatively excluded from, ownerless GC. */
+    /**
+     * Exact local append-intent facts admitted to, or conservatively excluded from, ownerless GC.
+     */
     public record Inspection(
             InspectionStatus status,
             long notBeforeMillis,
@@ -574,15 +485,10 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
             if (notBeforeMillis < 0) {
                 throw new IllegalArgumentException("notBeforeMillis must be non-negative");
             }
-            protectionRemovals = List.copyOf(Objects.requireNonNull(
-                    protectionRemovals, "protectionRemovals"));
-            metadataRemovals = List.copyOf(Objects.requireNonNull(
-                    metadataRemovals, "metadataRemovals"));
-            if (status != InspectionStatus.ELIGIBLE
-                    && (!protectionRemovals.isEmpty()
-                            || !metadataRemovals.isEmpty())) {
-                throw new IllegalArgumentException(
-                        "only an eligible inspection carries a removal plan");
+            protectionRemovals = List.copyOf(Objects.requireNonNull(protectionRemovals, "protectionRemovals"));
+            metadataRemovals = List.copyOf(Objects.requireNonNull(metadataRemovals, "metadataRemovals"));
+            if (status != InspectionStatus.ELIGIBLE && (!protectionRemovals.isEmpty() || !metadataRemovals.isEmpty())) {
+                throw new IllegalArgumentException("only an eligible inspection carries a removal plan");
             }
         }
 
@@ -594,27 +500,15 @@ public final class AbandonedAppendIntentPlanBuilder implements GcPlanMetadataRev
                 long notBeforeMillis,
                 List<GcPlannedProtectionRemoval> protectionRemovals,
                 List<GcPlannedMetadataRemoval> metadataRemovals) {
-            return new Inspection(
-                    InspectionStatus.ELIGIBLE,
-                    notBeforeMillis,
-                    protectionRemovals,
-                    metadataRemovals);
+            return new Inspection(InspectionStatus.ELIGIBLE, notBeforeMillis, protectionRemovals, metadataRemovals);
         }
 
         private static Inspection blocked(long notBeforeMillis) {
-            return new Inspection(
-                    InspectionStatus.BLOCKED,
-                    notBeforeMillis,
-                    List.of(),
-                    List.of());
+            return new Inspection(InspectionStatus.BLOCKED, notBeforeMillis, List.of(), List.of());
         }
 
         private static Inspection rebound(long notBeforeMillis) {
-            return new Inspection(
-                    InspectionStatus.REBOUND,
-                    notBeforeMillis,
-                    List.of(),
-                    List.of());
+            return new Inspection(InspectionStatus.REBOUND, notBeforeMillis, List.of(), List.of());
         }
     }
 }

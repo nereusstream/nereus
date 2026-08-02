@@ -24,8 +24,7 @@ public final class CommandLineArguments {
             List.of("object-store", "persistence", "create"),
             List.of("object-store", "persistence", "verify"),
             List.of("object-store", "persistence", "cleanup"));
-    private static final Set<String> SUPPORTED_OPTIONS = Set.of(
-            "config", "timeout-seconds", "output", "run-id");
+    private static final Set<String> SUPPORTED_OPTIONS = Set.of("config", "timeout-seconds", "output", "run-id");
 
     private final List<String> commandPath;
     private final Path config;
@@ -55,9 +54,7 @@ public final class CommandLineArguments {
     }
 
     public Optional<String> action() {
-        return commandPath.size() == 3
-                ? Optional.of(commandPath.get(2))
-                : Optional.empty();
+        return commandPath.size() == 3 ? Optional.of(commandPath.get(2)) : Optional.empty();
     }
 
     public List<String> commandPath() {
@@ -88,15 +85,13 @@ public final class CommandLineArguments {
         Objects.requireNonNull(args, "args");
         int optionsOffset = firstOptionOffset(args);
         if (optionsOffset < 2) {
-            throw new IllegalArgumentException(
-                    "usage: nereus-admin <command> <subcommand> [action] "
-                            + "--config <path> [--timeout-seconds <n>] [--output <path>]");
+            throw new IllegalArgumentException("usage: nereus-admin <command> <subcommand> [action] "
+                    + "--config <path> [--timeout-seconds <n>] [--output <path>]");
         }
-        List<String> commandPath = Collections.unmodifiableList(
-                Arrays.asList(Arrays.copyOfRange(args, 0, optionsOffset)));
+        List<String> commandPath =
+                Collections.unmodifiableList(Arrays.asList(Arrays.copyOfRange(args, 0, optionsOffset)));
         if (!SUPPORTED_COMMANDS.contains(commandPath)) {
-            throw new IllegalArgumentException(
-                    "unknown command: " + String.join(" ", commandPath));
+            throw new IllegalArgumentException("unknown command: " + String.join(" ", commandPath));
         }
 
         Map<String, String> options = parseOptions(args, optionsOffset);
@@ -113,8 +108,7 @@ public final class CommandLineArguments {
             try {
                 timeoutSeconds = Long.parseLong(options.get("timeout-seconds"));
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException(
-                        "invalid timeout-seconds: " + options.get("timeout-seconds"));
+                throw new IllegalArgumentException("invalid timeout-seconds: " + options.get("timeout-seconds"));
             }
         }
         if (timeoutSeconds <= 0) {
@@ -128,17 +122,14 @@ public final class CommandLineArguments {
                 && "persistence".equals(commandPath.get(1));
         if (persistenceCommand) {
             if (runId.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "--run-id is required for object-store persistence commands");
+                throw new IllegalArgumentException("--run-id is required for object-store persistence commands");
             }
             validateRunId(runId.orElseThrow());
         } else if (runId.isPresent()) {
-            throw new IllegalArgumentException(
-                    "--run-id is only valid for object-store persistence commands");
+            throw new IllegalArgumentException("--run-id is only valid for object-store persistence commands");
         }
 
-        return new CommandLineArguments(
-                commandPath, config, timeoutSeconds, output, runId);
+        return new CommandLineArguments(commandPath, config, timeoutSeconds, output, runId);
     }
 
     private static int firstOptionOffset(String[] args) {
@@ -156,8 +147,7 @@ public final class CommandLineArguments {
         while (i < args.length) {
             String arg = args[i];
             if (!arg.startsWith("--")) {
-                throw new IllegalArgumentException(
-                        "unknown argument: " + arg + " (expected --option value)");
+                throw new IllegalArgumentException("unknown argument: " + arg + " (expected --option value)");
             }
             arg = arg.substring(2);
             if (arg.isEmpty()) {
@@ -185,15 +175,12 @@ public final class CommandLineArguments {
 
     private static void validateRunId(String value) {
         if (value.length() < 26 || value.length() > 128) {
-            throw new IllegalArgumentException(
-                    "run-id must encode at least 128 bits and be at most 128 characters");
+            throw new IllegalArgumentException("run-id must encode at least 128 bits and be at most 128 characters");
         }
         for (int index = 0; index < value.length(); index++) {
             char current = value.charAt(index);
-            if (!((current >= 'a' && current <= 'z')
-                    || (current >= '2' && current <= '7'))) {
-                throw new IllegalArgumentException(
-                        "run-id must be lowercase base32 without padding");
+            if (!((current >= 'a' && current <= 'z') || (current >= '2' && current <= '7'))) {
+                throw new IllegalArgumentException("run-id must be lowercase base32 without padding");
             }
         }
     }

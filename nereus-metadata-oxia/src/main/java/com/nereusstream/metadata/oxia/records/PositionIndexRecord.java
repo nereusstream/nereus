@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
@@ -17,8 +18,9 @@ public record PositionIndexRecord(
         Objects.requireNonNull(identity, "identity");
         Objects.requireNonNull(formula, "formula");
         if (!managedLedgerNameHash.equals(ManagedLedgerProjectionNames.managedLedgerNameHash(managedLedgerName))
-                || !identity.streamId().equals(
-                        ManagedLedgerProjectionNames.streamId(managedLedgerName, identity.incarnation()).value())
+                || !identity.streamId()
+                        .equals(ManagedLedgerProjectionNames.streamId(managedLedgerName, identity.incarnation())
+                                .value())
                 || positionMappingVersion != ManagedLedgerProjectionNames.POSITION_MAPPING_VERSION
                 || !ManagedLedgerProjectionNames.POSITION_FORMULA_V1.equals(formula)
                 || metadataVersion < 0) {

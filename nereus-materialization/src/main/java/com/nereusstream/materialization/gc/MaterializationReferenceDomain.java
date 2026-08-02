@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ErrorCode;
@@ -26,7 +27,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Exact durable-task source/output reference domain for a query's affected streams. */
+/**
+ * Exact durable-task source/output reference domain for a query's affected streams.
+ */
 public final class MaterializationReferenceDomain implements GcReferenceDomain {
     public static final String DOMAIN_ID = "materialization-v1";
     public static final int PROTOCOL_VERSION = 1;
@@ -39,14 +42,8 @@ public final class MaterializationReferenceDomain implements GcReferenceDomain {
     private final GcGlobalReferenceScope globalScope;
 
     public MaterializationReferenceDomain(
-            String cluster,
-            GenerationMetadataStore metadataStore,
-            PhysicalGcConfig config) {
-        this(
-                cluster,
-                metadataStore,
-                config,
-                GcGlobalReferenceScope.unsupported());
+            String cluster, GenerationMetadataStore metadataStore, PhysicalGcConfig config) {
+        this(cluster, metadataStore, config, GcGlobalReferenceScope.unsupported());
     }
 
     public MaterializationReferenceDomain(
@@ -73,22 +70,14 @@ public final class MaterializationReferenceDomain implements GcReferenceDomain {
     @Override
     public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
         Objects.requireNonNull(query, "query");
-        GcReferenceSnapshotBuilder accumulator = new GcReferenceSnapshotBuilder(
-                DOMAIN_ID, PROTOCOL_VERSION, query, config.referenceDomainConfig());
-        return GcGlobalReferenceScope.resolveStreams(
-                        query, accumulator, globalScope)
-                .thenCompose(streams -> scan(
-                        query,
-                        streams,
-                        accumulator,
-                        0,
-                        Optional.empty(),
-                        null));
+        GcReferenceSnapshotBuilder accumulator =
+                new GcReferenceSnapshotBuilder(DOMAIN_ID, PROTOCOL_VERSION, query, config.referenceDomainConfig());
+        return GcGlobalReferenceScope.resolveStreams(query, accumulator, globalScope)
+                .thenCompose(streams -> scan(query, streams, accumulator, 0, Optional.empty(), null));
     }
 
     @Override
-    public CompletableFuture<Boolean> stillMatches(
-            GcReferenceQuery query, GcReferenceSnapshot snapshot) {
+    public CompletableFuture<Boolean> stillMatches(GcReferenceQuery query, GcReferenceSnapshot snapshot) {
         Objects.requireNonNull(query, "query");
         Objects.requireNonNull(snapshot, "snapshot");
         if (!snapshot.domainId().equals(DOMAIN_ID)
@@ -113,11 +102,8 @@ public final class MaterializationReferenceDomain implements GcReferenceDomain {
             return CompletableFuture.completedFuture(accumulator.build());
         }
         StreamId streamId = streams.get(streamIndex);
-        return metadataStore.scanTasks(
-                        cluster,
-                        streamId,
-                        continuation,
-                        config.metadataScanPageSize())
+        return metadataStore
+                .scanTasks(cluster, streamId, continuation, config.metadataScanPageSize())
                 .thenCompose(page -> {
                     requireProgress(page, previousKey);
                     for (VersionedMaterializationTask task : page.values()) {
@@ -135,22 +121,13 @@ public final class MaterializationReferenceDomain implements GcReferenceDomain {
                                 page.continuation(),
                                 page.values().get(page.values().size() - 1).key());
                     }
-                    return scan(
-                            query,
-                            streams,
-                            accumulator,
-                            streamIndex + 1,
-                            Optional.empty(),
-                            null);
+                    return scan(query, streams, accumulator, streamIndex + 1, Optional.empty(), null);
                 });
     }
 
     private static void addTask(
-            GcReferenceQuery query,
-            GcReferenceSnapshotBuilder accumulator,
-            VersionedMaterializationTask task) {
-        accumulator.addAuthority(new GcAuthorityToken(
-                task.key(), task.metadataVersion(), task.durableValueSha256()));
+            GcReferenceQuery query, GcReferenceSnapshotBuilder accumulator, VersionedMaterializationTask task) {
+        accumulator.addAuthority(new GcAuthorityToken(task.key(), task.metadataVersion(), task.durableValueSha256()));
         if (!retainsPhysicalReferences(task.value().lifecycle())) {
             return;
         }
@@ -188,8 +165,7 @@ public final class MaterializationReferenceDomain implements GcReferenceDomain {
                 || query.object().objectId().orElseThrow().equals(objectTarget.objectId());
     }
 
-    private static boolean matches(
-            GcReferenceQuery query, MaterializationOutputRecord output) {
+    private static boolean matches(GcReferenceQuery query, MaterializationOutputRecord output) {
         if (!output.objectKey().equals(query.object().objectKey().value())
                 || !output.objectKeyHash().equals(query.object().objectKeyHash().value())) {
             return false;
@@ -221,7 +197,6 @@ public final class MaterializationReferenceDomain implements GcReferenceDomain {
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 }

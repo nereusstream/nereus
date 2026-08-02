@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.retirement;
 
 import com.nereusstream.api.Checksum;
@@ -28,14 +29,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Production exact source-retirement adapter over a borrowed shared Oxia runtime. */
-public final class OxiaJavaSourceRetirementMetadataStore
-        implements SourceRetirementMetadataStore {
+/**
+ * Production exact source-retirement adapter over a borrowed shared Oxia runtime.
+ */
+public final class OxiaJavaSourceRetirementMetadataStore implements SourceRetirementMetadataStore {
     private final RetirementMetadataSupport support;
 
     public static OxiaJavaSourceRetirementMetadataStore usingSharedRuntime(
-            OxiaClientConfiguration clientConfig,
-            SharedOxiaClientRuntime runtime) {
+            OxiaClientConfiguration clientConfig, SharedOxiaClientRuntime runtime) {
         Objects.requireNonNull(runtime, "runtime");
         return new OxiaJavaSourceRetirementMetadataStore(
                 runtime.retirementMetadataClient(Objects.requireNonNull(clientConfig, "clientConfig")));
@@ -47,8 +48,7 @@ public final class OxiaJavaSourceRetirementMetadataStore
 
     @Override
     public CompletableFuture<Optional<VersionedGenerationZeroMarker>> getCommittedMarkerByKey(
-            String cluster,
-            String exactKey) {
+            String cluster, String exactKey) {
         OxiaKeyspace keys = new OxiaKeyspace(cluster);
         MarkerKeyRoute route = markerRoute(keys, exactKey);
         return support.get(route.key(), keys.streamPartitionKey(route.streamId()))
@@ -57,26 +57,23 @@ public final class OxiaJavaSourceRetirementMetadataStore
 
     @Override
     public CompletableFuture<Optional<VersionedGenerationZeroMarker>> getCommittedMarker(
-            String cluster,
-            StreamId streamId,
-            GenerationZeroMarkerIdentity marker) {
+            String cluster, StreamId streamId, GenerationZeroMarkerIdentity marker) {
         OxiaKeyspace keys = new OxiaKeyspace(cluster);
         StreamId stream = Objects.requireNonNull(streamId, "streamId");
         GenerationZeroMarkerIdentity identity = Objects.requireNonNull(marker, "marker");
         String key = markerKey(keys, stream, identity);
-        return getCommittedMarkerByKey(cluster, key).thenApply(optional -> optional.map(value -> {
-            if (!value.streamId().equals(stream) || !value.identity().equals(identity)) {
-                throw RetirementMetadataSupport.invariant(
-                        "committed marker lookup returned another identity");
-            }
-            return value;
-        }));
+        return getCommittedMarkerByKey(cluster, key)
+                .thenApply(optional -> optional.map(value -> {
+                    if (!value.streamId().equals(stream) || !value.identity().equals(identity)) {
+                        throw RetirementMetadataSupport.invariant("committed marker lookup returned another identity");
+                    }
+                    return value;
+                }));
     }
 
     @Override
     public CompletableFuture<Optional<VersionedGenerationZeroCommit>> getCommitNodeByKey(
-            String cluster,
-            String exactKey) {
+            String cluster, String exactKey) {
         OxiaKeyspace keys = new OxiaKeyspace(cluster);
         CommitKeyRoute route = commitRoute(keys, exactKey);
         return support.get(route.key(), keys.streamPartitionKey(route.streamId()))
@@ -98,8 +95,8 @@ public final class OxiaJavaSourceRetirementMetadataStore
         String key = keys.offsetIndexKey(stream, offsetEnd, 0);
         PartitionKey partition = keys.streamPartitionKey(stream);
         return support.get(key, partition).thenCompose(optional -> {
-            RetirementMetadataValue value = optional.orElseThrow(() ->
-                    RetirementMetadataSupport.missing("generation-zero index"));
+            RetirementMetadataValue value =
+                    optional.orElseThrow(() -> RetirementMetadataSupport.missing("generation-zero index"));
             validateGenerationZeroIndex(stream, offsetEnd, value);
             support.requireExpected(value, expectedVersion, expectedDurableValueSha256);
             return support.delete(key, expectedVersion, partition);
@@ -117,22 +114,18 @@ public final class OxiaJavaSourceRetirementMetadataStore
         StreamId stream = Objects.requireNonNull(streamId, "streamId");
         GenerationZeroMarkerIdentity identity = Objects.requireNonNull(marker, "marker");
         String key = markerKey(keys, stream, identity);
-        return deleteCommittedMarkerByKey(
-                cluster, key, expectedVersion, expectedDurableValueSha256);
+        return deleteCommittedMarkerByKey(cluster, key, expectedVersion, expectedDurableValueSha256);
     }
 
     @Override
     public CompletableFuture<Void> deleteCommittedMarkerByKey(
-            String cluster,
-            String exactKey,
-            long expectedVersion,
-            Checksum expectedDurableValueSha256) {
+            String cluster, String exactKey, long expectedVersion, Checksum expectedDurableValueSha256) {
         OxiaKeyspace keys = new OxiaKeyspace(cluster);
         MarkerKeyRoute route = markerRoute(keys, exactKey);
         PartitionKey partition = keys.streamPartitionKey(route.streamId());
         return support.get(route.key(), partition).thenCompose(optional -> {
-            RetirementMetadataValue value = optional.orElseThrow(() ->
-                    RetirementMetadataSupport.missing("generation-zero committed marker"));
+            RetirementMetadataValue value =
+                    optional.orElseThrow(() -> RetirementMetadataSupport.missing("generation-zero committed marker"));
             decodeMarker(keys, route, value);
             support.requireExpected(value, expectedVersion, expectedDurableValueSha256);
             return support.delete(route.key(), expectedVersion, partition);
@@ -150,22 +143,18 @@ public final class OxiaJavaSourceRetirementMetadataStore
         StreamId stream = Objects.requireNonNull(streamId, "streamId");
         String exactCommitId = text(commitId, "commitId");
         String key = keys.streamCommitKey(stream, exactCommitId);
-        return deleteCommitNodeByKey(
-                cluster, key, expectedVersion, expectedDurableValueSha256);
+        return deleteCommitNodeByKey(cluster, key, expectedVersion, expectedDurableValueSha256);
     }
 
     @Override
     public CompletableFuture<Void> deleteCommitNodeByKey(
-            String cluster,
-            String exactKey,
-            long expectedVersion,
-            Checksum expectedDurableValueSha256) {
+            String cluster, String exactKey, long expectedVersion, Checksum expectedDurableValueSha256) {
         OxiaKeyspace keys = new OxiaKeyspace(cluster);
         CommitKeyRoute route = commitRoute(keys, exactKey);
         PartitionKey partition = keys.streamPartitionKey(route.streamId());
         return support.get(route.key(), partition).thenCompose(optional -> {
-            RetirementMetadataValue value = optional.orElseThrow(() ->
-                    RetirementMetadataSupport.missing("checkpoint-replaced commit node"));
+            RetirementMetadataValue value =
+                    optional.orElseThrow(() -> RetirementMetadataSupport.missing("checkpoint-replaced commit node"));
             decodeCommit(keys, route, value);
             support.requireExpected(value, expectedVersion, expectedDurableValueSha256);
             return support.delete(route.key(), expectedVersion, partition);
@@ -178,9 +167,7 @@ public final class OxiaJavaSourceRetirementMetadataStore
     }
 
     private VersionedGenerationZeroMarker decodeMarker(
-            OxiaKeyspace keys,
-            MarkerKeyRoute route,
-            RetirementMetadataValue value) {
+            OxiaKeyspace keys, MarkerKeyRoute route, RetirementMetadataValue value) {
         GenerationZeroMarkerIdentity identity;
         long offsetStart;
         long offsetEnd;
@@ -188,13 +175,11 @@ public final class OxiaJavaSourceRetirementMetadataStore
         Optional<Checksum> readTargetIdentitySha256;
         if (route.family() == MarkerKeyFamily.LEGACY_COMMITTED_SLICE) {
             CommittedSliceRecord record = support.decode(value, CommittedSliceRecord.class);
-            identity = new LegacyCommittedSliceIdentity(
-                    new ObjectId(record.objectId()), record.sliceId());
+            identity = new LegacyCommittedSliceIdentity(new ObjectId(record.objectId()), record.sliceId());
             if (!record.streamId().equals(route.streamId().value())
                     || record.generation() != 0
                     || record.metadataVersion() != 0) {
-                throw RetirementMetadataSupport.invariant(
-                        "legacy committed marker key/value identity mismatch");
+                throw RetirementMetadataSupport.invariant("legacy committed marker key/value identity mismatch");
             }
             offsetStart = record.offsetStart();
             offsetEnd = record.offsetEnd();
@@ -206,24 +191,21 @@ public final class OxiaJavaSourceRetirementMetadataStore
             if (!record.streamId().equals(route.streamId().value())
                     || record.generation() != 0
                     || record.metadataVersion() != 0) {
-                throw RetirementMetadataSupport.invariant(
-                        "generic committed marker key/value identity mismatch");
+                throw RetirementMetadataSupport.invariant("generic committed marker key/value identity mismatch");
             }
             offsetStart = record.offsetStart();
             offsetEnd = record.offsetEnd();
             commitVersion = record.commitVersion();
             try {
-                readTargetIdentitySha256 = Optional.of(new Checksum(
-                        ChecksumType.SHA256, record.readTargetIdentitySha256()));
+                readTargetIdentitySha256 =
+                        Optional.of(new Checksum(ChecksumType.SHA256, record.readTargetIdentitySha256()));
             } catch (IllegalArgumentException failure) {
                 throw RetirementMetadataSupport.invariant(
-                        "generic committed marker has an invalid read-target identity",
-                        failure);
+                        "generic committed marker has an invalid read-target identity", failure);
             }
         }
         if (!markerKey(keys, route.streamId(), identity).equals(route.key())) {
-            throw RetirementMetadataSupport.invariant(
-                    "committed marker key is not canonical for its stored identity");
+            throw RetirementMetadataSupport.invariant("committed marker key is not canonical for its stored identity");
         }
         return new VersionedGenerationZeroMarker(
                 route.key(),
@@ -237,10 +219,7 @@ public final class OxiaJavaSourceRetirementMetadataStore
                 support.digest(value));
     }
 
-    private void validateGenerationZeroIndex(
-            StreamId stream,
-            long offsetEnd,
-            RetirementMetadataValue value) {
+    private void validateGenerationZeroIndex(StreamId stream, long offsetEnd, RetirementMetadataValue value) {
         String type = support.recordType(value);
         if (type.equals(OffsetIndexRecord.class.getSimpleName())) {
             OffsetIndexRecord record = support.decode(value, OffsetIndexRecord.class);
@@ -248,8 +227,7 @@ public final class OxiaJavaSourceRetirementMetadataStore
                     || record.offsetEnd() != offsetEnd
                     || record.generation() != 0
                     || record.metadataVersion() != 0) {
-                throw RetirementMetadataSupport.invariant(
-                        "legacy generation-zero index key/value identity mismatch");
+                throw RetirementMetadataSupport.invariant("legacy generation-zero index key/value identity mismatch");
             }
             return;
         }
@@ -259,19 +237,15 @@ public final class OxiaJavaSourceRetirementMetadataStore
                     || record.offsetEnd() != offsetEnd
                     || record.generation() != 0
                     || record.metadataVersion() != 0) {
-                throw RetirementMetadataSupport.invariant(
-                        "generic generation-zero index key/value identity mismatch");
+                throw RetirementMetadataSupport.invariant("generic generation-zero index key/value identity mismatch");
             }
             return;
         }
-        throw RetirementMetadataSupport.invariant(
-                "generation-zero index key contains an unsupported record type");
+        throw RetirementMetadataSupport.invariant("generation-zero index key contains an unsupported record type");
     }
 
     private VersionedGenerationZeroCommit decodeCommit(
-            OxiaKeyspace keys,
-            CommitKeyRoute route,
-            RetirementMetadataValue value) {
+            OxiaKeyspace keys, CommitKeyRoute route, RetirementMetadataValue value) {
         String type = support.recordType(value);
         AppendRecoveryCommitEncoding encoding;
         GenerationZeroMarkerIdentity markerIdentity;
@@ -282,12 +256,10 @@ public final class OxiaJavaSourceRetirementMetadataStore
                     || !record.commitId().equals(route.commitId())
                     || record.generation() != 0
                     || record.metadataVersion() != 0) {
-                throw RetirementMetadataSupport.invariant(
-                        "legacy commit-node key/value identity mismatch");
+                throw RetirementMetadataSupport.invariant("legacy commit-node key/value identity mismatch");
             }
             encoding = AppendRecoveryCommitEncoding.LEGACY_STREAM_COMMIT_V1;
-            markerIdentity = new LegacyCommittedSliceIdentity(
-                    new ObjectId(record.objectId()), record.sliceId());
+            markerIdentity = new LegacyCommittedSliceIdentity(new ObjectId(record.objectId()), record.sliceId());
             canonical = canonicalRecoveryCommit(record);
         } else if (type.equals(StreamCommitTargetRecord.class.getSimpleName())) {
             StreamCommitTargetRecord record = support.decode(value, StreamCommitTargetRecord.class);
@@ -295,22 +267,18 @@ public final class OxiaJavaSourceRetirementMetadataStore
                     || !record.commitId().equals(route.commitId())
                     || record.generation() != 0
                     || record.metadataVersion() != 0) {
-                throw RetirementMetadataSupport.invariant(
-                        "generic commit-node key/value identity mismatch");
+                throw RetirementMetadataSupport.invariant("generic commit-node key/value identity mismatch");
             }
             encoding = AppendRecoveryCommitEncoding.GENERIC_STREAM_COMMIT_TARGET_V1;
             markerIdentity = new GenericCommittedAppendIdentity(record.commitId());
             canonical = record;
         } else {
-            throw RetirementMetadataSupport.invariant(
-                    "commit-node key contains an unsupported record type");
+            throw RetirementMetadataSupport.invariant("commit-node key contains an unsupported record type");
         }
         if (!keys.streamCommitKey(route.streamId(), canonical.commitId()).equals(route.key())) {
-            throw RetirementMetadataSupport.invariant(
-                    "commit-node key is not canonical for its stored identity");
+            throw RetirementMetadataSupport.invariant("commit-node key is not canonical for its stored identity");
         }
-        byte[] canonicalBytes = MetadataRecordCodecFactory.encodeEnvelope(
-                canonical, StreamCommitTargetRecord.class);
+        byte[] canonicalBytes = MetadataRecordCodecFactory.encodeEnvelope(canonical, StreamCommitTargetRecord.class);
         return new VersionedGenerationZeroCommit(
                 route.key(),
                 route.streamId(),
@@ -330,20 +298,12 @@ public final class OxiaJavaSourceRetirementMetadataStore
         var rawIndex = value.entryIndexRef();
         EntryIndexRef index = new EntryIndexRef(
                 EntryIndexLocation.valueOf(rawIndex.location()),
-                rawIndex.objectId().isEmpty()
-                        ? Optional.empty()
-                        : Optional.of(new ObjectId(rawIndex.objectId())),
-                rawIndex.objectKey().isEmpty()
-                        ? Optional.empty()
-                        : Optional.of(new ObjectKey(rawIndex.objectKey())),
-                rawIndex.inlineData().length == 0
-                        ? Optional.empty()
-                        : Optional.of(rawIndex.inlineData()),
+                rawIndex.objectId().isEmpty() ? Optional.empty() : Optional.of(new ObjectId(rawIndex.objectId())),
+                rawIndex.objectKey().isEmpty() ? Optional.empty() : Optional.of(new ObjectKey(rawIndex.objectKey())),
+                rawIndex.inlineData().length == 0 ? Optional.empty() : Optional.of(rawIndex.inlineData()),
                 rawIndex.offset(),
                 rawIndex.length(),
-                new Checksum(
-                        ChecksumType.valueOf(rawIndex.checksumType()),
-                        rawIndex.checksumValue()));
+                new Checksum(ChecksumType.valueOf(rawIndex.checksumType()), rawIndex.checksumValue()));
         ObjectSliceReadTarget target = new ObjectSliceReadTarget(
                 1,
                 new ObjectId(value.objectId()),
@@ -354,9 +314,7 @@ public final class OxiaJavaSourceRetirementMetadataStore
                 value.sliceId(),
                 value.objectOffset(),
                 value.objectLength(),
-                new Checksum(
-                        ChecksumType.valueOf(value.sliceChecksumType()),
-                        value.sliceChecksumValue()),
+                new Checksum(ChecksumType.valueOf(value.sliceChecksumType()), value.sliceChecksumValue()),
                 index);
         return new StreamCommitTargetRecord(
                 value.streamId(),
@@ -391,17 +349,14 @@ public final class OxiaJavaSourceRetirementMetadataStore
             String commitId = KeyComponentCodec.decodeComponent(segments[1]);
             String canonical = keys.committedAppendKey(source.streamId(), commitId);
             if (!canonical.equals(source.key())) {
-                throw RetirementMetadataSupport.invariant(
-                        "generic committed-marker key is not canonical");
+                throw RetirementMetadataSupport.invariant("generic committed-marker key is not canonical");
             }
-            return new MarkerKeyRoute(
-                    source.key(), source.streamId(), MarkerKeyFamily.GENERIC_COMMITTED_APPEND);
+            return new MarkerKeyRoute(source.key(), source.streamId(), MarkerKeyFamily.GENERIC_COMMITTED_APPEND);
         }
         if (segments.length == 3 && segments[0].equals("committed-slices")) {
             ObjectId objectId = new ObjectId(KeyComponentCodec.decodeComponent(segments[1]));
             if (!segments[2].matches("[a-z2-7]{52}")) {
-                throw RetirementMetadataSupport.invariant(
-                        "legacy committed-marker hash component is not canonical");
+                throw RetirementMetadataSupport.invariant("legacy committed-marker hash component is not canonical");
             }
             String familyPrefix = keys.prefix()
                     + "/streams/"
@@ -410,27 +365,22 @@ public final class OxiaJavaSourceRetirementMetadataStore
                     + KeyComponentCodec.encodeComponent(objectId.value())
                     + "/";
             if (!source.key().startsWith(familyPrefix)) {
-                throw RetirementMetadataSupport.invariant(
-                        "legacy committed-marker key is not canonical");
+                throw RetirementMetadataSupport.invariant("legacy committed-marker key is not canonical");
             }
-            return new MarkerKeyRoute(
-                    source.key(), source.streamId(), MarkerKeyFamily.LEGACY_COMMITTED_SLICE);
+            return new MarkerKeyRoute(source.key(), source.streamId(), MarkerKeyFamily.LEGACY_COMMITTED_SLICE);
         }
-        throw RetirementMetadataSupport.invariant(
-                "journaled key is not a supported generation-zero marker key");
+        throw RetirementMetadataSupport.invariant("journaled key is not a supported generation-zero marker key");
     }
 
     private static CommitKeyRoute commitRoute(OxiaKeyspace keys, String suppliedKey) {
         SourceKeySuffix source = sourceSuffix(keys, suppliedKey);
         String[] segments = source.suffix().split("/", -1);
         if (segments.length != 2 || !segments[0].equals("commit-log")) {
-            throw RetirementMetadataSupport.invariant(
-                    "journaled key is not a generation-zero commit-node key");
+            throw RetirementMetadataSupport.invariant("journaled key is not a generation-zero commit-node key");
         }
         String commitId = KeyComponentCodec.decodeComponent(segments[1]);
         if (!keys.streamCommitKey(source.streamId(), commitId).equals(source.key())) {
-            throw RetirementMetadataSupport.invariant(
-                    "commit-node key is not canonical");
+            throw RetirementMetadataSupport.invariant("commit-node key is not canonical");
         }
         return new CommitKeyRoute(source.key(), source.streamId(), commitId);
     }
@@ -439,40 +389,29 @@ public final class OxiaJavaSourceRetirementMetadataStore
         String key = text(suppliedKey, "exactKey");
         String streamsPrefix = keys.prefix() + "/streams/";
         if (!key.startsWith(streamsPrefix)) {
-            throw RetirementMetadataSupport.invariant(
-                    "source-retirement key belongs to another cluster namespace");
+            throw RetirementMetadataSupport.invariant("source-retirement key belongs to another cluster namespace");
         }
         String remainder = key.substring(streamsPrefix.length());
         int streamEnd = remainder.indexOf('/');
         if (streamEnd <= 0 || streamEnd == remainder.length() - 1) {
-            throw RetirementMetadataSupport.invariant(
-                    "source-retirement key is missing its canonical stream scope");
+            throw RetirementMetadataSupport.invariant("source-retirement key is missing its canonical stream scope");
         }
-        StreamId stream = new StreamId(KeyComponentCodec.decodeComponent(
-                remainder.substring(0, streamEnd)));
-        String canonicalStreamPrefix = streamsPrefix
-                + KeyComponentCodec.encodeComponent(stream.value())
-                + "/";
+        StreamId stream = new StreamId(KeyComponentCodec.decodeComponent(remainder.substring(0, streamEnd)));
+        String canonicalStreamPrefix = streamsPrefix + KeyComponentCodec.encodeComponent(stream.value()) + "/";
         if (!key.startsWith(canonicalStreamPrefix)) {
-            throw RetirementMetadataSupport.invariant(
-                    "source-retirement stream component is not canonical");
+            throw RetirementMetadataSupport.invariant("source-retirement stream component is not canonical");
         }
-        return new SourceKeySuffix(
-                key, stream, remainder.substring(streamEnd + 1));
+        return new SourceKeySuffix(key, stream, remainder.substring(streamEnd + 1));
     }
 
-    private static String markerKey(
-            OxiaKeyspace keys,
-            StreamId stream,
-            GenerationZeroMarkerIdentity marker) {
+    private static String markerKey(OxiaKeyspace keys, StreamId stream, GenerationZeroMarkerIdentity marker) {
         if (marker instanceof LegacyCommittedSliceIdentity legacy) {
             return keys.committedSliceKey(stream, legacy.objectId(), legacy.sliceId());
         }
         if (marker instanceof GenericCommittedAppendIdentity generic) {
             return keys.committedAppendKey(stream, generic.commitId());
         }
-        throw RetirementMetadataSupport.invariant(
-                "unknown generation-zero committed marker identity");
+        throw RetirementMetadataSupport.invariant("unknown generation-zero committed marker identity");
     }
 
     private static String text(String value, String field) {
@@ -488,13 +427,9 @@ public final class OxiaJavaSourceRetirementMetadataStore
         GENERIC_COMMITTED_APPEND
     }
 
-    private record MarkerKeyRoute(
-            String key, StreamId streamId, MarkerKeyFamily family) {
-    }
+    private record MarkerKeyRoute(String key, StreamId streamId, MarkerKeyFamily family) {}
 
-    private record CommitKeyRoute(String key, StreamId streamId, String commitId) {
-    }
+    private record CommitKeyRoute(String key, StreamId streamId, String commitId) {}
 
-    private record SourceKeySuffix(String key, StreamId streamId, String suffix) {
-    }
+    private record SourceKeySuffix(String key, StreamId streamId, String suffix) {}
 }

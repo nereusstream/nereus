@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.keys.DeterministicIds;
 import java.security.SecureRandom;
 import java.util.Objects;
 
-/** Default 128-bit worker-claim identity generator. */
+/**
+ * Default 128-bit worker-claim identity generator.
+ */
 public final class SecureWorkerClaimIdGenerator implements WorkerClaimIdGenerator {
     private final SecureRandom random;
 

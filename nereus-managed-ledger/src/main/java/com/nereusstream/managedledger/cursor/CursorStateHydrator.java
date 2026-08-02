@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.api.ErrorCode;
@@ -13,7 +14,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
-/** Strict snapshot read plus root-version revalidation shared by storage and retention recovery. */
+/**
+ * Strict snapshot read plus root-version revalidation shared by storage and retention recovery.
+ */
 final class CursorStateHydrator {
     private final String cluster;
     private final CursorMetadataStore metadataStore;
@@ -40,10 +43,9 @@ final class CursorStateHydrator {
         Objects.requireNonNull(cursorName, "cursorName");
         return metadataStore
                 .getCursor(cluster, new StreamId(ledger.projection().streamId()), cursorName)
-                .thenCompose(root -> root
-                        .map(value -> hydrate(ledger, value))
-                        .orElseGet(() -> CompletableFuture.failedFuture(invariant(
-                                "cursor root disappeared during hydration"))));
+                .thenCompose(root -> root.map(value -> hydrate(ledger, value))
+                        .orElseGet(() ->
+                                CompletableFuture.failedFuture(invariant("cursor root disappeared during hydration"))));
     }
 
     CompletableFuture<CursorStatePersistencePlanner.HydratedState> hydrate(
@@ -67,14 +69,9 @@ final class CursorStateHydrator {
             if (!value.projection().equals(ledger.projection())) {
                 throw invariant("cursor projection changed during hydration");
             }
-            identity = new CursorIdentity(
-                    ledger,
-                    value.cursorName(),
-                    value.cursorNameHash(),
-                    value.cursorGeneration());
+            identity = new CursorIdentity(ledger, value.cursorName(), value.cursorNameHash(), value.cursorGeneration());
             if (value.snapshotReference().isEmpty()) {
-                return CompletableFuture.completedFuture(
-                        planner.hydrate(root, ledger, Optional.empty()));
+                return CompletableFuture.completedFuture(planner.hydrate(root, ledger, Optional.empty()));
             }
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
@@ -87,23 +84,21 @@ final class CursorStateHydrator {
             return CompletableFuture.failedFuture(error);
         }
         CompletableFuture<CursorAckState> snapshotRead = snapshotStore.read(reference, identity);
-        return snapshotRead.handle((snapshot, readError) -> new SnapshotRead(snapshot, unwrapNullable(readError)))
-                .thenCompose(read -> metadataStore.getCursor(
-                                cluster,
-                                new StreamId(ledger.projection().streamId()),
-                                value.cursorName())
+        return snapshotRead
+                .handle((snapshot, readError) -> new SnapshotRead(snapshot, unwrapNullable(readError)))
+                .thenCompose(read -> metadataStore
+                        .getCursor(cluster, new StreamId(ledger.projection().streamId()), value.cursorName())
                         .thenCompose(latest -> {
                             if (latest.isEmpty()) {
-                                return CompletableFuture.failedFuture(invariant(
-                                        "cursor root disappeared during snapshot revalidation"));
+                                return CompletableFuture.failedFuture(
+                                        invariant("cursor root disappeared during snapshot revalidation"));
                             }
                             VersionedCursorState current = latest.orElseThrow();
                             if (current.metadataVersion() != root.metadataVersion()) {
                                 return hydrateAttempt(ledger, current, attempt + 1);
                             }
                             if (read.error() != null) {
-                                return CompletableFuture.failedFuture(
-                                        stableSnapshotReadFailure(read.error()));
+                                return CompletableFuture.failedFuture(stableSnapshotReadFailure(read.error()));
                             }
                             try {
                                 return CompletableFuture.completedFuture(
@@ -144,6 +139,5 @@ final class CursorStateHydrator {
         return error;
     }
 
-    private record SnapshotRead(CursorAckState snapshot, Throwable error) {
-    }
+    private record SnapshotRead(CursorAckState snapshot, Throwable error) {}
 }

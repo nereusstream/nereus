@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Canonical remaining-message bitset for one partially acknowledged persisted batch entry. */
+/**
+ * Canonical remaining-message bitset for one partially acknowledged persisted batch entry.
+ */
 public record CursorPartialBatchAckRecord(long entryOffset, int batchSize, long[] remainingWords) {
     public static final int MAX_BATCH_INDEXES = 131_072;
 
@@ -15,7 +18,8 @@ public record CursorPartialBatchAckRecord(long entryOffset, int batchSize, long[
         if (batchSize <= 0 || batchSize > MAX_BATCH_INDEXES) {
             throw new IllegalArgumentException("partial ack batchSize is outside the F3 limit");
         }
-        remainingWords = Objects.requireNonNull(remainingWords, "remainingWords").clone();
+        remainingWords =
+                Objects.requireNonNull(remainingWords, "remainingWords").clone();
         int maximumWords = Math.addExact(batchSize, Long.SIZE - 1) / Long.SIZE;
         if (remainingWords.length == 0 || remainingWords.length > maximumWords) {
             throw new IllegalArgumentException("partial ack remainingWords has a noncanonical length");
@@ -42,10 +46,11 @@ public record CursorPartialBatchAckRecord(long entryOffset, int batchSize, long[
 
     @Override
     public boolean equals(Object other) {
-        return this == other || (other instanceof CursorPartialBatchAckRecord that
-                && entryOffset == that.entryOffset
-                && batchSize == that.batchSize
-                && Arrays.equals(remainingWords, that.remainingWords));
+        return this == other
+                || (other instanceof CursorPartialBatchAckRecord that
+                        && entryOffset == that.entryOffset
+                        && batchSize == that.batchSize
+                        && Arrays.equals(remainingWords, that.remainingWords));
     }
 
     @Override

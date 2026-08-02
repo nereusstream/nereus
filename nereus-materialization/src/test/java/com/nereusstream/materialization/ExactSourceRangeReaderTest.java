@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.CLUSTER;
@@ -7,7 +8,6 @@ import static com.nereusstream.materialization.MaterializationPlannerTestSupport
 import static com.nereusstream.materialization.MaterializationPlannerTestSupport.STREAM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.NereusException;
@@ -55,13 +55,12 @@ class ExactSourceRangeReaderTest {
 
     @Test
     void readsEveryFrozenOffsetUnderDemandAndReleasesTheDurablePin() {
-        VersionedGenerationZeroIndex candidate = MaterializationPlannerTestSupport.zero(
-                "/index/source-2", 0, 2, 0, 100, 2);
+        VersionedGenerationZeroIndex candidate =
+                MaterializationPlannerTestSupport.zero("/index/source-2", 0, 2, 0, 100, 2);
         SourceGeneration source = source(candidate);
         TrackingPins pins = new TrackingPins();
         AtomicInteger physicalReads = new AtomicInteger();
-        DefaultExactSourceRangeReader reader = reader(
-                List.of(candidate), pins, physicalReads);
+        DefaultExactSourceRangeReader reader = reader(List.of(candidate), pins, physicalReads);
 
         ExactSourceRead exact = reader.read(source, options()).join();
         CollectingSubscriber subscriber = new CollectingSubscriber();
@@ -69,7 +68,8 @@ class ExactSourceRangeReaderTest {
         ExactSourceReadSummary summary = exact.completion().join();
 
         assertThat(subscriber.terminal.join()).isNull();
-        assertThat(subscriber.batches).extracting(ReadBatch::range)
+        assertThat(subscriber.batches)
+                .extracting(ReadBatch::range)
                 .containsExactly(new OffsetRange(0, 1), new OffsetRange(1, 2));
         assertThat(subscriber.batches).allSatisfy(batch -> {
             assertThat(batch.payload()).hasSize(50);
@@ -88,8 +88,8 @@ class ExactSourceRangeReaderTest {
 
     @Test
     void refusesToSubstituteWhenTheFrozenIndexDisappears() {
-        VersionedGenerationZeroIndex candidate = MaterializationPlannerTestSupport.zero(
-                "/index/source-2", 0, 2, 0, 100, 2);
+        VersionedGenerationZeroIndex candidate =
+                MaterializationPlannerTestSupport.zero("/index/source-2", 0, 2, 0, 100, 2);
         SourceGeneration source = source(candidate);
         TrackingPins pins = new TrackingPins();
         DefaultExactSourceRangeReader reader = reader(List.of(), pins, new AtomicInteger());
@@ -149,10 +149,7 @@ class ExactSourceRangeReaderTest {
 
             @Override
             public CompletableFuture<PhysicalReadResult> readPhysicalWithStats(
-                    StreamId streamId,
-                    long startOffset,
-                    List<ResolvedRange> ranges,
-                    ReadOptions options) {
+                    StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
                 physicalReads.incrementAndGet();
                 ResolvedRange range = ranges.get(0);
                 byte[] payload = new byte[50];
@@ -173,16 +170,16 @@ class ExactSourceRangeReaderTest {
                         List.of()));
             }
         };
-        var store = MaterializationPlannerTestSupport.generationStore(
-                new ArrayList<>(List.of(candidate)), List.of(), null);
+        var store =
+                MaterializationPlannerTestSupport.generationStore(new ArrayList<>(List.of(candidate)), List.of(), null);
         DefaultExactSourceRangeReader reader = new DefaultExactSourceRangeReader(
                 CLUSTER,
                 STREAM,
                 store,
                 (ignoredTarget, ignoredView) -> {
                     objectIdentityCalls.incrementAndGet();
-                    return CompletableFuture.failedFuture(new AssertionError(
-                            "BookKeeper source must not enter Object identity resolution"));
+                    return CompletableFuture.failedFuture(
+                            new AssertionError("BookKeeper source must not enter Object identity resolution"));
                 },
                 pins,
                 new ReadTargetDispatcher(new ReadTargetReaderRegistry(List.of(physical))),
@@ -197,7 +194,8 @@ class ExactSourceRangeReaderTest {
         ExactSourceReadSummary summary = exact.completion().join();
 
         assertThat(subscriber.terminal.join()).isNull();
-        assertThat(subscriber.batches).extracting(ReadBatch::range)
+        assertThat(subscriber.batches)
+                .extracting(ReadBatch::range)
                 .containsExactly(new OffsetRange(0, 1), new OffsetRange(1, 2));
         assertThat(summary.coverage()).isEqualTo(source.range());
         assertThat(summary.logicalBytes()).isEqualTo(100);
@@ -208,14 +206,11 @@ class ExactSourceRangeReaderTest {
     }
 
     private static DefaultExactSourceRangeReader reader(
-            List<VersionedGenerationZeroIndex> candidates,
-            TrackingPins pins,
-            AtomicInteger reads) {
+            List<VersionedGenerationZeroIndex> candidates, TrackingPins pins, AtomicInteger reads) {
         ReadTargetReader physical = new ReadTargetReader() {
             private final ReadTargetReaderKey key = ReadTargetReaderKey.from(
                     candidates.isEmpty()
-                            ? MaterializationPlannerTestSupport.zero(
-                                    "/index/template", 0, 2, 0, 100, 2)
+                            ? MaterializationPlannerTestSupport.zero("/index/template", 0, 2, 0, 100, 2)
                                     .value()
                                     .readTarget()
                             : candidates.get(0).value().readTarget());
@@ -232,10 +227,7 @@ class ExactSourceRangeReaderTest {
 
             @Override
             public CompletableFuture<WalReadResult> readWithStats(
-                    StreamId streamId,
-                    long startOffset,
-                    List<ResolvedRange> ranges,
-                    ReadOptions options) {
+                    StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
                 reads.incrementAndGet();
                 ResolvedRange range = ranges.get(0);
                 ObjectSliceReadTarget target = (ObjectSliceReadTarget) range.readTarget();
@@ -252,13 +244,10 @@ class ExactSourceRangeReaderTest {
                         target.objectOffset(),
                         target.objectLength());
                 return CompletableFuture.completedFuture(new WalReadResult(
-                        List.of(batch),
-                        List.of(new WalSliceReadStats(
-                                target.objectId(), 0, 100, 0, payload.length))));
+                        List.of(batch), List.of(new WalSliceReadStats(target.objectId(), 0, 100, 0, payload.length))));
             }
         };
-        var store = MaterializationPlannerTestSupport.generationStore(
-                new ArrayList<>(candidates), List.of(), null);
+        var store = MaterializationPlannerTestSupport.generationStore(new ArrayList<>(candidates), List.of(), null);
         return new DefaultExactSourceRangeReader(
                 CLUSTER,
                 STREAM,
@@ -281,18 +270,12 @@ class ExactSourceRangeReaderTest {
 
     private static SourceGeneration source(VersionedGenerationZeroIndex candidate) {
         return MaterializationSourceMapper.committedSource(
-                        candidate,
-                        STREAM,
-                        com.nereusstream.api.ReadView.COMMITTED,
-                        2,
-                        2,
-                        Optional.of(PROJECTION))
+                        candidate, STREAM, com.nereusstream.api.ReadView.COMMITTED, 2, 2, Optional.of(PROJECTION))
                 .orElseThrow();
     }
 
     private static ReadOptions options() {
-        return new ReadOptions(
-                1, 64 * 1024, ReadIsolation.COMMITTED, Duration.ofSeconds(10));
+        return new ReadOptions(1, 64 * 1024, ReadIsolation.COMMITTED, Duration.ofSeconds(10));
     }
 
     private static final class TrackingPins implements ObjectReadPinManager {
@@ -342,8 +325,7 @@ class ExactSourceRangeReaderTest {
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
     }
 
     private static final class CollectingSubscriber implements Flow.Subscriber<ReadBatch> {

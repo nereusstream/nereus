@@ -1,16 +1,22 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import java.util.Objects;
 
-/** Explicit dual-generation envelope dispatch. It never probes decoders by trial and error. */
+/**
+ * Explicit dual-generation envelope dispatch. It never probes decoders by trial and error.
+ */
 public final class MetadataRecordCodecFactory {
-    private MetadataRecordCodecFactory() { }
+    private MetadataRecordCodecFactory() {}
 
     public static <T> byte[] encodeEnvelope(T record, Class<T> recordClass) {
         MetadataRecordCodec<T> codec = codecForClass(recordClass);
-        return MetadataRecordEnvelope.encode(codec.recordType(), codec.schemaVersion(record),
-                codec.minReaderSchemaVersion(record), MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1,
+        return MetadataRecordEnvelope.encode(
+                codec.recordType(),
+                codec.schemaVersion(record),
+                codec.minReaderSchemaVersion(record),
+                MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1,
                 codec.encode(record));
     }
 
@@ -25,10 +31,8 @@ public final class MetadataRecordCodecFactory {
         validateEnvelope(envelope, codec);
         T value = codec.decode(envelope.payload());
         if (codec.schemaVersion(value) != envelope.schemaVersion()
-                || codec.minReaderSchemaVersion(value)
-                        != envelope.minReaderSchemaVersion()) {
-            throw new MetadataCodecException(
-                    "metadata payload schema does not match its envelope");
+                || codec.minReaderSchemaVersion(value) != envelope.minReaderSchemaVersion()) {
+            throw new MetadataCodecException("metadata payload schema does not match its envelope");
         }
         if (!recordClass.isInstance(value)) {
             throw new MetadataCodecException("decoded metadata record has an unexpected Java type");
@@ -57,7 +61,11 @@ public final class MetadataRecordCodecFactory {
                         try {
                             return F4MetadataCodecs.registry().codecForClass(recordClass);
                         } catch (MetadataCodecException ignoredF4) {
-                            return BookKeeperMetadataCodecs.registry().codecForClass(recordClass);
+                            try {
+                                return KafkaMetadataCodecs.registry().codecForClass(recordClass);
+                            } catch (MetadataCodecException ignoredKafka) {
+                                return BookKeeperMetadataCodecs.registry().codecForClass(recordClass);
+                            }
                         }
                     }
                 }
@@ -82,7 +90,11 @@ public final class MetadataRecordCodecFactory {
                         try {
                             return F4MetadataCodecs.registry().codecForType(type);
                         } catch (MetadataCodecException ignoredF4) {
-                            return BookKeeperMetadataCodecs.registry().codecForType(type);
+                            try {
+                                return KafkaMetadataCodecs.registry().codecForType(type);
+                            } catch (MetadataCodecException ignoredKafka) {
+                                return BookKeeperMetadataCodecs.registry().codecForType(type);
+                            }
                         }
                     }
                 }
@@ -93,8 +105,7 @@ public final class MetadataRecordCodecFactory {
     private static void validateEnvelope(
             MetadataRecordEnvelope.DecodedEnvelope envelope, MetadataRecordCodec<?> codec) {
         if (!MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1.equals(envelope.payloadEncoding())
-                || !codec.supportsEnvelopeSchema(
-                        envelope.schemaVersion(), envelope.minReaderSchemaVersion())) {
+                || !codec.supportsEnvelopeSchema(envelope.schemaVersion(), envelope.minReaderSchemaVersion())) {
             throw new MetadataCodecException("unsupported metadata envelope for " + codec.recordType());
         }
     }

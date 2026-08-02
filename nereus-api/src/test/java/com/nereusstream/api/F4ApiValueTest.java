@@ -16,7 +16,6 @@ package com.nereusstream.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import org.junit.jupiter.api.Test;
 
 class F4ApiValueTest {
@@ -26,21 +25,18 @@ class F4ApiValueTest {
         assertThat(ReadView.TOPIC_COMPACTED.wireId()).isEqualTo(2);
         assertThat(ReadView.fromWireId(1)).isEqualTo(ReadView.COMMITTED);
         assertThat(ReadView.fromWireId(2)).isEqualTo(ReadView.TOPIC_COMPACTED);
-        assertThatThrownBy(() -> ReadView.fromWireId(0))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ReadView.fromWireId(0)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void generationRejectsNegativeValues() {
         assertThat(new GenerationId(0).value()).isZero();
-        assertThatThrownBy(() -> new GenerationId(-1))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GenerationId(-1)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void publicationIdRequiresAtLeast128BitsOfCanonicalBase32() {
-        assertThat(new PublicationId("abcdefghijklmnopqrstuvwxyz").value())
-                .isEqualTo("abcdefghijklmnopqrstuvwxyz");
+        assertThat(new PublicationId("abcdefghijklmnopqrstuvwxyz").value()).isEqualTo("abcdefghijklmnopqrstuvwxyz");
         assertThatThrownBy(() -> new PublicationId("abcdefghijklmnopqrstuvwxy"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new PublicationId("ABCDEFGHIJKLMNOPQRSTUVWXY2"))
@@ -53,8 +49,7 @@ class F4ApiValueTest {
     void objectKeyHashIsExactSha256Base32OfObjectKey() {
         ObjectKeyHash hash = ObjectKeyHash.from(new ObjectKey("cluster/objects/example"));
 
-        assertThat(hash.value())
-                .isEqualTo("6zx5cifhslcnhcpnpbwd3b5gqut4yebpefgn3i5n6fa5wyp2xw6q");
+        assertThat(hash.value()).isEqualTo("6zx5cifhslcnhcpnpbwd3b5gqut4yebpefgn3i5n6fa5wyp2xw6q");
         assertThatThrownBy(() -> new ObjectKeyHash(hash.value().substring(1)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ObjectKeyHash(hash.value().toUpperCase()))

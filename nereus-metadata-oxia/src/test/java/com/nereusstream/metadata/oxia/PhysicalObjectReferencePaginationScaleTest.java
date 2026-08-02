@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static com.nereusstream.metadata.oxia.F4MetadataTestValues.CLUSTER;
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
@@ -28,58 +28,43 @@ class PhysicalObjectReferencePaginationScaleTest {
     void scansOneThousandReaderLeasesAndProtectionsWithoutTruncationAndRestarts() {
         try (OxiaJavaPhysicalObjectMetadataStore store = store()) {
             VersionedPhysicalObjectRoot root = store.createRoot(
-                            CLUSTER,
-                            F4MetadataTestValues.physicalRoot(
-                                    PhysicalObjectLifecycle.ACTIVE))
+                            CLUSTER, F4MetadataTestValues.physicalRoot(PhysicalObjectLifecycle.ACTIVE))
                     .join();
-            ObjectKeyHash object = new ObjectKeyHash(
-                    root.value().objectKeyHash());
+            ObjectKeyHash object = new ObjectKeyHash(root.value().objectKeyHash());
             List<String> expectedReaderKeys = new ArrayList<>(REFERENCE_COUNT);
             List<String> expectedProtectionKeys = new ArrayList<>(REFERENCE_COUNT);
 
             for (int index = 0; index < REFERENCE_COUNT; index++) {
-                expectedReaderKeys.add(store.createOrCompareReaderLease(
-                                CLUSTER, readerLease(object, index))
+                expectedReaderKeys.add(store.createOrCompareReaderLease(CLUSTER, readerLease(object, index))
                         .join()
                         .key());
-                expectedProtectionKeys.add(store.createProtection(
-                                CLUSTER, protection(object, index))
+                expectedProtectionKeys.add(store.createProtection(CLUSTER, protection(object, index))
                         .join()
                         .key());
             }
             expectedReaderKeys.sort(Comparator.naturalOrder());
             expectedProtectionKeys.sort(Comparator.naturalOrder());
 
-            assertThat(scanReaderKeys(store, object))
-                    .containsExactlyElementsOf(expectedReaderKeys);
-            assertThat(scanProtectionKeys(store, object))
-                    .containsExactlyElementsOf(expectedProtectionKeys);
+            assertThat(scanReaderKeys(store, object)).containsExactlyElementsOf(expectedReaderKeys);
+            assertThat(scanProtectionKeys(store, object)).containsExactlyElementsOf(expectedProtectionKeys);
 
             // A fresh pass must restart only from the empty continuation and
             // reproduce the exact same complete inventories.
-            assertThat(scanReaderKeys(store, object))
-                    .containsExactlyElementsOf(expectedReaderKeys);
-            assertThat(scanProtectionKeys(store, object))
-                    .containsExactlyElementsOf(expectedProtectionKeys);
+            assertThat(scanReaderKeys(store, object)).containsExactlyElementsOf(expectedReaderKeys);
+            assertThat(scanProtectionKeys(store, object)).containsExactlyElementsOf(expectedProtectionKeys);
         }
     }
 
-    private static List<String> scanReaderKeys(
-            PhysicalObjectMetadataStore store, ObjectKeyHash object) {
+    private static List<String> scanReaderKeys(PhysicalObjectMetadataStore store, ObjectKeyHash object) {
         List<String> keys = new ArrayList<>(REFERENCE_COUNT);
         Optional<F4ScanToken> continuation = Optional.empty();
         int pages = 0;
         do {
-            ReaderLeaseScanPage page = store.scanReaderLeases(
-                            CLUSTER, object, continuation, PAGE_SIZE)
+            ReaderLeaseScanPage page = store.scanReaderLeases(CLUSTER, object, continuation, PAGE_SIZE)
                     .join();
             pages++;
-            assertPage(page.values().stream()
-                    .map(VersionedReaderLease::key)
-                    .toList(), page.continuation(), keys);
-            keys.addAll(page.values().stream()
-                    .map(VersionedReaderLease::key)
-                    .toList());
+            assertPage(page.values().stream().map(VersionedReaderLease::key).toList(), page.continuation(), keys);
+            keys.addAll(page.values().stream().map(VersionedReaderLease::key).toList());
             continuation = page.continuation();
         } while (continuation.isPresent());
         assertThat(pages).isEqualTo(EXPECTED_PAGE_COUNT);
@@ -87,22 +72,18 @@ class PhysicalObjectReferencePaginationScaleTest {
         return keys;
     }
 
-    private static List<String> scanProtectionKeys(
-            PhysicalObjectMetadataStore store, ObjectKeyHash object) {
+    private static List<String> scanProtectionKeys(PhysicalObjectMetadataStore store, ObjectKeyHash object) {
         List<String> keys = new ArrayList<>(REFERENCE_COUNT);
         Optional<F4ScanToken> continuation = Optional.empty();
         int pages = 0;
         do {
-            ObjectProtectionScanPage page = store.scanProtections(
-                            CLUSTER, object, continuation, PAGE_SIZE)
+            ObjectProtectionScanPage page = store.scanProtections(CLUSTER, object, continuation, PAGE_SIZE)
                     .join();
             pages++;
-            assertPage(page.values().stream()
-                    .map(VersionedObjectProtection::key)
-                    .toList(), page.continuation(), keys);
-            keys.addAll(page.values().stream()
-                    .map(VersionedObjectProtection::key)
-                    .toList());
+            assertPage(
+                    page.values().stream().map(VersionedObjectProtection::key).toList(), page.continuation(), keys);
+            keys.addAll(
+                    page.values().stream().map(VersionedObjectProtection::key).toList());
             continuation = page.continuation();
         } while (continuation.isPresent());
         assertThat(pages).isEqualTo(EXPECTED_PAGE_COUNT);
@@ -111,36 +92,22 @@ class PhysicalObjectReferencePaginationScaleTest {
     }
 
     private static void assertPage(
-            List<String> pageKeys,
-            Optional<F4ScanToken> continuation,
-            List<String> precedingKeys) {
+            List<String> pageKeys, Optional<F4ScanToken> continuation, List<String> precedingKeys) {
         assertThat(pageKeys).isNotEmpty().hasSizeLessThanOrEqualTo(PAGE_SIZE).isSorted();
         if (continuation.isPresent()) {
             assertThat(pageKeys).hasSize(PAGE_SIZE);
         }
         if (!precedingKeys.isEmpty()) {
-            assertThat(pageKeys.get(0))
-                    .isGreaterThan(precedingKeys.get(precedingKeys.size() - 1));
+            assertThat(pageKeys.get(0)).isGreaterThan(precedingKeys.get(precedingKeys.size() - 1));
         }
     }
 
-    private static ObjectReaderLeaseRecord readerLease(
-            ObjectKeyHash object, int index) {
+    private static ObjectReaderLeaseRecord readerLease(ObjectKeyHash object, int index) {
         return new ObjectReaderLeaseRecord(
-                1,
-                object.value(),
-                base32Id('d', index + 1),
-                base32Id('e', index + 1),
-                1,
-                100,
-                10_000,
-                9_000,
-                index,
-                0);
+                1, object.value(), base32Id('d', index + 1), base32Id('e', index + 1), 1, 100, 10_000, 9_000, index, 0);
     }
 
-    private static ObjectProtectionRecord protection(
-            ObjectKeyHash object, int index) {
+    private static ObjectProtectionRecord protection(ObjectKeyHash object, int index) {
         String identity = String.format("scale-reference-%04d", index);
         return new ObjectProtectionRecord(
                 1,

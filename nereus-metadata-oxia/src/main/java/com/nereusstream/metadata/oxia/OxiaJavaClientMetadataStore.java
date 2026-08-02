@@ -17,6 +17,7 @@ package com.nereusstream.metadata.oxia;
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
+import com.nereusstream.api.AppendSessionRequest;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -25,30 +26,31 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
-import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ProjectionRef;
+import com.nereusstream.api.StableStreamHeadSnapshot;
+import com.nereusstream.api.StreamCommitAnchor;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.StreamState;
-import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.keys.DeterministicIds;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.codec.MetadataCodecException;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
 import com.nereusstream.metadata.oxia.records.AppendSessionSnapshotRecord;
-import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.CommittedAppendRecord;
+import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.CommittedSliceRecord;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
 import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
-import com.nereusstream.metadata.oxia.records.ObjectReferenceRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
+import com.nereusstream.metadata.oxia.records.ObjectReferenceRecord;
 import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
 import com.nereusstream.metadata.oxia.records.OffsetIndexTargetRecord;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
@@ -66,10 +68,10 @@ import io.oxia.client.api.SyncOxiaClient;
 import io.oxia.client.api.exceptions.KeyAlreadyExistsException;
 import io.oxia.client.api.exceptions.UnexpectedVersionIdException;
 import java.nio.ByteBuffer;
-import java.time.Clock;
-import java.time.Duration;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
@@ -90,7 +92,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 
-/** Production Phase 1 metadata adapter backed by the public Oxia Java client API. */
+/**
+ * Production Phase 1 metadata adapter backed by the public Oxia Java client API.
+ */
 public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     private static final int MAX_CAS_RETRIES = 64;
 
@@ -105,22 +109,20 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     private final CopyOnWriteArrayList<WatchRegistration> watches = new CopyOnWriteArrayList<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
-    public static OxiaJavaClientMetadataStore connect(
-            OxiaClientConfiguration configuration,
-            Clock clock) {
+    public static OxiaJavaClientMetadataStore connect(OxiaClientConfiguration configuration, Clock clock) {
         Objects.requireNonNull(configuration, "configuration");
         SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, clock);
         return new OxiaJavaClientMetadataStore(configuration, runtime, clock, true, null);
     }
 
     public static OxiaJavaClientMetadataStore usingSharedRuntime(
-            OxiaClientConfiguration configuration,
-            SharedOxiaClientRuntime runtime,
-            Clock clock) {
+            OxiaClientConfiguration configuration, SharedOxiaClientRuntime runtime, Clock clock) {
         return new OxiaJavaClientMetadataStore(configuration, runtime, clock, false, null);
     }
 
-    /** Installs exact BookKeeper proof validation over the same shared Oxia runtime. */
+    /**
+     * Installs exact BookKeeper proof validation over the same shared Oxia runtime.
+     */
     public static OxiaJavaClientMetadataStore usingSharedRuntime(
             OxiaClientConfiguration configuration,
             SharedOxiaClientRuntime runtime,
@@ -134,10 +136,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 Objects.requireNonNull(bookKeeperMetadataConfiguration, "bookKeeperMetadataConfiguration"));
     }
 
-    OxiaJavaClientMetadataStore(
-            OxiaClientConfiguration configuration,
-            SyncOxiaClient oxiaClient,
-            Clock clock) {
+    OxiaJavaClientMetadataStore(OxiaClientConfiguration configuration, SyncOxiaClient oxiaClient, Clock clock) {
         this(configuration, SharedOxiaClientRuntime.usingClient(configuration, oxiaClient, clock), clock, true, null);
     }
 
@@ -159,15 +158,12 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 : new BookKeeperStableAppendProtectionValidator(
                         new OxiaJavaBookKeeperMetadataStore(client, clock, bookKeeperMetadataConfiguration),
                         bookKeeperMetadataConfiguration);
-        this.operationExecutor = boundedExecutor(
-                4, configuration.maxPendingOperations(), "nereus-oxia-operation");
+        this.operationExecutor = boundedExecutor(4, configuration.maxPendingOperations(), "nereus-oxia-operation");
     }
 
     @Override
     public CompletableFuture<StreamMetadataRecord> createOrGetStream(
-            String cluster,
-            StreamName streamName,
-            StreamCreateOptions options) {
+            String cluster, StreamName streamName, StreamCreateOptions options) {
         return complete(() -> {
             Objects.requireNonNull(streamName, "streamName");
             Objects.requireNonNull(options, "options");
@@ -223,30 +219,34 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     @Override
-    public CompletableFuture<Void> revalidateAppendSession(
-            String cluster,
-            AppendSession session) {
+    public CompletableFuture<StableStreamHeadSnapshot> getStableStreamHeadSnapshot(String cluster, StreamId streamId) {
+        return complete(() -> StableStreamHeadSnapshots.from(headOrThrow(new OxiaKeyspace(cluster), streamId)));
+    }
+
+    @Override
+    public CompletableFuture<Boolean> isCommitReachable(
+            String cluster, StreamCommitAnchor descendant, String ancestorCommitId, long ancestorCommitVersion) {
+        return complete(() ->
+                isCommitReachableSync(new OxiaKeyspace(cluster), descendant, ancestorCommitId, ancestorCommitVersion));
+    }
+
+    @Override
+    public CompletableFuture<Void> revalidateAppendSession(String cluster, AppendSession session) {
         return complete(() -> {
             AppendSession expected = Objects.requireNonNull(session, "session");
-            StreamHeadRecord head = headOrThrow(
-                    new OxiaKeyspace(cluster), expected.streamId());
+            StreamHeadRecord head = headOrThrow(new OxiaKeyspace(cluster), expected.streamId());
             requireActive(head);
             AppendSessionSnapshotRecord current = head.appendSession();
             long now = clock.millis();
             if (current.isEmpty() || current.expiresAtMillis() <= now) {
                 throw failure(
-                        ErrorCode.APPEND_SESSION_EXPIRED,
-                        true,
-                        "append session expired before guarded object upload");
+                        ErrorCode.APPEND_SESSION_EXPIRED, true, "append session expired before guarded object upload");
             }
             if (!current.writerId().equals(expected.writerId())
                     || current.epoch() != expected.epoch()
                     || !current.fencingToken().equals(expected.fencingToken())
                     || current.leaseVersion() < expected.leaseVersion()) {
-                throw failure(
-                        ErrorCode.FENCED_APPEND,
-                        false,
-                        "append session changed before guarded object upload");
+                throw failure(ErrorCode.FENCED_APPEND, false, "append session changed before guarded object upload");
             }
             return null;
         });
@@ -254,15 +254,14 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
 
     @Override
     public CompletableFuture<AppendSessionRecord> acquireAppendSession(
-            String cluster,
-            StreamId streamId,
-            AppendSessionOptions options) {
+            String cluster, StreamId streamId, AppendSessionOptions options) {
         return complete(() -> {
             Objects.requireNonNull(options, "options");
             OxiaKeyspace keyspace = new OxiaKeyspace(cluster);
             for (int attempt = 0; attempt < MAX_CAS_RETRIES; attempt++) {
                 StreamHeadRecord head = headOrThrow(keyspace, streamId);
                 requireActive(head);
+                AppendAuthoritySessionTransitions.requireLegacyMode(head);
                 long now = clock.millis();
                 AppendSessionSnapshotRecord current = head.appendSession();
                 boolean empty = current.isEmpty();
@@ -272,8 +271,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                     throw failure(ErrorCode.FENCED_APPEND, true, "append session is owned by another writer");
                 }
                 if (!empty && expired && !sameWriter && !options.allowStealExpiredSession()) {
-                    throw failure(
-                            ErrorCode.APPEND_SESSION_EXPIRED, true, "expired session steal is not allowed");
+                    throw failure(ErrorCode.APPEND_SESSION_EXPIRED, true, "expired session steal is not allowed");
                 }
                 long epoch = (!empty && sameWriter && !expired) ? current.epoch() : current.epoch() + 1;
                 String token = (!empty && sameWriter && !expired)
@@ -295,13 +293,37 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     @Override
+    public CompletableFuture<AppendSessionRecord> acquireAppendSession(
+            String cluster, StreamId streamId, AppendSessionRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (request.authority().isEmpty()) {
+            return acquireAppendSession(cluster, streamId, request.options());
+        }
+        return complete(() -> {
+            OxiaKeyspace keyspace = new OxiaKeyspace(cluster);
+            for (int attempt = 0; attempt < MAX_CAS_RETRIES; attempt++) {
+                StreamHeadRecord head = headOrThrow(keyspace, streamId);
+                requireActive(head);
+                long now = clock.millis();
+                AppendSessionSnapshotRecord session = AppendAuthoritySessionTransitions.acquire(
+                        head,
+                        request.options(),
+                        request.authority().orElseThrow(),
+                        now,
+                        leaseExpiration(now, request.options().ttl()),
+                        epoch -> newFencingToken(streamId, request.options().writerId(), epoch));
+                if (casHead(keyspace, streamId, head, withSession(head, session))
+                        .isPresent()) {
+                    return AppendSessionRecord.fromHead(streamId.value(), session);
+                }
+            }
+            throw condition("authority-bound append session CAS retry budget exhausted");
+        });
+    }
+
+    @Override
     public CompletableFuture<AppendSessionRecord> renewAppendSession(
-            String cluster,
-            StreamId streamId,
-            String writerId,
-            long epoch,
-            String fencingToken,
-            Duration ttl) {
+            String cluster, StreamId streamId, String writerId, long epoch, String fencingToken, Duration ttl) {
         return complete(() -> {
             Objects.requireNonNull(writerId, "writerId");
             Objects.requireNonNull(fencingToken, "fencingToken");
@@ -320,13 +342,10 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                         || !current.fencingToken().equals(fencingToken)) {
                     throw failure(ErrorCode.FENCED_APPEND, true, "append session token does not match");
                 }
-                AppendSessionSnapshotRecord session = new AppendSessionSnapshotRecord(
-                        writerId,
-                        epoch,
-                        fencingToken,
-                        current.leaseVersion() + 1,
-                        leaseExpiration(now, ttl));
-                if (casHead(keyspace, streamId, head, withSession(head, session)).isPresent()) {
+                AppendSessionSnapshotRecord session = AppendAuthoritySessionTransitions.preserveAuthorityOnRenewal(
+                        current, leaseExpiration(now, ttl));
+                if (casHead(keyspace, streamId, head, withSession(head, session))
+                        .isPresent()) {
                     return AppendSessionRecord.fromHead(streamId.value(), session);
                 }
             }
@@ -360,62 +379,46 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     @Override
-    public CompletableFuture<Optional<ObjectManifestRecord>> getObjectManifest(
-            String cluster,
-            ObjectId objectId) {
+    public CompletableFuture<Optional<ObjectManifestRecord>> getObjectManifest(String cluster, ObjectId objectId) {
         return complete(() -> getObjectManifestSync(new OxiaKeyspace(cluster), objectId));
     }
 
     @Override
-    public CompletableFuture<Optional<ObjectReferenceRecord>> getObjectReferences(
-            String cluster,
-            ObjectId objectId) {
+    public CompletableFuture<Optional<ObjectReferenceRecord>> getObjectReferences(String cluster, ObjectId objectId) {
         return complete(() -> getObjectReferencesSync(new OxiaKeyspace(cluster), objectId));
     }
 
     @Override
-    public CompletableFuture<ObjectReferenceRecord> repairObjectReferences(
-            String cluster,
-            ObjectId objectId) {
+    public CompletableFuture<ObjectReferenceRecord> repairObjectReferences(String cluster, ObjectId objectId) {
         return complete(() -> repairObjectReferencesSync(new OxiaKeyspace(cluster), objectId));
     }
 
     @Override
-    public CompletableFuture<CommitSliceResult> commitStreamSlice(
-            String cluster,
-            CommitSliceRequest request) {
+    public CompletableFuture<CommitSliceResult> commitStreamSlice(String cluster, CommitSliceRequest request) {
         return completeAppend(() -> commitStreamSliceSync(new OxiaKeyspace(cluster), request));
     }
 
     @Override
-    public CompletableFuture<PreparedStableAppend> prepareStableAppend(
-            String cluster,
-            CommitAppendRequest request) {
+    public CompletableFuture<PreparedStableAppend> prepareStableAppend(String cluster, CommitAppendRequest request) {
         return completeAppend(() -> prepareStableAppendSync(new OxiaKeyspace(cluster), request));
     }
 
     @Override
     public CompletableFuture<StableAppendResult> commitPreparedStableAppend(
-            String cluster,
-            PreparedStableAppend prepared,
-            PhysicalReferenceProof protectionProof) {
-        return completeAppend(() -> commitPreparedStableAppendSync(
-                new OxiaKeyspace(cluster),
-                prepared,
-                protectionProof));
+            String cluster, PreparedStableAppend prepared, PhysicalReferenceProof protectionProof) {
+        return completeAppend(
+                () -> commitPreparedStableAppendSync(new OxiaKeyspace(cluster), prepared, protectionProof));
     }
 
     @Override
     public CompletableFuture<MaterializedGenerationZero> materializeGenerationZero(
-            String cluster,
-            ReachableCommittedAppend reachableAppend) {
+            String cluster, ReachableCommittedAppend reachableAppend) {
         return completeAppend(() -> materializeGenerationZeroSync(new OxiaKeyspace(cluster), reachableAppend));
     }
 
     @Override
     public CompletableFuture<Void> revalidateMaterializedGenerationZero(
-            String cluster,
-            MaterializedGenerationZero materialized) {
+            String cluster, MaterializedGenerationZero materialized) {
         return completeAppend(() -> {
             revalidateMaterializedGenerationZeroSync(new OxiaKeyspace(cluster), materialized);
             return null;
@@ -428,14 +431,13 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             CommitAppendRequest request,
             Optional<AppendReplayCursor> continuation,
             int maxCommitsToScan) {
-        return completeAppend(() -> searchAppendReplaySync(
-                new OxiaKeyspace(cluster), request, continuation, maxCommitsToScan));
+        return completeAppend(
+                () -> searchAppendReplaySync(new OxiaKeyspace(cluster), request, continuation, maxCommitsToScan));
     }
 
     @Override
     public CompletableFuture<StreamMetadataSnapshot> transitionStreamState(
-            String cluster,
-            StreamStateTransitionRequest request) {
+            String cluster, StreamStateTransitionRequest request) {
         return complete(() -> transitionStreamStateSync(new OxiaKeyspace(cluster), request));
     }
 
@@ -447,11 +449,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             Optional<DerivedIndexRepairCursor> continuation,
             int maxCommitsToScan) {
         return complete(() -> repairDerivedStreamIndexesSync(
-                new OxiaKeyspace(cluster),
-                streamId,
-                targetOffset,
-                continuation,
-                maxCommitsToScan));
+                new OxiaKeyspace(cluster), streamId, targetOffset, continuation, maxCommitsToScan));
     }
 
     @Override
@@ -462,19 +460,12 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             Optional<AppendRecoveryTailCursor> continuation,
             int maxCommitsToScan) {
         return complete(() -> readAppendRecoveryTailSync(
-                new OxiaKeyspace(cluster),
-                streamId,
-                anchor,
-                continuation,
-                maxCommitsToScan));
+                new OxiaKeyspace(cluster), streamId, anchor, continuation, maxCommitsToScan));
     }
 
     @Override
     public CompletableFuture<List<OffsetIndexEntry>> scanOffsetIndex(
-            String cluster,
-            StreamId streamId,
-            long startOffset,
-            int limit) {
+            String cluster, StreamId streamId, long startOffset, int limit) {
         return complete(() -> {
             if (startOffset < 0 || limit <= 0) {
                 throw new IllegalArgumentException("startOffset must be non-negative and limit positive");
@@ -494,9 +485,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     @Override
-    public CompletableFuture<CommittedEndOffsetRecord> getCommittedEndOffset(
-            String cluster,
-            StreamId streamId) {
+    public CompletableFuture<CommittedEndOffsetRecord> getCommittedEndOffset(String cluster, StreamId streamId) {
         return complete(() -> {
             StreamHeadRecord head = headOrThrow(new OxiaKeyspace(cluster), streamId);
             return new CommittedEndOffsetRecord(
@@ -510,10 +499,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
 
     @Override
     public CompletableFuture<TrimRecord> updateTrim(
-            String cluster,
-            StreamId streamId,
-            long beforeOffset,
-            String reason) {
+            String cluster, StreamId streamId, long beforeOffset, String reason) {
         return complete(() -> {
             if (reason == null || beforeOffset < 0) {
                 throw new NereusException(ErrorCode.INVALID_ARGUMENT, false, "trim reason/range is invalid");
@@ -547,16 +533,12 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     public CompletableFuture<TrimRecord> getTrim(String cluster, StreamId streamId) {
         return complete(() -> {
             StreamHeadRecord head = headOrThrow(new OxiaKeyspace(cluster), streamId);
-            return new TrimRecord(
-                    streamId.value(), head.trimOffset(), "", clock.millis(), head.metadataVersion());
+            return new TrimRecord(streamId.value(), head.trimOffset(), "", clock.millis(), head.metadataVersion());
         });
     }
 
     @Override
-    public WatchRegistration watchStream(
-            String cluster,
-            StreamId streamId,
-            MetadataWatcher watcher) {
+    public WatchRegistration watchStream(String cluster, StreamId streamId, MetadataWatcher watcher) {
         Objects.requireNonNull(watcher, "watcher");
         ensureOpen();
         OxiaKeyspace keyspace = new OxiaKeyspace(cluster);
@@ -577,11 +559,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         };
     }
 
-    private void deliverWatch(
-            OxiaKeyspace keyspace,
-            StreamId streamId,
-            MetadataWatcher watcher,
-            AtomicBoolean active) {
+    private void deliverWatch(OxiaKeyspace keyspace, StreamId streamId, MetadataWatcher watcher, AtomicBoolean active) {
         if (!active.get() || closed.get()) {
             return;
         }
@@ -614,33 +592,28 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         }
     }
 
-    private PreparedStableAppend prepareStableAppendSync(
-            OxiaKeyspace keyspace,
-            CommitAppendRequest request) {
+    private PreparedStableAppend prepareStableAppendSync(OxiaKeyspace keyspace, CommitAppendRequest request) {
         Objects.requireNonNull(request, "request");
         String commitId = request.commitId();
         ReachableCommittedAppend markerReplay = findGenericMarkerReplay(keyspace, request);
         if (markerReplay != null) {
             return preparedFromDurable(
-                    keyspace,
-                    request,
-                    requireDurableTargetCommit(keyspace, request.streamId(), commitId),
-                    true);
+                    keyspace, request, requireDurableTargetCommit(keyspace, request.streamId(), commitId), true);
         }
         StreamHeadRecord initialHead = headOrThrow(keyspace, request.streamId());
         if (initialHead.committedEndOffset() > request.expectedStartOffset()) {
-            AppendReplaySearchResult replay = searchAppendReplaySync(keyspace, request, Optional.empty(),
-                    configuration.maxCommitChainScan());
+            AppendReplaySearchResult replay =
+                    searchAppendReplaySync(keyspace, request, Optional.empty(), configuration.maxCommitChainScan());
             if (replay.status() == AppendReplayStatus.FOUND) {
                 return preparedFromDurable(
-                        keyspace,
-                        request,
-                        requireDurableTargetCommit(keyspace, request.streamId(), commitId),
-                        true);
+                        keyspace, request, requireDurableTargetCommit(keyspace, request.streamId(), commitId), true);
             }
             if (replay.status() == AppendReplayStatus.CONTINUE) {
-                throw appendFailure(ErrorCode.METADATA_CONDITION_FAILED, true,
-                        AppendOutcome.MAY_HAVE_COMMITTED, "append replay requires paged recovery");
+                throw appendFailure(
+                        ErrorCode.METADATA_CONDITION_FAILED,
+                        true,
+                        AppendOutcome.MAY_HAVE_COMMITTED,
+                        "append replay requires paged recovery");
             }
         }
         validateCommitPreconditions(initialHead, request);
@@ -649,10 +622,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         DurableRecord<StreamCommitTargetRecord> durable;
         try {
             durable = putIfAbsentDurable(
-                    key,
-                    keyspace.streamPartitionKey(request.streamId()),
-                    candidate,
-                    StreamCommitTargetRecord.class);
+                    key, keyspace.streamPartitionKey(request.streamId()), candidate, StreamCommitTargetRecord.class);
         } catch (BackendConditionException e) {
             requireCause(e, KeyAlreadyExistsException.class);
             durable = requireDurableTargetCommit(keyspace, request.streamId(), commitId);
@@ -660,98 +630,82 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         validateReplay(request, durable.value(), AppendOutcome.KNOWN_NOT_COMMITTED);
         StreamHeadRecord currentHead = headOrThrow(keyspace, request.streamId());
         if (!sameCommitAnchor(initialHead, currentHead)) {
-            AppendReplaySearchResult replay = searchAppendReplaySync(
-                    keyspace, request, Optional.empty(), configuration.maxCommitChainScan());
+            AppendReplaySearchResult replay =
+                    searchAppendReplaySync(keyspace, request, Optional.empty(), configuration.maxCommitChainScan());
             if (replay.status() == AppendReplayStatus.FOUND) {
                 return preparedFromDurable(keyspace, request, durable, true);
             }
             if (replay.status() == AppendReplayStatus.CONTINUE) {
-                throw appendFailure(ErrorCode.METADATA_CONDITION_FAILED, true,
-                        AppendOutcome.MAY_HAVE_COMMITTED, "append replay requires paged recovery");
+                throw appendFailure(
+                        ErrorCode.METADATA_CONDITION_FAILED,
+                        true,
+                        AppendOutcome.MAY_HAVE_COMMITTED,
+                        "append replay requires paged recovery");
             }
         }
         validateCommitPreconditions(currentHead, request);
-        validateCommitAgainstHead(
-                request,
-                durable.value(),
-                currentHead,
-                AppendOutcome.KNOWN_NOT_COMMITTED);
+        validateCommitAgainstHead(request, durable.value(), currentHead, AppendOutcome.KNOWN_NOT_COMMITTED);
         return preparedFromDurable(keyspace, request, durable, false);
     }
 
     private StableAppendResult commitPreparedStableAppendSync(
-            OxiaKeyspace keyspace,
-            PreparedStableAppend prepared,
-            PhysicalReferenceProof protectionProof) {
+            OxiaKeyspace keyspace, PreparedStableAppend prepared, PhysicalReferenceProof protectionProof) {
         PreparedStableAppend exact = Objects.requireNonNull(prepared, "prepared");
         CommitAppendRequest request = exact.request();
-        DurableRecord<StreamCommitTargetRecord> initialIntent = requireExactPreparedIntent(
-                keyspace,
-                exact);
-        validateStableAppendProtection(
-                keyspace,
-                exact,
-                protectionProof);
+        DurableRecord<StreamCommitTargetRecord> initialIntent = requireExactPreparedIntent(keyspace, exact);
+        validateStableAppendProtection(keyspace, exact, protectionProof);
         ReachableCommittedAppend markerReplay = findGenericMarkerReplay(keyspace, request);
         if (markerReplay != null) {
             return new StableAppendResult(markerReplay, false);
         }
         StreamHeadRecord initialHead = headOrThrow(keyspace, request.streamId());
         if (initialHead.committedEndOffset() > request.expectedStartOffset()) {
-            AppendReplaySearchResult replay = searchAppendReplaySync(
-                    keyspace,
-                    request,
-                    Optional.empty(),
-                    configuration.maxCommitChainScan());
+            AppendReplaySearchResult replay =
+                    searchAppendReplaySync(keyspace, request, Optional.empty(), configuration.maxCommitChainScan());
             if (replay.status() == AppendReplayStatus.FOUND) {
                 return new StableAppendResult(replay.committedAppend().orElseThrow(), false);
             }
             if (replay.status() == AppendReplayStatus.CONTINUE) {
-                throw appendFailure(ErrorCode.METADATA_CONDITION_FAILED, true,
-                        AppendOutcome.MAY_HAVE_COMMITTED, "append replay requires paged recovery");
+                throw appendFailure(
+                        ErrorCode.METADATA_CONDITION_FAILED,
+                        true,
+                        AppendOutcome.MAY_HAVE_COMMITTED,
+                        "append replay requires paged recovery");
             }
         }
         validateCommitPreconditions(initialHead, request);
-        validateCommitAgainstHead(
-                request,
-                initialIntent.value(),
-                initialHead,
-                AppendOutcome.KNOWN_NOT_COMMITTED);
+        validateCommitAgainstHead(request, initialIntent.value(), initialHead, AppendOutcome.KNOWN_NOT_COMMITTED);
         for (int attempt = 0; attempt < MAX_CAS_RETRIES; attempt++) {
-            DurableRecord<StreamCommitTargetRecord> intent = requireExactPreparedIntent(
-                    keyspace,
-                    exact);
-            validateStableAppendProtection(
-                    keyspace,
-                    exact,
-                    protectionProof);
+            DurableRecord<StreamCommitTargetRecord> intent = requireExactPreparedIntent(keyspace, exact);
+            validateStableAppendProtection(keyspace, exact, protectionProof);
             StreamHeadRecord head = headOrThrow(keyspace, request.streamId());
             if (!sameCommitAnchor(initialHead, head)) {
-                AppendReplaySearchResult replay = searchAppendReplaySync(
-                        keyspace, request, Optional.empty(), configuration.maxCommitChainScan());
+                AppendReplaySearchResult replay =
+                        searchAppendReplaySync(keyspace, request, Optional.empty(), configuration.maxCommitChainScan());
                 if (replay.status() == AppendReplayStatus.FOUND) {
                     return new StableAppendResult(replay.committedAppend().orElseThrow(), false);
                 }
                 if (replay.status() == AppendReplayStatus.CONTINUE) {
-                    throw appendFailure(ErrorCode.METADATA_CONDITION_FAILED, true,
-                            AppendOutcome.MAY_HAVE_COMMITTED, "append replay requires paged recovery");
+                    throw appendFailure(
+                            ErrorCode.METADATA_CONDITION_FAILED,
+                            true,
+                            AppendOutcome.MAY_HAVE_COMMITTED,
+                            "append replay requires paged recovery");
                 }
             }
             validateCommitPreconditions(head, request);
             validateCommitAgainstHead(request, intent.value(), head, AppendOutcome.KNOWN_NOT_COMMITTED);
-            Optional<StreamHeadRecord> updated = casHeadForCommit(
-                    keyspace,
-                    request.streamId(),
-                    head,
-                    withCommit(head, intent.value()));
+            Optional<StreamHeadRecord> updated =
+                    casHeadForCommit(keyspace, request.streamId(), head, withCommit(head, intent.value()));
             if (updated.isPresent()) {
                 StreamHeadRecord anchored = updated.orElseThrow();
-                return new StableAppendResult(
-                        reachable(intent.value(), request.projectionRef(), anchored),
-                        true);
+                return new StableAppendResult(reachable(intent.value(), request.projectionRef(), anchored), true);
             }
         }
-        throw appendFailure(ErrorCode.METADATA_CONDITION_FAILED, true, AppendOutcome.MAY_HAVE_COMMITTED,
+        throw appendFailure(
+                ErrorCode.METADATA_CONDITION_FAILED,
+                true,
+                AppendOutcome.MAY_HAVE_COMMITTED,
                 "generic stream-head CAS retry budget exhausted");
     }
 
@@ -769,53 +723,63 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         }
         requireReachable(keyspace, append);
         OffsetIndexTargetRecord index = new OffsetIndexTargetRecord(
-                commit.streamId(), commit.offsetStart(), commit.offsetEnd(), commit.generation(),
-                commit.cumulativeSize(), commit.readTarget(), commit.payloadFormat(), commit.recordCount(),
-                commit.entryCount(), commit.logicalBytes(), commit.schemaRefs(), commit.projectionRef(),
-                commit.minEventTimeMillis(), commit.maxEventTimeMillis(), commit.commitVersion(), false, 0);
-        String indexKey = keyspace.offsetIndexKey(append.streamId(), append.range().endOffset(), 0);
+                commit.streamId(),
+                commit.offsetStart(),
+                commit.offsetEnd(),
+                commit.generation(),
+                commit.cumulativeSize(),
+                commit.readTarget(),
+                commit.payloadFormat(),
+                commit.recordCount(),
+                commit.entryCount(),
+                commit.logicalBytes(),
+                commit.schemaRefs(),
+                commit.projectionRef(),
+                commit.minEventTimeMillis(),
+                commit.maxEventTimeMillis(),
+                commit.commitVersion(),
+                false,
+                0);
+        String indexKey =
+                keyspace.offsetIndexKey(append.streamId(), append.range().endOffset(), 0);
         DurableRecord<OffsetIndexTargetRecord> durableIndex = putOrCompareDurable(
-                indexKey,
-                keyspace.streamPartitionKey(append.streamId()),
-                index,
-                OffsetIndexTargetRecord.class);
+                indexKey, keyspace.streamPartitionKey(append.streamId()), index, OffsetIndexTargetRecord.class);
         CommittedAppendRecord marker = new CommittedAppendRecord(
-                commit.streamId(), commit.commitId(), commit.offsetStart(), commit.offsetEnd(), commit.generation(),
-                commit.commitVersion(), commit.readTarget().identityChecksumValue(), 0);
-        putOrCompare(keyspace.committedAppendKey(append.streamId(), append.commitId()),
-                keyspace.streamPartitionKey(append.streamId()), marker, CommittedAppendRecord.class);
+                commit.streamId(),
+                commit.commitId(),
+                commit.offsetStart(),
+                commit.offsetEnd(),
+                commit.generation(),
+                commit.commitVersion(),
+                commit.readTarget().identityChecksumValue(),
+                0);
+        putOrCompare(
+                keyspace.committedAppendKey(append.streamId(), append.commitId()),
+                keyspace.streamPartitionKey(append.streamId()),
+                marker,
+                CommittedAppendRecord.class);
         return new MaterializedGenerationZero(
-                append,
-                indexKey,
-                durableIndex.metadataVersion(),
-                durableIndex.durableValueSha256());
+                append, indexKey, durableIndex.metadataVersion(), durableIndex.durableValueSha256());
     }
 
     private void revalidateMaterializedGenerationZeroSync(
-            OxiaKeyspace keyspace,
-            MaterializedGenerationZero materialized) {
+            OxiaKeyspace keyspace, MaterializedGenerationZero materialized) {
         MaterializedGenerationZero exact = Objects.requireNonNull(materialized, "materialized");
         CommittedAppend append = exact.committedAppend();
-        String expectedIndexKey = keyspace.offsetIndexKey(
-                append.streamId(),
-                append.range().endOffset(),
-                0);
+        String expectedIndexKey =
+                keyspace.offsetIndexKey(append.streamId(), append.range().endOffset(), 0);
         if (!exact.indexKey().equals(expectedIndexKey)) {
             throw invariant("generation-zero proof contains a non-canonical index key");
         }
-        DurableRecord<StreamCommitTargetRecord> durableCommit = requireDurableTargetCommit(
-                keyspace,
-                append.streamId(),
-                append.commitId());
+        DurableRecord<StreamCommitTargetRecord> durableCommit =
+                requireDurableTargetCommit(keyspace, append.streamId(), append.commitId());
         StreamCommitTargetRecord commit = durableCommit.value();
         if (!toCommitted(commit, append.projectionRef()).equals(append)) {
             throw invariant("generation-zero proof no longer matches its commit intent");
         }
         requireReachable(keyspace, append);
         DurableRecord<OffsetIndexTargetRecord> durableIndex = getDurableRecord(
-                        expectedIndexKey,
-                        keyspace.streamPartitionKey(append.streamId()),
-                        OffsetIndexTargetRecord.class)
+                        expectedIndexKey, keyspace.streamPartitionKey(append.streamId()), OffsetIndexTargetRecord.class)
                 .orElseThrow(() -> invariant("generation-zero index disappeared during protection"));
         if (durableIndex.metadataVersion() != exact.indexMetadataVersion()
                 || !durableIndex.durableValueSha256().equals(exact.indexRecordSha256())
@@ -846,19 +810,15 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private DurableRecord<StreamCommitTargetRecord> requireDurableTargetCommit(
-            OxiaKeyspace keyspace,
-            StreamId streamId,
-            String commitId) {
+            OxiaKeyspace keyspace, StreamId streamId, String commitId) {
         String key = keyspace.streamCommitKey(streamId, commitId);
-        Optional<DurableRecord<StreamCommitTargetRecord>> target = getDurableRecord(
-                key,
-                keyspace.streamPartitionKey(streamId),
-                StreamCommitTargetRecord.class);
+        Optional<DurableRecord<StreamCommitTargetRecord>> target =
+                getDurableRecord(key, keyspace.streamPartitionKey(streamId), StreamCommitTargetRecord.class);
         if (target.isPresent()) {
             return target.orElseThrow();
         }
-        Optional<PartitionedOxiaClient.VersionedValue> raw = join(
-                client.get(key, keyspace.streamPartitionKey(streamId)));
+        Optional<PartitionedOxiaClient.VersionedValue> raw =
+                join(client.get(key, keyspace.streamPartitionKey(streamId)));
         if (raw.isPresent()) {
             throw invariant("generic commit ID conflicts with a legacy record");
         }
@@ -866,22 +826,15 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private DurableRecord<StreamCommitTargetRecord> requireExactPreparedIntent(
-            OxiaKeyspace keyspace,
-            PreparedStableAppend prepared) {
+            OxiaKeyspace keyspace, PreparedStableAppend prepared) {
         if (!prepared.commitId().equals(prepared.request().commitId())
-                || !prepared.commitKey().equals(keyspace.streamCommitKey(
-                        prepared.request().streamId(),
-                        prepared.commitId()))) {
+                || !prepared.commitKey()
+                        .equals(keyspace.streamCommitKey(prepared.request().streamId(), prepared.commitId()))) {
             throw invariant("prepared stable append identity is non-canonical");
         }
-        DurableRecord<StreamCommitTargetRecord> durable = requireDurableTargetCommit(
-                keyspace,
-                prepared.request().streamId(),
-                prepared.commitId());
-        validateReplay(
-                prepared.request(),
-                durable.value(),
-                AppendOutcome.KNOWN_NOT_COMMITTED);
+        DurableRecord<StreamCommitTargetRecord> durable =
+                requireDurableTargetCommit(keyspace, prepared.request().streamId(), prepared.commitId());
+        validateReplay(prepared.request(), durable.value(), AppendOutcome.KNOWN_NOT_COMMITTED);
         if (durable.metadataVersion() != prepared.commitMetadataVersion()
                 || !durable.durableValueSha256().equals(prepared.commitRecordSha256())) {
             throw invariant("prepared stable append intent changed before head commit");
@@ -890,12 +843,8 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private void validateStableAppendProtection(
-            OxiaKeyspace keyspace,
-            PreparedStableAppend prepared,
-            PhysicalReferenceProof protectionProof) {
-        PhysicalReferenceProof genericProof = Objects.requireNonNull(
-                protectionProof,
-                "protectionProof");
+            OxiaKeyspace keyspace, PreparedStableAppend prepared, PhysicalReferenceProof protectionProof) {
+        PhysicalReferenceProof genericProof = Objects.requireNonNull(protectionProof, "protectionProof");
         if (genericProof instanceof BookKeeperPhysicalReferenceProof proof) {
             validateBookKeeperStableAppendProtection(keyspace, prepared, proof);
             return;
@@ -912,9 +861,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         long rootMetadataVersion = proof.rootMetadataVersion();
         long rootLifecycleEpoch = proof.rootLifecycleEpoch();
         long protectionMetadataVersion = proof.protectionMetadataVersion();
-        Checksum protectionSha = F4ValueValidation.sha256(
-                proof.protectionRecordSha256(),
-                "protectionRecordSha256");
+        Checksum protectionSha = F4ValueValidation.sha256(proof.protectionRecordSha256(), "protectionRecordSha256");
         if (rootMetadataVersion < 0 || rootLifecycleEpoch <= 0 || protectionMetadataVersion < 0) {
             throw new IllegalArgumentException("stable append protection versions are invalid");
         }
@@ -939,10 +886,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         }
         requireRootMatchesPreparedTarget(keyspace, prepared, rootValue);
         F4MetadataStoreSupport.Decoded<ObjectProtectionRecord> protection = join(f4Support.get(
-                        f4Keys.protectionKey(
-                                identity.object(),
-                                identity.type(),
-                                identity.referenceId()),
+                        f4Keys.protectionKey(identity.object(), identity.type(), identity.referenceId()),
                         f4Keys.physicalObjectPartitionKey(identity.object()),
                         ObjectProtectionRecord.class))
                 .orElseThrow(() -> invariant("REACHABLE_APPEND protection is absent before head commit"));
@@ -950,11 +894,15 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         if (protection.version() != protectionMetadataVersion
                 || !protection.durableSha256().equals(protectionSha)
                 || protectionValue.protectionTypeId() != ObjectProtectionType.REACHABLE_APPEND.wireId()
-                || !protectionValue.objectKeyHash().equals(prepared.objectKeyHash().value())
+                || !protectionValue
+                        .objectKeyHash()
+                        .equals(prepared.objectKeyHash().value())
                 || !protectionValue.referenceId().equals(expectedReferenceId)
                 || !protectionValue.ownerKey().equals(prepared.commitKey())
                 || protectionValue.ownerMetadataVersion() != prepared.commitMetadataVersion()
-                || !protectionValue.ownerIdentitySha256().equals(prepared.commitRecordSha256().value())
+                || !protectionValue
+                        .ownerIdentitySha256()
+                        .equals(prepared.commitRecordSha256().value())
                 || protectionValue.rootLifecycleEpoch() != rootLifecycleEpoch
                 || protectionValue.expiresAtMillis() != 0) {
             throw invariant("REACHABLE_APPEND protection changed before head commit");
@@ -962,9 +910,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private void validateBookKeeperStableAppendProtection(
-            OxiaKeyspace keyspace,
-            PreparedStableAppend prepared,
-            BookKeeperPhysicalReferenceProof proof) {
+            OxiaKeyspace keyspace, PreparedStableAppend prepared, BookKeeperPhysicalReferenceProof proof) {
         if (bookKeeperProtectionValidator == null) {
             throw invariant("BookKeeper physical-reference proof validation is not installed");
         }
@@ -972,9 +918,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private void requireRootMatchesPreparedTarget(
-            OxiaKeyspace keyspace,
-            PreparedStableAppend prepared,
-            PhysicalObjectRootRecord root) {
+            OxiaKeyspace keyspace, PreparedStableAppend prepared, PhysicalObjectRootRecord root) {
         if (!(prepared.request().readTarget() instanceof ObjectSliceReadTarget target)) {
             throw invariant("prepared stable append target is not an object slice");
         }
@@ -987,9 +931,8 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         } catch (ArithmeticException overflow) {
             throw invariant("Object WAL target range overflows", overflow);
         }
-        String expectedContentSha = "SHA256".equals(manifest.objectChecksumType())
-                ? manifest.objectChecksumValue()
-                : "";
+        String expectedContentSha =
+                "SHA256".equals(manifest.objectChecksumType()) ? manifest.objectChecksumValue() : "";
         if (!root.objectKey().equals(target.objectKey().value())
                 || !root.objectId().equals(target.objectId().value())
                 || root.objectKindId() != 1
@@ -1003,10 +946,11 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private static String reachableAppendReferenceId(PreparedStableAppend prepared) {
-        return "ra1-" + DeterministicIds.stableHashComponent(
-                prepared.request().streamId().value()
-                        + prepared.commitId()
-                        + prepared.objectKeyHash().value());
+        return "ra1-"
+                + DeterministicIds.stableHashComponent(
+                        prepared.request().streamId().value()
+                                + prepared.commitId()
+                                + prepared.objectKeyHash().value());
     }
 
     private static OffsetIndexTargetRecord generationZeroIndex(StreamCommitTargetRecord commit) {
@@ -1040,8 +984,12 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                     .orElseThrow(() -> invariant("reachability proof found a broken chain"));
             AnyCommit view = anyCommit(durable);
             validateAnyCommit(expected.streamId(), commitId, view, expectation);
-            if (commitId.equals(expected.commitId())) return;
-            if (view.offsetStart() <= expected.range().startOffset()) break;
+            if (commitId.equals(expected.commitId())) {
+                return;
+            }
+            if (view.offsetStart() <= expected.range().startOffset()) {
+                break;
+            }
             commitId = view.previousCommitId();
             expectation = new ChainExpectation(
                     view.offsetStart(), view.cumulativeSize() - view.logicalBytes(), view.commitVersion() - 1);
@@ -1063,11 +1011,15 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private AppendReplaySearchResult searchAppendReplaySync(
-            OxiaKeyspace keyspace, CommitAppendRequest request,
-            Optional<AppendReplayCursor> continuation, int maxCommitsToScan) {
+            OxiaKeyspace keyspace,
+            CommitAppendRequest request,
+            Optional<AppendReplayCursor> continuation,
+            int maxCommitsToScan) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(continuation, "continuation");
-        if (maxCommitsToScan <= 0) throw new IllegalArgumentException("maxCommitsToScan must be positive");
+        if (maxCommitsToScan <= 0) {
+            throw new IllegalArgumentException("maxCommitsToScan must be positive");
+        }
         StreamHeadRecord currentHead = headOrThrow(keyspace, request.streamId());
         String observedId = currentHead.lastCommitId();
         long observedEnd = currentHead.committedEndOffset();
@@ -1077,7 +1029,8 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         ChainExpectation expectation = new ChainExpectation(observedEnd, observedSize, observedVersion);
         if (continuation.isPresent()) {
             AppendReplayCursor cursor = continuation.orElseThrow();
-            if (!cursor.streamId().equals(request.streamId()) || !cursor.commitId().equals(request.commitId())
+            if (!cursor.streamId().equals(request.streamId())
+                    || !cursor.commitId().equals(request.commitId())
                     || cursor.expectedStartOffset() != request.expectedStartOffset()
                     || cursor.observedHeadCommitVersion() > currentHead.commitVersion()) {
                 throw invariant("append replay continuation does not match request/head");
@@ -1090,10 +1043,13 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                     || anchor.commitVersion() != cursor.observedHeadCommitVersion()) {
                 throw invariant("append replay continuation anchor changed");
             }
-            observedId = cursor.observedHeadCommitId(); observedEnd = cursor.observedHeadOffsetEnd();
-            observedSize = cursor.observedHeadCumulativeSize(); observedVersion = cursor.observedHeadCommitVersion();
+            observedId = cursor.observedHeadCommitId();
+            observedEnd = cursor.observedHeadOffsetEnd();
+            observedSize = cursor.observedHeadCumulativeSize();
+            observedVersion = cursor.observedHeadCommitVersion();
             nextId = cursor.nextCommitId();
-            expectation = new ChainExpectation(cursor.nextOffsetEnd(), cursor.nextCumulativeSize(), cursor.nextCommitVersion());
+            expectation = new ChainExpectation(
+                    cursor.nextOffsetEnd(), cursor.nextCumulativeSize(), cursor.nextCommitVersion());
         }
         int scanned = 0;
         while (!nextId.isEmpty() && scanned < maxCommitsToScan) {
@@ -1108,17 +1064,19 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 }
                 validateReplay(request, target, AppendOutcome.KNOWN_COMMITTED);
                 CommittedAppend append = toCommitted(target, request.projectionRef());
-                return new AppendReplaySearchResult(AppendReplayStatus.FOUND,
+                return new AppendReplaySearchResult(
+                        AppendReplayStatus.FOUND,
                         Optional.of(ReachableCommittedAppend.verified(
                                 append, observedId, observedEnd, observedSize, observedVersion)),
-                        Optional.empty(), scanned);
+                        Optional.empty(),
+                        scanned);
             }
             if (view.offsetStart() <= request.expectedStartOffset()) {
                 return new AppendReplaySearchResult(
                         AppendReplayStatus.PROVEN_NOT_COMMITTED, Optional.empty(), Optional.empty(), scanned);
             }
-            expectation = new ChainExpectation(view.offsetStart(),
-                    view.cumulativeSize() - view.logicalBytes(), view.commitVersion() - 1);
+            expectation = new ChainExpectation(
+                    view.offsetStart(), view.cumulativeSize() - view.logicalBytes(), view.commitVersion() - 1);
             nextId = view.previousCommitId();
         }
         if (nextId.isEmpty()) {
@@ -1126,8 +1084,16 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                     AppendReplayStatus.PROVEN_NOT_COMMITTED, Optional.empty(), Optional.empty(), scanned);
         }
         AppendReplayCursor cursor = new AppendReplayCursor(
-                request.streamId(), request.commitId(), request.expectedStartOffset(), observedId, observedEnd,
-                observedSize, observedVersion, nextId, expectation.offsetEnd(), expectation.cumulativeSize(),
+                request.streamId(),
+                request.commitId(),
+                request.expectedStartOffset(),
+                observedId,
+                observedEnd,
+                observedSize,
+                observedVersion,
+                nextId,
+                expectation.offsetEnd(),
+                expectation.cumulativeSize(),
                 expectation.commitVersion());
         return new AppendReplaySearchResult(
                 AppendReplayStatus.CONTINUE, Optional.empty(), Optional.of(cursor), scanned);
@@ -1162,37 +1128,24 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             observedHead = cursor.observedHead();
             nextCommitId = cursor.nextCommitId();
             expectation = new ChainExpectation(
-                    cursor.nextOffsetEnd(),
-                    cursor.nextCumulativeSize(),
-                    cursor.nextCommitVersion());
+                    cursor.nextOffsetEnd(), cursor.nextCumulativeSize(), cursor.nextCommitVersion());
         }
 
         List<AppendRecoveryCommit> commits = new ArrayList<>(maxCommitsToScan);
         while (commits.size() < maxCommitsToScan) {
             if (nextCommitId.equals(anchor.lastCommitId())) {
                 requireRecoveryBridge(anchor, expectation);
-                return new AppendRecoveryTailPage(
-                        anchor,
-                        observedHead,
-                        commits,
-                        true,
-                        Optional.empty());
+                return new AppendRecoveryTailPage(anchor, observedHead, commits, true, Optional.empty());
             }
             if (nextCommitId.isEmpty()) {
                 if (!anchor.isGenesis()) {
                     throw invariant("live commit tail ended before the recovery anchor");
                 }
                 requireRecoveryBridge(anchor, expectation);
-                return new AppendRecoveryTailPage(
-                        anchor,
-                        observedHead,
-                        commits,
-                        true,
-                        Optional.empty());
+                return new AppendRecoveryTailPage(anchor, observedHead, commits, true, Optional.empty());
             }
             PartitionedOxiaClient.VersionedValue raw = join(client.get(
-                            keyspace.streamCommitKey(streamId, nextCommitId),
-                            keyspace.streamPartitionKey(streamId)))
+                            keyspace.streamCommitKey(streamId, nextCommitId), keyspace.streamPartitionKey(streamId)))
                     .orElseThrow(() -> invariant("anchor-aware walk found a missing live commit"));
             AppendRecoveryCommit commit = recoveryCommit(keyspace, raw, streamId, nextCommitId);
             StreamCommitTargetRecord value = commit.canonicalCommit();
@@ -1206,12 +1159,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
 
         if (nextCommitId.equals(anchor.lastCommitId())) {
             requireRecoveryBridge(anchor, expectation);
-            return new AppendRecoveryTailPage(
-                    anchor,
-                    observedHead,
-                    commits,
-                    true,
-                    Optional.empty());
+            return new AppendRecoveryTailPage(anchor, observedHead, commits, true, Optional.empty());
         }
         AppendRecoveryTailCursor cursor = new AppendRecoveryTailCursor(
                 streamId,
@@ -1221,19 +1169,11 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 expectation.offsetEnd(),
                 expectation.cumulativeSize(),
                 expectation.commitVersion());
-        return new AppendRecoveryTailPage(
-                anchor,
-                observedHead,
-                commits,
-                false,
-                Optional.of(cursor));
+        return new AppendRecoveryTailPage(anchor, observedHead, commits, false, Optional.of(cursor));
     }
 
     private AppendRecoveryCommit recoveryCommit(
-            OxiaKeyspace keyspace,
-            PartitionedOxiaClient.VersionedValue raw,
-            StreamId streamId,
-            String commitId) {
+            OxiaKeyspace keyspace, PartitionedOxiaClient.VersionedValue raw, StreamId streamId, String commitId) {
         String expectedKey = keyspace.streamCommitKey(streamId, commitId);
         if (!raw.key().equals(expectedKey)) {
             throw invariant("append recovery commit key escaped its stream scope");
@@ -1252,8 +1192,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         } else {
             throw invariant("append recovery commit key contains an unsupported record type");
         }
-        byte[] canonicalBytes = MetadataRecordCodecFactory.encodeEnvelope(
-                canonical, StreamCommitTargetRecord.class);
+        byte[] canonicalBytes = MetadataRecordCodecFactory.encodeEnvelope(canonical, StreamCommitTargetRecord.class);
         return new AppendRecoveryCommit(
                 raw.key(),
                 encoding,
@@ -1268,20 +1207,12 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         EntryIndexReferenceRecord rawIndex = value.entryIndexRef();
         EntryIndexRef index = new EntryIndexRef(
                 EntryIndexLocation.valueOf(rawIndex.location()),
-                rawIndex.objectId().isEmpty()
-                        ? Optional.empty()
-                        : Optional.of(new ObjectId(rawIndex.objectId())),
-                rawIndex.objectKey().isEmpty()
-                        ? Optional.empty()
-                        : Optional.of(new ObjectKey(rawIndex.objectKey())),
-                rawIndex.inlineData().length == 0
-                        ? Optional.empty()
-                        : Optional.of(rawIndex.inlineData()),
+                rawIndex.objectId().isEmpty() ? Optional.empty() : Optional.of(new ObjectId(rawIndex.objectId())),
+                rawIndex.objectKey().isEmpty() ? Optional.empty() : Optional.of(new ObjectKey(rawIndex.objectKey())),
+                rawIndex.inlineData().length == 0 ? Optional.empty() : Optional.of(rawIndex.inlineData()),
                 rawIndex.offset(),
                 rawIndex.length(),
-                new Checksum(
-                        ChecksumType.valueOf(rawIndex.checksumType()),
-                        rawIndex.checksumValue()));
+                new Checksum(ChecksumType.valueOf(rawIndex.checksumType()), rawIndex.checksumValue()));
         ObjectSliceReadTarget target = new ObjectSliceReadTarget(
                 1,
                 new ObjectId(value.objectId()),
@@ -1292,9 +1223,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 value.sliceId(),
                 value.objectOffset(),
                 value.objectLength(),
-                new Checksum(
-                        ChecksumType.valueOf(value.sliceChecksumType()),
-                        value.sliceChecksumValue()),
+                new Checksum(ChecksumType.valueOf(value.sliceChecksumType()), value.sliceChecksumValue()),
                 index);
         ReadTargetRecord readTarget = ReadTargetCodecRegistry.phase15().encode(target);
         return new StreamCommitTargetRecord(
@@ -1370,16 +1299,13 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         if (previousSize < 0
                 || (commit.previousCommitId().isEmpty()
                         && (commit.offsetStart() != 0 || previousSize != 0 || previousVersion != 0))
-                || (!commit.previousCommitId().isEmpty()
-                        && (commit.offsetStart() == 0 || previousVersion <= 0))) {
+                || (!commit.previousCommitId().isEmpty() && (commit.offsetStart() == 0 || previousVersion <= 0))) {
             throw invariant("append recovery predecessor scalars are inconsistent");
         }
         return new ChainExpectation(commit.offsetStart(), previousSize, previousVersion);
     }
 
-    private static void requireRecoveryBridge(
-            AppendRecoveryAnchor anchor,
-            ChainExpectation expectation) {
+    private static void requireRecoveryBridge(AppendRecoveryAnchor anchor, ChainExpectation expectation) {
         if (expectation.offsetEnd() != anchor.offsetEnd()
                 || expectation.cumulativeSize() != anchor.cumulativeSize()
                 || expectation.commitVersion() != anchor.commitVersion()) {
@@ -1395,13 +1321,28 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             throw condition("stream state transition precondition changed");
         }
         StreamHeadRecord candidate = new StreamHeadRecord(
-                head.streamId(), head.streamName(), head.streamNameHash(), request.targetState().name(), head.profile(),
-                head.attributes(), head.createdAtMillis(), head.policyVersion(), head.committedEndOffset(),
-                head.cumulativeSize(), head.commitVersion(), head.trimOffset(), head.lastCommitId(),
-                head.appendSession(), 0);
+                head.streamId(),
+                head.streamName(),
+                head.streamNameHash(),
+                request.targetState().name(),
+                head.profile(),
+                head.attributes(),
+                head.createdAtMillis(),
+                head.policyVersion(),
+                head.committedEndOffset(),
+                head.cumulativeSize(),
+                head.commitVersion(),
+                head.trimOffset(),
+                head.lastCommitId(),
+                head.appendSession(),
+                0);
         try {
-            StreamHeadRecord updated = putIfVersion(keyspace.streamHeadKey(request.streamId()),
-                    keyspace.streamPartitionKey(request.streamId()), candidate, head.metadataVersion(), StreamHeadRecord.class);
+            StreamHeadRecord updated = putIfVersion(
+                    keyspace.streamHeadKey(request.streamId()),
+                    keyspace.streamPartitionKey(request.streamId()),
+                    candidate,
+                    head.metadataVersion(),
+                    StreamHeadRecord.class);
             return snapshot(updated);
         } catch (BackendConditionException e) {
             requireCause(e, UnexpectedVersionIdException.class);
@@ -1438,17 +1379,13 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         try {
             Phase1ObjectManifestValidator.validateCommitCandidate(manifest, request, false);
         } catch (NereusException e) {
-            throw new NereusException(
-                    e.code(), e.retriable(), e.getMessage(), e, AppendOutcome.KNOWN_NOT_COMMITTED);
+            throw new NereusException(e.code(), e.retriable(), e.getMessage(), e, AppendOutcome.KNOWN_NOT_COMMITTED);
         }
         StreamCommitRecord commit = buildCommit(request, initialHead, manifest, commitId);
         String commitKey = keyspace.streamCommitKey(request.streamId(), commitId);
         try {
             commit = putIfAbsent(
-                    commitKey,
-                    keyspace.streamPartitionKey(request.streamId()),
-                    commit,
-                    StreamCommitRecord.class);
+                    commitKey, keyspace.streamPartitionKey(request.streamId()), commit, StreamCommitRecord.class);
         } catch (BackendConditionException e) {
             requireCause(e, KeyAlreadyExistsException.class);
             StreamCommitRecord existing = getCommit(keyspace, request.streamId(), commitId)
@@ -1477,8 +1414,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             try {
                 materializeForAppend(keyspace, commit);
             } catch (NereusException e) {
-                throw new NereusException(
-                        e.code(), e.retriable(), e.getMessage(), e, AppendOutcome.KNOWN_COMMITTED);
+                throw new NereusException(e.code(), e.retriable(), e.getMessage(), e, AppendOutcome.KNOWN_COMMITTED);
             }
             updateObjectAuditBestEffort(keyspace, manifest, commit);
             return commitResult(commit, request.projectionRef());
@@ -1525,8 +1461,8 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         long repairedTo = 0;
         boolean covered = false;
         while (!commitId.isEmpty() && scanned < maxCommitsToScan) {
-            Object commit = getCommitValue(keyspace, streamId, commitId)
-                    .orElseThrow(() -> invariant("broken commit chain"));
+            Object commit =
+                    getCommitValue(keyspace, streamId, commitId).orElseThrow(() -> invariant("broken commit chain"));
             AnyCommit view = anyCommit(commit);
             validateAnyCommit(streamId, commitId, view, expectation);
             ChainExpectation previous = new ChainExpectation(
@@ -1575,8 +1511,8 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private ObjectReferenceRecord repairObjectReferencesSync(OxiaKeyspace keyspace, ObjectId objectId) {
-        ObjectManifestRecord manifest = getObjectManifestSync(keyspace, objectId)
-                .orElseThrow(() -> invariant("object manifest is missing"));
+        ObjectManifestRecord manifest =
+                getObjectManifestSync(keyspace, objectId).orElseThrow(() -> invariant("object manifest is missing"));
         Phase1ObjectManifestValidator.validateStoredManifest(manifest);
         List<VisibleSliceReferenceRecord> visible = new ArrayList<>();
         for (StreamSliceManifestRecord slice : manifest.slices()) {
@@ -1594,11 +1530,11 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 .toList();
         for (int attempt = 0; attempt < MAX_CAS_RETRIES; attempt++) {
             Optional<ObjectReferenceRecord> existing = getObjectReferencesSync(keyspace, objectId);
-            if (existing.isPresent() && !visible.containsAll(existing.orElseThrow().visibleSlices())) {
+            if (existing.isPresent()
+                    && !visible.containsAll(existing.orElseThrow().visibleSlices())) {
                 throw invariant("object-reference repair would remove an existing visible reference");
             }
-            ObjectReferenceRecord candidate = new ObjectReferenceRecord(
-                    objectId.value(), visible, clock.millis(), 0);
+            ObjectReferenceRecord candidate = new ObjectReferenceRecord(objectId.value(), visible, clock.millis(), 0);
             try {
                 if (existing.isEmpty()) {
                     return putIfAbsent(
@@ -1624,10 +1560,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private StreamCommitRecord buildCommit(
-            CommitSliceRequest request,
-            StreamHeadRecord head,
-            ObjectManifestRecord manifest,
-            String commitId) {
+            CommitSliceRequest request, StreamHeadRecord head, ObjectManifestRecord manifest, String commitId) {
         try {
             return new StreamCommitRecord(
                     request.streamId().value(),
@@ -1676,15 +1609,11 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private Optional<StreamHeadRecord> casHeadForCommit(
-            OxiaKeyspace keyspace,
-            StreamId streamId,
-            StreamHeadRecord expected,
-            StreamHeadRecord candidate) {
+            OxiaKeyspace keyspace, StreamId streamId, StreamHeadRecord expected, StreamHeadRecord candidate) {
         try {
             return casHead(keyspace, streamId, expected, candidate);
         } catch (NereusException e) {
-            throw new NereusException(
-                    e.code(), e.retriable(), e.getMessage(), e, AppendOutcome.MAY_HAVE_COMMITTED);
+            throw new NereusException(e.code(), e.retriable(), e.getMessage(), e, AppendOutcome.MAY_HAVE_COMMITTED);
         } catch (RuntimeException e) {
             Throwable cause = unwrap(e);
             if (cause instanceof UnexpectedVersionIdException) {
@@ -1702,10 +1631,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     private void validateCommitPreconditions(StreamHeadRecord head, CommitSliceRequest request) {
         if (!StreamState.ACTIVE.name().equals(head.state())) {
             throw appendFailure(
-                    ErrorCode.STREAM_NOT_ACTIVE,
-                    false,
-                    AppendOutcome.KNOWN_NOT_COMMITTED,
-                    "stream is not active");
+                    ErrorCode.STREAM_NOT_ACTIVE, false, AppendOutcome.KNOWN_NOT_COMMITTED, "stream is not active");
         }
         AppendSessionSnapshotRecord session = head.appendSession();
         if (session.isEmpty() || session.expiresAtMillis() <= clock.millis()) {
@@ -1735,21 +1661,31 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
 
     private void validateCommitPreconditions(StreamHeadRecord head, CommitAppendRequest request) {
         if (!StreamState.ACTIVE.name().equals(head.state())) {
-            throw appendFailure(ErrorCode.STREAM_NOT_ACTIVE, false, AppendOutcome.KNOWN_NOT_COMMITTED,
-                    "stream is not active");
+            throw appendFailure(
+                    ErrorCode.STREAM_NOT_ACTIVE, false, AppendOutcome.KNOWN_NOT_COMMITTED, "stream is not active");
         }
         AppendSessionSnapshotRecord session = head.appendSession();
         if (session.isEmpty() || session.expiresAtMillis() <= clock.millis()) {
-            throw appendFailure(ErrorCode.APPEND_SESSION_EXPIRED, true, AppendOutcome.KNOWN_NOT_COMMITTED,
+            throw appendFailure(
+                    ErrorCode.APPEND_SESSION_EXPIRED,
+                    true,
+                    AppendOutcome.KNOWN_NOT_COMMITTED,
                     "append session expired");
         }
-        if (!session.writerId().equals(request.writerId()) || session.epoch() != request.epoch()
+        if (!session.writerId().equals(request.writerId())
+                || session.epoch() != request.epoch()
                 || !session.fencingToken().equals(request.fencingToken())) {
-            throw appendFailure(ErrorCode.FENCED_APPEND, true, AppendOutcome.KNOWN_NOT_COMMITTED,
+            throw appendFailure(
+                    ErrorCode.FENCED_APPEND,
+                    true,
+                    AppendOutcome.KNOWN_NOT_COMMITTED,
                     "append session token does not match");
         }
         if (head.committedEndOffset() != request.expectedStartOffset()) {
-            throw appendFailure(ErrorCode.OFFSET_CONFLICT, true, AppendOutcome.KNOWN_NOT_COMMITTED,
+            throw appendFailure(
+                    ErrorCode.OFFSET_CONFLICT,
+                    true,
+                    AppendOutcome.KNOWN_NOT_COMMITTED,
                     "expected start offset does not match committed end");
         }
     }
@@ -1757,28 +1693,48 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     private StreamCommitTargetRecord buildTargetCommit(CommitAppendRequest request, StreamHeadRecord head) {
         try {
             return new StreamCommitTargetRecord(
-                    request.streamId().value(), request.commitId(), head.lastCommitId(),
-                    request.expectedStartOffset(), Math.addExact(request.expectedStartOffset(), request.recordCount()),
-                    0, Math.addExact(head.cumulativeSize(), request.logicalBytes()),
-                    Math.addExact(head.commitVersion(), 1), request.writerId(), request.writerRunIdHash(),
-                    request.epoch(), request.fencingTokenHash(), request.readTargetRecord(), request.payloadFormat().name(),
-                    request.recordCount(), request.entryCount(), request.logicalBytes(), request.schemaRefs(),
-                    request.projectionIdentity(), request.minEventTimeMillis(), request.maxEventTimeMillis(),
-                    clock.millis(), 0);
+                    request.streamId().value(),
+                    request.commitId(),
+                    head.lastCommitId(),
+                    request.expectedStartOffset(),
+                    Math.addExact(request.expectedStartOffset(), request.recordCount()),
+                    0,
+                    Math.addExact(head.cumulativeSize(), request.logicalBytes()),
+                    Math.addExact(head.commitVersion(), 1),
+                    request.writerId(),
+                    request.writerRunIdHash(),
+                    request.epoch(),
+                    request.fencingTokenHash(),
+                    request.readTargetRecord(),
+                    request.payloadFormat().name(),
+                    request.recordCount(),
+                    request.entryCount(),
+                    request.logicalBytes(),
+                    request.schemaRefs(),
+                    request.projectionIdentity(),
+                    request.minEventTimeMillis(),
+                    request.maxEventTimeMillis(),
+                    clock.millis(),
+                    0);
         } catch (ArithmeticException e) {
-            throw new NereusException(ErrorCode.INVALID_ARGUMENT, false, "generic commit fields overflow", e,
+            throw new NereusException(
+                    ErrorCode.INVALID_ARGUMENT,
+                    false,
+                    "generic commit fields overflow",
+                    e,
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
     }
 
-    private void validateReplay(
-            CommitAppendRequest request, StreamCommitTargetRecord replay, AppendOutcome outcome) {
+    private void validateReplay(CommitAppendRequest request, StreamCommitTargetRecord replay, AppendOutcome outcome) {
         AppendReplayRecords.requireMatches(request, replay, outcome);
     }
 
     private void validateCommitAgainstHead(
-            CommitAppendRequest request, StreamCommitTargetRecord commit,
-            StreamHeadRecord head, AppendOutcome outcome) {
+            CommitAppendRequest request,
+            StreamCommitTargetRecord commit,
+            StreamHeadRecord head,
+            AppendOutcome outcome) {
         long end;
         long cumulative;
         long version;
@@ -1789,19 +1745,27 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         } catch (ArithmeticException e) {
             throw new NereusException(ErrorCode.INVALID_ARGUMENT, false, "commit fields overflow", e, outcome);
         }
-        if (!commit.previousCommitId().equals(head.lastCommitId()) || commit.offsetStart() != request.expectedStartOffset()
-                || commit.offsetEnd() != end || commit.cumulativeSize() != cumulative || commit.commitVersion() != version) {
-            throw appendFailure(ErrorCode.METADATA_INVARIANT_VIOLATION, false, outcome,
+        if (!commit.previousCommitId().equals(head.lastCommitId())
+                || commit.offsetStart() != request.expectedStartOffset()
+                || commit.offsetEnd() != end
+                || commit.cumulativeSize() != cumulative
+                || commit.commitVersion() != version) {
+            throw appendFailure(
+                    ErrorCode.METADATA_INVARIANT_VIOLATION,
+                    false,
+                    outcome,
                     "stored generic commit does not match current head snapshot");
         }
     }
 
-    private ReachableCommittedAppend findGenericMarkerReplay(
-            OxiaKeyspace keyspace, CommitAppendRequest request) {
+    private ReachableCommittedAppend findGenericMarkerReplay(OxiaKeyspace keyspace, CommitAppendRequest request) {
         Optional<CommittedAppendRecord> marker = getRecord(
                 keyspace.committedAppendKey(request.streamId(), request.commitId()),
-                keyspace.streamPartitionKey(request.streamId()), CommittedAppendRecord.class);
-        if (marker.isEmpty()) return null;
+                keyspace.streamPartitionKey(request.streamId()),
+                CommittedAppendRecord.class);
+        if (marker.isEmpty()) {
+            return null;
+        }
         CommittedAppendRecord value = marker.orElseThrow();
         Object durable = getCommitValue(keyspace, request.streamId(), request.commitId())
                 .orElseThrow(() -> invariant("generic replay marker has no commit"));
@@ -1809,8 +1773,10 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             throw invariant("generic replay marker points to legacy commit bytes");
         }
         validateReplay(request, commit, AppendOutcome.KNOWN_COMMITTED);
-        if (!value.streamId().equals(commit.streamId()) || !value.commitId().equals(commit.commitId())
-                || value.offsetStart() != commit.offsetStart() || value.offsetEnd() != commit.offsetEnd()
+        if (!value.streamId().equals(commit.streamId())
+                || !value.commitId().equals(commit.commitId())
+                || value.offsetStart() != commit.offsetStart()
+                || value.offsetEnd() != commit.offsetEnd()
                 || value.commitVersion() != commit.commitVersion()
                 || !value.readTargetIdentitySha256().equals(commit.readTarget().identityChecksumValue())) {
             throw invariant("generic replay marker conflicts with commit");
@@ -1824,12 +1790,15 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
 
     private ReachableCommittedAppend reachable(
             StreamCommitTargetRecord commit, Optional<ProjectionRef> projectionRef, StreamHeadRecord head) {
-        return ReachableCommittedAppend.verified(toCommitted(commit, projectionRef), head.lastCommitId(),
-                head.committedEndOffset(), head.cumulativeSize(), head.commitVersion());
+        return ReachableCommittedAppend.verified(
+                toCommitted(commit, projectionRef),
+                head.lastCommitId(),
+                head.committedEndOffset(),
+                head.cumulativeSize(),
+                head.commitVersion());
     }
 
-    private CommittedAppend toCommitted(
-            StreamCommitTargetRecord commit, Optional<ProjectionRef> projectionRef) {
+    private CommittedAppend toCommitted(StreamCommitTargetRecord commit, Optional<ProjectionRef> projectionRef) {
         return AppendReplayRecords.hydrate(commit, projectionRef);
     }
 
@@ -1845,32 +1814,88 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 });
     }
 
+    private boolean isCommitReachableSync(
+            OxiaKeyspace keyspace, StreamCommitAnchor descendant, String ancestorCommitId, long ancestorCommitVersion) {
+        Objects.requireNonNull(descendant, "descendant");
+        Objects.requireNonNull(ancestorCommitId, "ancestorCommitId");
+        if (ancestorCommitId.isBlank() || ancestorCommitVersion <= 0) {
+            throw new IllegalArgumentException("ancestor commit ID/version must be nonblank and positive");
+        }
+        if (ancestorCommitVersion > descendant.commitVersion() || descendant.isGenesis()) {
+            return false;
+        }
+
+        StreamId streamId = descendant.streamId();
+        String current = descendant.lastCommitId();
+        ChainExpectation expectation = new ChainExpectation(
+                descendant.committedEndOffset(), descendant.cumulativeSize(), descendant.commitVersion());
+        int scanned = 0;
+        while (!current.isEmpty() && scanned < configuration.maxCommitChainScan()) {
+            Object durable = getCommitValue(keyspace, streamId, current)
+                    .orElseThrow(() -> invariant("commit reachability found a missing descendant commit"));
+            AnyCommit view = anyCommit(durable);
+            validateAnyCommit(streamId, current, view, expectation);
+            scanned++;
+            if (current.equals(ancestorCommitId)) {
+                return view.commitVersion() == ancestorCommitVersion;
+            }
+            if (view.commitVersion() <= ancestorCommitVersion) {
+                return false;
+            }
+            expectation = predecessorExpectation(view);
+            current = view.previousCommitId();
+        }
+        if (current.isEmpty()) {
+            if (!isGenesis(expectation)) {
+                throw invariant("commit reachability did not terminate at canonical genesis");
+            }
+            return false;
+        }
+        throw failure(
+                ErrorCode.METADATA_UNAVAILABLE,
+                true,
+                "commit reachability exhausted the configured commit-chain scan budget");
+    }
+
     private static AnyCommit anyCommit(Object durable) {
         if (durable instanceof StreamCommitRecord value) {
-            return new AnyCommit(value.streamId(), value.commitId(), value.previousCommitId(), value.offsetStart(),
-                    value.offsetEnd(), value.cumulativeSize(), value.commitVersion(), value.logicalBytes());
+            return new AnyCommit(
+                    value.streamId(),
+                    value.commitId(),
+                    value.previousCommitId(),
+                    value.offsetStart(),
+                    value.offsetEnd(),
+                    value.cumulativeSize(),
+                    value.commitVersion(),
+                    value.logicalBytes());
         }
         StreamCommitTargetRecord value = (StreamCommitTargetRecord) durable;
-        return new AnyCommit(value.streamId(), value.commitId(), value.previousCommitId(), value.offsetStart(),
-                value.offsetEnd(), value.cumulativeSize(), value.commitVersion(), value.logicalBytes());
+        return new AnyCommit(
+                value.streamId(),
+                value.commitId(),
+                value.previousCommitId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.cumulativeSize(),
+                value.commitVersion(),
+                value.logicalBytes());
     }
 
     private static void validateAnyCommit(
             StreamId streamId, String expectedId, AnyCommit commit, ChainExpectation expectation) {
-        if (!commit.streamId().equals(streamId.value()) || !commit.commitId().equals(expectedId)
+        if (!commit.streamId().equals(streamId.value())
+                || !commit.commitId().equals(expectedId)
                 || commit.offsetEnd() != expectation.offsetEnd()
                 || commit.cumulativeSize() != expectation.cumulativeSize()
                 || commit.commitVersion() != expectation.commitVersion()
-                || commit.offsetStart() < 0 || commit.offsetStart() >= commit.offsetEnd()
+                || commit.offsetStart() < 0
+                || commit.offsetStart() >= commit.offsetEnd()
                 || commit.cumulativeSize() < commit.logicalBytes()) {
             throw invariant("mixed-version commit chain record is inconsistent");
         }
     }
 
-    private void validateReplay(
-            CommitSliceRequest request,
-            StreamCommitRecord replay,
-            AppendOutcome outcome) {
+    private void validateReplay(CommitSliceRequest request, StreamCommitRecord replay, AppendOutcome outcome) {
         if (!replay.commitId().equals(request.commitId())
                 || !replay.streamId().equals(request.streamId().value())
                 || !replay.writerId().equals(request.writerId())
@@ -1888,7 +1913,8 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 || !replay.objectType().equals(ObjectType.MULTI_STREAM_WAL_OBJECT.name())
                 || !replay.physicalFormat().equals("WAL_OBJECT_V1")
                 || !replay.logicalFormat().equals("OPAQUE_SLICE")
-                || !replay.objectChecksumType().equals(request.objectChecksum().type().name())
+                || !replay.objectChecksumType()
+                        .equals(request.objectChecksum().type().name())
                 || !replay.objectChecksumValue().equals(request.objectChecksum().value())
                 || replay.objectOffset() != request.objectOffset()
                 || replay.objectLength() != request.objectLength()
@@ -1897,7 +1923,8 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 || !replay.schemaRefs().equals(request.schemaRefs())
                 || !replay.entryIndexRef().equals(EntryIndexReferenceRecord.fromApi(request.entryIndexRef()))
                 || !replay.projectionRef().equals(request.projectionIdentity())
-                || !replay.sliceChecksumType().equals(request.sliceChecksum().type().name())
+                || !replay.sliceChecksumType()
+                        .equals(request.sliceChecksum().type().name())
                 || !replay.sliceChecksumValue().equals(request.sliceChecksum().value())
                 || replay.minEventTimeMillis() != request.minEventTimeMillis()
                 || replay.maxEventTimeMillis() != request.maxEventTimeMillis()) {
@@ -1907,10 +1934,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private void validateCommitAgainstHead(
-            CommitSliceRequest request,
-            StreamCommitRecord commit,
-            StreamHeadRecord head,
-            AppendOutcome outcome) {
+            CommitSliceRequest request, StreamCommitRecord commit, StreamHeadRecord head, AppendOutcome outcome) {
         long end;
         long cumulative;
         long version;
@@ -1973,10 +1997,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         return commit;
     }
 
-    private SearchResult searchReplay(
-            OxiaKeyspace keyspace,
-            CommitSliceRequest request,
-            String commitId) {
+    private SearchResult searchReplay(OxiaKeyspace keyspace, CommitSliceRequest request, String commitId) {
         return searchReachable(
                 keyspace,
                 request.streamId(),
@@ -2025,26 +2046,25 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         if (current.isEmpty() && !isGenesis(expectation)) {
             return new SearchResult(SearchStatus.BROKEN, null, scanned);
         }
-        return new SearchResult(
-                current.isEmpty() ? SearchStatus.NOT_FOUND : SearchStatus.EXHAUSTED,
-                null,
-                scanned);
+        return new SearchResult(current.isEmpty() ? SearchStatus.NOT_FOUND : SearchStatus.EXHAUSTED, null, scanned);
     }
 
     private StreamCommitRecord appendSearchResult(SearchResult result, String operation) {
         return switch (result.status()) {
             case FOUND -> result.commit();
             case NOT_FOUND -> null;
-            case EXHAUSTED -> throw appendFailure(
-                    ErrorCode.METADATA_UNAVAILABLE,
-                    true,
-                    AppendOutcome.MAY_HAVE_COMMITTED,
-                    operation + " exhausted the commit-chain scan budget");
-            case BROKEN -> throw appendFailure(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION,
-                    false,
-                    AppendOutcome.MAY_HAVE_COMMITTED,
-                    operation + " found a broken commit chain");
+            case EXHAUSTED ->
+                throw appendFailure(
+                        ErrorCode.METADATA_UNAVAILABLE,
+                        true,
+                        AppendOutcome.MAY_HAVE_COMMITTED,
+                        operation + " exhausted the commit-chain scan budget");
+            case BROKEN ->
+                throw appendFailure(
+                        ErrorCode.METADATA_INVARIANT_VIOLATION,
+                        false,
+                        AppendOutcome.MAY_HAVE_COMMITTED,
+                        operation + " found a broken commit chain");
         };
     }
 
@@ -2059,10 +2079,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private ChainExpectation validateReachableCommit(
-            StreamId streamId,
-            String expectedId,
-            StreamCommitRecord commit,
-            ChainExpectation expectation) {
+            StreamId streamId, String expectedId, StreamCommitRecord commit, ChainExpectation expectation) {
         long calculatedEnd;
         try {
             calculatedEnd = Math.addExact(commit.offsetStart(), commit.recordCount());
@@ -2086,8 +2103,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         if (previousSize < 0
                 || (commit.previousCommitId().isEmpty()
                         && (commit.offsetStart() != 0 || previousSize != 0 || previousVersion != 0))
-                || (!commit.previousCommitId().isEmpty()
-                        && (commit.offsetStart() == 0 || previousVersion <= 0))) {
+                || (!commit.previousCommitId().isEmpty() && (commit.offsetStart() == 0 || previousVersion <= 0))) {
             throw invariant("commit chain predecessor is inconsistent");
         }
         return new ChainExpectation(commit.offsetStart(), previousSize, previousVersion);
@@ -2113,7 +2129,10 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 || cursor.nextCommitVersion() >= observed.commitVersion()) {
             throw invariant("repair continuation position is invalid");
         }
-        validateAnyCommit(streamId, cursor.observedHeadCommitId(), observed,
+        validateAnyCommit(
+                streamId,
+                cursor.observedHeadCommitId(),
+                observed,
                 new ChainExpectation(observed.offsetEnd(), observed.cumulativeSize(), observed.commitVersion()));
     }
 
@@ -2136,8 +2155,14 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             }
         }
         CommittedSliceRecord marker = new CommittedSliceRecord(
-                commit.streamId(), commit.objectId(), commit.sliceId(), commit.offsetStart(), commit.offsetEnd(),
-                commit.generation(), commit.commitVersion(), 0);
+                commit.streamId(),
+                commit.objectId(),
+                commit.sliceId(),
+                commit.offsetStart(),
+                commit.offsetEnd(),
+                commit.generation(),
+                commit.commitVersion(),
+                0);
         String markerKey = keyspace.committedSliceKey(streamId, objectId, commit.sliceId());
         try {
             putIfAbsent(markerKey, keyspace.streamPartitionKey(streamId), marker, CommittedSliceRecord.class);
@@ -2159,22 +2184,43 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         StreamId streamId = new StreamId(commit.streamId());
         boolean repaired = false;
         OffsetIndexTargetRecord index = new OffsetIndexTargetRecord(
-                commit.streamId(), commit.offsetStart(), commit.offsetEnd(), commit.generation(),
-                commit.cumulativeSize(), commit.readTarget(), commit.payloadFormat(), commit.recordCount(),
-                commit.entryCount(), commit.logicalBytes(), commit.schemaRefs(), commit.projectionRef(),
-                commit.minEventTimeMillis(), commit.maxEventTimeMillis(), commit.commitVersion(), false, 0);
+                commit.streamId(),
+                commit.offsetStart(),
+                commit.offsetEnd(),
+                commit.generation(),
+                commit.cumulativeSize(),
+                commit.readTarget(),
+                commit.payloadFormat(),
+                commit.recordCount(),
+                commit.entryCount(),
+                commit.logicalBytes(),
+                commit.schemaRefs(),
+                commit.projectionRef(),
+                commit.minEventTimeMillis(),
+                commit.maxEventTimeMillis(),
+                commit.commitVersion(),
+                false,
+                0);
         String indexKey = keyspace.offsetIndexKey(streamId, commit.offsetEnd(), commit.generation());
-        if (getRecord(indexKey, keyspace.streamPartitionKey(streamId), OffsetIndexTargetRecord.class).isEmpty()) {
+        if (getRecord(indexKey, keyspace.streamPartitionKey(streamId), OffsetIndexTargetRecord.class)
+                .isEmpty()) {
             putOrCompare(indexKey, keyspace.streamPartitionKey(streamId), index, OffsetIndexTargetRecord.class);
             repaired = true;
         } else {
             putOrCompare(indexKey, keyspace.streamPartitionKey(streamId), index, OffsetIndexTargetRecord.class);
         }
         CommittedAppendRecord marker = new CommittedAppendRecord(
-                commit.streamId(), commit.commitId(), commit.offsetStart(), commit.offsetEnd(), commit.generation(),
-                commit.commitVersion(), commit.readTarget().identityChecksumValue(), 0);
+                commit.streamId(),
+                commit.commitId(),
+                commit.offsetStart(),
+                commit.offsetEnd(),
+                commit.generation(),
+                commit.commitVersion(),
+                commit.readTarget().identityChecksumValue(),
+                0);
         String markerKey = keyspace.committedAppendKey(streamId, commit.commitId());
-        if (getRecord(markerKey, keyspace.streamPartitionKey(streamId), CommittedAppendRecord.class).isEmpty()) {
+        if (getRecord(markerKey, keyspace.streamPartitionKey(streamId), CommittedAppendRecord.class)
+                .isEmpty()) {
             putOrCompare(markerKey, keyspace.streamPartitionKey(streamId), marker, CommittedAppendRecord.class);
             repaired = true;
         } else {
@@ -2193,19 +2239,37 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
 
     private OffsetIndexRecord toOffsetIndex(StreamCommitRecord commit) {
         return new OffsetIndexRecord(
-                commit.streamId(), commit.offsetStart(), commit.offsetEnd(), commit.generation(),
-                commit.cumulativeSize(), commit.objectId(), commit.objectKey(), commit.sliceId(), commit.objectType(),
-                commit.physicalFormat(), commit.logicalFormat(), commit.payloadFormat(), commit.objectOffset(),
-                commit.objectLength(), commit.recordCount(), commit.entryCount(), commit.logicalBytes(),
-                commit.schemaRefs(), commit.entryIndexRef(), commit.projectionRef(), commit.sliceChecksumType(),
-                commit.sliceChecksumValue(), commit.minEventTimeMillis(), commit.maxEventTimeMillis(),
-                commit.commitVersion(), false, 0);
+                commit.streamId(),
+                commit.offsetStart(),
+                commit.offsetEnd(),
+                commit.generation(),
+                commit.cumulativeSize(),
+                commit.objectId(),
+                commit.objectKey(),
+                commit.sliceId(),
+                commit.objectType(),
+                commit.physicalFormat(),
+                commit.logicalFormat(),
+                commit.payloadFormat(),
+                commit.objectOffset(),
+                commit.objectLength(),
+                commit.recordCount(),
+                commit.entryCount(),
+                commit.logicalBytes(),
+                commit.schemaRefs(),
+                commit.entryIndexRef(),
+                commit.projectionRef(),
+                commit.sliceChecksumType(),
+                commit.sliceChecksumValue(),
+                commit.minEventTimeMillis(),
+                commit.maxEventTimeMillis(),
+                commit.commitVersion(),
+                false,
+                0);
     }
 
     private VisibleSliceReferenceRecord findReachableManifestCommit(
-            OxiaKeyspace keyspace,
-            ObjectManifestRecord manifest,
-            StreamSliceManifestRecord slice) {
+            OxiaKeyspace keyspace, ObjectManifestRecord manifest, StreamSliceManifestRecord slice) {
         StreamId streamId = new StreamId(slice.streamId());
         StreamHeadRecord head = headOrThrow(keyspace, streamId);
         String commitId = head.lastCommitId();
@@ -2218,7 +2282,8 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             validateAnyCommit(streamId, commitId, view, expectation);
             boolean matches = false;
             if (durable instanceof StreamCommitRecord legacy) {
-                if (legacy.objectId().equals(manifest.objectId()) && legacy.sliceId().equals(slice.sliceId())) {
+                if (legacy.objectId().equals(manifest.objectId())
+                        && legacy.sliceId().equals(slice.sliceId())) {
                     if (!commitMatchesManifest(manifest, slice, legacy)) {
                         throw invariant("reachable commit conflicts with object manifest slice");
                     }
@@ -2247,25 +2312,32 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                     matches = true;
                 }
             }
-            if (matches) return new VisibleSliceReferenceRecord(
-                    view.streamId(), slice.sliceId(), view.offsetStart(), view.offsetEnd(), 0, view.commitVersion());
+            if (matches) {
+                return new VisibleSliceReferenceRecord(
+                        view.streamId(),
+                        slice.sliceId(),
+                        view.offsetStart(),
+                        view.offsetEnd(),
+                        0,
+                        view.commitVersion());
+            }
             commitId = view.previousCommitId();
             expectation = new ChainExpectation(
                     view.offsetStart(), view.cumulativeSize() - view.logicalBytes(), view.commitVersion() - 1);
         }
-        if (!commitId.isEmpty()) throw failure(
-                ErrorCode.METADATA_UNAVAILABLE, true, "object repair exhausted commit-chain scan budget");
+        if (!commitId.isEmpty()) {
+            throw failure(ErrorCode.METADATA_UNAVAILABLE, true, "object repair exhausted commit-chain scan budget");
+        }
         return null;
     }
 
     private void updateObjectAuditBestEffort(
-            OxiaKeyspace keyspace,
-            ObjectManifestRecord original,
-            StreamCommitRecord commit) {
+            OxiaKeyspace keyspace, ObjectManifestRecord original, StreamCommitRecord commit) {
         try {
             ObjectId objectId = new ObjectId(original.objectId());
             for (int attempt = 0; attempt < MAX_CAS_RETRIES; attempt++) {
-                ObjectManifestRecord current = getObjectManifestSync(keyspace, objectId).orElseThrow();
+                ObjectManifestRecord current =
+                        getObjectManifestSync(keyspace, objectId).orElseThrow();
                 List<StreamSliceManifestRecord> slices = current.slices().stream()
                         .map(slice -> slice.streamId().equals(commit.streamId())
                                         && slice.sliceId().equals(commit.sliceId())
@@ -2293,25 +2365,21 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         }
     }
 
-    private Optional<StreamCommitRecord> getCommit(
-            OxiaKeyspace keyspace,
-            StreamId streamId,
-            String commitId) {
+    private Optional<StreamCommitRecord> getCommit(OxiaKeyspace keyspace, StreamId streamId, String commitId) {
         Optional<StreamCommitRecord> result = getRecord(
                 keyspace.streamCommitKey(streamId, commitId),
                 keyspace.streamPartitionKey(streamId),
                 StreamCommitRecord.class);
         result.ifPresent(commit -> {
-            if (!commit.streamId().equals(streamId.value()) || !commit.commitId().equals(commitId)) {
+            if (!commit.streamId().equals(streamId.value())
+                    || !commit.commitId().equals(commitId)) {
                 throw invariant("stream commit key/value identity mismatch");
             }
         });
         return result;
     }
 
-    private static CommitSliceResult commitResult(
-            StreamCommitRecord commit,
-            Optional<ProjectionRef> projection) {
+    private static CommitSliceResult commitResult(StreamCommitRecord commit, Optional<ProjectionRef> projection) {
         return new CommitSliceResult(
                 new StreamId(commit.streamId()),
                 new OffsetRange(commit.offsetStart(), commit.offsetEnd()),
@@ -2339,9 +2407,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private static boolean commitMatchesManifest(
-            ObjectManifestRecord manifest,
-            StreamSliceManifestRecord slice,
-            StreamCommitRecord commit) {
+            ObjectManifestRecord manifest, StreamSliceManifestRecord slice, StreamCommitRecord commit) {
         return commit.streamId().equals(slice.streamId())
                 && commit.objectId().equals(manifest.objectId())
                 && commit.objectKey().equals(manifest.objectKey())
@@ -2366,9 +2432,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private static boolean isGenesis(ChainExpectation expectation) {
-        return expectation.offsetEnd() == 0
-                && expectation.cumulativeSize() == 0
-                && expectation.commitVersion() == 0;
+        return expectation.offsetEnd() == 0 && expectation.cumulativeSize() == 0 && expectation.commitVersion() == 0;
     }
 
     private static long expectedEnd(CommitSliceRequest request) {
@@ -2384,10 +2448,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private static NereusException appendFailure(
-            ErrorCode code,
-            boolean retriable,
-            AppendOutcome outcome,
-            String message) {
+            ErrorCode code, boolean retriable, AppendOutcome outcome, String message) {
         return new NereusException(code, retriable, message, outcome);
     }
 
@@ -2406,9 +2467,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
 
     private Optional<StreamHeadRecord> getHead(OxiaKeyspace keyspace, StreamId streamId) {
         Optional<StreamHeadRecord> result = getRecord(
-                keyspace.streamHeadKey(streamId),
-                keyspace.streamPartitionKey(streamId),
-                StreamHeadRecord.class);
+                keyspace.streamHeadKey(streamId), keyspace.streamPartitionKey(streamId), StreamHeadRecord.class);
         result.ifPresent(head -> {
             StreamName streamName;
             try {
@@ -2425,9 +2484,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         return result;
     }
 
-    private Optional<ObjectReferenceRecord> getObjectReferencesSync(
-            OxiaKeyspace keyspace,
-            ObjectId objectId) {
+    private Optional<ObjectReferenceRecord> getObjectReferencesSync(OxiaKeyspace keyspace, ObjectId objectId) {
         Optional<ObjectReferenceRecord> result = getRecord(
                 keyspace.objectReferencesKey(objectId),
                 keyspace.objectPartitionKey(objectId),
@@ -2441,9 +2498,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private OffsetIndexEntry decodeOffsetIndexEntry(
-            OxiaKeyspace keyspace,
-            StreamId streamId,
-            PartitionedOxiaClient.VersionedValue value) {
+            OxiaKeyspace keyspace, StreamId streamId, PartitionedOxiaClient.VersionedValue value) {
         String type = MetadataRecordCodecFactory.recordType(value.value());
         OffsetIndexEntry entry;
         if (type.equals("OffsetIndexRecord")) {
@@ -2452,33 +2507,61 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             EntryIndexRef index = new EntryIndexRef(
                     EntryIndexLocation.valueOf(rawIndex.location()),
                     rawIndex.objectId().isEmpty() ? Optional.empty() : Optional.of(new ObjectId(rawIndex.objectId())),
-                    rawIndex.objectKey().isEmpty() ? Optional.empty() : Optional.of(new ObjectKey(rawIndex.objectKey())),
+                    rawIndex.objectKey().isEmpty()
+                            ? Optional.empty()
+                            : Optional.of(new ObjectKey(rawIndex.objectKey())),
                     rawIndex.inlineData().length == 0 ? Optional.empty() : Optional.of(rawIndex.inlineData()),
-                    rawIndex.offset(), rawIndex.length(),
+                    rawIndex.offset(),
+                    rawIndex.length(),
                     new Checksum(ChecksumType.valueOf(rawIndex.checksumType()), rawIndex.checksumValue()));
             ObjectSliceReadTarget target = new ObjectSliceReadTarget(
-                    1, new ObjectId(record.objectId()), new ObjectKey(record.objectKey()),
-                    ObjectType.valueOf(record.objectType()), record.physicalFormat(), record.logicalFormat(),
-                    record.sliceId(), record.objectOffset(), record.objectLength(),
-                    new Checksum(ChecksumType.valueOf(record.sliceChecksumType()), record.sliceChecksumValue()), index);
-            entry = new OffsetIndexEntry(streamId, new OffsetRange(record.offsetStart(), record.offsetEnd()),
-                    record.generation(), record.cumulativeSize(), target, PayloadFormat.valueOf(record.payloadFormat()),
-                    record.recordCount(), record.entryCount(), record.logicalBytes(), record.schemaRefs(),
-                    ProjectionIdentity.decode(record.projectionRef()), record.commitVersion(), record.tombstoned(),
+                    1,
+                    new ObjectId(record.objectId()),
+                    new ObjectKey(record.objectKey()),
+                    ObjectType.valueOf(record.objectType()),
+                    record.physicalFormat(),
+                    record.logicalFormat(),
+                    record.sliceId(),
+                    record.objectOffset(),
+                    record.objectLength(),
+                    new Checksum(ChecksumType.valueOf(record.sliceChecksumType()), record.sliceChecksumValue()),
+                    index);
+            entry = new OffsetIndexEntry(
+                    streamId,
+                    new OffsetRange(record.offsetStart(), record.offsetEnd()),
+                    record.generation(),
+                    record.cumulativeSize(),
+                    target,
+                    PayloadFormat.valueOf(record.payloadFormat()),
+                    record.recordCount(),
+                    record.entryCount(),
+                    record.logicalBytes(),
+                    record.schemaRefs(),
+                    ProjectionIdentity.decode(record.projectionRef()),
+                    record.commitVersion(),
+                    record.tombstoned(),
                     record.metadataVersion());
         } else if (type.equals("OffsetIndexTargetRecord")) {
             OffsetIndexTargetRecord record = decode(value, OffsetIndexTargetRecord.class);
-            entry = new OffsetIndexEntry(streamId, new OffsetRange(record.offsetStart(), record.offsetEnd()),
-                    record.generation(), record.cumulativeSize(),
+            entry = new OffsetIndexEntry(
+                    streamId,
+                    new OffsetRange(record.offsetStart(), record.offsetEnd()),
+                    record.generation(),
+                    record.cumulativeSize(),
                     ReadTargetCodecRegistry.phase15().decode(record.readTarget()),
-                    PayloadFormat.valueOf(record.payloadFormat()), record.recordCount(), record.entryCount(),
-                    record.logicalBytes(), record.schemaRefs(), ProjectionIdentity.decode(record.projectionRef()),
-                    record.commitVersion(), record.tombstoned(), record.metadataVersion());
+                    PayloadFormat.valueOf(record.payloadFormat()),
+                    record.recordCount(),
+                    record.entryCount(),
+                    record.logicalBytes(),
+                    record.schemaRefs(),
+                    ProjectionIdentity.decode(record.projectionRef()),
+                    record.commitVersion(),
+                    record.tombstoned(),
+                    record.metadataVersion());
         } else {
             throw invariant("unexpected record type at offset-index key: " + type);
         }
-        String expectedKey = keyspace.offsetIndexKey(
-                streamId, entry.range().endOffset(), entry.generation());
+        String expectedKey = keyspace.offsetIndexKey(streamId, entry.range().endOffset(), entry.generation());
         if (!entry.streamId().equals(streamId) || !value.key().equals(expectedKey)) {
             throw invariant("offset index key/value identity mismatch");
         }
@@ -2495,12 +2578,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                         head.cumulativeSize(),
                         head.commitVersion(),
                         head.metadataVersion()),
-                new TrimRecord(
-                        head.streamId(),
-                        head.trimOffset(),
-                        "",
-                        observedAtMillis,
-                        head.metadataVersion()));
+                new TrimRecord(head.streamId(), head.trimOffset(), "", observedAtMillis, head.metadataVersion()));
     }
 
     private StreamHeadRecord headOrThrow(OxiaKeyspace keyspace, StreamId streamId) {
@@ -2508,53 +2586,33 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 .orElseThrow(() -> failure(ErrorCode.STREAM_NOT_FOUND, false, "stream does not exist"));
     }
 
-    private <T> Optional<T> getRecord(
-            String key,
-            PartitionKey partitionKey,
-            Class<T> recordClass) {
+    private <T> Optional<T> getRecord(String key, PartitionKey partitionKey, Class<T> recordClass) {
         return join(client.get(key, partitionKey)).map(value -> decode(value, recordClass));
     }
 
     private <T> Optional<DurableRecord<T>> getDurableRecord(
-            String key,
-            PartitionKey partitionKey,
-            Class<T> recordClass) {
-        return join(client.get(key, partitionKey)).map(value -> new DurableRecord<>(
-                value.key(),
-                decode(value, recordClass),
-                value.version(),
-                sha256(value.value())));
+            String key, PartitionKey partitionKey, Class<T> recordClass) {
+        return join(client.get(key, partitionKey))
+                .map(value -> new DurableRecord<>(
+                        value.key(), decode(value, recordClass), value.version(), sha256(value.value())));
     }
 
-    private <T> T putIfAbsent(
-            String key,
-            PartitionKey partitionKey,
-            T record,
-            Class<T> recordClass) {
-        PartitionedOxiaClient.WriteResult result = join(client.putIfAbsent(
-                key, encode(record, recordClass), partitionKey));
+    private <T> T putIfAbsent(String key, PartitionKey partitionKey, T record, Class<T> recordClass) {
+        PartitionedOxiaClient.WriteResult result =
+                join(client.putIfAbsent(key, encode(record, recordClass), partitionKey));
         return hydrate(record, result.version(), recordClass);
     }
 
     private <T> DurableRecord<T> putIfAbsentDurable(
-            String key,
-            PartitionKey partitionKey,
-            T record,
-            Class<T> recordClass) {
+            String key, PartitionKey partitionKey, T record, Class<T> recordClass) {
         byte[] bytes = encode(record, recordClass);
         PartitionedOxiaClient.WriteResult result = join(client.putIfAbsent(key, bytes, partitionKey));
         return new DurableRecord<>(
-                key,
-                hydrate(record, result.version(), recordClass),
-                result.version(),
-                sha256(bytes));
+                key, hydrate(record, result.version(), recordClass), result.version(), sha256(bytes));
     }
 
     private <T> DurableRecord<T> putOrCompareDurable(
-            String key,
-            PartitionKey partitionKey,
-            T candidate,
-            Class<T> type) {
+            String key, PartitionKey partitionKey, T candidate, Class<T> type) {
         try {
             return putIfAbsentDurable(key, partitionKey, candidate, type);
         } catch (BackendConditionException e) {
@@ -2569,21 +2627,14 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private <T> T putIfVersion(
-            String key,
-            PartitionKey partitionKey,
-            T record,
-            long expectedVersion,
-            Class<T> recordClass) {
-        PartitionedOxiaClient.WriteResult result = join(client.putIfVersion(
-                key, encode(record, recordClass), expectedVersion, partitionKey));
+            String key, PartitionKey partitionKey, T record, long expectedVersion, Class<T> recordClass) {
+        PartitionedOxiaClient.WriteResult result =
+                join(client.putIfVersion(key, encode(record, recordClass), expectedVersion, partitionKey));
         return hydrate(record, result.version(), recordClass);
     }
 
     private Optional<StreamHeadRecord> casHead(
-            OxiaKeyspace keyspace,
-            StreamId streamId,
-            StreamHeadRecord expected,
-            StreamHeadRecord candidate) {
+            OxiaKeyspace keyspace, StreamId streamId, StreamHeadRecord expected, StreamHeadRecord candidate) {
         try {
             return Optional.of(putIfVersion(
                     keyspace.streamHeadKey(streamId),
@@ -2611,45 +2662,114 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         Object hydrated;
         if (record instanceof StreamHeadRecord value) {
             hydrated = new StreamHeadRecord(
-                    value.streamId(), value.streamName(), value.streamNameHash(), value.state(), value.profile(),
-                    value.attributes(), value.createdAtMillis(), value.policyVersion(), value.committedEndOffset(),
-                    value.cumulativeSize(), value.commitVersion(), value.trimOffset(), value.lastCommitId(),
-                    value.appendSession(), version);
+                    value.streamId(),
+                    value.streamName(),
+                    value.streamNameHash(),
+                    value.state(),
+                    value.profile(),
+                    value.attributes(),
+                    value.createdAtMillis(),
+                    value.policyVersion(),
+                    value.committedEndOffset(),
+                    value.cumulativeSize(),
+                    value.commitVersion(),
+                    value.trimOffset(),
+                    value.lastCommitId(),
+                    value.appendSession(),
+                    version);
         } else if (record instanceof StreamCommitRecord value) {
             hydrated = copyCommit(value, version);
         } else if (record instanceof StreamCommitTargetRecord value) {
             hydrated = new StreamCommitTargetRecord(
-                    value.streamId(), value.commitId(), value.previousCommitId(), value.offsetStart(), value.offsetEnd(),
-                    value.generation(), value.cumulativeSize(), value.commitVersion(), value.writerId(),
-                    value.writerRunIdHash(), value.writerEpoch(), value.fencingTokenHash(), value.readTarget(),
-                    value.payloadFormat(), value.recordCount(), value.entryCount(), value.logicalBytes(),
-                    value.schemaRefs(), value.projectionRef(), value.minEventTimeMillis(), value.maxEventTimeMillis(),
-                    value.preparedAtMillis(), version);
+                    value.streamId(),
+                    value.commitId(),
+                    value.previousCommitId(),
+                    value.offsetStart(),
+                    value.offsetEnd(),
+                    value.generation(),
+                    value.cumulativeSize(),
+                    value.commitVersion(),
+                    value.writerId(),
+                    value.writerRunIdHash(),
+                    value.writerEpoch(),
+                    value.fencingTokenHash(),
+                    value.readTarget(),
+                    value.payloadFormat(),
+                    value.recordCount(),
+                    value.entryCount(),
+                    value.logicalBytes(),
+                    value.schemaRefs(),
+                    value.projectionRef(),
+                    value.minEventTimeMillis(),
+                    value.maxEventTimeMillis(),
+                    value.preparedAtMillis(),
+                    version);
         } else if (record instanceof ObjectManifestRecord value) {
             hydrated = new ObjectManifestRecord(
-                    value.objectId(), value.objectKey(), value.objectType(), value.state(), value.formatMajorVersion(),
-                    value.formatMinorVersion(), value.writerVersion(), value.writerId(), value.writerRunIdHash(),
-                    value.writerEpoch(), value.createdAtMillis(), value.uploadedAtMillis(), value.objectLength(),
-                    value.objectChecksumType(), value.objectChecksumValue(), value.storageChecksumType(),
-                    value.storageChecksumValue(), value.slices(), value.orphanExpiresAtMillis(), version);
+                    value.objectId(),
+                    value.objectKey(),
+                    value.objectType(),
+                    value.state(),
+                    value.formatMajorVersion(),
+                    value.formatMinorVersion(),
+                    value.writerVersion(),
+                    value.writerId(),
+                    value.writerRunIdHash(),
+                    value.writerEpoch(),
+                    value.createdAtMillis(),
+                    value.uploadedAtMillis(),
+                    value.objectLength(),
+                    value.objectChecksumType(),
+                    value.objectChecksumValue(),
+                    value.storageChecksumType(),
+                    value.storageChecksumValue(),
+                    value.slices(),
+                    value.orphanExpiresAtMillis(),
+                    version);
         } else if (record instanceof ObjectReferenceRecord value) {
-            hydrated = new ObjectReferenceRecord(value.objectId(), value.visibleSlices(), value.updatedAtMillis(), version);
+            hydrated = new ObjectReferenceRecord(
+                    value.objectId(), value.visibleSlices(), value.updatedAtMillis(), version);
         } else if (record instanceof OffsetIndexRecord value) {
             hydrated = copyOffsetIndex(value, version);
         } else if (record instanceof OffsetIndexTargetRecord value) {
             hydrated = new OffsetIndexTargetRecord(
-                    value.streamId(), value.offsetStart(), value.offsetEnd(), value.generation(), value.cumulativeSize(),
-                    value.readTarget(), value.payloadFormat(), value.recordCount(), value.entryCount(), value.logicalBytes(),
-                    value.schemaRefs(), value.projectionRef(), value.minEventTimeMillis(), value.maxEventTimeMillis(),
-                    value.commitVersion(), value.tombstoned(), version);
+                    value.streamId(),
+                    value.offsetStart(),
+                    value.offsetEnd(),
+                    value.generation(),
+                    value.cumulativeSize(),
+                    value.readTarget(),
+                    value.payloadFormat(),
+                    value.recordCount(),
+                    value.entryCount(),
+                    value.logicalBytes(),
+                    value.schemaRefs(),
+                    value.projectionRef(),
+                    value.minEventTimeMillis(),
+                    value.maxEventTimeMillis(),
+                    value.commitVersion(),
+                    value.tombstoned(),
+                    version);
         } else if (record instanceof CommittedSliceRecord value) {
             hydrated = new CommittedSliceRecord(
-                    value.streamId(), value.objectId(), value.sliceId(), value.offsetStart(), value.offsetEnd(),
-                    value.generation(), value.commitVersion(), version);
+                    value.streamId(),
+                    value.objectId(),
+                    value.sliceId(),
+                    value.offsetStart(),
+                    value.offsetEnd(),
+                    value.generation(),
+                    value.commitVersion(),
+                    version);
         } else if (record instanceof CommittedAppendRecord value) {
             hydrated = new CommittedAppendRecord(
-                    value.streamId(), value.commitId(), value.offsetStart(), value.offsetEnd(), value.generation(),
-                    value.commitVersion(), value.readTargetIdentitySha256(), version);
+                    value.streamId(),
+                    value.commitId(),
+                    value.offsetStart(),
+                    value.offsetEnd(),
+                    value.generation(),
+                    value.commitVersion(),
+                    value.readTargetIdentitySha256(),
+                    version);
         } else if (record instanceof StreamNameRecord value) {
             hydrated = new StreamNameRecord(
                     value.streamName(), value.streamId(), value.streamNameHash(), value.createdAtMillis(), version);
@@ -2660,17 +2780,17 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private void putStreamNameAuditBestEffort(
-            OxiaKeyspace keyspace,
-            StreamName streamName,
-            StreamId streamId,
-            long createdAtMillis) {
+            OxiaKeyspace keyspace, StreamName streamName, StreamId streamId, long createdAtMillis) {
         try {
             putIfAbsent(
                     keyspace.streamNameKey(streamName),
                     keyspace.streamPartitionKey(streamId),
                     new StreamNameRecord(
-                            streamName.value(), streamId.value(), DeterministicIds.streamNameHash(streamName),
-                            createdAtMillis, 0),
+                            streamName.value(),
+                            streamId.value(),
+                            DeterministicIds.streamNameHash(streamName),
+                            createdAtMillis,
+                            0),
                     StreamNameRecord.class);
         } catch (RuntimeException ignored) {
             // The deterministic stream head remains authoritative.
@@ -2682,41 +2802,41 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             return NereusException.failedFuture(ErrorCode.STORAGE_CLOSED, false, "metadata store is closed");
         }
         try {
-            return CompletableFuture.supplyAsync(() -> {
-                ensureOpen();
-                try {
-                    return operation.call();
-                } catch (Throwable error) {
-                    throw normalize(error, Optional.empty());
-                }
-            }, operationExecutor);
+            return CompletableFuture.supplyAsync(
+                    () -> {
+                        ensureOpen();
+                        try {
+                            return operation.call();
+                        } catch (Throwable error) {
+                            throw normalize(error, Optional.empty());
+                        }
+                    },
+                    operationExecutor);
         } catch (RejectedExecutionException e) {
             if (!closed.get()) {
                 return NereusException.failedFuture(
                         ErrorCode.BACKPRESSURE_REJECTED, true, "metadata operation queue is full");
             }
-            return NereusException.failedFuture(
-                    ErrorCode.STORAGE_CLOSED, false, "metadata store is closing");
+            return NereusException.failedFuture(ErrorCode.STORAGE_CLOSED, false, "metadata store is closing");
         }
     }
 
     private <T> CompletableFuture<T> completeAppend(Callable<T> operation) {
         if (closed.get()) {
             return NereusException.failedAppendFuture(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    AppendOutcome.KNOWN_NOT_COMMITTED,
-                    "metadata store is closed");
+                    ErrorCode.STORAGE_CLOSED, false, AppendOutcome.KNOWN_NOT_COMMITTED, "metadata store is closed");
         }
         try {
-            return CompletableFuture.supplyAsync(() -> {
-                ensureOpen();
-                try {
-                    return operation.call();
-                } catch (Throwable error) {
-                    throw normalize(error, Optional.of(AppendOutcome.KNOWN_NOT_COMMITTED));
-                }
-            }, operationExecutor);
+            return CompletableFuture.supplyAsync(
+                    () -> {
+                        ensureOpen();
+                        try {
+                            return operation.call();
+                        } catch (Throwable error) {
+                            throw normalize(error, Optional.of(AppendOutcome.KNOWN_NOT_COMMITTED));
+                        }
+                    },
+                    operationExecutor);
         } catch (RejectedExecutionException e) {
             if (!closed.get()) {
                 return NereusException.failedAppendFuture(
@@ -2726,10 +2846,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                         "metadata operation queue is full");
             }
             return NereusException.failedAppendFuture(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    AppendOutcome.KNOWN_NOT_COMMITTED,
-                    "metadata store is closing");
+                    ErrorCode.STORAGE_CLOSED, false, AppendOutcome.KNOWN_NOT_COMMITTED, "metadata store is closing");
         }
     }
 
@@ -2758,8 +2875,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             retriable = true;
         }
         String message = "Oxia metadata operation failed: " + cause.getClass().getSimpleName();
-        return fallback.<NereusException>map(outcome -> new NereusException(
-                        code, retriable, message, cause, outcome))
+        return fallback.<NereusException>map(outcome -> new NereusException(code, retriable, message, cause, outcome))
                 .orElseGet(() -> new NereusException(code, retriable, message, cause));
     }
 
@@ -2824,7 +2940,8 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }
@@ -2847,31 +2964,52 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     private String newFencingToken(StreamId streamId, String writerId, long epoch) {
-        return DeterministicIds.stableHashComponent(
-                streamId.value() + "\0" + writerId + "\0" + epoch + "\0" + clock.millis()
-                        + "\0" + java.util.UUID.randomUUID());
+        return DeterministicIds.stableHashComponent(streamId.value() + "\0" + writerId + "\0" + epoch + "\0"
+                + clock.millis() + "\0" + java.util.UUID.randomUUID());
     }
 
-    private static StreamHeadRecord withSession(
-            StreamHeadRecord head,
-            AppendSessionSnapshotRecord session) {
-        return copyHead(head, head.committedEndOffset(), head.cumulativeSize(), head.commitVersion(),
-                head.trimOffset(), head.lastCommitId(), session);
+    private static StreamHeadRecord withSession(StreamHeadRecord head, AppendSessionSnapshotRecord session) {
+        return copyHead(
+                head,
+                head.committedEndOffset(),
+                head.cumulativeSize(),
+                head.commitVersion(),
+                head.trimOffset(),
+                head.lastCommitId(),
+                session);
     }
 
     private static StreamHeadRecord withTrim(StreamHeadRecord head, long trimOffset) {
-        return copyHead(head, head.committedEndOffset(), head.cumulativeSize(), head.commitVersion(),
-                trimOffset, head.lastCommitId(), head.appendSession());
+        return copyHead(
+                head,
+                head.committedEndOffset(),
+                head.cumulativeSize(),
+                head.commitVersion(),
+                trimOffset,
+                head.lastCommitId(),
+                head.appendSession());
     }
 
     private static StreamHeadRecord withCommit(StreamHeadRecord head, StreamCommitRecord commit) {
-        return copyHead(head, commit.offsetEnd(), commit.cumulativeSize(), commit.commitVersion(),
-                head.trimOffset(), commit.commitId(), head.appendSession());
+        return copyHead(
+                head,
+                commit.offsetEnd(),
+                commit.cumulativeSize(),
+                commit.commitVersion(),
+                head.trimOffset(),
+                commit.commitId(),
+                head.appendSession());
     }
 
     private static StreamHeadRecord withCommit(StreamHeadRecord head, StreamCommitTargetRecord commit) {
-        return copyHead(head, commit.offsetEnd(), commit.cumulativeSize(), commit.commitVersion(),
-                head.trimOffset(), commit.commitId(), head.appendSession());
+        return copyHead(
+                head,
+                commit.offsetEnd(),
+                commit.cumulativeSize(),
+                commit.commitVersion(),
+                head.trimOffset(),
+                commit.commitId(),
+                head.appendSession());
     }
 
     private static StreamHeadRecord copyHead(
@@ -2883,31 +3021,91 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             String lastCommitId,
             AppendSessionSnapshotRecord session) {
         return new StreamHeadRecord(
-                head.streamId(), head.streamName(), head.streamNameHash(), head.state(), head.profile(),
-                head.attributes(), head.createdAtMillis(), head.policyVersion(), committedEndOffset,
-                cumulativeSize, commitVersion, trimOffset, lastCommitId, session, 0);
+                head.streamId(),
+                head.streamName(),
+                head.streamNameHash(),
+                head.state(),
+                head.profile(),
+                head.attributes(),
+                head.createdAtMillis(),
+                head.policyVersion(),
+                committedEndOffset,
+                cumulativeSize,
+                commitVersion,
+                trimOffset,
+                lastCommitId,
+                session,
+                0);
     }
 
     private static StreamCommitRecord copyCommit(StreamCommitRecord value, long version) {
         return new StreamCommitRecord(
-                value.streamId(), value.commitId(), value.previousCommitId(), value.offsetStart(), value.offsetEnd(),
-                value.generation(), value.cumulativeSize(), value.commitVersion(), value.writerId(),
-                value.writerRunIdHash(), value.writerEpoch(), value.fencingTokenHash(), value.objectId(),
-                value.objectKey(), value.sliceId(), value.objectType(), value.physicalFormat(), value.logicalFormat(),
-                value.payloadFormat(), value.objectChecksumType(), value.objectChecksumValue(), value.objectOffset(),
-                value.objectLength(), value.recordCount(), value.entryCount(), value.logicalBytes(), value.schemaRefs(),
-                value.entryIndexRef(), value.projectionRef(), value.sliceChecksumType(), value.sliceChecksumValue(),
-                value.minEventTimeMillis(), value.maxEventTimeMillis(), value.preparedAtMillis(), version);
+                value.streamId(),
+                value.commitId(),
+                value.previousCommitId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.generation(),
+                value.cumulativeSize(),
+                value.commitVersion(),
+                value.writerId(),
+                value.writerRunIdHash(),
+                value.writerEpoch(),
+                value.fencingTokenHash(),
+                value.objectId(),
+                value.objectKey(),
+                value.sliceId(),
+                value.objectType(),
+                value.physicalFormat(),
+                value.logicalFormat(),
+                value.payloadFormat(),
+                value.objectChecksumType(),
+                value.objectChecksumValue(),
+                value.objectOffset(),
+                value.objectLength(),
+                value.recordCount(),
+                value.entryCount(),
+                value.logicalBytes(),
+                value.schemaRefs(),
+                value.entryIndexRef(),
+                value.projectionRef(),
+                value.sliceChecksumType(),
+                value.sliceChecksumValue(),
+                value.minEventTimeMillis(),
+                value.maxEventTimeMillis(),
+                value.preparedAtMillis(),
+                version);
     }
 
     private static OffsetIndexRecord copyOffsetIndex(OffsetIndexRecord value, long version) {
         return new OffsetIndexRecord(
-                value.streamId(), value.offsetStart(), value.offsetEnd(), value.generation(), value.cumulativeSize(),
-                value.objectId(), value.objectKey(), value.sliceId(), value.objectType(), value.physicalFormat(),
-                value.logicalFormat(), value.payloadFormat(), value.objectOffset(), value.objectLength(),
-                value.recordCount(), value.entryCount(), value.logicalBytes(), value.schemaRefs(), value.entryIndexRef(),
-                value.projectionRef(), value.sliceChecksumType(), value.sliceChecksumValue(), value.minEventTimeMillis(),
-                value.maxEventTimeMillis(), value.commitVersion(), value.tombstoned(), version);
+                value.streamId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.generation(),
+                value.cumulativeSize(),
+                value.objectId(),
+                value.objectKey(),
+                value.sliceId(),
+                value.objectType(),
+                value.physicalFormat(),
+                value.logicalFormat(),
+                value.payloadFormat(),
+                value.objectOffset(),
+                value.objectLength(),
+                value.recordCount(),
+                value.entryCount(),
+                value.logicalBytes(),
+                value.schemaRefs(),
+                value.entryIndexRef(),
+                value.projectionRef(),
+                value.sliceChecksumType(),
+                value.sliceChecksumValue(),
+                value.minEventTimeMillis(),
+                value.maxEventTimeMillis(),
+                value.commitVersion(),
+                value.tombstoned(),
+                version);
     }
 
     private static ThreadFactory daemonFactory(String prefix) {
@@ -2930,8 +3128,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 new ThreadPoolExecutor.AbortPolicy());
     }
 
-    private record ChainExpectation(long offsetEnd, long cumulativeSize, long commitVersion) {
-    }
+    private record ChainExpectation(long offsetEnd, long cumulativeSize, long commitVersion) {}
 
     private record AnyCommit(
             String streamId,
@@ -2941,14 +3138,9 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             long offsetEnd,
             long cumulativeSize,
             long commitVersion,
-            long logicalBytes) {
-    }
+            long logicalBytes) {}
 
-    private record DurableRecord<T>(
-            String key,
-            T value,
-            long metadataVersion,
-            Checksum durableValueSha256) {
+    private record DurableRecord<T>(String key, T value, long metadataVersion, Checksum durableValueSha256) {
         private DurableRecord {
             Objects.requireNonNull(key, "key");
             Objects.requireNonNull(value, "value");
@@ -2966,8 +3158,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         BROKEN
     }
 
-    private record SearchResult(SearchStatus status, StreamCommitRecord commit, int scanned) {
-    }
+    private record SearchResult(SearchStatus status, StreamCommitRecord commit, int scanned) {}
 
     private static final class BackendConditionException extends RuntimeException {
         private BackendConditionException(Throwable cause) {

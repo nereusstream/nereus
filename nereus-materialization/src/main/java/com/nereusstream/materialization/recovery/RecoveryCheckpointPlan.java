@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.recovery;
 
 import com.nereusstream.core.recovery.AnchorAwareCommitWalk;
@@ -11,7 +12,9 @@ import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointWriteRequest;
 import java.util.List;
 import java.util.Objects;
 
-/** Fully canonical, still-unpublished recovery-checkpoint object/root plan. */
+/**
+ * Fully canonical, still-unpublished recovery-checkpoint object/root plan.
+ */
 public record RecoveryCheckpointPlan(
         VersionedRecoveryCheckpointRoot baseRoot,
         VersionedMaterializationStreamRegistration registration,
@@ -26,14 +29,16 @@ public record RecoveryCheckpointPlan(
         Objects.requireNonNull(registration, "registration");
         Objects.requireNonNull(commitWalk, "commitWalk");
         Objects.requireNonNull(writeRequest, "writeRequest");
-        retainedReferences = List.copyOf(Objects.requireNonNull(
-                retainedReferences, "retainedReferences"));
+        retainedReferences = List.copyOf(Objects.requireNonNull(retainedReferences, "retainedReferences"));
         targets = List.copyOf(Objects.requireNonNull(targets, "targets"));
         entries = List.copyOf(Objects.requireNonNull(entries, "entries"));
         if (maximumObjectBytes <= 0
                 || !commitWalk.anchorReached()
                 || !baseRoot.value().streamId().equals(writeRequest.streamId().value())
-                || !registration.value().streamId().equals(writeRequest.streamId().value())
+                || !registration
+                        .value()
+                        .streamId()
+                        .equals(writeRequest.streamId().value())
                 || entries.size() != writeRequest.expectedEntryCount()
                 || targets.size() != writeRequest.expectedPublicationCount()
                 || entries.isEmpty()
@@ -46,8 +51,12 @@ public record RecoveryCheckpointPlan(
                 RecoveryCheckpointPublication previous = targets.get(index - 1).publication();
                 if (publication.generation() < previous.generation()
                         || (publication.generation() == previous.generation()
-                                && publication.publicationId().value().compareTo(
-                                        previous.publicationId().value()) <= 0)) {
+                                && publication
+                                                .publicationId()
+                                                .value()
+                                                .compareTo(
+                                                        previous.publicationId().value())
+                                        <= 0)) {
                     throw new IllegalArgumentException("checkpoint targets are not canonically sorted");
                 }
             }

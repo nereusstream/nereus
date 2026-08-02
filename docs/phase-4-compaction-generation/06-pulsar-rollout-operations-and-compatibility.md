@@ -591,7 +591,8 @@ broker epoch. `metadataVersion` is zero on wire and hydrated from
 Oxia. The version wrapper follows document 03's exact key/version/durable-value-digest contract.
 
 Allowed durable changes are `PREPARED -> ACTIVE`, false-to-true capability bits, replacement of a backfill proof by a
-changed opaque broker-readiness identity and exact domain-set changes only under a separately reviewed capability transition.
+changed opaque broker-readiness identity and exact domain-set changes only under a separately reviewed capability
+transition.
 No true bit returns false. A membership/property change invalidates the process-local readiness epoch, so the guard
 blocks immediately even though durable bits are monotonic；the next stable capable epoch must refresh every required
 proof before operations resume. `ACTIVE` requires：
@@ -755,23 +756,23 @@ than partially using the new policy.
 
 ### 8.1 Topic open/update
 
-| Feature | Phase 4 decision |
-| --- | --- |
-| system/internal topic | reject |
-| remote replication | reject |
-| deduplication | reject |
-| message TTL | allow as F3 cursor expiration only；does not directly delete objects |
-| subscription expiration | allow as F3 cursor deletion only；snapshot GC later |
-| retention time/size | allow only with generation runtime/cursor protocol ready and representable values |
-| backlog size eviction | allow；stock skip persists through F3, then F4 trim/GC |
-| backlog time eviction, precise mode | allow through expiry/cursor mutation |
-| backlog time eviction, non-precise ledger mode | reject；virtual ledger has no stock ledger rollover semantics |
-| producer hold/exception backlog policy | allow existing producer admission behavior；no delete authority |
-| compaction threshold | reject until F8 broker compaction integration |
-| Pulsar offload | reject |
-| entry filters | reject |
-| shadow/migration | reject |
-| ManagedLedger interceptor / auto-skip / shadow source | reject unchanged |
+| Feature                                               | Phase 4 decision                                                                  |
+|-------------------------------------------------------|-----------------------------------------------------------------------------------|
+| system/internal topic                                 | reject                                                                            |
+| remote replication                                    | reject                                                                            |
+| deduplication                                         | reject                                                                            |
+| message TTL                                           | allow as F3 cursor expiration only；does not directly delete objects               |
+| subscription expiration                               | allow as F3 cursor deletion only；snapshot GC later                                |
+| retention time/size                                   | allow only with generation runtime/cursor protocol ready and representable values |
+| backlog size eviction                                 | allow；stock skip persists through F3, then F4 trim/GC                             |
+| backlog time eviction, precise mode                   | allow through expiry/cursor mutation                                              |
+| backlog time eviction, non-precise ledger mode        | reject；virtual ledger has no stock ledger rollover semantics                      |
+| producer hold/exception backlog policy                | allow existing producer admission behavior；no delete authority                    |
+| compaction threshold                                  | reject until F8 broker compaction integration                                     |
+| Pulsar offload                                        | reject                                                                            |
+| entry filters                                         | reject                                                                            |
+| shadow/migration                                      | reject                                                                            |
+| ManagedLedger interceptor / auto-skip / shadow source | reject unchanged                                                                  |
 
 When a supported retention/backlog policy first requires F4 and the marker is absent, topic create/open/update runs
 the registration-before-marker sequence in 3.2 before publishing the topic or installing the new effective policy
@@ -798,23 +799,23 @@ F3 matrix remains：
 `NereusTopicFeatureValidator.validateAdminOperation` receives a typed capability view so loaded and unloaded checks
 make the same decision：
 
-| `NereusAdminOperation` | F4 |
-| --- | --- |
-| `TERMINATE_TOPIC` | allow existing seal behavior |
-| `DELETE_TOPIC` | allow logical delete；physical bytes remain GC work |
-| `UNLOAD_TOPIC` | allow；leases expire/release and new owner claims F3 roots |
-| `DELETE_DURABLE_SUBSCRIPTION` | allow F3 tombstone/snapshot handoff |
-| `ANALYZE_BACKLOG` | allow read-only |
-| `CLEAR_BACKLOG` | allow persisted destructive cursor movement |
-| `SKIP_MESSAGES` | allow persisted cursor movement |
-| `EXPIRE_MESSAGES` | allow F3 cursor mutation |
-| `RESET_CURSOR` | allow within F3 retained-range rules |
-| `TRIM_TOPIC` | allow only generation-ready；routes to F4 retention service |
-| `TRIGGER_COMPACTION` | reject until F8 |
-| `READ_COMPACTION_STATUS` | reject until F8 |
-| `TRIGGER_OFFLOAD` / `READ_OFFLOAD_STATUS` | reject |
-| `TRUNCATE_TOPIC` | reject |
-| `SET_SHADOW_TOPICS` / `MIGRATE_TOPIC` | reject |
+| `NereusAdminOperation`                    | F4                                                         |
+|-------------------------------------------|------------------------------------------------------------|
+| `TERMINATE_TOPIC`                         | allow existing seal behavior                               |
+| `DELETE_TOPIC`                            | allow logical delete；physical bytes remain GC work         |
+| `UNLOAD_TOPIC`                            | allow；leases expire/release and new owner claims F3 roots  |
+| `DELETE_DURABLE_SUBSCRIPTION`             | allow F3 tombstone/snapshot handoff                        |
+| `ANALYZE_BACKLOG`                         | allow read-only                                            |
+| `CLEAR_BACKLOG`                           | allow persisted destructive cursor movement                |
+| `SKIP_MESSAGES`                           | allow persisted cursor movement                            |
+| `EXPIRE_MESSAGES`                         | allow F3 cursor mutation                                   |
+| `RESET_CURSOR`                            | allow within F3 retained-range rules                       |
+| `TRIM_TOPIC`                              | allow only generation-ready；routes to F4 retention service |
+| `TRIGGER_COMPACTION`                      | reject until F8                                            |
+| `READ_COMPACTION_STATUS`                  | reject until F8                                            |
+| `TRIGGER_OFFLOAD` / `READ_OFFLOAD_STATUS` | reject                                                     |
+| `TRUNCATE_TOPIC`                          | reject                                                     |
+| `SET_SHADOW_TOPICS` / `MIGRATE_TOPIC`     | reject                                                     |
 
 The unloaded path in `NereusManagedLedgerStorage.validateUnloadedAdminOperation` first reads binding state and checks
 cluster generation readiness. The loaded path in `PersistentTopic.validateNereusAdminOperation` checks the exact
@@ -858,74 +859,74 @@ source-lock inventory and its focused test before M5 gate closes.
 
 Initial product defaults keep active mutation off：
 
-| Property | Default | Constraint/purpose |
-| --- | --- | --- |
-| `nereusGenerationProtocolEnabled` | `false` | advertise/runtime may exist, but no first activation while false |
-| `nereusGenerationRegistrationBackfillConcurrency` | `16` | positive bounded projection reads/registration writes |
-| `nereusGenerationRegistrationBackfillTimeoutSeconds` | `3600` | positive deadline for one full cold-topic traversal |
-| `nereusPhysicalGcEnabled` | `false` | independent destructive switch |
-| `nereusPhysicalGcDryRun` | `true` | inventory/plan metrics only；never MARK/DELETE while true |
-| `nereusDefaultStorageProfile` | `OBJECT_WAL_SYNC_OBJECT` | first-create only；async is opt-in |
-| `nereusMaterializationRegistryScanPageSize` | `256` | positive and `<= 256`；64 shards are protocol-fixed |
-| `nereusMaterializationRegistryScanIntervalSeconds` | `10` | positive；also drives authoritative planner reconciliation |
-| `nereusMaterializationPlannerPageSize` | `512` | positive and `<= 512` |
-| `nereusMaterializationTaskScanPageSize` | `256` | positive and `<= 256` |
-| `nereusMaterializationMaxTasksPerPlan` | `64` | positive bounded work per stream pass |
-| `nereusMaterializationMaxWorkers` | `8` | `<= object read concurrency` |
-| `nereusMaterializationMaxWorkersPerStream` | `1` | positive and `<= max workers` |
-| `nereusMaterializationSourceReadPageRecords` | `8192` | positive and `<= 65536` |
-| `nereusMaterializationSourceReadPageBytes` | `8388608` | `[64 KiB, 64 MiB]` and within core read-buffer reservation |
-| `nereusMaterializationWorkerClaimSeconds` | `120` | covers operation/renew/skew |
-| `nereusMaterializationWorkerRenewSeconds` | `30` | `<= claim/3` |
-| `nereusMaterializationOperationTimeoutSeconds` | `60` | positive and `< claim - skew` |
-| `nereusMaterializationCloseTimeoutSeconds` | `300` | drains admitted publication/recovery work |
-| `nereusMaterializationRetryMinMillis` | `1000` | positive |
-| `nereusMaterializationRetryMaxMillis` | `60000` | `>= min` |
-| `nereusMaterializationMaxTaskAttempts` | `20` | positive；exhaustion becomes terminal/operator-visible |
-| `nereusMaterializationMinMergeSourceRanges` | `2` | `[2, maxSourceRanges]`；prevents single-generation rewrite churn |
-| `nereusMaterializationMaxSourceRanges` | `128` | hard cap |
-| `nereusMaterializationMaxRangeRecords` | `1048576` | resolver hard span |
-| `nereusMaterializationTargetObjectBytes` | `268435456` | `<= 1 GiB` |
-| `nereusMaterializationTargetRowGroupRecords` | `8192` | `<= 65536` |
-| `nereusMaterializationCompression` | `ZSTD` | exactly `ZSTD` or `UNCOMPRESSED` |
-| `nereusMaterializationStagingDirectory` | `${java.io.tmpdir}/nereus-materialization` | absolute owner-only local base；runtime appends processRunId；not durable truth |
-| `nereusMaterializationMaxStagingBytes` | `2147483648` | global worker staging semaphore；covers both target object and recovery-checkpoint maxima |
-| `nereusObjectUploadChunkBytes` | `1048576` | `[64 KiB, 8 MiB]`；backpressure-aware streaming upload |
-| `nereusObjectPutMaxAttempts` | `3` | total guarded provider transmissions；`[1, 10]` |
-| `nereusObjectPutRetryMinMillis` | `100` | positive first-retry full-jitter cap |
-| `nereusObjectPutRetryMaxMillis` | `2000` | `>= min` and `<= object-store request timeout` |
-| `nereusReaderLeaseSeconds` | `120` | covers max read + skew |
-| `nereusReaderLeaseRenewSeconds` | `30` | positive, bounded |
-| `nereusMaximumClockSkewSeconds` | `5` | operational clock contract |
-| `nereusGcScanIntervalSeconds` | `60` | positive |
-| `nereusGcMetadataScanPageSize` | `1000` | positive and `<= 1000` |
-| `nereusGcObjectListPageSize` | `1000` | positive and `<= 1000` |
-| `nereusGcMaxConcurrentDeletes` | `4` | positive bounded object-store delete concurrency |
-| `nereusGcMaxStreamsPerCandidate` | `1024` | positive and `<= 4096`；larger manifest quarantines |
-| `nereusGcMaxAuthoritiesPerDomainSnapshot` | `100000` | positive hard memory bound；overflow vetoes |
-| `nereusGcMaxReferencesPerDomainSnapshot` | `100000` | positive hard memory bound；overflow vetoes |
-| `nereusGcOperationTimeoutSeconds` | `60` | positive and compatible with lease/skew |
-| `nereusGcCloseTimeoutSeconds` | `300` | drains admitted GC state reconciliation |
-| `nereusGcDrainGraceSeconds` | `300` | lease + skew lower bound |
-| `nereusPendingProtectionSeconds` | `300` | bounded checkpoint/snapshot publication intent；operation + skew lower bound |
-| `nereusSourceRetirementGraceSeconds` | `3600` | fallback/checkpoint grace |
-| `nereusAppendReplayGraceSeconds` | `21600` | protects live commit evidence during checkpoint retirement |
-| `nereusMaterializationMetadataAuditGraceSeconds` | `86400` | terminal task/index audit retention；`>= source retirement grace` |
-| `nereusOrphanGraceSeconds` | `86400` | no young orphan deletion |
-| `nereusGcTombstoneAuditGraceSeconds` | `604800` | `>= metadata audit + orphan grace` and beyond every stale PUT/owner lifetime |
-| `nereusRecoveryCheckpointMaxEntries` | `1000000` | NRC1 cap |
-| `nereusRecoveryCheckpointMaxBytes` | `1073741824` | NRC1 cap |
-| `nereusMaterializationLagThrottleRecords` | `1000000` | zero disables threshold |
-| `nereusMaterializationLagRejectRecords` | `10000000` | zero disables；otherwise > throttle |
-| `nereusMaterializationLagThrottleBytes` | `1073741824` | zero disables threshold |
-| `nereusMaterializationLagRejectBytes` | `8589934592` | zero disables；otherwise > throttle |
-| `nereusMaterializationLagRejectAgeSeconds` | `600` | zero disables；otherwise positive |
-| `nereusMaterializationLagThrottleDelayMillis` | `25` | positive；one bounded delay followed by exact remeasurement |
-| `nereusRetentionStatsScanPageSize` | `512` | positive and `<= 512` |
-| `nereusRetentionMaxConcurrentPlans` | `4` | positive；at most one executing per stream |
-| `nereusRetentionMaxQueuedPlans` | `1024` | positive bounded admission queue |
-| `nereusRetentionOperationTimeoutSeconds` | `60` | positive；one deadline for plan + logical trim request |
-| `nereusRetentionCloseTimeoutSeconds` | `120` | positive and within managed-ledger close budget |
+| Property                                             | Default                                    | Constraint/purpose                                                                       |
+|------------------------------------------------------|--------------------------------------------|------------------------------------------------------------------------------------------|
+| `nereusGenerationProtocolEnabled`                    | `false`                                    | advertise/runtime may exist, but no first activation while false                         |
+| `nereusGenerationRegistrationBackfillConcurrency`    | `16`                                       | positive bounded projection reads/registration writes                                    |
+| `nereusGenerationRegistrationBackfillTimeoutSeconds` | `3600`                                     | positive deadline for one full cold-topic traversal                                      |
+| `nereusPhysicalGcEnabled`                            | `false`                                    | independent destructive switch                                                           |
+| `nereusPhysicalGcDryRun`                             | `true`                                     | inventory/plan metrics only；never MARK/DELETE while true                                 |
+| `nereusDefaultStorageProfile`                        | `OBJECT_WAL_SYNC_OBJECT`                   | first-create only；async is opt-in                                                        |
+| `nereusMaterializationRegistryScanPageSize`          | `256`                                      | positive and `<= 256`；64 shards are protocol-fixed                                       |
+| `nereusMaterializationRegistryScanIntervalSeconds`   | `10`                                       | positive；also drives authoritative planner reconciliation                                |
+| `nereusMaterializationPlannerPageSize`               | `512`                                      | positive and `<= 512`                                                                    |
+| `nereusMaterializationTaskScanPageSize`              | `256`                                      | positive and `<= 256`                                                                    |
+| `nereusMaterializationMaxTasksPerPlan`               | `64`                                       | positive bounded work per stream pass                                                    |
+| `nereusMaterializationMaxWorkers`                    | `8`                                        | `<= object read concurrency`                                                             |
+| `nereusMaterializationMaxWorkersPerStream`           | `1`                                        | positive and `<= max workers`                                                            |
+| `nereusMaterializationSourceReadPageRecords`         | `8192`                                     | positive and `<= 65536`                                                                  |
+| `nereusMaterializationSourceReadPageBytes`           | `8388608`                                  | `[64 KiB, 64 MiB]` and within core read-buffer reservation                               |
+| `nereusMaterializationWorkerClaimSeconds`            | `120`                                      | covers operation/renew/skew                                                              |
+| `nereusMaterializationWorkerRenewSeconds`            | `30`                                       | `<= claim/3`                                                                             |
+| `nereusMaterializationOperationTimeoutSeconds`       | `60`                                       | positive and `< claim - skew`                                                            |
+| `nereusMaterializationCloseTimeoutSeconds`           | `300`                                      | drains admitted publication/recovery work                                                |
+| `nereusMaterializationRetryMinMillis`                | `1000`                                     | positive                                                                                 |
+| `nereusMaterializationRetryMaxMillis`                | `60000`                                    | `>= min`                                                                                 |
+| `nereusMaterializationMaxTaskAttempts`               | `20`                                       | positive；exhaustion becomes terminal/operator-visible                                    |
+| `nereusMaterializationMinMergeSourceRanges`          | `2`                                        | `[2, maxSourceRanges]`；prevents single-generation rewrite churn                          |
+| `nereusMaterializationMaxSourceRanges`               | `128`                                      | hard cap                                                                                 |
+| `nereusMaterializationMaxRangeRecords`               | `1048576`                                  | resolver hard span                                                                       |
+| `nereusMaterializationTargetObjectBytes`             | `268435456`                                | `<= 1 GiB`                                                                               |
+| `nereusMaterializationTargetRowGroupRecords`         | `8192`                                     | `<= 65536`                                                                               |
+| `nereusMaterializationCompression`                   | `ZSTD`                                     | exactly `ZSTD` or `UNCOMPRESSED`                                                         |
+| `nereusMaterializationStagingDirectory`              | `${java.io.tmpdir}/nereus-materialization` | absolute owner-only local base；runtime appends processRunId；not durable truth            |
+| `nereusMaterializationMaxStagingBytes`               | `2147483648`                               | global worker staging semaphore；covers both target object and recovery-checkpoint maxima |
+| `nereusObjectUploadChunkBytes`                       | `1048576`                                  | `[64 KiB, 8 MiB]`；backpressure-aware streaming upload                                    |
+| `nereusObjectPutMaxAttempts`                         | `3`                                        | total guarded provider transmissions；`[1, 10]`                                           |
+| `nereusObjectPutRetryMinMillis`                      | `100`                                      | positive first-retry full-jitter cap                                                     |
+| `nereusObjectPutRetryMaxMillis`                      | `2000`                                     | `>= min` and `<= object-store request timeout`                                           |
+| `nereusReaderLeaseSeconds`                           | `120`                                      | covers max read + skew                                                                   |
+| `nereusReaderLeaseRenewSeconds`                      | `30`                                       | positive, bounded                                                                        |
+| `nereusMaximumClockSkewSeconds`                      | `5`                                        | operational clock contract                                                               |
+| `nereusGcScanIntervalSeconds`                        | `60`                                       | positive                                                                                 |
+| `nereusGcMetadataScanPageSize`                       | `1000`                                     | positive and `<= 1000`                                                                   |
+| `nereusGcObjectListPageSize`                         | `1000`                                     | positive and `<= 1000`                                                                   |
+| `nereusGcMaxConcurrentDeletes`                       | `4`                                        | positive bounded object-store delete concurrency                                         |
+| `nereusGcMaxStreamsPerCandidate`                     | `1024`                                     | positive and `<= 4096`；larger manifest quarantines                                       |
+| `nereusGcMaxAuthoritiesPerDomainSnapshot`            | `100000`                                   | positive hard memory bound；overflow vetoes                                               |
+| `nereusGcMaxReferencesPerDomainSnapshot`             | `100000`                                   | positive hard memory bound；overflow vetoes                                               |
+| `nereusGcOperationTimeoutSeconds`                    | `60`                                       | positive and compatible with lease/skew                                                  |
+| `nereusGcCloseTimeoutSeconds`                        | `300`                                      | drains admitted GC state reconciliation                                                  |
+| `nereusGcDrainGraceSeconds`                          | `300`                                      | lease + skew lower bound                                                                 |
+| `nereusPendingProtectionSeconds`                     | `300`                                      | bounded checkpoint/snapshot publication intent；operation + skew lower bound              |
+| `nereusSourceRetirementGraceSeconds`                 | `3600`                                     | fallback/checkpoint grace                                                                |
+| `nereusAppendReplayGraceSeconds`                     | `21600`                                    | protects live commit evidence during checkpoint retirement                               |
+| `nereusMaterializationMetadataAuditGraceSeconds`     | `86400`                                    | terminal task/index audit retention；`>= source retirement grace`                         |
+| `nereusOrphanGraceSeconds`                           | `86400`                                    | no young orphan deletion                                                                 |
+| `nereusGcTombstoneAuditGraceSeconds`                 | `604800`                                   | `>= metadata audit + orphan grace` and beyond every stale PUT/owner lifetime             |
+| `nereusRecoveryCheckpointMaxEntries`                 | `1000000`                                  | NRC1 cap                                                                                 |
+| `nereusRecoveryCheckpointMaxBytes`                   | `1073741824`                               | NRC1 cap                                                                                 |
+| `nereusMaterializationLagThrottleRecords`            | `1000000`                                  | zero disables threshold                                                                  |
+| `nereusMaterializationLagRejectRecords`              | `10000000`                                 | zero disables；otherwise > throttle                                                       |
+| `nereusMaterializationLagThrottleBytes`              | `1073741824`                               | zero disables threshold                                                                  |
+| `nereusMaterializationLagRejectBytes`                | `8589934592`                               | zero disables；otherwise > throttle                                                       |
+| `nereusMaterializationLagRejectAgeSeconds`           | `600`                                      | zero disables；otherwise positive                                                         |
+| `nereusMaterializationLagThrottleDelayMillis`        | `25`                                       | positive；one bounded delay followed by exact remeasurement                               |
+| `nereusRetentionStatsScanPageSize`                   | `512`                                      | positive and `<= 512`                                                                    |
+| `nereusRetentionMaxConcurrentPlans`                  | `4`                                        | positive；at most one executing per stream                                                |
+| `nereusRetentionMaxQueuedPlans`                      | `1024`                                     | positive bounded admission queue                                                         |
+| `nereusRetentionOperationTimeoutSeconds`             | `60`                                       | positive；one deadline for plan + logical trim request                                    |
+| `nereusRetentionCloseTimeoutSeconds`                 | `120`                                      | positive and within managed-ledger close budget                                          |
 
 Secrets and object-store credentials remain on the existing resolver path. Config logs redact secret refs/tokens and
 do not log object keys at info level.
@@ -944,7 +945,8 @@ compatibility constructors deliberately use `PhysicalGcConfig.defaults()` (`enab
 makes the inventory scanner an owned runtime component；listing remains audit/discovery input and exposes no MARK/delete
 path. Checkpoint AN adds the non-overlapping lifecycle service and provider startup hook: when and only when
 `PhysicalGcConfig.enabled()` is true, the runtime is eligible to run complete physical-root routing/recovery, then
-complete registration retirement, then object inventory, using fixed delay after each pass. Checkpoint AO now maps all 17 explicit broker
+complete registration retirement, then object inventory, using fixed delay after each pass. Checkpoint AO now maps all
+17 explicit broker
 properties through `NereusBrokerStorageConfiguration` into the cross-validated runtime value and makes the provider use
 that same value for pending protections、reader leases、clock skew and orphan grace. The mapped `enabled=false` default
 therefore starts no lifecycle pass, while `dryRun=true` remains the second independent mutation guard. Broker startup

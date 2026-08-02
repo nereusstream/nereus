@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.core.StreamStorageConfig;
@@ -8,7 +9,9 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
-/** Bounded process-level configuration for Phase 4 physical-object garbage collection. */
+/**
+ * Bounded process-level configuration for Phase 4 physical-object garbage collection.
+ */
 public record PhysicalGcConfig(
         boolean enabled,
         boolean dryRun,
@@ -38,29 +41,15 @@ public record PhysicalGcConfig(
         if (maxConcurrentDeletes <= 0) {
             throw new IllegalArgumentException("maxConcurrentDeletes must be positive");
         }
-        requireInRange(
-                maxStreamsPerCandidate,
-                1,
-                MAX_STREAMS_PER_CANDIDATE,
-                "maxStreamsPerCandidate");
-        requireInRange(
-                maxAuthoritiesPerDomainSnapshot,
-                1,
-                MAX_DOMAIN_VALUES,
-                "maxAuthoritiesPerDomainSnapshot");
-        requireInRange(
-                maxReferencesPerDomainSnapshot,
-                1,
-                MAX_DOMAIN_VALUES,
-                "maxReferencesPerDomainSnapshot");
+        requireInRange(maxStreamsPerCandidate, 1, MAX_STREAMS_PER_CANDIDATE, "maxStreamsPerCandidate");
+        requireInRange(maxAuthoritiesPerDomainSnapshot, 1, MAX_DOMAIN_VALUES, "maxAuthoritiesPerDomainSnapshot");
+        requireInRange(maxReferencesPerDomainSnapshot, 1, MAX_DOMAIN_VALUES, "maxReferencesPerDomainSnapshot");
         scanInterval = requirePositiveMillis(scanInterval, "scanInterval");
         readerLeaseDuration = requirePositiveMillis(readerLeaseDuration, "readerLeaseDuration");
-        readerLeaseRenewInterval = requirePositiveMillis(
-                readerLeaseRenewInterval, "readerLeaseRenewInterval");
+        readerLeaseRenewInterval = requirePositiveMillis(readerLeaseRenewInterval, "readerLeaseRenewInterval");
         maximumClockSkew = requireNonNegativeMillis(maximumClockSkew, "maximumClockSkew");
         drainGrace = requirePositiveMillis(drainGrace, "drainGrace");
-        pendingProtectionDuration = requirePositiveMillis(
-                pendingProtectionDuration, "pendingProtectionDuration");
+        pendingProtectionDuration = requirePositiveMillis(pendingProtectionDuration, "pendingProtectionDuration");
         orphanGrace = requirePositiveMillis(orphanGrace, "orphanGrace");
         tombstoneAuditGrace = requirePositiveMillis(tombstoneAuditGrace, "tombstoneAuditGrace");
         operationTimeout = requirePositiveMillis(operationTimeout, "operationTimeout");
@@ -70,21 +59,22 @@ public record PhysicalGcConfig(
             throw new IllegalArgumentException(
                     "readerLeaseRenewInterval must be at most one third of readerLeaseDuration");
         }
-        Duration leaseSafety = checkedPlus(
-                readerLeaseDuration, maximumClockSkew, "readerLeaseDuration plus maximumClockSkew");
+        Duration leaseSafety =
+                checkedPlus(readerLeaseDuration, maximumClockSkew, "readerLeaseDuration plus maximumClockSkew");
         if (drainGrace.compareTo(leaseSafety) < 0) {
-            throw new IllegalArgumentException(
-                    "drainGrace must cover readerLeaseDuration plus maximumClockSkew");
+            throw new IllegalArgumentException("drainGrace must cover readerLeaseDuration plus maximumClockSkew");
         }
-        Duration operationSafety = checkedPlus(
-                operationTimeout, maximumClockSkew, "operationTimeout plus maximumClockSkew");
+        Duration operationSafety =
+                checkedPlus(operationTimeout, maximumClockSkew, "operationTimeout plus maximumClockSkew");
         if (operationSafety.compareTo(readerLeaseDuration) >= 0) {
             throw new IllegalArgumentException(
                     "operationTimeout plus maximumClockSkew must be shorter than readerLeaseDuration");
         }
     }
 
-    /** Safe defaults keep all destructive mutation disabled. */
+    /**
+     * Safe defaults keep all destructive mutation disabled.
+     */
     public static PhysicalGcConfig defaults() {
         return new PhysicalGcConfig(
                 false,
@@ -107,19 +97,21 @@ public record PhysicalGcConfig(
                 Duration.ofSeconds(30));
     }
 
-    /** Local config may plan and observe while both disabled and dry-run modes reject mutation. */
+    /**
+     * Local config may plan and observe while both disabled and dry-run modes reject mutation.
+     */
     public boolean mutationsAllowed() {
         return enabled && !dryRun;
     }
 
     public GcReferenceDomainConfig referenceDomainConfig() {
         return new GcReferenceDomainConfig(
-                metadataScanPageSize,
-                maxAuthoritiesPerDomainSnapshot,
-                maxReferencesPerDomainSnapshot);
+                metadataScanPageSize, maxAuthoritiesPerDomainSnapshot, maxReferencesPerDomainSnapshot);
     }
 
-    /** Cross-validates publication/recovery grace periods that can retain a physical reference. */
+    /**
+     * Cross-validates publication/recovery grace periods that can retain a physical reference.
+     */
     public PhysicalGcConfig validateAgainst(MaterializationConfig materialization) {
         Objects.requireNonNull(materialization, "materialization");
         Duration longestPublicationGrace = maximum(List.of(
@@ -130,13 +122,10 @@ public record PhysicalGcConfig(
             throw new IllegalArgumentException(
                     "orphanGrace must exceed source-retirement and pending-publication grace periods");
         }
-        Duration auditFloor = checkedPlus(
-                materialization.metadataAuditGrace(),
-                orphanGrace,
-                "metadataAuditGrace plus orphanGrace");
+        Duration auditFloor =
+                checkedPlus(materialization.metadataAuditGrace(), orphanGrace, "metadataAuditGrace plus orphanGrace");
         if (tombstoneAuditGrace.compareTo(auditFloor) < 0) {
-            throw new IllegalArgumentException(
-                    "tombstoneAuditGrace must cover metadataAuditGrace plus orphanGrace");
+            throw new IllegalArgumentException("tombstoneAuditGrace must cover metadataAuditGrace plus orphanGrace");
         }
         requireTombstoneStrictlyExceeds(
                 "materialization worker/reference lifetime",
@@ -147,14 +136,13 @@ public record PhysicalGcConfig(
         return this;
     }
 
-    /** Cross-validates append/session/recovery terminal lifetimes in addition to materialization. */
-    public PhysicalGcConfig validateAgainst(
-            StreamStorageConfig storage,
-            MaterializationConfig materialization) {
+    /**
+     * Cross-validates append/session/recovery terminal lifetimes in addition to materialization.
+     */
+    public PhysicalGcConfig validateAgainst(StreamStorageConfig storage, MaterializationConfig materialization) {
         Objects.requireNonNull(storage, "storage");
         validateAgainst(materialization);
-        Duration readSafety = checkedPlus(
-                storage.readTimeout(), maximumClockSkew, "readTimeout plus maximumClockSkew");
+        Duration readSafety = checkedPlus(storage.readTimeout(), maximumClockSkew, "readTimeout plus maximumClockSkew");
         if (readSafety.compareTo(readerLeaseDuration) >= 0) {
             throw new IllegalArgumentException(
                     "readTimeout plus maximumClockSkew must be shorter than readerLeaseDuration");
@@ -169,7 +157,9 @@ public record PhysicalGcConfig(
         return this;
     }
 
-    /** Returns an overflow-checked deadline or empty when the candidate must remain ineligible. */
+    /**
+     * Returns an overflow-checked deadline or empty when the candidate must remain ineligible.
+     */
     public java.util.OptionalLong deadline(long baseMillis, Duration grace) {
         if (baseMillis < 0) {
             throw new IllegalArgumentException("baseMillis must be non-negative");

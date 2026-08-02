@@ -21,11 +21,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 public record RangeReadResult(
-        ObjectKey key,
-        long offset,
-        long length,
-        ByteBuffer payload,
-        Optional<Checksum> checksum) {
+        ObjectKey key, long offset, long length, ByteBuffer payload, Optional<Checksum> checksum) {
     public RangeReadResult {
         Objects.requireNonNull(key, "key");
         RangeChecks.requireNonNegativeNonOverflowingRange(offset, length, "range read");

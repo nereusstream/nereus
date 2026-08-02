@@ -1,13 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import java.util.Map;
 import java.util.Objects;
 
-/** Immutable accounting for one complete per-stream task-prefix recovery scan. */
-public record TaskRecoveryScanResult(
-        int scannedTasks,
-        Map<MaterializationTaskRecoveryAction, Integer> actions) {
+/**
+ * Immutable accounting for one complete per-stream task-prefix recovery scan.
+ */
+public record TaskRecoveryScanResult(int scannedTasks, Map<MaterializationTaskRecoveryAction, Integer> actions) {
     public TaskRecoveryScanResult {
         if (scannedTasks < 0) {
             throw new IllegalArgumentException("scannedTasks must be non-negative");

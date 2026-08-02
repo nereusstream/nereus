@@ -29,7 +29,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Metadata implementation that repairs references before classifying an object. */
+/**
+ * Metadata implementation that repairs references before classifying an object.
+ */
 public final class MetadataOrphanObjectScanner implements OrphanObjectScanner {
     private final String cluster;
     private final OxiaMetadataStore metadataStore;
@@ -51,36 +53,31 @@ public final class MetadataOrphanObjectScanner implements OrphanObjectScanner {
     @Override
     public CompletableFuture<OrphanObjectAssessment> scan(ObjectId objectId) {
         if (closed.get()) {
-            return NereusException.failedFuture(
-                    ErrorCode.STORAGE_CLOSED, false, "orphan object scanner is closed");
+            return NereusException.failedFuture(ErrorCode.STORAGE_CLOSED, false, "orphan object scanner is closed");
         }
         if (objectId == null) {
-            return NereusException.failedFuture(
-                    ErrorCode.INVALID_ARGUMENT, false, "objectId is required");
+            return NereusException.failedFuture(ErrorCode.INVALID_ARGUMENT, false, "objectId is required");
         }
-        return metadataStore.getObjectManifest(cluster, objectId)
-                .thenComposeAsync(manifest -> manifest
-                        .map(value -> inspectManifest(objectId, value))
-                        .orElseGet(() -> CompletableFuture.completedFuture(missingManifest(objectId))),
+        return metadataStore
+                .getObjectManifest(cluster, objectId)
+                .thenComposeAsync(
+                        manifest -> manifest.map(value -> inspectManifest(objectId, value))
+                                .orElseGet(() -> CompletableFuture.completedFuture(missingManifest(objectId))),
                         callbackExecutor);
     }
 
     private CompletableFuture<OrphanObjectAssessment> inspectManifest(
-            ObjectId objectId,
-            ObjectManifestRecord manifest) {
+            ObjectId objectId, ObjectManifestRecord manifest) {
         if (!manifest.objectId().equals(objectId.value())) {
             return NereusException.failedFuture(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION,
-                    false,
-                    "object manifest id does not match its lookup key");
+                    ErrorCode.METADATA_INVARIANT_VIOLATION, false, "object manifest id does not match its lookup key");
         }
-        return metadataStore.repairObjectReferences(cluster, objectId)
+        return metadataStore
+                .repairObjectReferences(cluster, objectId)
                 .thenApplyAsync(references -> assess(manifest, references), callbackExecutor);
     }
 
-    private OrphanObjectAssessment assess(
-            ObjectManifestRecord manifest,
-            ObjectReferenceRecord references) {
+    private OrphanObjectAssessment assess(ObjectManifestRecord manifest, ObjectReferenceRecord references) {
         if (!manifest.objectId().equals(references.objectId())) {
             throw invariant("object references belong to a different manifest");
         }
@@ -89,8 +86,8 @@ public final class MetadataOrphanObjectScanner implements OrphanObjectScanner {
             manifestSlices.put(new SliceIdentity(slice.streamId(), slice.sliceId()), slice);
         }
         for (VisibleSliceReferenceRecord visible : references.visibleSlices()) {
-            StreamSliceManifestRecord slice = manifestSlices.get(
-                    new SliceIdentity(visible.streamId(), visible.sliceId()));
+            StreamSliceManifestRecord slice =
+                    manifestSlices.get(new SliceIdentity(visible.streamId(), visible.sliceId()));
             if (slice == null) {
                 throw invariant("object references contain a slice absent from the manifest");
             }
@@ -117,12 +114,8 @@ public final class MetadataOrphanObjectScanner implements OrphanObjectScanner {
     }
 
     private OrphanObjectAssessment missingManifest(ObjectId objectId) {
-        OrphanObjectAssessment assessment = new OrphanObjectAssessment(
-                objectId,
-                OrphanObjectStatus.MISSING_MANIFEST,
-                0,
-                0,
-                0);
+        OrphanObjectAssessment assessment =
+                new OrphanObjectAssessment(objectId, OrphanObjectStatus.MISSING_MANIFEST, 0, 0, 0);
         observe(() -> observer.onObjectAssessed(assessment.status()));
         return assessment;
     }
@@ -152,6 +145,5 @@ public final class MetadataOrphanObjectScanner implements OrphanObjectScanner {
         closed.set(true);
     }
 
-    private record SliceIdentity(String streamId, String sliceId) {
-    }
+    private record SliceIdentity(String streamId, String sliceId) {}
 }

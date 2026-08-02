@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.recovery;
 
 import com.nereusstream.metadata.oxia.AppendReplayStatus;
@@ -6,7 +7,9 @@ import com.nereusstream.metadata.oxia.ReachableCommittedAppend;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Terminal bounded replay proof from either the live tail or the current NRC1 root. */
+/**
+ * Terminal bounded replay proof from either the live tail or the current NRC1 root.
+ */
 public record AppendReplayResolution(
         AppendReplayStatus status,
         Optional<ReachableCommittedAppend> committedAppend,
@@ -25,9 +28,7 @@ public record AppendReplayResolution(
     }
 
     public static AppendReplayResolution found(
-            ReachableCommittedAppend append,
-            AppendReplayEvidenceSource source,
-            int scannedLiveCommits) {
+            ReachableCommittedAppend append, AppendReplayEvidenceSource source, int scannedLiveCommits) {
         return new AppendReplayResolution(
                 AppendReplayStatus.FOUND,
                 Optional.of(Objects.requireNonNull(append, "append")),
@@ -37,9 +38,6 @@ public record AppendReplayResolution(
 
     public static AppendReplayResolution notCommitted(int scannedLiveCommits) {
         return new AppendReplayResolution(
-                AppendReplayStatus.PROVEN_NOT_COMMITTED,
-                Optional.empty(),
-                Optional.empty(),
-                scannedLiveCommits);
+                AppendReplayStatus.PROVEN_NOT_COMMITTED, Optional.empty(), Optional.empty(), scannedLiveCommits);
     }
 }

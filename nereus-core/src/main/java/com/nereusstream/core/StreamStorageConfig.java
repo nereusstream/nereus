@@ -19,7 +19,9 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Objects;
 
-/** Resource, timeout, and append-session limits for one stream-storage instance. */
+/**
+ * Resource, timeout, and append-session limits for one stream-storage instance.
+ */
 public record StreamStorageConfig(
         String cluster,
         String writerId,
@@ -55,8 +57,8 @@ public record StreamStorageConfig(
         writerId = requireNonBlank(writerId, "writerId");
         appendSessionTtl = requirePositive(appendSessionTtl, "appendSessionTtl");
         appendSessionRenewBefore = requirePositive(appendSessionRenewBefore, "appendSessionRenewBefore");
-        appendSessionMinCommitRemaining = requirePositive(
-                appendSessionMinCommitRemaining, "appendSessionMinCommitRemaining");
+        appendSessionMinCommitRemaining =
+                requirePositive(appendSessionMinCommitRemaining, "appendSessionMinCommitRemaining");
         requirePositiveMillis(appendSessionTtl, "appendSessionTtl");
         requirePositiveMillis(appendSessionRenewBefore, "appendSessionRenewBefore");
         requirePositiveMillis(appendSessionMinCommitRemaining, "appendSessionMinCommitRemaining");
@@ -78,10 +80,16 @@ public record StreamStorageConfig(
         if (appendSessionMinCommitRemaining.compareTo(appendSessionTtl) >= 0) {
             throw new IllegalArgumentException("appendSessionMinCommitRemaining must be less than appendSessionTtl");
         }
-        if (maxResolveRanges <= 0 || maxCommitChainScan <= 0 || maxDerivedIndexRepairCommitsPerCall <= 0
+        if (maxResolveRanges <= 0
+                || maxCommitChainScan <= 0
+                || maxDerivedIndexRepairCommitsPerCall <= 0
                 || maxCachedStreams <= 0
-                || maxInFlightAppends <= 0 || maxBufferedBytes <= 0 || maxConcurrentObjectReads <= 0
-                || maxReadBufferBytes <= 0 || maxObjectBytes <= 0 || maxAppendBatchRecords <= 0) {
+                || maxInFlightAppends <= 0
+                || maxBufferedBytes <= 0
+                || maxConcurrentObjectReads <= 0
+                || maxReadBufferBytes <= 0
+                || maxObjectBytes <= 0
+                || maxAppendBatchRecords <= 0) {
             throw new IllegalArgumentException("numeric resource limits must be positive");
         }
         if (maxObjectBytes > maxBufferedBytes) {
@@ -95,22 +103,60 @@ public record StreamStorageConfig(
         }
     }
 
-    /** Phase 1 source-compatible constructor with generated process identity and bounded recovery defaults. */
+    /**
+     * Phase 1 source-compatible constructor with generated process identity and bounded recovery defaults.
+     */
     public StreamStorageConfig(
-            String cluster, String writerId, Duration appendSessionTtl, Duration appendSessionRenewBefore,
-            Duration appendSessionMinCommitRemaining, Duration appendTimeout, Duration readTimeout,
-            Duration shutdownGrace, int maxResolveRanges, int maxCommitChainScan,
-            int maxDerivedIndexRepairCommitsPerCall, int maxCachedStreams, int maxInFlightAppends,
-            long maxBufferedBytes, int maxConcurrentObjectReads, long maxReadBufferBytes, int maxObjectBytes,
-            int maxAppendBatchRecords, Duration offsetIndexCacheTtl, boolean autoAcquireAppendSession,
-            boolean enableMetadataWatch, boolean enableOffsetIndexCache) {
-        this(cluster, writerId, appendSessionTtl, appendSessionRenewBefore, appendSessionMinCommitRemaining,
-                appendTimeout, readTimeout, shutdownGrace, maxResolveRanges, maxCommitChainScan,
-                maxDerivedIndexRepairCommitsPerCall, maxCachedStreams, maxInFlightAppends, maxBufferedBytes,
-                maxConcurrentObjectReads, maxReadBufferBytes, maxObjectBytes, maxAppendBatchRecords,
-                offsetIndexCacheTtl, autoAcquireAppendSession, enableMetadataWatch, enableOffsetIndexCache,
+            String cluster,
+            String writerId,
+            Duration appendSessionTtl,
+            Duration appendSessionRenewBefore,
+            Duration appendSessionMinCommitRemaining,
+            Duration appendTimeout,
+            Duration readTimeout,
+            Duration shutdownGrace,
+            int maxResolveRanges,
+            int maxCommitChainScan,
+            int maxDerivedIndexRepairCommitsPerCall,
+            int maxCachedStreams,
+            int maxInFlightAppends,
+            long maxBufferedBytes,
+            int maxConcurrentObjectReads,
+            long maxReadBufferBytes,
+            int maxObjectBytes,
+            int maxAppendBatchRecords,
+            Duration offsetIndexCacheTtl,
+            boolean autoAcquireAppendSession,
+            boolean enableMetadataWatch,
+            boolean enableOffsetIndexCache) {
+        this(
+                cluster,
+                writerId,
+                appendSessionTtl,
+                appendSessionRenewBefore,
+                appendSessionMinCommitRemaining,
+                appendTimeout,
+                readTimeout,
+                shutdownGrace,
+                maxResolveRanges,
+                maxCommitChainScan,
+                maxDerivedIndexRepairCommitsPerCall,
+                maxCachedStreams,
+                maxInFlightAppends,
+                maxBufferedBytes,
+                maxConcurrentObjectReads,
+                maxReadBufferBytes,
+                maxObjectBytes,
+                maxAppendBatchRecords,
+                offsetIndexCacheTtl,
+                autoAcquireAppendSession,
+                enableMetadataWatch,
+                enableOffsetIndexCache,
                 randomProcessRunId(),
-                Duration.ofSeconds(5), Duration.ofMillis(100), Duration.ofSeconds(5), Duration.ofMinutes(10),
+                Duration.ofSeconds(5),
+                Duration.ofMillis(100),
+                Duration.ofSeconds(5),
+                Duration.ofMinutes(10),
                 Math.max(1, maxInFlightAppends),
                 maxInFlightAppends > Integer.MAX_VALUE / 2 ? Integer.MAX_VALUE : Math.max(2, maxInFlightAppends * 2));
     }
@@ -148,9 +194,17 @@ public record StreamStorageConfig(
                 2_048);
     }
 
-    public int maxConcurrentPrimaryReads() { return maxConcurrentObjectReads; }
-    public long maxPrimaryReadBufferBytes() { return maxReadBufferBytes; }
-    public long maxPrimaryAppendBytes() { return maxBufferedBytes; }
+    public int maxConcurrentPrimaryReads() {
+        return maxConcurrentObjectReads;
+    }
+
+    public long maxPrimaryReadBufferBytes() {
+        return maxReadBufferBytes;
+    }
+
+    public long maxPrimaryAppendBytes() {
+        return maxBufferedBytes;
+    }
 
     private static String randomProcessRunId() {
         byte[] entropy = new byte[32];

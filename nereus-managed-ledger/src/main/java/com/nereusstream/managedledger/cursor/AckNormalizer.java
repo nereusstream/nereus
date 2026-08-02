@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import java.util.ArrayList;
@@ -9,22 +10,22 @@ import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.TreeMap;
 
-/** Canonical whole-range and partial-batch normalization shared by codecs and mutations. */
+/**
+ * Canonical whole-range and partial-batch normalization shared by codecs and mutations.
+ */
 public final class AckNormalizer {
-    private AckNormalizer() {
-    }
+    private AckNormalizer() {}
 
     public static Normalized normalize(
-            long markDeleteOffset,
-            List<OffsetRange> ranges,
-            Map<Long, BatchAckState> partials) {
+            long markDeleteOffset, List<OffsetRange> ranges, Map<Long, BatchAckState> partials) {
         if (markDeleteOffset < 0) {
             throw new IllegalArgumentException("markDeleteOffset must be non-negative");
         }
         List<OffsetRange> normalizedRanges = mergeRanges(markDeleteOffset, ranges);
         TreeMap<Long, BatchAckState> normalizedPartials = new TreeMap<>();
         List<OffsetRange> promoted = new ArrayList<>(normalizedRanges);
-        for (Map.Entry<Long, BatchAckState> entry : Objects.requireNonNull(partials, "partials").entrySet()) {
+        for (Map.Entry<Long, BatchAckState> entry :
+                Objects.requireNonNull(partials, "partials").entrySet()) {
             Long offset = Objects.requireNonNull(entry.getKey(), "partials contains null offset");
             BatchAckState state = Objects.requireNonNull(entry.getValue(), "partials contains null state");
             if (offset < markDeleteOffset) {
@@ -46,23 +47,23 @@ public final class AckNormalizer {
             foldedMarkDelete = normalizedRanges.get(firstRemainingRange).endOffset();
             firstRemainingRange++;
         }
-        List<OffsetRange> finalRanges = List.copyOf(
-                normalizedRanges.subList(firstRemainingRange, normalizedRanges.size()));
+        List<OffsetRange> finalRanges =
+                List.copyOf(normalizedRanges.subList(firstRemainingRange, normalizedRanges.size()));
         normalizedPartials.headMap(foldedMarkDelete, false).clear();
         for (OffsetRange range : finalRanges) {
-            normalizedPartials.subMap(range.startOffset(), true, range.endOffset(), false).clear();
+            normalizedPartials
+                    .subMap(range.startOffset(), true, range.endOffset(), false)
+                    .clear();
         }
         return new Normalized(
-                foldedMarkDelete,
-                finalRanges,
-                Collections.unmodifiableNavigableMap(new TreeMap<>(normalizedPartials)));
+                foldedMarkDelete, finalRanges, Collections.unmodifiableNavigableMap(new TreeMap<>(normalizedPartials)));
     }
 
     private static List<OffsetRange> mergeRanges(long markDeleteOffset, List<OffsetRange> ranges) {
         List<OffsetRange> sorted = new ArrayList<>(Objects.requireNonNull(ranges, "ranges"));
         sorted.forEach(range -> Objects.requireNonNull(range, "ranges contains null"));
-        sorted.sort(java.util.Comparator.comparingLong(OffsetRange::startOffset)
-                .thenComparingLong(OffsetRange::endOffset));
+        sorted.sort(
+                java.util.Comparator.comparingLong(OffsetRange::startOffset).thenComparingLong(OffsetRange::endOffset));
         List<OffsetRange> merged = new ArrayList<>();
         for (OffsetRange range : sorted) {
             if (range.startOffset() < markDeleteOffset) {
@@ -74,8 +75,9 @@ public final class AckNormalizer {
             }
             OffsetRange previous = merged.get(merged.size() - 1);
             if (range.startOffset() <= previous.endOffset()) {
-                merged.set(merged.size() - 1, new OffsetRange(
-                        previous.startOffset(), Math.max(previous.endOffset(), range.endOffset())));
+                merged.set(
+                        merged.size() - 1,
+                        new OffsetRange(previous.startOffset(), Math.max(previous.endOffset(), range.endOffset())));
             } else {
                 merged.add(range);
             }

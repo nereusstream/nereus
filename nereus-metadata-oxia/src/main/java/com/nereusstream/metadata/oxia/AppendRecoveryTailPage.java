@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Newest-to-oldest exact live-tail page ending at either a continuation or the requested anchor. */
+/**
+ * Newest-to-oldest exact live-tail page ending at either a continuation or the requested anchor.
+ */
 public record AppendRecoveryTailPage(
         AppendRecoveryAnchor anchor,
         AppendRecoveryHead observedHead,
@@ -15,8 +18,7 @@ public record AppendRecoveryTailPage(
     public AppendRecoveryTailPage {
         Objects.requireNonNull(anchor, "anchor");
         Objects.requireNonNull(observedHead, "observedHead");
-        commitsNewestFirst = List.copyOf(Objects.requireNonNull(
-                commitsNewestFirst, "commitsNewestFirst"));
+        commitsNewestFirst = List.copyOf(Objects.requireNonNull(commitsNewestFirst, "commitsNewestFirst"));
         continuation = Objects.requireNonNull(continuation, "continuation");
         if (!anchor.streamId().equals(observedHead.streamId())
                 || anchorReached == continuation.isPresent()

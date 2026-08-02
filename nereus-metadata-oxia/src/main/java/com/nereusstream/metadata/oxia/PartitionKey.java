@@ -16,7 +16,9 @@ package com.nereusstream.metadata.oxia;
 
 import java.util.Objects;
 
-/** Adapter-private routing key that mirrors Oxia partition-key use. */
+/**
+ * Adapter-private routing key that mirrors Oxia partition-key use.
+ */
 public record PartitionKey(String value) {
     public PartitionKey {
         Objects.requireNonNull(value, "value");

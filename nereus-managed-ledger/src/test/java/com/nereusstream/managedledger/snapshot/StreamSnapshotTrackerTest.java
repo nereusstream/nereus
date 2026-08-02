@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.snapshot;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
@@ -37,10 +37,8 @@ class StreamSnapshotTrackerTest {
 
         StreamSnapshotView appended = tracker.advanceFromAppend(result(0, 1, 7, 1));
         StreamSnapshotView stale = tracker.updateFromMetadata(initial);
-        StreamSnapshotView newerButBehind = tracker.updateFromMetadata(
-                metadata(2, 0, 0, 0, StreamState.ACTIVE));
-        StreamSnapshotView caughtUp = tracker.updateFromMetadata(
-                metadata(3, 1, 7, 0, StreamState.ACTIVE));
+        StreamSnapshotView newerButBehind = tracker.updateFromMetadata(metadata(2, 0, 0, 0, StreamState.ACTIVE));
+        StreamSnapshotView caughtUp = tracker.updateFromMetadata(metadata(3, 1, 7, 0, StreamState.ACTIVE));
 
         assertThat(appended.metadata().committedEndOffset()).isEqualTo(1);
         assertThat(appended.metadata().cumulativeSize()).isEqualTo(7);
@@ -54,11 +52,9 @@ class StreamSnapshotTrackerTest {
 
     @Test
     void olderRecoveredAppendIsANoopButMixedRegressionFails() {
-        StreamSnapshotTracker tracker = new StreamSnapshotTracker(
-                metadata(3, 2, 14, 0, StreamState.ACTIVE), 2);
+        StreamSnapshotTracker tracker = new StreamSnapshotTracker(metadata(3, 2, 14, 0, StreamState.ACTIVE), 2);
 
-        assertThat(tracker.advanceFromAppend(result(0, 1, 7, 1)))
-                .isEqualTo(tracker.current());
+        assertThat(tracker.advanceFromAppend(result(0, 1, 7, 1))).isEqualTo(tracker.current());
         assertThatThrownBy(() -> tracker.advanceFromAppend(result(2, 3, 13, 3)))
                 .isInstanceOf(NereusException.class)
                 .hasMessageContaining("regresses");
@@ -66,44 +62,42 @@ class StreamSnapshotTrackerTest {
 
     @Test
     void equalVersionDriftAndNewerRemoteRegressionFailClosed() {
-        StreamSnapshotTracker tracker = new StreamSnapshotTracker(
-                metadata(3, 2, 14, 1, StreamState.ACTIVE), 2);
+        StreamSnapshotTracker tracker = new StreamSnapshotTracker(metadata(3, 2, 14, 1, StreamState.ACTIVE), 2);
 
-        assertThatThrownBy(() -> tracker.updateFromMetadata(
-                        metadata(3, 2, 14, 2, StreamState.ACTIVE)))
+        assertThatThrownBy(() -> tracker.updateFromMetadata(metadata(3, 2, 14, 2, StreamState.ACTIVE)))
                 .isInstanceOf(NereusException.class)
                 .hasMessageContaining("equal backend");
-        assertThatThrownBy(() -> tracker.updateFromMetadata(
-                        metadata(4, 1, 7, 1, StreamState.ACTIVE)))
+        assertThatThrownBy(() -> tracker.updateFromMetadata(metadata(4, 1, 7, 1, StreamState.ACTIVE)))
                 .isInstanceOf(NereusException.class)
                 .hasMessageContaining("regresses");
         assertThatThrownBy(() -> tracker.updateFromMetadata(new StreamMetadata(
-                        new StreamId("s-other"), STREAM_NAME, StreamState.ACTIVE,
-                        StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of(), 1, 4, 2, 14, 1)))
+                        new StreamId("s-other"),
+                        STREAM_NAME,
+                        StreamState.ACTIVE,
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                        Map.of(),
+                        1,
+                        4,
+                        2,
+                        14,
+                        1)))
                 .isInstanceOf(NereusException.class)
                 .hasMessageContaining("identity");
     }
 
     @Test
     void lifecycleCanAdvanceWhileTheLocalTailOverlayRemainsExact() {
-        StreamSnapshotTracker tracker = new StreamSnapshotTracker(
-                metadata(1, 0, 0, 0, StreamState.ACTIVE), 0);
+        StreamSnapshotTracker tracker = new StreamSnapshotTracker(metadata(1, 0, 0, 0, StreamState.ACTIVE), 0);
         tracker.advanceFromAppend(result(0, 1, 7, 1));
 
-        StreamSnapshotView sealed = tracker.updateFromMetadata(
-                metadata(2, 0, 0, 0, StreamState.SEALED));
+        StreamSnapshotView sealed = tracker.updateFromMetadata(metadata(2, 0, 0, 0, StreamState.SEALED));
 
         assertThat(sealed.metadata().state()).isEqualTo(StreamState.SEALED);
         assertThat(sealed.metadata().committedEndOffset()).isEqualTo(1);
         assertThat(sealed.localAppendOverlay()).isTrue();
     }
 
-    private static StreamMetadata metadata(
-            long metadataVersion,
-            long end,
-            long size,
-            long trim,
-            StreamState state) {
+    private static StreamMetadata metadata(long metadataVersion, long end, long size, long trim, StreamState state) {
         return new StreamMetadata(
                 STREAM_ID,
                 STREAM_NAME,
@@ -120,8 +114,12 @@ class StreamSnapshotTrackerTest {
     private static AppendResult result(long start, long end, long cumulativeSize, long commitVersion) {
         EntryIndexRef index = new EntryIndexRef(
                 EntryIndexLocation.OBJECT_FOOTER,
-                Optional.empty(), Optional.empty(), Optional.empty(),
-                0, 1, new Checksum(ChecksumType.CRC32C, "11111111"));
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                0,
+                1,
+                new Checksum(ChecksumType.CRC32C, "11111111"));
         ObjectSliceReadTarget target = new ObjectSliceReadTarget(
                 1,
                 new ObjectId("object"),

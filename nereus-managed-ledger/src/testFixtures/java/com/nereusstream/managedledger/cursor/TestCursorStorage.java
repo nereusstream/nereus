@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.metadata.oxia.CursorNames;
@@ -12,7 +13,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** Lightweight owner-aware cursor storage used by managed-ledger facade unit tests. */
+/**
+ * Lightweight owner-aware cursor storage used by managed-ledger facade unit tests.
+ */
 public final class TestCursorStorage implements CursorStorage {
     private final Map<CursorKey, CursorHandle> handles = new ConcurrentHashMap<>();
     private final Map<CursorKey, CursorState> tombstones = new ConcurrentHashMap<>();
@@ -20,26 +23,18 @@ public final class TestCursorStorage implements CursorStorage {
     private final AtomicLong openInvocations = new AtomicLong();
     private final AtomicLong deleteInvocations = new AtomicLong();
     private final AtomicLong claimInvocations = new AtomicLong();
-    private final AtomicReference<CompletableFuture<Void>> nextResetCompletionGate =
-            new AtomicReference<>();
-    private final AtomicReference<CompletableFuture<Void>> nextFlushCompletionGate =
-            new AtomicReference<>();
-    private final AtomicReference<CompletableFuture<Void>> nextOpenCompletionGate =
-            new AtomicReference<>();
-    private final AtomicReference<CompletableFuture<Void>> nextDeleteCompletionGate =
-            new AtomicReference<>();
-    private final AtomicReference<CompletableFuture<Void>> nextClaimCompletionGate =
-            new AtomicReference<>();
+    private final AtomicReference<CompletableFuture<Void>> nextResetCompletionGate = new AtomicReference<>();
+    private final AtomicReference<CompletableFuture<Void>> nextFlushCompletionGate = new AtomicReference<>();
+    private final AtomicReference<CompletableFuture<Void>> nextOpenCompletionGate = new AtomicReference<>();
+    private final AtomicReference<CompletableFuture<Void>> nextDeleteCompletionGate = new AtomicReference<>();
+    private final AtomicReference<CompletableFuture<Void>> nextClaimCompletionGate = new AtomicReference<>();
     private final AtomicReference<Throwable> nextClaimFailure = new AtomicReference<>();
-    private final CursorStateMachine stateMachine =
-            new CursorStateMachine(CursorStorageConfig.defaults());
+    private final CursorStateMachine stateMachine = new CursorStateMachine(CursorStorageConfig.defaults());
     private volatile boolean closed;
 
     @Override
     public CompletableFuture<CursorHandle> open(
-            CursorOwnerSession owner,
-            String cursorName,
-            CursorOpenRequest request) {
+            CursorOwnerSession owner, String cursorName, CursorOpenRequest request) {
         openInvocations.incrementAndGet();
         if (closed) {
             return closedFuture();
@@ -53,26 +48,24 @@ public final class TestCursorStorage implements CursorStorage {
                     long generation = tombstone == null
                             ? 1
                             : Math.addExact(tombstone.identity().cursorGeneration(), 1);
-                    long sequence = tombstone == null
-                            ? 1
-                            : Math.addExact(tombstone.mutationSequence(), 1);
-                    return newHandle(stateMachine.create(
-                            owner,
-                            exactName,
-                            generation,
-                            sequence,
-                            nextId(),
-                            request.initialMarkDeleteOffset(),
-                            request.initialPositionProperties(),
-                            request.initialCursorProperties(),
-                            tombstone == null ? 0 : nextNow(tombstone)), owner);
+                    long sequence = tombstone == null ? 1 : Math.addExact(tombstone.mutationSequence(), 1);
+                    return newHandle(
+                            stateMachine.create(
+                                    owner,
+                                    exactName,
+                                    generation,
+                                    sequence,
+                                    nextId(),
+                                    request.initialMarkDeleteOffset(),
+                                    request.initialPositionProperties(),
+                                    request.initialCursorProperties(),
+                                    tombstone == null ? 0 : nextNow(tombstone)),
+                            owner);
                 }
                 return claim(current, owner);
             });
             CompletableFuture<Void> gate = nextOpenCompletionGate.getAndSet(null);
-            return gate == null
-                    ? CompletableFuture.completedFuture(handle)
-                    : gate.thenApply(ignored -> handle);
+            return gate == null ? CompletableFuture.completedFuture(handle) : gate.thenApply(ignored -> handle);
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
         }
@@ -101,85 +94,62 @@ public final class TestCursorStorage implements CursorStorage {
         });
         List<CursorHandle> result = List.copyOf(claimed);
         CompletableFuture<Void> gate = nextClaimCompletionGate.getAndSet(null);
-        return gate == null
-                ? CompletableFuture.completedFuture(result)
-                : gate.thenApply(ignored -> result);
+        return gate == null ? CompletableFuture.completedFuture(result) : gate.thenApply(ignored -> result);
     }
 
     @Override
-    public CompletableFuture<CursorMutationResult> cumulativeAck(
-            CursorHandle handle,
-            CursorAckRequest request) {
-        return mutate(handle, state -> stateMachine.cumulativeAck(
-                state,
-                request,
-                0,
-                mutationEnd(state, List.of(request)),
-                nextNow(state)));
+    public CompletableFuture<CursorMutationResult> cumulativeAck(CursorHandle handle, CursorAckRequest request) {
+        return mutate(
+                handle,
+                state -> stateMachine.cumulativeAck(
+                        state, request, 0, mutationEnd(state, List.of(request)), nextNow(state)));
     }
 
     @Override
-    public CompletableFuture<CursorMutationResult> individualAck(
-            CursorHandle handle,
-            List<CursorAckRequest> requests) {
+    public CompletableFuture<CursorMutationResult> individualAck(CursorHandle handle, List<CursorAckRequest> requests) {
         final List<CursorAckRequest> copied;
         try {
             copied = List.copyOf(requests);
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
         }
-        return mutate(handle, state -> stateMachine.individualAck(
-                state,
-                copied,
-                0,
-                mutationEnd(state, copied),
-                nextNow(state)));
+        return mutate(
+                handle,
+                state -> stateMachine.individualAck(state, copied, 0, mutationEnd(state, copied), nextNow(state)));
     }
 
     @Override
-    public CompletableFuture<CursorMutationResult> reset(
-            CursorHandle handle,
-            CursorResetRequest request) {
-        CompletableFuture<CursorMutationResult> mutation = mutate(handle, state -> stateMachine.reset(
-                state, request, nextId(), nextNow(state)));
+    public CompletableFuture<CursorMutationResult> reset(CursorHandle handle, CursorResetRequest request) {
+        CompletableFuture<CursorMutationResult> mutation =
+                mutate(handle, state -> stateMachine.reset(state, request, nextId(), nextNow(state)));
         CompletableFuture<Void> gate = nextResetCompletionGate.getAndSet(null);
-        return gate == null
-                ? mutation
-                : mutation.thenCompose(result -> gate.thenApply(ignored -> result));
+        return gate == null ? mutation : mutation.thenCompose(result -> gate.thenApply(ignored -> result));
     }
 
     @Override
-    public CompletableFuture<CursorMutationResult> clearBacklog(
-            CursorHandle handle,
-            long observedCommittedEndOffset) {
-        return mutate(handle, state -> stateMachine.clearBacklog(
-                state, observedCommittedEndOffset, nextNow(state)));
+    public CompletableFuture<CursorMutationResult> clearBacklog(CursorHandle handle, long observedCommittedEndOffset) {
+        return mutate(handle, state -> stateMachine.clearBacklog(state, observedCommittedEndOffset, nextNow(state)));
     }
 
     @Override
     public CompletableFuture<CursorMutationResult> mutateCursorProperties(
-            CursorHandle handle,
-            CursorPropertyMutation mutation) {
-        return mutate(handle, state -> stateMachine.mutateCursorProperties(
-                state, mutation, nextNow(state)));
+            CursorHandle handle, CursorPropertyMutation mutation) {
+        return mutate(handle, state -> stateMachine.mutateCursorProperties(state, mutation, nextNow(state)));
     }
 
     @Override
     public CompletableFuture<CursorMutationResult> flushPositionProperties(
-            CursorHandle handle,
-            Map<String, Long> stagedProperties) {
+            CursorHandle handle, Map<String, Long> stagedProperties) {
         final Map<String, Long> copied;
         try {
             copied = Map.copyOf(stagedProperties);
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
         }
-        CompletableFuture<CursorMutationResult> mutation = mutate(handle, state -> stateMachine.flushPositionProperties(
-                state, copied, nextNow(state)));
+        CompletableFuture<CursorMutationResult> mutation =
+                mutate(handle, state -> stateMachine.flushPositionProperties(state, copied, nextNow(state)));
         CompletableFuture<Void> gate = nextFlushCompletionGate.getAndSet(null);
-        return gate == null
-                ? mutation
-                : mutation.thenCompose(result -> gate.thenApply(ignored -> result));
+        return gate == null ? mutation : mutation.thenCompose(result -> gate.thenApply(ignored -> result));
     }
 
     @Override
@@ -194,19 +164,15 @@ public final class TestCursorStorage implements CursorStorage {
                 deletion = CompletableFuture.completedFuture(null);
             } else if (!handle.owner().equals(owner)) {
                 handles.putIfAbsent(key, handle);
-                deletion = CompletableFuture.failedFuture(
-                        new IllegalStateException("test cursor owner changed"));
+                deletion = CompletableFuture.failedFuture(new IllegalStateException("test cursor owner changed"));
             } else {
-                CursorMutationResult deleted = stateMachine.delete(
-                        handle.state(), nextNow(handle.state()));
+                CursorMutationResult deleted = stateMachine.delete(handle.state(), nextNow(handle.state()));
                 tombstones.put(key, deleted.state());
                 handle.publish(deleted.state());
                 deletion = handle.closeAsync();
             }
             CompletableFuture<Void> gate = nextDeleteCompletionGate.getAndSet(null);
-            return gate == null
-                    ? deletion
-                    : deletion.thenCompose(ignored -> gate);
+            return gate == null ? deletion : deletion.thenCompose(ignored -> gate);
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
         }
@@ -282,9 +248,7 @@ public final class TestCursorStorage implements CursorStorage {
         }
     }
 
-    public Optional<CursorState> tombstone(
-            CursorOwnerSession owner,
-            String cursorName) {
+    public Optional<CursorState> tombstone(CursorOwnerSession owner, String cursorName) {
         return Optional.ofNullable(tombstones.get(new CursorKey(owner.ledger(), cursorName)));
     }
 
@@ -318,15 +282,12 @@ public final class TestCursorStorage implements CursorStorage {
         return String.format("%032x", ids.incrementAndGet());
     }
 
-    private CompletableFuture<CursorMutationResult> mutate(
-            CursorHandle handle,
-            Mutation mutation) {
+    private CompletableFuture<CursorMutationResult> mutate(CursorHandle handle, Mutation mutation) {
         if (closed) {
             return closedFuture();
         }
         if (handle.isClosed()) {
-            return CompletableFuture.failedFuture(
-                    new IllegalStateException("test cursor handle is closed"));
+            return CompletableFuture.failedFuture(new IllegalStateException("test cursor handle is closed"));
         }
         return handle.mutationLane().submit(() -> {
             try {
@@ -339,9 +300,7 @@ public final class TestCursorStorage implements CursorStorage {
         });
     }
 
-    private static long mutationEnd(
-            CursorState state,
-            List<CursorAckRequest> requests) {
+    private static long mutationEnd(CursorState state, List<CursorAckRequest> requests) {
         long end = state.acknowledgements().markDeleteOffset();
         for (OffsetRange range : state.acknowledgements().wholeAckRanges()) {
             end = Math.max(end, range.endOffset());
@@ -363,8 +322,7 @@ public final class TestCursorStorage implements CursorStorage {
         return CompletableFuture.failedFuture(new IllegalStateException("test cursor storage is closed"));
     }
 
-    private record CursorKey(CursorLedgerIdentity ledger, String cursorName) {
-    }
+    private record CursorKey(CursorLedgerIdentity ledger, String cursorName) {}
 
     @FunctionalInterface
     private interface Mutation {

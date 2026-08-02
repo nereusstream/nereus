@@ -3,7 +3,6 @@ package com.nereusstream.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,7 +14,8 @@ class AdminConfigurationTest {
     @Test
     void loadsValidMinimalConfig(@TempDir Path tempDir) throws IOException {
         Path config = tempDir.resolve("admin.properties");
-        Files.writeString(config,
+        Files.writeString(
+                config,
                 "cluster=test-cluster\n"
                         + "oxia.serviceAddress=localhost:6648\n"
                         + "oxia.namespace=nereus\n"
@@ -29,7 +29,8 @@ class AdminConfigurationTest {
                         + "objectStore.pathStyleAccess=true\n"
                         + "objectStore.requestTimeoutSeconds=30\n"
                         + "objectStore.maxConnections=64\n"
-                        + "objectStore.secretResolverClassName=com.nereusstream.objectstore.EnvironmentObjectStoreSecretResolver\n"
+                        + "objectStore.secretResolverClassName="
+                        + "com.nereusstream.objectstore.EnvironmentObjectStoreSecretResolver\n"
                         + "objectStore.accessKeySecretRef=NEREUS_S3_ACCESS_KEY\n"
                         + "objectStore.secretKeySecretRef=NEREUS_S3_SECRET_KEY\n"
                         + "bookkeeper.deploymentId=nereus-v010-benchmark\n"
@@ -67,23 +68,20 @@ class AdminConfigurationTest {
     }
 
     @Test
-    void rejectsUnknownKeysInsteadOfSilentlyIgnoringTypos(
-            @TempDir Path tempDir) throws IOException {
+    void rejectsUnknownKeysInsteadOfSilentlyIgnoringTypos(@TempDir Path tempDir) throws IOException {
         Path config = tempDir.resolve("admin.properties");
-        Files.writeString(config,
-                "cluster=test\n"
-                        + "objectStore.maxConnection=64\n");
+        Files.writeString(config, "cluster=test\n" + "objectStore.maxConnection=64\n");
 
         assertThatThrownBy(() -> AdminConfiguration.load(config))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining(
-                        "unsupported config keys: objectStore.maxConnection");
+                .hasMessageContaining("unsupported config keys: objectStore.maxConnection");
     }
 
     @Test
     void usesDefaultsForOptionalFields(@TempDir Path tempDir) throws IOException {
         Path config = tempDir.resolve("admin.properties");
-        Files.writeString(config,
+        Files.writeString(
+                config,
                 "cluster=test-cluster\n"
                         + "oxia.serviceAddress=localhost:6648\n"
                         + "oxia.namespace=nereus\n"
@@ -107,23 +105,21 @@ class AdminConfigurationTest {
         assertThat(adminConfig.objectStore().maxConnections()).isEqualTo(64);
         assertThat(adminConfig.objectStore().requestTimeout().toSeconds()).isEqualTo(30);
         assertThat(adminConfig.objectStoreSecretResolverClassName())
-                .isEqualTo(
-                        "com.nereusstream.objectstore.EnvironmentObjectStoreSecretResolver");
+                .isEqualTo("com.nereusstream.objectstore.EnvironmentObjectStoreSecretResolver");
     }
 
     @Test
     void rejectsUnknownFile(@TempDir Path tempDir) {
         Path config = tempDir.resolve("nonexistent.properties");
 
-        assertThatThrownBy(() -> AdminConfiguration.load(config))
-                .isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> AdminConfiguration.load(config)).isInstanceOf(RuntimeException.class);
     }
 
     @Test
-    void rejectsInvalidBooleanInsteadOfSilentlyDisablingIt(
-            @TempDir Path tempDir) throws IOException {
+    void rejectsInvalidBooleanInsteadOfSilentlyDisablingIt(@TempDir Path tempDir) throws IOException {
         Path config = tempDir.resolve("admin.properties");
-        Files.writeString(config,
+        Files.writeString(
+                config,
                 "cluster=test-cluster\n"
                         + "oxia.serviceAddress=localhost:6648\n"
                         + "oxia.namespace=nereus\n"
@@ -150,10 +146,10 @@ class AdminConfigurationTest {
     }
 
     @Test
-    void loadsObjectStoreOnlyConfigWhenBookKeeperAdministrationIsDisabled(
-            @TempDir Path tempDir) throws IOException {
+    void loadsObjectStoreOnlyConfigWhenBookKeeperAdministrationIsDisabled(@TempDir Path tempDir) throws IOException {
         Path config = tempDir.resolve("admin.properties");
-        Files.writeString(config,
+        Files.writeString(
+                config,
                 "cluster=test-cluster\n"
                         + "oxia.serviceAddress=localhost:6648\n"
                         + "oxia.namespace=nereus\n"

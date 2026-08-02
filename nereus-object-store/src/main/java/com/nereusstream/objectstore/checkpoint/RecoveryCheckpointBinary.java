@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -22,8 +23,7 @@ import java.util.Objects;
 import java.util.zip.CRC32C;
 
 final class RecoveryCheckpointBinary {
-    private RecoveryCheckpointBinary() {
-    }
+    private RecoveryCheckpointBinary() {}
 
     static byte[] encodeHeader(RecoveryCheckpointWriteRequest value) {
         Objects.requireNonNull(value, "value");
@@ -141,8 +141,7 @@ final class RecoveryCheckpointBinary {
         Reader reader = new Reader(bytes, "NRC1 commit entry");
         try {
             long commitVersion = reader.int64("commitVersion");
-            OffsetRange range = new OffsetRange(
-                    reader.int64("offsetStart"), reader.int64("offsetEnd"));
+            OffsetRange range = new OffsetRange(reader.int64("offsetStart"), reader.int64("offsetEnd"));
             long cumulativeSizeAtEnd = reader.int64("cumulativeSizeAtEnd");
             String commitId = reader.string("commitId");
             String previousCommitId = reader.string("previousCommitId");
@@ -202,8 +201,7 @@ final class RecoveryCheckpointBinary {
             long commitLength = reader.int64("commitDirectoryLength");
             Checksum bodySha256 = reader.sha256("bodySha256");
             reader.verifyTrailingCrc("NRC1 footer");
-            if (reader.consumed() != RecoveryCheckpointFormatV1.FOOTER_BYTES
-                    || reader.remaining() != 0) {
+            if (reader.consumed() != RecoveryCheckpointFormatV1.FOOTER_BYTES || reader.remaining() != 0) {
                 throw corrupt("NRC1 footer has an invalid fixed length");
             }
             return new Footer(
@@ -245,11 +243,9 @@ final class RecoveryCheckpointBinary {
         return new RecoveryCheckpointFormatException(message, cause);
     }
 
-    record Decoded<T>(T value, int bytesConsumed) {
-    }
+    record Decoded<T>(T value, int bytesConsumed) {}
 
-    record Footer(RecoveryCheckpointDirectory directory, Checksum bodySha256) {
-    }
+    record Footer(RecoveryCheckpointDirectory directory, Checksum bodySha256) {}
 
     @FunctionalInterface
     private interface WriterAction {
@@ -286,8 +282,7 @@ final class RecoveryCheckpointBinary {
 
         private void bytes(ByteBuffer value, String field) {
             ByteBuffer source = Objects.requireNonNull(value, field).asReadOnlyBuffer();
-            if (!source.hasRemaining()
-                    || source.remaining() > RecoveryCheckpointFormatV1.MAX_EMBEDDED_RECORD_BYTES) {
+            if (!source.hasRemaining() || source.remaining() > RecoveryCheckpointFormatV1.MAX_EMBEDDED_RECORD_BYTES) {
                 throw new IllegalArgumentException(field + " exceeds the NRC1 embedded-record limit");
             }
             byte[] copied = new byte[source.remaining()];
@@ -324,7 +319,8 @@ final class RecoveryCheckpointBinary {
         private final String context;
 
         private Reader(ByteBuffer value, String context) {
-            this.source = Objects.requireNonNull(value, "value").asReadOnlyBuffer().order(ByteOrder.BIG_ENDIAN);
+            this.source =
+                    Objects.requireNonNull(value, "value").asReadOnlyBuffer().order(ByteOrder.BIG_ENDIAN);
             this.start = source.position();
             this.context = context;
         }
@@ -363,7 +359,8 @@ final class RecoveryCheckpointBinary {
             encoded.limit(length);
             source.position(source.position() + length);
             try {
-                return StandardCharsets.UTF_8.newDecoder()
+                return StandardCharsets.UTF_8
+                        .newDecoder()
                         .onMalformedInput(CodingErrorAction.REPORT)
                         .onUnmappableCharacter(CodingErrorAction.REPORT)
                         .decode(encoded)

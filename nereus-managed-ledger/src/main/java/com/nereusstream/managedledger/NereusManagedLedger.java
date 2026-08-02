@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import com.google.common.collect.BoundType;
@@ -12,8 +13,8 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.core.capability.LiveProjectionSubject;
-import com.nereusstream.managedledger.callbacks.SerialCallbackLane;
 import com.nereusstream.managedledger.callbacks.CallbackDispatcher;
+import com.nereusstream.managedledger.callbacks.SerialCallbackLane;
 import com.nereusstream.managedledger.config.ManagedLedgerConfigValidator;
 import com.nereusstream.managedledger.cursor.CursorAckState;
 import com.nereusstream.managedledger.cursor.CursorHandle;
@@ -28,7 +29,6 @@ import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProjecti
 import com.nereusstream.managedledger.projection.F2L0RequestFactory;
 import com.nereusstream.managedledger.projection.PositionProjection;
 import com.nereusstream.managedledger.projection.ProjectionValidationException;
-import com.nereusstream.managedledger.projection.StreamPositionBounds;
 import com.nereusstream.managedledger.projection.VirtualLedgerProjection;
 import com.nereusstream.managedledger.retention.NereusManagedLedgerRetentionService;
 import com.nereusstream.managedledger.retention.RetentionPolicySnapshot;
@@ -61,17 +61,17 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.AddEntryCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.CloseCallback;
-import org.apache.bookkeeper.mledger.AsyncCallbacks.DeleteLedgerCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.DeleteCursorCallback;
+import org.apache.bookkeeper.mledger.AsyncCallbacks.DeleteLedgerCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.OpenCursorCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntryCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.TerminateCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.UpdatePropertiesCallback;
 import org.apache.bookkeeper.mledger.Entry;
+import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.ManagedLedgerMXBean;
-import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.PositionBound;
 import org.apache.bookkeeper.mledger.PositionFactory;
@@ -80,7 +80,9 @@ import org.apache.pulsar.common.api.proto.CommandSubscribe.InitialPosition;
 import org.apache.pulsar.common.policies.data.ManagedLedgerInternalStats;
 import org.apache.pulsar.common.util.DateFormatter;
 
-/** One writable Pulsar managed-ledger facade over one immutable F2 virtual-ledger projection. */
+/**
+ * One writable Pulsar managed-ledger facade over one immutable F2 virtual-ledger projection.
+ */
 public final class NereusManagedLedger extends AbstractNereusManagedLedger
         implements NereusWriteFenceView, NereusCursorLedgerView {
     private static final Duration TERMINAL_OBSERVER_TIMEOUT = Duration.ofNanos(Long.MAX_VALUE);
@@ -96,17 +98,13 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     private record WriteFence(
-            long generation,
-            AppendAttemptId attemptId,
-            CompletableFuture<NereusWriteFenceResolution> terminal) {
-    }
+            long generation, AppendAttemptId attemptId, CompletableFuture<NereusWriteFenceResolution> terminal) {}
 
     private final NereusManagedLedgerRuntime runtime;
     private final CursorOwnerSession cursorOwnerSession;
     private final NereusManagedLedgerOwnershipGuard ownershipGuard;
     private volatile CursorRetentionView cursorRetention;
-    private final AtomicReference<RetentionPolicySnapshot> retentionPolicy =
-            new AtomicReference<>();
+    private final AtomicReference<RetentionPolicySnapshot> retentionPolicy = new AtomicReference<>();
     private final NereusManagedLedgerRetentionService retentionService;
     private final VirtualLedgerProjection projection;
     private final StreamSnapshotTracker snapshots;
@@ -119,8 +117,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     private final ConcurrentHashMap<String, NereusManagedCursor> cursors = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CompletableFuture<NereusManagedCursor>> cursorOpenFlights =
             new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, CompletableFuture<Void>> cursorDeleteFlights =
-            new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CompletableFuture<Void>> cursorDeleteFlights = new ConcurrentHashMap<>();
     private final AtomicInteger pendingAdds = new AtomicInteger();
     private final AtomicLong lastAddEntryTime = new AtomicLong();
     private final NereusManagedLedgerStats stats;
@@ -154,14 +151,14 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         this.topicProjection = new AtomicReference<>(result.topicProjection());
         this.snapshots = new StreamSnapshotTracker(result.streamMetadata(), 0);
         this.entryCodec = new PulsarEntryCodec(runtime.config().maxEntryBytes());
-        this.callbacks = new SerialCallbackLane(runtime.callbackExecutor(), runtime.config().maxPendingCallbacks());
+        this.callbacks = new SerialCallbackLane(
+                runtime.callbackExecutor(), runtime.config().maxPendingCallbacks());
         this.stats = new NereusManagedLedgerStats(
-                projection.managedLedgerName(), () -> snapshots.current().metadata().cumulativeSize());
+                projection.managedLedgerName(),
+                () -> snapshots.current().metadata().cumulativeSize());
         this.tailPoll = new TailPollCoordinator(
-                runtime.scheduler(), runtime.config().tailPollInterval(),
-                this::refreshMetadata, this::currentMetadata);
-        this.retentionService = createRetentionService(
-                result.topicProjection());
+                runtime.scheduler(), runtime.config().tailPollInterval(), this::refreshMetadata, this::currentMetadata);
+        this.retentionService = createRetentionService(result.topicProjection());
         this.state = switch (result.streamMetadata().state()) {
             case ACTIVE -> LocalState.OPEN;
             case SEALED -> LocalState.SEALED;
@@ -193,12 +190,13 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         return cursorRetention;
     }
 
-    /** Installs the exact effective product policy derived from one authoritative Pulsar policy snapshot. */
+    /**
+     * Installs the exact effective product policy derived from one authoritative Pulsar policy snapshot.
+     */
     public void installRetentionPolicy(RetentionPolicySnapshot policy) {
         RetentionPolicySnapshot exact = Objects.requireNonNull(policy, "policy");
         if (!runtime.hasRetentionRuntime()) {
-            throw new IllegalStateException(
-                    "this managed ledger runtime has no Phase 4 retention composition");
+            throw new IllegalStateException("this managed ledger runtime has no Phase 4 retention composition");
         }
         retentionPolicy.set(exact);
     }
@@ -207,7 +205,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         return Optional.ofNullable(retentionPolicy.get());
     }
 
-    /** Completes only after registration-backed generation authority is active and still owned by this broker. */
+    /**
+     * Completes only after registration-backed generation authority is active and still owned by this broker.
+     */
     public CompletableFuture<Void> ensureGenerationProtocolReadyForPolicy() {
         if (retentionService == null) {
             return CompletableFuture.failedFuture(new NereusException(
@@ -230,7 +230,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     @Override
     public CompletableFuture<StreamMetadata> refreshMetadata() {
-        return runtime.streamStorage().getStreamMetadata(projection.streamId())
+        return runtime.streamStorage()
+                .getStreamMetadata(projection.streamId())
                 .thenApply(metadata -> snapshots.updateFromMetadata(metadata).metadata());
     }
 
@@ -238,11 +239,13 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     public CompletableFuture<Entry> readAt(long offset, StreamMetadata metadata) {
         Position position = positions.entryPosition(projection, offset);
         positions.requireReadableEntryOffset(projection, position, metadata);
-        return runtime.streamStorage().read(
+        return runtime.streamStorage()
+                .read(
                         projection.streamId(),
                         offset,
                         requests.singleEntryReadOptions(
-                                runtime.config().maxEntryBytes(), runtime.config().readTimeout()))
+                                runtime.config().maxEntryBytes(),
+                                runtime.config().readTimeout()))
                 .thenApply(result -> entryCodec.decode(position, result));
     }
 
@@ -274,9 +277,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     @Override
     public void trimConsumedLedgersInBackground(CompletableFuture<?> promise) {
-        CompletableFuture<?> exactPromise = Objects.requireNonNull(
-                promise,
-                "promise");
+        CompletableFuture<?> exactPromise = Objects.requireNonNull(promise, "promise");
         final CompletableFuture<?> trim;
         try {
             if (retentionService == null) {
@@ -285,70 +286,52 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
                         false,
                         "Phase 4 logical retention is not installed in this runtime");
             }
-            trim = runtime.retentionRuntime().trim(
-                    projection.streamId(),
-                    retentionService,
-                    "pulsar-managed-ledger-retention");
+            trim = runtime.retentionRuntime()
+                    .trim(projection.streamId(), retentionService, "pulsar-managed-ledger-retention");
         } catch (Throwable failure) {
             completeRetentionPromise(exactPromise, failure);
             return;
         }
-        trim.whenComplete((ignored, failure) ->
-                completeRetentionPromise(exactPromise, failure));
+        trim.whenComplete((ignored, failure) -> completeRetentionPromise(exactPromise, failure));
     }
 
-    private NereusManagedLedgerRetentionService createRetentionService(
-            TopicProjectionRecord record) {
+    private NereusManagedLedgerRetentionService createRetentionService(TopicProjectionRecord record) {
         if (!runtime.hasRetentionRuntime()) {
             return null;
         }
         ManagedLedgerGenerationProjectionRefV1 reference =
-                new ManagedLedgerGenerationProjectionRefV1(
-                        record.managedLedgerName(),
-                        record.projectionIdentity());
+                new ManagedLedgerGenerationProjectionRefV1(record.managedLedgerName(), record.projectionIdentity());
         LiveProjectionSubject subject = new LiveProjectionSubject(
-                projection.streamId(),
-                reference.toProjectionRef(),
-                reference.projectionIdentitySha256());
-        return runtime.retentionRuntime().createService(
-                projection.streamId(),
-                subject,
-                ownershipGuard,
-                this::snapshotRetentionPolicy,
-                cursorOwnerSession,
-                view -> cursorRetention = view);
+                projection.streamId(), reference.toProjectionRef(), reference.projectionIdentitySha256());
+        return runtime.retentionRuntime()
+                .createService(
+                        projection.streamId(),
+                        subject,
+                        ownershipGuard,
+                        this::snapshotRetentionPolicy,
+                        cursorOwnerSession,
+                        view -> cursorRetention = view);
     }
 
-    private CompletableFuture<RetentionPolicySnapshot> snapshotRetentionPolicy(
-            StreamId streamId) {
-        if (!projection.streamId().equals(
-                Objects.requireNonNull(streamId, "streamId"))) {
+    private CompletableFuture<RetentionPolicySnapshot> snapshotRetentionPolicy(StreamId streamId) {
+        if (!projection.streamId().equals(Objects.requireNonNull(streamId, "streamId"))) {
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.INVALID_ARGUMENT,
-                    false,
-                    "retention policy requested for another stream"));
+                    ErrorCode.INVALID_ARGUMENT, false, "retention policy requested for another stream"));
         }
         RetentionPolicySnapshot current = retentionPolicy.get();
         if (current == null) {
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.METADATA_UNAVAILABLE,
-                    true,
-                    "authoritative Pulsar retention policy is not installed"));
+                    ErrorCode.METADATA_UNAVAILABLE, true, "authoritative Pulsar retention policy is not installed"));
         }
         return CompletableFuture.completedFuture(current);
     }
 
-    private void completeRetentionPromise(
-            CompletableFuture<?> promise,
-            Throwable failure) {
+    private void completeRetentionPromise(CompletableFuture<?> promise, Throwable failure) {
         CallbackDispatcher.execute(runtime.callbackExecutor(), () -> {
             if (failure == null) {
                 promise.complete(null);
             } else {
-                promise.completeExceptionally(map(
-                        unwrap(failure),
-                        "trimConsumedLedgers",
-                        false));
+                promise.completeExceptionally(map(unwrap(failure), "trimConsumedLedgers", false));
             }
         });
     }
@@ -368,9 +351,11 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             String name,
             InitialPosition initialPosition,
             Map<String, Long> properties,
-            Map<String, String> cursorProperties) throws ManagedLedgerException {
-        return await(openDurableCursor(
-                name, initialPosition, properties, cursorProperties), runtime.config().metadataTimeout());
+            Map<String, String> cursorProperties)
+            throws ManagedLedgerException {
+        return await(
+                openDurableCursor(name, initialPosition, properties, cursorProperties),
+                runtime.config().metadataTimeout());
     }
 
     @Override
@@ -379,8 +364,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     @Override
-    public void asyncOpenCursor(
-            String name, InitialPosition initialPosition, OpenCursorCallback callback, Object ctx) {
+    public void asyncOpenCursor(String name, InitialPosition initialPosition, OpenCursorCallback callback, Object ctx) {
         asyncOpenCursor(name, initialPosition, Map.of(), Map.of(), callback, ctx);
     }
 
@@ -394,13 +378,15 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             Object ctx) {
         Objects.requireNonNull(callback, "callback");
         openDurableCursor(name, initialPosition, properties, cursorProperties)
-                .whenCompleteAsync((cursor, error) -> {
-                    if (error == null) {
-                        callback.openCursorComplete(cursor, ctx);
-                    } else {
-                        callback.openCursorFailed(map(error, "openCursor", false), ctx);
-                    }
-                }, runtime.callbackExecutor());
+                .whenCompleteAsync(
+                        (cursor, error) -> {
+                            if (error == null) {
+                                callback.openCursorComplete(cursor, ctx);
+                            } else {
+                                callback.openCursorFailed(map(error, "openCursor", false), ctx);
+                            }
+                        },
+                        runtime.callbackExecutor());
     }
 
     private CompletableFuture<NereusManagedCursor> openDurableCursor(
@@ -412,9 +398,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         final CursorOpenRequest request;
         try {
             exactName = CursorNames.requireCursorName(name);
-            InitialPosition normalizedInitial = initialPosition == null
-                    ? InitialPosition.Latest
-                    : initialPosition;
+            InitialPosition normalizedInitial = initialPosition == null ? InitialPosition.Latest : initialPosition;
             StreamMetadata observed = currentMetadata();
             InitialCursorPosition internalInitial = normalizedInitial == InitialPosition.Earliest
                     ? new InitialCursorPosition.Earliest()
@@ -431,9 +415,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         return openDurableCursor(exactName, request);
     }
 
-    private CompletableFuture<NereusManagedCursor> openDurableCursor(
-            String name,
-            CursorOpenRequest request) {
+    private CompletableFuture<NereusManagedCursor> openDurableCursor(String name, CursorOpenRequest request) {
         final CompletableFuture<NereusManagedCursor> candidate;
         synchronized (cursorRegistryLock) {
             if (cursorAdmissionClosed) {
@@ -447,15 +429,17 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             NereusManagedCursor registered = cursors.get(name);
             if (registered != null) {
                 if (!registered.isDurable()) {
-                    return CompletableFuture.failedFuture(new ManagedLedgerException(
-                            "a non-durable cursor already uses the exact name"));
+                    return CompletableFuture.failedFuture(
+                            new ManagedLedgerException("a non-durable cursor already uses the exact name"));
                 }
                 if (!registered.isOpenForRegistry()) {
-                    return registered.closeAsyncFuture()
+                    return registered
+                            .closeAsyncFuture()
                             .handle((ignored, error) -> null)
                             .thenCompose(ignored -> openDurableCursor(name, request));
                 }
-                return ownershipGuard.requireOwned("existing durable cursor open")
+                return ownershipGuard
+                        .requireOwned("existing durable cursor open")
                         .thenApply(ignored -> registered);
             }
             CompletableFuture<NereusManagedCursor> existing = cursorOpenFlights.get(name);
@@ -466,25 +450,21 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             cursorOpenFlights.put(name, candidate);
         }
 
-        ownershipGuard.requireOwned("durable cursor open before mutation")
+        ownershipGuard
+                .requireOwned("durable cursor open before mutation")
                 .thenCompose(ignored -> runtime.cursorStorage().open(cursorOwnerSession, name, request))
                 .thenCompose(handle -> ownershipGuard
                         .requireOwned("durable cursor open final publication")
                         .thenApply(ignored -> handle)
                         .exceptionallyCompose(error -> handle.closeAsync()
                                 .handle((ignored, closeError) -> null)
-                                .thenCompose(ignored -> CompletableFuture.failedFuture(
-                                        unwrap(error)))))
-                .whenComplete((handle, error) -> completeDurableCursorOpen(
-                        name, candidate, handle, error));
+                                .thenCompose(ignored -> CompletableFuture.failedFuture(unwrap(error)))))
+                .whenComplete((handle, error) -> completeDurableCursorOpen(name, candidate, handle, error));
         return candidate;
     }
 
     private void completeDurableCursorOpen(
-            String name,
-            CompletableFuture<NereusManagedCursor> candidate,
-            CursorHandle handle,
-            Throwable error) {
+            String name, CompletableFuture<NereusManagedCursor> candidate, CursorHandle handle, Throwable error) {
         if (error != null) {
             synchronized (cursorRegistryLock) {
                 cursorOpenFlights.remove(name, candidate);
@@ -513,8 +493,10 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             }
             if (registered != null && !registered.isDurable()) {
                 created.closeDetached();
-                closeHandleThenFail(handle, candidate, new ManagedLedgerException(
-                        "a non-durable cursor already uses the exact name"));
+                closeHandleThenFail(
+                        handle,
+                        candidate,
+                        new ManagedLedgerException("a non-durable cursor already uses the exact name"));
                 return;
             }
             if (registered != null) {
@@ -538,9 +520,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     private static void closeHandleThenFail(
-            CursorHandle handle,
-            CompletableFuture<NereusManagedCursor> candidate,
-            Throwable failure) {
+            CursorHandle handle, CompletableFuture<NereusManagedCursor> candidate, Throwable failure) {
         handle.closeAsync().whenComplete((ignored, closeError) -> {
             Throwable exactFailure = unwrap(failure);
             if (closeError != null) {
@@ -552,9 +532,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     @Override
     public ManagedCursor newNonDurableCursor(Position startCursorPosition) throws ManagedLedgerException {
-        return newNonDurableCursor(
-                startCursorPosition,
-                "non-durable-cursor-" + UUID.randomUUID());
+        return newNonDurableCursor(startCursorPosition, "non-durable-cursor-" + UUID.randomUUID());
     }
 
     @Override
@@ -565,24 +543,15 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     @Override
     public ManagedCursor newNonDurableCursor(
-            Position startPosition,
-            String subscriptionName,
-            InitialPosition initialPosition,
-            boolean isReadCompacted) throws ManagedLedgerException {
+            Position startPosition, String subscriptionName, InitialPosition initialPosition, boolean isReadCompacted)
+            throws ManagedLedgerException {
         if (isReadCompacted) {
             throw unsupported("newNonDurableCursor(readCompacted)");
         }
         StreamMetadata metadata = currentMetadata();
         long offset = normalizeNonDurableCursorReadOffset(
-                startPosition,
-                Objects.requireNonNull(initialPosition, "initialPosition"),
-                metadata);
-        return createLocalCursor(
-                subscriptionName,
-                CursorAckState.empty(offset),
-                offset,
-                Map.of(),
-                Map.of());
+                startPosition, Objects.requireNonNull(initialPosition, "initialPosition"), metadata);
+        return createLocalCursor(subscriptionName, CursorAckState.empty(offset), offset, Map.of(), Map.of());
     }
 
     @Override
@@ -593,13 +562,16 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     @Override
     public void asyncDeleteCursor(String name, DeleteCursorCallback callback, Object ctx) {
         Objects.requireNonNull(callback, "callback");
-        deleteCursorFuture(name).whenCompleteAsync((ignored, error) -> {
-            if (error == null) {
-                callback.deleteCursorComplete(ctx);
-            } else {
-                callback.deleteCursorFailed(map(error, "deleteCursor", false), ctx);
-            }
-        }, runtime.callbackExecutor());
+        deleteCursorFuture(name)
+                .whenCompleteAsync(
+                        (ignored, error) -> {
+                            if (error == null) {
+                                callback.deleteCursorComplete(ctx);
+                            } else {
+                                callback.deleteCursorFailed(map(error, "deleteCursor", false), ctx);
+                            }
+                        },
+                        runtime.callbackExecutor());
     }
 
     private CompletableFuture<Void> deleteCursorFuture(String name) {
@@ -629,8 +601,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             } else {
                 CompletableFuture<NereusManagedCursor> opening = cursorOpenFlights.get(exactName);
                 operation = (opening == null
-                        ? CompletableFuture.completedFuture(null)
-                        : opening.handle((ignored, error) -> null))
+                                ? CompletableFuture.completedFuture(null)
+                                : opening.handle((ignored, error) -> null))
                         .thenCompose(ignored -> deleteDurableCursor(exactName));
             }
         }
@@ -648,22 +620,20 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     private CompletableFuture<Void> deleteDurableCursor(String name) {
-        return ownershipGuard.requireOwned("durable cursor delete")
+        return ownershipGuard
+                .requireOwned("durable cursor delete")
                 .thenCompose(ignored -> runtime.cursorStorage().delete(cursorOwnerSession, name))
                 .thenCompose(ignored -> {
                     final NereusManagedCursor removed;
                     synchronized (cursorRegistryLock) {
                         NereusManagedCursor registered = cursors.get(name);
-                        if (registered != null && registered.isDurable()
-                                && cursors.remove(name, registered)) {
+                        if (registered != null && registered.isDurable() && cursors.remove(name, registered)) {
                             removed = registered;
                         } else {
                             removed = null;
                         }
                     }
-                    return removed == null
-                            ? CompletableFuture.completedFuture(null)
-                            : removed.closeAfterDelete();
+                    return removed == null ? CompletableFuture.completedFuture(null) : removed.closeAfterDelete();
                 });
     }
 
@@ -681,7 +651,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     @Override
-    public void removeWaitingCursor(ManagedCursor cursor) { }
+    public void removeWaitingCursor(ManagedCursor cursor) {}
 
     @Override
     public Position addEntry(byte[] data) throws ManagedLedgerException {
@@ -700,20 +670,25 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     @Override
-    public Position addEntry(byte[] data, int numberOfMessages, int offset, int length)
-            throws ManagedLedgerException {
+    public Position addEntry(byte[] data, int numberOfMessages, int offset, int length) throws ManagedLedgerException {
         CompletableFuture<Position> result = new CompletableFuture<>();
-        asyncAddEntry(data, numberOfMessages, offset, length, new AddEntryCallback() {
-            @Override
-            public void addComplete(Position position, ByteBuf entryData, Object ctx) {
-                result.complete(position);
-            }
+        asyncAddEntry(
+                data,
+                numberOfMessages,
+                offset,
+                length,
+                new AddEntryCallback() {
+                    @Override
+                    public void addComplete(Position position, ByteBuf entryData, Object ctx) {
+                        result.complete(position);
+                    }
 
-            @Override
-            public void addFailed(ManagedLedgerException exception, Object ctx) {
-                result.completeExceptionally(exception);
-            }
-        }, null);
+                    @Override
+                    public void addFailed(ManagedLedgerException exception, Object ctx) {
+                        result.completeExceptionally(exception);
+                    }
+                },
+                null);
         return await(result, runtime.config().closeTimeout());
     }
 
@@ -724,19 +699,13 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     @Override
-    public void asyncAddEntry(
-            byte[] data, int offset, int length, AddEntryCallback callback, Object ctx) {
+    public void asyncAddEntry(byte[] data, int offset, int length, AddEntryCallback callback, Object ctx) {
         asyncAddEntry(data, 1, offset, length, callback, ctx);
     }
 
     @Override
     public void asyncAddEntry(
-            byte[] data,
-            int numberOfMessages,
-            int offset,
-            int length,
-            AddEntryCallback callback,
-            Object ctx) {
+            byte[] data, int numberOfMessages, int offset, int length, AddEntryCallback callback, Object ctx) {
         Objects.requireNonNull(data, "data");
         Objects.checkFromIndexSize(offset, length, data.length);
         asyncAddEntry(Unpooled.wrappedBuffer(data, offset, length), numberOfMessages, callback, ctx);
@@ -748,8 +717,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     @Override
-    public void asyncAddEntry(
-            ByteBuf buffer, int numberOfMessages, AddEntryCallback callback, Object ctx) {
+    public void asyncAddEntry(ByteBuf buffer, int numberOfMessages, AddEntryCallback callback, Object ctx) {
         Objects.requireNonNull(buffer, "buffer");
         Objects.requireNonNull(callback, "callback");
         Admission admission = admit("append", callback::addFailed, ctx);
@@ -766,13 +734,12 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         }
         pendingAdds.incrementAndGet();
         long startedNanos = System.nanoTime();
-        runtime.streamStorage().append(
+        runtime.streamStorage()
+                .append(
                         projection.streamId(),
                         encoded.appendBatch(),
                         requests.appendOptions(
-                                snapshots.current()
-                                        .metadata()
-                                        .profile(),
+                                snapshots.current().metadata().profile(),
                                 runtime.config().appendTimeout()))
                 .whenComplete((result, error) -> {
                     if (error == null) {
@@ -800,11 +767,13 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             fail(admission, callback::readEntryFailed, ctx, error, "readEntry", true);
             return;
         }
-        runtime.streamStorage().read(
+        runtime.streamStorage()
+                .read(
                         projection.streamId(),
                         offset,
                         requests.singleEntryReadOptions(
-                                runtime.config().maxEntryBytes(), runtime.config().readTimeout()))
+                                runtime.config().maxEntryBytes(),
+                                runtime.config().readTimeout()))
                 .whenComplete((result, error) -> {
                     if (error != null) {
                         stats.recordReadFailure();
@@ -863,8 +832,10 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             }
             state = LocalState.TERMINATING;
         }
-        runtime.streamStorage().seal(
-                        projection.streamId(), requests.sealOptions(runtime.config().metadataTimeout()))
+        runtime.streamStorage()
+                .seal(
+                        projection.streamId(),
+                        requests.sealOptions(runtime.config().metadataTimeout()))
                 .thenCompose(metadata -> {
                     snapshots.updateFromMetadata(metadata);
                     return mirrorState(ManagedLedgerFacadeState.SEALED);
@@ -889,17 +860,19 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     @Override
     public Position terminate() throws ManagedLedgerException {
         CompletableFuture<Position> result = new CompletableFuture<>();
-        asyncTerminate(new TerminateCallback() {
-            @Override
-            public void terminateComplete(Position lastCommittedPosition, Object ctx) {
-                result.complete(lastCommittedPosition);
-            }
+        asyncTerminate(
+                new TerminateCallback() {
+                    @Override
+                    public void terminateComplete(Position lastCommittedPosition, Object ctx) {
+                        result.complete(lastCommittedPosition);
+                    }
 
-            @Override
-            public void terminateFailed(ManagedLedgerException exception, Object ctx) {
-                result.completeExceptionally(exception);
-            }
-        }, null);
+                    @Override
+                    public void terminateFailed(ManagedLedgerException exception, Object ctx) {
+                        result.completeExceptionally(exception);
+                    }
+                },
+                null);
         return await(result, runtime.config().closeTimeout());
     }
 
@@ -921,8 +894,10 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             }
             state = LocalState.DELETING;
         }
-        runtime.streamStorage().delete(
-                        projection.streamId(), requests.deleteOptions(runtime.config().metadataTimeout()))
+        runtime.streamStorage()
+                .delete(
+                        projection.streamId(),
+                        requests.deleteOptions(runtime.config().metadataTimeout()))
                 .thenCompose(metadata -> {
                     snapshots.updateFromMetadata(metadata);
                     return mirrorDeleteState();
@@ -947,31 +922,35 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     @Override
     public void delete() throws ManagedLedgerException {
         CompletableFuture<Void> result = new CompletableFuture<>();
-        asyncDelete(new DeleteLedgerCallback() {
-            @Override
-            public void deleteLedgerComplete(Object ctx) {
-                result.complete(null);
-            }
+        asyncDelete(
+                new DeleteLedgerCallback() {
+                    @Override
+                    public void deleteLedgerComplete(Object ctx) {
+                        result.complete(null);
+                    }
 
-            @Override
-            public void deleteLedgerFailed(ManagedLedgerException exception, Object ctx) {
-                result.completeExceptionally(exception);
-            }
-        }, null);
+                    @Override
+                    public void deleteLedgerFailed(ManagedLedgerException exception, Object ctx) {
+                        result.completeExceptionally(exception);
+                    }
+                },
+                null);
         await(result, runtime.config().closeTimeout());
     }
 
     @Override
     public void asyncClose(CloseCallback callback, Object ctx) {
         Objects.requireNonNull(callback, "callback");
-        beginLedgerClose().whenCompleteAsync((ignored, error) -> {
-            if (error == null) {
-                callback.closeComplete(ctx);
-            } else {
-                callback.closeFailed(
-                        errorMapper.map(error, OperationContext.ledger("close")), ctx);
-            }
-        }, runtime.callbackExecutor());
+        beginLedgerClose()
+                .whenCompleteAsync(
+                        (ignored, error) -> {
+                            if (error == null) {
+                                callback.closeComplete(ctx);
+                            } else {
+                                callback.closeFailed(errorMapper.map(error, OperationContext.ledger("close")), ctx);
+                            }
+                        },
+                        runtime.callbackExecutor());
     }
 
     private CompletableFuture<Void> beginLedgerClose() {
@@ -995,10 +974,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
                     .filter(cursor -> !cursorDeleteFlights.containsKey(cursor.getName()))
                     .toList();
             registryFlights = new ArrayList<>();
-            cursorOpenFlights.values().forEach(flight ->
-                    registryFlights.add(flight.handle((value, error) -> null)));
-            cursorDeleteFlights.forEach((name, flight) -> registryFlights.add(
-                    flight.handle((value, error) -> null).thenCompose(ignored -> {
+            cursorOpenFlights.values().forEach(flight -> registryFlights.add(flight.handle((value, error) -> null)));
+            cursorDeleteFlights.forEach((name, flight) ->
+                    registryFlights.add(flight.handle((value, error) -> null).thenCompose(ignored -> {
                         NereusManagedCursor remaining = cursors.get(name);
                         return remaining == null
                                 ? CompletableFuture.completedFuture(null)
@@ -1009,9 +987,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         try {
             sequence = callbacks.admit();
         } catch (Throwable error) {
-            ManagedLedgerException admissionFailure = closingFrom == LocalState.DELETED
-                    ? null
-                    : errorMapper.map(error, OperationContext.ledger("close"));
+            ManagedLedgerException admissionFailure =
+                    closingFrom == LocalState.DELETED ? null : errorMapper.map(error, OperationContext.ledger("close"));
             tailPoll.close();
             cursorCloseDrain(snapshot, registryFlights).whenComplete((ignored, closeError) -> {
                 ManagedLedgerException failure = admissionFailure;
@@ -1033,9 +1010,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
         tailPoll.close();
         cursorCloseDrain(snapshot, registryFlights).whenComplete((ignored, closeError) -> {
-            ManagedLedgerException failure = closeError == null
-                    ? null
-                    : errorMapper.map(closeError, OperationContext.ledger("close"));
+            ManagedLedgerException failure =
+                    closeError == null ? null : errorMapper.map(closeError, OperationContext.ledger("close"));
             try {
                 callbacks.complete(sequence, () -> {
                     notifyClosed();
@@ -1047,8 +1023,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
                 });
             } catch (Throwable callbackError) {
                 notifyClosed();
-                result.completeExceptionally(
-                        errorMapper.map(callbackError, OperationContext.ledger("close")));
+                result.completeExceptionally(errorMapper.map(callbackError, OperationContext.ledger("close")));
             }
         });
         callbacks.closeAfterDrain();
@@ -1056,11 +1031,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     private static CompletableFuture<Void> cursorCloseDrain(
-            List<NereusManagedCursor> cursors,
-            List<CompletableFuture<?>> registryFlights) {
+            List<NereusManagedCursor> cursors, List<CompletableFuture<?>> registryFlights) {
         CompletableFuture<?>[] closes = java.util.stream.Stream.concat(
-                        cursors.stream().map(NereusManagedCursor::closeAsyncFuture),
-                        registryFlights.stream())
+                        cursors.stream().map(NereusManagedCursor::closeAsyncFuture), registryFlights.stream())
                 .toArray(CompletableFuture[]::new);
         return CompletableFuture.allOf(closes);
     }
@@ -1109,10 +1082,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     @Override
     public long getEstimatedBacklogSize() {
         ManagedCursor slowest = getSlowestConsumer();
-        return slowest == null
-                ? 0
-                : getEstimatedBacklogSize(
-                        slowest.getMarkDeletedPosition());
+        return slowest == null ? 0 : getEstimatedBacklogSize(slowest.getMarkDeletedPosition());
     }
 
     @Override
@@ -1120,13 +1090,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         StreamMetadata metadata = snapshots.current().metadata();
         long markDeleteOffset = requireVirtualLedgerPosition(position);
         long firstBacklogOffset = incrementSaturated(markDeleteOffset);
-        firstBacklogOffset = Math.max(
-                metadata.trimOffset(),
-                Math.min(
-                        firstBacklogOffset,
-                        metadata.committedEndOffset()));
-        long entries = metadata.committedEndOffset()
-                - firstBacklogOffset;
+        firstBacklogOffset =
+                Math.max(metadata.trimOffset(), Math.min(firstBacklogOffset, metadata.committedEndOffset()));
+        long entries = metadata.committedEndOffset() - firstBacklogOffset;
         if (entries == 0 || metadata.committedEndOffset() == 0) {
             return 0;
         }
@@ -1147,7 +1113,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     public Position getNextValidPosition(Position position) {
         StreamMetadata metadata = snapshots.current().metadata();
         long offset = position.getEntryId() == metadata.trimOffset() - 1
-                && position.getLedgerId() == projection.virtualLedgerId()
+                        && position.getLedgerId() == projection.virtualLedgerId()
                 ? metadata.trimOffset()
                 : Math.addExact(positions.requireReadableEntryOffset(projection, position, metadata), 1);
         return positions.readPosition(projection, offset, metadata);
@@ -1212,8 +1178,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     @Override
-    public CompletableFuture<ManagedLedgerInternalStats> getManagedLedgerInternalStats(
-            boolean includeLedgerMetadata) {
+    public CompletableFuture<ManagedLedgerInternalStats> getManagedLedgerInternalStats(boolean includeLedgerMetadata) {
         StreamMetadata metadata = snapshots.current().metadata();
         ManagedLedgerInternalStats internal = new ManagedLedgerInternalStats();
         internal.entriesAddedCounter = stats.getAddEntrySucceedTotal();
@@ -1259,18 +1224,15 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         StreamMetadata metadata = snapshots.current().metadata();
         long last = metadata.committedEndOffset() - 1;
         return searchBackward(predicate, last, metadata, runtime.config().maxScanEntries())
-                .thenApply(found -> found
-                        .map(this::getNextValidPosition)
+                .thenApply(found -> found.map(this::getNextValidPosition)
                         .orElseGet(() -> positions.bounds(projection, metadata).firstAvailable()));
     }
 
     @Override
-    public CompletableFuture<Position> getLastDispatchablePosition(
-            Predicate<Entry> predicate, Position startPosition) {
+    public CompletableFuture<Position> getLastDispatchablePosition(Predicate<Entry> predicate, Position startPosition) {
         Objects.requireNonNull(predicate, "predicate");
         StreamMetadata metadata = snapshots.current().metadata();
-        Position normalized = positions.normalizeInclusiveMaxPosition(
-                projection, startPosition, metadata);
+        Position normalized = positions.normalizeInclusiveMaxPosition(projection, startPosition, metadata);
         return searchBackward(
                         predicate,
                         normalized.getEntryId(),
@@ -1281,10 +1243,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     private CompletableFuture<Optional<Position>> searchBackward(
-            Predicate<Entry> predicate,
-            long offset,
-            StreamMetadata metadata,
-            int remaining) {
+            Predicate<Entry> predicate, long offset, StreamMetadata metadata, int remaining) {
         if (offset < metadata.trimOffset()) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
@@ -1293,11 +1252,13 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
                     ErrorCode.READ_LIMIT_TOO_SMALL, false, "managed-ledger scan budget is exhausted"));
         }
         Position position = positions.entryPosition(projection, offset);
-        return runtime.streamStorage().read(
+        return runtime.streamStorage()
+                .read(
                         projection.streamId(),
                         offset,
                         requests.singleEntryReadOptions(
-                                runtime.config().maxEntryBytes(), runtime.config().readTimeout()))
+                                runtime.config().maxEntryBytes(),
+                                runtime.config().readTimeout()))
                 .thenApply(result -> entryCodec.decode(position, result))
                 .thenCompose(entry -> {
                     boolean matches;
@@ -1346,27 +1307,31 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     @Override
-    public void asyncSetProperty(
-            String key, String value, UpdatePropertiesCallback callback, Object ctx) {
-        asyncUpdateProperties(current -> {
-            Map<String, String> updated = new java.util.HashMap<>(current);
-            updated.put(key, value);
-            return updated;
-        }, callback, ctx);
+    public void asyncSetProperty(String key, String value, UpdatePropertiesCallback callback, Object ctx) {
+        asyncUpdateProperties(
+                current -> {
+                    Map<String, String> updated = new java.util.HashMap<>(current);
+                    updated.put(key, value);
+                    return updated;
+                },
+                callback,
+                ctx);
     }
 
     @Override
     public void asyncDeleteProperty(String key, UpdatePropertiesCallback callback, Object ctx) {
-        asyncUpdateProperties(current -> {
-            Map<String, String> updated = new java.util.HashMap<>(current);
-            updated.remove(key);
-            return updated;
-        }, callback, ctx);
+        asyncUpdateProperties(
+                current -> {
+                    Map<String, String> updated = new java.util.HashMap<>(current);
+                    updated.remove(key);
+                    return updated;
+                },
+                callback,
+                ctx);
     }
 
     @Override
-    public void asyncSetProperties(
-            Map<String, String> properties, UpdatePropertiesCallback callback, Object ctx) {
+    public void asyncSetProperties(Map<String, String> properties, UpdatePropertiesCallback callback, Object ctx) {
         asyncUpdateProperties(ignored -> properties, callback, ctx);
     }
 
@@ -1380,9 +1345,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     @Override
     public Optional<LedgerInfo> getOptionalLedgerInfo(long ledgerId) {
-        return ledgerId == projection.virtualLedgerId()
-                ? Optional.of(syntheticLedgerInfo())
-                : Optional.empty();
+        return ledgerId == projection.virtualLedgerId() ? Optional.of(syntheticLedgerInfo()) : Optional.empty();
     }
 
     @Override
@@ -1423,7 +1386,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             failAppend(admission, callback, ctx, invariant);
             return;
         }
-        runtime.streamStorage().recoverAppend(
+        runtime.streamStorage()
+                .recoverAppend(
                         projection.streamId(),
                         attemptId,
                         requests.recoveryOptions(runtime.config().appendRecoveryTimeout()))
@@ -1447,10 +1411,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     private void observeFenceTerminal(WriteFence fence) {
-        runtime.streamStorage().recoverAppend(
-                        projection.streamId(),
-                        fence.attemptId(),
-                        requests.recoveryOptions(TERMINAL_OBSERVER_TIMEOUT))
+        runtime.streamStorage()
+                .recoverAppend(
+                        projection.streamId(), fence.attemptId(), requests.recoveryOptions(TERMINAL_OBSERVER_TIMEOUT))
                 .whenComplete((result, error) -> {
                     if (error == null) {
                         try {
@@ -1480,8 +1443,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             snapshots.advanceFromAppend(result);
             tailPoll.signalLocalAppend();
             position = positions.entryPosition(projection, result.range().startOffset());
-            fence.ifPresent(value -> resolveFence(
-                    value, NereusWriteFenceResolution.COMMITTED, null));
+            fence.ifPresent(value -> resolveFence(value, NereusWriteFenceResolution.COMMITTED, null));
         } catch (Throwable invalid) {
             if (fence.isPresent()) {
                 failAppend(
@@ -1509,15 +1471,11 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     private void failAppend(Admission admission, AddEntryCallback callback, Object ctx, Throwable error) {
-        failAppend(admission, callback, ctx, error, () -> { });
+        failAppend(admission, callback, ctx, error, () -> {});
     }
 
     private void failAppend(
-            Admission admission,
-            AddEntryCallback callback,
-            Object ctx,
-            Throwable error,
-            Runnable afterCallback) {
+            Admission admission, AddEntryCallback callback, Object ctx, Throwable error, Runnable afterCallback) {
         Objects.requireNonNull(afterCallback, "afterCallback");
         stats.recordAddFailure();
         ManagedLedgerException mapped = map(error, "append", false);
@@ -1551,10 +1509,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         return created;
     }
 
-    private void resolveFence(
-            WriteFence fence,
-            NereusWriteFenceResolution resolution,
-            Throwable error) {
+    private void resolveFence(WriteFence fence, NereusWriteFenceResolution resolution, Throwable error) {
         synchronized (this) {
             if (currentFence != fence) {
                 return;
@@ -1577,8 +1532,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         currentFence = null;
         lastFence = fence == null ? lastFence : fence;
         if (fence != null) {
-            fence.terminal().completeExceptionally(new NereusException(
-                    ErrorCode.STORAGE_CLOSED, false, "managed ledger closed with unresolved append recovery"));
+            fence.terminal()
+                    .completeExceptionally(new NereusException(
+                            ErrorCode.STORAGE_CLOSED, false, "managed ledger closed with unresolved append recovery"));
         }
     }
 
@@ -1589,12 +1545,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     private CompletableFuture<TopicProjectionRecord> mirrorStateAttempt(
             ManagedLedgerFacadeState target, long deadlineNanos) {
         TopicProjectionRecord current = topicProjection.get();
-        return runtime.projectionStore().mirrorFacadeState(
-                        runtime.cluster(),
-                        getName(),
-                        current.projectionIdentity(),
-                        current.metadataVersion(),
-                        target)
+        return runtime.projectionStore()
+                .mirrorFacadeState(
+                        runtime.cluster(), getName(), current.projectionIdentity(), current.metadataVersion(), target)
                 .handle((updated, error) -> {
                     if (error == null) {
                         topicProjection.set(updated);
@@ -1604,9 +1557,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
                     if (!isMetadataConditionFailure(cause) || deadlineExpired(deadlineNanos)) {
                         return CompletableFuture.<TopicProjectionRecord>failedFuture(cause);
                     }
-                    return refreshTopic(current).thenCompose(
-                            ignored -> mirrorStateAttempt(target, deadlineNanos));
-                }).thenCompose(value -> value);
+                    return refreshTopic(current).thenCompose(ignored -> mirrorStateAttempt(target, deadlineNanos));
+                })
+                .thenCompose(value -> value);
     }
 
     private CompletableFuture<TopicProjectionRecord> mirrorDeleteState() {
@@ -1618,21 +1571,23 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         return deleting.thenCompose(ignored -> mirrorState(ManagedLedgerFacadeState.DELETED));
     }
 
-    private void updateProperties(
-            java.util.function.Function<Map<String, String>, Map<String, String>> mutation)
+    private void updateProperties(java.util.function.Function<Map<String, String>, Map<String, String>> mutation)
             throws ManagedLedgerException {
         CompletableFuture<Void> result = new CompletableFuture<>();
-        asyncUpdateProperties(mutation, new UpdatePropertiesCallback() {
-            @Override
-            public void updatePropertiesComplete(Map<String, String> properties, Object ctx) {
-                result.complete(null);
-            }
+        asyncUpdateProperties(
+                mutation,
+                new UpdatePropertiesCallback() {
+                    @Override
+                    public void updatePropertiesComplete(Map<String, String> properties, Object ctx) {
+                        result.complete(null);
+                    }
 
-            @Override
-            public void updatePropertiesFailed(ManagedLedgerException exception, Object ctx) {
-                result.completeExceptionally(exception);
-            }
-        }, null);
+                    @Override
+                    public void updatePropertiesFailed(ManagedLedgerException exception, Object ctx) {
+                        result.completeExceptionally(exception);
+                    }
+                },
+                null);
         await(result, runtime.config().metadataTimeout());
     }
 
@@ -1646,20 +1601,17 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         if (admission == null) {
             return;
         }
-        updatePropertiesAttempt(mutation, metadataDeadlineNanos())
-                .whenComplete((record, error) -> {
-                    if (error != null) {
-                        fail(admission, callback::updatePropertiesFailed, ctx, unwrap(error),
-                                "updateProperties", false);
-                    } else {
-                        finish(admission, () -> callback.updatePropertiesComplete(record.properties(), ctx));
-                    }
-                });
+        updatePropertiesAttempt(mutation, metadataDeadlineNanos()).whenComplete((record, error) -> {
+            if (error != null) {
+                fail(admission, callback::updatePropertiesFailed, ctx, unwrap(error), "updateProperties", false);
+            } else {
+                finish(admission, () -> callback.updatePropertiesComplete(record.properties(), ctx));
+            }
+        });
     }
 
     private CompletableFuture<TopicProjectionRecord> updatePropertiesAttempt(
-            java.util.function.Function<Map<String, String>, Map<String, String>> mutation,
-            long deadlineNanos) {
+            java.util.function.Function<Map<String, String>, Map<String, String>> mutation, long deadlineNanos) {
         TopicProjectionRecord current = topicProjection.get();
         Map<String, String> updated;
         try {
@@ -1667,12 +1619,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
         }
-        return runtime.projectionStore().updateProperties(
-                        runtime.cluster(),
-                        getName(),
-                        current.projectionIdentity(),
-                        current.metadataVersion(),
-                        updated)
+        return runtime.projectionStore()
+                .updateProperties(
+                        runtime.cluster(), getName(), current.projectionIdentity(), current.metadataVersion(), updated)
                 .handle((record, error) -> {
                     if (error == null) {
                         topicProjection.set(record);
@@ -1682,33 +1631,32 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
                     if (!isMetadataConditionFailure(cause) || deadlineExpired(deadlineNanos)) {
                         return CompletableFuture.<TopicProjectionRecord>failedFuture(cause);
                     }
-                    return refreshTopic(current).thenCompose(
-                            ignored -> updatePropertiesAttempt(mutation, deadlineNanos));
-                }).thenCompose(value -> value);
+                    return refreshTopic(current)
+                            .thenCompose(ignored -> updatePropertiesAttempt(mutation, deadlineNanos));
+                })
+                .thenCompose(value -> value);
     }
 
     private CompletableFuture<TopicProjectionRecord> refreshTopic(TopicProjectionRecord expected) {
-        return runtime.projectionStore().getProjection(runtime.cluster(), getName())
+        return runtime.projectionStore()
+                .getProjection(runtime.cluster(), getName())
                 .thenApply(optional -> {
-                    TopicProjectionRecord refreshed = optional.orElseThrow(() -> invariant(
-                            new IllegalStateException("topic projection disappeared during CAS retry")));
+                    TopicProjectionRecord refreshed = optional.orElseThrow(() ->
+                            invariant(new IllegalStateException("topic projection disappeared during CAS retry")));
                     if (!refreshed.projectionIdentity().equals(expected.projectionIdentity())) {
-                        throw invariant(new IllegalStateException(
-                                "topic projection identity changed during CAS retry"));
+                        throw invariant(
+                                new IllegalStateException("topic projection identity changed during CAS retry"));
                     }
-                    topicProjection.getAndUpdate(current ->
-                            refreshed.metadataVersion() >= current.metadataVersion() ? refreshed : current);
+                    topicProjection.getAndUpdate(
+                            current -> refreshed.metadataVersion() >= current.metadataVersion() ? refreshed : current);
                     return refreshed;
                 });
     }
 
-    private Admission admit(
-            String operation,
-            FailureCallback failure,
-            Object ctx) {
+    private Admission admit(String operation, FailureCallback failure, Object ctx) {
         if (!runtime.tryAcquireCallbackPermit()) {
-            ManagedLedgerException rejected = new ManagedLedgerException.TooManyRequestsException(
-                    "Nereus callback capacity is exhausted");
+            ManagedLedgerException rejected =
+                    new ManagedLedgerException.TooManyRequestsException("Nereus callback capacity is exhausted");
             CallbackDispatcher.execute(runtime.callbackExecutor(), () -> failure.fail(rejected, ctx));
             return null;
         }
@@ -1745,8 +1693,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     private ManagedLedgerException map(Throwable error, String operation, boolean directRead) {
         StreamState observed = snapshots.current().metadata().state();
-        return errorMapper.map(error, new OperationContext(
-                operation, false, directRead, Optional.of(observed)));
+        return errorMapper.map(error, new OperationContext(operation, false, directRead, Optional.of(observed)));
     }
 
     private synchronized void requireAppendable() throws ManagedLedgerException {
@@ -1757,9 +1704,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     private synchronized void requireReadable() throws ManagedLedgerException {
-        if (state == LocalState.OPEN
-                || state == LocalState.SEALED
-                || state == LocalState.PERMANENTLY_FENCED) {
+        if (state == LocalState.OPEN || state == LocalState.SEALED || state == LocalState.PERMANENTLY_FENCED) {
             return;
         }
         throw fencedOrClosed("readEntry");
@@ -1767,12 +1712,13 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     private ManagedLedgerException fencedOrClosed(String operation) {
         return switch (state) {
-            case SEALED, TERMINATING -> new ManagedLedgerException.ManagedLedgerTerminatedException(
-                    "managed ledger is sealed or terminating");
-            case CLOSED, DELETING, DELETED -> new ManagedLedgerException.ManagedLedgerAlreadyClosedException(
-                    "managed ledger is closed or deleted");
-            case PERMANENTLY_FENCED, OPEN -> new ManagedLedgerException.ManagedLedgerFencedException(
-                    new IllegalStateException("Nereus " + operation + " is write-fenced"));
+            case SEALED, TERMINATING ->
+                new ManagedLedgerException.ManagedLedgerTerminatedException("managed ledger is sealed or terminating");
+            case CLOSED, DELETING, DELETED ->
+                new ManagedLedgerException.ManagedLedgerAlreadyClosedException("managed ledger is closed or deleted");
+            case PERMANENTLY_FENCED, OPEN ->
+                new ManagedLedgerException.ManagedLedgerFencedException(
+                        new IllegalStateException("Nereus " + operation + " is write-fenced"));
         };
     }
 
@@ -1803,22 +1749,17 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             CursorAckState acknowledgements,
             long initialReadOffset,
             Map<String, Long> properties,
-            Map<String, String> cursorProperties) throws ManagedLedgerException {
+            Map<String, String> cursorProperties)
+            throws ManagedLedgerException {
         String exactName = CursorNames.requireCursorName(name);
         NereusManagedCursor cursor = new NereusManagedCursor(
-                this,
-                exactName,
-                acknowledgements,
-                initialReadOffset,
-                properties,
-                cursorProperties);
+                this, exactName, acknowledgements, initialReadOffset, properties, cursorProperties);
         synchronized (cursorRegistryLock) {
             if (cursorAdmissionClosed) {
                 cursor.closeDetached();
                 throw cursorAdmissionClosed("newNonDurableCursor");
             }
-            if (cursorOpenFlights.containsKey(exactName)
-                    || cursorDeleteFlights.containsKey(exactName)) {
+            if (cursorOpenFlights.containsKey(exactName) || cursorDeleteFlights.containsKey(exactName)) {
                 cursor.closeDetached();
                 throw new ManagedLedgerException(
                         "a durable cursor operation is active for the exact name: " + exactName);
@@ -1842,8 +1783,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         }
     }
 
-    private ManagedLedgerException.ManagedLedgerAlreadyClosedException cursorAdmissionClosed(
-            String operation) {
+    private ManagedLedgerException.ManagedLedgerAlreadyClosedException cursorAdmissionClosed(String operation) {
         return new ManagedLedgerException.ManagedLedgerAlreadyClosedException(
                 "managed ledger is closed for cursor operation " + operation);
     }
@@ -1872,10 +1812,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         return PositionFactory.create(projection.virtualLedgerId(), Math.subtractExact(nextReadOffset, 1));
     }
 
-    long normalizeCursorResetReadOffset(
-            Position position,
-            boolean force,
-            StreamMetadata metadata) {
+    long normalizeCursorResetReadOffset(Position position, boolean force, StreamMetadata metadata) {
         if (samePosition(position, PositionFactory.EARLIEST)) {
             return metadata.trimOffset();
         }
@@ -1903,17 +1840,12 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         return positions.cursorReadOffsetAfter(projection, position, metadata);
     }
 
-    private static long initialReadOffset(
-            InitialPosition initialPosition, StreamMetadata metadata) {
-        return initialPosition == InitialPosition.Latest
-                ? metadata.committedEndOffset()
-                : metadata.trimOffset();
+    private static long initialReadOffset(InitialPosition initialPosition, StreamMetadata metadata) {
+        return initialPosition == InitialPosition.Latest ? metadata.committedEndOffset() : metadata.trimOffset();
     }
 
     private static boolean samePosition(Position left, Position right) {
-        return left != null
-                && left.getLedgerId() == right.getLedgerId()
-                && left.getEntryId() == right.getEntryId();
+        return left != null && left.getLedgerId() == right.getLedgerId() && left.getEntryId() == right.getEntryId();
     }
 
     private long requireVirtualLedgerPosition(Position position) {
@@ -1942,18 +1874,17 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     private static boolean isRetriableUncertainty(Throwable error) {
         return error instanceof NereusException nereus
                 && nereus.retriable()
-                && nereus.appendOutcome().orElse(AppendOutcome.MAY_HAVE_COMMITTED)
-                        != AppendOutcome.KNOWN_NOT_COMMITTED;
+                && nereus.appendOutcome().orElse(AppendOutcome.MAY_HAVE_COMMITTED) != AppendOutcome.KNOWN_NOT_COMMITTED;
     }
 
     private static boolean isMetadataConditionFailure(Throwable error) {
-        return error instanceof NereusException nereus
-                && nereus.code() == ErrorCode.METADATA_CONDITION_FAILED;
+        return error instanceof NereusException nereus && nereus.code() == ErrorCode.METADATA_CONDITION_FAILED;
     }
 
     private long metadataDeadlineNanos() {
         try {
-            return Math.addExact(System.nanoTime(), runtime.config().metadataTimeout().toNanos());
+            return Math.addExact(
+                    System.nanoTime(), runtime.config().metadataTimeout().toNanos());
         } catch (ArithmeticException ignored) {
             return Long.MAX_VALUE;
         }
@@ -1965,10 +1896,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     private static NereusException invariant(Throwable cause) {
         return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                "managed-ledger facade invariant failed",
-                cause);
+                ErrorCode.METADATA_INVARIANT_VIOLATION, false, "managed-ledger facade invariant failed", cause);
     }
 
     private static Throwable unwrap(Throwable error) {
@@ -1980,8 +1908,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         return current;
     }
 
-    private static <T> T await(CompletableFuture<T> future, Duration timeout)
-            throws ManagedLedgerException {
+    private static <T> T await(CompletableFuture<T> future, Duration timeout) throws ManagedLedgerException {
         try {
             Objects.requireNonNull(timeout, "timeout");
             return future.get();
@@ -1997,8 +1924,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         }
     }
 
-    private record Admission(long sequence) {
-    }
+    private record Admission(long sequence) {}
 
     @FunctionalInterface
     private interface FailureCallback {

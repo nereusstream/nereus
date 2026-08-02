@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.AppendSession;
@@ -6,7 +7,6 @@ import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamId;
-import com.nereusstream.api.target.BookKeeperEntryMapping;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.api.target.ReadTargetType;
 import com.nereusstream.core.wal.DurablePrimaryAppend;
@@ -36,7 +36,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** BOOKKEEPER_WAL_ONLY primary appender with pre-write range reservation and exact-id writes. */
+/**
+ * BOOKKEEPER_WAL_ONLY primary appender with pre-write range reservation and exact-id writes.
+ */
 public final class BookKeeperPrimaryWalAppender
         implements PrimaryWalAppender<BookKeeperPreparedPrimaryAppend>, AutoCloseable {
     private final String cluster;
@@ -86,8 +88,8 @@ public final class BookKeeperPrimaryWalAppender
     @Override
     public BookKeeperPreparedPrimaryAppend prepare(PrimaryAppendRequest request) {
         ensureOpen();
-        BookKeeperPreparedPrimaryAppend prepared = new BookKeeperPreparedPrimaryAppend(
-                Objects.requireNonNull(request, "request"));
+        BookKeeperPreparedPrimaryAppend prepared =
+                new BookKeeperPreparedPrimaryAppend(Objects.requireNonNull(request, "request"));
         try {
             validateBatchBound(prepared);
             return prepared;
@@ -98,8 +100,7 @@ public final class BookKeeperPrimaryWalAppender
     }
 
     @Override
-    public CompletableFuture<DurablePrimaryAppend> persist(
-            BookKeeperPreparedPrimaryAppend prepared, Duration timeout) {
+    public CompletableFuture<DurablePrimaryAppend> persist(BookKeeperPreparedPrimaryAppend prepared, Duration timeout) {
         ensureOpen();
         BookKeeperPreparedPrimaryAppend exact = Objects.requireNonNull(prepared, "prepared");
         Duration budget = min(Objects.requireNonNull(timeout, "timeout"), configuration.operationTimeout());
@@ -118,8 +119,11 @@ public final class BookKeeperPrimaryWalAppender
         CompletableFuture<DurablePrimaryAppend> exposed = new CompletableFuture<>();
         pipeline.whenComplete((durable, failure) -> {
             permit.close();
-            if (failure == null) exposed.complete(durable);
-            else exposed.completeExceptionally(failure);
+            if (failure == null) {
+                exposed.complete(durable);
+            } else {
+                exposed.completeExceptionally(failure);
+            }
         });
         return exposed;
     }
@@ -137,15 +141,15 @@ public final class BookKeeperPrimaryWalAppender
                 || target.entryCount() != token.entryCount()
                 || !target.rangeChecksum().equals(token.rangeChecksum())) {
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    ErrorCode.METADATA_INVARIANT_VIOLATION,
+                    false,
                     "BookKeeper durable append target/token identity mismatch"));
         }
         BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(
                 min(Objects.requireNonNull(timeout, "timeout"), configuration.operationTimeout()));
         var writerFuture = writerMetadata.getWriter(cluster, durable.streamId());
         var reservationFuture = writerMetadata.getReservation(cluster, durable.streamId(), token.reservationId());
-        var rootFuture = ledgerMetadata.getRoot(
-                cluster, configuration.providerScopeSha256(), token.ledgerId());
+        var rootFuture = ledgerMetadata.getRoot(cluster, configuration.providerScopeSha256(), token.ledgerId());
         @SuppressWarnings("unchecked")
         CompletableFuture<Optional<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>>>[] protections =
                 new CompletableFuture[3];
@@ -157,13 +161,14 @@ public final class BookKeeperPrimaryWalAppender
             writerFuture, reservationFuture, rootFuture, protections[0], protections[1], protections[2]
         };
         return deadline.bound(CompletableFuture.allOf(all)).thenApply(ignored -> {
-            BookKeeperVersionedValue<BookKeeperWriterStateRecord> writer = writerFuture.join().orElseThrow(
-                    () -> invariant("BookKeeper writer disappeared before head commit"));
-            BookKeeperVersionedValue<BookKeeperAppendReservationRecord> reservation =
-                    reservationFuture.join().orElseThrow(
-                            () -> invariant("BookKeeper reservation disappeared before head commit"));
-            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root = rootFuture.join().orElseThrow(
-                    () -> invariant("BookKeeper root disappeared before head commit"));
+            BookKeeperVersionedValue<BookKeeperWriterStateRecord> writer = writerFuture
+                    .join()
+                    .orElseThrow(() -> invariant("BookKeeper writer disappeared before head commit"));
+            BookKeeperVersionedValue<BookKeeperAppendReservationRecord> reservation = reservationFuture
+                    .join()
+                    .orElseThrow(() -> invariant("BookKeeper reservation disappeared before head commit"));
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root =
+                    rootFuture.join().orElseThrow(() -> invariant("BookKeeper root disappeared before head commit"));
             writerState.requireCurrentActive(writer.value(), exactSession, token.ledgerId(), token.ledgerRootEpoch());
             if (writer.metadataVersion() != token.writerMetadataVersion()
                     || reservation.metadataVersion() != token.reservationMetadataVersion()
@@ -173,8 +178,10 @@ public final class BookKeeperPrimaryWalAppender
                 throw invariant("BookKeeper append metadata changed before head commit");
             }
             for (int slot = 0; slot < protections.length; slot++) {
-                BookKeeperLedgerProtectionRecord protection = protections[slot].join().orElseThrow(
-                        () -> invariant("mandatory BookKeeper range protection is absent")).value();
+                BookKeeperLedgerProtectionRecord protection = protections[slot]
+                        .join()
+                        .orElseThrow(() -> invariant("mandatory BookKeeper range protection is absent"))
+                        .value();
                 if (protection.ledgerId() != token.ledgerId()
                         || protection.ledgerRangeSlot() != token.ledgerRangeSlot()
                         || protection.protectionSlot() != slot
@@ -192,8 +199,11 @@ public final class BookKeeperPrimaryWalAppender
         ActiveLedger cached = activeLedgers.get(request.streamId());
         if (cached != null) {
             try {
-                writerState.requireCurrentActive(cached.writer().value(), request.session(),
-                        cached.root().value().ledgerId(), cached.root().value().lifecycleEpoch());
+                writerState.requireCurrentActive(
+                        cached.writer().value(),
+                        request.session(),
+                        cached.root().value().ledgerId(),
+                        cached.root().value().lifecycleEpoch());
                 return CompletableFuture.completedFuture(cached);
             } catch (NereusException stale) {
                 if (stale.code() != ErrorCode.FENCED_APPEND) {
@@ -211,9 +221,7 @@ public final class BookKeeperPrimaryWalAppender
     }
 
     private CompletableFuture<ActiveLedger> rolloverIfRequired(
-            ActiveLedger active,
-            BookKeeperPreparedPrimaryAppend prepared,
-            BookKeeperOperationDeadline deadline) {
+            ActiveLedger active, BookKeeperPreparedPrimaryAppend prepared, BookKeeperOperationDeadline deadline) {
         if (!requiresRollover(active, prepared)) {
             return CompletableFuture.completedFuture(active);
         }
@@ -221,10 +229,7 @@ public final class BookKeeperPrimaryWalAppender
     }
 
     private CompletableFuture<ActiveLedger> recoverAndAllocate(
-            PrimaryAppendRequest request,
-            ActiveLedger cached,
-            BookKeeperOperationDeadline deadline,
-            String reason) {
+            PrimaryAppendRequest request, ActiveLedger cached, BookKeeperOperationDeadline deadline, String reason) {
         if (cached != null) {
             activeLedgers.remove(request.streamId(), cached);
             cached.handle().closeAsync();
@@ -235,7 +240,8 @@ public final class BookKeeperPrimaryWalAppender
 
     private CompletableFuture<ActiveLedger> allocate(
             PrimaryAppendRequest request, BookKeeperOperationDeadline deadline) {
-        return allocator.allocate(new BookKeeperLedgerAllocationRequest(
+        return allocator
+                .allocate(new BookKeeperLedgerAllocationRequest(
                         request.streamId(), request.session(), deadline.remaining()))
                 .thenApply(allocated -> {
                     ActiveLedger active = new ActiveLedger(
@@ -249,51 +255,58 @@ public final class BookKeeperPrimaryWalAppender
     }
 
     private CompletableFuture<DurablePrimaryAppend> persistRange(
-            ActiveLedger active,
-            BookKeeperPreparedPrimaryAppend prepared,
-            BookKeeperOperationDeadline deadline) {
+            ActiveLedger active, BookKeeperPreparedPrimaryAppend prepared, BookKeeperOperationDeadline deadline) {
         BookKeeperWriterStateRecord writer = active.writer().value();
         long firstEntryId = writer.nextEntryId();
         int rangeSlot = writer.activeAppendRangeCount();
         Checksum rangeChecksum = prepared.rangeChecksum(firstEntryId);
         String reservationId = BookKeeperAppendReservationIds.forAttempt(
                 prepared.streamId(), prepared.request().attemptId());
-        BookKeeperAppendReservationRecord desired = reservation(
-                active, prepared, reservationId, firstEntryId, rangeSlot, rangeChecksum);
-        return writerMetadata.createReservation(cluster, desired).thenCompose(reservation ->
-                writerState.reserveRange(active.writer(), prepared.request().session(), reservationId,
-                                prepared.entryCount(), prepared.physicalBytes())
-                        .handle((reservedWriter, reserveFailure) -> {
-                            if (reserveFailure != null) {
-                                return abandonWithoutSeal(reservation, unwrap(reserveFailure));
-                            }
-                            ActiveLedger reservedActive = active.withWriter(reservedWriter);
-                            activeLedgers.replace(prepared.streamId(), active, reservedActive);
-                            CompletableFuture<DurablePrimaryAppend> pipeline = createMandatoryProtections(
-                                            reservedActive, prepared, reservation)
-                                    .thenCompose(ignored -> casReservation(
-                                            reservation, AppendReservationLifecycle.WRITING, ""))
-                                    .thenCompose(writing -> writeEntries(
-                                                    reservedActive.handle(), firstEntryId,
-                                                    prepared.retainedEntries(), deadline)
-                                            .thenCompose(ignored -> casReservation(
-                                                    writing, AppendReservationLifecycle.DURABLE, "")))
-                                    .thenCompose(durableReservation -> activateAppendRecoveryProtection(
-                                                    reservedActive, durableReservation)
-                                            .thenApply(ignored -> durableReservation))
-                                    .thenCompose(durableReservation -> writerState.clearRangeReservation(
-                                                    reservedWriter, prepared.request().session(), reservationId)
-                                            .thenApply(clearedWriter -> durableAppend(
-                                                    reservedActive.withWriter(clearedWriter), prepared,
-                                                    durableReservation, firstEntryId, rangeSlot, rangeChecksum)));
-                            return pipeline.handle((durable, failure) -> {
+        BookKeeperAppendReservationRecord desired =
+                reservation(active, prepared, reservationId, firstEntryId, rangeSlot, rangeChecksum);
+        return writerMetadata.createReservation(cluster, desired).thenCompose(reservation -> writerState
+                .reserveRange(
+                        active.writer(),
+                        prepared.request().session(),
+                        reservationId,
+                        prepared.entryCount(),
+                        prepared.physicalBytes())
+                .handle((reservedWriter, reserveFailure) -> {
+                    if (reserveFailure != null) {
+                        return abandonWithoutSeal(reservation, unwrap(reserveFailure));
+                    }
+                    ActiveLedger reservedActive = active.withWriter(reservedWriter);
+                    activeLedgers.replace(prepared.streamId(), active, reservedActive);
+                    CompletableFuture<DurablePrimaryAppend> pipeline = createMandatoryProtections(
+                                    reservedActive, prepared, reservation)
+                            .thenCompose(ignored -> casReservation(reservation, AppendReservationLifecycle.WRITING, ""))
+                            .thenCompose(writing -> writeEntries(
+                                            reservedActive.handle(), firstEntryId,
+                                            prepared.retainedEntries(), deadline)
+                                    .thenCompose(
+                                            ignored -> casReservation(writing, AppendReservationLifecycle.DURABLE, "")))
+                            .thenCompose(durableReservation -> activateAppendRecoveryProtection(
+                                            reservedActive, durableReservation)
+                                    .thenApply(ignored -> durableReservation))
+                            .thenCompose(durableReservation -> writerState
+                                    .clearRangeReservation(
+                                            reservedWriter, prepared.request().session(), reservationId)
+                                    .thenApply(clearedWriter -> durableAppend(
+                                            reservedActive.withWriter(clearedWriter),
+                                            prepared,
+                                            durableReservation,
+                                            firstEntryId,
+                                            rangeSlot,
+                                            rangeChecksum)));
+                    return pipeline.handle((durable, failure) -> {
                                 if (failure == null) {
                                     return CompletableFuture.completedFuture(durable);
                                 }
-                                return failAndSeal(
-                                        reservedActive, prepared, reservation, unwrap(failure), deadline);
-                            }).thenCompose(java.util.function.Function.identity());
-                        }).thenCompose(java.util.function.Function.identity()));
+                                return failAndSeal(reservedActive, prepared, reservation, unwrap(failure), deadline);
+                            })
+                            .thenCompose(java.util.function.Function.identity());
+                })
+                .thenCompose(java.util.function.Function.identity()));
     }
 
     private CompletableFuture<Void> createMandatoryProtections(
@@ -308,8 +321,10 @@ public final class BookKeeperPrimaryWalAppender
         };
         for (int slot = 0; slot < types.length; slot++) {
             int exactSlot = slot;
-            chain = chain.thenCompose(ignored -> ledgerMetadata.createProtection(
-                            cluster, configuration.providerScopeSha256(),
+            chain = chain.thenCompose(ignored -> ledgerMetadata
+                    .createProtection(
+                            cluster,
+                            configuration.providerScopeSha256(),
                             reservedProtection(active, prepared, reservation.value(), exactSlot, types[exactSlot]))
                     .thenApply(created -> null));
         }
@@ -318,9 +333,9 @@ public final class BookKeeperPrimaryWalAppender
 
     private CompletableFuture<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>>
             activateAppendRecoveryProtection(
-                    ActiveLedger active,
-                    BookKeeperVersionedValue<BookKeeperAppendReservationRecord> reservation) {
-        return ledgerMetadata.getProtection(
+                    ActiveLedger active, BookKeeperVersionedValue<BookKeeperAppendReservationRecord> reservation) {
+        return ledgerMetadata
+                .getProtection(
                         cluster,
                         configuration.providerScopeSha256(),
                         active.root().value().ledgerId(),
@@ -333,8 +348,8 @@ public final class BookKeeperPrimaryWalAppender
                     if (before.lifecycle() == ProtectionLifecycle.ACTIVE) {
                         if (!before.ownerKey().equals(reservation.key())
                                 || before.ownerMetadataVersion() != reservation.metadataVersion()
-                                || !before.ownerIdentitySha256().equals(
-                                        reservation.durableValueSha256().value())) {
+                                || !before.ownerIdentitySha256()
+                                        .equals(reservation.durableValueSha256().value())) {
                             throw invariant("APPEND_RECOVERY protection owner conflicts with reservation");
                         }
                         return CompletableFuture.completedFuture(current);
@@ -361,12 +376,29 @@ public final class BookKeeperPrimaryWalAppender
             long ownerMetadataVersion,
             String ownerIdentitySha256) {
         return new BookKeeperLedgerProtectionRecord(
-                before.schemaVersion(), before.ledgerIdentitySha256(), before.clusterAlias(), before.ledgerId(),
-                before.rootLifecycleEpoch(), before.ledgerRangeSlot(), before.protectionSlot(),
-                before.protectionTypeId(), referenceId, before.firstEntryId(), before.entryCount(),
-                before.rangeChecksumSha256(), before.streamId(), before.offsetStart(), before.offsetEnd(),
-                commitVersion, ownerKey, ownerMetadataVersion, ownerIdentitySha256,
-                ProtectionLifecycle.ACTIVE, before.createdAtMillis(), before.expiresAtMillis(), 0);
+                before.schemaVersion(),
+                before.ledgerIdentitySha256(),
+                before.clusterAlias(),
+                before.ledgerId(),
+                before.rootLifecycleEpoch(),
+                before.ledgerRangeSlot(),
+                before.protectionSlot(),
+                before.protectionTypeId(),
+                referenceId,
+                before.firstEntryId(),
+                before.entryCount(),
+                before.rangeChecksumSha256(),
+                before.streamId(),
+                before.offsetStart(),
+                before.offsetEnd(),
+                commitVersion,
+                ownerKey,
+                ownerMetadataVersion,
+                ownerIdentitySha256,
+                ProtectionLifecycle.ACTIVE,
+                before.createdAtMillis(),
+                before.expiresAtMillis(),
+                0);
     }
 
     private CompletableFuture<Void> writeEntries(
@@ -399,8 +431,7 @@ public final class BookKeeperPrimaryWalAppender
         }
         return write.whenComplete((ignored, failure) -> entry.release()).thenCompose(writtenId -> {
             if (writtenId != entryId) {
-                return CompletableFuture.failedFuture(invariant(
-                        "BookKeeper explicit write returned another entry id"));
+                return CompletableFuture.failedFuture(invariant("BookKeeper explicit write returned another entry id"));
             }
             return writeNext(handle, firstEntryId, index + 1, remaining, deadline);
         });
@@ -413,23 +444,52 @@ public final class BookKeeperPrimaryWalAppender
             long firstEntryId,
             int rangeSlot,
             Checksum rangeChecksum) {
-        activeLedgers.compute(prepared.streamId(), (ignored, current) ->
-                current != null && current.root().value().ledgerId() == active.root().value().ledgerId()
-                        ? active : current);
+        activeLedgers.compute(
+                prepared.streamId(),
+                (ignored, current) -> current != null
+                                && current.root().value().ledgerId()
+                                        == active.root().value().ledgerId()
+                        ? active
+                        : current);
         BookKeeperEntryRangeReadTarget target = new BookKeeperEntryRangeReadTarget(
-                1, configuration.clusterAlias(), active.root().value().ledgerId(), firstEntryId,
-                prepared.entryCount(), BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY, rangeChecksum);
+                1,
+                configuration.clusterAlias(),
+                active.root().value().ledgerId(),
+                firstEntryId,
+                prepared.entryCount(),
+                prepared.entryMapping(),
+                rangeChecksum);
         BookKeeperPrimaryPhysicalIdentity identity = new BookKeeperPrimaryPhysicalIdentity(
-                configuration.clusterAlias(), target.ledgerId(), active.root().value().lifecycleEpoch(),
-                target.firstEntryId(), target.entryCount(), target.rangeChecksum());
+                configuration.clusterAlias(),
+                target.ledgerId(),
+                active.root().value().lifecycleEpoch(),
+                target.firstEntryId(),
+                target.entryCount(),
+                target.rangeChecksum());
         BookKeeperProviderAppendToken token = new BookKeeperProviderAppendToken(
-                reservation.value().reservationId(), target.ledgerId(), active.root().value().lifecycleEpoch(),
-                rangeSlot, target.firstEntryId(), target.entryCount(), target.rangeChecksum(),
-                reservation.metadataVersion(), active.writer().metadataVersion(), active.root().metadataVersion());
-        return new DurablePrimaryAppend(prepared.streamId(), target, identity, rangeChecksum,
-                prepared.request().batch().payloadFormat(), prepared.recordCount(), prepared.entryCount(),
-                prepared.logicalBytes(), prepared.request().batch().schemaRefs(),
-                prepared.request().batch().minEventTimeMillis(), prepared.request().batch().maxEventTimeMillis(), token);
+                reservation.value().reservationId(),
+                target.ledgerId(),
+                active.root().value().lifecycleEpoch(),
+                rangeSlot,
+                target.firstEntryId(),
+                target.entryCount(),
+                target.rangeChecksum(),
+                reservation.metadataVersion(),
+                active.writer().metadataVersion(),
+                active.root().metadataVersion());
+        return new DurablePrimaryAppend(
+                prepared.streamId(),
+                target,
+                identity,
+                rangeChecksum,
+                prepared.request().batch().payloadFormat(),
+                prepared.recordCount(),
+                prepared.entryCount(),
+                prepared.logicalBytes(),
+                prepared.request().batch().schemaRefs(),
+                prepared.request().batch().minEventTimeMillis(),
+                prepared.request().batch().maxEventTimeMillis(),
+                token);
     }
 
     private CompletableFuture<DurablePrimaryAppend> abandonWithoutSeal(
@@ -445,7 +505,9 @@ public final class BookKeeperPrimaryWalAppender
             BookKeeperVersionedValue<BookKeeperAppendReservationRecord> reservation,
             Throwable failure,
             BookKeeperOperationDeadline deadline) {
-        return writerMetadata.getReservation(cluster, prepared.streamId(), reservation.value().reservationId())
+        return writerMetadata
+                .getReservation(
+                        cluster, prepared.streamId(), reservation.value().reservationId())
                 .thenCompose(optional -> {
                     if (optional.isEmpty()
                             || optional.orElseThrow().value().lifecycle() == AppendReservationLifecycle.ABANDONED) {
@@ -454,16 +516,20 @@ public final class BookKeeperPrimaryWalAppender
                     BookKeeperVersionedValue<BookKeeperAppendReservationRecord> current = optional.orElseThrow();
                     if (current.value().lifecycle() == AppendReservationLifecycle.RESERVED
                             || current.value().lifecycle() == AppendReservationLifecycle.WRITING) {
-                        return casReservation(current, AppendReservationLifecycle.ABANDONED,
-                                "provider write/metadata pipeline failed").thenApply(ignored -> null);
+                        return casReservation(
+                                        current,
+                                        AppendReservationLifecycle.ABANDONED,
+                                        "provider write/metadata pipeline failed")
+                                .thenApply(ignored -> null);
                     }
                     // Once the exact range reached DURABLE it remains a recoverable commit candidate. A foreground
                     // metadata timeout must not destroy that fact; generic append recovery will either commit this
                     // reservation or prove it unreachable after the ledger has been recovery-opened and sealed.
                     return CompletableFuture.completedFuture(null);
-                }).handle((ignored, abandonFailure) -> null)
-                .thenCompose(ignored -> recoverWithinRemainingBudget(
-                        prepared.request().session(), deadline, "append range failure"))
+                })
+                .handle((ignored, abandonFailure) -> null)
+                .thenCompose(ignored ->
+                        recoverWithinRemainingBudget(prepared.request().session(), deadline, "append range failure"))
                 .handle((ignored, recoveryFailure) -> {
                     activeLedgers.remove(prepared.streamId(), active);
                     active.handle().closeAsync();
@@ -471,7 +537,8 @@ public final class BookKeeperPrimaryWalAppender
                         failure.addSuppressed(unwrap(recoveryFailure));
                     }
                     return CompletableFuture.<DurablePrimaryAppend>failedFuture(failure);
-                }).thenCompose(java.util.function.Function.identity());
+                })
+                .thenCompose(java.util.function.Function.identity());
     }
 
     private CompletableFuture<BookKeeperLedgerRecoveryResult> recoverWithinRemainingBudget(
@@ -489,15 +556,39 @@ public final class BookKeeperPrimaryWalAppender
             String reason) {
         BookKeeperAppendReservationRecord before = current.value();
         BookKeeperAppendReservationRecord replacement = new BookKeeperAppendReservationRecord(
-                before.schemaVersion(), before.reservationId(), before.appendAttemptId(), before.streamId(),
-                before.writerId(), before.writerRunIdHash(), before.appendSessionEpoch(), before.fencingTokenHash(),
-                before.writerStateEpoch(), before.ledgerId(), before.ledgerRootEpoch(), before.ledgerRangeSlot(),
-                before.firstEntryId(), before.entryCount(), before.rangeChecksumSha256(), before.expectedStartOffset(),
-                before.payloadFormat(), before.recordCount(), before.logicalBytes(), before.physicalBytes(),
-                before.schemaRefs(), before.projectionIdentity(), before.minEventTimeMillis(),
-                before.maxEventTimeMillis(), lifecycle, before.commitId(), before.commitKey(),
-                before.commitMetadataVersion(), before.commitRecordSha256(), before.createdAtMillis(), clock.millis(),
-                lifecycle == AppendReservationLifecycle.ABANDONED ? text(reason, "reason") : "", 0);
+                before.schemaVersion(),
+                before.reservationId(),
+                before.appendAttemptId(),
+                before.streamId(),
+                before.writerId(),
+                before.writerRunIdHash(),
+                before.appendSessionEpoch(),
+                before.fencingTokenHash(),
+                before.writerStateEpoch(),
+                before.ledgerId(),
+                before.ledgerRootEpoch(),
+                before.ledgerRangeSlot(),
+                before.firstEntryId(),
+                before.entryCount(),
+                before.rangeChecksumSha256(),
+                before.expectedStartOffset(),
+                before.payloadFormat(),
+                before.recordCount(),
+                before.logicalBytes(),
+                before.physicalBytes(),
+                before.schemaRefs(),
+                before.projectionIdentity(),
+                before.minEventTimeMillis(),
+                before.maxEventTimeMillis(),
+                lifecycle,
+                before.commitId(),
+                before.commitKey(),
+                before.commitMetadataVersion(),
+                before.commitRecordSha256(),
+                before.createdAtMillis(),
+                clock.millis(),
+                lifecycle == AppendReservationLifecycle.ABANDONED ? text(reason, "reason") : "",
+                0);
         return writerMetadata.compareAndSetReservation(cluster, replacement, current.metadataVersion());
     }
 
@@ -510,15 +601,40 @@ public final class BookKeeperPrimaryWalAppender
             Checksum checksum) {
         BookKeeperWriterStateRecord writer = active.writer().value();
         long now = clock.millis();
-        return new BookKeeperAppendReservationRecord(1, reservationId, prepared.request().attemptId().value(),
-                prepared.streamId().value(), writer.writerId(), writer.writerRunIdHash(), writer.appendSessionEpoch(),
-                writer.fencingTokenHash(), writer.writerStateEpoch() + 1, active.root().value().ledgerId(),
-                active.root().value().lifecycleEpoch(), rangeSlot, firstEntryId, prepared.entryCount(), checksum.value(),
-                prepared.request().expectedStartOffset(), prepared.request().batch().payloadFormat().name(),
-                prepared.recordCount(), prepared.logicalBytes(), prepared.physicalBytes(),
-                prepared.request().batch().schemaRefs(), CommitAppendRequest.absentProjectionIdentity(),
-                prepared.request().batch().minEventTimeMillis(), prepared.request().batch().maxEventTimeMillis(),
-                AppendReservationLifecycle.RESERVED, "", "", 0, "", now, now, "", 0);
+        return new BookKeeperAppendReservationRecord(
+                1,
+                reservationId,
+                prepared.request().attemptId().value(),
+                prepared.streamId().value(),
+                writer.writerId(),
+                writer.writerRunIdHash(),
+                writer.appendSessionEpoch(),
+                writer.fencingTokenHash(),
+                writer.writerStateEpoch() + 1,
+                active.root().value().ledgerId(),
+                active.root().value().lifecycleEpoch(),
+                rangeSlot,
+                firstEntryId,
+                prepared.entryCount(),
+                checksum.value(),
+                prepared.request().expectedStartOffset(),
+                prepared.request().batch().payloadFormat().name(),
+                prepared.recordCount(),
+                prepared.logicalBytes(),
+                prepared.physicalBytes(),
+                prepared.request().batch().schemaRefs(),
+                CommitAppendRequest.absentProjectionIdentity(),
+                prepared.request().batch().minEventTimeMillis(),
+                prepared.request().batch().maxEventTimeMillis(),
+                AppendReservationLifecycle.RESERVED,
+                "",
+                "",
+                0,
+                "",
+                now,
+                now,
+                "",
+                0);
     }
 
     private BookKeeperLedgerProtectionRecord reservedProtection(
@@ -527,14 +643,30 @@ public final class BookKeeperPrimaryWalAppender
             BookKeeperAppendReservationRecord reservation,
             int protectionSlot,
             BookKeeperProtectionType type) {
-        return new BookKeeperLedgerProtectionRecord(1, active.root().value().ledgerIdentitySha256(),
-                configuration.clusterAlias(), active.root().value().ledgerId(),
-                active.root().value().lifecycleEpoch(), reservation.ledgerRangeSlot(), protectionSlot, type.wireId(),
-                reservation.reservationId(), reservation.firstEntryId(), reservation.entryCount(),
-                reservation.rangeChecksumSha256(), prepared.streamId().value(),
+        return new BookKeeperLedgerProtectionRecord(
+                1,
+                active.root().value().ledgerIdentitySha256(),
+                configuration.clusterAlias(),
+                active.root().value().ledgerId(),
+                active.root().value().lifecycleEpoch(),
+                reservation.ledgerRangeSlot(),
+                protectionSlot,
+                type.wireId(),
+                reservation.reservationId(),
+                reservation.firstEntryId(),
+                reservation.entryCount(),
+                reservation.rangeChecksumSha256(),
+                prepared.streamId().value(),
                 prepared.request().expectedStartOffset(),
                 Math.addExact(prepared.request().expectedStartOffset(), prepared.recordCount()),
-                0, "", 0, "", ProtectionLifecycle.RESERVED, reservation.createdAtMillis(), 0, 0);
+                0,
+                "",
+                0,
+                "",
+                ProtectionLifecycle.RESERVED,
+                reservation.createdAtMillis(),
+                0,
+                0);
     }
 
     private boolean requiresRollover(ActiveLedger active, BookKeeperPreparedPrimaryAppend prepared) {
@@ -544,8 +676,9 @@ public final class BookKeeperPrimaryWalAppender
                     || Math.addExact(writer.activePhysicalBytes(), prepared.physicalBytes())
                             > configuration.maxBytesPerLedger()
                     || Math.addExact(writer.activeAppendRangeCount(), 1) > configuration.maxAppendRangesPerLedger()
-                    || !clock.instant().isBefore(InstantMath.add(
-                            active.root().value().createdAtMillis(), configuration.maxLedgerAge()));
+                    || !clock.instant()
+                            .isBefore(InstantMath.add(
+                                    active.root().value().createdAtMillis(), configuration.maxLedgerAge()));
         } catch (ArithmeticException overflow) {
             return true;
         }
@@ -554,8 +687,8 @@ public final class BookKeeperPrimaryWalAppender
     private void validateBatchBound(BookKeeperPreparedPrimaryAppend prepared) {
         if (prepared.entryCount() > configuration.maxEntriesPerLedger()
                 || prepared.physicalBytes() > configuration.maxBytesPerLedger()) {
-            throw new NereusException(ErrorCode.INVALID_ARGUMENT, false,
-                    "one append batch exceeds an empty BookKeeper ledger bound");
+            throw new NereusException(
+                    ErrorCode.INVALID_ARGUMENT, false, "one append batch exceeds an empty BookKeeper ledger bound");
         }
     }
 
@@ -567,9 +700,7 @@ public final class BookKeeperPrimaryWalAppender
         ensureOpen();
         if (inFlightWrites >= configuration.maxWritesInFlight()) {
             throw new NereusException(
-                    ErrorCode.BACKPRESSURE_REJECTED,
-                    true,
-                    "BookKeeper primary writer capacity is exhausted");
+                    ErrorCode.BACKPRESSURE_REJECTED, true, "BookKeeper primary writer capacity is exhausted");
         }
         inFlightWrites++;
         return new WritePermit();
@@ -580,7 +711,9 @@ public final class BookKeeperPrimaryWalAppender
 
         @Override
         public void close() {
-            if (!released.compareAndSet(false, true)) return;
+            if (!released.compareAndSet(false, true)) {
+                return;
+            }
             synchronized (BookKeeperPrimaryWalAppender.this) {
                 inFlightWrites--;
             }
@@ -589,7 +722,9 @@ public final class BookKeeperPrimaryWalAppender
 
     @Override
     public void close() {
-        if (!closed.compareAndSet(false, true)) return;
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
         activeLedgers.values().forEach(active -> active.handle().closeAsync());
         activeLedgers.clear();
     }
@@ -607,7 +742,8 @@ public final class BookKeeperPrimaryWalAppender
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
         while ((current instanceof java.util.concurrent.CompletionException
-                || current instanceof java.util.concurrent.ExecutionException) && current.getCause() != null) {
+                        || current instanceof java.util.concurrent.ExecutionException)
+                && current.getCause() != null) {
             current = current.getCause();
         }
         return current;
@@ -619,7 +755,9 @@ public final class BookKeeperPrimaryWalAppender
 
     private static String text(String value, String name) {
         Objects.requireNonNull(value, name);
-        if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " cannot be blank");
+        }
         return value;
     }
 
@@ -641,7 +779,7 @@ public final class BookKeeperPrimaryWalAppender
     }
 
     private static final class InstantMath {
-        private InstantMath() { }
+        private InstantMath() {}
 
         private static java.time.Instant add(long epochMillis, Duration duration) {
             try {

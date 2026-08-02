@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
-/** Outcome of one bounded DELETED-root audit-retirement pass. */
+/**
+ * Outcome of one bounded DELETED-root audit-retirement pass.
+ */
 public enum TombstoneRetirementStatus {
     DISABLED,
     DRY_RUN,

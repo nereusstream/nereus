@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.metadata.oxia.VersionedCursorState;
 import com.nereusstream.metadata.oxia.codec.F3MetadataCodecs;
@@ -27,17 +27,12 @@ class CursorStatePersistencePlannerTest {
         CursorState state = state(config, 5);
         CursorState candidate = next(
                 state,
-                new CursorAckState(
-                        5,
-                        List.of(new OffsetRange(7, 9)),
-                        new TreeMap<>(Map.of(10L, batch8(0x03L)))),
+                new CursorAckState(5, List.of(new OffsetRange(7, 9)), new TreeMap<>(Map.of(10L, batch8(0x03L)))),
                 Optional.empty());
         CursorStateRecord root = planner.recordWithoutSnapshot(candidate);
 
         CursorStatePersistencePlanner.HydratedState hydrated = planner.hydrate(
-                new VersionedCursorState(root, 7),
-                candidate.identity().ledger(),
-                Optional.empty());
+                new VersionedCursorState(root, 7), candidate.identity().ledger(), Optional.empty());
 
         assertThat(hydrated.state().acknowledgements()).isEqualTo(candidate.acknowledgements());
         assertThat(hydrated.state().metadataVersion()).isEqualTo(7);
@@ -54,9 +49,7 @@ class CursorStatePersistencePlannerTest {
         CursorState narrowed = machine.individualAck(
                         fixture.current().state(),
                         List.of(new CursorAckRequest(
-                                15,
-                                Optional.of(new BatchAckState(65, new long[] {-4L, 1L})),
-                                Map.of())),
+                                15, Optional.of(new BatchAckState(65, new long[] {-4L, 1L})), Map.of())),
                         0,
                         30,
                         106)
@@ -72,8 +65,7 @@ class CursorStatePersistencePlannerTest {
                 new VersionedCursorState(partialPlan.record(), 5),
                 narrowed.identity().ledger(),
                 Optional.of(fixture.snapshotBase()));
-        assertThat(partialHydrated.state().acknowledgements())
-                .isEqualTo(narrowed.acknowledgements());
+        assertThat(partialHydrated.state().acknowledgements()).isEqualTo(narrowed.acknowledgements());
 
         CursorState whole = machine.individualAck(
                         fixture.current().state(),
@@ -138,8 +130,7 @@ class CursorStatePersistencePlannerTest {
 
     @Test
     void inlineCountThresholdIsInclusiveAndSpillsOnlyAboveIt() {
-        CursorStorageConfig config = copyConfig(
-                CursorStorageConfig.defaults(), 4_096, 8_192, 1, 16_384, 8_192, 16_384);
+        CursorStorageConfig config = copyConfig(CursorStorageConfig.defaults(), 4_096, 8_192, 1, 16_384, 8_192, 16_384);
         CursorStatePersistencePlanner planner = planner(config);
         CursorStatePersistencePlanner.HydratedState current = inlineCurrent(planner, state(config, 5), 3);
 
@@ -147,15 +138,11 @@ class CursorStatePersistencePlannerTest {
                 current.state(),
                 new CursorAckState(5, List.of(new OffsetRange(7, 8)), new TreeMap<>()),
                 Optional.empty());
-        assertThat(planner.plan(current, oneRange))
-                .isInstanceOf(CursorStatePersistencePlanner.InlinePlan.class);
+        assertThat(planner.plan(current, oneRange)).isInstanceOf(CursorStatePersistencePlanner.InlinePlan.class);
 
         CursorState twoRanges = next(
                 current.state(),
-                new CursorAckState(
-                        5,
-                        List.of(new OffsetRange(7, 8), new OffsetRange(9, 10)),
-                        new TreeMap<>()),
+                new CursorAckState(5, List.of(new OffsetRange(7, 8), new OffsetRange(9, 10)), new TreeMap<>()),
                 Optional.empty());
         CursorStatePersistencePlanner.SnapshotPlan spill =
                 (CursorStatePersistencePlanner.SnapshotPlan) planner.plan(current, twoRanges);
@@ -165,8 +152,7 @@ class CursorStatePersistencePlannerTest {
 
     @Test
     void emptyInlineDeltaNeverCreatesAnEmptyReplacementSnapshot() {
-        CursorStorageConfig config = copyConfig(
-                CursorStorageConfig.defaults(), 4_096, 1, 1, 16_384, 8_192, 16_384);
+        CursorStorageConfig config = copyConfig(CursorStorageConfig.defaults(), 4_096, 1, 1, 16_384, 8_192, 16_384);
         CursorStatePersistencePlanner planner = planner(config);
         CursorStatePersistencePlanner.HydratedState current = inlineCurrent(planner, state(config, 5), 3);
         CursorState propertyOnly = new CursorState(
@@ -184,8 +170,7 @@ class CursorStatePersistencePlannerTest {
                 current.state().updatedAtMillis() + 1,
                 current.state().metadataVersion());
 
-        assertThat(planner.plan(current, propertyOnly))
-                .isInstanceOf(CursorStatePersistencePlanner.InlinePlan.class);
+        assertThat(planner.plan(current, propertyOnly)).isInstanceOf(CursorStatePersistencePlanner.InlinePlan.class);
     }
 
     @Test
@@ -198,16 +183,13 @@ class CursorStatePersistencePlannerTest {
             long start = 100L + index * 2L;
             ranges.add(new OffsetRange(start, start + 1));
         }
-        CursorState candidate = next(
-                current.state(),
-                new CursorAckState(10, ranges, new TreeMap<>()),
-                Optional.empty());
+        CursorState candidate =
+                next(current.state(), new CursorAckState(10, ranges, new TreeMap<>()), Optional.empty());
 
         assertThatThrownBy(() -> F3MetadataCodecs.encodeEnvelope(
                         planner.recordWithoutSnapshot(candidate), CursorStateRecord.class))
                 .isInstanceOf(MetadataValueTooLargeException.class);
-        assertThat(planner.plan(current, candidate))
-                .isInstanceOf(CursorStatePersistencePlanner.SnapshotPlan.class);
+        assertThat(planner.plan(current, candidate)).isInstanceOf(CursorStatePersistencePlanner.SnapshotPlan.class);
     }
 
     @Test
@@ -230,8 +212,7 @@ class CursorStatePersistencePlannerTest {
 
     @Test
     void composedReferencedRootMustFitTheSafetyAdjustedLimitBeforeUpload() {
-        CursorStorageConfig config = copyConfig(
-                CursorStorageConfig.defaults(), 65_200, 64, 1, 8, 8, 8);
+        CursorStorageConfig config = copyConfig(CursorStorageConfig.defaults(), 65_200, 64, 1, 8, 8, 8);
         CursorStatePersistencePlanner planner = planner(config);
         CursorStatePersistencePlanner.HydratedState current = inlineCurrent(planner, state(config, 5), 3);
         CursorState candidate = next(
@@ -249,16 +230,17 @@ class CursorStatePersistencePlannerTest {
     }
 
     private static CursorState state(CursorStorageConfig config, long markDeleteOffset) {
-        return new CursorStateMachine(config).create(
-                new CursorOwnerSession(CursorTestSamples.identity().ledger(), OWNER),
-                CursorTestSamples.CURSOR,
-                1,
-                1,
-                ATTEMPT,
-                markDeleteOffset,
-                Map.of(),
-                Map.of(),
-                100);
+        return new CursorStateMachine(config)
+                .create(
+                        new CursorOwnerSession(CursorTestSamples.identity().ledger(), OWNER),
+                        CursorTestSamples.CURSOR,
+                        1,
+                        1,
+                        ATTEMPT,
+                        markDeleteOffset,
+                        Map.of(),
+                        Map.of(),
+                        100);
     }
 
     private static CursorStatePersistencePlanner.HydratedState inlineCurrent(
@@ -269,8 +251,7 @@ class CursorStatePersistencePlannerTest {
                 Optional.empty());
     }
 
-    private static SnapshotFixture snapshotFixture(
-            CursorStatePersistencePlanner planner, CursorStorageConfig config) {
+    private static SnapshotFixture snapshotFixture(CursorStatePersistencePlanner planner, CursorStorageConfig config) {
         CursorAckState base = CursorTestSamples.complexState();
         CursorState created = state(config, base.markDeleteOffset());
         CursorState snapshotState = new CursorState(
@@ -318,16 +299,12 @@ class CursorStatePersistencePlannerTest {
                 0);
         CursorStateRecord root = planner.afterSnapshot(referenced, reference);
         CursorStatePersistencePlanner.HydratedState current = planner.hydrate(
-                new VersionedCursorState(root, 4),
-                referenced.identity().ledger(),
-                Optional.of(base));
+                new VersionedCursorState(root, 4), referenced.identity().ledger(), Optional.of(base));
         return new SnapshotFixture(base, current);
     }
 
     private static CursorState next(
-            CursorState current,
-            CursorAckState acknowledgements,
-            Optional<CursorSnapshotReference> reference) {
+            CursorState current, CursorAckState acknowledgements, Optional<CursorSnapshotReference> reference) {
         return new CursorState(
                 current.identity(),
                 current.ownerSessionId(),
@@ -403,8 +380,5 @@ class CursorStatePersistencePlannerTest {
                 source.cursorSnapshotOperationTimeout());
     }
 
-    private record SnapshotFixture(
-            CursorAckState snapshotBase,
-            CursorStatePersistencePlanner.HydratedState current) {
-    }
+    private record SnapshotFixture(CursorAckState snapshotBase, CursorStatePersistencePlanner.HydratedState current) {}
 }

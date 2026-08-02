@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.ErrorCode;
@@ -11,8 +12,7 @@ public final class ManagedLedgerProjectionIdentityMismatchException extends Nere
     private final ManagedLedgerProjectionIdentity actual;
 
     public ManagedLedgerProjectionIdentityMismatchException(
-            ManagedLedgerProjectionIdentity expected,
-            ManagedLedgerProjectionIdentity actual) {
+            ManagedLedgerProjectionIdentity expected, ManagedLedgerProjectionIdentity actual) {
         super(
                 ErrorCode.METADATA_INVARIANT_VIOLATION,
                 false,

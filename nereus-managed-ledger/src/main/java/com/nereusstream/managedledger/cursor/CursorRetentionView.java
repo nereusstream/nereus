@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.metadata.oxia.CursorIds;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable owner-scoped view of the per-stream cursor retention root. */
+/**
+ * Immutable owner-scoped view of the per-stream cursor retention root.
+ */
 public record CursorRetentionView(
         CursorLedgerIdentity ledger,
         String ownerSessionId,
@@ -20,7 +23,8 @@ public record CursorRetentionView(
         Objects.requireNonNull(ledger, "ledger");
         ownerSessionId = CursorIds.requireRandomId(ownerSessionId, "ownerSessionId");
         Objects.requireNonNull(lifecycle, "lifecycle");
-        if (mutationSequence < 1 || metadataVersion < 0
+        if (mutationSequence < 1
+                || metadataVersion < 0
                 || lastCompletedTrimOffset < 0
                 || protectedFloorOffset < lastCompletedTrimOffset) {
             throw new IllegalArgumentException("retention sequence, version, or floor is invalid");

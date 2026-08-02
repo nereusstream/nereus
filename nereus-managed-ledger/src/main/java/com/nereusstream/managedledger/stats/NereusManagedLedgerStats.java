@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.stats;
 
 import java.util.Objects;
@@ -8,7 +9,9 @@ import org.apache.bookkeeper.mledger.ManagedLedgerMXBean;
 import org.apache.bookkeeper.mledger.proto.PendingBookieOpsStats;
 import org.apache.bookkeeper.mledger.util.StatsBuckets;
 
-/** Exact cumulative facade counters; rate windows and BookKeeper-only counters remain zero. */
+/**
+ * Exact cumulative facade counters; rate windows and BookKeeper-only counters remain zero.
+ */
 public final class NereusManagedLedgerStats implements ManagedLedgerMXBean {
     private static final long[] ENTRY_BUCKETS = {128, 512, 1024, 4096, 16384, 65536, 262144, 1048576};
     private static final long[] LATENCY_BUCKETS_USEC = {100, 500, 1000, 5000, 10000, 50000, 100000, 1000000};
@@ -61,43 +64,190 @@ public final class NereusManagedLedgerStats implements ManagedLedgerMXBean {
         readErrors.increment();
     }
 
-    @Override public String getName() { return name; }
-    @Override public long getStoredMessagesSize() { return storedSize.getAsLong(); }
-    @Override public long getStoredMessagesLogicalSize() { return storedSize.getAsLong(); }
-    @Override public long getNumberOfMessagesInBacklog() { return 0; }
-    @Override public double getAddEntryMessagesRate() { return 0; }
-    @Override public double getAddEntryBytesRate() { return 0; }
-    @Override public long getAddEntryBytesTotal() { return addBytes.sum(); }
-    @Override public double getAddEntryWithReplicasBytesRate() { return 0; }
-    @Override public long getAddEntryWithReplicasBytesTotal() { return addBytes.sum(); }
-    @Override public double getReadEntriesRate() { return 0; }
-    @Override public double getReadEntriesBytesRate() { return 0; }
-    @Override public long getReadEntriesBytesTotal() { return readBytes.sum(); }
-    @Override public double getMarkDeleteRate() { return 0; }
-    @Override public long getMarkDeleteTotal() { return 0; }
-    @Override public long getAddEntrySucceed() { return addSucceeded.sum(); }
-    @Override public long getAddEntrySucceedTotal() { return addSucceeded.sum(); }
-    @Override public long getAddEntryErrors() { return addErrors.sum(); }
-    @Override public long getAddEntryErrorsTotal() { return addErrors.sum(); }
-    @Override public long getEntriesReadTotalCount() { return entriesRead.sum(); }
-    @Override public long getReadEntriesSucceeded() { return readSucceeded.sum(); }
-    @Override public long getReadEntriesSucceededTotal() { return readSucceeded.sum(); }
-    @Override public long getReadEntriesErrors() { return readErrors.sum(); }
-    @Override public long getReadEntriesErrorsTotal() { return readErrors.sum(); }
-    @Override public double getReadEntriesOpsCacheMissesRate() { return 0; }
-    @Override public long getReadEntriesOpsCacheMissesTotal() { return readSucceeded.sum(); }
-    @Override public double getEntrySizeAverage() { return average(entrySizeTotal, entrySizeCount); }
-    @Override public long[] getEntrySizeBuckets() { return snapshot(entrySizes); }
-    @Override public double getAddEntryLatencyAverageUsec() { return average(addLatencyTotalUsec, addLatencyCount); }
-    @Override public long[] getAddEntryLatencyBuckets() { return snapshot(addLatencies); }
-    @Override public long[] getLedgerSwitchLatencyBuckets() { return new long[LATENCY_BUCKETS_USEC.length + 1]; }
-    @Override public double getLedgerSwitchLatencyAverageUsec() { return 0; }
-    @Override public StatsBuckets getInternalAddEntryLatencyBuckets() { return addLatencies; }
-    @Override public StatsBuckets getInternalEntrySizeBuckets() { return entrySizes; }
-    @Override public PendingBookieOpsStats getPendingBookieOpsStats() { return new PendingBookieOpsStats(); }
-    @Override public double getLedgerAddEntryLatencyAverageUsec() { return 0; }
-    @Override public long[] getLedgerAddEntryLatencyBuckets() { return new long[LATENCY_BUCKETS_USEC.length + 1]; }
-    @Override public StatsBuckets getInternalLedgerAddEntryLatencyBuckets() { return emptyLedgerSwitchLatencies; }
+    @Override
+    public String getName() {
+        return name;
+    }
+
+    @Override
+    public long getStoredMessagesSize() {
+        return storedSize.getAsLong();
+    }
+
+    @Override
+    public long getStoredMessagesLogicalSize() {
+        return storedSize.getAsLong();
+    }
+
+    @Override
+    public long getNumberOfMessagesInBacklog() {
+        return 0;
+    }
+
+    @Override
+    public double getAddEntryMessagesRate() {
+        return 0;
+    }
+
+    @Override
+    public double getAddEntryBytesRate() {
+        return 0;
+    }
+
+    @Override
+    public long getAddEntryBytesTotal() {
+        return addBytes.sum();
+    }
+
+    @Override
+    public double getAddEntryWithReplicasBytesRate() {
+        return 0;
+    }
+
+    @Override
+    public long getAddEntryWithReplicasBytesTotal() {
+        return addBytes.sum();
+    }
+
+    @Override
+    public double getReadEntriesRate() {
+        return 0;
+    }
+
+    @Override
+    public double getReadEntriesBytesRate() {
+        return 0;
+    }
+
+    @Override
+    public long getReadEntriesBytesTotal() {
+        return readBytes.sum();
+    }
+
+    @Override
+    public double getMarkDeleteRate() {
+        return 0;
+    }
+
+    @Override
+    public long getMarkDeleteTotal() {
+        return 0;
+    }
+
+    @Override
+    public long getAddEntrySucceed() {
+        return addSucceeded.sum();
+    }
+
+    @Override
+    public long getAddEntrySucceedTotal() {
+        return addSucceeded.sum();
+    }
+
+    @Override
+    public long getAddEntryErrors() {
+        return addErrors.sum();
+    }
+
+    @Override
+    public long getAddEntryErrorsTotal() {
+        return addErrors.sum();
+    }
+
+    @Override
+    public long getEntriesReadTotalCount() {
+        return entriesRead.sum();
+    }
+
+    @Override
+    public long getReadEntriesSucceeded() {
+        return readSucceeded.sum();
+    }
+
+    @Override
+    public long getReadEntriesSucceededTotal() {
+        return readSucceeded.sum();
+    }
+
+    @Override
+    public long getReadEntriesErrors() {
+        return readErrors.sum();
+    }
+
+    @Override
+    public long getReadEntriesErrorsTotal() {
+        return readErrors.sum();
+    }
+
+    @Override
+    public double getReadEntriesOpsCacheMissesRate() {
+        return 0;
+    }
+
+    @Override
+    public long getReadEntriesOpsCacheMissesTotal() {
+        return readSucceeded.sum();
+    }
+
+    @Override
+    public double getEntrySizeAverage() {
+        return average(entrySizeTotal, entrySizeCount);
+    }
+
+    @Override
+    public long[] getEntrySizeBuckets() {
+        return snapshot(entrySizes);
+    }
+
+    @Override
+    public double getAddEntryLatencyAverageUsec() {
+        return average(addLatencyTotalUsec, addLatencyCount);
+    }
+
+    @Override
+    public long[] getAddEntryLatencyBuckets() {
+        return snapshot(addLatencies);
+    }
+
+    @Override
+    public long[] getLedgerSwitchLatencyBuckets() {
+        return new long[LATENCY_BUCKETS_USEC.length + 1];
+    }
+
+    @Override
+    public double getLedgerSwitchLatencyAverageUsec() {
+        return 0;
+    }
+
+    @Override
+    public StatsBuckets getInternalAddEntryLatencyBuckets() {
+        return addLatencies;
+    }
+
+    @Override
+    public StatsBuckets getInternalEntrySizeBuckets() {
+        return entrySizes;
+    }
+
+    @Override
+    public PendingBookieOpsStats getPendingBookieOpsStats() {
+        return new PendingBookieOpsStats();
+    }
+
+    @Override
+    public double getLedgerAddEntryLatencyAverageUsec() {
+        return 0;
+    }
+
+    @Override
+    public long[] getLedgerAddEntryLatencyBuckets() {
+        return new long[LATENCY_BUCKETS_USEC.length + 1];
+    }
+
+    @Override
+    public StatsBuckets getInternalLedgerAddEntryLatencyBuckets() {
+        return emptyLedgerSwitchLatencies;
+    }
 
     private static long elapsedUsec(long startedNanos) {
         return Math.max(0, (System.nanoTime() - startedNanos) / 1_000);

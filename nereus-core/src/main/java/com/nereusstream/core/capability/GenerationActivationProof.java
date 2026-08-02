@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.capability;
 
 import com.nereusstream.api.Checksum;
@@ -11,7 +12,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Objects;
 
-/** Short-lived proof that must be revalidated immediately before an F4 mutation CAS. */
+/**
+ * Short-lived proof that must be revalidated immediately before an F4 mutation CAS.
+ */
 public record GenerationActivationProof(
         GenerationOperation operation,
         GenerationActivationSubject subject,
@@ -36,8 +39,7 @@ public record GenerationActivationProof(
                 || provedAtMillis < 0) {
             throw new IllegalArgumentException("activation proof versions/times must be non-negative");
         }
-        referenceDomainSetSha256 = GcReferenceQuery.requireSha256(
-                referenceDomainSetSha256, "referenceDomainSetSha256");
+        referenceDomainSetSha256 = GcReferenceQuery.requireSha256(referenceDomainSetSha256, "referenceDomainSetSha256");
         if (subject instanceof DomainValidatedDeletionSubject) {
             if (operation != GenerationOperation.PHYSICAL_DELETE || subjectValidationVersion != 0) {
                 throw new IllegalArgumentException("domain-validated subjects are only legal for physical delete");
@@ -45,8 +47,7 @@ public record GenerationActivationProof(
         } else if (operation == GenerationOperation.PHYSICAL_DELETE) {
             throw new IllegalArgumentException("physical delete requires a domain-validated subject");
         }
-        boolean requiresDeletion =
-                operation == GenerationOperation.PHYSICAL_DELETE;
+        boolean requiresDeletion = operation == GenerationOperation.PHYSICAL_DELETE;
         if ((requiresDeletion && !deletionEnabled) || (!requiresDeletion && !publicationEnabled)) {
             throw new IllegalArgumentException("operation-specific F4 capability is not enabled");
         }
@@ -84,6 +85,10 @@ public record GenerationActivationProof(
             digest.text(live.projectionRef().type().name());
             digest.text(live.projectionRef().value());
             digest.text(live.projectionIdentitySha256().value());
+        } else if (subject instanceof LiveStreamSubject live) {
+            digest.text("nereus-generation-live-stream-subject-v1");
+            digest.text(live.streamId().value());
+            digest.text(live.streamIdentitySha256().value());
         } else if (subject instanceof DomainValidatedDeletionSubject deletion) {
             digest.text("nereus-generation-delete-subject-v1");
             digest.text(deletion.referenceQuery().queryIdentitySha256().value());
@@ -107,7 +112,8 @@ public record GenerationActivationProof(
 
         private void text(String value) {
             byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-            digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+            digest.update(
+                    ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
             digest.update(bytes);
         }
 

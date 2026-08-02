@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.objectstore.staging.StagingFileManager;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import java.nio.file.Path;
@@ -15,10 +15,8 @@ class RecoveryCheckpointAttemptIdentityTest {
 
     @Test
     void identicalAttemptIsByteStableAndFreshAttemptCannotReuseDeletedIdentity() throws Exception {
-        try (LocalFileObjectStore objectStore = new LocalFileObjectStore(
-                        temporaryDirectory.resolve("objects"));
-                StagingFileManager staging = RecoveryCheckpointTestSupport.staging(
-                        temporaryDirectory, 128L << 20)) {
+        try (LocalFileObjectStore objectStore = new LocalFileObjectStore(temporaryDirectory.resolve("objects"));
+                StagingFileManager staging = RecoveryCheckpointTestSupport.staging(temporaryDirectory, 128L << 20)) {
             DefaultRecoveryCheckpointCodecV1 codec = new DefaultRecoveryCheckpointCodecV1(
                     objectStore, staging, Runnable::run, RecoveryCheckpointTestSupport.verifier());
             try (RecoveryCheckpointWriteResult first = write(codec, "a".repeat(26));
@@ -36,9 +34,7 @@ class RecoveryCheckpointAttemptIdentityTest {
         }
     }
 
-    private static RecoveryCheckpointWriteResult write(
-            DefaultRecoveryCheckpointCodecV1 codec,
-            String attemptId) {
+    private static RecoveryCheckpointWriteResult write(DefaultRecoveryCheckpointCodecV1 codec, String attemptId) {
         return codec.write(
                         RecoveryCheckpointTestSupport.request(attemptId),
                         RecoveryCheckpointTestSupport.publisher(RecoveryCheckpointTestSupport.publications()),

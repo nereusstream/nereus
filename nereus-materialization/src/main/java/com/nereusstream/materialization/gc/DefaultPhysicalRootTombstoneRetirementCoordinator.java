@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
@@ -72,13 +73,11 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
     }
 
     @Override
-    public CompletableFuture<TombstoneRetirementResult> retire(
-            VersionedPhysicalObjectRoot deletedRoot) {
-        VersionedPhysicalObjectRoot discovered = Objects.requireNonNull(
-                deletedRoot, "deletedRoot");
+    public CompletableFuture<TombstoneRetirementResult> retire(VersionedPhysicalObjectRoot deletedRoot) {
+        VersionedPhysicalObjectRoot discovered = Objects.requireNonNull(deletedRoot, "deletedRoot");
         if (discovered.value().lifecycle() != PhysicalObjectLifecycle.DELETED) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "tombstone retirement requires an exact DELETED root"));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("tombstone retirement requires an exact DELETED root"));
         }
         ObjectKeyHash object = object(discovered);
         if (!config.enabled()) {
@@ -90,17 +89,12 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
                     object, discovered.metadataVersion(), TombstoneRetirementStatus.DRY_RUN));
         }
         long now = nonNegativeNow();
-        MaterializationDeadline deadline = new MaterializationDeadline(
-                config.operationTimeout(), scheduler);
+        MaterializationDeadline deadline = new MaterializationDeadline(config.operationTimeout(), scheduler);
         CompletableFuture<TombstoneRetirementResult> result = reloadExact(discovered, deadline)
-                .thenCompose(current -> current
-                        .<CompletableFuture<TombstoneRetirementResult>>map(root -> {
-                            if (!elapsed(
-                                    root.value().deletedAtMillis(),
-                                    config.tombstoneAuditGrace(),
-                                    now)) {
-                                return CompletableFuture.completedFuture(simple(
-                                        root, TombstoneRetirementStatus.NOT_OLD_ENOUGH));
+                .thenCompose(current -> current.<CompletableFuture<TombstoneRetirementResult>>map(root -> {
+                            if (!elapsed(root.value().deletedAtMillis(), config.tombstoneAuditGrace(), now)) {
+                                return CompletableFuture.completedFuture(
+                                        simple(root, TombstoneRetirementStatus.NOT_OLD_ENOUGH));
                             }
                             return firstAuthorityPass(root, now, deadline);
                         })
@@ -111,9 +105,7 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
     }
 
     private CompletableFuture<TombstoneRetirementResult> firstAuthorityPass(
-            VersionedPhysicalObjectRoot root,
-            long now,
-            MaterializationDeadline deadline) {
+            VersionedPhysicalObjectRoot root, long now, MaterializationDeadline deadline) {
         return scanAuthority(root, deadline).thenCompose(scan -> {
             if (!scan.clearAbsent()) {
                 return resolveBlockedScan(root, scan, false, false, deadline);
@@ -121,35 +113,22 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
             Checksum proof = proof(root, scan.collection().orElseThrow());
             if (root.value().tombstoneFirstAbsentAtMillis() == 0
                     || !root.value().tombstoneProofSha256().equals(proof.value())) {
-                return replaceObservation(root, now, proof, deadline)
-                        .thenApply(updated -> updated
-                                .map(value -> simple(
-                                        value,
-                                        TombstoneRetirementStatus.NOT_OLD_ENOUGH))
-                                .orElseGet(() -> simple(
-                                        root,
-                                        TombstoneRetirementStatus.VERSION_CHANGED)));
+                return replaceObservation(root, now, proof, deadline).thenApply(updated -> updated.map(
+                                value -> simple(value, TombstoneRetirementStatus.NOT_OLD_ENOUGH))
+                        .orElseGet(() -> simple(root, TombstoneRetirementStatus.VERSION_CHANGED)));
             }
-            if (!elapsed(
-                    root.value().tombstoneFirstAbsentAtMillis(),
-                    config.orphanGrace(),
-                    now)) {
-                return CompletableFuture.completedFuture(
-                        simple(root, TombstoneRetirementStatus.NOT_OLD_ENOUGH));
+            if (!elapsed(root.value().tombstoneFirstAbsentAtMillis(), config.orphanGrace(), now)) {
+                return CompletableFuture.completedFuture(simple(root, TombstoneRetirementStatus.NOT_OLD_ENOUGH));
             }
             return secondAuthorityPass(root, proof, now, deadline);
         });
     }
 
     private CompletableFuture<TombstoneRetirementResult> secondAuthorityPass(
-            VersionedPhysicalObjectRoot expected,
-            Checksum firstProof,
-            long now,
-            MaterializationDeadline deadline) {
+            VersionedPhysicalObjectRoot expected, Checksum firstProof, long now, MaterializationDeadline deadline) {
         return reloadExact(expected, deadline).thenCompose(reloaded -> {
             if (reloaded.isEmpty()) {
-                return CompletableFuture.completedFuture(
-                        simple(expected, TombstoneRetirementStatus.VERSION_CHANGED));
+                return CompletableFuture.completedFuture(simple(expected, TombstoneRetirementStatus.VERSION_CHANGED));
             }
             VersionedPhysicalObjectRoot d2 = reloaded.orElseThrow();
             return scanAuthority(d2, deadline).thenCompose(scan -> {
@@ -159,34 +138,18 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
                 Checksum secondProof = proof(d2, scan.collection().orElseThrow());
                 if (!firstProof.equals(secondProof)
                         || !d2.value().tombstoneProofSha256().equals(secondProof.value())) {
-                    return replaceObservation(d2, now, secondProof, deadline)
-                            .thenApply(updated -> updated
-                                    .map(value -> simple(
-                                            value,
-                                            TombstoneRetirementStatus.NOT_OLD_ENOUGH))
-                                    .orElseGet(() -> simple(
-                                            d2,
-                                            TombstoneRetirementStatus.VERSION_CHANGED)));
+                    return replaceObservation(d2, now, secondProof, deadline).thenApply(updated -> updated.map(
+                                    value -> simple(value, TombstoneRetirementStatus.NOT_OLD_ENOUGH))
+                            .orElseGet(() -> simple(d2, TombstoneRetirementStatus.VERSION_CHANGED)));
                 }
                 return captureAudits(d2, deadline)
-                        .thenCompose(audits -> head(d2, deadline)
-                                .thenCompose(head -> {
-                                    if (head.state() != HeadState.ABSENT) {
-                                        return resolveHeadAfterClearScan(
-                                                d2,
-                                                scan.collection().orElseThrow(),
-                                                head,
-                                                false,
-                                                false,
-                                                deadline);
-                                    }
-                                    return retireAuditsAndRoot(
-                                            d2,
-                                            secondProof,
-                                            audits,
-                                            now,
-                                            deadline);
-                                }));
+                        .thenCompose(audits -> head(d2, deadline).thenCompose(head -> {
+                            if (head.state() != HeadState.ABSENT) {
+                                return resolveHeadAfterClearScan(
+                                        d2, scan.collection().orElseThrow(), head, false, false, deadline);
+                            }
+                            return retireAuditsAndRoot(d2, secondProof, audits, now, deadline);
+                        }));
             });
         });
     }
@@ -199,77 +162,52 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
             MaterializationDeadline deadline) {
         return reloadExact(root, deadline).thenCompose(beforeReferences -> {
             if (beforeReferences.isEmpty()) {
-                return CompletableFuture.completedFuture(result(
-                        root,
-                        TombstoneRetirementStatus.VERSION_CHANGED,
-                        false,
-                        false,
-                        false));
+                return CompletableFuture.completedFuture(
+                        result(root, TombstoneRetirementStatus.VERSION_CHANGED, false, false, false));
             }
-            return deleteReferences(root, audits.references(), deadline)
-                    .thenCompose(referencesRetired -> reloadExact(root, deadline)
-                            .thenCompose(beforeManifest -> {
-                                if (beforeManifest.isEmpty()) {
-                                    return CompletableFuture.completedFuture(result(
-                                            root,
-                                            TombstoneRetirementStatus.VERSION_CHANGED,
-                                            referencesRetired,
-                                            false,
-                                            false));
-                                }
-                                return deleteManifest(root, audits.manifest(), deadline)
-                                        .thenCompose(manifestRetired -> requireAuditsAbsent(
-                                                        root, deadline)
-                                                .thenCompose(ignored ->
-                                                        scanAuthority(root, deadline))
-                                                .thenCompose(scan -> {
-                                                    if (!scan.clearAbsent()) {
-                                                        return resolveBlockedScan(
-                                                                root,
-                                                                scan,
+            return deleteReferences(root, audits.references(), deadline).thenCompose(referencesRetired -> reloadExact(
+                            root, deadline)
+                    .thenCompose(beforeManifest -> {
+                        if (beforeManifest.isEmpty()) {
+                            return CompletableFuture.completedFuture(result(
+                                    root, TombstoneRetirementStatus.VERSION_CHANGED, referencesRetired, false, false));
+                        }
+                        return deleteManifest(root, audits.manifest(), deadline)
+                                .thenCompose(manifestRetired -> requireAuditsAbsent(root, deadline)
+                                        .thenCompose(ignored -> scanAuthority(root, deadline))
+                                        .thenCompose(scan -> {
+                                            if (!scan.clearAbsent()) {
+                                                return resolveBlockedScan(
+                                                        root, scan, referencesRetired, manifestRetired, deadline);
+                                            }
+                                            Checksum finalProof = proof(
+                                                    root, scan.collection().orElseThrow());
+                                            if (!expectedProof.equals(finalProof)) {
+                                                return replaceObservation(root, now, finalProof, deadline)
+                                                        .thenApply(updated -> result(
+                                                                updated.orElse(root),
+                                                                TombstoneRetirementStatus.NOT_OLD_ENOUGH,
                                                                 referencesRetired,
                                                                 manifestRetired,
-                                                                deadline);
-                                                    }
-                                                    Checksum finalProof = proof(
+                                                                false));
+                                            }
+                                            return reloadExact(root, deadline).thenCompose(exact -> {
+                                                if (exact.isEmpty()) {
+                                                    return CompletableFuture.completedFuture(result(
                                                             root,
-                                                            scan.collection()
-                                                                    .orElseThrow());
-                                                    if (!expectedProof.equals(finalProof)) {
-                                                        return replaceObservation(
-                                                                        root,
-                                                                        now,
-                                                                        finalProof,
-                                                                        deadline)
-                                                                .thenApply(updated -> result(
-                                                                        updated.orElse(root),
-                                                                        TombstoneRetirementStatus
-                                                                                .NOT_OLD_ENOUGH,
-                                                                        referencesRetired,
-                                                                        manifestRetired,
-                                                                        false));
-                                                    }
-                                                    return reloadExact(root, deadline)
-                                                            .thenCompose(exact -> {
-                                                                if (exact.isEmpty()) {
-                                                                    return CompletableFuture
-                                                                            .completedFuture(
-                                                                                    result(
-                                                                                            root,
-                                                                                            TombstoneRetirementStatus
-                                                                                                    .VERSION_CHANGED,
-                                                                                            referencesRetired,
-                                                                                            manifestRetired,
-                                                                                            false));
-                                                                }
-                                                                return deleteRoot(
-                                                                        exact.orElseThrow(),
-                                                                        referencesRetired,
-                                                                        manifestRetired,
-                                                                        deadline);
-                                                            });
-                                                }));
-                            }));
+                                                            TombstoneRetirementStatus.VERSION_CHANGED,
+                                                            referencesRetired,
+                                                            manifestRetired,
+                                                            false));
+                                                }
+                                                return deleteRoot(
+                                                        exact.orElseThrow(),
+                                                        referencesRetired,
+                                                        manifestRetired,
+                                                        deadline);
+                                            });
+                                        }));
+                    }));
         });
     }
 
@@ -280,25 +218,22 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
             boolean manifestRetired,
             MaterializationDeadline deadline) {
         if (scan.head().state() == HeadState.EXACT_PRESENT
-                && scan.blockingStatus().orElseThrow()
-                        == TombstoneRetirementStatus.OBJECT_PRESENT) {
+                && scan.blockingStatus().orElseThrow() == TombstoneRetirementStatus.OBJECT_PRESENT) {
             return deleteLateObject(
-                    root,
-                    scan.collection().orElseThrow(),
-                    referencesRetired,
-                    manifestRetired,
-                    deadline);
+                    root, scan.collection().orElseThrow(), referencesRetired, manifestRetired, deadline);
         }
-        TombstoneRetirementStatus status = switch (scan.head().state()) {
-            case QUARANTINED -> TombstoneRetirementStatus.QUARANTINED;
-            case ABSENT, EXACT_PRESENT -> scan.blockingStatus().orElseThrow();
-        };
-        return clearObservation(root, deadline).thenApply(updated -> result(
-                updated.orElse(root),
-                updated.isPresent() ? status : TombstoneRetirementStatus.VERSION_CHANGED,
-                referencesRetired,
-                manifestRetired,
-                false));
+        TombstoneRetirementStatus status =
+                switch (scan.head().state()) {
+                    case QUARANTINED -> TombstoneRetirementStatus.QUARANTINED;
+                    case ABSENT, EXACT_PRESENT -> scan.blockingStatus().orElseThrow();
+                };
+        return clearObservation(root, deadline)
+                .thenApply(updated -> result(
+                        updated.orElse(root),
+                        updated.isPresent() ? status : TombstoneRetirementStatus.VERSION_CHANGED,
+                        referencesRetired,
+                        manifestRetired,
+                        false));
     }
 
     private CompletableFuture<TombstoneRetirementResult> resolveHeadAfterClearScan(
@@ -309,21 +244,17 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
             boolean manifestRetired,
             MaterializationDeadline deadline) {
         if (head.state() == HeadState.EXACT_PRESENT) {
-            return deleteLateObject(
-                    root,
-                    collection,
-                    referencesRetired,
-                    manifestRetired,
-                    deadline);
+            return deleteLateObject(root, collection, referencesRetired, manifestRetired, deadline);
         }
-        return clearObservation(root, deadline).thenApply(updated -> result(
-                updated.orElse(root),
-                updated.isPresent()
-                        ? TombstoneRetirementStatus.QUARANTINED
-                        : TombstoneRetirementStatus.VERSION_CHANGED,
-                referencesRetired,
-                manifestRetired,
-                false));
+        return clearObservation(root, deadline)
+                .thenApply(updated -> result(
+                        updated.orElse(root),
+                        updated.isPresent()
+                                ? TombstoneRetirementStatus.QUARANTINED
+                                : TombstoneRetirementStatus.VERSION_CHANGED,
+                        referencesRetired,
+                        manifestRetired,
+                        false));
     }
 
     private CompletableFuture<TombstoneRetirementResult> deleteLateObject(
@@ -335,158 +266,128 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
         return reloadExact(root, deadline).thenCompose(exact -> {
             if (exact.isEmpty()) {
                 return CompletableFuture.completedFuture(result(
-                        root,
-                        TombstoneRetirementStatus.VERSION_CHANGED,
-                        referencesRetired,
-                        manifestRetired,
-                        false));
+                        root, TombstoneRetirementStatus.VERSION_CHANGED, referencesRetired, manifestRetired, false));
             }
             return handlesPresent(root, deadline).thenCompose(present -> {
                 if (present) {
-                    return clearObservation(root, deadline).thenApply(updated -> result(
-                            updated.orElse(root),
-                            updated.isPresent()
-                                    ? TombstoneRetirementStatus.HANDLE_PRESENT
-                                    : TombstoneRetirementStatus.VERSION_CHANGED,
-                            referencesRetired,
-                            manifestRetired,
-                            false));
+                    return clearObservation(root, deadline)
+                            .thenApply(updated -> result(
+                                    updated.orElse(root),
+                                    updated.isPresent()
+                                            ? TombstoneRetirementStatus.HANDLE_PRESENT
+                                            : TombstoneRetirementStatus.VERSION_CHANGED,
+                                    referencesRetired,
+                                    manifestRetired,
+                                    false));
                 }
-                return referenceDomains.stillMatches(collection, deadline)
-                        .thenCompose(matches -> {
-                            if (!matches) {
+                return referenceDomains.stillMatches(collection, deadline).thenCompose(matches -> {
+                    if (!matches) {
+                        return clearObservation(root, deadline)
+                                .thenApply(updated -> result(
+                                        updated.orElse(root),
+                                        updated.isPresent()
+                                                ? TombstoneRetirementStatus.DOMAIN_VETO
+                                                : TombstoneRetirementStatus.VERSION_CHANGED,
+                                        referencesRetired,
+                                        manifestRetired,
+                                        false));
+                    }
+                    return head(root, deadline).thenCompose(head -> {
+                        if (head.state() == HeadState.ABSENT) {
+                            return clearObservation(root, deadline)
+                                    .thenApply(updated -> result(
+                                            updated.orElse(root),
+                                            updated.isPresent()
+                                                    ? TombstoneRetirementStatus.OBJECT_PRESENT
+                                                    : TombstoneRetirementStatus.VERSION_CHANGED,
+                                            referencesRetired,
+                                            manifestRetired,
+                                            false));
+                        }
+                        if (head.state() == HeadState.QUARANTINED) {
+                            return clearObservation(root, deadline)
+                                    .thenApply(updated -> result(
+                                            updated.orElse(root),
+                                            updated.isPresent()
+                                                    ? TombstoneRetirementStatus.QUARANTINED
+                                                    : TombstoneRetirementStatus.VERSION_CHANGED,
+                                            referencesRetired,
+                                            manifestRetired,
+                                            false));
+                        }
+                        return deleteExactLateObject(root, deadline).thenCompose(outcome -> {
+                            if (outcome == LateObjectDeleteOutcome.VERSION_CHANGED) {
+                                return CompletableFuture.completedFuture(result(
+                                        root,
+                                        TombstoneRetirementStatus.VERSION_CHANGED,
+                                        referencesRetired,
+                                        manifestRetired,
+                                        false));
+                            }
+                            if (outcome == LateObjectDeleteOutcome.QUARANTINED) {
                                 return clearObservation(root, deadline)
                                         .thenApply(updated -> result(
                                                 updated.orElse(root),
                                                 updated.isPresent()
-                                                        ? TombstoneRetirementStatus
-                                                                .DOMAIN_VETO
-                                                        : TombstoneRetirementStatus
-                                                                .VERSION_CHANGED,
+                                                        ? TombstoneRetirementStatus.QUARANTINED
+                                                        : TombstoneRetirementStatus.VERSION_CHANGED,
                                                 referencesRetired,
                                                 manifestRetired,
                                                 false));
                             }
-                            return head(root, deadline).thenCompose(head -> {
-                                if (head.state() == HeadState.ABSENT) {
-                                    return clearObservation(root, deadline)
-                                            .thenApply(updated -> result(
-                                                    updated.orElse(root),
-                                                    updated.isPresent()
-                                                            ? TombstoneRetirementStatus
-                                                                    .OBJECT_PRESENT
-                                                            : TombstoneRetirementStatus
-                                                                    .VERSION_CHANGED,
-                                                    referencesRetired,
-                                                    manifestRetired,
-                                                    false));
-                                }
-                                if (head.state() == HeadState.QUARANTINED) {
-                                    return clearObservation(root, deadline)
-                                            .thenApply(updated -> result(
-                                                    updated.orElse(root),
-                                                    updated.isPresent()
-                                                            ? TombstoneRetirementStatus
-                                                                    .QUARANTINED
-                                                            : TombstoneRetirementStatus
-                                                                    .VERSION_CHANGED,
-                                                    referencesRetired,
-                                                    manifestRetired,
-                                                    false));
-                                }
-                                return deleteExactLateObject(root, deadline)
-                                        .thenCompose(outcome -> {
-                                            if (outcome
-                                                    == LateObjectDeleteOutcome
-                                                            .VERSION_CHANGED) {
-                                                return CompletableFuture.completedFuture(
-                                                        result(
-                                                                root,
-                                                                TombstoneRetirementStatus
-                                                                        .VERSION_CHANGED,
-                                                                referencesRetired,
-                                                                manifestRetired,
-                                                                false));
-                                            }
-                                            if (outcome
-                                                    == LateObjectDeleteOutcome
-                                                            .QUARANTINED) {
-                                                return clearObservation(root, deadline)
-                                                        .thenApply(updated -> result(
-                                                                updated.orElse(root),
-                                                                updated.isPresent()
-                                                                        ? TombstoneRetirementStatus
-                                                                                .QUARANTINED
-                                                                        : TombstoneRetirementStatus
-                                                                                .VERSION_CHANGED,
-                                                                referencesRetired,
-                                                                manifestRetired,
-                                                                false));
-                                            }
-                                            return clearObservation(root, deadline)
-                                                    .thenApply(updated -> result(
-                                                            updated.orElse(root),
-                                                            updated.isPresent()
-                                                                    ? TombstoneRetirementStatus
-                                                                            .OBJECT_PRESENT
-                                                                    : TombstoneRetirementStatus
-                                                                            .VERSION_CHANGED,
-                                                            referencesRetired,
-                                                            manifestRetired,
-                                                            false));
-                                        });
-                            });
+                            return clearObservation(root, deadline)
+                                    .thenApply(updated -> result(
+                                            updated.orElse(root),
+                                            updated.isPresent()
+                                                    ? TombstoneRetirementStatus.OBJECT_PRESENT
+                                                    : TombstoneRetirementStatus.VERSION_CHANGED,
+                                            referencesRetired,
+                                            manifestRetired,
+                                            false));
                         });
+                    });
+                });
             });
         });
     }
 
     private CompletableFuture<LateObjectDeleteOutcome> deleteExactLateObject(
-            VersionedPhysicalObjectRoot root,
-            MaterializationDeadline deadline) {
+            VersionedPhysicalObjectRoot root, MaterializationDeadline deadline) {
         PhysicalObjectIdentity object = PhysicalObjectIdentity.from(root.value());
         CompletableFuture<DeleteObjectResult> deletion = deadline.bound(
                 () -> objectStore.deleteObject(
                         object.objectKey(),
                         new DeleteObjectOptions(
-                                object.objectLength(),
-                                object.storageChecksum(),
-                                object.etag(),
-                                deadline.remaining())),
+                                object.objectLength(), object.storageChecksum(), object.etag(), deadline.remaining())),
                 "delete exact reappearing object under DELETED root");
         return deletion.handle((deleted, failure) -> {
-            if (failure == null) {
-                if (!deleted.key().equals(object.objectKey())) {
-                    return CompletableFuture.completedFuture(
-                            LateObjectDeleteOutcome.QUARANTINED);
-                }
-                return CompletableFuture.completedFuture(
-                        LateObjectDeleteOutcome.DELETED_OR_ABSENT);
-            }
-            Throwable original = unwrap(failure);
-            return reloadExact(root, deadline).thenCompose(exact -> {
-                if (exact.isEmpty()) {
-                    return CompletableFuture.completedFuture(
-                            LateObjectDeleteOutcome.VERSION_CHANGED);
-                }
-                return head(root, deadline).thenCompose(reloaded -> {
-                    if (reloaded.state() == HeadState.ABSENT) {
-                        return CompletableFuture.completedFuture(
-                                LateObjectDeleteOutcome.DELETED_OR_ABSENT);
+                    if (failure == null) {
+                        if (!deleted.key().equals(object.objectKey())) {
+                            return CompletableFuture.completedFuture(LateObjectDeleteOutcome.QUARANTINED);
+                        }
+                        return CompletableFuture.completedFuture(LateObjectDeleteOutcome.DELETED_OR_ABSENT);
                     }
-                    if (reloaded.state() == HeadState.QUARANTINED) {
-                        return CompletableFuture.completedFuture(
-                                LateObjectDeleteOutcome.QUARANTINED);
-                    }
-                    return CompletableFuture.failedFuture(original);
-                });
-            });
-        }).thenCompose(Function.identity());
+                    Throwable original = unwrap(failure);
+                    return reloadExact(root, deadline).thenCompose(exact -> {
+                        if (exact.isEmpty()) {
+                            return CompletableFuture.completedFuture(LateObjectDeleteOutcome.VERSION_CHANGED);
+                        }
+                        return head(root, deadline).thenCompose(reloaded -> {
+                            if (reloaded.state() == HeadState.ABSENT) {
+                                return CompletableFuture.completedFuture(LateObjectDeleteOutcome.DELETED_OR_ABSENT);
+                            }
+                            if (reloaded.state() == HeadState.QUARANTINED) {
+                                return CompletableFuture.completedFuture(LateObjectDeleteOutcome.QUARANTINED);
+                            }
+                            return CompletableFuture.failedFuture(original);
+                        });
+                    });
+                })
+                .thenCompose(Function.identity());
     }
 
     private CompletableFuture<AuthorityScan> scanAuthority(
-            VersionedPhysicalObjectRoot root,
-            MaterializationDeadline deadline) {
+            VersionedPhysicalObjectRoot root, MaterializationDeadline deadline) {
         return head(root, deadline).thenCompose(head -> {
             if (head.state() == HeadState.QUARANTINED) {
                 return CompletableFuture.completedFuture(
@@ -495,48 +396,32 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
             return handlesPresent(root, deadline).thenCompose(handles -> {
                 if (handles) {
                     return CompletableFuture.completedFuture(
-                            AuthorityScan.blocked(
-                                    head, TombstoneRetirementStatus.HANDLE_PRESENT));
+                            AuthorityScan.blocked(head, TombstoneRetirementStatus.HANDLE_PRESENT));
                 }
                 GcReferenceQuery query = ownerlessQuery(root);
-                return referenceDomains.snapshotForDeletion(query, deadline)
-                        .thenApply(collection -> {
-                            boolean owner = collection.snapshots().stream()
-                                    .anyMatch(snapshot -> snapshot.referenceCount() > 0);
-                            if (owner) {
-                                return AuthorityScan.blocked(
-                                        head,
-                                        TombstoneRetirementStatus.OWNER_PRESENT,
-                                        collection);
-                            }
-                            if (!collection.clear()) {
-                                return AuthorityScan.blocked(
-                                        head,
-                                        TombstoneRetirementStatus.DOMAIN_VETO,
-                                        collection);
-                            }
-                            if (head.state() == HeadState.EXACT_PRESENT) {
-                                return AuthorityScan.blocked(
-                                        head,
-                                        TombstoneRetirementStatus.OBJECT_PRESENT,
-                                        collection);
-                            }
-                            return AuthorityScan.clear(head, collection);
-                        });
+                return referenceDomains.snapshotForDeletion(query, deadline).thenApply(collection -> {
+                    boolean owner = collection.snapshots().stream().anyMatch(snapshot -> snapshot.referenceCount() > 0);
+                    if (owner) {
+                        return AuthorityScan.blocked(head, TombstoneRetirementStatus.OWNER_PRESENT, collection);
+                    }
+                    if (!collection.clear()) {
+                        return AuthorityScan.blocked(head, TombstoneRetirementStatus.DOMAIN_VETO, collection);
+                    }
+                    if (head.state() == HeadState.EXACT_PRESENT) {
+                        return AuthorityScan.blocked(head, TombstoneRetirementStatus.OBJECT_PRESENT, collection);
+                    }
+                    return AuthorityScan.clear(head, collection);
+                });
             });
         });
     }
 
     private CompletableFuture<Boolean> handlesPresent(
-            VersionedPhysicalObjectRoot root,
-            MaterializationDeadline deadline) {
+            VersionedPhysicalObjectRoot root, MaterializationDeadline deadline) {
         ObjectKeyHash object = object(root);
         return deadline.bound(
                         () -> metadataStore.scanReaderLeases(
-                                cluster,
-                                object,
-                                Optional.empty(),
-                                config.metadataScanPageSize()),
+                                cluster, object, Optional.empty(), config.metadataScanPageSize()),
                         "scan reader handles before tombstone retirement")
                 .thenCompose(readers -> {
                     requireReaderPageObject(readers, object);
@@ -545,10 +430,7 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
                     }
                     return deadline.bound(
                                     () -> metadataStore.scanProtections(
-                                            cluster,
-                                            object,
-                                            Optional.empty(),
-                                            config.metadataScanPageSize()),
+                                            cluster, object, Optional.empty(), config.metadataScanPageSize()),
                                     "scan protection handles before tombstone retirement")
                             .thenApply(protections -> {
                                 requireProtectionPageObject(protections, object);
@@ -557,29 +439,22 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
                 });
     }
 
-    private CompletableFuture<HeadResult> head(
-            VersionedPhysicalObjectRoot root,
-            MaterializationDeadline deadline) {
+    private CompletableFuture<HeadResult> head(VersionedPhysicalObjectRoot root, MaterializationDeadline deadline) {
         PhysicalObjectIdentity expected = PhysicalObjectIdentity.from(root.value());
         CompletableFuture<HeadObjectResult> head;
         try {
             head = deadline.bound(
-                    () -> objectStore.headObject(
-                            expected.objectKey(),
-                            new HeadObjectOptions(deadline.remaining())),
+                    () -> objectStore.headObject(expected.objectKey(), new HeadObjectOptions(deadline.remaining())),
                     "HEAD exact DELETED physical object key");
         } catch (UnsupportedOperationException unsupported) {
             return CompletableFuture.completedFuture(HeadResult.quarantined());
         }
         return head.handle((actual, failure) -> {
             if (failure == null) {
-                return exactHead(expected, actual)
-                        ? HeadResult.exact(actual)
-                        : HeadResult.quarantined();
+                return exactHead(expected, actual) ? HeadResult.exact(actual) : HeadResult.quarantined();
             }
             Throwable exact = unwrap(failure);
-            if (exact instanceof NereusException nereus
-                    && nereus.code() == ErrorCode.OBJECT_NOT_FOUND) {
+            if (exact instanceof NereusException nereus && nereus.code() == ErrorCode.OBJECT_NOT_FOUND) {
                 return HeadResult.absent();
             }
             if (exact instanceof UnsupportedOperationException) {
@@ -590,8 +465,7 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
     }
 
     private CompletableFuture<AuditSnapshot> captureAudits(
-            VersionedPhysicalObjectRoot root,
-            MaterializationDeadline deadline) {
+            VersionedPhysicalObjectRoot root, MaterializationDeadline deadline) {
         Optional<ObjectId> objectId = PhysicalObjectIdentity.from(root.value()).objectId();
         if (objectId.isEmpty()) {
             return CompletableFuture.completedFuture(AuditSnapshot.empty());
@@ -664,53 +538,49 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
             java.util.function.Supplier<CompletableFuture<Optional<T>>> reload,
             MaterializationDeadline deadline) {
         return deletion.handle((ignored, failure) -> {
-            if (failure == null) {
-                return CompletableFuture.completedFuture(true);
-            }
-            Throwable original = unwrap(failure);
-            return reloadExact(root, deadline).thenCompose(exact -> {
-                if (exact.isEmpty()) {
-                    return CompletableFuture.failedFuture(invariant(
-                            "DELETED root changed after uncertain audit deletion"));
-                }
-                return deadline.bound(reload, "reload audit after uncertain conditional delete")
-                        .thenCompose(current -> {
-                            if (current.isEmpty()) {
-                                return CompletableFuture.completedFuture(true);
-                            }
-                            if (current.orElseThrow().equals(expected)) {
-                                return CompletableFuture.failedFuture(original);
-                            }
-                            return CompletableFuture.failedFuture(invariant(
-                                    "object audit changed after uncertain conditional delete"));
-                        });
-            });
-        }).thenCompose(Function.identity());
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(true);
+                    }
+                    Throwable original = unwrap(failure);
+                    return reloadExact(root, deadline).thenCompose(exact -> {
+                        if (exact.isEmpty()) {
+                            return CompletableFuture.failedFuture(
+                                    invariant("DELETED root changed after uncertain audit deletion"));
+                        }
+                        return deadline.bound(reload, "reload audit after uncertain conditional delete")
+                                .thenCompose(current -> {
+                                    if (current.isEmpty()) {
+                                        return CompletableFuture.completedFuture(true);
+                                    }
+                                    if (current.orElseThrow().equals(expected)) {
+                                        return CompletableFuture.failedFuture(original);
+                                    }
+                                    return CompletableFuture.failedFuture(
+                                            invariant("object audit changed after uncertain conditional delete"));
+                                });
+                    });
+                })
+                .thenCompose(Function.identity());
     }
 
     private CompletableFuture<Void> requireAuditsAbsent(
-            VersionedPhysicalObjectRoot root,
-            MaterializationDeadline deadline) {
+            VersionedPhysicalObjectRoot root, MaterializationDeadline deadline) {
         Optional<ObjectId> objectId = PhysicalObjectIdentity.from(root.value()).objectId();
         if (objectId.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
         ObjectId id = objectId.orElseThrow();
-        return deadline.bound(
-                        () -> auditStore.getReferences(cluster, id),
-                        "verify object-reference audit absence")
+        return deadline.bound(() -> auditStore.getReferences(cluster, id), "verify object-reference audit absence")
                 .thenCompose(references -> {
                     if (references.isPresent()) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "object-reference audit remains after retirement"));
+                        return CompletableFuture.failedFuture(
+                                invariant("object-reference audit remains after retirement"));
                     }
                     return deadline.bound(
-                                    () -> auditStore.getManifest(cluster, id),
-                                    "verify object-manifest audit absence")
+                                    () -> auditStore.getManifest(cluster, id), "verify object-manifest audit absence")
                             .thenAccept(manifest -> {
                                 if (manifest.isPresent()) {
-                                    throw invariant(
-                                            "object-manifest audit remains after retirement");
+                                    throw invariant("object-manifest audit remains after retirement");
                                 }
                             });
                 });
@@ -723,45 +593,38 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
             MaterializationDeadline deadline) {
         ObjectKeyHash object = object(root);
         CompletableFuture<Void> deletion = deadline.bound(
-                () -> metadataStore.deleteRoot(
-                        cluster,
-                        object,
-                        root.metadataVersion(),
-                        root.durableValueSha256()),
+                () -> metadataStore.deleteRoot(cluster, object, root.metadataVersion(), root.durableValueSha256()),
                 "conditionally retire DELETED physical root as final metadata action");
         return deletion.handle((ignored, failure) -> {
-            if (failure == null) {
-                return CompletableFuture.completedFuture(result(
-                        root,
-                        TombstoneRetirementStatus.RETIRED,
-                        referencesRetired,
-                        manifestRetired,
-                        true));
-            }
-            Throwable original = unwrap(failure);
-            return deadline.bound(
-                            () -> metadataStore.getRoot(cluster, object),
-                            "reload physical root after uncertain final retirement")
-                    .thenCompose(current -> {
-                        if (current.isEmpty()) {
-                            return CompletableFuture.completedFuture(result(
-                                    root,
-                                    TombstoneRetirementStatus.RETIRED,
-                                    referencesRetired,
-                                    manifestRetired,
-                                    true));
-                        }
-                        if (current.orElseThrow().equals(root)) {
-                            return CompletableFuture.failedFuture(original);
-                        }
+                    if (failure == null) {
                         return CompletableFuture.completedFuture(result(
-                                current.orElseThrow(),
-                                TombstoneRetirementStatus.VERSION_CHANGED,
-                                referencesRetired,
-                                manifestRetired,
-                                false));
-                    });
-        }).thenCompose(Function.identity());
+                                root, TombstoneRetirementStatus.RETIRED, referencesRetired, manifestRetired, true));
+                    }
+                    Throwable original = unwrap(failure);
+                    return deadline.bound(
+                                    () -> metadataStore.getRoot(cluster, object),
+                                    "reload physical root after uncertain final retirement")
+                            .thenCompose(current -> {
+                                if (current.isEmpty()) {
+                                    return CompletableFuture.completedFuture(result(
+                                            root,
+                                            TombstoneRetirementStatus.RETIRED,
+                                            referencesRetired,
+                                            manifestRetired,
+                                            true));
+                                }
+                                if (current.orElseThrow().equals(root)) {
+                                    return CompletableFuture.failedFuture(original);
+                                }
+                                return CompletableFuture.completedFuture(result(
+                                        current.orElseThrow(),
+                                        TombstoneRetirementStatus.VERSION_CHANGED,
+                                        referencesRetired,
+                                        manifestRetired,
+                                        false));
+                            });
+                })
+                .thenCompose(Function.identity());
     }
 
     private CompletableFuture<Optional<VersionedPhysicalObjectRoot>> replaceObservation(
@@ -769,14 +632,12 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
             long firstAbsentAtMillis,
             Checksum proof,
             MaterializationDeadline deadline) {
-        PhysicalObjectRootRecord replacement = observation(
-                root.value(), firstAbsentAtMillis, proof.value());
+        PhysicalObjectRootRecord replacement = observation(root.value(), firstAbsentAtMillis, proof.value());
         return tombstoneAuditCas(root, replacement, deadline);
     }
 
     private CompletableFuture<Optional<VersionedPhysicalObjectRoot>> clearObservation(
-            VersionedPhysicalObjectRoot root,
-            MaterializationDeadline deadline) {
+            VersionedPhysicalObjectRoot root, MaterializationDeadline deadline) {
         if (root.value().tombstoneFirstAbsentAtMillis() == 0) {
             return reloadExact(root, deadline);
         }
@@ -784,44 +645,36 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
     }
 
     private CompletableFuture<Optional<VersionedPhysicalObjectRoot>> tombstoneAuditCas(
-            VersionedPhysicalObjectRoot root,
-            PhysicalObjectRootRecord replacement,
-            MaterializationDeadline deadline) {
+            VersionedPhysicalObjectRoot root, PhysicalObjectRootRecord replacement, MaterializationDeadline deadline) {
         CompletableFuture<VersionedPhysicalObjectRoot> cas = deadline.bound(
-                () -> metadataStore.compareAndSetRoot(
-                        cluster, replacement, root.metadataVersion()),
+                () -> metadataStore.compareAndSetRoot(cluster, replacement, root.metadataVersion()),
                 "CAS DELETED tombstone audit checkpoint");
         return cas.handle((updated, failure) -> {
-            if (failure == null) {
-                return CompletableFuture.completedFuture(
-                        Optional.<VersionedPhysicalObjectRoot>of(updated));
-            }
-            Throwable original = unwrap(failure);
-            return deadline.bound(
-                            () -> metadataStore.getRoot(cluster, object(root)),
-                            "reload DELETED root after uncertain tombstone audit CAS")
-                    .thenCompose(current -> {
-                        if (current.isPresent()
-                                && exactReplacement(current.orElseThrow(), replacement)) {
-                            return CompletableFuture.completedFuture(current);
-                        }
-                        if (current.isPresent() && current.orElseThrow().equals(root)) {
-                            return CompletableFuture
-                                    .<Optional<VersionedPhysicalObjectRoot>>failedFuture(
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(Optional.<VersionedPhysicalObjectRoot>of(updated));
+                    }
+                    Throwable original = unwrap(failure);
+                    return deadline.bound(
+                                    () -> metadataStore.getRoot(cluster, object(root)),
+                                    "reload DELETED root after uncertain tombstone audit CAS")
+                            .thenCompose(current -> {
+                                if (current.isPresent() && exactReplacement(current.orElseThrow(), replacement)) {
+                                    return CompletableFuture.completedFuture(current);
+                                }
+                                if (current.isPresent() && current.orElseThrow().equals(root)) {
+                                    return CompletableFuture.<Optional<VersionedPhysicalObjectRoot>>failedFuture(
                                             original);
-                        }
-                        return CompletableFuture.completedFuture(
-                                Optional.<VersionedPhysicalObjectRoot>empty());
-                    });
-        }).thenCompose(Function.identity());
+                                }
+                                return CompletableFuture.completedFuture(Optional.<VersionedPhysicalObjectRoot>empty());
+                            });
+                })
+                .thenCompose(Function.identity());
     }
 
     private CompletableFuture<Optional<VersionedPhysicalObjectRoot>> reloadExact(
-            VersionedPhysicalObjectRoot expected,
-            MaterializationDeadline deadline) {
+            VersionedPhysicalObjectRoot expected, MaterializationDeadline deadline) {
         return deadline.bound(
-                        () -> metadataStore.getRoot(cluster, object(expected)),
-                        "reload exact DELETED physical root")
+                        () -> metadataStore.getRoot(cluster, object(expected)), "reload exact DELETED physical root")
                 .thenApply(current -> current.filter(expected::equals));
     }
 
@@ -834,25 +687,16 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
                 evidence);
     }
 
-    private static Checksum proof(
-            VersionedPhysicalObjectRoot root,
-            GcReferenceCollection collection) {
-        return TombstoneRetirementDigests.proof(
-                root,
-                collection.query().queryIdentitySha256(),
-                collection.snapshots());
+    private static Checksum proof(VersionedPhysicalObjectRoot root, GcReferenceCollection collection) {
+        return TombstoneRetirementDigests.proof(root, collection.query().queryIdentitySha256(), collection.snapshots());
     }
 
-    private boolean elapsed(
-            long baseMillis,
-            java.time.Duration grace,
-            long now) {
+    private boolean elapsed(long baseMillis, java.time.Duration grace, long now) {
         OptionalLong withGrace = config.deadline(baseMillis, grace);
         if (withGrace.isEmpty()) {
             return false;
         }
-        OptionalLong withSkew = config.deadline(
-                withGrace.orElseThrow(), config.maximumClockSkew());
+        OptionalLong withSkew = config.deadline(withGrace.orElseThrow(), config.maximumClockSkew());
         return withSkew.isPresent() && withSkew.orElseThrow() < now;
     }
 
@@ -871,38 +715,33 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
             if (!value.value().objectId().equals(objectId.value())
                     || !value.value().objectKey().equals(object.objectKey().value())
                     || value.value().objectLength() != object.objectLength()
-                    || !value.value().storageChecksumType().equals(
-                            object.storageChecksum().type().name())
-                    || !value.value().storageChecksumValue().equals(
-                            object.storageChecksum().value())) {
+                    || !value.value()
+                            .storageChecksumType()
+                            .equals(object.storageChecksum().type().name())
+                    || !value.value()
+                            .storageChecksumValue()
+                            .equals(object.storageChecksum().value())) {
                 throw invariant("object-manifest audit does not match the DELETED root");
             }
         });
     }
 
-    private static boolean exactHead(
-            PhysicalObjectIdentity expected,
-            HeadObjectResult actual) {
-        boolean etagMatches = expected.etag().isEmpty()
-                || expected.etag().equals(actual.etag());
+    private static boolean exactHead(PhysicalObjectIdentity expected, HeadObjectResult actual) {
+        boolean etagMatches = expected.etag().isEmpty() || expected.etag().equals(actual.etag());
         return actual.key().equals(expected.objectKey())
                 && actual.objectLength() == expected.objectLength()
                 && actual.checksum().equals(expected.storageChecksum())
                 && etagMatches;
     }
 
-    private static void requireReaderPageObject(
-            ReaderLeaseScanPage page,
-            ObjectKeyHash object) {
+    private static void requireReaderPageObject(ReaderLeaseScanPage page, ObjectKeyHash object) {
         if (page.values().stream()
                 .anyMatch(value -> !value.value().objectKeyHash().equals(object.value()))) {
             throw invariant("reader-handle scan escaped the DELETED object");
         }
     }
 
-    private static void requireProtectionPageObject(
-            ObjectProtectionScanPage page,
-            ObjectKeyHash object) {
+    private static void requireProtectionPageObject(ObjectProtectionScanPage page, ObjectKeyHash object) {
         if (page.values().stream()
                 .anyMatch(value -> !value.value().objectKeyHash().equals(object.value()))) {
             throw invariant("protection-handle scan escaped the DELETED object");
@@ -910,9 +749,7 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
     }
 
     private static PhysicalObjectRootRecord observation(
-            PhysicalObjectRootRecord root,
-            long firstAbsentAtMillis,
-            String proofSha256) {
+            PhysicalObjectRootRecord root, long firstAbsentAtMillis, String proofSha256) {
         return new PhysicalObjectRootRecord(
                 root.schemaVersion(),
                 root.objectKeyHash(),
@@ -940,9 +777,7 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
                 0);
     }
 
-    private static boolean exactReplacement(
-            VersionedPhysicalObjectRoot actual,
-            PhysicalObjectRootRecord replacement) {
+    private static boolean exactReplacement(VersionedPhysicalObjectRoot actual, PhysicalObjectRootRecord replacement) {
         return actual.value().withMetadataVersion(0).equals(replacement);
     }
 
@@ -951,10 +786,8 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
     }
 
     private static TombstoneRetirementResult simple(
-            VersionedPhysicalObjectRoot root,
-            TombstoneRetirementStatus status) {
-        return TombstoneRetirementResult.simple(
-                object(root), root.metadataVersion(), status);
+            VersionedPhysicalObjectRoot root, TombstoneRetirementStatus status) {
+        return TombstoneRetirementResult.simple(object(root), root.metadataVersion(), status);
     }
 
     private static TombstoneRetirementResult result(
@@ -964,12 +797,7 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
             boolean manifestRetired,
             boolean rootRetired) {
         return new TombstoneRetirementResult(
-                object(root),
-                root.metadataVersion(),
-                status,
-                referencesRetired,
-                manifestRetired,
-                rootRetired);
+                object(root), root.metadataVersion(), status, referencesRetired, manifestRetired, rootRetired);
     }
 
     private long nonNegativeNow() {
@@ -989,14 +817,12 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
     }
 
     private static NereusException invariant(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static Throwable unwrap(Throwable supplied) {
         Throwable current = supplied;
-        while ((current instanceof CompletionException
-                        || current instanceof ExecutionException)
+        while ((current instanceof CompletionException || current instanceof ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -1004,9 +830,7 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
     }
 
     private static CompletionException propagate(Throwable failure) {
-        return failure instanceof CompletionException completion
-                ? completion
-                : new CompletionException(failure);
+        return failure instanceof CompletionException completion ? completion : new CompletionException(failure);
     }
 
     private enum HeadState {
@@ -1021,15 +845,12 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
         QUARANTINED
     }
 
-    private record HeadResult(
-            HeadState state,
-            Optional<HeadObjectResult> value) {
+    private record HeadResult(HeadState state, Optional<HeadObjectResult> value) {
         private HeadResult {
             Objects.requireNonNull(state, "state");
             value = Objects.requireNonNull(value, "value");
             if ((state == HeadState.EXACT_PRESENT) != value.isPresent()) {
-                throw new IllegalArgumentException(
-                        "only an exact-present HEAD result carries a value");
+                throw new IllegalArgumentException("only an exact-present HEAD result carries a value");
             }
         }
 
@@ -1054,33 +875,25 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
             Objects.requireNonNull(head, "head");
             blockingStatus = Objects.requireNonNull(blockingStatus, "blockingStatus");
             collection = Objects.requireNonNull(collection, "collection");
-            if (blockingStatus.isEmpty() != (head.state() == HeadState.ABSENT
-                    && collection.isPresent()
-                    && collection.orElseThrow().clear())) {
+            if (blockingStatus.isEmpty()
+                    != (head.state() == HeadState.ABSENT
+                            && collection.isPresent()
+                            && collection.orElseThrow().clear())) {
                 throw new IllegalArgumentException("authority scan state is inconsistent");
             }
         }
 
-        private static AuthorityScan clear(
-                HeadResult head,
-                GcReferenceCollection collection) {
-            return new AuthorityScan(
-                    head, Optional.empty(), Optional.of(collection));
+        private static AuthorityScan clear(HeadResult head, GcReferenceCollection collection) {
+            return new AuthorityScan(head, Optional.empty(), Optional.of(collection));
+        }
+
+        private static AuthorityScan blocked(HeadResult head, TombstoneRetirementStatus status) {
+            return new AuthorityScan(head, Optional.of(status), Optional.empty());
         }
 
         private static AuthorityScan blocked(
-                HeadResult head,
-                TombstoneRetirementStatus status) {
-            return new AuthorityScan(
-                    head, Optional.of(status), Optional.empty());
-        }
-
-        private static AuthorityScan blocked(
-                HeadResult head,
-                TombstoneRetirementStatus status,
-                GcReferenceCollection collection) {
-            return new AuthorityScan(
-                    head, Optional.of(status), Optional.of(collection));
+                HeadResult head, TombstoneRetirementStatus status, GcReferenceCollection collection) {
+            return new AuthorityScan(head, Optional.of(status), Optional.of(collection));
         }
 
         private boolean clearAbsent() {
@@ -1104,8 +917,7 @@ public final class DefaultPhysicalRootTombstoneRetirementCoordinator
             references = Objects.requireNonNull(references, "references");
             manifest = Objects.requireNonNull(manifest, "manifest");
             if (objectId.isEmpty() && (references.isPresent() || manifest.isPresent())) {
-                throw new IllegalArgumentException(
-                        "audit records require a physical object id");
+                throw new IllegalArgumentException("audit records require a physical object id");
             }
         }
 

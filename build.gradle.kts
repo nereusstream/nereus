@@ -12,32 +12,114 @@
  * limitations under the License.
  */
 
+import com.diffplug.gradle.spotless.SpotlessExtension
+import org.gradle.api.DefaultTask
+import org.gradle.api.artifacts.VersionCatalogsExtension
+import org.gradle.api.plugins.quality.Checkstyle
+import org.gradle.api.plugins.quality.CheckstyleExtension
+import org.gradle.api.provider.Property
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.TaskAction
 
 abstract class DockerIntegrationGateService : BuildService<BuildServiceParameters.None>
 
 abstract class PulsarCheckoutGateService : BuildService<BuildServiceParameters.None>
 
+abstract class KafkaCheckoutGateService : BuildService<BuildServiceParameters.None>
+
+abstract class DevelopmentCoordinateVerificationTask : DefaultTask() {
+    @get:Input
+    abstract val actualVersion: Property<String>
+
+    @get:Input
+    abstract val expectedVersion: Property<String>
+
+    @TaskAction
+    fun verifyCoordinate() {
+        check(actualVersion.get() == expectedVersion.get()) {
+            "Refusing to publish Kafka F9 development artifacts as ${actualVersion.get()}; " +
+                    "expected ${expectedVersion.get()}. Add the calling gate to " +
+                    "kafkaDevelopmentGateRequested."
+        }
+    }
+}
+
 plugins {
     `base`
     `maven-publish`
+    alias(libs.plugins.spotless) apply false
 }
 
 group = providers.gradleProperty("nereusGroup").get()
 val phase2DevelopmentVersion = "0.1.0-f2-dev"
+val phase9DevelopmentVersion = "0.1.0-f9-dev"
 val pulsarDevelopmentGateRequested = gradle.startParameter.taskNames.any { requested ->
     requested.substringAfterLast(':').startsWith("phase2")
-        || requested.substringAfterLast(':').startsWith("phase3")
-        // M1 consumes the final-gated F3 source composite. The Pulsar fork remains on the
-        // frozen F2 development coordinate until the F4 broker rollout milestone changes both repos.
-        || requested.substringAfterLast(':').startsWith("phase4")
-        || requested.substringAfterLast(':').startsWith("bookKeeperPrimaryWal")
-        || requested.substringAfterLast(':') == "publishPhase2DevelopmentArtifacts"
+            || requested.substringAfterLast(':').startsWith("phase3")
+            // M1 consumes the final-gated F3 source composite. The Pulsar fork remains on the
+            // frozen F2 development coordinate until the F4 broker rollout milestone changes both repos.
+            || requested.substringAfterLast(':').startsWith("phase4")
+            || requested.substringAfterLast(':').startsWith("bookKeeperPrimaryWal")
+            || requested.substringAfterLast(':') == "publishPhase2DevelopmentArtifacts"
+}
+val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { requested ->
+    val task = requested.substringAfterLast(':')
+    task.startsWith("phase9M3")
+            || task.startsWith("phase9M6Kafka")
+            || task == "phase9M5KafkaCompactionOracleCheck"
+            || task == "phase9M5KafkaRetentionOracleCheck"
+            || task == "phase9ChaosCheck"
+            || task == "phase9CompatibilityCheck"
+            || task == "phase9PerformanceCheck"
+            || task == "phase9M4FinalCheck"
+            || task == "phase9M5FinalCheck"
+            || task == "phase9M6FinalCheck"
+            || task == "phase9M7Check"
+            || task == "phase9M7FinalCheck"
+            || task == "phase9PrepareFinalEvidence"
+            || task == "phase9FinalEvidenceReport"
+            || task == "phase9FinalCheck"
+            || task == "phase9KafkaForkCompatibilityCheck"
+            || task == "f9EvidenceAggregatorTest"
+            || task == "f9M6KafkaProcessIntegrationTest"
+            || task == "f9CheckpointTrimRecoveryProcessIntegrationTest"
+            || task == "f9DeleteRecordsBoundaryProcessIntegrationTest"
+            || task == "f9TrimResponseLossProcessIntegrationTest"
+            || task == "f9TrimProfileMatrixProcessIntegrationTest"
+            || task == "f9MultiBrokerTakeoverProviderIntegrationTest"
+            || task == "f9MultiBrokerTakeoverProcessIntegrationTest"
+            || task == "f9CoordinatorMigrationProcessIntegrationTest"
+            || task == "f9OngoingTransactionMigrationProcessIntegrationTest"
+            || task == "f9TransactionResolutionCutProcessIntegrationTest"
+            || task == "f9TransactionResolutionProfileMatrixProcessIntegrationTest"
+            || task == "f9MandatoryInternalTopicNtc2ProcessIntegrationTest"
+            || task == "f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest"
+            || task == "f9MultiControllerFailoverProcessIntegrationTest"
+            || task == "f9ActivationCutFailoverProcessIntegrationTest"
+            || task == "f9ActivationProofCutFailoverProcessIntegrationTest"
+            || task == "f9ActivationTransportRecoveryProcessIntegrationTest"
+            || task == "f9InFlightTakeoverProcessIntegrationTest"
+            || task == "f9BookKeeperProfileTakeoverProcessIntegrationTest"
+            || task == "f9BookKeeperInFlightTakeoverProcessIntegrationTest"
+            || task == "f9BookKeeperWalOnlyProcessIntegrationTest"
+            || task == "f9BookKeeperWalAsyncObjectProcessIntegrationTest"
+            || task == "f9BookKeeperWalSyncObjectProcessIntegrationTest"
+            || task == "f9ObjectWalAsyncObjectProcessIntegrationTest"
+            || task == "f9LeaderChurnChaosProcessIntegrationTest"
+            || task == "f9ClientCompatibilityProcessIntegrationTest"
+            || task == "f9PerformanceProfileProcessIntegrationTest"
+            || task == "publishPhase9DevelopmentArtifacts"
+}
+check(!(pulsarDevelopmentGateRequested && kafkaDevelopmentGateRequested)) {
+    "Pulsar F2 and Kafka F9 development artifact gates require separate Gradle invocations"
 }
 version = gradle.startParameter.projectProperties["nereusVersion"]
     ?: if (pulsarDevelopmentGateRequested) {
         phase2DevelopmentVersion
+    } else if (kafkaDevelopmentGateRequested) {
+        phase9DevelopmentVersion
     } else {
         providers.gradleProperty("nereusVersion").getOrElse("0.1.0-SNAPSHOT")
     }
@@ -46,8 +128,19 @@ if (pulsarDevelopmentGateRequested) {
         "Phase 2 development gates require version $phase2DevelopmentVersion, got $version"
     }
 }
+if (kafkaDevelopmentGateRequested) {
+    check(version.toString() == phase9DevelopmentVersion) {
+        "Kafka F9 development gates require version $phase9DevelopmentVersion, got $version"
+    }
+}
 
 val javaLanguageVersion = providers.gradleProperty("javaVersion").map(String::toInt).getOrElse(21)
+val checkstyleToolVersion = libs.versions.checkstyle.get()
+val palantirJavaFormatVersion = extensions.getByType<VersionCatalogsExtension>()
+    .named("libs")
+    .findVersion("palantir-java-format")
+    .orElseThrow()
+    .requiredVersion
 val dockerIntegrationGate = gradle.sharedServices.registerIfAbsent(
     "nereusDockerIntegrationGate",
     DockerIntegrationGateService::class,
@@ -60,6 +153,12 @@ val pulsarCheckoutGate = gradle.sharedServices.registerIfAbsent(
 ) {
     maxParallelUsages.set(1)
 }
+val kafkaCheckoutGate = gradle.sharedServices.registerIfAbsent(
+    "nereusKafkaCheckoutGate",
+    KafkaCheckoutGateService::class,
+) {
+    maxParallelUsages.set(1)
+}
 val dockerBackedSubprojectTasks = mapOf(
     ":nereus-core" to setOf("phase1IntegrationTest"),
     ":nereus-managed-ledger" to setOf("cursorS3IntegrationTest", "cursorM2IntegrationTest"),
@@ -68,8 +167,45 @@ val dockerBackedSubprojectTasks = mapOf(
         "oxiaCapabilitySpike",
         "oxiaIntegrationTest",
         "f4OxiaIntegrationTest",
+        "f9ActivationOxiaIntegrationTest",
+        "f9OxiaIntegrationTest",
+        "f9BindingScaleOxiaIntegrationTest",
     ),
-    ":nereus-object-store" to setOf("s3IntegrationTest"),
+    ":nereus-object-store" to setOf(
+        "s3IntegrationTest",
+        "rangedFormatS3IntegrationTest",
+        "kafkaCheckpointS3IntegrationTest",
+    ),
+    ":nereus-kafka-adapter" to setOf(
+        "f9M3ProviderIntegrationTest",
+        "f9MultiBrokerTakeoverProviderIntegrationTest",
+        "f9BookKeeperWalOnlyProviderIntegrationTest",
+        "f9BookKeeperLedgerDeletionProviderIntegrationTest",
+        "f9M6KafkaProcessIntegrationTest",
+        "f9CheckpointTrimRecoveryProcessIntegrationTest",
+        "f9DeleteRecordsBoundaryProcessIntegrationTest",
+        "f9TrimResponseLossProcessIntegrationTest",
+        "f9TrimProfileMatrixProcessIntegrationTest",
+        "f9MultiBrokerTakeoverProcessIntegrationTest",
+        "f9CoordinatorMigrationProcessIntegrationTest",
+        "f9OngoingTransactionMigrationProcessIntegrationTest",
+        "f9TransactionResolutionCutProcessIntegrationTest",
+        "f9TransactionResolutionProfileMatrixProcessIntegrationTest",
+        "f9MandatoryInternalTopicNtc2ProcessIntegrationTest",
+        "f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest",
+        "f9MultiControllerFailoverProcessIntegrationTest",
+        "f9ActivationCutFailoverProcessIntegrationTest",
+        "f9ActivationProofCutFailoverProcessIntegrationTest",
+        "f9ActivationTransportRecoveryProcessIntegrationTest",
+        "f9InFlightTakeoverProcessIntegrationTest",
+        "f9BookKeeperProfileTakeoverProcessIntegrationTest",
+        "f9BookKeeperInFlightTakeoverProcessIntegrationTest",
+        "f9BookKeeperWalOnlyProcessIntegrationTest",
+        "f9BookKeeperWalAsyncObjectProcessIntegrationTest",
+        "f9BookKeeperWalSyncObjectProcessIntegrationTest",
+        "f9ObjectWalAsyncObjectProcessIntegrationTest",
+        "f9LeaderChurnChaosProcessIntegrationTest",
+    ),
     ":nereus-pulsar-adapter" to setOf(
         "f4M4IntegrationTest",
         "bkM2IntegrationTest",
@@ -142,8 +278,37 @@ subprojects {
 }
 
 configure(subprojects.filter { it.name != "nereus-bom" }) {
+    apply(plugin = "checkstyle")
     apply(plugin = "java-library")
     apply(plugin = "maven-publish")
+    apply(plugin = "com.diffplug.spotless")
+
+    extensions.configure<CheckstyleExtension>("checkstyle") {
+        toolVersion = checkstyleToolVersion
+        configFile = rootProject.file("buildtools/src/main/resources/nereus/checkstyle.xml")
+        configProperties["checkstyle.suppressions.file"] =
+            rootProject.file("buildtools/src/main/resources/nereus/suppressions.xml").absolutePath
+        maxErrors = 0
+        maxWarnings = 0
+    }
+
+    tasks.withType<Checkstyle>().configureEach {
+        maxHeapSize.set("1g")
+        exclude("**/generated/**")
+        exclude("**/generated-sources/**")
+        exclude("**/generated-test-sources/**")
+    }
+
+    extensions.configure<SpotlessExtension>("spotless") {
+        java {
+            target("src/**/*.java")
+            palantirJavaFormat(palantirJavaFormatVersion)
+            importOrder("\\#|")
+            removeUnusedImports()
+            trimTrailingWhitespace()
+            endWithNewline()
+        }
+    }
 
     extensions.configure<JavaPluginExtension>("java") {
         toolchain {
@@ -532,7 +697,8 @@ tasks.register<Exec>("phase3M5PulsarFinalCheck") {
         ":pulsar-broker:checkstyleMain",
         ":pulsar-broker:checkstyleTest",
         ":pulsar-broker:test",
-        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusCursorMultiBrokerIntegrationTest.preservesDurableCursorTruthAcrossUnloadFailoverRestartExpiryAndBookKeeper",
+        "--tests",
+        "org.apache.pulsar.broker.storage.nereus.NereusCursorMultiBrokerIntegrationTest.preservesDurableCursorTruthAcrossUnloadFailoverRestartExpiryAndBookKeeper",
         "--rerun-tasks",
         "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
         "-PtestFailFast=true",
@@ -574,7 +740,8 @@ tasks.register<Exec>("phase3M6PulsarFinalCheck") {
         ":pulsar-broker:checkstyleMain",
         ":pulsar-broker:checkstyleTest",
         ":pulsar-broker:test",
-        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusCursorMultiBrokerIntegrationTest.preservesMessageIdsPropertiesAndIncarnationAcrossCompatibilityCuts",
+        "--tests",
+        "org.apache.pulsar.broker.storage.nereus.NereusCursorMultiBrokerIntegrationTest.preservesMessageIdsPropertiesAndIncarnationAcrossCompatibilityCuts",
         "--rerun-tasks",
         "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
         "-PtestFailFast=true",
@@ -662,7 +829,8 @@ tasks.register("bookKeeperPrimaryWalM2MetadataCheck") {
 
 tasks.register("bookKeeperPrimaryWalM2RuntimeCheck") {
     group = "verification"
-    description = "Verify the BK-M2 allocator, writer, recovery, physical-reference, lease, and exact reader runtime checkpoint."
+    description =
+        "Verify the BK-M2 allocator, writer, recovery, physical-reference, lease, and exact reader runtime checkpoint."
     dependsOn("bookKeeperPrimaryWalM2RecoveryFencingCheck")
     dependsOn(":nereus-bookkeeper:test")
     dependsOn(":nereus-core:test")
@@ -685,7 +853,8 @@ tasks.register("bookKeeperPrimaryWalM2AppendReadCheck") {
 
 tasks.register("bookKeeperPrimaryWalM2RecoveryFencingCheck") {
     group = "verification"
-    description = "Verify stale-session fencing, recovery-open sealing, restart ownership transfer, and inventory repair."
+    description =
+        "Verify stale-session fencing, recovery-open sealing, restart ownership transfer, and inventory repair."
     dependsOn("bookKeeperPrimaryWalM2AppendReadCheck")
     dependsOn(":nereus-bookkeeper:bkM2RecoveryFencingTest")
 }
@@ -721,7 +890,8 @@ tasks.register<Exec>("bookKeeperPrimaryWalM2PulsarCheck") {
 
 tasks.register("bookKeeperPrimaryWalM2RealServiceCheck") {
     group = "verification"
-    description = "Run BK-M2 real Oxia/BookKeeper append recovery, restart, rollover, and delete-response-loss acceptance."
+    description =
+        "Run BK-M2 real Oxia/BookKeeper append recovery, restart, rollover, and delete-response-loss acceptance."
     dependsOn("bookKeeperPrimaryWalM2RetentionCheck")
     dependsOn(":nereus-pulsar-adapter:bkM2IntegrationTest")
 }
@@ -804,7 +974,8 @@ tasks.register("bookKeeperPrimaryWalM3SourceRetirementCheck") {
 
 tasks.register("bookKeeperPrimaryWalM3LiveReadCheck") {
     group = "verification"
-    description = "Verify exact higher-generation retirement uses the normal resolver, durable Object pin, and full-range reader."
+    description =
+        "Verify exact higher-generation retirement uses the normal resolver, durable Object pin, and full-range reader."
     dependsOn("bookKeeperPrimaryWalM3SourceRetirementCheck")
     dependsOn(":nereus-core:test")
     dependsOn(":nereus-materialization:test")
@@ -834,14 +1005,16 @@ tasks.register("bookKeeperPrimaryWalM3Check") {
 
 tasks.register("bookKeeperPrimaryWalM3RealServiceCheck") {
     group = "verification"
-    description = "Run BK-M3 real Oxia/BookKeeper/Object stable-head, fallback, fresh-runtime publication, read, and retirement proof."
+    description =
+        "Run BK-M3 real Oxia/BookKeeper/Object stable-head, fallback, fresh-runtime publication, read, and retirement proof."
     dependsOn("bookKeeperPrimaryWalM3Check")
     dependsOn(":nereus-pulsar-adapter:bkM3IntegrationTest")
 }
 
 tasks.register("bookKeeperPrimaryWalM3PhysicalRetirementCheck") {
     group = "verification"
-    description = "Verify BK-M3 real source release, mandatory-reference retirement, and whole-ledger physical deletion."
+    description =
+        "Verify BK-M3 real source release, mandatory-reference retirement, and whole-ledger physical deletion."
     dependsOn("bookKeeperPrimaryWalM3RealServiceCheck")
 }
 
@@ -862,14 +1035,16 @@ tasks.register("bookKeeperPrimaryWalM3LagFailureCheck") {
 
 tasks.register("bookKeeperPrimaryWalM3FinalCheck") {
     group = "verification"
-    description = "Run BK-M3 ordinary and real Oxia/BookKeeper/Object acceptance over the final-gated BK_ONLY predecessor."
+    description =
+        "Run BK-M3 ordinary and real Oxia/BookKeeper/Object acceptance over the final-gated BK_ONLY predecessor."
     dependsOn("bookKeeperPrimaryWalM3LagFailureCheck")
     dependsOn("bookKeeperPrimaryWalM2FinalCheck")
 }
 
 tasks.register("bookKeeperPrimaryWalM4CompletionPolicyCheck") {
     group = "verification"
-    description = "Verify BK sync resolves REQUIRED_OBJECT_GENERATION and rejects weaker or uninstalled policies before IO."
+    description =
+        "Verify BK sync resolves REQUIRED_OBJECT_GENERATION and rejects weaker or uninstalled policies before IO."
     dependsOn("bookKeeperPrimaryWalDocumentationCheck")
     dependsOn(":nereus-core:test")
     dependsOn(":nereus-bookkeeper:test")
@@ -877,7 +1052,8 @@ tasks.register("bookKeeperPrimaryWalM4CompletionPolicyCheck") {
 
 tasks.register("bookKeeperPrimaryWalM4TaskReuseCheck") {
     group = "verification"
-    description = "Verify exact single-source task creation uses the shared F4 worker and cannot race the background planner."
+    description =
+        "Verify exact single-source task creation uses the shared F4 worker and cannot race the background planner."
     dependsOn("bookKeeperPrimaryWalM4CompletionPolicyCheck")
     dependsOn(":nereus-materialization:test")
     dependsOn(":nereus-pulsar-adapter:bkM4IntegrationTest")
@@ -885,7 +1061,8 @@ tasks.register("bookKeeperPrimaryWalM4TaskReuseCheck") {
 
 tasks.register("bookKeeperPrimaryWalM4KnownCommittedCheck") {
     group = "verification"
-    description = "Verify post-head Object failure returns KNOWN_COMMITTED and recovery reuses one BK reservation and offset."
+    description =
+        "Verify post-head Object failure returns KNOWN_COMMITTED and recovery reuses one BK reservation and offset."
     dependsOn("bookKeeperPrimaryWalM4TaskReuseCheck")
     dependsOn(":nereus-bookkeeper:test")
     dependsOn(":nereus-pulsar-adapter:bkM4IntegrationTest")
@@ -946,7 +1123,8 @@ tasks.register<Exec>("bookKeeperPrimaryWalM5CapabilityCheck") {
 
 tasks.register("bookKeeperPrimaryWalM5FirstCreateCheck") {
     group = "verification"
-    description = "Verify BK first-create admission precedes every L0 mutation while existing projection open remains available."
+    description =
+        "Verify BK first-create admission precedes every L0 mutation while existing projection open remains available."
     dependsOn("bookKeeperPrimaryWalM5CapabilityCheck")
     dependsOn(":nereus-managed-ledger:test")
     dependsOn(":nereus-pulsar-adapter:test")
@@ -1108,7 +1286,8 @@ tasks.register("bookKeeperPrimaryWalM6ScaleCheck") {
 
 tasks.register("bookKeeperPrimaryWalM6ChaosCheck") {
     group = "verification"
-    description = "Verify allocation/write/seal/head/task/publication/delete response-loss recovery across fresh runtimes."
+    description =
+        "Verify allocation/write/seal/head/task/publication/delete response-loss recovery across fresh runtimes."
     dependsOn("bookKeeperPrimaryWalM6ScaleCheck")
     dependsOn(":nereus-bookkeeper:bkM6ChaosTest")
     dependsOn("bookKeeperPrimaryWalM2AllocationAuthorityCheck")
@@ -1501,7 +1680,8 @@ tasks.register<Exec>("checkPhase4M4GenerationRetirementContractSurface") {
 
 tasks.register("phase4M4GenerationRetirementCheck") {
     group = "verification"
-    description = "Verify exact source deletion, view-specific/below-trim eligibility, higher pre-drain, and retirement recovery."
+    description =
+        "Verify exact source deletion, view-specific/below-trim eligibility, higher pre-drain, and retirement recovery."
     dependsOn("phase4M4DestructiveRecoveryCheck")
     dependsOn("checkPhase4M4GenerationRetirementContractSurface")
     dependsOn("checkPhase4Documentation")
@@ -1643,7 +1823,8 @@ tasks.register<Exec>("checkPhase4M4CursorGcExecutionContractSurface") {
 
 tasks.register("phase4M4CursorGcExecutionCheck") {
     group = "verification"
-    description = "Verify cursor snapshot MARK/drain/restart/delete execution with production deletion still default-off."
+    description =
+        "Verify cursor snapshot MARK/drain/restart/delete execution with production deletion still default-off."
     dependsOn("phase4M4CursorSnapshotGcCheck")
     dependsOn("checkPhase4M4CursorGcExecutionContractSurface")
     dependsOn("checkPhase4Documentation")
@@ -1857,7 +2038,8 @@ tasks.register<Exec>("checkPhase4M4PhysicalDeletionIntegrationContractSurface") 
 
 tasks.register("phase4M4PhysicalDeletionIntegrationCheck") {
     group = "verification"
-    description = "Verify checkpoint AS real Oxia/LocalStack activation, scope fencing, and destructive restart recovery."
+    description =
+        "Verify checkpoint AS real Oxia/LocalStack activation, scope fencing, and destructive restart recovery."
     dependsOn("phase4M4PhysicalDeletionActivationCheck")
     dependsOn("checkPhase4M4PhysicalDeletionIntegrationContractSurface")
     dependsOn("checkPhase4Documentation")
@@ -1920,7 +2102,8 @@ tasks.register<Exec>("checkPhase4M4TwoWorkerConvergenceContractSurface") {
 
 tasks.register("phase4M4TwoWorkerConvergenceCheck") {
     group = "verification"
-    description = "Verify checkpoint AV two independent workers converge one durable delete intent against real services."
+    description =
+        "Verify checkpoint AV two independent workers converge one durable delete intent against real services."
     dependsOn("phase4M4DeletedCasResponseLossCheck")
     dependsOn("checkPhase4M4TwoWorkerConvergenceContractSurface")
     dependsOn("checkPhase4Documentation")
@@ -2008,7 +2191,8 @@ tasks.register<Exec>("checkPhase4M4CursorGcScaleContractSurface") {
 
 tasks.register("phase4M4CursorGcScaleCheck") {
     group = "verification"
-    description = "Verify checkpoint AZ classifies and deletes live/old/CAS-lost/deleted-cursor snapshots at 10,000 roots."
+    description =
+        "Verify checkpoint AZ classifies and deletes live/old/CAS-lost/deleted-cursor snapshots at 10,000 roots."
     dependsOn("phase4M4TombstoneScaleCheck")
     dependsOn("checkPhase4M4CursorGcScaleContractSurface")
     dependsOn("checkPhase4Documentation")
@@ -2742,4 +2926,722 @@ tasks.register("phase4FinalCheck") {
     dependsOn("phase4M6FinalCheck")
     dependsOn("checkPhase4FinalDockerIsolation")
     dependsOn("checkPhase4FinalPulsarCheckoutIsolation")
+}
+
+tasks.register<Exec>("checkPhase9ScenarioManifest") {
+    group = "verification"
+    description = "Verify the F9 Markdown and JSON scenario contracts have the same 146 stable IDs."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase9-scenario-manifest.sh")
+}
+
+val autoMqCheckoutPath = providers.gradleProperty("autoMqCheckout")
+    .orElse(providers.environmentVariable("NEREUS_AUTOMQ_CHECKOUT"))
+    .orElse(layout.projectDirectory.dir("../automq").asFile.absolutePath)
+val phase9PulsarExpectedHead =
+    "50fc70fe4620febcf0fd31d97ff7d2be447af3d4"
+
+tasks.register<Exec>("phase9PulsarSourceLockCheck") {
+    group = "verification"
+    description =
+        "Verify the exact clean Pulsar 5.0.0-M1 Nereus fork consumed by the inherited F9 foundation."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-pulsar-source-lock.sh",
+        pulsarCheckoutPath.get(),
+        phase9PulsarExpectedHead,
+    )
+}
+
+tasks.register<Exec>("phase9SourceLockCheck") {
+    group = "verification"
+    description = "Verify the F9 AutoMQ reference and current Nereus ranged-foundation source locks."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase9-source-lock.sh",
+        autoMqCheckoutPath.get(),
+        "1c648d84819d5c3fef2af585f02149c397584870",
+        "3.9.0-SNAPSHOT",
+    )
+}
+
+val kafkaBaselineCheckoutPath = providers.gradleProperty("kafkaCheckout")
+    .orElse(providers.environmentVariable("NEREUS_KAFKA_CHECKOUT"))
+    .orElse(layout.projectDirectory.dir("../kafka").asFile.absolutePath)
+
+val kafkaForkCheckoutPath = providers.gradleProperty("kafkaForkCheckout")
+    .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+    .orElse(layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+
+tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
+    group = "verification"
+    description = "Verify the clean local Apache Kafka source baseline used for the F9-M3 fork probe."
+    usesService(kafkaCheckoutGate)
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase9-kafka-baseline-source-lock.sh",
+        kafkaBaselineCheckoutPath.get(),
+        "427b409cf440f745ad6195673d3342f6bd3974d4",
+        "4.3.0-SNAPSHOT",
+    )
+}
+
+tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
+    group = "verification"
+    description =
+        "Verify the local organization-fork F9 branch, exact bridge/recovery/metadata-lifecycle commits, markers, and source blobs."
+    usesService(kafkaCheckoutGate)
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase9-kafka-fork-development-source-lock.sh",
+        kafkaForkCheckoutPath.get(),
+        "76f62f3b83e882105219b6c7687dbde594a8b8a2",
+        "427b409cf440f745ad6195673d3342f6bd3974d4",
+        "c300006a7705c240642db6950b5a95fec982bfc5",
+        "4.3.0-SNAPSHOT",
+    )
+}
+
+val phase9PublishedModules = listOf(
+    ":nereus-api",
+    ":nereus-core",
+    ":nereus-metadata-oxia",
+    ":nereus-object-store",
+    ":nereus-materialization",
+    ":nereus-bookkeeper",
+    ":nereus-kafka-adapter",
+)
+
+tasks.register<DevelopmentCoordinateVerificationTask>("publishPhase9DevelopmentArtifacts") {
+    group = "verification"
+    description = "Publish the exact Nereus F9 development coordinate for the Kafka fork gate."
+    dependsOn(phase9PublishedModules.map { "$it:publishAllPublicationsToDevelopmentRepository" })
+    actualVersion.set(version.toString())
+    expectedVersion.set(phase9DevelopmentVersion)
+}
+
+val phase9DevelopmentRepository = layout.buildDirectory.dir("development-repository")
+val kafkaForkGradleWrapper = file(kafkaForkCheckoutPath.get()).resolve("gradlew").absolutePath
+
+tasks.register<Exec>("phase9M6KafkaProcessRuntime") {
+    group = "verification"
+    description = "Build the exact Nereus-enabled Kafka release distribution used by the provider-backed F9 gate."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    dependsOn("publishPhase9DevelopmentArtifacts")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":core:releaseTarGz",
+        "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
+        "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
+    )
+}
+
+tasks.register<Exec>("phase9M3KafkaForkStockCheck") {
+    group = "verification"
+    description =
+        "Compile and test the stock Kafka ListOffsets, metadata lifecycle, and inert configuration seams with no Nereus artifact inputs."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":server:checkstyleMain",
+        ":server:checkstyleTest",
+        ":server:spotbugsMain",
+        ":server:test",
+        "--tests",
+        "org.apache.kafka.server.config.NereusKafkaStorageConfigTest",
+        "--tests",
+        "org.apache.kafka.server.KRaftClusterTest.testCreateClusterAndRestartBrokerNode",
+        ":storage:checkstyleMain",
+        ":storage:spotbugsMain",
+        ":core:compileScala",
+        ":core:checkstyleMain",
+        ":core:checkstyleTest",
+        ":core:spotbugsMain",
+        ":core:test",
+        "--tests",
+        "kafka.server.KafkaConfigTest",
+        "--tests",
+        "kafka.server.NereusKafkaConfigValidatorTest",
+        "--tests",
+        "kafka.server.storage.BrokerStorageRuntimeFactoryTest",
+        "--tests",
+        "kafka.cluster.PartitionTest.testLeaderEpochAwareOffsetLookup*",
+        "--tests",
+        "kafka.cluster.PartitionTest.testAuthoritativeAppendPreservesRequiredAcks",
+        "--tests",
+        "kafka.server.ReplicaManagerTest.testApplyDeltaPreparesOnlyNewLeaderAfterPartitionStatePublication",
+        "--tests",
+        "kafka.server.ReplicaManagerTest.testStorageAppendExecutorDefersAppendAndCallbacksUntilOwnedWorkCompletes",
+        "--tests",
+        "kafka.server.ReplicaManagerTest.testStorageFetchExecutorOwnsStockReadWaveAndDefersResponse",
+        "--tests",
+        "kafka.server.metadata.BrokerMetadataPublisherTest",
+    )
+}
+
+tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
+    group = "verification"
+    description = "Run the Kafka fork ListOffsets and async metadata-lifecycle tests against isolated F9 artifacts."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    dependsOn("publishPhase9DevelopmentArtifacts")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":server:checkstyleMain",
+        ":server:checkstyleTest",
+        ":server:spotbugsMain",
+        ":server:test",
+        "--tests",
+        "org.apache.kafka.server.config.NereusKafkaStorageConfigTest",
+        "--tests",
+        "org.apache.kafka.server.KRaftClusterTest.testCreateClusterAndRestartBrokerNode",
+        ":storage:checkstyleMain",
+        ":storage:spotbugsMain",
+        ":core:spotlessCheck",
+        ":core:checkstyleMain",
+        ":core:checkstyleTest",
+        ":core:spotbugsMain",
+        ":core:test",
+        "--tests",
+        "kafka.server.KafkaConfigTest",
+        "--tests",
+        "kafka.server.NereusKafkaConfigValidatorTest",
+        "--tests",
+        "kafka.server.storage.BrokerStorageRuntimeFactoryTest",
+        "--tests",
+        "kafka.log.nereus.*Test",
+        "--tests",
+        "kafka.server.nereus.*Test",
+        "--tests",
+        "kafka.cluster.PartitionTest.testLeaderEpochAwareOffsetLookup*",
+        "--tests",
+        "kafka.cluster.PartitionTest.testAuthoritativeAppendPreservesRequiredAcks",
+        "--tests",
+        "kafka.server.ReplicaManagerTest.testApplyDeltaPreparesOnlyNewLeaderAfterPartitionStatePublication",
+        "--tests",
+        "kafka.server.ReplicaManagerTest.testStorageAppendExecutorDefersAppendAndCallbacksUntilOwnedWorkCompletes",
+        "--tests",
+        "kafka.server.ReplicaManagerTest.testStorageFetchExecutorOwnsStockReadWaveAndDefersResponse",
+        "--tests",
+        "kafka.server.metadata.BrokerMetadataPublisherTest",
+        "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
+        "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
+    )
+}
+
+tasks.register<Exec>("phase9M5KafkaRetentionOracleCheck") {
+    group = "verification"
+    description =
+        "Compare Nereus time, size, combined, high-watermark, and compact-only retention boundaries with stock UnifiedLog."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    dependsOn("publishPhase9DevelopmentArtifacts")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":core:spotlessCheck",
+        ":core:checkstyleTest",
+        ":core:test",
+        "--tests",
+        "kafka.log.nereus.KafkaRetentionOracleTest",
+        "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
+        "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
+    )
+}
+
+tasks.register<Exec>("phase9M5KafkaCompactionOracleCheck") {
+    group = "verification"
+    description =
+        "Compare Nereus compaction survivors and exact Kafka batch metadata with stock LogCleaner."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    dependsOn("publishPhase9DevelopmentArtifacts")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":core:spotlessCheck",
+        ":core:checkstyleTest",
+        ":core:test",
+        "--tests",
+        "kafka.log.nereus.KafkaCompactionOracleTest",
+        "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
+        "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
+    )
+}
+
+tasks.register<Exec>("phase9M6KafkaFeatureServerCommonCheck") {
+    group = "verification"
+    description = "Verify the opt-in nereus.storage.version definition and stock feature-set isolation."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":server-common:test",
+        "--tests",
+        "org.apache.kafka.server.common.FeatureTest",
+    )
+}
+
+tasks.register<Exec>("phase9M6KafkaFeatureServerCheck") {
+    group = "verification"
+    description = "Verify broker feature advertisement is enabled only for Nereus storage processes."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":server:test",
+        "--tests",
+        "org.apache.kafka.server.BrokerFeaturesTest",
+    )
+}
+
+tasks.register<Exec>("phase9M6KafkaFeatureMetadataCheck") {
+    group = "verification"
+    description = "Verify controller feature finalization and RF/minISR/ISR/reassignment/directory enforcement."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":metadata:test",
+        "--tests",
+        "org.apache.kafka.controller.FeatureControlManagerTest",
+        "--tests",
+        "org.apache.kafka.controller.QuorumFeaturesTest",
+        "--tests",
+        "org.apache.kafka.controller.ConfigurationControlManagerTest",
+        "--tests",
+        "org.apache.kafka.controller.ReplicationControlManagerTest",
+    )
+}
+
+tasks.register<Exec>("phase9M6KafkaFeatureCoreCheck") {
+    group = "verification"
+    description =
+        "Verify dedicated-controller admission, explicit storage formatting, and feature-gated activation scheduling."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    dependsOn("publishPhase9DevelopmentArtifacts")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":core:test",
+        "--tests",
+        "kafka.server.NereusKafkaConfigValidatorTest",
+        "--tests",
+        "kafka.tools.StorageToolTest",
+        "--tests",
+        "kafka.server.nereus.NereusControllerStorageRuntimeTest",
+        "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
+        "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
+    )
+}
+
+tasks.register<Exec>("phase9KafkaForkCompatibilityCheck") {
+    group = "verification"
+    description =
+        "Run current-fork ApiVersions, Produce, Fetch, Admin, consumer-group, and transaction compatibility suites."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":clients:test",
+        "--tests",
+        "org.apache.kafka.clients.NodeApiVersionsTest",
+        "--tests",
+        "org.apache.kafka.clients.producer.KafkaProducerTest.testOverwriteAcksAndRetriesForIdempotentProducers",
+        "--tests",
+        "org.apache.kafka.clients.consumer.KafkaConsumerTest.testPollReturnsRecords",
+        "--tests",
+        "org.apache.kafka.clients.admin.KafkaAdminClientTest.testCreateTopics",
+        "--tests",
+        "org.apache.kafka.clients.admin.KafkaAdminClientTest.testListOffsets",
+        ":core:test",
+        "--tests",
+        "kafka.api.TransactionsTest.testBasicTransactions",
+        "--tests",
+        "kafka.api.GroupCoordinatorIntegrationTest.testGroupCoordinatorPropagatesOffsetsTopicCompressionCodec",
+        "--rerun-tasks",
+    )
+}
+
+tasks.register("phase9M6KafkaFeatureCheck") {
+    group = "verification"
+    description = "Run the deterministic F9 Kafka durable feature and controller policy gate."
+    dependsOn("phase9M6KafkaFeatureServerCommonCheck")
+    dependsOn("phase9M6KafkaFeatureServerCheck")
+    dependsOn("phase9M6KafkaFeatureMetadataCheck")
+    dependsOn("phase9M6KafkaFeatureCoreCheck")
+}
+
+tasks.register("phase9M6KafkaProcessCheck") {
+    group = "verification"
+    description =
+        "Run real Oxia + LocalStack + BookKeeper cold-restart, broker/controller takeover, and in-flight fencing acceptance."
+    dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9CheckpointTrimRecoveryProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9DeleteRecordsBoundaryProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9TrimResponseLossProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9TrimProfileMatrixProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9CoordinatorMigrationProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9OngoingTransactionMigrationProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9TransactionResolutionCutProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9TransactionResolutionProfileMatrixProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9MandatoryInternalTopicNtc2ProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9MandatoryInternalTopicNtc2ProfileMatrixProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9MultiControllerFailoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9ActivationCutFailoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9ActivationProofCutFailoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9ActivationTransportRecoveryProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9InFlightTakeoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperProfileTakeoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperInFlightTakeoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalAsyncObjectProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalSyncObjectProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9ObjectWalAsyncObjectProcessIntegrationTest")
+}
+
+tasks.register("phase9M6KafkaBookKeeperProcessCheck") {
+    group = "verification"
+    description =
+        "Run focused real BookKeeper three-profile cold-restart, deletion, live-takeover, and in-flight fencing gates."
+    dependsOn(":nereus-kafka-adapter:f9TrimProfileMatrixProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperProfileTakeoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperInFlightTakeoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalAsyncObjectProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalSyncObjectProcessIntegrationTest")
+}
+
+tasks.register("phase9M6KafkaObjectAsyncProcessCheck") {
+    group = "verification"
+    description = "Run the focused async Object-WAL native Kafka cold-restart process gate."
+    dependsOn(":nereus-kafka-adapter:f9ObjectWalAsyncObjectProcessIntegrationTest")
+}
+
+tasks.register("phase9M3KafkaForkCheck") {
+    group = "verification"
+    description = "Run the partial F9-M3 Nereus adapter and local Kafka-fork bridge gates."
+    dependsOn("phase9M3ProviderCheck")
+    dependsOn("phase9M3KafkaForkStockCheck")
+    dependsOn("phase9M3KafkaForkBridgeCheck")
+}
+
+tasks.register("phase9M1ApiCheck") {
+    group = "verification"
+    description = "Run the in-progress F9-M1 public ranged-entry API slice and scenario-manifest gate."
+    dependsOn("checkPhase9ScenarioManifest")
+    dependsOn(":nereus-api:test")
+}
+
+tasks.register("phase9M1Check") {
+    group = "verification"
+    description = "Run the complete deterministic F9-M1 ranged-entry and NCP2/NTC2 foundation gate."
+    dependsOn("phase9M1ApiCheck")
+    dependsOn("phase9SourceLockCheck")
+    dependsOn(":nereus-core:rangedEntryTest")
+    dependsOn(":nereus-object-store:rangedFormatTest")
+    dependsOn(":nereus-bookkeeper:rangedBookKeeperIntegrationTest")
+    dependsOn(":nereus-materialization:test")
+}
+
+tasks.register("phase9M1FinalCheck") {
+    group = "verification"
+    description = "Run F9-M1 plus inherited protocol-neutral regression and real-object-store gates."
+    dependsOn("phase9M1Check")
+    dependsOn("phase9PulsarSourceLockCheck")
+    dependsOn("phase1FinalCheck")
+    dependsOn("phase15FinalCheck")
+    dependsOn(":nereus-managed-ledger:test")
+    dependsOn(":nereus-materialization:test")
+    dependsOn(":nereus-bookkeeper:test")
+    dependsOn(":nereus-object-store:rangedFormatS3IntegrationTest")
+}
+
+tasks.register("phase9M2Check") {
+    group = "verification"
+    description = "Run deterministic F9-M2 authority, binding, NKC1 publication, and recovery gates."
+    dependsOn("phase9M1Check")
+    dependsOn(":nereus-metadata-oxia:f9MetadataTest")
+    dependsOn(":nereus-object-store:kafkaCheckpointTest")
+    dependsOn(":nereus-kafka-adapter:f9M2Test")
+}
+
+tasks.register("phase9M2FinalCheck") {
+    group = "verification"
+    description = "Run F9-M2 plus inherited and real Oxia/Object-store checkpoint acceptance gates."
+    dependsOn("phase9M2Check")
+    dependsOn("phase9M1FinalCheck")
+    dependsOn(":nereus-metadata-oxia:f9OxiaIntegrationTest")
+    dependsOn(":nereus-object-store:kafkaCheckpointS3IntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9M2IntegrationTest")
+}
+
+tasks.register("phase9M3CodecCheck") {
+    group = "verification"
+    description = "Run the partial F9-M3 Kafka baseline and byte-exact adapter codec gate."
+    dependsOn("phase9M2Check")
+    dependsOn("phase9KafkaBaselineSourceLockCheck")
+    dependsOn(":nereus-kafka-adapter:f9M3CodecTest")
+}
+
+tasks.register("phase9M3ProviderCheck") {
+    group = "verification"
+    description =
+        "Run the partial F9-M3 provider-backed Object-WAL, live two-broker takeover, and BookKeeper-WAL-only gates."
+    dependsOn("phase9M3CodecCheck")
+    dependsOn(":nereus-kafka-adapter:f9M3ProviderIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProviderIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProviderIntegrationTest")
+}
+
+tasks.register("phase9M4ProducerStateCheck") {
+    group = "verification"
+    description = "Run the partial F9-M4 canonical state checkpoint gate."
+    dependsOn("phase9M3ProviderCheck")
+    dependsOn(":nereus-kafka-adapter:f9ProducerStatePropertyTest")
+}
+
+tasks.register("phase9M5RetentionCheck") {
+    group = "verification"
+    description = "Run the partial F9-M5 retention, DeleteRecords, and checkpoint-before-trim gate."
+    dependsOn("phase9M4ProducerStateCheck")
+    dependsOn("phase9M5KafkaRetentionOracleCheck")
+    dependsOn(":nereus-kafka-adapter:f9RetentionTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperLedgerDeletionProviderIntegrationTest")
+}
+
+tasks.register("phase9M5CompactionCoreCheck") {
+    group = "verification"
+    description = "Run the partial F9-M5 authoritative-source, Kafka compaction, and NTC2 gate."
+    dependsOn("phase9M5RetentionCheck")
+    dependsOn("phase9M5KafkaCompactionOracleCheck")
+    dependsOn(":nereus-materialization:f9ExactSourceSetTest")
+    dependsOn(":nereus-kafka-adapter:f9CompactionPropertyTest")
+}
+
+tasks.register("phase9M6ActivationMetadataCheck") {
+    group = "verification"
+    description = "Run partial F9-M6 activation metadata, broker publication, admission, and real-Oxia gates."
+    dependsOn("phase9M2Check")
+    dependsOn(":nereus-kafka-adapter:f9ActivationTest")
+    dependsOn(":nereus-metadata-oxia:f9ActivationOxiaIntegrationTest")
+}
+
+tasks.register("phase9M6CheckpointQuarantineCheck") {
+    group = "verification"
+    description =
+        "Verify durable F9 checkpoint quarantine metadata, fallback ordering, restart skip, and runtime composition."
+    dependsOn("checkPhase9ScenarioManifest")
+    dependsOn(":nereus-metadata-oxia:f9MetadataTest")
+    dependsOn(":nereus-metadata-oxia:f9OxiaIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9CheckpointQuarantineTest")
+}
+
+tasks.register("phase9ScaleCheck") {
+    group = "verification"
+    description =
+        "Run the F9-M7 binding, partition, IO, ranged-count, and materialization scale boundaries."
+    dependsOn("checkPhase9ScenarioManifest")
+    dependsOn("phase9SourceLockCheck")
+    dependsOn(":nereus-api:f9RangedCountLimitTest")
+    dependsOn(":nereus-metadata-oxia:f9BindingScaleOxiaIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9PartitionScaleTest")
+    dependsOn(":nereus-kafka-adapter:f9IoConcurrencyStressTest")
+    dependsOn(":nereus-kafka-adapter:f9MaterializationScaleTest")
+}
+
+tasks.register("phase9ChaosCheck") {
+    group = "verification"
+    description =
+        "Run the implemented F9-M7 leader-churn and Oxia/Object/BookKeeper response-loss matrix."
+    dependsOn("checkPhase9ScenarioManifest")
+    dependsOn("phase9SourceLockCheck")
+    dependsOn(":nereus-kafka-adapter:f9LeaderChurnChaosProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9ActivationTransportRecoveryProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9TrimResponseLossProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9TrimProfileMatrixProcessIntegrationTest")
+}
+
+tasks.register("phase9CompatibilityCheck") {
+    group = "verification"
+    description =
+        "Run the F9-M7 multi-version client process contract and current Kafka fork compatibility suites."
+    dependsOn("checkPhase9ScenarioManifest")
+    dependsOn("phase9SourceLockCheck")
+    dependsOn("phase9KafkaForkCompatibilityCheck")
+    dependsOn(":nereus-kafka-adapter:f9ClientCompatibilityProcessIntegrationTest")
+}
+
+tasks.register("phase9PerformanceCheck") {
+    group = "verification"
+    description =
+        "Run the F9-M7 observation-only five-profile performance and fresh-cache recovery evidence gate."
+    dependsOn("checkPhase9ScenarioManifest")
+    dependsOn("phase9SourceLockCheck")
+    dependsOn(":nereus-kafka-adapter:f9PerformanceProfileProcessIntegrationTest")
+}
+
+tasks.register("phase9M3FinalCheck") {
+    group = "verification"
+    description =
+        "Run the complete F9-M3 product, provider, Kafka-fork, and release-process Produce/Fetch gate."
+    dependsOn("phase9M2FinalCheck")
+    dependsOn("phase9M3KafkaForkCheck")
+    dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalAsyncObjectProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9BookKeeperWalSyncObjectProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9ObjectWalAsyncObjectProcessIntegrationTest")
+}
+
+tasks.register("phase9M4FinalCheck") {
+    group = "verification"
+    description =
+        "Run the complete F9-M4 checkpoint, producer-state, transaction, coordinator, and profile gate."
+    dependsOn("phase9M3FinalCheck")
+    dependsOn("phase9M4ProducerStateCheck")
+    dependsOn("phase9M6KafkaProcessCheck")
+    dependsOn("phase9KafkaForkCompatibilityCheck")
+}
+
+tasks.register("phase9M5FinalCheck") {
+    group = "verification"
+    description =
+        "Run the complete F9-M5 retention, compaction, provider response-loss, and restart gate."
+    dependsOn("phase9M4FinalCheck")
+    dependsOn("phase9M5CompactionCoreCheck")
+    dependsOn("phase9ChaosCheck")
+}
+
+tasks.register("phase9M6FinalCheck") {
+    group = "verification"
+    description =
+        "Run the complete F9-M6 activation, configuration, quarantine, fork-feature, and process gate."
+    dependsOn("phase9M5FinalCheck")
+    dependsOn("phase9M6ActivationMetadataCheck")
+    dependsOn("phase9M6CheckpointQuarantineCheck")
+    dependsOn("phase9M6KafkaFeatureCheck")
+    dependsOn("phase9M6KafkaProcessCheck")
+}
+
+tasks.register("phase9M7Check") {
+    group = "verification"
+    description =
+        "Run every F9-M7 scale, chaos, compatibility, and observation-only performance slice."
+    dependsOn("phase9ScaleCheck")
+    dependsOn("phase9ChaosCheck")
+    dependsOn("phase9CompatibilityCheck")
+    dependsOn("phase9PerformanceCheck")
+}
+
+val phase9PreEvidence =
+    layout.buildDirectory.file("f9-final-evidence/pre-evidence.json")
+val phase9FinalEvidence =
+    layout.buildDirectory.file("f9-final-evidence/final-report.json")
+
+val phase9PrepareFinalEvidence =
+    tasks.register<Exec>("phase9PrepareFinalEvidence") {
+        group = "verification"
+        description =
+            "Verify every F9 predecessor ran fresh and write the exact source/artifact input for KF-SCL-010."
+        dependsOn("phase9M1FinalCheck")
+        dependsOn("phase9M2FinalCheck")
+        dependsOn("phase9M3FinalCheck")
+        dependsOn("phase9M4FinalCheck")
+        dependsOn("phase9M5FinalCheck")
+        dependsOn("phase9M6FinalCheck")
+        dependsOn("phase9M7Check")
+        workingDir = layout.projectDirectory.asFile
+        commandLine(
+            "bash",
+            "scripts/prepare-phase9-final-evidence.sh",
+            layout.projectDirectory.asFile.absolutePath,
+            autoMqCheckoutPath.get(),
+            kafkaForkCheckoutPath.get(),
+            pulsarCheckoutPath.get(),
+            phase9PreEvidence.get().asFile.absolutePath,
+            gradle.startParameter.isRerunTasks.toString(),
+        )
+        inputs.file("scripts/prepare-phase9-final-evidence.sh")
+        inputs.file("docs/phase-9-kafka-native-storage/f9-scenarios.json")
+        inputs.file("docs/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md")
+        outputs.file(phase9PreEvidence)
+        outputs.upToDateWhen { false }
+    }
+
+gradle.projectsEvaluated {
+    project(":nereus-kafka-adapter")
+        .tasks
+        .named("f9EvidenceAggregatorTest") {
+            dependsOn(phase9PrepareFinalEvidence)
+        }
+}
+
+val phase9FinalEvidenceReport =
+    tasks.register<Exec>("phase9FinalEvidenceReport") {
+        group = "verification"
+        description =
+            "Verify 146 unique KF-SCL-010 JUnit mappings and write the deterministic final F9 evidence report."
+        dependsOn(":nereus-kafka-adapter:f9EvidenceAggregatorTest")
+        workingDir = layout.projectDirectory.asFile
+        commandLine(
+            "bash",
+            "scripts/finalize-phase9-evidence.sh",
+            layout.projectDirectory.asFile.absolutePath,
+            phase9PreEvidence.get().asFile.absolutePath,
+            layout.projectDirectory
+                .dir(
+                    "nereus-kafka-adapter/build/test-results/"
+                            + "f9EvidenceAggregatorTest",
+                )
+                .asFile
+                .absolutePath,
+            phase9FinalEvidence.get().asFile.absolutePath,
+        )
+        inputs.file("scripts/finalize-phase9-evidence.sh")
+        inputs.file(phase9PreEvidence)
+        inputs.dir(
+            layout.projectDirectory.dir(
+                "nereus-kafka-adapter/build/test-results/"
+                        + "f9EvidenceAggregatorTest",
+            ),
+        )
+        outputs.file(phase9FinalEvidence)
+        outputs.upToDateWhen { false }
+    }
+
+tasks.register("phase9M7FinalCheck") {
+    group = "verification"
+    description =
+        "Run every F9-M7 slice and the 146-scenario exact-source evidence aggregator."
+    dependsOn("phase9M7Check")
+    dependsOn(phase9FinalEvidenceReport)
+}
+
+tasks.register("phase9FinalCheck") {
+    group = "verification"
+    description =
+        "Run the clean F9-M1 through F9-M7 release aggregate; this is the only F9 completion claim."
+    dependsOn("phase9M1FinalCheck")
+    dependsOn("phase9M2FinalCheck")
+    dependsOn("phase9M3FinalCheck")
+    dependsOn("phase9M4FinalCheck")
+    dependsOn("phase9M5FinalCheck")
+    dependsOn("phase9M6FinalCheck")
+    dependsOn("phase9M7FinalCheck")
 }

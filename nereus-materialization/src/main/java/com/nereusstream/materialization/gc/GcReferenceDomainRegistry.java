@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.ErrorCode;
@@ -19,7 +20,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Exact bounded local reference-domain registry used by GC discovery and drain revalidation. */
+/**
+ * Exact bounded local reference-domain registry used by GC discovery and drain revalidation.
+ */
 public final class GcReferenceDomainRegistry {
     private final PhysicalGcConfig config;
     private final ScheduledExecutorService scheduler;
@@ -28,9 +31,7 @@ public final class GcReferenceDomainRegistry {
     private final List<GcReferenceDomainVersion> requiredDomains;
 
     public GcReferenceDomainRegistry(
-            PhysicalGcConfig config,
-            ScheduledExecutorService scheduler,
-            List<GcReferenceDomain> domains) {
+            PhysicalGcConfig config, ScheduledExecutorService scheduler, List<GcReferenceDomain> domains) {
         this.config = Objects.requireNonNull(config, "config");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         List<RegisteredDomain> registered = Objects.requireNonNull(domains, "domains").stream()
@@ -47,9 +48,10 @@ public final class GcReferenceDomainRegistry {
             }
         }
         this.domains = registered;
-        this.byId = registered.stream().collect(Collectors.toUnmodifiableMap(
-                domain -> domain.version().domainId(), Function.identity()));
-        this.requiredDomains = registered.stream().map(RegisteredDomain::version).toList();
+        this.byId = registered.stream()
+                .collect(Collectors.toUnmodifiableMap(domain -> domain.version().domainId(), Function.identity()));
+        this.requiredDomains =
+                registered.stream().map(RegisteredDomain::version).toList();
     }
 
     public List<GcReferenceDomainVersion> requiredDomains() {
@@ -80,8 +82,8 @@ public final class GcReferenceDomainRegistry {
     public CompletableFuture<Boolean> stillMatches(GcReferenceCollection collection) {
         Objects.requireNonNull(collection, "collection");
         if (!collection.clear()) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "only a CLEAR reference collection can be revalidated"));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("only a CLEAR reference collection can be revalidated"));
         }
         requireExactRegisteredSet(collection.snapshots());
         MaterializationDeadline deadline = new MaterializationDeadline(config.operationTimeout(), scheduler);
@@ -90,13 +92,12 @@ public final class GcReferenceDomainRegistry {
         return result;
     }
 
-    CompletableFuture<Boolean> stillMatches(
-            GcReferenceCollection collection, MaterializationDeadline deadline) {
+    CompletableFuture<Boolean> stillMatches(GcReferenceCollection collection, MaterializationDeadline deadline) {
         Objects.requireNonNull(collection, "collection");
         Objects.requireNonNull(deadline, "deadline");
         if (!collection.clear()) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException(
-                    "only a CLEAR reference collection can be revalidated"));
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("only a CLEAR reference collection can be revalidated"));
         }
         requireExactRegisteredSet(collection.snapshots());
         return revalidate(collection.query(), collection.snapshots(), 0, deadline);
@@ -108,11 +109,8 @@ public final class GcReferenceDomainRegistry {
             int index,
             MaterializationDeadline deadline) {
         if (index == domains.size()) {
-            return CompletableFuture.completedFuture(new GcReferenceCollection(
-                    query,
-                    snapshots,
-                    GcReferenceCollectionStatus.CLEAR,
-                    Optional.empty()));
+            return CompletableFuture.completedFuture(
+                    new GcReferenceCollection(query, snapshots, GcReferenceCollectionStatus.CLEAR, Optional.empty()));
         }
         RegisteredDomain registered = domains.get(index);
         return deadline.bound(
@@ -123,21 +121,15 @@ public final class GcReferenceDomainRegistry {
                     snapshots.add(snapshot);
                     GcReferenceCollectionStatus blocker = blocker(snapshot);
                     if (blocker != null) {
-                        return CompletableFuture.completedFuture(new GcReferenceCollection(
-                                query,
-                                snapshots,
-                                blocker,
-                                Optional.of(snapshot.domainId())));
+                        return CompletableFuture.completedFuture(
+                                new GcReferenceCollection(query, snapshots, blocker, Optional.of(snapshot.domainId())));
                     }
                     return collect(query, snapshots, index + 1, deadline);
                 });
     }
 
     private CompletableFuture<Boolean> revalidate(
-            GcReferenceQuery query,
-            List<GcReferenceSnapshot> snapshots,
-            int index,
-            MaterializationDeadline deadline) {
+            GcReferenceQuery query, List<GcReferenceSnapshot> snapshots, int index, MaterializationDeadline deadline) {
         if (index == snapshots.size()) {
             return CompletableFuture.completedFuture(true);
         }
@@ -148,8 +140,8 @@ public final class GcReferenceDomainRegistry {
                         "revalidate GC reference domain " + snapshot.domainId())
                 .thenCompose(matches -> {
                     if (matches == null) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "reference domain returned a null stillMatches result"));
+                        return CompletableFuture.failedFuture(
+                                invariant("reference domain returned a null stillMatches result"));
                     }
                     return matches
                             ? revalidate(query, snapshots, index + 1, deadline)
@@ -182,9 +174,7 @@ public final class GcReferenceDomainRegistry {
     }
 
     private static void requireExactSnapshot(
-            RegisteredDomain registered,
-            GcReferenceQuery query,
-            GcReferenceSnapshot snapshot) {
+            RegisteredDomain registered, GcReferenceQuery query, GcReferenceSnapshot snapshot) {
         if (snapshot == null
                 || !registered.matches(snapshot)
                 || !snapshot.queryIdentitySha256().equals(query.queryIdentitySha256())) {
@@ -196,9 +186,7 @@ public final class GcReferenceDomainRegistry {
         return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
-    private record RegisteredDomain(
-            GcReferenceDomain domain,
-            GcReferenceDomainVersion version) {
+    private record RegisteredDomain(GcReferenceDomain domain, GcReferenceDomainVersion version) {
         private RegisteredDomain(GcReferenceDomain domain) {
             this(
                     Objects.requireNonNull(domain, "domain"),

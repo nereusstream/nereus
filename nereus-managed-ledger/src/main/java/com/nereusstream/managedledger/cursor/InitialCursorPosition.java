@@ -1,13 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
-/** Internal non-null initial durable cursor position selected by the ManagedLedger facade. */
+/**
+ * Internal non-null initial durable cursor position selected by the ManagedLedger facade.
+ */
 public sealed interface InitialCursorPosition {
-    record Earliest() implements InitialCursorPosition {
-    }
+    record Earliest() implements InitialCursorPosition {}
 
-    record Latest() implements InitialCursorPosition {
-    }
+    record Latest() implements InitialCursorPosition {}
 
     record AtOffset(long nextReadOffset) implements InitialCursorPosition {
         public AtOffset {

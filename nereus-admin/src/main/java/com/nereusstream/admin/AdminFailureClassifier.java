@@ -9,13 +9,11 @@ import java.util.concurrent.TimeoutException;
 
 final class AdminFailureClassifier {
 
-    private AdminFailureClassifier() {
-    }
+    private AdminFailureClassifier() {}
 
     static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while ((current instanceof ExecutionException
-                        || current instanceof CompletionException)
+        while ((current instanceof ExecutionException || current instanceof CompletionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -25,8 +23,7 @@ final class AdminFailureClassifier {
     static AdminExitCode classify(Throwable failure, AdminExitCode fallback) {
         Throwable cause = unwrap(failure);
         if (cause instanceof TimeoutException
-                || (cause instanceof NereusException nereus
-                        && nereus.code() == ErrorCode.TIMEOUT)) {
+                || (cause instanceof NereusException nereus && nereus.code() == ErrorCode.TIMEOUT)) {
             return AdminExitCode.TIMEOUT;
         }
         return fallback;
@@ -35,8 +32,6 @@ final class AdminFailureClassifier {
     static String safeMessage(Throwable failure) {
         Throwable cause = unwrap(failure);
         String message = cause.getMessage();
-        return message == null || message.isBlank()
-                ? cause.getClass().getSimpleName()
-                : message;
+        return message == null || message.isBlank() ? cause.getClass().getSimpleName() : message;
     }
 }

@@ -10,13 +10,13 @@
 `nereus-metadata-oxia` 不应该成为独立的产品 Future。它是横切基础设施模块，服务多个
 Future：
 
-| Future | Uses `nereus-metadata-oxia` for |
-| --- | --- |
-| Future 1 | stream metadata、append session、offset index、trim、object manifest |
-| Future 3 | cursor state、ack range small state、cursor snapshot reference |
-| Future 4 | generation replacement、compaction task/checkpoint、GC references |
-| Future 6 | SBT/SDT state、repair state、catalog snapshot references |
-| Future 7 | broker session、routing ring、brown-out state、watch invalidation |
+| Future   | Uses `nereus-metadata-oxia` for                                                                          |
+|----------|----------------------------------------------------------------------------------------------------------|
+| Future 1 | stream metadata、append session、offset index、trim、object manifest                                         |
+| Future 3 | cursor state、ack range small state、cursor snapshot reference                                             |
+| Future 4 | generation replacement、compaction task/checkpoint、GC references                                          |
+| Future 6 | SBT/SDT state、repair state、catalog snapshot references                                                   |
+| Future 7 | broker session、routing ring、brown-out state、watch invalidation                                           |
 | Future 8 | advanced Pulsar state such as delayed index, transaction/pending-ack references, schema/system bootstrap |
 
 Each Future owns its own metadata schema and state machine. `nereus-metadata-oxia` owns the shared Oxia
@@ -55,13 +55,20 @@ branch on fake-only capabilities.
 
 On 2026-07-05, Apache Pulsar `master` contains Oxia support under `pulsar-metadata`:
 
-- [`OxiaMetadataStore.java`](https://github.com/apache/pulsar/blob/master/pulsar-metadata/src/main/java/org/apache/pulsar/metadata/impl/oxia/OxiaMetadataStore.java)
-- [`OxiaMetadataStoreProvider.java`](https://github.com/apache/pulsar/blob/master/pulsar-metadata/src/main/java/org/apache/pulsar/metadata/impl/oxia/OxiaMetadataStoreProvider.java)
-- [`MetadataStoreFactoryImpl.java`](https://github.com/apache/pulsar/blob/master/pulsar-metadata/src/main/java/org/apache/pulsar/metadata/impl/MetadataStoreFactoryImpl.java)
-- [`MetadataStoreTest.java`](https://github.com/apache/pulsar/blob/master/pulsar-metadata/src/test/java/org/apache/pulsar/metadata/MetadataStoreTest.java)
-- [`OxiaPartitionKeyTest.java`](https://github.com/apache/pulsar/blob/master/pulsar-metadata/src/test/java/org/apache/pulsar/metadata/OxiaPartitionKeyTest.java)
-- [`OxiaSequenceKeysTest.java`](https://github.com/apache/pulsar/blob/master/pulsar-metadata/src/test/java/org/apache/pulsar/metadata/OxiaSequenceKeysTest.java)
-- [`OxiaSmokeTest.java`](https://github.com/apache/pulsar/blob/master/tests/integration/src/test/java/org/apache/pulsar/tests/integration/oxia/OxiaSmokeTest.java)
+- [
+  `OxiaMetadataStore.java`](https://github.com/apache/pulsar/blob/master/pulsar-metadata/src/main/java/org/apache/pulsar/metadata/impl/oxia/OxiaMetadataStore.java)
+- [
+  `OxiaMetadataStoreProvider.java`](https://github.com/apache/pulsar/blob/master/pulsar-metadata/src/main/java/org/apache/pulsar/metadata/impl/oxia/OxiaMetadataStoreProvider.java)
+- [
+  `MetadataStoreFactoryImpl.java`](https://github.com/apache/pulsar/blob/master/pulsar-metadata/src/main/java/org/apache/pulsar/metadata/impl/MetadataStoreFactoryImpl.java)
+- [
+  `MetadataStoreTest.java`](https://github.com/apache/pulsar/blob/master/pulsar-metadata/src/test/java/org/apache/pulsar/metadata/MetadataStoreTest.java)
+- [
+  `OxiaPartitionKeyTest.java`](https://github.com/apache/pulsar/blob/master/pulsar-metadata/src/test/java/org/apache/pulsar/metadata/OxiaPartitionKeyTest.java)
+- [
+  `OxiaSequenceKeysTest.java`](https://github.com/apache/pulsar/blob/master/pulsar-metadata/src/test/java/org/apache/pulsar/metadata/OxiaSequenceKeysTest.java)
+- [
+  `OxiaSmokeTest.java`](https://github.com/apache/pulsar/blob/master/tests/integration/src/test/java/org/apache/pulsar/tests/integration/oxia/OxiaSmokeTest.java)
 
 Observed Pulsar integration pattern:
 
@@ -122,10 +129,14 @@ runs successfully. Root `phase1Check` only compiles the spike source; it does no
 
 The public Oxia Java client repository surface checked for this decision is:
 
-- [`AsyncOxiaClient.java`](https://github.com/oxia-db/oxia-client-java/blob/main/client-api/src/main/java/io/oxia/client/api/AsyncOxiaClient.java)；
-- [`SyncOxiaClient.java`](https://github.com/oxia-db/oxia-client-java/blob/main/client-api/src/main/java/io/oxia/client/api/SyncOxiaClient.java)；
-- [`PutOption.java`](https://github.com/oxia-db/oxia-client-java/blob/main/client-api/src/main/java/io/oxia/client/api/options/PutOption.java)；
-- [`client.proto`](https://github.com/oxia-db/oxia-client-java/blob/main/client/src/main/proto/io/streamnative/oxia/client.proto)。
+- [
+  `AsyncOxiaClient.java`](https://github.com/oxia-db/oxia-client-java/blob/main/client-api/src/main/java/io/oxia/client/api/AsyncOxiaClient.java)；
+- [
+  `SyncOxiaClient.java`](https://github.com/oxia-db/oxia-client-java/blob/main/client-api/src/main/java/io/oxia/client/api/SyncOxiaClient.java)；
+- [
+  `PutOption.java`](https://github.com/oxia-db/oxia-client-java/blob/main/client-api/src/main/java/io/oxia/client/api/options/PutOption.java)；
+- [
+  `client.proto`](https://github.com/oxia-db/oxia-client-java/blob/main/client/src/main/proto/io/streamnative/oxia/client.proto)。
 
 Observed surface:
 

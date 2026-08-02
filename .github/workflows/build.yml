@@ -1,10 +1,15 @@
 name: Build
+run-name: "Build (${{ github.event_name }})${{ github.event_name == 'push' && format(' - {0}', github.event.head_commit.message) || github.event_name == 'pull_request' && format(' - PR #{0}', github.event.pull_request.number) || '' }}"
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '7/15 * * * *'
+      timezone: 'Asia/Shanghai'
 
 jobs:
   build:
@@ -28,5 +33,7 @@ jobs:
         run: bash scripts/check-pulsar-source-lock.sh "$NEREUS_PULSAR_CHECKOUT" 100d3ef0ff7c7da36d497453b141ddff6f34a9d3
       - name: Check scaffold
         run: ./gradlew checkPhase0
+      - name: Check code style
+        run: ./gradlew spotlessCheck checkstyleMain checkstyleTest
       - name: Build
         run: ./gradlew build

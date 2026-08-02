@@ -391,13 +391,15 @@ snapshot inventory. It creates/verifies exact roots plus commit-owned `REACHABLE
 re-reads registration/projection/stable head/cursor authority and counts a stream covered only if those correctness
 facts are unchanged. A full
 pass with zero failures and the same broker/domain readiness epoch CASes the activation record's live-reference
-data/cursor backfill proofs from the two report digests. New append/snapshot publication creates root/protection before visibility once this epoch begins, so
+data/cursor backfill proofs from the two report digests. New append/snapshot publication creates root/protection before
+visibility once this epoch begins, so
 concurrent new objects are covered by their write hook. Object-store listing is not coverage evidence；unreferenced
 or deleted-incarnation bytes enter the orphan/domain-proof path separately. Any unknown live index/target format
 keeps deletion disabled.
 
 Checkpoint BC adds a second mode for a deletion-active readiness change. `runRollover` freezes the exact old
-activation wrapper and performs the same complete root/protection traversal for the changed opaque epoch token, but does not
+activation wrapper and performs the same complete root/protection traversal for the changed opaque epoch token, but does
+not
 CAS either coverage proof. After exact old-wrapper revalidation, the activation coordinator combines the report with
 the new registration completion and a fresh object-store capability proof, then publishes all three proofs、the scope
 digest and the new epoch in one CAS while both delete bits stay true. This prevents a partial durable epoch from
@@ -930,7 +932,8 @@ the SPI. Affected streams are sorted/unique and capped at 4,096；`REFERENCED_OB
 `CURSOR_SNAPSHOT_CANDIDATE` require at least one, while `OWNERLESS_ORPHAN_CANDIDATE` requires an empty set plus a
 complete domain-wide absence proof. Query identity hashes the exact object、kind、
 candidate-evidence digest and stream set. Evidence is the canonical manifest/reference record when present, otherwise
-the canonical root/listing classification proof. Snapshot lists use canonical `(type/key/version/identity)` order. `complete=false` or
+the canonical root/listing classification proof. Snapshot lists use canonical `(type/key/version/identity)` order.
+`complete=false` or
 any count above configured in-memory limits requires `veto=true`；a domain may stream-hash a larger scan for
 diagnostics but cannot truncate it into permission. `stillMatches(query, snapshot)` receives the full exact query and
 repeats the authoritative scan；no domain may recover scope from a process-local snapshot-to-query cache.
@@ -984,14 +987,14 @@ materialization.
 
 F4 registers：
 
-| Domain | Revalidated authority |
-| --- | --- |
-| `generation-v1` | implemented J affected / T ownerless：both-view exact indexes and DRAINING eligibility |
-| `append-recovery-v1` | implemented J affected / T ownerless：head + optional stable recovery root + complete live tail |
-| `materialization-v1` | implemented J affected / T ownerless：task roots/output/source identities and active-task veto |
-| `projection-generation-v1` | implemented K affected / T ownerless：exact F2 binding/current-topic authority、marker and strict old-incarnation unaddressability proof |
-| `cursor-snapshot-v1` | implemented K affected / T ownerless：exact F3 retention authority + complete paged cursor roots and live-root veto |
-| `future-catalog-sentinel-v1` | implemented T：veto if durable required domain set differs from installed plugins or deletion stage is disabled |
+| Domain                       | Revalidated authority                                                                                                                  |
+|------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `generation-v1`              | implemented J affected / T ownerless：both-view exact indexes and DRAINING eligibility                                                  |
+| `append-recovery-v1`         | implemented J affected / T ownerless：head + optional stable recovery root + complete live tail                                         |
+| `materialization-v1`         | implemented J affected / T ownerless：task roots/output/source identities and active-task veto                                          |
+| `projection-generation-v1`   | implemented K affected / T ownerless：exact F2 binding/current-topic authority、marker and strict old-incarnation unaddressability proof |
+| `cursor-snapshot-v1`         | implemented K affected / T ownerless：exact F3 retention authority + complete paged cursor roots and live-root veto                     |
+| `future-catalog-sentinel-v1` | implemented T：veto if durable required domain set differs from installed plugins or deletion stage is disabled                         |
 
 The durable cluster generation-activation record stores the exact required domain id/version set. Runtime startup
 fails F4 readiness if its registered set differs. Future 6 must atomically add its capability/domain before writing a
@@ -1360,7 +1363,8 @@ later replacement/index/root degradation blocks MARK/DELETE planning.
 Checkpoint R completes the remaining §9.1 source-eligibility branches. `CompletedTrimRetirementVerifier` requires the
 whole source range below the current L0 trim, freezes the exact source、versioned `StreamMetadataSnapshot` authority
 and optional recovery-root wrapper, then rereads all three. The comparison retains the shared Oxia version and every
-persisted exposed fact but excludes hydrated trim reason/read time. Generation-zero uses that proof as the alternative to checkpoint P's
+persisted exposed fact but excludes hydrated trim reason/read time. Generation-zero uses that proof as the alternative
+to checkpoint P's
 healthy NRC1 replacement；higher COMMITTED and TOPIC_COMPACTED sources use it before consulting view-specific
 replacement facts.
 
@@ -1494,7 +1498,8 @@ If the final root-delete response is lost, absence of that exact root key comple
 value is strictly decoded and a different version/identity is never treated as success.
 
 Every writer enforces the other side of this protocol. Before the first PUT and before every provider retry it reloads
-its exact durable append/session, task-claim, checkpoint or cursor owner and requires the physical root to be absent or the
+its exact durable append/session, task-claim, checkpoint or cursor owner and requires the physical root to be absent or
+the
 same `ACTIVE` identity. An absent root is legal only for that current owner. `MARKED/DELETING/DELETED/QUARANTINED`,
 owner absence/version drift or a lost claim aborts the PUT. A later attempt allocates a fresh 128-bit attempt id (and
 for Object WAL a never-reused process-run/sequence identity), hence a fresh object key. This rule, plus the long
@@ -1740,15 +1745,15 @@ metadata scans completed.
 For one complete root pass, `Phase4PhysicalRootLifecycleRouter` creates fresh deduplication state and applies the
 following total routing table:
 
-| root lifecycle | route |
-|---|---|
-| `ACTIVE`, canonical NCS1 cursor key with stable historical binding | one `CursorSnapshotGcScanner` evaluation per stream |
-| `ACTIVE`, every other exact identity or unresolved cursor binding | `ReferencedObjectGcExecutor.executeActive` first；fall through to `OwnerlessObjectGcExecutor.executeActive` only when no current visible-generation owner is discovered |
-| `MARKED`, recoverable cursor evidence | `CursorSnapshotGcExecutor.recoverMarked` |
-| `MARKED`, every other exact identity | `ReferencedObjectGcExecutor.recoverMarked` first；fall through to `OwnerlessObjectGcExecutor.recoverMarked` only when referenced discovery is empty |
-| `DELETING` | `SourceRetirementCoordinator.resume` |
-| `DELETED` | `DefaultPhysicalRootTombstoneRetirementCoordinator.retire` |
-| `QUARANTINED` | no mutation |
+| root lifecycle                                                     | route                                                                                                                                                                  |
+|--------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ACTIVE`, canonical NCS1 cursor key with stable historical binding | one `CursorSnapshotGcScanner` evaluation per stream                                                                                                                    |
+| `ACTIVE`, every other exact identity or unresolved cursor binding  | `ReferencedObjectGcExecutor.executeActive` first；fall through to `OwnerlessObjectGcExecutor.executeActive` only when no current visible-generation owner is discovered |
+| `MARKED`, recoverable cursor evidence                              | `CursorSnapshotGcExecutor.recoverMarked`                                                                                                                               |
+| `MARKED`, every other exact identity                               | `ReferencedObjectGcExecutor.recoverMarked` first；fall through to `OwnerlessObjectGcExecutor.recoverMarked` only when referenced discovery is empty                     |
+| `DELETING`                                                         | `SourceRetirementCoordinator.resume`                                                                                                                                   |
+| `DELETED`                                                          | `DefaultPhysicalRootTombstoneRetirementCoordinator.retire`                                                                                                             |
+| `QUARANTINED`                                                      | no mutation                                                                                                                                                            |
 
 Referenced discovery scans the complete bounded protection prefix and selects canonical streams only from exact
 `VISIBLE_GENERATION` owner keys. Any such owner makes the referenced executor responsible for that root, including a
@@ -1918,31 +1923,31 @@ identities under configured privacy policy.
 
 ## 15. Failure Matrix
 
-| Race/failure | Safe outcome |
-| --- | --- |
-| reader lease write races mark | root post-check or mark rescan orders them；reader starts only if protected |
-| lease expires during slow IO | read deadline/renewal rule cancels before unprotected interval |
-| task protection write races mark | post-check fails or GC rescan vetoes/unmarks |
-| append intent/head races mark | pre-head protection handshake fails or durable `REACHABLE_APPEND` vetoes deletion；head is never acknowledged unprotected |
-| generation-zero index write response is lost | reachable protection remains；exact index reload adds/repairs `VISIBLE_GENERATION` before strict success |
-| generation becomes committed while GC scans output | visible protection/domain version changes；attempt invalid |
-| cursor root starts referencing candidate after inventory | final root/version inventory differs；unmark/retry |
-| cursor retention enters pending after mark | domain veto at final scan；unmark before deletion |
-| object has another stream slice | whole-object eligibility fails |
-| recovery root advances while source plan waits | digest/version changes；recompute, possibly safer |
-| higher generation quarantined during source retirement | coverage veto；no delete |
-| metadata index delete partially succeeds | DELETING root blocks reads；recovery conditionally finishes |
-| process stops after journaled source/protection delete | exact DELETING root + sealed journal accept only the planned absent key, then resume the remaining ordered stages |
-| protection delete succeeds, response lost | root/journal reauthentication plus exact protection-scope absence permits object access；present/drifted protection fails |
-| object delete succeeds, response lost | root-shard scan rediscovers exact DELETING root；HEAD absent completes idempotently |
-| stopped writer retries PUT while tombstone retires | owner/root pre-PUT validation or final owner scan loses；the old key is never recreated |
-| audit-record delete succeeds, response lost | exact unchanged DELETED root plus missing audit key completes that step；root remains until final CAS |
-| object reappears after root retirement | missing-root inventory classifies it as ownerless candidate；full domain proof is still required |
-| unknown future domain activates | sentinel vetoes globally |
-| stale S3 listing omits a live object | registered root scan still runs；only missing-root orphan discovery is delayed |
-| stale listing contains deleted object | HEAD/root resolves status；no second unrelated delete |
-| registration retirement races task/reference creation | final stream/domain/version proof changes；conditional delete is not attempted |
-| registration delete response lost | exact key/version reread proves absent or retry；never deletes another incarnation |
+| Race/failure                                             | Safe outcome                                                                                                             |
+|----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| reader lease write races mark                            | root post-check or mark rescan orders them；reader starts only if protected                                               |
+| lease expires during slow IO                             | read deadline/renewal rule cancels before unprotected interval                                                           |
+| task protection write races mark                         | post-check fails or GC rescan vetoes/unmarks                                                                             |
+| append intent/head races mark                            | pre-head protection handshake fails or durable `REACHABLE_APPEND` vetoes deletion；head is never acknowledged unprotected |
+| generation-zero index write response is lost             | reachable protection remains；exact index reload adds/repairs `VISIBLE_GENERATION` before strict success                  |
+| generation becomes committed while GC scans output       | visible protection/domain version changes；attempt invalid                                                                |
+| cursor root starts referencing candidate after inventory | final root/version inventory differs；unmark/retry                                                                        |
+| cursor retention enters pending after mark               | domain veto at final scan；unmark before deletion                                                                         |
+| object has another stream slice                          | whole-object eligibility fails                                                                                           |
+| recovery root advances while source plan waits           | digest/version changes；recompute, possibly safer                                                                         |
+| higher generation quarantined during source retirement   | coverage veto；no delete                                                                                                  |
+| metadata index delete partially succeeds                 | DELETING root blocks reads；recovery conditionally finishes                                                               |
+| process stops after journaled source/protection delete   | exact DELETING root + sealed journal accept only the planned absent key, then resume the remaining ordered stages        |
+| protection delete succeeds, response lost                | root/journal reauthentication plus exact protection-scope absence permits object access；present/drifted protection fails |
+| object delete succeeds, response lost                    | root-shard scan rediscovers exact DELETING root；HEAD absent completes idempotently                                       |
+| stopped writer retries PUT while tombstone retires       | owner/root pre-PUT validation or final owner scan loses；the old key is never recreated                                   |
+| audit-record delete succeeds, response lost              | exact unchanged DELETED root plus missing audit key completes that step；root remains until final CAS                     |
+| object reappears after root retirement                   | missing-root inventory classifies it as ownerless candidate；full domain proof is still required                          |
+| unknown future domain activates                          | sentinel vetoes globally                                                                                                 |
+| stale S3 listing omits a live object                     | registered root scan still runs；only missing-root orphan discovery is delayed                                            |
+| stale listing contains deleted object                    | HEAD/root resolves status；no second unrelated delete                                                                     |
+| registration retirement races task/reference creation    | final stream/domain/version proof changes；conditional delete is not attempted                                            |
+| registration delete response lost                        | exact key/version reread proves absent or retry；never deletes another incarnation                                        |
 
 ## 16. Required Tests
 

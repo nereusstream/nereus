@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore;
 
 import com.nereusstream.api.ErrorCode;
@@ -15,10 +16,11 @@ import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
-/** Closed, redacted mapping from SDK failures to the public Nereus error model. */
+/**
+ * Closed, redacted mapping from SDK failures to the public Nereus error model.
+ */
 final class S3ObjectErrorMapper {
-    private S3ObjectErrorMapper() {
-    }
+    private S3ObjectErrorMapper() {}
 
     static NereusException bootstrap(Throwable failure, String bucket) {
         return map(failure, Operation.HEAD, bucket, null);
@@ -103,29 +105,20 @@ final class S3ObjectErrorMapper {
     }
 
     private static NereusException failure(
-            ErrorCode code,
-            boolean retriable,
-            Operation operation,
-            String bucket,
-            ObjectKey key,
-            String detail) {
-        String keyHash = key == null
-                ? "none"
-                : DeterministicIds.stableHashComponent("nereus-s3-key-log-v1\0" + key.value());
-        return new NereusException(code, retriable,
-                message(operation, bucket, keyHash, detail));
+            ErrorCode code, boolean retriable, Operation operation, String bucket, ObjectKey key, String detail) {
+        String keyHash =
+                key == null ? "none" : DeterministicIds.stableHashComponent("nereus-s3-key-log-v1\0" + key.value());
+        return new NereusException(code, retriable, message(operation, bucket, keyHash, detail));
     }
 
-    private static ObjectAlreadyExistsException alreadyExists(
-            Operation operation, String bucket, ObjectKey key) {
+    private static ObjectAlreadyExistsException alreadyExists(Operation operation, String bucket, ObjectKey key) {
         String keyHash = DeterministicIds.stableHashComponent("nereus-s3-key-log-v1\0" + key.value());
         return new ObjectAlreadyExistsException(message(operation, bucket, keyHash, "HTTP 412"));
     }
 
-    private static String message(
-            Operation operation, String bucket, String keyHash, String detail) {
-        return "S3 " + operation.label + " failed; bucket=" + safeBucket(bucket)
-                + "; keyHash=" + keyHash + "; detail=" + detail;
+    private static String message(Operation operation, String bucket, String keyHash, String detail) {
+        return "S3 " + operation.label + " failed; bucket=" + safeBucket(bucket) + "; keyHash=" + keyHash + "; detail="
+                + detail;
     }
 
     private static String safeBucket(String bucket) {
@@ -134,8 +127,11 @@ final class S3ObjectErrorMapper {
         }
         for (int index = 0; index < bucket.length(); index++) {
             char value = bucket.charAt(index);
-            if (!(value == '.' || value == '-' || (value >= '0' && value <= '9')
-                    || (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z'))) {
+            if (!(value == '.'
+                    || value == '-'
+                    || (value >= '0' && value <= '9')
+                    || (value >= 'A' && value <= 'Z')
+                    || (value >= 'a' && value <= 'z'))) {
                 return "invalid";
             }
         }

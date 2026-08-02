@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.api.Checksum;
@@ -19,7 +20,9 @@ import java.util.Objects;
 import java.util.TreeMap;
 import java.util.zip.CRC32C;
 
-/** Strict NCS1 full acknowledgement-state snapshot codec. */
+/**
+ * Strict NCS1 full acknowledgement-state snapshot codec.
+ */
 public final class CursorSnapshotCodecV1 {
     private static final byte[] HEADER_MAGIC = ascii("NCS1");
     private static final byte[] RANGE_MAGIC = ascii("NCR1");
@@ -31,13 +34,10 @@ public final class CursorSnapshotCodecV1 {
     private static final int FLAGS = 0;
     private static final int FOOTER_LENGTH = 4 + Short.BYTES * 2 + Long.BYTES * 3 + Integer.BYTES;
 
-    private CursorSnapshotCodecV1() {
-    }
+    private CursorSnapshotCodecV1() {}
 
     public static EncodedSnapshot encode(
-            CursorSnapshotWriteRequest request,
-            String snapshotId,
-            CursorStorageConfig config) {
+            CursorSnapshotWriteRequest request, String snapshotId, CursorStorageConfig config) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(config, "config");
         byte[] snapshotIdBytes = decodeSnapshotId(snapshotId);
@@ -46,27 +46,35 @@ public final class CursorSnapshotCodecV1 {
         NavigableMap<Long, BatchAckState> partials = state.partialBatchAcks();
 
         byte[] streamId = strictUtf8(request.identity().ledger().projection().streamId(), "streamId");
-        byte[] managedLedgerHash = strictUtf8(
-                request.identity().ledger().managedLedgerNameHash(), "managedLedgerNameHash");
+        byte[] managedLedgerHash =
+                strictUtf8(request.identity().ledger().managedLedgerNameHash(), "managedLedgerNameHash");
         byte[] cursorHash = strictUtf8(request.identity().cursorNameHash(), "cursorNameHash");
 
         long headerLength = Math.addExact(
-                4L + Short.BYTES * 4L + Integer.BYTES + Long.BYTES + 16L
-                        + stringSize(streamId) + stringSize(managedLedgerHash) + stringSize(cursorHash)
-                        + Long.BYTES * 7L + Integer.BYTES * 3L,
+                4L
+                        + Short.BYTES * 4L
+                        + Integer.BYTES
+                        + Long.BYTES
+                        + 16L
+                        + stringSize(streamId)
+                        + stringSize(managedLedgerHash)
+                        + stringSize(cursorHash)
+                        + Long.BYTES * 7L
+                        + Integer.BYTES * 3L,
                 0L);
         long rangeLength = Math.addExact(
-                4L + Long.BYTES + Integer.BYTES,
-                Math.multiplyExact((long) ranges.size(), Long.BYTES * 2L));
+                4L + Long.BYTES + Integer.BYTES, Math.multiplyExact((long) ranges.size(), Long.BYTES * 2L));
         long partialPayload = 0;
         for (Map.Entry<Long, BatchAckState> entry : partials.entrySet()) {
-            partialPayload = Math.addExact(partialPayload,
-                    Long.BYTES + Integer.BYTES * 2L
+            partialPayload = Math.addExact(
+                    partialPayload,
+                    Long.BYTES
+                            + Integer.BYTES * 2L
                             + Math.multiplyExact((long) entry.getValue().remainingWords().length, Long.BYTES));
         }
         long partialLength = Math.addExact(4L + Long.BYTES + Integer.BYTES, partialPayload);
-        long totalLength = Math.addExact(
-                Math.addExact(Math.addExact(headerLength, rangeLength), partialLength), FOOTER_LENGTH);
+        long totalLength =
+                Math.addExact(Math.addExact(Math.addExact(headerLength, rangeLength), partialLength), FOOTER_LENGTH);
         if (totalLength <= 0 || totalLength > config.cursorSnapshotMaxBytes() || totalLength > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("cursor snapshot exceeds the configured object bound");
         }
@@ -150,10 +158,7 @@ public final class CursorSnapshotCodecV1 {
         byte[] bytes = object.toByteArray();
         Checksum storageChecksum = Crc32cChecksums.checksum(bytes);
         return new EncodedSnapshot(
-                ByteBuffer.wrap(bytes).asReadOnlyBuffer(),
-                formatCrc32c,
-                storageChecksum,
-                totalLength);
+                ByteBuffer.wrap(bytes).asReadOnlyBuffer(), formatCrc32c, storageChecksum, totalLength);
     }
 
     public static CursorAckState decode(
@@ -206,14 +211,16 @@ public final class CursorSnapshotCodecV1 {
 
             requireEqual(snapshotId, reference.snapshotId(), "snapshot ID");
             requireEqual(streamId, expectedIdentity.ledger().projection().streamId(), "stream ID");
-            requireEqual(managedLedgerHash, expectedIdentity.ledger().managedLedgerNameHash(),
-                    "managed-ledger name hash");
+            requireEqual(
+                    managedLedgerHash, expectedIdentity.ledger().managedLedgerNameHash(), "managed-ledger name hash");
             requireEqual(cursorHash, expectedIdentity.cursorNameHash(), "cursor name hash");
-            requireEqual(bindingGeneration,
-                    expectedIdentity.ledger().projection().storageClassBindingGeneration(), "binding generation");
+            requireEqual(
+                    bindingGeneration,
+                    expectedIdentity.ledger().projection().storageClassBindingGeneration(),
+                    "binding generation");
             requireEqual(incarnation, expectedIdentity.ledger().projection().incarnation(), "incarnation");
-            requireEqual(virtualLedgerId,
-                    expectedIdentity.ledger().projection().virtualLedgerId(), "virtual ledger ID");
+            requireEqual(
+                    virtualLedgerId, expectedIdentity.ledger().projection().virtualLedgerId(), "virtual ledger ID");
             requireEqual(cursorGeneration, expectedIdentity.cursorGeneration(), "cursor generation");
             requireEqual(cursorGeneration, reference.cursorGeneration(), "reference cursor generation");
             requireEqual(sourceSequence, reference.sourceMutationSequence(), "source mutation sequence");
@@ -233,8 +240,7 @@ public final class CursorSnapshotCodecV1 {
             int rangeCrcOffset = reader.position();
             int rangeCrc = reader.i32("range section CRC32C");
             requireEqual(reader.position() - rangeStart, rangeLength, "range section length");
-            requireEqual(crc32c(bytes, rangeStart, rangeCrcOffset - rangeStart), rangeCrc,
-                    "range section CRC32C");
+            requireEqual(crc32c(bytes, rangeStart, rangeCrcOffset - rangeStart), rangeCrc, "range section CRC32C");
 
             int partialStart = reader.position();
             reader.magic(PARTIAL_MAGIC, "partial section");
@@ -255,16 +261,15 @@ public final class CursorSnapshotCodecV1 {
                     words[word] = reader.i64("partial remainingWord");
                 }
                 BatchAckState state = new BatchAckState(batchSize, words);
-                if (state.isWholeEntryAcknowledged() || state.isAllRemaining()
-                        || partials.put(offset, state) != null) {
+                if (state.isWholeEntryAcknowledged() || state.isAllRemaining() || partials.put(offset, state) != null) {
                     throw corruption("noncanonical or duplicate partial batch state");
                 }
             }
             int partialCrcOffset = reader.position();
             int partialCrc = reader.i32("partial section CRC32C");
             requireEqual(reader.position() - partialStart, partialLength, "partial section length");
-            requireEqual(crc32c(bytes, partialStart, partialCrcOffset - partialStart), partialCrc,
-                    "partial section CRC32C");
+            requireEqual(
+                    crc32c(bytes, partialStart, partialCrcOffset - partialStart), partialCrc, "partial section CRC32C");
 
             int footerStart = reader.position();
             reader.magic(FOOTER_MAGIC, "footer");
@@ -307,11 +312,7 @@ public final class CursorSnapshotCodecV1 {
         }
     }
 
-    public record EncodedSnapshot(
-            ByteBuffer payload,
-            int formatCrc32c,
-            Checksum storageChecksum,
-            long objectLength) {
+    public record EncodedSnapshot(ByteBuffer payload, int formatCrc32c, Checksum storageChecksum, long objectLength) {
         public EncodedSnapshot {
             payload = Objects.requireNonNull(payload, "payload").asReadOnlyBuffer();
             Objects.requireNonNull(storageChecksum, "storageChecksum");
@@ -338,8 +339,8 @@ public final class CursorSnapshotCodecV1 {
 
     private static byte[] decodeSnapshotId(String snapshotId) {
         try {
-            byte[] bytes = HexFormat.of().parseHex(
-                    com.nereusstream.metadata.oxia.CursorIds.requireRandomId(snapshotId, "snapshotId"));
+            byte[] bytes = HexFormat.of()
+                    .parseHex(com.nereusstream.metadata.oxia.CursorIds.requireRandomId(snapshotId, "snapshotId"));
             if (bytes.length != 16) {
                 throw new IllegalArgumentException("snapshotId must decode to 16 bytes");
             }
@@ -387,7 +388,8 @@ public final class CursorSnapshotCodecV1 {
 
     private static byte[] strictUtf8(String value, String field) {
         try {
-            ByteBuffer encoded = StandardCharsets.UTF_8.newEncoder()
+            ByteBuffer encoded = StandardCharsets.UTF_8
+                    .newEncoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .encode(CharBuffer.wrap(Objects.requireNonNull(value, field)));
@@ -401,7 +403,8 @@ public final class CursorSnapshotCodecV1 {
 
     private static String strictUtf8(byte[] bytes, String field) {
         try {
-            return StandardCharsets.UTF_8.newDecoder()
+            return StandardCharsets.UTF_8
+                    .newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .decode(ByteBuffer.wrap(bytes))

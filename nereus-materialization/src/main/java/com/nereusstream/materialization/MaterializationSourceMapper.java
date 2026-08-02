@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -22,12 +23,13 @@ import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Strict conversion of an authoritative generation candidate into one immutable planner source edge. */
+/**
+ * Strict conversion of an authoritative generation candidate into one immutable planner source edge.
+ */
 final class MaterializationSourceMapper {
     private static final ReadTargetCodecRegistry TARGET_CODECS = ReadTargetCodecRegistry.phase15();
 
-    private MaterializationSourceMapper() {
-    }
+    private MaterializationSourceMapper() {}
 
     static Optional<SourceGeneration> committedSource(
             VersionedGenerationCandidate candidate,
@@ -45,12 +47,7 @@ final class MaterializationSourceMapper {
         }
         if (candidate instanceof VersionedGenerationZeroIndex zero) {
             return generationZero(
-                    zero,
-                    expectedStream,
-                    expectedView,
-                    committedEndOffset,
-                    headCommitVersion,
-                    effectiveProjection);
+                    zero, expectedStream, expectedView, committedEndOffset, headCommitVersion, effectiveProjection);
         }
         return higherGeneration(
                 (VersionedGenerationIndex) candidate,
@@ -62,9 +59,7 @@ final class MaterializationSourceMapper {
     }
 
     static boolean matchesExactSource(
-            VersionedGenerationCandidate candidate,
-            StreamId streamId,
-            SourceGeneration expected) {
+            VersionedGenerationCandidate candidate, StreamId streamId, SourceGeneration expected) {
         Optional<SourceGeneration> actual = committedSource(
                 candidate,
                 Objects.requireNonNull(streamId, "streamId"),
@@ -178,11 +173,8 @@ final class MaterializationSourceMapper {
     }
 
     private static Optional<ProjectionRef> effectiveProjection(
-            Optional<ProjectionRef> stored,
-            Optional<ProjectionRef> effective,
-            boolean higherGeneration) {
-        if (stored.isPresent() && effective.isPresent()
-                && !stored.orElseThrow().equals(effective.orElseThrow())) {
+            Optional<ProjectionRef> stored, Optional<ProjectionRef> effective, boolean higherGeneration) {
+        if (stored.isPresent() && effective.isPresent() && !stored.orElseThrow().equals(effective.orElseThrow())) {
             throw invariant("source projection conflicts with the registered effective projection");
         }
         if (higherGeneration && effective.isPresent() && stored.isEmpty()) {

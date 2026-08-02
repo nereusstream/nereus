@@ -17,18 +17,19 @@ package com.nereusstream.api;
 import java.util.Locale;
 import java.util.Objects;
 
-/** Checksum type and canonical lowercase hexadecimal value. */
-public record Checksum(
-        ChecksumType type,
-        String value) {
+/**
+ * Checksum type and canonical lowercase hexadecimal value.
+ */
+public record Checksum(ChecksumType type, String value) {
     public Checksum {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(value, "value");
         value = value.toLowerCase(Locale.ROOT);
-        int expectedLength = switch (type) {
-            case CRC32C -> 8;
-            case SHA256 -> 64;
-        };
+        int expectedLength =
+                switch (type) {
+                    case CRC32C -> 8;
+                    case SHA256 -> 64;
+                };
         if (value.length() != expectedLength || !isLowerHex(value)) {
             throw new IllegalArgumentException("invalid checksum value for " + type);
         }

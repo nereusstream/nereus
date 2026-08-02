@@ -1,10 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static com.nereusstream.materialization.GenerationPublicationTestSupport.CLUSTER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.PhysicalReadResult;
 import com.nereusstream.api.PhysicalReadStats;
 import com.nereusstream.api.ReadBatch;
@@ -24,7 +24,6 @@ import com.nereusstream.metadata.oxia.GenerationIndexValidator;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -49,8 +48,7 @@ class NormalPathCommittedObjectGenerationReadVerifierTest {
                     context.generations(),
                     GenerationIndexValidator.phase15Targets(),
                     readers,
-                    new MetadataPhysicalObjectIdentityResolver(
-                            CLUSTER, context.l0Store(), context.physical()),
+                    new MetadataPhysicalObjectIdentityResolver(CLUSTER, context.l0Store(), context.physical()),
                     pins,
                     100,
                     GenerationPublicationTestSupport.CLOCK,
@@ -67,8 +65,8 @@ class NormalPathCommittedObjectGenerationReadVerifierTest {
                     Duration.ofSeconds(10),
                     context.scheduler());
 
-            CommittedObjectGenerationProof proof = authority.prove(
-                            context.task().streamId(), context.task().coverage(), 1)
+            CommittedObjectGenerationProof proof = authority
+                    .prove(context.task().streamId(), context.task().coverage(), 1)
                     .join()
                     .orElseThrow();
 
@@ -78,8 +76,9 @@ class NormalPathCommittedObjectGenerationReadVerifierTest {
             assertThat(pins.releases).hasValue(2);
 
             reader.readable.set(false);
-            assertThatThrownBy(() -> authority.prove(
-                            context.task().streamId(), context.task().coverage(), 1).join())
+            assertThatThrownBy(() -> authority
+                            .prove(context.task().streamId(), context.task().coverage(), 1)
+                            .join())
                     .hasRootCauseInstanceOf(com.nereusstream.api.NereusException.class);
             assertThat(pins.acquires).hasValue(3);
             assertThat(pins.releases).hasValue(3);
@@ -87,28 +86,32 @@ class NormalPathCommittedObjectGenerationReadVerifierTest {
     }
 
     private static void createCoveringCheckpoint(GenerationPublicationTestSupport.Context context) {
-        var created = context.generations().getOrCreateMaterializationCheckpoint(
-                CLUSTER,
-                context.task().streamId(),
-                context.task().policy().policyId(),
-                context.task().policy().policyVersion(),
-                context.task().policyDigestSha256()).join();
+        var created = context.generations()
+                .getOrCreateMaterializationCheckpoint(
+                        CLUSTER,
+                        context.task().streamId(),
+                        context.task().policy().policyId(),
+                        context.task().policy().policyVersion(),
+                        context.task().policyDigestSha256())
+                .join();
         MaterializationCheckpointRecord checkpoint = created.value();
-        context.generations().compareAndSetMaterializationCheckpoint(
-                CLUSTER,
-                new MaterializationCheckpointRecord(
-                        checkpoint.schemaVersion(),
-                        checkpoint.streamId(),
-                        checkpoint.policyId(),
-                        checkpoint.policyVersion(),
-                        checkpoint.policySha256(),
-                        2,
-                        context.task().taskSequence(),
-                        context.task().taskSequence(),
-                        context.task().taskId(),
-                        2_000,
-                        0),
-                created.metadataVersion()).join();
+        context.generations()
+                .compareAndSetMaterializationCheckpoint(
+                        CLUSTER,
+                        new MaterializationCheckpointRecord(
+                                checkpoint.schemaVersion(),
+                                checkpoint.streamId(),
+                                checkpoint.policyId(),
+                                checkpoint.policyVersion(),
+                                checkpoint.policySha256(),
+                                2,
+                                context.task().taskSequence(),
+                                context.task().taskSequence(),
+                                context.task().taskId(),
+                                2_000,
+                                0),
+                        created.metadataVersion())
+                .join();
     }
 
     private static final class RecordingReader implements ReadTargetReader {
@@ -160,12 +163,7 @@ class NormalPathCommittedObjectGenerationReadVerifierTest {
             return CompletableFuture.completedFuture(new PhysicalReadResult(
                     List.of(batch),
                     List.of(new PhysicalReadStats(
-                            identity,
-                            range.logicalBytes(),
-                            0,
-                            payload.length,
-                            0,
-                            payload.length))));
+                            identity, range.logicalBytes(), 0, payload.length, 0, payload.length))));
         }
     }
 
@@ -213,7 +211,6 @@ class NormalPathCommittedObjectGenerationReadVerifierTest {
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
     }
 }

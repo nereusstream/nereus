@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.recovery;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.OffsetRange;
@@ -43,9 +43,8 @@ class MetadataRecoveryCheckpointVerifierTest {
 
     @Test
     void rejectsDurableMetadataVersionAndDuplicatedIdentityDrift() {
-        GenerationIndexRecord durable = F4MetadataTestValues
-                .generation(GenerationLifecycle.COMMITTED)
-                .withMetadataVersion(9);
+        GenerationIndexRecord durable =
+                F4MetadataTestValues.generation(GenerationLifecycle.COMMITTED).withMetadataVersion(9);
         StreamCommitTargetRecord wrongCommit = commit("different-commit");
 
         assertThatThrownBy(() -> verifier.verifyPublication(header(), publication(durable)))
@@ -86,11 +85,8 @@ class MetadataRecoveryCheckpointVerifierTest {
                 sha256(canonical));
     }
 
-    private static RecoveryCheckpointEntry entry(
-            StreamCommitTargetRecord record,
-            String declaredCommitId) {
-        byte[] canonical = MetadataRecordCodecFactory.encodeEnvelope(
-                record, StreamCommitTargetRecord.class);
+    private static RecoveryCheckpointEntry entry(StreamCommitTargetRecord record, String declaredCommitId) {
+        byte[] canonical = MetadataRecordCodecFactory.encodeEnvelope(record, StreamCommitTargetRecord.class);
         return new RecoveryCheckpointEntry(
                 record.commitVersion(),
                 new OffsetRange(record.offsetStart(), record.offsetEnd()),
@@ -137,7 +133,8 @@ class MetadataRecoveryCheckpointVerifierTest {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException(failure);
         }

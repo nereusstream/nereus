@@ -16,7 +16,9 @@ package com.nereusstream.api;
 
 import java.util.Objects;
 
-/** Durable identifier for an object-store object. */
+/**
+ * Durable identifier for an object-store object.
+ */
 public record ObjectId(String value) {
     public ObjectId {
         Objects.requireNonNull(value, "value");

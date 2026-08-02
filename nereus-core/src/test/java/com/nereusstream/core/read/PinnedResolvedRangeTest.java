@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectKeyHash;
@@ -25,11 +25,19 @@ import org.junit.jupiter.api.Test;
 class PinnedResolvedRangeTest {
     @Test
     void releaseIsIdempotentAndOwnsTheExactObjectLease() {
-        ObjectSliceReadTarget target = ReadTargetReaderRegistryTest.target(
-                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
+        ObjectSliceReadTarget target =
+                ReadTargetReaderRegistryTest.target(ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
         ResolvedRange resolved = new ResolvedRange(
-                new OffsetRange(0, 1), 2, target, PayloadFormat.OPAQUE_RECORD_BATCH,
-                1, 1, 1, List.of(), Optional.empty(), 1);
+                new OffsetRange(0, 1),
+                2,
+                target,
+                PayloadFormat.OPAQUE_RECORD_BATCH,
+                1,
+                1,
+                1,
+                List.of(),
+                Optional.empty(),
+                1);
         GenerationReadCandidate candidate = new GenerationReadCandidate(
                 ReadView.COMMITTED,
                 resolved,
@@ -52,7 +60,8 @@ class PinnedResolvedRangeTest {
         pinned.close();
         assertThat(lease.releases).hasValue(1);
         assertThat(pinned.isReleased()).isTrue();
-        assertThat(ObjectKeyHash.from(target.objectKey())).isEqualTo(lease.object().objectKeyHash());
+        assertThat(ObjectKeyHash.from(target.objectKey()))
+                .isEqualTo(lease.object().objectKeyHash());
     }
 
     private static final class TestLease implements ObjectReadLease {

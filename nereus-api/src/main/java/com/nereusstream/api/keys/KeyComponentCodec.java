@@ -21,12 +21,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Objects;
 
-/** Shared durable key component encoding for Oxia paths and object keys. */
+/**
+ * Shared durable key component encoding for Oxia paths and object keys.
+ */
 public final class KeyComponentCodec {
     private static final String ENCODED_PREFIX = "b32-";
 
-    private KeyComponentCodec() {
-    }
+    private KeyComponentCodec() {}
 
     public static String encodeComponent(String value) {
         Objects.requireNonNull(value, "value");
@@ -36,7 +37,9 @@ public final class KeyComponentCodec {
         return ENCODED_PREFIX + Base32LowerNoPad.encode(value.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Strict inverse used only by type-owned durable-key routers. */
+    /**
+     * Strict inverse used only by type-owned durable-key routers.
+     */
     public static String decodeComponent(String value) {
         Objects.requireNonNull(value, "value");
         if (!value.startsWith(ENCODED_PREFIX)) {
@@ -93,7 +96,10 @@ public final class KeyComponentCodec {
     }
 
     private static boolean isAllowedRawComponent(String value) {
-        if (value.isEmpty() || value.equals(".") || value.equals("..") || value.startsWith(ENCODED_PREFIX)
+        if (value.isEmpty()
+                || value.equals(".")
+                || value.equals("..")
+                || value.startsWith(ENCODED_PREFIX)
                 || isWindowsDriveDesignator(value)) {
             return false;
         }

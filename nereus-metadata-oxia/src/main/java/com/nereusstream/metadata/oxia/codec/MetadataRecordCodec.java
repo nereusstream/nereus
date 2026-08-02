@@ -29,10 +29,8 @@ public interface MetadataRecordCodec<T> {
         return minReaderSchemaVersion();
     }
 
-    default boolean supportsEnvelopeSchema(
-            int writerSchemaVersion, int minimumReaderSchemaVersion) {
-        return writerSchemaVersion == schemaVersion()
-                && minimumReaderSchemaVersion == minReaderSchemaVersion();
+    default boolean supportsEnvelopeSchema(int writerSchemaVersion, int minimumReaderSchemaVersion) {
+        return writerSchemaVersion == schemaVersion() && minimumReaderSchemaVersion == minReaderSchemaVersion();
     }
 
     byte[] encode(T record);

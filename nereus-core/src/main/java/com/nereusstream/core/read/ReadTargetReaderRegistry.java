@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.ErrorCode;
@@ -7,10 +8,11 @@ import com.nereusstream.api.target.ReadTarget;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Immutable exact-key reader registry with fail-closed lookup. */
+/**
+ * Immutable exact-key reader registry with fail-closed lookup.
+ */
 public final class ReadTargetReaderRegistry {
     private final Map<ReadTargetReaderKey, ReadTargetReader> readers;
 
@@ -19,11 +21,10 @@ public final class ReadTargetReaderRegistry {
         try {
             this.readers = readers.stream()
                     .map(reader -> Objects.requireNonNull(reader, "reader"))
-                    .collect(Collectors.toUnmodifiableMap(
-                            ReadTargetReader::key, Function.identity(), (left, right) -> {
-                                throw new IllegalArgumentException(
-                                        "duplicate read target reader key: " + left.key());
-                            }));
+                    .flatMap(reader -> reader.keys().stream().map(key -> Map.entry(key, reader)))
+                    .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue, (left, right) -> {
+                        throw new IllegalArgumentException("duplicate read target reader key: " + left.key());
+                    }));
         } catch (IllegalStateException duplicate) {
             throw new IllegalArgumentException("duplicate read target reader key", duplicate);
         }
@@ -37,9 +38,7 @@ public final class ReadTargetReaderRegistry {
         ReadTargetReader reader = readers.get(Objects.requireNonNull(key, "key"));
         if (reader == null) {
             throw new NereusException(
-                    ErrorCode.UNSUPPORTED_READ_TARGET,
-                    false,
-                    "no physical reader is registered for " + key);
+                    ErrorCode.UNSUPPORTED_READ_TARGET, false, "no physical reader is registered for " + key);
         }
         return reader;
     }

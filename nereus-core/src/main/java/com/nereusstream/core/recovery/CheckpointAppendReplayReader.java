@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.recovery;
 
 import com.nereusstream.api.AppendOutcome;
@@ -30,14 +31,15 @@ import java.nio.ByteBuffer;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Function;
 
-/** Root-double-read exact append replay across the live tail and current NRC1 prefix. */
+/**
+ * Root-double-read exact append replay across the live tail and current NRC1 prefix.
+ */
 public final class CheckpointAppendReplayReader implements AppendRecoverySearcher {
     private static final int MAX_ROOT_RESTARTS = 8;
 
@@ -65,18 +67,10 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
 
     @Override
     public CompletableFuture<AppendReplayResolution> search(
-            CommitAppendRequest request,
-            int maximumLiveCommits,
-            int pageSize,
-            Duration timeout) {
+            CommitAppendRequest request, int maximumLiveCommits, int pageSize, Duration timeout) {
         Objects.requireNonNull(request, "request");
         requireBounds(maximumLiveCommits, pageSize, timeout);
-        return searchAttempt(
-                request,
-                maximumLiveCommits,
-                pageSize,
-                new ReplayDeadline(timeout, clock),
-                0);
+        return searchAttempt(request, maximumLiveCommits, pageSize, new ReplayDeadline(timeout, clock), 0);
     }
 
     private CompletableFuture<AppendReplayResolution> searchAttempt(
@@ -89,31 +83,24 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
                         request.streamId(), maximumLiveCommits, pageSize)
                 .thenCompose(walk -> searchStableWalk(request, walk, deadline));
         return attempt.handle((value, failure) -> {
-            if (failure == null) {
-                return CompletableFuture.completedFuture(value);
-            }
-            Throwable exact = unwrap(failure);
-            if (exact instanceof RecoveryRootChangedException
-                    && rootRestarts + 1 < MAX_ROOT_RESTARTS) {
-                return searchAttempt(
-                        request,
-                        maximumLiveCommits,
-                        pageSize,
-                        deadline,
-                        rootRestarts + 1);
-            }
-            if (exact instanceof RecoveryRootChangedException) {
-                return CompletableFuture.<AppendReplayResolution>failedFuture(
-                        condition("recovery root changed throughout append replay"));
-            }
-            return CompletableFuture.<AppendReplayResolution>failedFuture(exact);
-        }).thenCompose(Function.identity());
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(value);
+                    }
+                    Throwable exact = unwrap(failure);
+                    if (exact instanceof RecoveryRootChangedException && rootRestarts + 1 < MAX_ROOT_RESTARTS) {
+                        return searchAttempt(request, maximumLiveCommits, pageSize, deadline, rootRestarts + 1);
+                    }
+                    if (exact instanceof RecoveryRootChangedException) {
+                        return CompletableFuture.<AppendReplayResolution>failedFuture(
+                                condition("recovery root changed throughout append replay"));
+                    }
+                    return CompletableFuture.<AppendReplayResolution>failedFuture(exact);
+                })
+                .thenCompose(Function.identity());
     }
 
     private CompletableFuture<AppendReplayResolution> searchStableWalk(
-            CommitAppendRequest request,
-            AnchorAwareCommitWalk walk,
-            ReplayDeadline deadline) {
+            CommitAppendRequest request, AnchorAwareCommitWalk walk, ReplayDeadline deadline) {
         deadline.requireRemaining("walk append recovery tail");
         if (!walk.anchorReached()) {
             return CompletableFuture.failedFuture(new NereusException(
@@ -129,9 +116,8 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
         Optional<VersionedRecoveryCheckpointRoot> optionalRoot = walk.recoveryRoot();
         if (optionalRoot.isEmpty()
                 || optionalRoot.orElseThrow().value().checkpoints().isEmpty()) {
-            return CompletableFuture.completedFuture(
-                    AppendReplayResolution.notCommitted(
-                            walk.commitsNewestFirst().size()));
+            return CompletableFuture.completedFuture(AppendReplayResolution.notCommitted(
+                    walk.commitsNewestFirst().size()));
         }
         VersionedRecoveryCheckpointRoot root = optionalRoot.orElseThrow();
         long expectedStart = request.expectedStartOffset();
@@ -143,39 +129,28 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
                     AppendOutcome.MAY_HAVE_COMMITTED));
         }
         if (expectedStart >= root.value().coveredEndOffset()) {
-            return CompletableFuture.failedFuture(invariant(
-                    "live tail did not decide an append at or after the recovery anchor"));
+            return CompletableFuture.failedFuture(
+                    invariant("live tail did not decide an append at or after the recovery anchor"));
         }
         RecoveryCheckpointReferenceRecord reference = referenceCovering(root, expectedStart);
         PhysicalObjectIdentity object = checkpointIdentity(reference);
         long readDeadlineMillis = deadline.maximumReadDeadlineMillis();
-        CompletableFuture<ObjectReadLease> acquired = pinManager.acquire(
-                object,
-                readDeadlineMillis,
-                () -> requireExactRoot(root));
-        return withLease(acquired, lease -> openAndSearch(
-                        request,
-                        walk,
-                        root,
-                        reference,
-                        deadline))
+        CompletableFuture<ObjectReadLease> acquired =
+                pinManager.acquire(object, readDeadlineMillis, () -> requireExactRoot(root));
+        return withLease(acquired, lease -> openAndSearch(request, walk, root, reference, deadline))
                 .thenCompose(result -> requireExactRoot(root).thenApply(ignored -> result));
     }
 
-    private AppendReplayResolution searchLiveTail(
-            CommitAppendRequest request,
-            AnchorAwareCommitWalk walk) {
+    private AppendReplayResolution searchLiveTail(CommitAppendRequest request, AnchorAwareCommitWalk walk) {
         int scanned = 0;
         for (AppendRecoveryCommit evidence : walk.commitsNewestFirst()) {
             StreamCommitTargetRecord record = evidence.canonicalCommit();
             scanned++;
             if (record.commitId().equals(request.commitId())) {
-                CommittedAppend append = AppendReplayRecords.validateAndHydrate(
-                        request, record, AppendOutcome.KNOWN_COMMITTED);
+                CommittedAppend append =
+                        AppendReplayRecords.validateAndHydrate(request, record, AppendOutcome.KNOWN_COMMITTED);
                 return AppendReplayResolution.found(
-                        reachable(append, walk),
-                        AppendReplayEvidenceSource.LIVE_COMMIT,
-                        scanned);
+                        reachable(append, walk), AppendReplayEvidenceSource.LIVE_COMMIT, scanned);
             }
             if (record.offsetStart() <= request.expectedStartOffset()) {
                 return AppendReplayResolution.notCommitted(scanned);
@@ -205,14 +180,12 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
                 .thenApply(optional -> decideCheckpointEntry(
                         request,
                         walk,
-                        optional.orElseThrow(() -> invariant(
-                                "recovery checkpoint has no entry for a covered offset"))));
+                        optional.orElseThrow(
+                                () -> invariant("recovery checkpoint has no entry for a covered offset"))));
     }
 
     private AppendReplayResolution decideCheckpointEntry(
-            CommitAppendRequest request,
-            AnchorAwareCommitWalk walk,
-            RecoveryCheckpointEntry entry) {
+            CommitAppendRequest request, AnchorAwareCommitWalk walk, RecoveryCheckpointEntry entry) {
         int scanned = walk.commitsNewestFirst().size();
         if (entry.range().startOffset() != request.expectedStartOffset()
                 || !entry.commitId().equals(request.commitId())) {
@@ -221,31 +194,25 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
         byte[] canonical = bytes(entry.canonicalCommitRecord());
         StreamCommitTargetRecord record;
         try {
-            record = MetadataRecordCodecFactory.decodeEnvelope(
-                    canonical, StreamCommitTargetRecord.class);
+            record = MetadataRecordCodecFactory.decodeEnvelope(canonical, StreamCommitTargetRecord.class);
         } catch (RuntimeException failure) {
             throw invariant("cannot decode NRC1 append replay record", failure);
         }
         if (record.metadataVersion() != 0
                 || !Arrays.equals(
-                        canonical,
-                        MetadataRecordCodecFactory.encodeEnvelope(
-                                record, StreamCommitTargetRecord.class))) {
+                        canonical, MetadataRecordCodecFactory.encodeEnvelope(record, StreamCommitTargetRecord.class))) {
             throw invariant("NRC1 append replay record is not canonical");
         }
-        CommittedAppend append = AppendReplayRecords.validateAndHydrate(
-                request, record, AppendOutcome.KNOWN_COMMITTED);
+        CommittedAppend append = AppendReplayRecords.validateAndHydrate(request, record, AppendOutcome.KNOWN_COMMITTED);
         return AppendReplayResolution.found(
-                reachable(append, walk),
-                AppendReplayEvidenceSource.RECOVERY_CHECKPOINT,
-                scanned);
+                reachable(append, walk), AppendReplayEvidenceSource.RECOVERY_CHECKPOINT, scanned);
     }
 
-    private CompletableFuture<Void> requireExactRoot(
-            VersionedRecoveryCheckpointRoot expected) {
-        return generationStore.getRecoveryRoot(
-                        cluster, new com.nereusstream.api.StreamId(
-                                expected.value().streamId()))
+    private CompletableFuture<Void> requireExactRoot(VersionedRecoveryCheckpointRoot expected) {
+        return generationStore
+                .getRecoveryRoot(
+                        cluster,
+                        new com.nereusstream.api.StreamId(expected.value().streamId()))
                 .thenAccept(actual -> {
                     if (!actual.equals(Optional.of(expected))) {
                         throw new RecoveryRootChangedException();
@@ -253,43 +220,32 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
                 });
     }
 
-    private static ReachableCommittedAppend reachable(
-            CommittedAppend append,
-            AnchorAwareCommitWalk walk) {
+    private static ReachableCommittedAppend reachable(CommittedAppend append, AnchorAwareCommitWalk walk) {
         var head = walk.observedHead();
         return ReachableCommittedAppend.verified(
-                append,
-                head.lastCommitId(),
-                head.offsetEnd(),
-                head.cumulativeSize(),
-                head.commitVersion());
+                append, head.lastCommitId(), head.offsetEnd(), head.cumulativeSize(), head.commitVersion());
     }
 
     private static RecoveryCheckpointReferenceRecord referenceCovering(
-            VersionedRecoveryCheckpointRoot root,
-            long offset) {
+            VersionedRecoveryCheckpointRoot root, long offset) {
         for (RecoveryCheckpointReferenceRecord reference : root.value().checkpoints()) {
-            if (reference.coveredStartOffset() <= offset
-                    && offset < reference.coveredEndOffset()) {
+            if (reference.coveredStartOffset() <= offset && offset < reference.coveredEndOffset()) {
                 return reference;
             }
         }
         throw invariant("recovery root has a gap at the append replay offset");
     }
 
-    private static PhysicalObjectIdentity checkpointIdentity(
-            RecoveryCheckpointReferenceRecord reference) {
+    private static PhysicalObjectIdentity checkpointIdentity(RecoveryCheckpointReferenceRecord reference) {
         PhysicalObjectIdentity identity = PhysicalObjectIdentity.create(
                 new ObjectKey(reference.objectKey()),
                 Optional.of(new ObjectId(reference.objectId())),
                 PhysicalObjectKind.RECOVERY_CHECKPOINT,
                 reference.objectLength(),
                 new Checksum(ChecksumType.CRC32C, reference.storageCrc32c()),
-                Optional.of(new Checksum(
-                        ChecksumType.SHA256, reference.contentSha256())),
+                Optional.of(new Checksum(ChecksumType.SHA256, reference.contentSha256())),
                 Optional.empty());
-        if (!identity.objectKeyHash().equals(
-                new ObjectKeyHash(reference.objectKeyHash()))) {
+        if (!identity.objectKeyHash().equals(new ObjectKeyHash(reference.objectKeyHash()))) {
             throw invariant("recovery checkpoint reference has a wrong object-key hash");
         }
         return identity;
@@ -303,62 +259,49 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
         if (!header.cluster().equals(cluster)
                 || !header.streamId().value().equals(root.value().streamId())
                 || header.checkpointSequence() != reference.checkpointSequence()
-                || !header.checkpointAttemptId().equals(
-                        reference.checkpointAttemptId())
-                || header.coverage().startOffset()
-                        != reference.coveredStartOffset()
+                || !header.checkpointAttemptId().equals(reference.checkpointAttemptId())
+                || header.coverage().startOffset() != reference.coveredStartOffset()
                 || header.coverage().endOffset() != reference.coveredEndOffset()
                 || header.firstCommitVersion() != reference.firstCommitVersion()
                 || header.lastCommitVersion() != reference.lastCommitVersion()
-                || header.cumulativeSizeAtStart()
-                        != reference.cumulativeSizeAtStart()
-                || header.cumulativeSizeAtEnd()
-                        != reference.cumulativeSizeAtEnd()
+                || header.cumulativeSizeAtStart() != reference.cumulativeSizeAtStart()
+                || header.cumulativeSizeAtEnd() != reference.cumulativeSizeAtEnd()
                 || !header.firstCommitId().equals(reference.firstCommitId())
                 || !header.lastCommitId().equals(reference.lastCommitId())
-                || !header.sourceHeadCommitId().equals(
-                        reference.sourceHeadCommitId())
-                || header.sourceHeadCommitVersion()
-                        != reference.sourceHeadCommitVersion()
-                || !header.projectionIdentitySha256().value().equals(
-                        reference.projectionIdentitySha256())
+                || !header.sourceHeadCommitId().equals(reference.sourceHeadCommitId())
+                || header.sourceHeadCommitVersion() != reference.sourceHeadCommitVersion()
+                || !header.projectionIdentitySha256().value().equals(reference.projectionIdentitySha256())
                 || header.expectedEntryCount() != reference.commitEntryCount()
                 || header.expectedPublicationCount() != reference.publicationCount()
                 || !object.objectId().value().equals(reference.objectId())
                 || !object.objectKey().value().equals(reference.objectKey())
                 || object.objectLength() != reference.objectLength()
-                || !object.contentSha256().value().equals(
-                        reference.contentSha256())) {
+                || !object.contentSha256().value().equals(reference.contentSha256())) {
             throw invariant("verified NRC1 object differs from recovery-root reference");
         }
     }
 
     private static <T> CompletableFuture<T> withLease(
-            CompletableFuture<ObjectReadLease> acquired,
-            Function<ObjectReadLease, CompletableFuture<T>> operation) {
+            CompletableFuture<ObjectReadLease> acquired, Function<ObjectReadLease, CompletableFuture<T>> operation) {
         return acquired.thenCompose(lease -> {
             CompletableFuture<T> source;
             try {
-                source = Objects.requireNonNull(
-                        operation.apply(lease), "checkpoint replay operation");
+                source = Objects.requireNonNull(operation.apply(lease), "checkpoint replay operation");
             } catch (Throwable failure) {
                 source = CompletableFuture.failedFuture(failure);
             }
             CompletableFuture<T> result = new CompletableFuture<>();
-            source.whenComplete((value, failure) -> lease.release()
-                    .whenComplete((ignored, releaseFailure) -> {
-                        if (failure == null && releaseFailure == null) {
-                            result.complete(value);
-                            return;
-                        }
-                        Throwable exact = failure == null
-                                ? unwrap(releaseFailure)
-                                : unwrap(failure);
-                        if (failure != null && releaseFailure != null) {
-                            exact.addSuppressed(unwrap(releaseFailure));
-                        }
-                        result.completeExceptionally(exact);
-                    }));
+            source.whenComplete((value, failure) -> lease.release().whenComplete((ignored, releaseFailure) -> {
+                if (failure == null && releaseFailure == null) {
+                    result.complete(value);
+                    return;
+                }
+                Throwable exact = failure == null ? unwrap(releaseFailure) : unwrap(failure);
+                if (failure != null && releaseFailure != null) {
+                    exact.addSuppressed(unwrap(releaseFailure));
+                }
+                result.completeExceptionally(exact);
+            }));
             return result;
         });
     }
@@ -370,10 +313,7 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
         return result;
     }
 
-    private static void requireBounds(
-            int maximumLiveCommits,
-            int pageSize,
-            Duration timeout) {
+    private static void requireBounds(int maximumLiveCommits, int pageSize, Duration timeout) {
         Objects.requireNonNull(timeout, "timeout");
         if (maximumLiveCommits <= 0
                 || pageSize <= 0
@@ -386,8 +326,7 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = Objects.requireNonNull(failure, "failure");
-        while ((current instanceof CompletionException
-                        || current instanceof java.util.concurrent.ExecutionException)
+        while ((current instanceof CompletionException || current instanceof java.util.concurrent.ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -400,19 +339,12 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
 
     private static NereusException invariant(String message, Throwable cause) {
         return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message,
-                cause,
-                AppendOutcome.MAY_HAVE_COMMITTED);
+                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause, AppendOutcome.MAY_HAVE_COMMITTED);
     }
 
     private static NereusException condition(String message) {
         return new NereusException(
-                ErrorCode.METADATA_CONDITION_FAILED,
-                true,
-                message,
-                AppendOutcome.MAY_HAVE_COMMITTED);
+                ErrorCode.METADATA_CONDITION_FAILED, true, message, AppendOutcome.MAY_HAVE_COMMITTED);
     }
 
     private static String requireText(String value, String field) {
@@ -423,8 +355,7 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
         return value;
     }
 
-    private static final class RecoveryRootChangedException
-            extends RuntimeException {
+    private static final class RecoveryRootChangedException extends RuntimeException {
         private static final long serialVersionUID = 1L;
     }
 
@@ -441,9 +372,7 @@ public final class CheckpointAppendReplayReader implements AppendRecoverySearche
                 timeoutNanos = Long.MAX_VALUE;
             }
             long now = System.nanoTime();
-            expiresAtNanos = timeoutNanos >= Long.MAX_VALUE - now
-                    ? Long.MAX_VALUE
-                    : now + timeoutNanos;
+            expiresAtNanos = timeoutNanos >= Long.MAX_VALUE - now ? Long.MAX_VALUE : now + timeoutNanos;
         }
 
         private Duration remaining(String action) {

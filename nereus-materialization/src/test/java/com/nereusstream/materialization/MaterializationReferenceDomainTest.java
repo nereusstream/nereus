@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.OffsetRange;
@@ -26,18 +26,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class MaterializationReferenceDomainTest {
-    private static final Checksum EVIDENCE = new Checksum(
-            ChecksumType.SHA256, "e".repeat(64));
+    private static final Checksum EVIDENCE = new Checksum(ChecksumType.SHA256, "e".repeat(64));
 
     @Test
     void scansExactTaskSourcesAndDetectsAuthorityDrift() {
         List<VersionedGenerationCandidate> candidates = List.of(
-                MaterializationPlannerTestSupport.zero(
-                        "/index/task-domain-2", 0, 2, 0, 100, 2),
-                MaterializationPlannerTestSupport.zero(
-                        "/index/task-domain-4", 2, 4, 100, 100, 4));
-        MaterializationTask task = MaterializationPlannerTestSupport.planner(
-                        candidates, List.of(), 0, 4)
+                MaterializationPlannerTestSupport.zero("/index/task-domain-2", 0, 2, 0, 100, 2),
+                MaterializationPlannerTestSupport.zero("/index/task-domain-4", 2, 4, 100, 100, 4));
+        MaterializationTask task = MaterializationPlannerTestSupport.planner(candidates, List.of(), 0, 4)
                 .plan(
                         MaterializationPlannerTestSupport.STREAM,
                         new OffsetRange(0, 4),
@@ -45,15 +41,11 @@ class MaterializationReferenceDomainTest {
                         1)
                 .join()
                 .get(0);
-        VersionedMaterializationTask durable =
-                MaterializationPlannerTestSupport.durableTask(task, 9);
-        AtomicReference<List<VersionedMaterializationTask>> tasks =
-                new AtomicReference<>(List.of(durable));
+        VersionedMaterializationTask durable = MaterializationPlannerTestSupport.durableTask(task, 9);
+        AtomicReference<List<VersionedMaterializationTask>> tasks = new AtomicReference<>(List.of(durable));
         AtomicInteger scans = new AtomicInteger();
         MaterializationReferenceDomain domain = new MaterializationReferenceDomain(
-                MaterializationPlannerTestSupport.CLUSTER,
-                store(tasks, scans),
-                PhysicalGcConfig.defaults());
+                MaterializationPlannerTestSupport.CLUSTER, store(tasks, scans), PhysicalGcConfig.defaults());
         GcReferenceQuery query = query(task);
 
         var snapshot = domain.snapshot(query).join();
@@ -85,18 +77,15 @@ class MaterializationReferenceDomainTest {
                 MaterializationPlannerTestSupport.CLUSTER,
                 store(new AtomicReference<>(List.of()), scans),
                 PhysicalGcConfig.defaults());
-        VersionedGenerationCandidate candidate = MaterializationPlannerTestSupport.zero(
-                "/index/ownerless-task", 0, 2, 0, 100, 2);
-        ObjectSliceReadTarget target = (ObjectSliceReadTarget)
-                ((com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex) candidate)
+        VersionedGenerationCandidate candidate =
+                MaterializationPlannerTestSupport.zero("/index/ownerless-task", 0, 2, 0, 100, 2);
+        ObjectSliceReadTarget target =
+                (ObjectSliceReadTarget) ((com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex) candidate)
                         .value()
                         .readTarget();
         PhysicalObjectIdentity object = object(target);
-        GcReferenceQuery ownerless = GcReferenceQuery.create(
-                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
-                object,
-                List.of(),
-                EVIDENCE);
+        GcReferenceQuery ownerless =
+                GcReferenceQuery.create(GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE, object, List.of(), EVIDENCE);
 
         var snapshot = domain.snapshot(ownerless).join();
 
@@ -112,37 +101,30 @@ class MaterializationReferenceDomainTest {
                 MaterializationPlannerTestSupport.CLUSTER,
                 store(new AtomicReference<>(List.of()), scans),
                 PhysicalGcConfig.defaults(),
-                GcGlobalScopeTestSupport.complete(
-                        MaterializationPlannerTestSupport.STREAM));
-        VersionedGenerationCandidate candidate = MaterializationPlannerTestSupport.zero(
-                "/index/global-task", 0, 2, 0, 100, 2);
-        ObjectSliceReadTarget target = (ObjectSliceReadTarget)
-                ((com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex) candidate)
+                GcGlobalScopeTestSupport.complete(MaterializationPlannerTestSupport.STREAM));
+        VersionedGenerationCandidate candidate =
+                MaterializationPlannerTestSupport.zero("/index/global-task", 0, 2, 0, 100, 2);
+        ObjectSliceReadTarget target =
+                (ObjectSliceReadTarget) ((com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex) candidate)
                         .value()
                         .readTarget();
         GcReferenceQuery ownerless = GcReferenceQuery.create(
-                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
-                object(target),
-                List.of(),
-                EVIDENCE);
+                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE, object(target), List.of(), EVIDENCE);
 
         var snapshot = domain.snapshot(ownerless).join();
 
         assertThat(snapshot.complete()).isTrue();
         assertThat(snapshot.veto()).isFalse();
-        assertThat(snapshot.authorities()).singleElement()
-                .satisfies(authority -> assertThat(authority.authorityKey())
-                        .isEqualTo("/global/reference-scope"));
+        assertThat(snapshot.authorities()).singleElement().satisfies(authority -> assertThat(authority.authorityKey())
+                .isEqualTo("/global/reference-scope"));
         assertThat(scans).hasValue(1);
     }
 
     private static GcReferenceQuery query(MaterializationTask task) {
-        ObjectSliceReadTarget target = (ObjectSliceReadTarget) task.sources().get(0).readTarget();
+        ObjectSliceReadTarget target =
+                (ObjectSliceReadTarget) task.sources().get(0).readTarget();
         return GcReferenceQuery.create(
-                GcReferenceQueryKind.REFERENCED_OBJECT,
-                object(target),
-                List.of(task.streamId()),
-                EVIDENCE);
+                GcReferenceQueryKind.REFERENCED_OBJECT, object(target), List.of(task.streamId()), EVIDENCE);
     }
 
     private static PhysicalObjectIdentity object(ObjectSliceReadTarget target) {
@@ -157,8 +139,7 @@ class MaterializationReferenceDomainTest {
     }
 
     private static GenerationMetadataStore store(
-            AtomicReference<List<VersionedMaterializationTask>> tasks,
-            AtomicInteger scans) {
+            AtomicReference<List<VersionedMaterializationTask>> tasks, AtomicInteger scans) {
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
@@ -176,8 +157,7 @@ class MaterializationReferenceDomainTest {
                             scans.incrementAndGet();
                             yield CompletableFuture.completedFuture(new TaskScanPage(
                                     tasks.get().stream()
-                                            .sorted(java.util.Comparator.comparing(
-                                                    VersionedMaterializationTask::key))
+                                            .sorted(java.util.Comparator.comparing(VersionedMaterializationTask::key))
                                             .toList(),
                                     Optional.empty()));
                         }

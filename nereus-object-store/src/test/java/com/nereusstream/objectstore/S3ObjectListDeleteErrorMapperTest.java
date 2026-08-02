@@ -16,7 +16,6 @@ package com.nereusstream.objectstore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
@@ -81,8 +80,7 @@ class S3ObjectListDeleteErrorMapperTest {
                     .filter(value -> value.key().startsWith(request.prefix()))
                     .sorted(Comparator.comparing(S3Object::key))
                     .toList();
-            int start = request.continuationToken() == null
-                    ? 0 : Integer.parseInt(request.continuationToken());
+            int start = request.continuationToken() == null ? 0 : Integer.parseInt(request.continuationToken());
             int end = Math.min(matching.size(), start + request.maxKeys());
             boolean truncated = end < matching.size();
             return CompletableFuture.completedFuture(ListObjectsV2Response.builder()
@@ -99,10 +97,10 @@ class S3ObjectListDeleteErrorMapperTest {
         Optional<String> continuation = Optional.empty();
         do {
             ListObjectsResult page = store.listObjects(
-                    new ObjectKeyPrefix("a"),
-                    continuation,
-                    new ListObjectsOptions(1, TIMEOUT)).join();
-            keys.addAll(page.objects().stream().map(value -> value.key().value()).toList());
+                            new ObjectKeyPrefix("a"), continuation, new ListObjectsOptions(1, TIMEOUT))
+                    .join();
+            keys.addAll(
+                    page.objects().stream().map(value -> value.key().value()).toList());
             Optional<String> previous = continuation;
             continuation = page.continuationToken();
             assertThat(continuation).isNotEqualTo(previous);
@@ -124,7 +122,8 @@ class S3ObjectListDeleteErrorMapperTest {
         store = store(stub);
 
         assertThatThrownBy(() -> store.listObjects(
-                        new ObjectKeyPrefix("a"), Optional.empty(), new ListObjectsOptions(10, TIMEOUT)).join())
+                                new ObjectKeyPrefix("a"), Optional.empty(), new ListObjectsOptions(10, TIMEOUT))
+                        .join())
                 .satisfies(error -> assertThat(unwrap(error).code()).isEqualTo(ErrorCode.OBJECT_READ_FAILED));
     }
 
@@ -137,18 +136,22 @@ class S3ObjectListDeleteErrorMapperTest {
                 .contentLength(11L)
                 .eTag("etag-1")
                 .metadata(Map.of(
-                        S3CompatibleObjectStore.CHECKSUM_TYPE_METADATA, "CRC32C",
-                        S3CompatibleObjectStore.CHECKSUM_VALUE_METADATA, checksum.value()))
+                        S3CompatibleObjectStore.CHECKSUM_TYPE_METADATA,
+                        "CRC32C",
+                        S3CompatibleObjectStore.CHECKSUM_VALUE_METADATA,
+                        checksum.value()))
                 .build());
         AtomicReference<DeleteObjectRequest> deleted = new AtomicReference<>();
         stub.delete = request -> {
             deleted.set(request);
-            return CompletableFuture.completedFuture(DeleteObjectResponse.builder().build());
+            return CompletableFuture.completedFuture(
+                    DeleteObjectResponse.builder().build());
         };
         store = store(stub);
 
         DeleteObjectResult result = store.deleteObject(
-                key, new DeleteObjectOptions(11, checksum, Optional.of("etag-1"), TIMEOUT)).join();
+                        key, new DeleteObjectOptions(11, checksum, Optional.of("etag-1"), TIMEOUT))
+                .join();
         assertThat(result.status()).isEqualTo(DeleteObjectResult.Status.DELETED);
         assertThat(deleted.get().ifMatch()).isEqualTo("etag-1");
         store.close();
@@ -157,8 +160,9 @@ class S3ObjectListDeleteErrorMapperTest {
         absent.head = request -> CompletableFuture.failedFuture(service(404));
         absent.delete = request -> CompletableFuture.failedFuture(new AssertionError("delete must not run"));
         store = store(absent);
-        assertThat(store.deleteObject(
-                        key, new DeleteObjectOptions(11, checksum, Optional.of("etag-1"), TIMEOUT)).join().status())
+        assertThat(store.deleteObject(key, new DeleteObjectOptions(11, checksum, Optional.of("etag-1"), TIMEOUT))
+                        .join()
+                        .status())
                 .isEqualTo(DeleteObjectResult.Status.ALREADY_ABSENT);
     }
 
@@ -171,8 +175,10 @@ class S3ObjectListDeleteErrorMapperTest {
                 .contentLength(11L)
                 .eTag("etag-1")
                 .metadata(Map.of(
-                        S3CompatibleObjectStore.CHECKSUM_TYPE_METADATA, "CRC32C",
-                        S3CompatibleObjectStore.CHECKSUM_VALUE_METADATA, checksum.value()))
+                        S3CompatibleObjectStore.CHECKSUM_TYPE_METADATA,
+                        "CRC32C",
+                        S3CompatibleObjectStore.CHECKSUM_VALUE_METADATA,
+                        checksum.value()))
                 .build());
         List<Optional<String>> conditions = new ArrayList<>();
         stub.delete = request -> {
@@ -180,12 +186,14 @@ class S3ObjectListDeleteErrorMapperTest {
             if (request.ifMatch() != null) {
                 return CompletableFuture.failedFuture(service(501));
             }
-            return CompletableFuture.completedFuture(DeleteObjectResponse.builder().build());
+            return CompletableFuture.completedFuture(
+                    DeleteObjectResponse.builder().build());
         };
         store = store(stub);
 
         DeleteObjectResult result = store.deleteObject(
-                key, new DeleteObjectOptions(11, checksum, Optional.of("etag-1"), TIMEOUT)).join();
+                        key, new DeleteObjectOptions(11, checksum, Optional.of("etag-1"), TIMEOUT))
+                .join();
 
         assertThat(result.status()).isEqualTo(DeleteObjectResult.Status.DELETED);
         assertThat(conditions).containsExactly(Optional.of("etag-1"), Optional.empty());
@@ -194,8 +202,7 @@ class S3ObjectListDeleteErrorMapperTest {
     @Test
     void listAndDeleteServiceFailuresUseClosedRedactedMappings() {
         NereusException list = S3ObjectErrorMapper.list(service(503), "bucket");
-        NereusException delete = S3ObjectErrorMapper.delete(
-                service(403), "bucket", new ObjectKey("secret/key"));
+        NereusException delete = S3ObjectErrorMapper.delete(service(403), "bucket", new ObjectKey("secret/key"));
 
         assertThat(list.code()).isEqualTo(ErrorCode.OBJECT_READ_FAILED);
         assertThat(list.retriable()).isTrue();
@@ -241,8 +248,8 @@ class S3ObjectListDeleteErrorMapperTest {
         private Function<DeleteObjectRequest, CompletableFuture<DeleteObjectResponse>> delete;
 
         private S3AsyncClient proxy() {
-            return (S3AsyncClient) Proxy.newProxyInstance(
-                    getClass().getClassLoader(), new Class<?>[] {S3AsyncClient.class}, this);
+            return (S3AsyncClient)
+                    Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] {S3AsyncClient.class}, this);
         }
 
         @Override

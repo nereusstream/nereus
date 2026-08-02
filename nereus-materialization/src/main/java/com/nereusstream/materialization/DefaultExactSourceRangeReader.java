@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
@@ -79,9 +80,7 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
     }
 
     @Override
-    public CompletableFuture<ExactSourceRead> read(
-            SourceGeneration expected,
-            ReadOptions options) {
+    public CompletableFuture<ExactSourceRead> read(SourceGeneration expected, ReadOptions options) {
         try {
             SourceGeneration source = Objects.requireNonNull(expected, "expected");
             ReadOptions exactOptions = Objects.requireNonNull(options, "options");
@@ -93,23 +92,15 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
             if (source.readTarget() instanceof ObjectSliceReadTarget target) {
                 return revalidate(source)
                         .thenCompose(ignored -> identities.resolve(target, source.view()))
-                        .thenCompose(identity -> pins.acquire(
-                                identity,
-                                maximumReadDeadlineMillis,
-                                () -> revalidate(source)))
-                        .thenCompose(lease -> createRead(
-                                source,
-                                resolved,
-                                exactOptions,
-                                deadlineNanos,
-                                () -> lease.release().thenCompose(ignored -> revalidate(source))));
+                        .thenCompose(
+                                identity -> pins.acquire(identity, maximumReadDeadlineMillis, () -> revalidate(source)))
+                        .thenCompose(
+                                lease -> createRead(source, resolved, exactOptions, deadlineNanos, () -> lease.release()
+                                        .thenCompose(ignored -> revalidate(source))));
             }
-            return revalidate(source).thenCompose(ignored -> createRead(
-                    source,
-                    resolved,
-                    exactOptions,
-                    deadlineNanos,
-                    () -> revalidate(source)));
+            return revalidate(source)
+                    .thenCompose(ignored ->
+                            createRead(source, resolved, exactOptions, deadlineNanos, () -> revalidate(source)));
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -122,8 +113,7 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
             long deadlineNanos,
             ExactSourceLease lease) {
         try {
-            return CompletableFuture.completedFuture(new Session(
-                    source, resolved, options, deadlineNanos, lease));
+            return CompletableFuture.completedFuture(new Session(source, resolved, options, deadlineNanos, lease));
         } catch (Throwable failure) {
             return lease.release().handle((ignored, releaseFailure) -> {
                 if (releaseFailure != null) {
@@ -135,12 +125,9 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
     }
 
     private CompletableFuture<Void> revalidate(SourceGeneration expected) {
-        return generations.getCandidate(
-                        cluster,
-                        streamId,
-                        expected.view(),
-                        expected.range().endOffset(),
-                        expected.generation())
+        return generations
+                .getCandidate(
+                        cluster, streamId, expected.view(), expected.range().endOffset(), expected.generation())
                 .thenAccept(actual -> {
                     if (actual.isEmpty()
                             || !MaterializationSourceMapper.matchesExactSource(
@@ -218,10 +205,7 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
         @Override
         public void close() {
             cancellationRequested.set(true);
-            submit(() -> cancel(new NereusException(
-                    ErrorCode.CANCELLED,
-                    false,
-                    "exact source read was closed")));
+            submit(() -> cancel(new NereusException(ErrorCode.CANCELLED, false, "exact source read was closed")));
         }
 
         private void subscribe(Flow.Subscriber<? super ReadBatch> value) {
@@ -247,9 +231,7 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
                         public void cancel() {
                             cancellationRequested.set(true);
                             submit(() -> Session.this.cancel(new NereusException(
-                                    ErrorCode.CANCELLED,
-                                    false,
-                                    "exact source subscriber cancelled")));
+                                    ErrorCode.CANCELLED, false, "exact source subscriber cancelled")));
                         }
                     });
                 } catch (Throwable failure) {
@@ -275,14 +257,10 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
                 return;
             }
             if (cancellationRequested.get()) {
-                cancel(new NereusException(
-                        ErrorCode.CANCELLED, false, "exact source subscriber cancelled"));
+                cancel(new NereusException(ErrorCode.CANCELLED, false, "exact source subscriber cancelled"));
                 return;
             }
-            while (demand > 0
-                    && !page.isEmpty()
-                    && !terminal
-                    && !cancellationRequested.get()) {
+            while (demand > 0 && !page.isEmpty() && !terminal && !cancellationRequested.get()) {
                 ReadBatch batch = page.removeFirst();
                 try {
                     account(batch);
@@ -294,8 +272,7 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
                 }
             }
             if (cancellationRequested.get() && !terminal) {
-                cancel(new NereusException(
-                        ErrorCode.CANCELLED, false, "exact source subscriber cancelled"));
+                cancel(new NereusException(ErrorCode.CANCELLED, false, "exact source subscriber cancelled"));
                 return;
             }
             if (terminal || !page.isEmpty() || inFlight != null) {
@@ -312,21 +289,12 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
 
         private void readPage() {
             int remainingRecords = Math.toIntExact(source.range().endOffset() - cursor);
-            int pageRecords = Math.min(
-                    Math.min(options.maxRecords(), sourceReadPageRecords), remainingRecords);
+            int pageRecords = Math.min(Math.min(options.maxRecords(), sourceReadPageRecords), remainingRecords);
             int pageBytes = Math.min(options.maxBytes(), sourceReadPageBytes);
             ReadOptions pageOptions;
             try {
-                pageOptions = new ReadOptions(
-                        pageRecords,
-                        pageBytes,
-                        options.isolation(),
-                        remaining());
-                inFlight = dispatcher.read(
-                        streamId,
-                        cursor,
-                        List.of(resolved),
-                        pageOptions);
+                pageOptions = new ReadOptions(pageRecords, pageBytes, options.isolation(), remaining());
+                inFlight = dispatcher.read(streamId, cursor, List.of(resolved), pageOptions);
             } catch (Throwable failure) {
                 fail(failure, true);
                 return;
@@ -342,7 +310,8 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
                     return;
                 }
                 try {
-                    List<ReadBatch> batches = Objects.requireNonNull(result, "read result").batches();
+                    List<ReadBatch> batches =
+                            Objects.requireNonNull(result, "read result").batches();
                     validatePage(batches, pageOptions);
                     page.addAll(batches);
                     drain();
@@ -478,14 +447,9 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
         }
 
         private Duration remaining() {
-            long nanos = deadlineNanos == Long.MAX_VALUE
-                    ? Long.MAX_VALUE
-                    : deadlineNanos - System.nanoTime();
+            long nanos = deadlineNanos == Long.MAX_VALUE ? Long.MAX_VALUE : deadlineNanos - System.nanoTime();
             if (nanos <= 0) {
-                throw new NereusException(
-                        ErrorCode.TIMEOUT,
-                        true,
-                        "exact source read deadline expired");
+                throw new NereusException(ErrorCode.TIMEOUT, true, "exact source read deadline expired");
             }
             return Duration.ofNanos(nanos);
         }
@@ -495,11 +459,13 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
                 serial.execute(action);
             } catch (RejectedExecutionException failure) {
                 if (!terminal) {
-                    fail(new NereusException(
-                            ErrorCode.STORAGE_CLOSED,
-                            false,
-                            "exact source callback executor rejected admitted work",
-                            failure), true);
+                    fail(
+                            new NereusException(
+                                    ErrorCode.STORAGE_CLOSED,
+                                    false,
+                                    "exact source callback executor rejected admitted work",
+                                    failure),
+                            true);
                 }
             }
         }
@@ -508,8 +474,7 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
     private static void rejectSecondSubscriber(Flow.Subscriber<? super ReadBatch> subscriber) {
         try {
             subscriber.onSubscribe(NoopSubscription.INSTANCE);
-            subscriber.onError(new IllegalStateException(
-                    "exact source publisher permits exactly one subscriber"));
+            subscriber.onError(new IllegalStateException("exact source publisher permits exactly one subscriber"));
         } catch (Throwable ignored) {
             // No state is owned by a rejected subscriber.
         }
@@ -559,24 +524,17 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
 
     private static NereusException sourceChanged(String message) {
         return new MaterializationExecutionException(
-                TaskFailureClass.SOURCE_CHANGED,
-                ErrorCode.METADATA_CONDITION_FAILED,
-                true,
-                message);
+                TaskFailureClass.SOURCE_CHANGED, ErrorCode.METADATA_CONDITION_FAILED, true, message);
     }
 
     private static NereusException outputInvariant(String message) {
         return new MaterializationExecutionException(
-                TaskFailureClass.OUTPUT_INVARIANT,
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message);
+                TaskFailureClass.OUTPUT_INVARIANT, ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while ((current instanceof CompletionException
-                        || current instanceof java.util.concurrent.ExecutionException)
+        while ((current instanceof CompletionException || current instanceof java.util.concurrent.ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -595,12 +553,10 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
         INSTANCE;
 
         @Override
-        public void request(long count) {
-        }
+        public void request(long count) {}
 
         @Override
-        public void cancel() {
-        }
+        public void cancel() {}
     }
 
     @FunctionalInterface

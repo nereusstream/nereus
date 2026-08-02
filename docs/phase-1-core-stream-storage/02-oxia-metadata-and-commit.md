@@ -1137,8 +1137,8 @@ Algorithm:
    needed by the caller's bounded resolve window, once it reaches offset `0`, or once the repair budget is
    exhausted.
 6. For each reachable commit record, idempotently put:
-   - `/offset-index/{offsetEnd}/{generation}`；
-   - `/committed-slices/{objectIdComponent}/{sliceIdComponent}`。
+    - `/offset-index/{offsetEnd}/{generation}`；
+    - `/committed-slices/{objectIdComponent}/{sliceIdComponent}`。
 7. If `maxCommitsToScan` is exhausted before the target offset is covered, return
    `targetCovered=false`、`repairBudgetExhausted=true` and a non-empty continuation cursor。The resolver may
    pass that cursor to the next bounded call within the same read timeout；restarting from head is not
@@ -1334,17 +1334,17 @@ Watch rules:
 
 ## 12. Failure Semantics
 
-| Failure | Metadata outcome | Caller behavior |
-| --- | --- | --- |
-| Oxia unavailable before object upload | no metadata commit | retry append later |
-| object upload succeeds, manifest put fails | orphan by object store naming; no visibility | retry manifest or GC after TTL |
-| manifest succeeds, slice commit fails due to stale token | manifest remains uploaded; no visibility | reacquire session and retry or abandon |
-| timeout after head CAS is sent | commit may or may not have succeeded; derived indexes may lag | retry same physical slice can use head chain or committed-slice marker; caller-level retry may duplicate |
-| head CAS succeeds but derived index materialization times out | stream head is committed; normal read may need repair | retry same physical slice should finish materialization before ack |
-| slice commit succeeds, ack response lost | data visible after derived index materialization; committed-slice marker or head chain exists | retry can return idempotent commit result |
-| slice commit succeeds, object reference update fails | data visible; object reference stale | rebuild from head chain and idempotently materialize/validate derived indexes |
-| offset conflict | no new index entry | refresh committedEndOffset and retry |
-| checksum mismatch | no index entry | fail non-retriably and quarantine object |
+| Failure                                                       | Metadata outcome                                                                              | Caller behavior                                                                                          |
+|---------------------------------------------------------------|-----------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| Oxia unavailable before object upload                         | no metadata commit                                                                            | retry append later                                                                                       |
+| object upload succeeds, manifest put fails                    | orphan by object store naming; no visibility                                                  | retry manifest or GC after TTL                                                                           |
+| manifest succeeds, slice commit fails due to stale token      | manifest remains uploaded; no visibility                                                      | reacquire session and retry or abandon                                                                   |
+| timeout after head CAS is sent                                | commit may or may not have succeeded; derived indexes may lag                                 | retry same physical slice can use head chain or committed-slice marker; caller-level retry may duplicate |
+| head CAS succeeds but derived index materialization times out | stream head is committed; normal read may need repair                                         | retry same physical slice should finish materialization before ack                                       |
+| slice commit succeeds, ack response lost                      | data visible after derived index materialization; committed-slice marker or head chain exists | retry can return idempotent commit result                                                                |
+| slice commit succeeds, object reference update fails          | data visible; object reference stale                                                          | rebuild from head chain and idempotently materialize/validate derived indexes                            |
+| offset conflict                                               | no new index entry                                                                            | refresh committedEndOffset and retry                                                                     |
+| checksum mismatch                                             | no index entry                                                                                | fail non-retriably and quarantine object                                                                 |
 
 ## 13. Fake Metadata Store for Tests
 

@@ -14,8 +14,8 @@
 
 package com.nereusstream.objectstore.wal;
 
-import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.NereusException;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -26,8 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 
 final class WalBinary {
-    private WalBinary() {
-    }
+    private WalBinary() {}
 
     static final class Writer {
         private final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -117,7 +116,8 @@ final class WalBinary {
         String string() {
             byte[] bytes = bytes();
             try {
-                return StandardCharsets.UTF_8.newDecoder()
+                return StandardCharsets.UTF_8
+                        .newDecoder()
                         .onMalformedInput(CodingErrorAction.REPORT)
                         .onUnmappableCharacter(CodingErrorAction.REPORT)
                         .decode(ByteBuffer.wrap(bytes))

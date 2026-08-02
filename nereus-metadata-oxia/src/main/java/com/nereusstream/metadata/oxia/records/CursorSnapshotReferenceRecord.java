@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.Checksum;
@@ -6,7 +7,9 @@ import com.nereusstream.api.ChecksumType;
 import com.nereusstream.metadata.oxia.CursorIds;
 import java.util.Objects;
 
-/** Immutable object-store reference embedded in one cursor root. */
+/**
+ * Immutable object-store reference embedded in one cursor root.
+ */
 public record CursorSnapshotReferenceRecord(
         String objectKey,
         String snapshotId,

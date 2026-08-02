@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.checkpoint;
 
 import com.nereusstream.api.Checksum;
@@ -44,7 +45,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
-/** Private-staging NRC1 writer and exact object-store range reader. */
+/**
+ * Private-staging NRC1 writer and exact object-store range reader.
+ */
 public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpointCodecV1 {
     private static final int PUBLICATION_DIRECTORY_ENTRY_BYTES = Integer.BYTES + Long.BYTES;
     private static final int COMMIT_DIRECTORY_ENTRY_BYTES = Long.BYTES * 3;
@@ -77,9 +80,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         CompletableFuture<RecoveryCheckpointWriteResult> result = new CompletableFuture<>();
         if (request == null || publications == null || entries == null) {
             result.completeExceptionally(new NereusException(
-                    ErrorCode.INVALID_ARGUMENT,
-                    false,
-                    "recovery checkpoint request and both publishers are required"));
+                    ErrorCode.INVALID_ARGUMENT, false, "recovery checkpoint request and both publishers are required"));
             return result;
         }
         SerialExecutor serial = new SerialExecutor(codecExecutor);
@@ -99,10 +100,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             });
         } catch (RejectedExecutionException failure) {
             result.completeExceptionally(new NereusException(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    "recovery checkpoint executor rejected the operation",
-                    failure));
+                    ErrorCode.STORAGE_CLOSED, false, "recovery checkpoint executor rejected the operation", failure));
         }
         result.whenComplete((ignored, failure) -> {
             if (result.isCancelled()) {
@@ -123,11 +121,9 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             Duration timeout) {
         final List<RecoveryCheckpointObject> exactSources;
         try {
-            exactSources = validateMergeInputs(
-                    sources, checkpointSequence, checkpointAttemptId, timeout);
+            exactSources = validateMergeInputs(sources, checkpointSequence, checkpointAttemptId, timeout);
         } catch (RuntimeException failure) {
-            return CompletableFuture.failedFuture(
-                    mapWriteFailure("validate recovery checkpoint merge", failure));
+            return CompletableFuture.failedFuture(mapWriteFailure("validate recovery checkpoint merge", failure));
         }
 
         CompletableFuture<RecoveryCheckpointMergeResult> result = new CompletableFuture<>();
@@ -137,11 +133,8 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 if (result.isCancelled()) {
                     return;
                 }
-                MergeOperation operation = new MergeOperation(
-                        exactSources,
-                        checkpointSequence,
-                        checkpointAttemptId,
-                        timeout);
+                MergeOperation operation =
+                        new MergeOperation(exactSources, checkpointSequence, checkpointAttemptId, timeout);
                 admitted.set(operation);
                 operation.run().whenComplete((merged, failure) -> {
                     if (failure == null) {
@@ -149,17 +142,13 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                             merged.close();
                         }
                     } else {
-                        result.completeExceptionally(mapWriteFailure(
-                                "merge recovery checkpoint objects", failure));
+                        result.completeExceptionally(mapWriteFailure("merge recovery checkpoint objects", failure));
                     }
                 });
             });
         } catch (RejectedExecutionException failure) {
             result.completeExceptionally(new NereusException(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    "recovery checkpoint executor rejected the merge",
-                    failure));
+                    ErrorCode.STORAGE_CLOSED, false, "recovery checkpoint executor rejected the merge", failure));
         }
         result.whenComplete((ignored, failure) -> {
             if (result.isCancelled()) {
@@ -174,10 +163,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
 
     @Override
     public CompletableFuture<RecoveryCheckpointObject> openAndVerify(
-            ObjectKey key,
-            long expectedLength,
-            Checksum expectedContentSha256,
-            Duration timeout) {
+            ObjectKey key, long expectedLength, Checksum expectedContentSha256, Duration timeout) {
         try {
             Objects.requireNonNull(key, "key");
             requireObjectLength(expectedLength);
@@ -188,17 +174,15 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         }
         CheckpointReadDeadline deadline = new CheckpointReadDeadline(timeout);
         long footerOffset = expectedLength - RecoveryCheckpointFormatV1.FOOTER_BYTES;
-        CompletableFuture<Void> head = objectStore.headObject(key, new HeadObjectOptions(deadline.remaining()))
+        CompletableFuture<Void> head = objectStore
+                .headObject(key, new HeadObjectOptions(deadline.remaining()))
                 .thenAccept(value -> {
                     if (!value.key().equals(key) || value.objectLength() != expectedLength) {
                         throw corrupt("recovery checkpoint HEAD identity or length mismatch");
                     }
                 });
         CompletableFuture<RecoveryCheckpointBinary.Footer> footer = readExact(
-                        key,
-                        footerOffset,
-                        RecoveryCheckpointFormatV1.FOOTER_BYTES,
-                        deadline)
+                        key, footerOffset, RecoveryCheckpointFormatV1.FOOTER_BYTES, deadline)
                 .thenApply(RecoveryCheckpointBinary::decodeFooter)
                 .thenApply(value -> {
                     validateFooterBounds(value.directory(), expectedLength);
@@ -212,27 +196,20 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                     CompletableFuture<RecoveryCheckpointBinary.Decoded<RecoveryCheckpointWriteRequest>> header =
                             readExact(key, 0, headerReadLength, deadline)
                                     .thenApply(RecoveryCheckpointBinary::decodeHeader);
-                    CompletableFuture<PublicationOffsets> publications = readPublicationDirectory(
-                            key, value.directory(), deadline);
-                    CompletableFuture<CommitOffsets> commits = readCommitDirectory(
-                            key, value.directory(), deadline);
-                    CompletableFuture<Void> digests = verifyDigests(
-                            key,
-                            expectedLength,
-                            value.bodySha256(),
-                            expectedContentSha256,
-                            deadline);
+                    CompletableFuture<PublicationOffsets> publications =
+                            readPublicationDirectory(key, value.directory(), deadline);
+                    CompletableFuture<CommitOffsets> commits = readCommitDirectory(key, value.directory(), deadline);
+                    CompletableFuture<Void> digests =
+                            verifyDigests(key, expectedLength, value.bodySha256(), expectedContentSha256, deadline);
                     return header.thenCombine(publications, HeaderAndPublications::new)
                             .thenCombine(commits, HeaderPublicationsAndCommits::new)
                             .thenCombine(digests, (state, ignored) -> {
                                 validateDirectories(
-                                        state.header(),
-                                        state.publications(),
-                                        state.commits(),
-                                        value.directory());
-                                RecoveryCheckpointWriteRequest request = state.header().value();
-                                ObjectKey expectedKey = RecoveryCheckpointFormatV1.objectKey(
-                                        request, expectedContentSha256);
+                                        state.header(), state.publications(), state.commits(), value.directory());
+                                RecoveryCheckpointWriteRequest request =
+                                        state.header().value();
+                                ObjectKey expectedKey =
+                                        RecoveryCheckpointFormatV1.objectKey(request, expectedContentSha256);
                                 if (!expectedKey.equals(key)) {
                                     throw corrupt("NRC1 header does not reproduce the exact object key");
                                 }
@@ -256,10 +233,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
 
     @Override
     public CompletableFuture<Optional<RecoveryCheckpointPublication>> findPublication(
-            RecoveryCheckpointObject object,
-            long generation,
-            PublicationId publicationId,
-            Duration timeout) {
+            RecoveryCheckpointObject object, long generation, PublicationId publicationId, Duration timeout) {
         try {
             Objects.requireNonNull(object, "object");
             if (generation <= 0) {
@@ -271,11 +245,12 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             return failedRead("invalid recovery checkpoint publication lookup", failure);
         }
         CheckpointReadDeadline deadline = new CheckpointReadDeadline(timeout);
-        CompletableFuture<PublicationOffsets> publications = readPublicationDirectory(
-                object.objectKey(), object.directory(), deadline);
-        CompletableFuture<CommitOffsets> commits = readCommitDirectory(
-                object.objectKey(), object.directory(), deadline);
-        return publications.thenCombine(commits, DirectoryState::new)
+        CompletableFuture<PublicationOffsets> publications =
+                readPublicationDirectory(object.objectKey(), object.directory(), deadline);
+        CompletableFuture<CommitOffsets> commits =
+                readCommitDirectory(object.objectKey(), object.directory(), deadline);
+        return publications
+                .thenCombine(commits, DirectoryState::new)
                 .thenCompose(state -> findPublication(
                         object,
                         state.publications(),
@@ -295,16 +270,12 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
 
     @Override
     public CompletableFuture<RecoveryCheckpointPublicationPage> scanPublications(
-            RecoveryCheckpointObject object,
-            OptionalInt continuation,
-            int limit,
-            Duration timeout) {
+            RecoveryCheckpointObject object, OptionalInt continuation, int limit, Duration timeout) {
         try {
             Objects.requireNonNull(object, "object");
             Objects.requireNonNull(continuation, "continuation");
             if (limit <= 0 || limit > RecoveryCheckpointFormatV1.MAX_PUBLICATION_SCAN_PAGE_SIZE) {
-                throw new IllegalArgumentException(
-                        "publication scan limit must be in [1, 1000]");
+                throw new IllegalArgumentException("publication scan limit must be in [1, 1000]");
             }
             requireTimeout(timeout);
         } catch (RuntimeException failure) {
@@ -314,19 +285,18 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         if (start < 0 || start >= object.header().expectedPublicationCount()) {
             return failedRead(
                     "invalid recovery checkpoint publication continuation",
-                    new IllegalArgumentException(
-                            "publication continuation is outside the table"));
+                    new IllegalArgumentException("publication continuation is outside the table"));
         }
         CheckpointReadDeadline deadline = new CheckpointReadDeadline(timeout);
-        CompletableFuture<PublicationOffsets> publications = readPublicationDirectory(
-                object.objectKey(), object.directory(), deadline);
-        CompletableFuture<CommitOffsets> commits = readCommitDirectory(
-                object.objectKey(), object.directory(), deadline);
-        return publications.thenCombine(commits, DirectoryState::new)
+        CompletableFuture<PublicationOffsets> publications =
+                readPublicationDirectory(object.objectKey(), object.directory(), deadline);
+        CompletableFuture<CommitOffsets> commits =
+                readCommitDirectory(object.objectKey(), object.directory(), deadline);
+        return publications
+                .thenCombine(commits, DirectoryState::new)
                 .thenCompose(state -> {
                     int end = Math.min(
-                            Math.addExact(start, limit),
-                            state.publications().fileOffsets().length);
+                            Math.addExact(start, limit), state.publications().fileOffsets().length);
                     ArrayList<RecoveryCheckpointPublication> values = new ArrayList<>(end - start);
                     return readPublicationPage(
                                     object,
@@ -344,8 +314,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 })
                 .handle((value, failure) -> {
                     if (failure != null) {
-                        throw new CompletionException(mapReadFailure(
-                                "scan recovery checkpoint publications", failure));
+                        throw new CompletionException(mapReadFailure("scan recovery checkpoint publications", failure));
                     }
                     return value;
                 });
@@ -366,21 +335,13 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 .thenCompose(value -> {
                     values.add(value);
                     return readPublicationPage(
-                            object,
-                            offsets,
-                            publicationRecordsEnd,
-                            index + 1,
-                            end,
-                            values,
-                            deadline);
+                            object, offsets, publicationRecordsEnd, index + 1, end, values, deadline);
                 });
     }
 
     @Override
     public CompletableFuture<Optional<RecoveryCheckpointEntry>> findCommitCoveringOffset(
-            RecoveryCheckpointObject object,
-            long offset,
-            Duration timeout) {
+            RecoveryCheckpointObject object, long offset, Duration timeout) {
         try {
             Objects.requireNonNull(object, "object");
             if (offset < 0) {
@@ -394,11 +355,12 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             return CompletableFuture.completedFuture(Optional.empty());
         }
         CheckpointReadDeadline deadline = new CheckpointReadDeadline(timeout);
-        CompletableFuture<PublicationOffsets> publications = readPublicationDirectory(
-                object.objectKey(), object.directory(), deadline);
-        CompletableFuture<CommitOffsets> commits = readCommitDirectory(
-                object.objectKey(), object.directory(), deadline);
-        return publications.thenCombine(commits, DirectoryState::new)
+        CompletableFuture<PublicationOffsets> publications =
+                readPublicationDirectory(object.objectKey(), object.directory(), deadline);
+        CompletableFuture<CommitOffsets> commits =
+                readCommitDirectory(object.objectKey(), object.directory(), deadline);
+        return publications
+                .thenCombine(commits, DirectoryState::new)
                 .thenCompose(state -> {
                     int block = floorIndex(state.commits().offsetStarts(), offset);
                     if (block < 0) {
@@ -425,8 +387,8 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 })
                 .handle((value, failure) -> {
                     if (failure != null) {
-                        throw new CompletionException(mapReadFailure(
-                                "find recovery checkpoint commit by offset", failure));
+                        throw new CompletionException(
+                                mapReadFailure("find recovery checkpoint commit by offset", failure));
                     }
                     return value;
                 });
@@ -434,10 +396,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
 
     @Override
     public CompletableFuture<Optional<RecoveryCheckpointEntry>> findCommit(
-            RecoveryCheckpointObject object,
-            long commitVersion,
-            String commitId,
-            Duration timeout) {
+            RecoveryCheckpointObject object, long commitVersion, String commitId, Duration timeout) {
         try {
             Objects.requireNonNull(object, "object");
             RecoveryCheckpointValidation.requireText(commitId, "commitId");
@@ -450,15 +409,15 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             return CompletableFuture.completedFuture(Optional.empty());
         }
         CheckpointReadDeadline deadline = new CheckpointReadDeadline(timeout);
-        CompletableFuture<PublicationOffsets> publications = readPublicationDirectory(
-                object.objectKey(), object.directory(), deadline);
-        CompletableFuture<CommitOffsets> commits = readCommitDirectory(
-                object.objectKey(), object.directory(), deadline);
-        return publications.thenCombine(commits, DirectoryState::new)
+        CompletableFuture<PublicationOffsets> publications =
+                readPublicationDirectory(object.objectKey(), object.directory(), deadline);
+        CompletableFuture<CommitOffsets> commits =
+                readCommitDirectory(object.objectKey(), object.directory(), deadline);
+        return publications
+                .thenCombine(commits, DirectoryState::new)
                 .thenCompose(state -> {
-                    int block = Math.toIntExact(
-                            (commitVersion - header.firstCommitVersion())
-                                    / RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE);
+                    int block = Math.toIntExact((commitVersion - header.firstCommitVersion())
+                            / RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE);
                     long start = state.commits().fileOffsets()[block];
                     long end = block + 1 < state.commits().fileOffsets().length
                             ? state.commits().fileOffsets()[block + 1]
@@ -535,13 +494,11 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             int index,
             CheckpointReadDeadline deadline) {
         long start = offsets.fileOffsets()[index];
-        long end = index + 1 < offsets.fileOffsets().length
-                ? offsets.fileOffsets()[index + 1]
-                : publicationRecordsEnd;
+        long end = index + 1 < offsets.fileOffsets().length ? offsets.fileOffsets()[index + 1] : publicationRecordsEnd;
         long length = end - start;
         if (length <= 0 || length > RecoveryCheckpointFormatV1.MAX_RECORD_BYTES) {
-            return CompletableFuture.failedFuture(corrupt(
-                    "NRC1 publication directory points to an invalid record length"));
+            return CompletableFuture.failedFuture(
+                    corrupt("NRC1 publication directory points to an invalid record length"));
         }
         return readExact(object.objectKey(), start, length, deadline).thenApply(bytes -> {
             RecoveryCheckpointBinary.Decoded<RecoveryCheckpointPublication> decoded =
@@ -574,12 +531,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 if (!entry.commitId().equals(commitId)) {
                     return CompletableFuture.completedFuture(Optional.empty());
                 }
-                return verifyPublicationReferences(
-                                object,
-                                publicationOffsets,
-                                publicationRecordsEnd,
-                                entry,
-                                deadline)
+                return verifyPublicationReferences(object, publicationOffsets, publicationRecordsEnd, entry, deadline)
                         .thenApply(ignored -> Optional.of(entry));
             }
             if (entry.commitVersion() > commitVersion) {
@@ -605,12 +557,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             validateEntryBounds(object.header(), entry);
             verifier.verifyEntry(object.header(), entry);
             if (entry.range().contains(offset)) {
-                return verifyPublicationReferences(
-                                object,
-                                publicationOffsets,
-                                publicationRecordsEnd,
-                                entry,
-                                deadline)
+                return verifyPublicationReferences(object, publicationOffsets, publicationRecordsEnd, entry, deadline)
                         .thenApply(ignored -> Optional.of(entry));
             }
             if (entry.range().startOffset() > offset) {
@@ -632,41 +579,30 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         List<CompletableFuture<RecoveryCheckpointPublication>> reads = new ArrayList<>();
         for (int index : entry.coveringPublicationIndexes()) {
             if (index >= publicationOffsets.fileOffsets().length) {
-                return CompletableFuture.failedFuture(corrupt(
-                        "NRC1 commit entry references a publication outside the table"));
+                return CompletableFuture.failedFuture(
+                        corrupt("NRC1 commit entry references a publication outside the table"));
             }
             reads.add(readPublicationAt(object, publicationOffsets, publicationRecordsEnd, index, deadline));
         }
         return CompletableFuture.allOf(reads.toArray(CompletableFuture[]::new)).thenRun(() -> {
             List<Coverage> coverages = reads.stream()
                     .map(CompletableFuture::join)
-                    .map(value -> new Coverage(value.coverage().startOffset(), value.coverage().endOffset()))
+                    .map(value -> new Coverage(
+                            value.coverage().startOffset(), value.coverage().endOffset()))
                     .toList();
             requireCovered(entry, coverages);
         });
     }
 
     private CompletableFuture<PublicationOffsets> readPublicationDirectory(
-            ObjectKey key,
-            RecoveryCheckpointDirectory directory,
-            CheckpointReadDeadline deadline) {
-        return readExact(
-                        key,
-                        directory.publicationDirectoryOffset(),
-                        directory.publicationDirectoryLength(),
-                        deadline)
+            ObjectKey key, RecoveryCheckpointDirectory directory, CheckpointReadDeadline deadline) {
+        return readExact(key, directory.publicationDirectoryOffset(), directory.publicationDirectoryLength(), deadline)
                 .thenApply(DefaultRecoveryCheckpointCodecV1::decodePublicationDirectory);
     }
 
     private CompletableFuture<CommitOffsets> readCommitDirectory(
-            ObjectKey key,
-            RecoveryCheckpointDirectory directory,
-            CheckpointReadDeadline deadline) {
-        return readExact(
-                        key,
-                        directory.commitDirectoryOffset(),
-                        directory.commitDirectoryLength(),
-                        deadline)
+            ObjectKey key, RecoveryCheckpointDirectory directory, CheckpointReadDeadline deadline) {
+        return readExact(key, directory.commitDirectoryOffset(), directory.commitDirectoryLength(), deadline)
                 .thenApply(DefaultRecoveryCheckpointCodecV1::decodeCommitDirectory);
     }
 
@@ -683,8 +619,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 .thenRun(() -> {
                     Checksum actualBody = checksum(body.digest());
                     Checksum actualContent = checksum(content.digest());
-                    if (!actualBody.equals(expectedBodySha256)
-                            || !actualContent.equals(expectedContentSha256)) {
+                    if (!actualBody.equals(expectedBodySha256) || !actualContent.equals(expectedContentSha256)) {
                         throw corrupt("NRC1 body or complete-object SHA256 mismatch");
                     }
                 });
@@ -718,26 +653,16 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
     }
 
     private CompletableFuture<ByteBuffer> readExact(
-            ObjectKey key,
-            long offset,
-            long length,
-            CheckpointReadDeadline deadline) {
+            ObjectKey key, long offset, long length, CheckpointReadDeadline deadline) {
         if (length < 0 || length > Integer.MAX_VALUE) {
             return CompletableFuture.failedFuture(corrupt("NRC1 range read exceeds the bounded buffer limit"));
         }
-        return objectStore.readRange(
-                        key,
-                        offset,
-                        length,
-                        new RangeReadOptions(Optional.empty(), deadline.remaining()))
+        return objectStore
+                .readRange(key, offset, length, new RangeReadOptions(Optional.empty(), deadline.remaining()))
                 .thenApply(result -> validateRange(result, key, offset, length));
     }
 
-    private static ByteBuffer validateRange(
-            RangeReadResult result,
-            ObjectKey key,
-            long offset,
-            long length) {
+    private static ByteBuffer validateRange(RangeReadResult result, ObjectKey key, long offset, long length) {
         if (!result.key().equals(key)
                 || result.offset() != offset
                 || result.length() != length
@@ -780,12 +705,10 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         requireRemaining(reader, Integer.BYTES * 2, "commit directory header");
         int stride = reader.getInt();
         int count = reader.getInt();
-        int maximumCount = (RecoveryCheckpointFormatV1.MAX_ENTRY_COUNT
-                        + RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE - 1)
-                / RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE;
-        if (stride != RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE
-                || count <= 0
-                || count > maximumCount) {
+        int maximumCount =
+                (RecoveryCheckpointFormatV1.MAX_ENTRY_COUNT + RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE - 1)
+                        / RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE;
+        if (stride != RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE || count <= 0 || count > maximumCount) {
             throw corrupt("NRC1 commit directory stride or count is invalid");
         }
         long expectedLength = Integer.BYTES * 2L + (long) count * COMMIT_DIRECTORY_ENTRY_BYTES;
@@ -802,9 +725,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             long version = reader.getLong();
             long offsetStart = reader.getLong();
             long fileOffset = reader.getLong();
-            if (version <= previousVersion
-                    || offsetStart <= previousOffsetStart
-                    || fileOffset <= previousFileOffset) {
+            if (version <= previousVersion || offsetStart <= previousOffsetStart || fileOffset <= previousFileOffset) {
                 throw corrupt("NRC1 commit directory is not strictly ordered");
             }
             versions[index] = version;
@@ -836,27 +757,23 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             throw corrupt("NRC1 commit directory count differs from the header");
         }
         if (publications.fileOffsets()[0] != header.bytesConsumed()
-                || publications.fileOffsets()[publications.fileOffsets().length - 1]
-                        >= commits.fileOffsets()[0]
+                || publications.fileOffsets()[publications.fileOffsets().length - 1] >= commits.fileOffsets()[0]
                 || commits.fileOffsets()[0] <= header.bytesConsumed()
-                || commits.fileOffsets()[commits.fileOffsets().length - 1]
-                        >= directory.publicationDirectoryOffset()
+                || commits.fileOffsets()[commits.fileOffsets().length - 1] >= directory.publicationDirectoryOffset()
                 || commits.versions()[0] != request.firstCommitVersion()
                 || commits.offsetStarts()[0] != request.coverage().startOffset()) {
             throw corrupt("NRC1 directory record bounds do not match header/body sections");
         }
         for (int index = 0; index < commits.versions().length; index++) {
-            long expectedVersion = request.firstCommitVersion()
-                    + (long) index * RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE;
+            long expectedVersion =
+                    request.firstCommitVersion() + (long) index * RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE;
             if (commits.versions()[index] != expectedVersion) {
                 throw corrupt("NRC1 sparse commit directory version is non-canonical");
             }
         }
     }
 
-    private static void validateFooterBounds(
-            RecoveryCheckpointDirectory directory,
-            long objectLength) {
+    private static void validateFooterBounds(RecoveryCheckpointDirectory directory, long objectLength) {
         long footerOffset = objectLength - RecoveryCheckpointFormatV1.FOOTER_BYTES;
         if (directory.commitDirectoryOffset() + directory.commitDirectoryLength() != footerOffset
                 || directory.publicationDirectoryOffset() >= footerOffset) {
@@ -864,9 +781,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         }
     }
 
-    private void validatePublication(
-            RecoveryCheckpointWriteRequest header,
-            RecoveryCheckpointPublication publication) {
+    private void validatePublication(RecoveryCheckpointWriteRequest header, RecoveryCheckpointPublication publication) {
         if (publication.coverage().startOffset() < header.coverage().startOffset()
                 || publication.coverage().endOffset() > header.coverage().endOffset()) {
             throw corrupt("NRC1 publication coverage is outside checkpoint coverage");
@@ -874,9 +789,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         verifier.verifyPublication(header, publication);
     }
 
-    private static void validateEntryBounds(
-            RecoveryCheckpointWriteRequest header,
-            RecoveryCheckpointEntry entry) {
+    private static void validateEntryBounds(RecoveryCheckpointWriteRequest header, RecoveryCheckpointEntry entry) {
         if (entry.commitVersion() < header.firstCommitVersion()
                 || entry.commitVersion() > header.lastCommitVersion()
                 || entry.range().startOffset() < header.coverage().startOffset()
@@ -891,9 +804,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
     }
 
     private static int comparePublication(
-            RecoveryCheckpointPublication actual,
-            long generation,
-            PublicationId publicationId) {
+            RecoveryCheckpointPublication actual, long generation, PublicationId publicationId) {
         int generationComparison = Long.compare(actual.generation(), generation);
         return generationComparison != 0
                 ? generationComparison
@@ -917,8 +828,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
     }
 
     private static void requireObjectLength(long value) {
-        if (value <= RecoveryCheckpointFormatV1.FOOTER_BYTES
-                || value > RecoveryCheckpointFormatV1.MAX_OBJECT_BYTES) {
+        if (value <= RecoveryCheckpointFormatV1.FOOTER_BYTES || value > RecoveryCheckpointFormatV1.MAX_OBJECT_BYTES) {
             throw new IllegalArgumentException("expectedLength is outside the NRC1 object limit");
         }
     }
@@ -972,8 +882,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = Objects.requireNonNull(failure, "failure");
-        while ((current instanceof CompletionException
-                        || current instanceof java.util.concurrent.ExecutionException)
+        while ((current instanceof CompletionException || current instanceof java.util.concurrent.ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -985,16 +894,14 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             long checkpointSequence,
             String checkpointAttemptId,
             Duration timeout) {
-        List<RecoveryCheckpointObject> exact = List.copyOf(
-                Objects.requireNonNull(sources, "sources"));
+        List<RecoveryCheckpointObject> exact = List.copyOf(Objects.requireNonNull(sources, "sources"));
         if (exact.size() < 2 || exact.size() > MAX_MERGE_SOURCE_COUNT) {
             throw new IllegalArgumentException("checkpoint merge requires 2..32 source objects");
         }
         if (checkpointSequence <= 0) {
             throw new IllegalArgumentException("merged checkpoint sequence must be positive");
         }
-        RecoveryCheckpointValidation.requireBase32Id(
-                checkpointAttemptId, "checkpointAttemptId");
+        RecoveryCheckpointValidation.requireBase32Id(checkpointAttemptId, "checkpointAttemptId");
         requireTimeout(timeout);
 
         RecoveryCheckpointWriteRequest first = exact.get(0).header();
@@ -1010,8 +917,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             }
             if (!header.cluster().equals(first.cluster())
                     || !header.streamId().equals(first.streamId())
-                    || !header.projectionIdentitySha256().equals(
-                            first.projectionIdentitySha256())) {
+                    || !header.projectionIdentitySha256().equals(first.projectionIdentitySha256())) {
                 throw new IllegalArgumentException(
                         "checkpoint merge sources disagree on cluster/stream/projection identity");
             }
@@ -1020,34 +926,28 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 try {
                     nextVersion = Math.addExact(previous.lastCommitVersion(), 1);
                 } catch (ArithmeticException overflow) {
-                    throw new IllegalArgumentException(
-                            "checkpoint merge commit version overflows", overflow);
+                    throw new IllegalArgumentException("checkpoint merge commit version overflows", overflow);
                 }
                 if (header.checkpointSequence() <= previous.checkpointSequence()
                         || header.coverage().startOffset()
                                 != previous.coverage().endOffset()
                         || header.firstCommitVersion() != nextVersion
-                        || header.cumulativeSizeAtStart()
-                                != previous.cumulativeSizeAtEnd()) {
+                        || header.cumulativeSizeAtStart() != previous.cumulativeSizeAtEnd()) {
                     throw new IllegalArgumentException(
                             "checkpoint merge sources are not strictly ordered and gap-free");
                 }
             }
-            totalEntries = Math.addExact(
-                    totalEntries, header.expectedEntryCount());
-            totalPublications = Math.addExact(
-                    totalPublications, header.expectedPublicationCount());
+            totalEntries = Math.addExact(totalEntries, header.expectedEntryCount());
+            totalPublications = Math.addExact(totalPublications, header.expectedPublicationCount());
             previous = header;
         }
         if (totalEntries > RecoveryCheckpointFormatV1.MAX_ENTRY_COUNT
-                || totalPublications
-                        > RecoveryCheckpointFormatV1.MAX_PUBLICATION_COUNT) {
+                || totalPublications > RecoveryCheckpointFormatV1.MAX_PUBLICATION_COUNT) {
             throw new IllegalArgumentException(
                     "checkpoint merge source counts exceed the bounded NRC1 merge workspace");
         }
         if (checkpointSequence <= Objects.requireNonNull(previous).checkpointSequence()) {
-            throw new IllegalArgumentException(
-                    "merged checkpoint sequence must follow every source checkpoint");
+            throw new IllegalArgumentException("merged checkpoint sequence must follow every source checkpoint");
         }
         return exact;
     }
@@ -1079,8 +979,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         private CompletableFuture<RecoveryCheckpointMergeResult> run() {
             return loadSources()
                     .thenCompose(sources -> resume(() -> planPublications(sources)
-                            .thenCompose(uniquePublicationCount ->
-                                    writeMerged(sources, uniquePublicationCount))))
+                            .thenCompose(uniquePublicationCount -> writeMerged(sources, uniquePublicationCount))))
                     .whenComplete((ignored, failure) -> {
                         if (failure != null) {
                             closeSink();
@@ -1093,71 +992,61 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             List<CompletableFuture<MergeSource>> loads = new ArrayList<>(objects.size());
             for (int index = 0; index < objects.size(); index++) {
                 RecoveryCheckpointObject object = objects.get(index);
-                CompletableFuture<PublicationOffsets> publications = readPublicationDirectory(
-                        object.objectKey(), object.directory(), deadline);
-                CompletableFuture<CommitOffsets> commits = readCommitDirectory(
-                        object.objectKey(), object.directory(), deadline);
+                CompletableFuture<PublicationOffsets> publications =
+                        readPublicationDirectory(object.objectKey(), object.directory(), deadline);
+                CompletableFuture<CommitOffsets> commits =
+                        readCommitDirectory(object.objectKey(), object.directory(), deadline);
                 int sourceIndex = index;
                 loads.add(publications.thenCombine(commits, (publicationOffsets, commitOffsets) -> {
                     ensureActive();
                     RecoveryCheckpointWriteRequest header = object.header();
-                    int expectedCommitDirectories = Math.toIntExact(
-                            (header.expectedEntryCount()
-                                            + (long) RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE
-                                            - 1)
-                                    / RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE);
-                    if (publicationOffsets.fileOffsets().length
-                                    != header.expectedPublicationCount()
-                            || commitOffsets.fileOffsets().length
-                                    != expectedCommitDirectories) {
-                        throw corrupt(
-                                "NRC1 merge source directory counts differ from its verified header");
+                    int expectedCommitDirectories = Math.toIntExact((header.expectedEntryCount()
+                                    + (long) RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE
+                                    - 1)
+                            / RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE);
+                    if (publicationOffsets.fileOffsets().length != header.expectedPublicationCount()
+                            || commitOffsets.fileOffsets().length != expectedCommitDirectories) {
+                        throw corrupt("NRC1 merge source directory counts differ from its verified header");
                     }
                     int[] publicationRemap = new int[header.expectedPublicationCount()];
                     Arrays.fill(publicationRemap, -1);
-                    return new MergeSource(
-                            sourceIndex,
-                            object,
-                            publicationOffsets,
-                            commitOffsets,
-                            publicationRemap);
+                    return new MergeSource(sourceIndex, object, publicationOffsets, commitOffsets, publicationRemap);
                 }));
             }
             return CompletableFuture.allOf(loads.toArray(CompletableFuture[]::new))
-                    .thenApply(ignored -> loads.stream().map(CompletableFuture::join).toList());
+                    .thenApply(ignored ->
+                            loads.stream().map(CompletableFuture::join).toList());
         }
 
-        private CompletableFuture<Integer> planPublications(
-                List<MergeSource> sources) {
+        private CompletableFuture<Integer> planPublications(List<MergeSource> sources) {
             return mergePublications(sources, (publication, items, mergedIndex) -> {
-                for (PublicationItem item : items) {
-                    int[] remap = sources.get(item.sourceIndex()).publicationRemap();
-                    if (remap[item.localIndex()] != -1) {
-                        throw corrupt("NRC1 merge planned one source publication twice");
-                    }
-                    remap[item.localIndex()] = mergedIndex;
-                }
-            }).thenApply(count -> {
-                if (count <= 0) {
-                    throw corrupt("NRC1 merge produced an empty publication table");
-                }
-                for (MergeSource source : sources) {
-                    for (int mapped : source.publicationRemap()) {
-                        if (mapped < 0) {
-                            throw corrupt("NRC1 merge omitted a source publication mapping");
+                        for (PublicationItem item : items) {
+                            int[] remap = sources.get(item.sourceIndex()).publicationRemap();
+                            if (remap[item.localIndex()] != -1) {
+                                throw corrupt("NRC1 merge planned one source publication twice");
+                            }
+                            remap[item.localIndex()] = mergedIndex;
                         }
-                    }
-                }
-                return count;
-            });
+                    })
+                    .thenApply(count -> {
+                        if (count <= 0) {
+                            throw corrupt("NRC1 merge produced an empty publication table");
+                        }
+                        for (MergeSource source : sources) {
+                            for (int mapped : source.publicationRemap()) {
+                                if (mapped < 0) {
+                                    throw corrupt("NRC1 merge omitted a source publication mapping");
+                                }
+                            }
+                        }
+                        return count;
+                    });
         }
 
         private CompletableFuture<RecoveryCheckpointMergeResult> writeMerged(
-                List<MergeSource> sources,
-                int uniquePublicationCount) {
+                List<MergeSource> sources, int uniquePublicationCount) {
             ensureActive();
-            RecoveryCheckpointWriteRequest request = mergedRequest(
-                    sources, uniquePublicationCount);
+            RecoveryCheckpointWriteRequest request = mergedRequest(sources, uniquePublicationCount);
             try {
                 sink = new CheckpointSink(request);
             } catch (IOException failure) {
@@ -1165,19 +1054,15 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             }
             return mergePublications(sources, (publication, items, mergedIndex) -> {
                         for (PublicationItem item : items) {
-                            if (sources.get(item.sourceIndex())
-                                            .publicationRemap()[item.localIndex()]
-                                    != mergedIndex) {
-                                throw corrupt(
-                                        "NRC1 publication identity changed between merge passes");
+                            if (sources.get(item.sourceIndex()).publicationRemap()[item.localIndex()] != mergedIndex) {
+                                throw corrupt("NRC1 publication identity changed between merge passes");
                             }
                         }
                         sink.writePublication(publication);
                     })
                     .thenCompose(actualCount -> resume(() -> {
                         if (actualCount != uniquePublicationCount) {
-                            throw corrupt(
-                                    "NRC1 publication count changed between merge passes");
+                            throw corrupt("NRC1 publication count changed between merge passes");
                         }
                         sink.finishPublications();
                         return writeEntries(sources, 0, 0);
@@ -1191,22 +1076,17 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                             throw new CompletionException(failure);
                         }
                         sink = null;
-                        return new RecoveryCheckpointMergeResult(
-                                request, completed, sources.size());
+                        return new RecoveryCheckpointMergeResult(request, completed, sources.size());
                     });
         }
 
-        private RecoveryCheckpointWriteRequest mergedRequest(
-                List<MergeSource> sources,
-                int uniquePublicationCount) {
-            RecoveryCheckpointWriteRequest first =
-                    sources.get(0).object().header();
+        private RecoveryCheckpointWriteRequest mergedRequest(List<MergeSource> sources, int uniquePublicationCount) {
+            RecoveryCheckpointWriteRequest first = sources.get(0).object().header();
             RecoveryCheckpointWriteRequest last =
                     sources.get(sources.size() - 1).object().header();
             long entryCount = 0;
             for (MergeSource source : sources) {
-                entryCount = Math.addExact(
-                        entryCount, source.object().header().expectedEntryCount());
+                entryCount = Math.addExact(entryCount, source.object().header().expectedEntryCount());
             }
             return new RecoveryCheckpointWriteRequest(
                     first.cluster(),
@@ -1214,8 +1094,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                     checkpointSequence,
                     checkpointAttemptId,
                     new OffsetRange(
-                            first.coverage().startOffset(),
-                            last.coverage().endOffset()),
+                            first.coverage().startOffset(), last.coverage().endOffset()),
                     first.firstCommitVersion(),
                     last.lastCommitVersion(),
                     first.cumulativeSizeAtStart(),
@@ -1230,15 +1109,12 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         }
 
         private CompletableFuture<Integer> mergePublications(
-                List<MergeSource> sources,
-                MergePublicationConsumer consumer) {
+                List<MergeSource> sources, MergePublicationConsumer consumer) {
             ensureActive();
-            List<PublicationCursor> cursors = sources.stream()
-                    .map(PublicationCursor::new)
-                    .toList();
-            List<CompletableFuture<Void>> initial = cursors.stream()
-                    .map(this::loadPublicationPage)
-                    .toList();
+            List<PublicationCursor> cursors =
+                    sources.stream().map(PublicationCursor::new).toList();
+            List<CompletableFuture<Void>> initial =
+                    cursors.stream().map(this::loadPublicationPage).toList();
             PublicationMergeState state = new PublicationMergeState(consumer);
             return CompletableFuture.allOf(initial.toArray(CompletableFuture[]::new))
                     .thenCompose(ignored -> resume(() -> {
@@ -1253,8 +1129,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                     .thenApply(ignored -> state.uniqueCount);
         }
 
-        private CompletableFuture<Void> drainPublications(
-                PublicationMergeState state) {
+        private CompletableFuture<Void> drainPublications(PublicationMergeState state) {
             ensureActive();
             List<PublicationCursor> reload = new ArrayList<>();
             while (!state.queue.isEmpty()) {
@@ -1263,33 +1138,24 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 List<PublicationCursor> duplicates = new ArrayList<>();
                 duplicates.add(firstCursor);
                 while (!state.queue.isEmpty()
-                        && comparePublicationKeys(
-                                        state.queue.peek().current().value(),
-                                        first.value())
-                                == 0) {
+                        && comparePublicationKeys(state.queue.peek().current().value(), first.value()) == 0) {
                     duplicates.add(state.queue.remove());
                 }
-                List<PublicationItem> items = duplicates.stream()
-                        .map(PublicationCursor::current)
-                        .toList();
+                List<PublicationItem> items =
+                        duplicates.stream().map(PublicationCursor::current).toList();
                 for (PublicationItem item : items) {
                     if (!item.value().equals(first.value())) {
-                        throw corrupt(
-                                "NRC1 merge found conflicting bytes for one publication identity");
+                        throw corrupt("NRC1 merge found conflicting bytes for one publication identity");
                     }
                 }
-                if (state.previous != null
-                        && comparePublicationKeys(first.value(), state.previous) <= 0) {
-                    throw corrupt(
-                            "NRC1 merge source publication tables are not unique and ordered");
+                if (state.previous != null && comparePublicationKeys(first.value(), state.previous) <= 0) {
+                    throw corrupt("NRC1 merge source publication tables are not unique and ordered");
                 }
-                if (state.uniqueCount
-                        >= RecoveryCheckpointFormatV1.MAX_PUBLICATION_COUNT) {
+                if (state.uniqueCount >= RecoveryCheckpointFormatV1.MAX_PUBLICATION_COUNT) {
                     throw corrupt("NRC1 merged publication table exceeds its hard limit");
                 }
                 try {
-                    state.consumer.accept(
-                            first.value(), items, state.uniqueCount);
+                    state.consumer.accept(first.value(), items, state.uniqueCount);
                 } catch (Exception failure) {
                     throw new CompletionException(failure);
                 }
@@ -1306,15 +1172,13 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 }
                 if (!reload.isEmpty()) {
                     List<PublicationCursor> exactReload = List.copyOf(reload);
-                    List<CompletableFuture<Void>> loads = exactReload.stream()
-                            .map(this::loadPublicationPage)
-                            .toList();
+                    List<CompletableFuture<Void>> loads =
+                            exactReload.stream().map(this::loadPublicationPage).toList();
                     return CompletableFuture.allOf(loads.toArray(CompletableFuture[]::new))
                             .thenCompose(ignored -> resume(() -> {
                                 for (PublicationCursor cursor : exactReload) {
                                     if (!cursor.hasCurrent()) {
-                                        throw corrupt(
-                                                "NRC1 merge continuation returned no publication");
+                                        throw corrupt("NRC1 merge continuation returned no publication");
                                     }
                                     state.queue.add(cursor);
                                 }
@@ -1325,8 +1189,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             return CompletableFuture.completedFuture(null);
         }
 
-        private CompletableFuture<Void> loadPublicationPage(
-                PublicationCursor cursor) {
+        private CompletableFuture<Void> loadPublicationPage(PublicationCursor cursor) {
             ensureActive();
             MergeSource source = cursor.source();
             int count = source.object().header().expectedPublicationCount();
@@ -1334,8 +1197,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             if (start >= count) {
                 return CompletableFuture.completedFuture(null);
             }
-            int maximumEnd = Math.min(
-                    count, Math.addExact(start, MAX_MERGE_PAGE_RECORDS));
+            int maximumEnd = Math.min(count, Math.addExact(start, MAX_MERGE_PAGE_RECORDS));
             long startOffset = source.publications().fileOffsets()[start];
             int end = start + 1;
             while (end < maximumEnd) {
@@ -1347,18 +1209,11 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             }
             long endOffset = publicationBoundary(source, end);
             long length = endOffset - startOffset;
-            if (length <= 0
-                    || (length > MAX_MERGE_PAGE_BYTES && end > start + 1)
-                    || length > Integer.MAX_VALUE) {
-                return CompletableFuture.failedFuture(corrupt(
-                        "NRC1 merge publication page exceeds its bounded range"));
+            if (length <= 0 || (length > MAX_MERGE_PAGE_BYTES && end > start + 1) || length > Integer.MAX_VALUE) {
+                return CompletableFuture.failedFuture(corrupt("NRC1 merge publication page exceeds its bounded range"));
             }
             int pageEnd = end;
-            return readExact(
-                            source.object().objectKey(),
-                            startOffset,
-                            length,
-                            deadline)
+            return readExact(source.object().objectKey(), startOffset, length, deadline)
                     .thenAccept(bytes -> {
                         ensureActive();
                         List<PublicationItem> values = new ArrayList<>(pageEnd - start);
@@ -1367,11 +1222,8 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                             long recordEnd = publicationBoundary(source, index + 1);
                             int relativeStart = Math.toIntExact(recordStart - startOffset);
                             int recordLength = Math.toIntExact(recordEnd - recordStart);
-                            if (recordLength <= 0
-                                    || recordLength
-                                            > RecoveryCheckpointFormatV1.MAX_RECORD_BYTES) {
-                                throw corrupt(
-                                        "NRC1 merge publication directory has an invalid record range");
+                            if (recordLength <= 0 || recordLength > RecoveryCheckpointFormatV1.MAX_RECORD_BYTES) {
+                                throw corrupt("NRC1 merge publication directory has an invalid record range");
                             }
                             ByteBuffer record = bytes.asReadOnlyBuffer();
                             record.position(relativeStart);
@@ -1379,12 +1231,10 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                             RecoveryCheckpointBinary.Decoded<RecoveryCheckpointPublication> decoded =
                                     RecoveryCheckpointBinary.decodePublication(record.slice());
                             if (decoded.bytesConsumed() != recordLength) {
-                                throw corrupt(
-                                        "NRC1 merge publication range does not delimit one record");
+                                throw corrupt("NRC1 merge publication range does not delimit one record");
                             }
                             validatePublication(source.object().header(), decoded.value());
-                            values.add(new PublicationItem(
-                                    source.sourceIndex(), index, decoded.value()));
+                            values.add(new PublicationItem(source.sourceIndex(), index, decoded.value()));
                         }
                         cursor.install(values, pageEnd);
                     });
@@ -1396,10 +1246,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                     : source.commits().fileOffsets()[0];
         }
 
-        private CompletableFuture<Void> writeEntries(
-                List<MergeSource> sources,
-                int sourceIndex,
-                int blockIndex) {
+        private CompletableFuture<Void> writeEntries(List<MergeSource> sources, int sourceIndex, int blockIndex) {
             ensureActive();
             if (sourceIndex == sources.size()) {
                 return CompletableFuture.completedFuture(null);
@@ -1424,23 +1271,15 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             long maximumBlock = (long) RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE
                     * RecoveryCheckpointFormatV1.MAX_RECORD_BYTES;
             if (length <= 0
-                    || (length > MAX_MERGE_PAGE_BYTES
-                            && endBlock > blockIndex + 1)
+                    || (length > MAX_MERGE_PAGE_BYTES && endBlock > blockIndex + 1)
                     || length > maximumBlock * (endBlock - blockIndex)
                     || length > Integer.MAX_VALUE) {
-                return CompletableFuture.failedFuture(corrupt(
-                        "NRC1 merge commit page exceeds its bounded range"));
+                return CompletableFuture.failedFuture(corrupt("NRC1 merge commit page exceeds its bounded range"));
             }
             int nextBlock = endBlock;
-            return readExact(
-                            source.object().objectKey(),
-                            start,
-                            length,
-                            deadline)
-                    .thenAccept(bytes -> writeEntryPage(
-                            source, blockIndex, nextBlock, bytes))
-                    .thenCompose(ignored -> resume(() ->
-                            writeEntries(sources, sourceIndex, nextBlock)));
+            return readExact(source.object().objectKey(), start, length, deadline)
+                    .thenAccept(bytes -> writeEntryPage(source, blockIndex, nextBlock, bytes))
+                    .thenCompose(ignored -> resume(() -> writeEntries(sources, sourceIndex, nextBlock)));
         }
 
         private long commitBoundary(MergeSource source, int blockIndex) {
@@ -1449,19 +1288,12 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                     : source.object().directory().publicationDirectoryOffset();
         }
 
-        private void writeEntryPage(
-                MergeSource source,
-                int firstBlock,
-                int endBlock,
-                ByteBuffer bytes) {
+        private void writeEntryPage(MergeSource source, int firstBlock, int endBlock, ByteBuffer bytes) {
             ensureActive();
-            int firstEntry = Math.multiplyExact(
-                    firstBlock, RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE);
+            int firstEntry = Math.multiplyExact(firstBlock, RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE);
             int endEntry = Math.min(
                     source.object().header().expectedEntryCount(),
-                    Math.multiplyExact(
-                            endBlock,
-                            RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE));
+                    Math.multiplyExact(endBlock, RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE));
             ByteBuffer cursor = bytes.asReadOnlyBuffer();
             for (int index = firstEntry; index < endEntry; index++) {
                 if (!cursor.hasRemaining()) {
@@ -1469,17 +1301,15 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 }
                 RecoveryCheckpointBinary.Decoded<RecoveryCheckpointEntry> decoded =
                         RecoveryCheckpointBinary.decodeEntry(cursor);
-                cursor.position(Math.addExact(
-                        cursor.position(), decoded.bytesConsumed()));
+                cursor.position(Math.addExact(cursor.position(), decoded.bytesConsumed()));
                 RecoveryCheckpointEntry entry = decoded.value();
                 validateEntryBounds(source.object().header(), entry);
                 verifier.verifyEntry(source.object().header(), entry);
-                List<Integer> remapped = new ArrayList<>(
-                        entry.coveringPublicationIndexes().size());
+                List<Integer> remapped =
+                        new ArrayList<>(entry.coveringPublicationIndexes().size());
                 for (int local : entry.coveringPublicationIndexes()) {
                     if (local < 0 || local >= source.publicationRemap().length) {
-                        throw corrupt(
-                                "NRC1 merge entry references a publication outside its source table");
+                        throw corrupt("NRC1 merge entry references a publication outside its source table");
                     }
                     int merged = source.publicationRemap()[local];
                     if (merged < 0) {
@@ -1507,8 +1337,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             }
         }
 
-        private <T> CompletableFuture<T> resume(
-                Supplier<CompletableFuture<T>> next) {
+        private <T> CompletableFuture<T> resume(Supplier<CompletableFuture<T>> next) {
             CompletableFuture<T> result = new CompletableFuture<>();
             try {
                 serial.execute(() -> {
@@ -1548,10 +1377,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         }
 
         private NereusException cancelledFailure() {
-            return new NereusException(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    "recovery checkpoint merge was cancelled");
+            return new NereusException(ErrorCode.STORAGE_CLOSED, false, "recovery checkpoint merge was cancelled");
         }
 
         private void cancel() {
@@ -1569,14 +1395,12 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         }
 
         private final class PublicationMergeState {
-            private final PriorityQueue<PublicationCursor> queue = new PriorityQueue<>(
-                    Comparator.comparing(
-                                    (PublicationCursor cursor) ->
-                                            cursor.current().value().generation())
+            private final PriorityQueue<PublicationCursor> queue =
+                    new PriorityQueue<>(Comparator.comparing((PublicationCursor cursor) ->
+                                    cursor.current().value().generation())
                             .thenComparing(cursor ->
                                     cursor.current().value().publicationId().value())
-                            .thenComparingInt(cursor ->
-                                    cursor.current().sourceIndex()));
+                            .thenComparingInt(cursor -> cursor.current().sourceIndex()));
             private final MergePublicationConsumer consumer;
             private RecoveryCheckpointPublication previous;
             private int uniqueCount;
@@ -1587,22 +1411,17 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         }
     }
 
-    private static int comparePublicationKeys(
-            RecoveryCheckpointPublication left,
-            RecoveryCheckpointPublication right) {
+    private static int comparePublicationKeys(RecoveryCheckpointPublication left, RecoveryCheckpointPublication right) {
         int generation = Long.compare(left.generation(), right.generation());
         return generation != 0
                 ? generation
-                : left.publicationId().value().compareTo(
-                        right.publicationId().value());
+                : left.publicationId().value().compareTo(right.publicationId().value());
     }
 
     @FunctionalInterface
     private interface MergePublicationConsumer {
-        void accept(
-                RecoveryCheckpointPublication publication,
-                List<PublicationItem> sourceItems,
-                int mergedIndex) throws Exception;
+        void accept(RecoveryCheckpointPublication publication, List<PublicationItem> sourceItems, int mergedIndex)
+                throws Exception;
     }
 
     private record MergeSource(
@@ -1610,14 +1429,9 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             RecoveryCheckpointObject object,
             PublicationOffsets publications,
             CommitOffsets commits,
-            int[] publicationRemap) {
-    }
+            int[] publicationRemap) {}
 
-    private record PublicationItem(
-            int sourceIndex,
-            int localIndex,
-            RecoveryCheckpointPublication value) {
-    }
+    private record PublicationItem(int sourceIndex, int localIndex, RecoveryCheckpointPublication value) {}
 
     private static final class PublicationCursor {
         private final MergeSource source;
@@ -1642,8 +1456,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         }
 
         private boolean hasRemaining() {
-            return nextLoadIndex
-                    < source.object().header().expectedPublicationCount();
+            return nextLoadIndex < source.object().header().expectedPublicationCount();
         }
 
         private PublicationItem current() {
@@ -1668,8 +1481,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             if (hasCurrent()
                     || values.isEmpty()
                     || continuation <= nextLoadIndex
-                    || continuation
-                            > source.object().header().expectedPublicationCount()) {
+                    || continuation > source.object().header().expectedPublicationCount()) {
                 throw new IllegalStateException("invalid publication cursor page");
             }
             page = List.copyOf(values);
@@ -1691,7 +1503,8 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 RecoveryCheckpointWriteRequest request,
                 Flow.Publisher<RecoveryCheckpointEntry> entries,
                 CompletableFuture<RecoveryCheckpointWriteResult> result,
-                SerialExecutor serial) throws IOException {
+                SerialExecutor serial)
+                throws IOException {
             this.request = request;
             this.entries = entries;
             this.result = result;
@@ -1700,20 +1513,16 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         }
 
         private void start(Flow.Publisher<RecoveryCheckpointPublication> publications) {
-            PhaseSubscriber<RecoveryCheckpointPublication> subscriber = new PhaseSubscriber<>(
-                    this,
-                    sink::writePublication,
-                    this::publicationsComplete);
+            PhaseSubscriber<RecoveryCheckpointPublication> subscriber =
+                    new PhaseSubscriber<>(this, sink::writePublication, this::publicationsComplete);
             active = subscriber;
             publications.subscribe(subscriber);
         }
 
         private void publicationsComplete() {
             sink.finishPublications();
-            PhaseSubscriber<RecoveryCheckpointEntry> subscriber = new PhaseSubscriber<>(
-                    this,
-                    sink::writeEntry,
-                    this::entriesComplete);
+            PhaseSubscriber<RecoveryCheckpointEntry> subscriber =
+                    new PhaseSubscriber<>(this, sink::writeEntry, this::entriesComplete);
             active = subscriber;
             entries.subscribe(subscriber);
         }
@@ -1775,9 +1584,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         private volatile Flow.Subscription subscription;
 
         private PhaseSubscriber(
-                WriteCoordinator coordinator,
-                ThrowingConsumer<T> consumer,
-                ThrowingRunnable completion) {
+                WriteCoordinator coordinator, ThrowingConsumer<T> consumer, ThrowingRunnable completion) {
             this.coordinator = coordinator;
             this.consumer = consumer;
             this.completion = completion;
@@ -1959,10 +1766,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 publicationsFinished = true;
             } catch (IOException failure) {
                 throw new NereusException(
-                        ErrorCode.OBJECT_UPLOAD_FAILED,
-                        true,
-                        "failed to seal NRC1 publication runs",
-                        failure);
+                        ErrorCode.OBJECT_UPLOAD_FAILED, true, "failed to seal NRC1 publication runs", failure);
             }
         }
 
@@ -2025,12 +1829,9 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             }
             commitDirectoryOutput.close();
             commitDirectorySpill.seal();
-            long publicationDirectoryLength = Math.addExact(
-                    Integer.BYTES, publicationDirectorySpill.sealedLength());
-            long commitDirectoryLength = Math.addExact(
-                    Integer.BYTES * 2L, commitDirectorySpill.sealedLength());
-            if (publicationDirectoryLength + commitDirectoryLength
-                    > RecoveryCheckpointFormatV1.MAX_DIRECTORY_BYTES) {
+            long publicationDirectoryLength = Math.addExact(Integer.BYTES, publicationDirectorySpill.sealedLength());
+            long commitDirectoryLength = Math.addExact(Integer.BYTES * 2L, commitDirectorySpill.sealedLength());
+            if (publicationDirectoryLength + commitDirectoryLength > RecoveryCheckpointFormatV1.MAX_DIRECTORY_BYTES) {
                 throw new RecoveryCheckpointFormatException("NRC1 combined directories exceed their hard limit");
             }
             long publicationDirectoryOffset = position;
@@ -2081,9 +1882,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             return result;
         }
 
-        private void writePublicationFact(
-                int index,
-                RecoveryCheckpointPublication publication) throws IOException {
+        private void writePublicationFact(int index, RecoveryCheckpointPublication publication) throws IOException {
             ByteBuffer body = ByteBuffer.allocate(PUBLICATION_FACT_BYTES - Integer.BYTES)
                     .order(ByteOrder.BIG_ENDIAN)
                     .putInt(index)
@@ -2099,7 +1898,8 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
 
         private PublicationFact readPublicationFact(int expectedIndex) {
             long offset = (long) expectedIndex * PUBLICATION_FACT_BYTES;
-            ByteBuffer value = publicationFactsReader.readRange(offset, PUBLICATION_FACT_BYTES)
+            ByteBuffer value = publicationFactsReader
+                    .readRange(offset, PUBLICATION_FACT_BYTES)
                     .order(ByteOrder.BIG_ENDIAN);
             byte[] protectedBytes = new byte[PUBLICATION_FACT_BYTES - Integer.BYTES];
             value.get(protectedBytes);
@@ -2147,8 +1947,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         }
 
         private void requireWritableBodyBytes(long bytes) {
-            long maximumBody = RecoveryCheckpointFormatV1.MAX_OBJECT_BYTES
-                    - RecoveryCheckpointFormatV1.FOOTER_BYTES;
+            long maximumBody = RecoveryCheckpointFormatV1.MAX_OBJECT_BYTES - RecoveryCheckpointFormatV1.FOOTER_BYTES;
             if (bytes < 0 || position > maximumBody || bytes > maximumBody - position) {
                 throw new RecoveryCheckpointFormatException("NRC1 object exceeds its 1 GiB hard limit");
             }
@@ -2177,12 +1976,9 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         }
     }
 
-    private static void requireCovered(
-            RecoveryCheckpointEntry entry,
-            List<Coverage> publicationCoverages) {
+    private static void requireCovered(RecoveryCheckpointEntry entry, List<Coverage> publicationCoverages) {
         List<Coverage> ordered = publicationCoverages.stream()
-                .sorted(Comparator.comparingLong(Coverage::startOffset)
-                        .thenComparingLong(Coverage::endOffset))
+                .sorted(Comparator.comparingLong(Coverage::startOffset).thenComparingLong(Coverage::endOffset))
                 .toList();
         long cursor = entry.range().startOffset();
         for (Coverage coverage : ordered) {
@@ -2203,7 +1999,10 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
     }
 
     private static byte[] int32(int value) {
-        return ByteBuffer.allocate(Integer.BYTES).order(ByteOrder.BIG_ENDIAN).putInt(value).array();
+        return ByteBuffer.allocate(Integer.BYTES)
+                .order(ByteOrder.BIG_ENDIAN)
+                .putInt(value)
+                .array();
     }
 
     private static final class SerialExecutor implements Executor {
@@ -2281,10 +2080,7 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         private Duration remaining() {
             long remaining = deadlineNanos - System.nanoTime();
             if (remaining <= 0) {
-                throw new NereusException(
-                        ErrorCode.TIMEOUT,
-                        true,
-                        "recovery checkpoint read deadline expired");
+                throw new NereusException(ErrorCode.TIMEOUT, true, "recovery checkpoint read deadline expired");
             }
             return Duration.ofNanos(remaining);
         }
@@ -2300,25 +2096,18 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         void run() throws Exception;
     }
 
-    private record Coverage(long startOffset, long endOffset) {
-    }
+    private record Coverage(long startOffset, long endOffset) {}
 
-    private record PublicationFact(int index, long startOffset, long endOffset) {
-    }
+    private record PublicationFact(int index, long startOffset, long endOffset) {}
 
-    private record PublicationOffsets(long[] fileOffsets) {
-    }
+    private record PublicationOffsets(long[] fileOffsets) {}
 
-    private record CommitOffsets(long[] versions, long[] offsetStarts, long[] fileOffsets) {
-    }
+    private record CommitOffsets(long[] versions, long[] offsetStarts, long[] fileOffsets) {}
 
-    private record DirectoryState(PublicationOffsets publications, CommitOffsets commits) {
-    }
+    private record DirectoryState(PublicationOffsets publications, CommitOffsets commits) {}
 
     private record HeaderAndPublications(
-            RecoveryCheckpointBinary.Decoded<RecoveryCheckpointWriteRequest> header,
-            PublicationOffsets publications) {
-    }
+            RecoveryCheckpointBinary.Decoded<RecoveryCheckpointWriteRequest> header, PublicationOffsets publications) {}
 
     private record HeaderPublicationsAndCommits(
             RecoveryCheckpointBinary.Decoded<RecoveryCheckpointWriteRequest> header,

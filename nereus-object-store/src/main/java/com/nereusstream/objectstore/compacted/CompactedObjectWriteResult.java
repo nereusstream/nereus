@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import com.nereusstream.api.Checksum;
@@ -11,7 +12,9 @@ import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.objectstore.staging.StagedObjectFile;
 import java.util.Objects;
 
-/** Close-owned sealed compacted object and its exact immutable publication identity. */
+/**
+ * Close-owned sealed compacted object and its exact immutable publication identity.
+ */
 public record CompactedObjectWriteResult(
         StagedObjectFile stagingFile,
         ObjectId objectId,
@@ -22,7 +25,8 @@ public record CompactedObjectWriteResult(
         Checksum contentSha256,
         String physicalFormat,
         EntryIndexRef entryIndexRef,
-        int outputRecordCount) implements AutoCloseable {
+        int outputRecordCount)
+        implements AutoCloseable {
     public CompactedObjectWriteResult {
         Objects.requireNonNull(stagingFile, "stagingFile");
         Objects.requireNonNull(objectId, "objectId");
@@ -36,8 +40,7 @@ public record CompactedObjectWriteResult(
         }
         requireChecksum(storageCrc32c, ChecksumType.CRC32C, "storageCrc32c");
         requireChecksum(contentSha256, ChecksumType.SHA256, "contentSha256");
-        if (!storageCrc32c.equals(stagingFile.storageCrc32c())
-                || !contentSha256.equals(stagingFile.contentSha256())) {
+        if (!storageCrc32c.equals(stagingFile.storageCrc32c()) || !contentSha256.equals(stagingFile.contentSha256())) {
             throw new IllegalArgumentException("compacted object checksums do not match staging bytes");
         }
         if (!physicalFormat.equals(CompactedObjectFormatV1.COMMITTED_PHYSICAL_FORMAT)

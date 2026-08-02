@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -15,7 +16,9 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 
-/** Idempotent restart entry point for every executable task lifecycle. */
+/**
+ * Idempotent restart entry point for every executable task lifecycle.
+ */
 public final class MaterializationTaskRecovery {
     private static final String EXPIRED_CLAIM_MESSAGE = "worker claim expired during task recovery";
 
@@ -40,37 +43,33 @@ public final class MaterializationTaskRecovery {
         this.publications = Objects.requireNonNull(publications, "publications");
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.maximumClockSkewMillis = requireNonNegative(
-                maximumClockSkew, "maximumClockSkew");
+        this.maximumClockSkewMillis = requireNonNegative(maximumClockSkew, "maximumClockSkew");
         this.retryDelayMillis = requirePositive(retryDelay, "retryDelay");
     }
 
-    public CompletableFuture<MaterializationTaskRecoveryAction> recover(
-            VersionedMaterializationTask durable) {
+    public CompletableFuture<MaterializationTaskRecoveryAction> recover(VersionedMaterializationTask durable) {
         return recover(durable, MaterializationTaskMutationGuard.noOp());
     }
 
     public CompletableFuture<MaterializationTaskRecoveryAction> recover(
-            VersionedMaterializationTask durable,
-            MaterializationTaskMutationGuard mutationGuard) {
+            VersionedMaterializationTask durable, MaterializationTaskMutationGuard mutationGuard) {
         try {
             Objects.requireNonNull(durable, "durable");
-            MaterializationTaskMutationGuard exactGuard = Objects.requireNonNull(
-                    mutationGuard, "mutationGuard");
+            MaterializationTaskMutationGuard exactGuard = Objects.requireNonNull(mutationGuard, "mutationGuard");
             MaterializationTask task = tasks.requireTask(durable);
             MaterializationTaskRecord record = durable.value();
             return switch (record.lifecycle()) {
                 case PLANNED -> dispatch(durable, task, exactGuard);
-                case RETRY_WAIT -> clock.millis() >= record.retryNotBeforeMillis()
-                        ? dispatch(durable, task, exactGuard)
-                        : completed(MaterializationTaskRecoveryAction.NONE);
+                case RETRY_WAIT ->
+                    clock.millis() >= record.retryNotBeforeMillis()
+                            ? dispatch(durable, task, exactGuard)
+                            : completed(MaterializationTaskRecoveryAction.NONE);
                 case CLAIMED -> recoverClaim(durable, exactGuard);
                 case OUTPUT_READY, PUBLISHING -> reconcilePublication(durable, task, record);
                 // PUBLISHED is terminal. Recreating task-owned temporary protections here would race the
                 // terminal-metadata retirer after it has proved the index-owned visible protection.
                 case PUBLISHED -> completed(MaterializationTaskRecoveryAction.NONE);
-                case CANCELLED, TERMINAL_FAILED ->
-                        completed(MaterializationTaskRecoveryAction.NONE);
+                case CANCELLED, TERMINAL_FAILED -> completed(MaterializationTaskRecoveryAction.NONE);
             };
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
@@ -78,8 +77,7 @@ public final class MaterializationTaskRecovery {
     }
 
     private CompletableFuture<MaterializationTaskRecoveryAction> recoverClaim(
-            VersionedMaterializationTask durable,
-            MaterializationTaskMutationGuard mutationGuard) {
+            VersionedMaterializationTask durable, MaterializationTaskMutationGuard mutationGuard) {
         return recoverClaim(durable, mutationGuard, false);
     }
 
@@ -88,9 +86,7 @@ public final class MaterializationTaskRecovery {
             MaterializationTaskMutationGuard mutationGuard,
             boolean reloadedAfterConflict) {
         MaterializationTaskRecord current = durable.value();
-        long safeExpiry = saturatingAdd(
-                current.workerClaim().orElseThrow().expiresAtMillis(),
-                maximumClockSkewMillis);
+        long safeExpiry = saturatingAdd(current.workerClaim().orElseThrow().expiresAtMillis(), maximumClockSkewMillis);
         long now = clock.millis();
         if (now < safeExpiry) {
             return completed(MaterializationTaskRecoveryAction.NONE);
@@ -98,8 +94,7 @@ public final class MaterializationTaskRecovery {
         long updatedAt = Math.max(now, current.updatedAtMillis());
         long retryNotBefore = saturatingAdd(updatedAt, retryDelayMillis);
         if (retryNotBefore <= updatedAt) {
-            return CompletableFuture.failedFuture(new IllegalStateException(
-                    "materialization retry time exhausted"));
+            return CompletableFuture.failedFuture(new IllegalStateException("materialization retry time exhausted"));
         }
         MaterializationTaskRecord retry = new MaterializationTaskRecord(
                 current.schemaVersion(),
@@ -128,7 +123,8 @@ public final class MaterializationTaskRecovery {
                 current.createdAtMillis(),
                 updatedAt,
                 0);
-        return mutationGuard.revalidate()
+        return mutationGuard
+                .revalidate()
                 .thenCompose(ignored -> tasks.compareAndSet(retry, durable.metadataVersion()))
                 .handle((updated, failure) -> {
                     if (failure == null) {
@@ -138,9 +134,7 @@ public final class MaterializationTaskRecovery {
                     if (!isConditionFailure(exact) || reloadedAfterConflict) {
                         return CompletableFuture.<MaterializationTaskRecoveryAction>failedFuture(exact);
                     }
-                    return tasks.get(
-                                    new com.nereusstream.api.StreamId(current.streamId()),
-                                    current.taskId())
+                    return tasks.get(new com.nereusstream.api.StreamId(current.streamId()), current.taskId())
                             .thenCompose(optional -> {
                                 if (optional.isEmpty()) {
                                     return CompletableFuture.failedFuture(exact);
@@ -148,8 +142,7 @@ public final class MaterializationTaskRecovery {
                                 VersionedMaterializationTask reloaded = optional.orElseThrow();
                                 tasks.requireTask(reloaded);
                                 if (isSameExpiredRetry(retry, reloaded.value())) {
-                                    return completed(
-                                            MaterializationTaskRecoveryAction.EXPIRED_CLAIM_REQUEUED);
+                                    return completed(MaterializationTaskRecoveryAction.EXPIRED_CLAIM_REQUEUED);
                                 }
                                 if (reloaded.value().lifecycle() == TaskLifecycle.CLAIMED) {
                                     return recoverClaim(reloaded, mutationGuard, true);
@@ -161,12 +154,11 @@ public final class MaterializationTaskRecovery {
     }
 
     private CompletableFuture<MaterializationTaskRecoveryAction> reconcilePublication(
-            VersionedMaterializationTask durable,
-            MaterializationTask task,
-            MaterializationTaskRecord record) {
-        MaterializationOutput output = MaterializationRecordMapper.domainOutput(
-                task, record.output().orElseThrow());
-        return protections.reconcile(durable)
+            VersionedMaterializationTask durable, MaterializationTask task, MaterializationTaskRecord record) {
+        MaterializationOutput output =
+                MaterializationRecordMapper.domainOutput(task, record.output().orElseThrow());
+        return protections
+                .reconcile(durable)
                 .thenCompose(ignored -> publications.reconcile(task, output))
                 .thenApply(ignored -> MaterializationTaskRecoveryAction.PUBLICATION_RECONCILED);
     }
@@ -178,8 +170,7 @@ public final class MaterializationTaskRecovery {
         return mutationGuard.revalidate().thenCompose(ignored -> {
             CompletableFuture<Void> admitted;
             try {
-                admitted = Objects.requireNonNull(
-                        dispatcher.dispatch(durable, task), "task dispatch future");
+                admitted = Objects.requireNonNull(dispatcher.dispatch(durable, task), "task dispatch future");
             } catch (RuntimeException failure) {
                 return CompletableFuture.failedFuture(failure);
             }
@@ -219,9 +210,7 @@ public final class MaterializationTaskRecovery {
         }
     }
 
-    private static boolean isSameExpiredRetry(
-            MaterializationTaskRecord expected,
-            MaterializationTaskRecord actual) {
+    private static boolean isSameExpiredRetry(MaterializationTaskRecord expected, MaterializationTaskRecord actual) {
         return actual.lifecycle() == TaskLifecycle.RETRY_WAIT
                 && actual.taskId().equals(expected.taskId())
                 && actual.sourceSetSha256().equals(expected.sourceSetSha256())
@@ -235,8 +224,7 @@ public final class MaterializationTaskRecovery {
 
     private static boolean isConditionFailure(Throwable failure) {
         return failure instanceof F4MetadataConditionFailedException
-                || failure instanceof NereusException nereus
-                        && nereus.code() == ErrorCode.METADATA_CONDITION_FAILED;
+                || failure instanceof NereusException nereus && nereus.code() == ErrorCode.METADATA_CONDITION_FAILED;
     }
 
     private static Throwable unwrap(Throwable failure) {

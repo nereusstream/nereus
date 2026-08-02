@@ -1,13 +1,11 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import java.time.Duration;
 import java.util.Objects;
 
-public record ProjectionMetadataStoreConfig(
-        Duration operationTimeout,
-        int maxPendingOperations,
-        int maxValueBytes) {
+public record ProjectionMetadataStoreConfig(Duration operationTimeout, int maxPendingOperations, int maxValueBytes) {
     public static final int F2_MAX_VALUE_BYTES = 64 * 1024;
 
     public ProjectionMetadataStoreConfig {

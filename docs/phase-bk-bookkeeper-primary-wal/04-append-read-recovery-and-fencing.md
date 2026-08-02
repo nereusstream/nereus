@@ -177,15 +177,15 @@ are acquired before IO. A single target larger than the hard read bound fails cl
 
 ### 4.4 BookKeeper exception mapping
 
-| Provider result | Nereus classification | Retry/fallback rule |
-| --- | --- | --- |
-| `BKException.BKNoSuchLedgerExistsException` with live protection/root | physical not found / invariant | higher healthy generation may be selected; gen0 alone fails |
-| digest/password/unauthorized | authentication/config invariant | non-retriable, quarantine/admission block |
-| entry missing/out-of-range/count mismatch | metadata invariant or physical loss | no empty result |
-| range checksum mismatch | checksum mismatch | quarantine affected generation/ledger; higher healthy fallback allowed |
-| timeout/not-enough-bookies/transient client error | transient IO | bounded retry under same deadline; no recovery-open |
-| fenced/closed on normal read | closed is readable; fenced writer signal is irrelevant to read handle | reload metadata/root; never mutate |
-| unknown target/config alias | unsupported target/profile | fail before BK open |
+| Provider result                                                       | Nereus classification                                                 | Retry/fallback rule                                                    |
+|-----------------------------------------------------------------------|-----------------------------------------------------------------------|------------------------------------------------------------------------|
+| `BKException.BKNoSuchLedgerExistsException` with live protection/root | physical not found / invariant                                        | higher healthy generation may be selected; gen0 alone fails            |
+| digest/password/unauthorized                                          | authentication/config invariant                                       | non-retriable, quarantine/admission block                              |
+| entry missing/out-of-range/count mismatch                             | metadata invariant or physical loss                                   | no empty result                                                        |
+| range checksum mismatch                                               | checksum mismatch                                                     | quarantine affected generation/ledger; higher healthy fallback allowed |
+| timeout/not-enough-bookies/transient client error                     | transient IO                                                          | bounded retry under same deadline; no recovery-open                    |
+| fenced/closed on normal read                                          | closed is readable; fenced writer signal is irrelevant to read handle | reload metadata/root; never mutate                                     |
+| unknown target/config alias                                           | unsupported target/profile                                            | fail before BK open                                                    |
 
 Failure handling works through provider-neutral `PhysicalReadFailureKind`; core methods named
 `isObjectReadFailure`/`OBJECT_*` are generalized in BK-M1.
@@ -357,11 +357,11 @@ enum AppendAckBoundary {
 
 `StorageExecutionPlan` carries this separately from `DurabilityLevel` and `ObjectPublicationMode`：
 
-| Profile/default | Durability | Ack boundary |
-| --- | --- | --- |
-| BK_ONLY | `WAL_DURABLE` | `STABLE_HEAD` (or explicit strict gen0 request) |
-| BK_ASYNC_OBJECT | `WAL_DURABLE` | `STABLE_HEAD` |
-| BK_SYNC_OBJECT | existing WAL/gen0 durability facts | `REQUIRED_OBJECT_GENERATION` |
+| Profile/default | Durability                         | Ack boundary                                    |
+|-----------------|------------------------------------|-------------------------------------------------|
+| BK_ONLY         | `WAL_DURABLE`                      | `STABLE_HEAD` (or explicit strict gen0 request) |
+| BK_ASYNC_OBJECT | `WAL_DURABLE`                      | `STABLE_HEAD`                                   |
+| BK_SYNC_OBJECT  | existing WAL/gen0 durability facts | `REQUIRED_OBJECT_GENERATION`                    |
 
 The exact sync barrier is specified in document 05. Consumers use head visibility and may read BK bytes while a sync
 producer still waits for higher generation.
@@ -383,14 +383,14 @@ must produce byte-identical Pulsar Entry and MessageId.
 
 ## 11. Close and failure outcomes
 
-| Cut | Exposed append outcome |
-| --- | --- |
-| admission/reservation CAS definitely failed before write | `KNOWN_NOT_COMMITTED` |
-| provider write timeout/partial and head not attempted | `MAY_HAVE_COMMITTED` until reservation reconciliation; then known not committed unless exact head found |
-| commit/head CAS uncertain | generic recovery decides `KNOWN_COMMITTED` or remains may-have |
-| reachable head, gen0 repair failed | `KNOWN_COMMITTED` |
-| reachable head, async task later failed | producer success remains valid; lag/admission reacts |
-| reachable head, sync Object barrier failed/timed out | `KNOWN_COMMITTED`; retry/recovery resumes same task |
+| Cut                                                      | Exposed append outcome                                                                                  |
+|----------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| admission/reservation CAS definitely failed before write | `KNOWN_NOT_COMMITTED`                                                                                   |
+| provider write timeout/partial and head not attempted    | `MAY_HAVE_COMMITTED` until reservation reconciliation; then known not committed unless exact head found |
+| commit/head CAS uncertain                                | generic recovery decides `KNOWN_COMMITTED` or remains may-have                                          |
+| reachable head, gen0 repair failed                       | `KNOWN_COMMITTED`                                                                                       |
+| reachable head, async task later failed                  | producer success remains valid; lag/admission reacts                                                    |
+| reachable head, sync Object barrier failed/timed out     | `KNOWN_COMMITTED`; retry/recovery resumes same task                                                     |
 
 Runtime close stops new admission and allows active attempts only within the bounded close budget. Any unfinished
 provider transmission taints the ledger; durable rows allow the next process to converge. Borrowed BookKeeper client

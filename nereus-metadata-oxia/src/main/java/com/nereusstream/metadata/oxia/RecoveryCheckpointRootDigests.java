@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -12,15 +13,14 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 
-/** Canonical digest of the complete ordered recovery-checkpoint reference set. */
+/**
+ * Canonical digest of the complete ordered recovery-checkpoint reference set.
+ */
 public final class RecoveryCheckpointRootDigests {
-    private RecoveryCheckpointRootDigests() {
-    }
+    private RecoveryCheckpointRootDigests() {}
 
-    public static Checksum checkpointSetSha256(
-            List<RecoveryCheckpointReferenceRecord> references) {
-        List<RecoveryCheckpointReferenceRecord> values = List.copyOf(
-                Objects.requireNonNull(references, "references"));
+    public static Checksum checkpointSetSha256(List<RecoveryCheckpointReferenceRecord> references) {
+        List<RecoveryCheckpointReferenceRecord> values = List.copyOf(Objects.requireNonNull(references, "references"));
         Digest digest = new Digest();
         digest.text("nereus-recovery-checkpoint-set-v1");
         digest.integer(values.size());
@@ -76,9 +76,7 @@ public final class RecoveryCheckpointRootDigests {
         }
 
         private Checksum finish() {
-            return new Checksum(
-                    ChecksumType.SHA256,
-                    HexFormat.of().formatHex(digest.digest()));
+            return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest()));
         }
     }
 }

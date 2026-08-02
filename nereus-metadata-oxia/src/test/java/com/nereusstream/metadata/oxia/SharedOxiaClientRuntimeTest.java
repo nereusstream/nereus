@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.metadata.oxia.retirement.ObjectAuditRetirementStore;
 import com.nereusstream.metadata.oxia.retirement.OxiaJavaObjectAuditRetirementStore;
 import com.nereusstream.metadata.oxia.retirement.OxiaJavaSourceRetirementMetadataStore;
@@ -19,13 +19,12 @@ class SharedOxiaClientRuntimeTest {
     void adaptersCloseLocallyAndTheRuntimeClosesTheClientExactlyOnce() {
         AtomicInteger clientCloses = new AtomicInteger();
         OxiaClientConfiguration config = OxiaClientConfiguration.defaults("unused:6648");
-        SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.usingClient(
-                config, emptyClient(clientCloses), Clock.systemUTC());
+        SharedOxiaClientRuntime runtime =
+                SharedOxiaClientRuntime.usingClient(config, emptyClient(clientCloses), Clock.systemUTC());
         OxiaJavaClientMetadataStore l0 =
                 OxiaJavaClientMetadataStore.usingSharedRuntime(config, runtime, Clock.systemUTC());
-        ManagedLedgerProjectionMetadataStore projection =
-                ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
-                        config, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC());
+        ManagedLedgerProjectionMetadataStore projection = ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
+                config, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC());
         SourceRetirementMetadataStore sourceRetirement =
                 OxiaJavaSourceRetirementMetadataStore.usingSharedRuntime(config, runtime);
         ObjectAuditRetirementStore objectAuditRetirement =
@@ -35,7 +34,8 @@ class SharedOxiaClientRuntimeTest {
         sourceRetirement.close();
         objectAuditRetirement.close();
         assertThat(clientCloses).hasValue(0);
-        assertThat(projection.getProjection("cluster", "tenant/ns/topic").join()).isEmpty();
+        assertThat(projection.getProjection("cluster", "tenant/ns/topic").join())
+                .isEmpty();
         projection.close();
         assertThat(clientCloses).hasValue(0);
         assertThat(runtime.isClosed()).isFalse();
@@ -50,9 +50,7 @@ class SharedOxiaClientRuntimeTest {
     void legacyConstructorRetainsOwningCloseBehavior() {
         AtomicInteger clientCloses = new AtomicInteger();
         OxiaJavaClientMetadataStore store = new OxiaJavaClientMetadataStore(
-                OxiaClientConfiguration.defaults("unused:6648"),
-                emptyClient(clientCloses),
-                Clock.systemUTC());
+                OxiaClientConfiguration.defaults("unused:6648"), emptyClient(clientCloses), Clock.systemUTC());
 
         store.close();
         store.close();
@@ -64,18 +62,21 @@ class SharedOxiaClientRuntimeTest {
     void sharedRuntimeRejectsAdapterConfigurationDrift() {
         AtomicInteger clientCloses = new AtomicInteger();
         OxiaClientConfiguration config = OxiaClientConfiguration.defaults("unused:6648");
-        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.usingClient(
-                config, emptyClient(clientCloses), Clock.systemUTC())) {
+        try (SharedOxiaClientRuntime runtime =
+                SharedOxiaClientRuntime.usingClient(config, emptyClient(clientCloses), Clock.systemUTC())) {
             OxiaClientConfiguration drifted = new OxiaClientConfiguration(
-                    config.serviceAddress(), config.namespace(), config.requestTimeout(), config.sessionTimeout(),
-                    config.maxCommitChainScan() + 1, config.maxPendingOperations());
+                    config.serviceAddress(),
+                    config.namespace(),
+                    config.requestTimeout(),
+                    config.sessionTimeout(),
+                    config.maxCommitChainScan() + 1,
+                    config.maxPendingOperations());
 
             assertThatThrownBy(() -> ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
                             drifted, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("does not match");
-            assertThatThrownBy(() -> OxiaJavaSourceRetirementMetadataStore.usingSharedRuntime(
-                            drifted, runtime))
+            assertThatThrownBy(() -> OxiaJavaSourceRetirementMetadataStore.usingSharedRuntime(drifted, runtime))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("does not match");
         }

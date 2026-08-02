@@ -110,16 +110,16 @@ Boundary script：`scripts/check-bookkeeper-module-boundaries.sh`。It fails on 
 
 Target changes：
 
-| Area | Target files/types |
-| --- | --- |
-| generic read values | `ReadSourceRef`、`PhysicalReadStats`、`PhysicalReadResult`; simplify `ReadBatch` |
-| compatibility | migrate `WalReadResult`/`WalSliceReadStats` and Object reader tests without logical/metric drift |
-| registry | `ReadTargetReader` and `ReadTargetDispatcher` return generic results |
-| read validation | `ReadCoordinator` compares canonical target identity; provider-neutral failure classification |
-| append durable value | extend `DurablePrimaryAppend` with typed physical identity/evidence |
-| append coordinator | select appender from `PrimaryWalRegistry`; remove Object prepared/durable casts |
-| protection | `PrimaryPhysicalReferenceAdapterRegistry`; generic prepared stable append |
-| completion | `AppendCompletionPolicy` + `AppendAckBoundary` + extended `StorageExecutionPlan` (all BK routes still closed) |
+| Area                 | Target files/types                                                                                            |
+|----------------------|---------------------------------------------------------------------------------------------------------------|
+| generic read values  | `ReadSourceRef`、`PhysicalReadStats`、`PhysicalReadResult`; simplify `ReadBatch`                                |
+| compatibility        | migrate `WalReadResult`/`WalSliceReadStats` and Object reader tests without logical/metric drift              |
+| registry             | `ReadTargetReader` and `ReadTargetDispatcher` return generic results                                          |
+| read validation      | `ReadCoordinator` compares canonical target identity; provider-neutral failure classification                 |
+| append durable value | extend `DurablePrimaryAppend` with typed physical identity/evidence                                           |
+| append coordinator   | select appender from `PrimaryWalRegistry`; remove Object prepared/durable casts                               |
+| protection           | `PrimaryPhysicalReferenceAdapterRegistry`; generic prepared stable append                                     |
+| completion           | `AppendCompletionPolicy` + `AppendAckBoundary` + extended `StorageExecutionPlan` (all BK routes still closed) |
 
 Compatibility constructors may live for one milestone but tests must use both native generic and legacy Object entry
 points. No BK reader is allowed to construct a fake `ObjectId`/`EntryIndexRef`.
@@ -237,7 +237,8 @@ exact entry bytes through the module-local BK generation-zero runtime，forces t
 virtual ledger，then unloads/reopens the facade and proves historical seek plus durable F3 cursor mark-delete/hydration
 remain logical。The shared `TestCursorStorage` fixture is exported from `nereus-managed-ledger` test fixtures so this
 cross-module proof uses the same cursor state machine as the F3 suite。The checkpoint also source-locks the broker
-handoff of the exact stock BookKeeper client as a borrowed/non-closed context resource。`bookKeeperPrimaryWalM2PulsarCheck` publishes the
+handoff of the exact stock BookKeeper client as a borrowed/non-closed context resource。
+`bookKeeperPrimaryWalM2PulsarCheck` publishes the
 exact development artifacts，runs the ManagedLedger/adapter/module tests，then forces fresh broker Checkstyle and the
 borrowed-client test against the clean pinned checkout。
 
@@ -385,7 +386,8 @@ fresh runtimes。
 `bookKeeperPrimaryWalM2AllocationAuthorityCheck --rerun-tasks` passed on 2026-07-20。
 
 The remaining M2 row suffixes were explicitly assigned to BK-M5 Pulsar rollout and BK-M6 process-loss/chaos
-evidence rather than hidden M2 prerequisites；both successor milestones are now complete/final-gated。The ordinary and aggregate final tasks passed against the current source
+evidence rather than hidden M2 prerequisites；both successor milestones are now complete/final-gated。The ordinary and
+aggregate final tasks passed against the current source
 locks。Production provider composition、first-create admission and loaded/unloaded/two-broker ownership rollout were
 BK-M5 responsibilities, not hidden BK-M2 completion criteria；BK-M5 has since final-gated those routes behind exact
 activation/capability admission。
@@ -488,7 +490,8 @@ DefaultMaterializationLagSnapshotReader profile admission
 Every switch is on registered target/provider identity. Output Object protocols/formats/codecs remain unchanged.
 
 Current implementation checkpoint：`SourceGeneration`/task V2 round-trips BK targets；
-`DefaultExactSourceRangeReader` dispatches BK through the common `ReadTargetReaderRegistry` without Object identity/pins；
+`DefaultExactSourceRangeReader` dispatches BK through the common `ReadTargetReaderRegistry` without Object
+identity/pins；
 worker、committer and recovery reconciliation use `MaterializationSourceProtectionRegistry`；and
 `Phase4ObjectWalRuntime` accepts additional matched `MaterializationSourceProvider` pairs while retaining one shared
 reader registry、worker pool、task store and checkpoint authority。
@@ -849,7 +852,8 @@ bookKeeperPrimaryWalM5Check
 bookKeeperPrimaryWalM5FinalCheck             retry-disabled real two-broker acceptance
 ```
 
-Checkpoints D/E/E.1/E.2/E.3 register the first eight names as real tasks：configuration runs the typed adapter tests plus source/doc
+Checkpoints D/E/E.1/E.2/E.3 register the first eight names as real tasks：configuration runs the typed adapter tests plus
+source/doc
 locks；capability publishes exact development artifacts and runs the locked Pulsar capability test with fresh broker
 Checkstyle；first-create adds the ManagedLedger pre-L0 admission regression；borrowed-client reruns the stock-client
 identity/close-ownership test；retention runs the all-shard scanner/service and production composition checks。
@@ -863,7 +867,8 @@ over that ordinary gate plus the complete BK-M4 final predecessor chain。
 
 The focused Pulsar capability/Checkstyle run on 2026-07-20 passed 136/136 fresh tasks at source lock
 `a8eef5eb3906b6005006627506b3516ff2349fa7`，including stable publication identity、strongest-profile live deletion
-readiness and broker/property drift invalidation. This remains checkpoint-D/E historical evidence. The latest complete fresh
+readiness and broker/property drift invalidation. This remains checkpoint-D/E historical evidence. The latest complete
+fresh
 `bookKeeperPrimaryWalM5RetentionCheck --rerun-tasks` then passed 91/91 outer tasks in 2m13s；its nested capability and
 borrowed-client builds each passed 136/136 executable tasks。
 The fresh `bookKeeperPrimaryWalM5DeletionActivationCheck --rerun-tasks` passes 101/101 outer tasks in 2m46s at
@@ -962,6 +967,21 @@ Fresh results on 2026-07-22 at
   final and BK-M1–M6 final predecessors。
 
 BK-M6 and the whole BookKeeper Primary WAL Delivery are complete/final-gated. No online profile migration is included。
+
+Post-final compatibility checkpoint（2026-07-30，consumed by F9）：
+
+- product `main@03f0601` makes retired generation-zero sources a typed
+  `MaterializationSourceRetiredException/SOURCE_RETIRED` outcome rather than a generic retry loop；
+- `BookKeeperMaterializationSourceProtectionAdapter` replays an existing deterministic task protection without reopening
+  a
+  retired fixed anchor，but requires an exact ACTIVE anchor before creating a missing task protection；
+- Kafka compaction reconstructs task protection before source IO and releases exact provider protections before terminal
+  task/KCP1 deletion；the shared terminal releaser also covers Object-slice protections；
+- focused source-protection/worker/terminal/pass tests pass 32/32 tasks after the final plan-only recovery
+  adjustment，and
+  the fresh four-profile mandatory-NTC2 process gate passes 64/64 tasks in 5m39s。
+
+This is a compatibility hardening of the completed BK contract，not a new profile or an online migration claim。
 
 ## 10. Test source sets
 

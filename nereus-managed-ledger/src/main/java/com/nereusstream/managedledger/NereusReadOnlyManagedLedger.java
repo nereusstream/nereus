@@ -1,11 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
-import com.nereusstream.api.ErrorCode;
-import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamMetadata;
-import com.nereusstream.managedledger.entry.PulsarEntryCodec;
 import com.nereusstream.managedledger.callbacks.CallbackDispatcher;
+import com.nereusstream.managedledger.entry.PulsarEntryCodec;
 import com.nereusstream.managedledger.errors.ManagedLedgerErrorMapper;
 import com.nereusstream.managedledger.errors.OperationContext;
 import com.nereusstream.managedledger.projection.F2L0RequestFactory;
@@ -15,10 +14,10 @@ import com.nereusstream.managedledger.snapshot.StreamSnapshotTracker;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntryCallback;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
@@ -26,7 +25,9 @@ import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.ReadOnlyCursor;
 import org.apache.bookkeeper.mledger.ReadOnlyManagedLedger;
 
-/** Get-only F2 ledger handle; cursor construction is completed by F2-M4. */
+/**
+ * Get-only F2 ledger handle; cursor construction is completed by F2-M4.
+ */
 public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger, NereusCursorLedgerView {
     private final NereusManagedLedgerRuntime runtime;
     private final VirtualLedgerProjection projection;
@@ -40,9 +41,7 @@ public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger,
     private final Runnable onClose;
 
     public NereusReadOnlyManagedLedger(
-            NereusManagedLedgerRuntime runtime,
-            NereusLedgerOpenResult opened,
-            Runnable onClose) {
+            NereusManagedLedgerRuntime runtime, NereusLedgerOpenResult opened, Runnable onClose) {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         NereusLedgerOpenResult result = Objects.requireNonNull(opened, "opened");
         this.projection = result.projection();
@@ -64,46 +63,53 @@ public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger,
     public void asyncReadEntry(Position position, ReadEntryCallback callback, Object ctx) {
         Objects.requireNonNull(callback, "callback");
         if (!runtime.tryAcquireCallbackPermit()) {
-            CallbackDispatcher.execute(runtime.callbackExecutor(), () -> callback.readEntryFailed(
-                    new ManagedLedgerException.TooManyRequestsException(
-                            "Nereus callback capacity is exhausted"), ctx));
+            CallbackDispatcher.execute(
+                    runtime.callbackExecutor(),
+                    () -> callback.readEntryFailed(
+                            new ManagedLedgerException.TooManyRequestsException(
+                                    "Nereus callback capacity is exhausted"),
+                            ctx));
             return;
         }
         if (closed.get()) {
             runtime.releaseCallbackPermit();
-            CallbackDispatcher.execute(runtime.callbackExecutor(), () -> callback.readEntryFailed(
-                    new ManagedLedgerException.ManagedLedgerAlreadyClosedException(
-                            "read-only managed ledger is closed"), ctx));
+            CallbackDispatcher.execute(
+                    runtime.callbackExecutor(),
+                    () -> callback.readEntryFailed(
+                            new ManagedLedgerException.ManagedLedgerAlreadyClosedException(
+                                    "read-only managed ledger is closed"),
+                            ctx));
             return;
         }
-        runtime.streamStorage().getStreamMetadata(projection.streamId())
+        runtime.streamStorage()
+                .getStreamMetadata(projection.streamId())
                 .thenApply(snapshots::updateFromMetadata)
                 .thenCompose(view -> {
-                    long offset = positions.requireReadableEntryOffset(
-                            projection, position, view.metadata());
-                    return runtime.streamStorage().read(
-                            projection.streamId(),
-                            offset,
-                            requests.singleEntryReadOptions(
-                                    runtime.config().maxEntryBytes(), runtime.config().readTimeout()));
+                    long offset = positions.requireReadableEntryOffset(projection, position, view.metadata());
+                    return runtime.streamStorage()
+                            .read(
+                                    projection.streamId(),
+                                    offset,
+                                    requests.singleEntryReadOptions(
+                                            runtime.config().maxEntryBytes(),
+                                            runtime.config().readTimeout()));
                 })
                 .thenApply(result -> codec.decode(position, result))
-                .whenComplete((entry, error) -> CallbackDispatcher.execute(
-                        runtime.callbackExecutor(), () -> {
+                .whenComplete((entry, error) -> CallbackDispatcher.execute(runtime.callbackExecutor(), () -> {
+                    try {
+                        if (error == null) {
                             try {
-                                if (error == null) {
-                                    try {
-                                        callback.readEntryComplete(entry, ctx);
-                                    } catch (Throwable callbackError) {
-                                        entry.release();
-                                    }
-                                } else {
-                                    callback.readEntryFailed(map(error), ctx);
-                                }
-                            } finally {
-                                runtime.releaseCallbackPermit();
+                                callback.readEntryComplete(entry, ctx);
+                            } catch (Throwable callbackError) {
+                                entry.release();
                             }
-                        }));
+                        } else {
+                            callback.readEntryFailed(map(error), ctx);
+                        }
+                    } finally {
+                        runtime.releaseCallbackPermit();
+                    }
+                }));
     }
 
     @Override
@@ -152,7 +158,8 @@ public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger,
 
     @Override
     public CompletableFuture<StreamMetadata> refreshMetadata() {
-        return runtime.streamStorage().getStreamMetadata(projection.streamId())
+        return runtime.streamStorage()
+                .getStreamMetadata(projection.streamId())
                 .thenApply(metadata -> snapshots.updateFromMetadata(metadata).metadata());
     }
 
@@ -160,11 +167,13 @@ public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger,
     public CompletableFuture<Entry> readAt(long offset, StreamMetadata metadata) {
         Position position = positions.entryPosition(projection, offset);
         positions.requireReadableEntryOffset(projection, position, metadata);
-        return runtime.streamStorage().read(
+        return runtime.streamStorage()
+                .read(
                         projection.streamId(),
                         offset,
                         requests.singleEntryReadOptions(
-                                runtime.config().maxEntryBytes(), runtime.config().readTimeout()))
+                                runtime.config().maxEntryBytes(),
+                                runtime.config().readTimeout()))
                 .thenApply(result -> codec.decode(position, result));
     }
 
@@ -183,11 +192,13 @@ public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger,
     }
 
     private ManagedLedgerException map(Throwable error) {
-        return errorMapper.map(unwrap(error), new OperationContext(
-                "readOnlyReadEntry",
-                false,
-                true,
-                Optional.of(snapshots.current().metadata().state())));
+        return errorMapper.map(
+                unwrap(error),
+                new OperationContext(
+                        "readOnlyReadEntry",
+                        false,
+                        true,
+                        Optional.of(snapshots.current().metadata().state())));
     }
 
     private static Throwable unwrap(Throwable error) {

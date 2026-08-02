@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.StorageProfile;
@@ -8,7 +9,9 @@ import com.nereusstream.core.backpressure.MaterializationLagGate;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** Applies the shared F4 lag gate to BK-async appends before primary BookKeeper preparation or IO. */
+/**
+ * Applies the shared F4 lag gate to BK-async appends before primary BookKeeper preparation or IO.
+ */
 public final class BookKeeperAsyncAppendAdmissionGuard implements AppendAdmissionGuard {
     private final MaterializationLagGate lagGate;
 

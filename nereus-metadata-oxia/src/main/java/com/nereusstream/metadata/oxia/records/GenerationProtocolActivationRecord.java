@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import java.util.List;
 import java.util.Objects;
 
-/** Durable cluster authority for generation publication/deletion and the exact GC domain set. */
+/**
+ * Durable cluster authority for generation publication/deletion and the exact GC domain set.
+ */
 public record GenerationProtocolActivationRecord(
         int schemaVersion,
         int protocolVersion,
@@ -33,18 +36,14 @@ public record GenerationProtocolActivationRecord(
         }
         Objects.requireNonNull(lifecycle, "lifecycle");
         requiredReferenceDomains = F4RecordValidation.immutableBoundedList(
-                requiredReferenceDomains,
-                MAX_REFERENCE_DOMAINS,
-                "requiredReferenceDomains");
+                requiredReferenceDomains, MAX_REFERENCE_DOMAINS, "requiredReferenceDomains");
         if (requiredReferenceDomains.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "requiredReferenceDomains must be non-empty");
+            throw new IllegalArgumentException("requiredReferenceDomains must be non-empty");
         }
         for (int index = 1; index < requiredReferenceDomains.size(); index++) {
             ReferenceDomainVersionRecord previous = requiredReferenceDomains.get(index - 1);
             ReferenceDomainVersionRecord current = requiredReferenceDomains.get(index);
-            if (previous.compareTo(current) >= 0
-                    || previous.domainId().equals(current.domainId())) {
+            if (previous.compareTo(current) >= 0 || previous.domainId().equals(current.domainId())) {
                 throw new IllegalArgumentException(
                         "requiredReferenceDomains must be strictly sorted with unique domain ids");
             }
@@ -52,49 +51,37 @@ public record GenerationProtocolActivationRecord(
         Objects.requireNonNull(streamRegistrationBackfill, "streamRegistrationBackfill");
         Objects.requireNonNull(physicalRootBackfill, "physicalRootBackfill");
         Objects.requireNonNull(cursorSnapshotBackfill, "cursorSnapshotBackfill");
-        F4RecordValidation.requireNonNegative(
-                brokerCapabilityReadinessEpoch,
-                "brokerCapabilityReadinessEpoch");
+        F4RecordValidation.requireNonNegative(brokerCapabilityReadinessEpoch, "brokerCapabilityReadinessEpoch");
         requireBackfillEpoch(streamRegistrationBackfill, brokerCapabilityReadinessEpoch);
         requireBackfillEpoch(physicalRootBackfill, brokerCapabilityReadinessEpoch);
         requireBackfillEpoch(cursorSnapshotBackfill, brokerCapabilityReadinessEpoch);
-        objectStoreCapabilitySha256 = F4RecordValidation.requireOptionalSha256(
-                objectStoreCapabilitySha256, "objectStoreCapabilitySha256");
-        activatingBrokerRunId = F4RecordValidation.requireBase32Id(
-                activatingBrokerRunId, "activatingBrokerRunId");
+        objectStoreCapabilitySha256 =
+                F4RecordValidation.requireOptionalSha256(objectStoreCapabilitySha256, "objectStoreCapabilitySha256");
+        activatingBrokerRunId = F4RecordValidation.requireBase32Id(activatingBrokerRunId, "activatingBrokerRunId");
         F4RecordValidation.requireNonNegative(preparedAtMillis, "preparedAtMillis");
         F4RecordValidation.requireNonNegative(activatedAtMillis, "activatedAtMillis");
         F4RecordValidation.requireNonNegative(updatedAtMillis, "updatedAtMillis");
         F4RecordValidation.requireMetadataVersion(metadataVersion);
         if (updatedAtMillis < preparedAtMillis) {
-            throw new IllegalArgumentException(
-                    "updatedAtMillis cannot precede preparedAtMillis");
+            throw new IllegalArgumentException("updatedAtMillis cannot precede preparedAtMillis");
         }
         if (lifecycle == GenerationProtocolActivationLifecycle.PREPARED) {
-            if (publicationEnabled
-                    || physicalDeleteEnabled
-                    || cursorSnapshotDeleteEnabled
-                    || activatedAtMillis != 0) {
+            if (publicationEnabled || physicalDeleteEnabled || cursorSnapshotDeleteEnabled || activatedAtMillis != 0) {
                 throw new IllegalArgumentException(
                         "PREPARED activation cannot enable capabilities or carry activatedAtMillis");
             }
-        } else if (!publicationEnabled
-                || activatedAtMillis < preparedAtMillis
-                || activatedAtMillis > updatedAtMillis) {
-            throw new IllegalArgumentException(
-                    "ACTIVE activation requires publication and a valid activation time");
+        } else if (!publicationEnabled || activatedAtMillis < preparedAtMillis || activatedAtMillis > updatedAtMillis) {
+            throw new IllegalArgumentException("ACTIVE activation requires publication and a valid activation time");
         }
         if (physicalDeleteEnabled != cursorSnapshotDeleteEnabled) {
-            throw new IllegalArgumentException(
-                    "V1 physical and cursor-snapshot deletion must activate together");
+            throw new IllegalArgumentException("V1 physical and cursor-snapshot deletion must activate together");
         }
         if (physicalDeleteEnabled
                 && (!streamRegistrationBackfill.complete()
                         || !physicalRootBackfill.complete()
                         || !cursorSnapshotBackfill.complete()
                         || objectStoreCapabilitySha256.isEmpty())) {
-            throw new IllegalArgumentException(
-                    "physical deletion requires all backfills and object-store capability");
+            throw new IllegalArgumentException("physical deletion requires all backfills and object-store capability");
         }
     }
 
@@ -119,13 +106,9 @@ public record GenerationProtocolActivationRecord(
                 version);
     }
 
-    private static void requireBackfillEpoch(
-            GenerationBackfillProofRecord proof,
-            long brokerCapabilityReadinessEpoch) {
-        if (proof.brokerReadinessEpoch()
-                != brokerCapabilityReadinessEpoch) {
-            throw new IllegalArgumentException(
-                    "backfill proof belongs to another broker readiness identity");
+    private static void requireBackfillEpoch(GenerationBackfillProofRecord proof, long brokerCapabilityReadinessEpoch) {
+        if (proof.brokerReadinessEpoch() != brokerCapabilityReadinessEpoch) {
+            throw new IllegalArgumentException("backfill proof belongs to another broker readiness identity");
         }
     }
 }

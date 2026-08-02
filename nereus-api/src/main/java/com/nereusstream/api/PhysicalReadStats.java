@@ -1,9 +1,12 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.api;
 
 import java.util.Objects;
 
-/** Provider-neutral physical/logical byte accounting for one complete resolved source range. */
+/**
+ * Provider-neutral physical/logical byte accounting for one complete resolved source range.
+ */
 public record PhysicalReadStats(
         Checksum targetIdentity,
         long resolvedPayloadBytes,

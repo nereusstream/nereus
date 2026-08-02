@@ -42,7 +42,8 @@ final class AppendResourceLimiter {
     }
 
     private synchronized void reserveBuffer(Reservation reservation, long conservativeBytes) {
-        if (conservativeBytes <= 0 || conservativeBytes > maxBufferedBytes
+        if (conservativeBytes <= 0
+                || conservativeBytes > maxBufferedBytes
                 || bufferedBytes > maxBufferedBytes - conservativeBytes) {
             throw new NereusException(
                     ErrorCode.BACKPRESSURE_REJECTED,

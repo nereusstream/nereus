@@ -63,8 +63,7 @@ public final class GenerationZeroRepairScanner {
         this.cluster = requireText(cluster, "cluster");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         this.walker = Objects.requireNonNull(walker, "walker");
-        this.physicalReferences = Objects.requireNonNull(
-                physicalReferences, "physicalReferences");
+        this.physicalReferences = Objects.requireNonNull(physicalReferences, "physicalReferences");
         if (maxCommits <= 0 || pageSize <= 0 || pageSize > maxCommits || pageSize > 1_000) {
             throw new IllegalArgumentException("generation-zero repair scan bounds are invalid");
         }
@@ -72,76 +71,62 @@ public final class GenerationZeroRepairScanner {
         this.pageSize = pageSize;
     }
 
-    /** Repairs every untrimmed commit returned by one bounded, root-stable live-tail walk. */
-    public CompletableFuture<ScanResult> repairAll(
-            StreamId streamId, Duration timeout) {
+    /**
+     * Repairs every untrimmed commit returned by one bounded, root-stable live-tail walk.
+     */
+    public CompletableFuture<ScanResult> repairAll(StreamId streamId, Duration timeout) {
         Objects.requireNonNull(streamId, "streamId");
         RepairDeadline deadline = new RepairDeadline(timeout);
-        return loadSnapshot(streamId, deadline)
-                .thenCompose(snapshot -> deadline.bound(
-                        () -> walker.walk(streamId, maxCommits, pageSize),
-                        "walk live tail for generation-zero repair")
-                        .thenCompose(walk -> {
-                            requireWalkAtOrAfterSnapshot(streamId, snapshot, walk);
-                            List<AppendRecoveryCommit> repairOrder =
-                                    new ArrayList<>(walk.commitsNewestFirst());
-                            Collections.reverse(repairOrder);
-                            List<AppendRecoveryCommit> untrimmed = repairOrder.stream()
-                                    .filter(commit -> commit.canonicalCommit().offsetEnd()
-                                            > snapshot.trim().trimOffset())
-                                    .toList();
-                            return repairSequentially(
-                                            untrimmed,
-                                            walk,
-                                            0,
-                                            0,
-                                            deadline)
-                                    .thenCompose(repaired -> loadSnapshot(streamId, deadline)
-                                            .thenApply(reloaded -> {
-                                                requireSnapshotStream(streamId, reloaded);
-                                                requireHeadNotRegressed(walk, reloaded);
-                                                return new ScanResult(
-                                                        streamId,
-                                                        walk.commitsNewestFirst().size(),
-                                                        repaired,
-                                                        walk.anchorReached(),
-                                                        walk.observedHead().commitVersion());
-                                            }));
-                        }));
+        return loadSnapshot(streamId, deadline).thenCompose(snapshot -> deadline.bound(
+                        () -> walker.walk(streamId, maxCommits, pageSize), "walk live tail for generation-zero repair")
+                .thenCompose(walk -> {
+                    requireWalkAtOrAfterSnapshot(streamId, snapshot, walk);
+                    List<AppendRecoveryCommit> repairOrder = new ArrayList<>(walk.commitsNewestFirst());
+                    Collections.reverse(repairOrder);
+                    List<AppendRecoveryCommit> untrimmed = repairOrder.stream()
+                            .filter(commit -> commit.canonicalCommit().offsetEnd()
+                                    > snapshot.trim().trimOffset())
+                            .toList();
+                    return repairSequentially(untrimmed, walk, 0, 0, deadline)
+                            .thenCompose(
+                                    repaired -> loadSnapshot(streamId, deadline).thenApply(reloaded -> {
+                                        requireSnapshotStream(streamId, reloaded);
+                                        requireHeadNotRegressed(walk, reloaded);
+                                        return new ScanResult(
+                                                streamId,
+                                                walk.commitsNewestFirst().size(),
+                                                repaired,
+                                                walk.anchorReached(),
+                                                walk.observedHead().commitVersion());
+                                    }));
+                }));
     }
 
-    /** Repairs the exact live commit covering one committed offset, including its VISIBLE_GENERATION protection. */
+    /**
+     * Repairs the exact live commit covering one committed offset, including its VISIBLE_GENERATION protection.
+     */
     public CompletableFuture<TargetRepairResult> repairCovering(
-            StreamId streamId,
-            long targetOffset,
-            Duration timeout) {
+            StreamId streamId, long targetOffset, Duration timeout) {
         Objects.requireNonNull(streamId, "streamId");
         if (targetOffset < 0) {
             throw new IllegalArgumentException("targetOffset must be non-negative");
         }
         RepairDeadline deadline = new RepairDeadline(timeout);
-        return loadSnapshot(streamId, deadline)
-                .thenCompose(snapshot -> {
-                    if (targetOffset < snapshot.trim().trimOffset()) {
-                        return CompletableFuture.completedFuture(
-                                TargetRepairResult.trimmed(streamId, targetOffset));
-                    }
-                    if (targetOffset >= snapshot.committedEnd().committedEndOffset()) {
-                        return CompletableFuture.failedFuture(new NereusException(
-                                ErrorCode.READ_RESOLUTION_FAILED,
-                                true,
-                                "generation-zero repair target is not a committed offset"));
-                    }
-                    return deadline.bound(
-                                    () -> walker.walk(streamId, maxCommits, pageSize),
-                                    "walk live tail for read-after-commit repair")
-                            .thenCompose(walk -> repairCovering(
-                                    streamId,
-                                    targetOffset,
-                                    snapshot,
-                                    walk,
-                                    deadline));
-                });
+        return loadSnapshot(streamId, deadline).thenCompose(snapshot -> {
+            if (targetOffset < snapshot.trim().trimOffset()) {
+                return CompletableFuture.completedFuture(TargetRepairResult.trimmed(streamId, targetOffset));
+            }
+            if (targetOffset >= snapshot.committedEnd().committedEndOffset()) {
+                return CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.READ_RESOLUTION_FAILED,
+                        true,
+                        "generation-zero repair target is not a committed offset"));
+            }
+            return deadline.bound(
+                            () -> walker.walk(streamId, maxCommits, pageSize),
+                            "walk live tail for read-after-commit repair")
+                    .thenCompose(walk -> repairCovering(streamId, targetOffset, snapshot, walk, deadline));
+        });
     }
 
     private CompletableFuture<TargetRepairResult> repairCovering(
@@ -158,8 +143,7 @@ public final class GenerationZeroRepairScanner {
         if (candidate.isEmpty()) {
             if (walk.recoveryRoot().isPresent()
                     && !walk.recoveryRoot().orElseThrow().value().checkpoints().isEmpty()
-                    && targetOffset
-                            < walk.recoveryRoot().orElseThrow().value().coveredEndOffset()) {
+                    && targetOffset < walk.recoveryRoot().orElseThrow().value().coveredEndOffset()) {
                 return CompletableFuture.failedFuture(new NereusException(
                         ErrorCode.READ_RESOLUTION_FAILED,
                         true,
@@ -171,25 +155,19 @@ public final class GenerationZeroRepairScanner {
                         true,
                         "generation-zero repair live tail exceeds its bounded scan"));
             }
-            return CompletableFuture.failedFuture(invariant(
-                    "root-stable live tail does not contain a committed repair target",
-                    null));
+            return CompletableFuture.failedFuture(
+                    invariant("root-stable live tail does not contain a committed repair target", null));
         }
         return repairCommit(candidate.orElseThrow(), walk, deadline)
-                .thenCompose(materialized -> loadSnapshot(streamId, deadline)
-                        .thenApply(reloaded -> {
-                            requireSnapshotStream(streamId, reloaded);
-                            requireHeadNotRegressed(walk, reloaded);
-                            if (targetOffset < reloaded.trim().trimOffset()) {
-                                return TargetRepairResult.trimmed(
-                                        streamId, targetOffset);
-                            }
-                            return TargetRepairResult.repaired(
-                                    streamId,
-                                    targetOffset,
-                                    walk.commitsNewestFirst().size(),
-                                    materialized);
-                        }));
+                .thenCompose(materialized -> loadSnapshot(streamId, deadline).thenApply(reloaded -> {
+                    requireSnapshotStream(streamId, reloaded);
+                    requireHeadNotRegressed(walk, reloaded);
+                    if (targetOffset < reloaded.trim().trimOffset()) {
+                        return TargetRepairResult.trimmed(streamId, targetOffset);
+                    }
+                    return TargetRepairResult.repaired(
+                            streamId, targetOffset, walk.commitsNewestFirst().size(), materialized);
+                }));
     }
 
     private CompletableFuture<Integer> repairSequentially(
@@ -202,45 +180,33 @@ public final class GenerationZeroRepairScanner {
             return CompletableFuture.completedFuture(repaired);
         }
         return repairCommit(commits.get(index), walk, deadline)
-                .thenCompose(ignored -> repairSequentially(
-                        commits,
-                        walk,
-                        index + 1,
-                        Math.addExact(repaired, 1),
-                        deadline));
+                .thenCompose(
+                        ignored -> repairSequentially(commits, walk, index + 1, Math.addExact(repaired, 1), deadline));
     }
 
     private CompletableFuture<MaterializedGenerationZero> repairCommit(
-            AppendRecoveryCommit evidence,
-            AnchorAwareCommitWalk walk,
-            RepairDeadline deadline) {
+            AppendRecoveryCommit evidence, AnchorAwareCommitWalk walk, RepairDeadline deadline) {
         ReachableCommittedAppend reachable = hydrateReachable(evidence, walk);
         return deadline.bound(
-                        () -> metadataStore.materializeGenerationZero(
-                                cluster, reachable),
+                        () -> metadataStore.materializeGenerationZero(cluster, reachable),
                         "materialize repaired generation-zero index")
                 .thenCompose(materialized -> deadline.bound(
-                                () -> physicalReferences.protectVisibleIndex(
-                                        materialized, deadline.remaining()),
+                                () -> physicalReferences.protectVisibleIndex(materialized, deadline.remaining()),
                                 "protect repaired generation-zero index")
                         .thenApply(protectedIndex -> {
                             if (!protectedIndex.materialized().equals(materialized)) {
-                                throw invariant(
-                                        "generation-zero protection returned another materialization",
-                                        null);
+                                throw invariant("generation-zero protection returned another materialization", null);
                             }
                             return materialized;
                         }));
     }
 
     private static ReachableCommittedAppend hydrateReachable(
-            AppendRecoveryCommit evidence,
-            AnchorAwareCommitWalk walk) {
+            AppendRecoveryCommit evidence, AnchorAwareCommitWalk walk) {
         try {
             var committed = AppendReplayRecords.hydrate(
                     evidence.canonicalCommit(),
-                    ProjectionIdentity.decode(
-                            evidence.canonicalCommit().projectionRef()));
+                    ProjectionIdentity.decode(evidence.canonicalCommit().projectionRef()));
             return ReachableCommittedAppend.verified(
                     committed,
                     walk.observedHead().lastCommitId(),
@@ -248,14 +214,11 @@ public final class GenerationZeroRepairScanner {
                     walk.observedHead().cumulativeSize(),
                     walk.observedHead().commitVersion());
         } catch (RuntimeException failure) {
-            throw invariant(
-                    "live append evidence cannot be hydrated for generation-zero repair",
-                    failure);
+            throw invariant("live append evidence cannot be hydrated for generation-zero repair", failure);
         }
     }
 
-    private CompletableFuture<StreamMetadataSnapshot> loadSnapshot(
-            StreamId streamId, RepairDeadline deadline) {
+    private CompletableFuture<StreamMetadataSnapshot> loadSnapshot(StreamId streamId, RepairDeadline deadline) {
         return deadline.bound(
                         () -> metadataStore.getStreamSnapshot(cluster, streamId),
                         "load stream snapshot for generation-zero repair")
@@ -266,8 +229,7 @@ public final class GenerationZeroRepairScanner {
                 });
     }
 
-    private static void requireSnapshotStream(
-            StreamId streamId, StreamMetadataSnapshot snapshot) {
+    private static void requireSnapshotStream(StreamId streamId, StreamMetadataSnapshot snapshot) {
         if (!snapshot.metadata().streamId().equals(streamId.value())) {
             throw invariant("stream snapshot belongs to another stream", null);
         }
@@ -278,18 +240,13 @@ public final class GenerationZeroRepairScanner {
         StorageProfile profile;
         try {
             state = StreamState.valueOf(snapshot.metadata().state());
-            profile = StorageProfile.valueOf(snapshot.metadata().profile())
-                    .canonical();
+            profile = StorageProfile.valueOf(snapshot.metadata().profile()).canonical();
         } catch (IllegalArgumentException failure) {
-            throw invariant(
-                    "stream snapshot contains an unknown state or profile",
-                    failure);
+            throw invariant("stream snapshot contains an unknown state or profile", failure);
         }
         if (state != StreamState.ACTIVE && state != StreamState.SEALED) {
             throw new NereusException(
-                    state == StreamState.DELETED
-                            ? ErrorCode.STREAM_NOT_FOUND
-                            : ErrorCode.STREAM_NOT_ACTIVE,
+                    state == StreamState.DELETED ? ErrorCode.STREAM_NOT_FOUND : ErrorCode.STREAM_NOT_ACTIVE,
                     state == StreamState.CREATING,
                     "stream state does not admit generation-zero repair");
         }
@@ -302,33 +259,22 @@ public final class GenerationZeroRepairScanner {
     }
 
     private static void requireWalkAtOrAfterSnapshot(
-            StreamId streamId,
-            StreamMetadataSnapshot snapshot,
-            AnchorAwareCommitWalk walk) {
+            StreamId streamId, StreamMetadataSnapshot snapshot, AnchorAwareCommitWalk walk) {
         if (!walk.observedHead().streamId().equals(streamId)
-                || walk.observedHead().offsetEnd()
-                        < snapshot.committedEnd().committedEndOffset()
+                || walk.observedHead().offsetEnd() < snapshot.committedEnd().committedEndOffset()
                 || walk.observedHead().cumulativeSize()
                         < snapshot.committedEnd().cumulativeSize()
-                || walk.observedHead().commitVersion()
-                        < snapshot.committedEnd().commitVersion()) {
-            throw invariant(
-                    "root-stable live-tail head regressed behind the stream snapshot",
-                    null);
+                || walk.observedHead().commitVersion() < snapshot.committedEnd().commitVersion()) {
+            throw invariant("root-stable live-tail head regressed behind the stream snapshot", null);
         }
     }
 
-    private static void requireHeadNotRegressed(
-            AnchorAwareCommitWalk walk, StreamMetadataSnapshot snapshot) {
-        if (snapshot.committedEnd().committedEndOffset()
-                        < walk.observedHead().offsetEnd()
+    private static void requireHeadNotRegressed(AnchorAwareCommitWalk walk, StreamMetadataSnapshot snapshot) {
+        if (snapshot.committedEnd().committedEndOffset() < walk.observedHead().offsetEnd()
                 || snapshot.committedEnd().cumulativeSize()
                         < walk.observedHead().cumulativeSize()
-                || snapshot.committedEnd().commitVersion()
-                        < walk.observedHead().commitVersion()) {
-            throw invariant(
-                    "stream head regressed after generation-zero repair",
-                    null);
+                || snapshot.committedEnd().commitVersion() < walk.observedHead().commitVersion()) {
+            throw invariant("stream head regressed after generation-zero repair", null);
         }
     }
 
@@ -344,8 +290,7 @@ public final class GenerationZeroRepairScanner {
                     || protectedIndexes < 0
                     || protectedIndexes > scannedCommits
                     || observedHeadCommitVersion < 0) {
-                throw new IllegalArgumentException(
-                        "generation-zero scan result is invalid");
+                throw new IllegalArgumentException("generation-zero scan result is invalid");
             }
         }
     }
@@ -359,55 +304,30 @@ public final class GenerationZeroRepairScanner {
         public TargetRepairResult {
             Objects.requireNonNull(streamId, "streamId");
             materialized = Objects.requireNonNull(materialized, "materialized");
-            if (targetOffset < 0
-                    || scannedCommits < 0
-                    || trimmed == materialized.isPresent()) {
-                throw new IllegalArgumentException(
-                        "generation-zero target repair result is invalid");
+            if (targetOffset < 0 || scannedCommits < 0 || trimmed == materialized.isPresent()) {
+                throw new IllegalArgumentException("generation-zero target repair result is invalid");
             }
             materialized.ifPresent(value -> {
                 if (!value.committedAppend().streamId().equals(streamId)
-                        || value.committedAppend().range().startOffset()
-                                > targetOffset
-                        || targetOffset
-                                >= value.committedAppend().range().endOffset()) {
-                    throw new IllegalArgumentException(
-                            "materialized generation zero does not cover target");
+                        || value.committedAppend().range().startOffset() > targetOffset
+                        || targetOffset >= value.committedAppend().range().endOffset()) {
+                    throw new IllegalArgumentException("materialized generation zero does not cover target");
                 }
             });
         }
 
-        static TargetRepairResult trimmed(
-                StreamId streamId, long targetOffset) {
-            return new TargetRepairResult(
-                    streamId,
-                    targetOffset,
-                    0,
-                    true,
-                    Optional.empty());
+        static TargetRepairResult trimmed(StreamId streamId, long targetOffset) {
+            return new TargetRepairResult(streamId, targetOffset, 0, true, Optional.empty());
         }
 
         static TargetRepairResult repaired(
-                StreamId streamId,
-                long targetOffset,
-                int scannedCommits,
-                MaterializedGenerationZero materialized) {
-            return new TargetRepairResult(
-                    streamId,
-                    targetOffset,
-                    scannedCommits,
-                    false,
-                    Optional.of(materialized));
+                StreamId streamId, long targetOffset, int scannedCommits, MaterializedGenerationZero materialized) {
+            return new TargetRepairResult(streamId, targetOffset, scannedCommits, false, Optional.of(materialized));
         }
     }
 
-    private static NereusException invariant(
-            String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message,
-                cause);
+    private static NereusException invariant(String message, Throwable cause) {
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static String requireText(String value, String field) {
@@ -441,50 +361,41 @@ public final class GenerationZeroRepairScanner {
                 timeoutNanos = Long.MAX_VALUE;
             }
             long now = System.nanoTime();
-            expiresAtNanos = timeoutNanos >= Long.MAX_VALUE - now
-                    ? Long.MAX_VALUE
-                    : now + timeoutNanos;
+            expiresAtNanos = timeoutNanos >= Long.MAX_VALUE - now ? Long.MAX_VALUE : now + timeoutNanos;
         }
 
         private Duration remaining() {
-            return Duration.ofNanos(Math.max(
-                    0, expiresAtNanos - System.nanoTime()));
+            return Duration.ofNanos(Math.max(0, expiresAtNanos - System.nanoTime()));
         }
 
-        private <T> CompletableFuture<T> bound(
-                Supplier<CompletableFuture<T>> operation, String action) {
+        private <T> CompletableFuture<T> bound(Supplier<CompletableFuture<T>> operation, String action) {
             long remaining = expiresAtNanos - System.nanoTime();
             if (remaining <= 0) {
                 return CompletableFuture.failedFuture(timeout(action));
             }
             CompletableFuture<T> source;
             try {
-                source = Objects.requireNonNull(
-                        operation.get(), "operation future");
+                source = Objects.requireNonNull(operation.get(), "operation future");
             } catch (Throwable failure) {
                 return CompletableFuture.failedFuture(failure);
             }
-            return source.orTimeout(remaining, TimeUnit.NANOSECONDS)
-                    .handle((value, failure) -> {
-                        if (failure == null) {
-                            return value;
-                        }
-                        Throwable exact = unwrap(failure);
-                        if (exact instanceof TimeoutException) {
-                            throw timeout(action);
-                        }
-                        if (exact instanceof RuntimeException runtime) {
-                            throw runtime;
-                        }
-                        throw new CompletionException(exact);
-                    });
+            return source.orTimeout(remaining, TimeUnit.NANOSECONDS).handle((value, failure) -> {
+                if (failure == null) {
+                    return value;
+                }
+                Throwable exact = unwrap(failure);
+                if (exact instanceof TimeoutException) {
+                    throw timeout(action);
+                }
+                if (exact instanceof RuntimeException runtime) {
+                    throw runtime;
+                }
+                throw new CompletionException(exact);
+            });
         }
 
         private static NereusException timeout(String action) {
-            return new NereusException(
-                    ErrorCode.TIMEOUT,
-                    true,
-                    action + " exceeded its deadline");
+            return new NereusException(ErrorCode.TIMEOUT, true, action + " exceeded its deadline");
         }
     }
 }

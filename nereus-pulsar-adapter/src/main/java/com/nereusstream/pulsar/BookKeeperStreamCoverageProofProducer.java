@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.pulsar;
 
 import com.nereusstream.api.Checksum;
@@ -11,6 +12,8 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadiness;
 import com.nereusstream.bookkeeper.BookKeeperOperationDeadline;
+import com.nereusstream.bookkeeper.BookKeeperStreamCoverageProof;
+import com.nereusstream.bookkeeper.BookKeeperStreamCoverageProofProvider;
 import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProjectionRefV1;
 import com.nereusstream.metadata.oxia.F4Keyspace;
@@ -37,8 +40,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Produces NBKSTREAM1 only after all 64 registrations and each live BK L0/F2 authority agree. */
-public final class BookKeeperStreamCoverageProofProducer {
+/**
+ * Produces NBKSTREAM1 only after all 64 registrations and each live BK L0/F2 authority agree.
+ */
+public final class BookKeeperStreamCoverageProofProducer implements BookKeeperStreamCoverageProofProvider {
     private static final String DOMAIN = "NBKSTREAM1";
 
     private final String cluster;
@@ -60,10 +65,7 @@ public final class BookKeeperStreamCoverageProofProducer {
         this.cluster = text(cluster, "cluster");
         this.configuration = Objects.requireNonNull(configuration, "configuration");
         this.ledgerIdNamespaceSha256 = new Checksum(
-                        ChecksumType.SHA256,
-                        Objects.requireNonNull(
-                                ledgerIdNamespaceSha256,
-                                "ledgerIdNamespaceSha256"))
+                        ChecksumType.SHA256, Objects.requireNonNull(ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256"))
                 .value();
         this.generations = Objects.requireNonNull(generations, "generations");
         this.l0 = Objects.requireNonNull(l0, "l0");
@@ -72,6 +74,7 @@ public final class BookKeeperStreamCoverageProofProducer {
         this.pageSize = Math.min(configuration.retentionPageSize(), 1_000);
     }
 
+    @Override
     public CompletableFuture<BookKeeperStreamCoverageProof> produce(
             BookKeeperBrokerReadiness readiness, Duration timeout) {
         final BookKeeperBrokerReadiness exactReadiness;
@@ -84,8 +87,7 @@ public final class BookKeeperStreamCoverageProofProducer {
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return scanShard(0, Optional.empty(), accumulator, deadline)
-                .thenApply(ignored -> accumulator.finish());
+        return scanShard(0, Optional.empty(), accumulator, deadline).thenApply(ignored -> accumulator.finish());
     }
 
     private CompletableFuture<Void> scanShard(
@@ -96,24 +98,14 @@ public final class BookKeeperStreamCoverageProofProducer {
         if (shard == BookKeeperStreamCoverageProof.STREAM_SHARDS) {
             return CompletableFuture.completedFuture(null);
         }
-        return deadline.bound(generations.scanStreamRegistrations(
-                        cluster, shard, continuation, pageSize))
-                .thenCompose(page -> process(
-                                page.values(), 0, shard, accumulator, deadline)
+        return deadline.bound(generations.scanStreamRegistrations(cluster, shard, continuation, pageSize))
+                .thenCompose(page -> process(page.values(), 0, shard, accumulator, deadline)
                         .thenCompose(ignored -> {
                             if (page.continuation().isPresent()) {
-                                return scanShard(
-                                        shard,
-                                        page.continuation(),
-                                        accumulator,
-                                        deadline);
+                                return scanShard(shard, page.continuation(), accumulator, deadline);
                             }
                             accumulator.completeShard(shard);
-                            return scanShard(
-                                    shard + 1,
-                                    Optional.empty(),
-                                    accumulator,
-                                    deadline);
+                            return scanShard(shard + 1, Optional.empty(), accumulator, deadline);
                         }));
     }
 
@@ -128,8 +120,7 @@ public final class BookKeeperStreamCoverageProofProducer {
         }
         VersionedMaterializationStreamRegistration registration = values.get(index);
         accumulator.observeKey(shard, registration.key());
-        accumulator.registrationsScanned = Math.addExact(
-                accumulator.registrationsScanned, 1);
+        accumulator.registrationsScanned = Math.addExact(accumulator.registrationsScanned, 1);
         MaterializationStreamRegistrationRecord value = registration.value();
         StorageProfile profile = parseProfile(value.storageProfile());
         if (!isBookKeeper(profile)) {
@@ -143,18 +134,15 @@ public final class BookKeeperStreamCoverageProofProducer {
                         (snapshot, projection) -> {
                             requireAuthorities(registration, profile, snapshot, projection);
                             accumulator.stream(registration, snapshot, projection);
-                            accumulator.bookKeeperStreamsVerified = Math.addExact(
-                                    accumulator.bookKeeperStreamsVerified, 1);
+                            accumulator.bookKeeperStreamsVerified =
+                                    Math.addExact(accumulator.bookKeeperStreamsVerified, 1);
                             return null;
                         })
-                .thenCompose(ignored -> process(
-                        values, index + 1, shard, accumulator, deadline));
+                .thenCompose(ignored -> process(values, index + 1, shard, accumulator, deadline));
     }
 
     private void requireRegistration(
-            VersionedMaterializationStreamRegistration registration,
-            StreamId streamId,
-            int shard) {
+            VersionedMaterializationStreamRegistration registration, StreamId streamId, int shard) {
         if (!registration.key().equals(keys.materializationRegistryKey(streamId))
                 || keys.materializationRegistryShard(streamId) != shard
                 || registration.value().metadataVersion() != registration.metadataVersion()) {
@@ -183,10 +171,11 @@ public final class BookKeeperStreamCoverageProofProducer {
         if (streamState != StreamState.ACTIVE && streamState != StreamState.SEALED) {
             throw invariant("registered BookKeeper stream is not ACTIVE or SEALED");
         }
-        VersionedVirtualLedgerProjection binding = projection.streamBinding()
+        VersionedVirtualLedgerProjection binding = projection
+                .streamBinding()
                 .orElseThrow(() -> invariant("BookKeeper stream projection binding is absent"));
-        VersionedTopicProjection topic = projection.currentTopic()
-                .orElseThrow(() -> invariant("BookKeeper current topic projection is absent"));
+        VersionedTopicProjection topic =
+                projection.currentTopic().orElseThrow(() -> invariant("BookKeeper current topic projection is absent"));
         TopicProjectionRecord topicValue = topic.value();
         if (!projection.streamId().equals(streamId)
                 || !binding.value().identity().streamId().equals(streamId.value())
@@ -196,9 +185,8 @@ public final class BookKeeperStreamCoverageProofProducer {
                 || topicValue.createdAtMillis() != snapshot.metadata().createdAtMillis()) {
             throw invariant("BookKeeper L0 and F2 projection identities disagree");
         }
-        ManagedLedgerGenerationProjectionRefV1 expectedRef =
-                new ManagedLedgerGenerationProjectionRefV1(
-                        topicValue.managedLedgerName(), topicValue.projectionIdentity());
+        ManagedLedgerGenerationProjectionRefV1 expectedRef = new ManagedLedgerGenerationProjectionRefV1(
+                topicValue.managedLedgerName(), topicValue.projectionIdentity());
         Optional<ProjectionRef> registrationRef;
         try {
             registrationRef = ProjectionIdentity.decode(value.projectionRef());
@@ -268,7 +256,8 @@ public final class BookKeeperStreamCoverageProofProducer {
                 VersionedMaterializationStreamRegistration registration,
                 StreamMetadataSnapshot snapshot,
                 ManagedLedgerStreamProjection projection) {
-            VersionedVirtualLedgerProjection binding = projection.streamBinding().orElseThrow();
+            VersionedVirtualLedgerProjection binding =
+                    projection.streamBinding().orElseThrow();
             VersionedTopicProjection topic = projection.currentTopic().orElseThrow();
             frame(digest, registration.key());
             number(digest, registration.metadataVersion());
@@ -296,9 +285,7 @@ public final class BookKeeperStreamCoverageProofProducer {
                     shardsScanned,
                     registrationsScanned,
                     bookKeeperStreamsVerified,
-                    new Checksum(
-                            ChecksumType.SHA256,
-                            HexFormat.of().formatHex(digest.digest())));
+                    new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest())));
         }
     }
 
@@ -325,8 +312,7 @@ public final class BookKeeperStreamCoverageProofProducer {
     }
 
     private static NereusException invariant(String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static String text(String value, String name) {

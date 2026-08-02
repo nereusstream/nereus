@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.CursorNames;
@@ -28,8 +28,7 @@ class CursorStorageScaleTest {
 
     @Test
     void hydratesTenThousandRootsAcrossBoundedPagesAndRejectsTheNextCreate() {
-        try (CursorStorageTestSupport.Context context =
-                new CursorStorageTestSupport.Context(0, 20)) {
+        try (CursorStorageTestSupport.Context context = new CursorStorageTestSupport.Context(0, 20)) {
             CursorOwnerSession owner = prepareActivatedOwner(context);
             seed(context, owner, RECORD_LIMIT);
 
@@ -42,26 +41,20 @@ class CursorStorageScaleTest {
                     .extracting(record -> record.value().cursorName())
                     .doesNotHaveDuplicates();
 
-            List<CursorHandle> hydrated = context.storage
-                    .claimAndLoadActiveCursors(owner)
-                    .join();
+            List<CursorHandle> hydrated =
+                    context.storage.claimAndLoadActiveCursors(owner).join();
             assertThat(hydrated).hasSize(RECORD_LIMIT);
             assertThat(hydrated)
                     .extracting(handle -> handle.identity().cursorName())
                     .doesNotHaveDuplicates();
-            assertThat(hydrated)
-                    .allSatisfy(handle -> assertThat(handle.owner()).isEqualTo(owner));
+            assertThat(hydrated).allSatisfy(handle -> assertThat(handle.owner()).isEqualTo(owner));
 
             assertThatThrownBy(() -> context.storage
                             .open(
                                     owner,
                                     "subscription-overflow",
                                     new CursorOpenRequest(
-                                            new InitialCursorPosition.Earliest(),
-                                            Map.of(),
-                                            Map.of(),
-                                            0,
-                                            20))
+                                            new InitialCursorPosition.Earliest(), Map.of(), Map.of(), 0, 20))
                             .join())
                     .hasCauseInstanceOf(ManagedLedgerException.TooManyRequestsException.class);
             assertThat(context.metadataBackend
@@ -76,32 +69,28 @@ class CursorStorageScaleTest {
 
     @Test
     void failsClosedWhenMetadataContainsTenThousandAndOneRoots() {
-        try (CursorStorageTestSupport.Context context =
-                new CursorStorageTestSupport.Context(0, 20)) {
+        try (CursorStorageTestSupport.Context context = new CursorStorageTestSupport.Context(0, 20)) {
             CursorOwnerSession owner = prepareActivatedOwner(context);
             seed(context, owner, RECORD_LIMIT + 1);
 
-            assertThatThrownBy(() -> context.storage
-                            .claimAndLoadActiveCursors(owner)
-                            .join())
+            assertThatThrownBy(() ->
+                            context.storage.claimAndLoadActiveCursors(owner).join())
                     .hasRootCauseInstanceOf(NereusException.class)
                     .hasRootCauseMessage("cursor scan exceeds cursorRecordsPerStreamMax");
             assertThat(scanAll(context).records()).hasSize(RECORD_LIMIT + 1);
         }
     }
 
-    private static CursorOwnerSession prepareActivatedOwner(
-            CursorStorageTestSupport.Context context) {
+    private static CursorOwnerSession prepareActivatedOwner(CursorStorageTestSupport.Context context) {
         CursorOwnerSession owner = context.owner(CursorStorageTestSupport.OWNER_1);
         context.retention.claimAndRecover(owner).join();
         var current = context.projectionStore
-                .getProjection(
-                        CursorStorageTestSupport.CLUSTER,
-                        CursorStorageTestSupport.TOPIC)
+                .getProjection(CursorStorageTestSupport.CLUSTER, CursorStorageTestSupport.TOPIC)
                 .join()
                 .orElseThrow();
         assertThat(ManagedLedgerCursorProtocol.isActivated(current)).isFalse();
-        context.projectionStore.activateCursorProtocol(
+        context.projectionStore
+                .activateCursorProtocol(
                         CursorStorageTestSupport.CLUSTER,
                         CursorStorageTestSupport.TOPIC,
                         context.ledger.projection(),
@@ -110,23 +99,16 @@ class CursorStorageScaleTest {
         return owner;
     }
 
-    private static void seed(
-            CursorStorageTestSupport.Context context,
-            CursorOwnerSession owner,
-            int count) {
+    private static void seed(CursorStorageTestSupport.Context context, CursorOwnerSession owner, int count) {
         for (int index = 0; index < count; index++) {
             context.metadataBackend
-                    .createCursor(
-                            CursorStorageTestSupport.CLUSTER,
-                            activeRecord(context, owner, index))
+                    .createCursor(CursorStorageTestSupport.CLUSTER, activeRecord(context, owner, index))
                     .join();
         }
     }
 
     private static CursorStateRecord activeRecord(
-            CursorStorageTestSupport.Context context,
-            CursorOwnerSession owner,
-            int index) {
+            CursorStorageTestSupport.Context context, CursorOwnerSession owner, int index) {
         String cursorName = String.format("subscription-%05d", index);
         return new CursorStateRecord(
                 0,
@@ -173,7 +155,5 @@ class CursorStorageScaleTest {
     }
 
     private record ScanResult(
-            List<com.nereusstream.metadata.oxia.VersionedCursorState> records,
-            List<Integer> pageSizes) {
-    }
+            List<com.nereusstream.metadata.oxia.VersionedCursorState> records, List<Integer> pageSizes) {}
 }

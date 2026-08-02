@@ -14,7 +14,9 @@
 
 package com.nereusstream.metadata.oxia.records;
 
-/** Durable owner/reference class protecting one physical object from deletion. */
+/**
+ * Durable owner/reference class protecting one physical object from deletion.
+ */
 public enum ObjectProtectionType {
     VISIBLE_GENERATION(1),
     REACHABLE_APPEND(2),
@@ -27,7 +29,9 @@ public enum ObjectProtectionType {
     REPAIR(9),
     CATALOG_SNAPSHOT(10),
     CATALOG_DELIVERY(11),
-    RECOVERY_CHECKPOINT_PENDING(12);
+    RECOVERY_CHECKPOINT_PENDING(12),
+    KAFKA_CHECKPOINT_PENDING(13),
+    KAFKA_CHECKPOINT_ROOT(14);
 
     private final int wireId;
 

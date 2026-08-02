@@ -1,17 +1,16 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.nio.ByteBuffer;
 import org.junit.jupiter.api.Test;
 
 class TopicCompactionKeyEncodingV1Test {
     @Test
     void keyedAndUnkeyedNamespacesCannotCollide() {
-        ByteBuffer keyed = TopicCompactionKeyEncodingV1.keyed(
-                ByteBuffer.wrap(new byte[] {1, 0, 0, 0, 0, 0, 0, 0, 7}));
+        ByteBuffer keyed = TopicCompactionKeyEncodingV1.keyed(ByteBuffer.wrap(new byte[] {1, 0, 0, 0, 0, 0, 0, 0, 7}));
         ByteBuffer unkeyed = TopicCompactionKeyEncodingV1.unkeyed(7);
 
         assertThat(bytes(keyed)).isNotEqualTo(bytes(unkeyed));
@@ -24,11 +23,10 @@ class TopicCompactionKeyEncodingV1Test {
 
     @Test
     void rejectsMalformedTagsAndUnkeyedOffsetMismatch() {
-        assertThatThrownBy(() -> TopicCompactionKeyEncodingV1.decode(
-                        ByteBuffer.wrap(new byte[] {2, 1})))
+        assertThatThrownBy(() -> TopicCompactionKeyEncodingV1.decode(ByteBuffer.wrap(new byte[] {2, 1})))
                 .isInstanceOf(CompactedObjectFormatException.class);
-        assertThatThrownBy(() -> TopicCompactionKeyEncodingV1.validateForOffset(
-                        TopicCompactionKeyEncodingV1.unkeyed(8), 7))
+        assertThatThrownBy(() ->
+                        TopicCompactionKeyEncodingV1.validateForOffset(TopicCompactionKeyEncodingV1.unkeyed(8), 7))
                 .isInstanceOf(CompactedObjectFormatException.class);
     }
 

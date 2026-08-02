@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -10,23 +11,20 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** Production verifier that composes exact object-store HEAD with the M3 format verifier. */
+/**
+ * Production verifier that composes exact object-store HEAD with the M3 format verifier.
+ */
 public final class DefaultMaterializationOutputVerifier implements MaterializationOutputVerifier {
     private final ObjectStore objectStore;
     private final MaterializationFormatVerifier formatVerifier;
 
-    public DefaultMaterializationOutputVerifier(
-            ObjectStore objectStore,
-            MaterializationFormatVerifier formatVerifier) {
+    public DefaultMaterializationOutputVerifier(ObjectStore objectStore, MaterializationFormatVerifier formatVerifier) {
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
         this.formatVerifier = Objects.requireNonNull(formatVerifier, "formatVerifier");
     }
 
     @Override
-    public CompletableFuture<Void> verify(
-            MaterializationTask task,
-            MaterializationOutput output,
-            Duration timeout) {
+    public CompletableFuture<Void> verify(MaterializationTask task, MaterializationOutput output, Duration timeout) {
         MaterializationTask exactTask;
         MaterializationOutput exact;
         Deadline deadline;
@@ -40,29 +38,21 @@ public final class DefaultMaterializationOutputVerifier implements Materializati
         CompletableFuture<HeadObjectResult> head;
         try {
             head = Objects.requireNonNull(
-                    objectStore.headObject(
-                            exact.objectKey(),
-                            new HeadObjectOptions(deadline.remaining())),
+                    objectStore.headObject(exact.objectKey(), new HeadObjectOptions(deadline.remaining())),
                     "head future");
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
         return head.thenApply(value -> requireExactHead(exact, value))
-                .thenCompose(ignored -> formatVerifier.verify(
-                        exactTask,
-                        exact,
-                        deadline.remaining()));
+                .thenCompose(ignored -> formatVerifier.verify(exactTask, exact, deadline.remaining()));
     }
 
-    private static Void requireExactHead(
-            MaterializationOutput output,
-            HeadObjectResult head) {
+    private static Void requireExactHead(MaterializationOutput output, HeadObjectResult head) {
         if (!head.key().equals(output.objectKey())
                 || head.objectLength() != output.objectLength()
                 || !head.checksum().equals(output.storageCrc32c())
                 || (!output.etag().isEmpty()
-                        && (head.etag().isEmpty()
-                                || !head.etag().orElseThrow().equals(output.etag())))) {
+                        && (head.etag().isEmpty() || !head.etag().orElseThrow().equals(output.etag())))) {
             throw new NereusException(
                     ErrorCode.OBJECT_CHECKSUM_MISMATCH,
                     false,
@@ -94,14 +84,10 @@ public final class DefaultMaterializationOutputVerifier implements Materializati
         }
 
         private Duration remaining() {
-            long nanos = deadlineNanos == Long.MAX_VALUE
-                    ? Long.MAX_VALUE
-                    : deadlineNanos - System.nanoTime();
+            long nanos = deadlineNanos == Long.MAX_VALUE ? Long.MAX_VALUE : deadlineNanos - System.nanoTime();
             if (nanos <= 0) {
                 throw new NereusException(
-                        ErrorCode.TIMEOUT,
-                        true,
-                        "materialization output verification deadline expired");
+                        ErrorCode.TIMEOUT, true, "materialization output verification deadline expired");
             }
             return Duration.ofNanos(nanos);
         }

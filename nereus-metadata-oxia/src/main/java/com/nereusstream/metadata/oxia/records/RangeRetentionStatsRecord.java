@@ -1,7 +1,10 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
-/** Verified publish-time/size statistics for one immutable committed range. */
+/**
+ * Verified publish-time/size statistics for one immutable committed range.
+ */
 public record RangeRetentionStatsRecord(
         int schemaVersion,
         String streamId,
@@ -32,8 +35,8 @@ public record RangeRetentionStatsRecord(
             throw new IllegalArgumentException("publish times are not ordered");
         }
         sourceIndexKey = F4RecordValidation.requireText(sourceIndexKey, "sourceIndexKey");
-        sourceIndexIdentitySha256 = F4RecordValidation.requireSha256(
-                sourceIndexIdentitySha256, "sourceIndexIdentitySha256");
+        sourceIndexIdentitySha256 =
+                F4RecordValidation.requireSha256(sourceIndexIdentitySha256, "sourceIndexIdentitySha256");
         F4RecordValidation.requireMetadataVersion(sourceIndexMetadataVersion);
         verifierBuild = F4RecordValidation.requireText(verifierBuild, "verifierBuild");
         F4RecordValidation.requireNonNegative(verifiedAtMillis, "verifiedAtMillis");
@@ -42,8 +45,20 @@ public record RangeRetentionStatsRecord(
 
     public RangeRetentionStatsRecord withMetadataVersion(long version) {
         return new RangeRetentionStatsRecord(
-                schemaVersion, streamId, offsetStart, offsetEnd, commitVersion, cumulativeSizeAtStart,
-                cumulativeSizeAtEnd, minPublishTimeMillis, maxPublishTimeMillis, sourceIndexKey,
-                sourceIndexIdentitySha256, sourceIndexMetadataVersion, verifierBuild, verifiedAtMillis, version);
+                schemaVersion,
+                streamId,
+                offsetStart,
+                offsetEnd,
+                commitVersion,
+                cumulativeSizeAtStart,
+                cumulativeSizeAtEnd,
+                minPublishTimeMillis,
+                maxPublishTimeMillis,
+                sourceIndexKey,
+                sourceIndexIdentitySha256,
+                sourceIndexMetadataVersion,
+                verifierBuild,
+                verifiedAtMillis,
+                version);
     }
 }

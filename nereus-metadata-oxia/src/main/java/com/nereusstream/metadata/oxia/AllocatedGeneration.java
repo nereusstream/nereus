@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
@@ -8,7 +9,9 @@ import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import java.util.Objects;
 
-/** Process-local proof of one view-scoped sequence allocation. */
+/**
+ * Process-local proof of one view-scoped sequence allocation.
+ */
 public record AllocatedGeneration(
         StreamId streamId,
         ReadView view,

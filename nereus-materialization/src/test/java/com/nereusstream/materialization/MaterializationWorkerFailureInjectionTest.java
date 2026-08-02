@@ -1,11 +1,15 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.core.physical.ObjectProtection;
+import com.nereusstream.core.physical.ObjectProtectionManager;
+import com.nereusstream.core.physical.ObjectProtectionOwner;
+import com.nereusstream.core.physical.ObjectProtectionRequest;
 import com.nereusstream.metadata.oxia.F4MetadataConditionFailedException;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
@@ -37,12 +41,82 @@ class MaterializationWorkerFailureInjectionTest {
     Path temporaryDirectory;
 
     @Test
+    void typedSourceRetirementCancelsInsteadOfRetryingTheImmutableTask() {
+        var scenario = MaterializationWorkerTestHarness.scenario(delegate -> delegate);
+        var exactReader = new MaterializationWorkerTestHarness.TrackingExactReader();
+        AtomicInteger writerCalls = new AtomicInteger();
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        ObjectProtectionManager retiredSource = new ObjectProtectionManager() {
+            @Override
+            public CompletableFuture<ObjectProtection> acquire(
+                    ObjectProtectionRequest request, OwnerRevalidator ownerRevalidator) {
+                return CompletableFuture.failedFuture(
+                        new MaterializationSourceRetiredException("injected exact source retirement"));
+            }
+
+            @Override
+            public CompletableFuture<ObjectProtection> acquireOrTransfer(
+                    ObjectProtectionRequest request, OwnerRevalidator ownerRevalidator) {
+                return acquire(request, ownerRevalidator);
+            }
+
+            @Override
+            public CompletableFuture<ObjectProtection> revalidate(
+                    ObjectProtection protection, OwnerRevalidator ownerRevalidator) {
+                return CompletableFuture.completedFuture(protection);
+            }
+
+            @Override
+            public CompletableFuture<ObjectProtection> transfer(
+                    ObjectProtection protection, ObjectProtectionOwner newOwner, OwnerRevalidator newOwnerRevalidator) {
+                return CompletableFuture.completedFuture(protection);
+            }
+
+            @Override
+            public CompletableFuture<Void> release(ObjectProtection protection, RemovalAuthorizer removalAuthorizer) {
+                return CompletableFuture.completedFuture(null);
+            }
+
+            @Override
+            public void close() {}
+        };
+        try (LocalFileObjectStore objects =
+                new LocalFileObjectStore(temporaryDirectory.resolve("source-retired-objects"))) {
+            DefaultMaterializationWorker worker = MaterializationWorkerTestHarness.worker(
+                    "r".repeat(26),
+                    scenario,
+                    retiredSource,
+                    exactReader,
+                    (request, rows) -> {
+                        writerCalls.incrementAndGet();
+                        return CompletableFuture.failedFuture(new AssertionError("writer must not run"));
+                    },
+                    objects,
+                    (task, output, timeout) -> CompletableFuture.completedFuture(null),
+                    () -> "c".repeat(26),
+                    scheduler);
+
+            assertThatThrownBy(() -> worker.execute(scenario.task()).join())
+                    .hasRootCauseMessage("injected exact source retirement");
+
+            MaterializationTaskRecord durable = task(scenario);
+            assertThat(durable.lifecycle()).isEqualTo(TaskLifecycle.CANCELLED);
+            assertThat(durable.failureClassId()).isEqualTo(TaskFailureClass.SOURCE_RETIRED.wireId());
+            assertThat(durable.workerClaim()).isEmpty();
+            assertThat(durable.output()).isEmpty();
+            assertThat(writerCalls).hasValue(0);
+            assertThat(exactReader.completedSources()).isZero();
+        } finally {
+            scheduler.shutdownNow();
+        }
+    }
+
+    @Test
     void sourceChangeAfterProtectionCancelsAndReleasesTheExactClaim() {
         AtomicBoolean sourcesChanged = new AtomicBoolean();
         var scenario = MaterializationWorkerTestHarness.scenario(delegate -> proxy(
                 delegate,
-                (method, args, result) -> method.getName().equals("getCandidate")
-                                && sourcesChanged.get()
+                (method, args, result) -> method.getName().equals("getCandidate") && sourcesChanged.get()
                         ? CompletableFuture.completedFuture(Optional.empty())
                         : result));
         sourcesChanged.set(true);
@@ -50,8 +124,8 @@ class MaterializationWorkerFailureInjectionTest {
         var exactReader = new MaterializationWorkerTestHarness.TrackingExactReader();
         AtomicInteger writerCalls = new AtomicInteger();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        try (LocalFileObjectStore objects = new LocalFileObjectStore(
-                temporaryDirectory.resolve("source-change-objects"))) {
+        try (LocalFileObjectStore objects =
+                new LocalFileObjectStore(temporaryDirectory.resolve("source-change-objects"))) {
             DefaultMaterializationWorker worker = MaterializationWorkerTestHarness.worker(
                     "r".repeat(26),
                     scenario,
@@ -88,17 +162,14 @@ class MaterializationWorkerFailureInjectionTest {
         var protections = new MaterializationWorkerTestHarness.TrackingProtections();
         var exactReader = new MaterializationWorkerTestHarness.TrackingExactReader();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        try (LocalFileObjectStore objects = new LocalFileObjectStore(
-                temporaryDirectory.resolve("checksum-objects"))) {
+        try (LocalFileObjectStore objects = new LocalFileObjectStore(temporaryDirectory.resolve("checksum-objects"))) {
             DefaultMaterializationWorker worker = MaterializationWorkerTestHarness.worker(
                     "r".repeat(26),
                     scenario,
                     protections,
                     exactReader,
                     (request, rows) -> CompletableFuture.failedFuture(new NereusException(
-                            ErrorCode.OBJECT_CHECKSUM_MISMATCH,
-                            false,
-                            "injected corrupt staged output")),
+                            ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "injected corrupt staged output")),
                     objects,
                     (task, output, timeout) -> CompletableFuture.completedFuture(null),
                     () -> "c".repeat(26),
@@ -121,22 +192,19 @@ class MaterializationWorkerFailureInjectionTest {
     @Test
     void lostOutputReadyCasResponseReloadsTheExactFrozenOutput() throws Exception {
         AtomicBoolean loseOutputReady = new AtomicBoolean(true);
-        var scenario = MaterializationWorkerTestHarness.scenario(delegate -> proxy(
-                delegate,
-                (method, args, result) -> {
-                    if (!method.getName().equals("compareAndSetTask")
-                            || !(args[1] instanceof MaterializationTaskRecord replacement)
-                            || replacement.lifecycle() != TaskLifecycle.OUTPUT_READY
-                            || !loseOutputReady.compareAndSet(true, false)) {
-                        return result;
-                    }
-                    @SuppressWarnings("unchecked")
-                    CompletableFuture<VersionedMaterializationTask> written =
-                            (CompletableFuture<VersionedMaterializationTask>) result;
-                    return written.thenCompose(ignored -> CompletableFuture.failedFuture(
-                            new F4MetadataConditionFailedException(
-                                    "injected lost OUTPUT_READY response")));
-                }));
+        var scenario = MaterializationWorkerTestHarness.scenario(delegate -> proxy(delegate, (method, args, result) -> {
+            if (!method.getName().equals("compareAndSetTask")
+                    || !(args[1] instanceof MaterializationTaskRecord replacement)
+                    || replacement.lifecycle() != TaskLifecycle.OUTPUT_READY
+                    || !loseOutputReady.compareAndSet(true, false)) {
+                return result;
+            }
+            @SuppressWarnings("unchecked")
+            CompletableFuture<VersionedMaterializationTask> written =
+                    (CompletableFuture<VersionedMaterializationTask>) result;
+            return written.thenCompose(ignored -> CompletableFuture.failedFuture(
+                    new F4MetadataConditionFailedException("injected lost OUTPUT_READY response")));
+        }));
         var protections = new MaterializationWorkerTestHarness.TrackingProtections();
         var exactReader = new MaterializationWorkerTestHarness.TrackingExactReader();
         Path stagingPath = Files.createDirectory(temporaryDirectory.resolve("lost-ready-staging"));
@@ -148,14 +216,11 @@ class MaterializationWorkerFailureInjectionTest {
                         StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
                         Duration.ofHours(1),
                         Runnable::run);
-                LocalFileObjectStore objects = new LocalFileObjectStore(
-                        temporaryDirectory.resolve("lost-ready-objects"))) {
-            ParquetCompactedObjectReader reader =
-                    new ParquetCompactedObjectReader(objects, Runnable::run);
+                LocalFileObjectStore objects =
+                        new LocalFileObjectStore(temporaryDirectory.resolve("lost-ready-objects"))) {
+            ParquetCompactedObjectReader reader = new ParquetCompactedObjectReader(objects, Runnable::run);
             DefaultMaterializationOutputVerifier verifier = new DefaultMaterializationOutputVerifier(
-                    objects,
-                    new CompactedMaterializationFormatVerifier(
-                            new CompactedObjectVerifier(objects, reader)));
+                    objects, new CompactedMaterializationFormatVerifier(new CompactedObjectVerifier(objects, reader)));
             DefaultMaterializationWorker worker = MaterializationWorkerTestHarness.worker(
                     "r".repeat(26),
                     scenario,
@@ -171,8 +236,7 @@ class MaterializationWorkerFailureInjectionTest {
 
             assertThat(loseOutputReady).isFalse();
             assertThat(task(scenario).lifecycle()).isEqualTo(TaskLifecycle.OUTPUT_READY);
-            assertThat(task(scenario).output())
-                    .contains(MaterializationRecordMapper.outputRecord(output));
+            assertThat(task(scenario).output()).contains(MaterializationRecordMapper.outputRecord(output));
             assertThat(protections.acquired()).isEqualTo(3);
             assertThat(protections.transferred()).isEqualTo(5);
             assertThat(protections.released()).isZero();
@@ -184,8 +248,7 @@ class MaterializationWorkerFailureInjectionTest {
         }
     }
 
-    private static MaterializationTaskRecord task(
-            MaterializationWorkerTestHarness.Scenario scenario) {
+    private static MaterializationTaskRecord task(MaterializationWorkerTestHarness.Scenario scenario) {
         return scenario.tasks()
                 .get(scenario.task().streamId(), scenario.task().taskId())
                 .join()
@@ -193,9 +256,7 @@ class MaterializationWorkerFailureInjectionTest {
                 .value();
     }
 
-    private static GenerationMetadataStore proxy(
-            GenerationMetadataStore delegate,
-            ResultInterceptor interceptor) {
+    private static GenerationMetadataStore proxy(GenerationMetadataStore delegate, ResultInterceptor interceptor) {
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},

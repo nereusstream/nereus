@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.ErrorCode;
@@ -21,9 +22,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** Restartable codec-backed fake for the complete F2 projection metadata contract. */
-public final class FakeManagedLedgerProjectionMetadataStore
-        implements ManagedLedgerProjectionMetadataStore {
+/**
+ * Restartable codec-backed fake for the complete F2 projection metadata contract.
+ */
+public final class FakeManagedLedgerProjectionMetadataStore implements ManagedLedgerProjectionMetadataStore {
     public enum FailurePoint {
         AFTER_ALLOCATOR_WRITE,
         AFTER_TOPIC_WRITE,
@@ -47,7 +49,9 @@ public final class FakeManagedLedgerProjectionMetadataStore
         }
     }
 
-    /** Durable bytes and versions survive construction of a new fake adapter instance. */
+    /**
+     * Durable bytes and versions survive construction of a new fake adapter instance.
+     */
     public static final class DurableState {
         private final Map<String, StoredValue> values = new HashMap<>();
         private final AtomicLong nextVersion = new AtomicLong();
@@ -63,10 +67,7 @@ public final class FakeManagedLedgerProjectionMetadataStore
             return Optional.ofNullable(value == null ? null : copy(value));
         }
 
-        public synchronized void inject(
-                String key,
-                String partitionKey,
-                byte[] envelope) {
+        public synchronized void inject(String key, String partitionKey, byte[] envelope) {
             long version = nextVersion.getAndIncrement();
             values.put(key, new StoredValue(key, partitionKey, envelope, version));
         }
@@ -101,21 +102,19 @@ public final class FakeManagedLedgerProjectionMetadataStore
             }
         }
 
-        private synchronized Optional<PartitionedOxiaClient.VersionedValue> get(
-                String key,
-                PartitionKey partitionKey) {
+        private synchronized Optional<PartitionedOxiaClient.VersionedValue> get(String key, PartitionKey partitionKey) {
             StoredValue value = values.get(key);
             if (value != null && !value.partitionKey().equals(partitionKey.value())) {
                 throw new IllegalStateException("partition key mismatch for durable key: " + key);
             }
-            return Optional.ofNullable(value == null ? null : new PartitionedOxiaClient.VersionedValue(
-                    value.key(), value.envelope(), value.version()));
+            return Optional.ofNullable(
+                    value == null
+                            ? null
+                            : new PartitionedOxiaClient.VersionedValue(value.key(), value.envelope(), value.version()));
         }
 
         private synchronized PartitionedOxiaClient.WriteResult putIfAbsent(
-                String key,
-                byte[] envelope,
-                PartitionKey partitionKey) {
+                String key, byte[] envelope, PartitionKey partitionKey) {
             if (values.containsKey(key)) {
                 throw new ProjectionMetadataConditionFailedException("key already exists: " + key);
             }
@@ -125,10 +124,7 @@ public final class FakeManagedLedgerProjectionMetadataStore
         }
 
         private synchronized PartitionedOxiaClient.WriteResult putIfVersion(
-                String key,
-                byte[] envelope,
-                long expectedVersion,
-                PartitionKey partitionKey) {
+                String key, byte[] envelope, long expectedVersion, PartitionKey partitionKey) {
             StoredValue current = values.get(key);
             if (current == null || current.version() != expectedVersion) {
                 throw new ProjectionMetadataConditionFailedException("unexpected version for key: " + key);
@@ -141,8 +137,7 @@ public final class FakeManagedLedgerProjectionMetadataStore
             return new PartitionedOxiaClient.WriteResult(version);
         }
 
-        private synchronized void deleteIfVersion(
-                String key, long expectedVersion, PartitionKey partitionKey) {
+        private synchronized void deleteIfVersion(String key, long expectedVersion, PartitionKey partitionKey) {
             StoredValue current = values.get(key);
             if (current == null || current.version() != expectedVersion) {
                 throw new F4MetadataConditionFailedException("unexpected version for key: " + key);
@@ -161,17 +156,15 @@ public final class FakeManagedLedgerProjectionMetadataStore
         }
 
         private synchronized List<PartitionedOxiaClient.VersionedValue> rangeScan(
-                String fromInclusive,
-                String toExclusive,
-                int limit) {
+                String fromInclusive, String toExclusive, int limit) {
             List<PartitionedOxiaClient.VersionedValue> result = new ArrayList<>();
             values.values().stream()
                     .filter(value -> value.key().compareTo(fromInclusive) >= 0
                             && value.key().compareTo(toExclusive) < 0)
                     .sorted(Comparator.comparing(StoredValue::key))
                     .limit(limit)
-                    .forEach(value -> result.add(new PartitionedOxiaClient.VersionedValue(
-                            value.key(), value.envelope(), value.version())));
+                    .forEach(value -> result.add(
+                            new PartitionedOxiaClient.VersionedValue(value.key(), value.envelope(), value.version())));
             return List.copyOf(result);
         }
 
@@ -190,9 +183,7 @@ public final class FakeManagedLedgerProjectionMetadataStore
     }
 
     public FakeManagedLedgerProjectionMetadataStore(
-            DurableState durableState,
-            ProjectionMetadataStoreConfig config,
-            Clock clock) {
+            DurableState durableState, ProjectionMetadataStoreConfig config, Clock clock) {
         this.durableState = Objects.requireNonNull(durableState, "durableState");
         for (FailurePoint point : FailurePoint.values()) {
             successfulWrites.put(point, new AtomicLong());
@@ -212,27 +203,24 @@ public final class FakeManagedLedgerProjectionMetadataStore
     }
 
     public long successfulWrites(FailurePoint failurePoint) {
-        return successfulWrites.get(Objects.requireNonNull(failurePoint, "failurePoint")).get();
+        return successfulWrites
+                .get(Objects.requireNonNull(failurePoint, "failurePoint"))
+                .get();
     }
 
     @Override
-    public CompletableFuture<Optional<TopicProjectionRecord>> getProjection(
-            String cluster,
-            String managedLedgerName) {
+    public CompletableFuture<Optional<TopicProjectionRecord>> getProjection(String cluster, String managedLedgerName) {
         return core.getProjection(cluster, managedLedgerName);
     }
 
     @Override
-    public CompletableFuture<ManagedLedgerStreamProjection> getProjectionByStream(
-            String cluster, StreamId streamId) {
+    public CompletableFuture<ManagedLedgerStreamProjection> getProjectionByStream(String cluster, StreamId streamId) {
         return core.getProjectionByStream(cluster, streamId);
     }
 
     @Override
     public CompletableFuture<TopicProjectionRecord> createFirstProjection(
-            String cluster,
-            ProjectionCreateRequest request,
-            ProjectionPublishGuard publishGuard) {
+            String cluster, ProjectionCreateRequest request, ProjectionPublishGuard publishGuard) {
         return core.createFirstProjection(cluster, request, publishGuard);
     }
 
@@ -254,8 +242,7 @@ public final class FakeManagedLedgerProjectionMetadataStore
             ManagedLedgerProjectionIdentity expectedIdentity,
             long expectedVersion,
             Map<String, String> properties) {
-        return core.updateProperties(
-                cluster, managedLedgerName, expectedIdentity, expectedVersion, properties);
+        return core.updateProperties(cluster, managedLedgerName, expectedIdentity, expectedVersion, properties);
     }
 
     @Override
@@ -264,8 +251,7 @@ public final class FakeManagedLedgerProjectionMetadataStore
             String managedLedgerName,
             ManagedLedgerProjectionIdentity expectedIdentity,
             long expectedMetadataVersion) {
-        return core.activateCursorProtocol(
-                cluster, managedLedgerName, expectedIdentity, expectedMetadataVersion);
+        return core.activateCursorProtocol(cluster, managedLedgerName, expectedIdentity, expectedMetadataVersion);
     }
 
     @Override
@@ -274,8 +260,7 @@ public final class FakeManagedLedgerProjectionMetadataStore
             String managedLedgerName,
             ManagedLedgerProjectionIdentity expectedIdentity,
             long expectedMetadataVersion) {
-        return core.activateGenerationProtocol(
-                cluster, managedLedgerName, expectedIdentity, expectedMetadataVersion);
+        return core.activateGenerationProtocol(cluster, managedLedgerName, expectedIdentity, expectedMetadataVersion);
     }
 
     @Override
@@ -285,14 +270,12 @@ public final class FakeManagedLedgerProjectionMetadataStore
             ManagedLedgerProjectionIdentity expectedIdentity,
             long expectedVersion,
             ManagedLedgerFacadeState state) {
-        return core.mirrorFacadeState(
-                cluster, managedLedgerName, expectedIdentity, expectedVersion, state);
+        return core.mirrorFacadeState(cluster, managedLedgerName, expectedIdentity, expectedVersion, state);
     }
 
     @Override
     public CompletableFuture<ProjectionRepairResult> repairProjectionIndexes(
-            String cluster,
-            TopicProjectionRecord authoritative) {
+            String cluster, TopicProjectionRecord authoritative) {
         return core.repairProjectionIndexes(cluster, authoritative);
     }
 
@@ -302,16 +285,16 @@ public final class FakeManagedLedgerProjectionMetadataStore
     }
 
     private void afterWrite(ProjectionMetadataStoreCore.WriteKind kind) {
-        FailurePoint point = switch (kind) {
-            case ALLOCATOR -> FailurePoint.AFTER_ALLOCATOR_WRITE;
-            case TOPIC -> FailurePoint.AFTER_TOPIC_WRITE;
-            case VIRTUAL_LEDGER -> FailurePoint.AFTER_VIRTUAL_LEDGER_WRITE;
-            case POSITION_INDEX -> FailurePoint.AFTER_POSITION_INDEX_WRITE;
-        };
+        FailurePoint point =
+                switch (kind) {
+                    case ALLOCATOR -> FailurePoint.AFTER_ALLOCATOR_WRITE;
+                    case TOPIC -> FailurePoint.AFTER_TOPIC_WRITE;
+                    case VIRTUAL_LEDGER -> FailurePoint.AFTER_VIRTUAL_LEDGER_WRITE;
+                    case POSITION_INDEX -> FailurePoint.AFTER_POSITION_INDEX_WRITE;
+                };
         successfulWrites.get(point).incrementAndGet();
         if (failNext.compareAndSet(point, null)) {
-            throw new NereusException(
-                    ErrorCode.METADATA_UNAVAILABLE, true, "injected fake failure at " + point);
+            throw new NereusException(ErrorCode.METADATA_UNAVAILABLE, true, "injected fake failure at " + point);
         }
     }
 
@@ -324,31 +307,24 @@ public final class FakeManagedLedgerProjectionMetadataStore
 
         @Override
         public CompletableFuture<Optional<PartitionedOxiaClient.VersionedValue>> get(
-                String key,
-                PartitionKey partitionKey) {
+                String key, PartitionKey partitionKey) {
             return invoke(() -> state.get(key, partitionKey));
         }
 
         @Override
         public CompletableFuture<PartitionedOxiaClient.WriteResult> putIfAbsent(
-                String key,
-                byte[] value,
-                PartitionKey partitionKey) {
+                String key, byte[] value, PartitionKey partitionKey) {
             return invoke(() -> state.putIfAbsent(key, value, partitionKey));
         }
 
         @Override
         public CompletableFuture<PartitionedOxiaClient.WriteResult> putIfVersion(
-                String key,
-                byte[] value,
-                long expectedVersion,
-                PartitionKey partitionKey) {
+                String key, byte[] value, long expectedVersion, PartitionKey partitionKey) {
             return invoke(() -> state.putIfVersion(key, value, expectedVersion, partitionKey));
         }
 
         @Override
-        public CompletableFuture<Void> deleteIfVersion(
-                String key, long expectedVersion, PartitionKey partitionKey) {
+        public CompletableFuture<Void> deleteIfVersion(String key, long expectedVersion, PartitionKey partitionKey) {
             return invoke(() -> {
                 state.deleteIfVersion(key, expectedVersion, partitionKey);
                 return null;
@@ -357,27 +333,19 @@ public final class FakeManagedLedgerProjectionMetadataStore
 
         @Override
         public CompletableFuture<List<String>> list(
-                String fromInclusive,
-                String toExclusive,
-                PartitionKey partitionKey) {
+                String fromInclusive, String toExclusive, PartitionKey partitionKey) {
             return invoke(() -> state.list(fromInclusive, toExclusive));
         }
 
         @Override
         public CompletableFuture<List<PartitionedOxiaClient.VersionedValue>> rangeScan(
-                String fromInclusive,
-                String toExclusive,
-                int limit,
-                PartitionKey partitionKey) {
+                String fromInclusive, String toExclusive, int limit, PartitionKey partitionKey) {
             return invoke(() -> state.rangeScan(fromInclusive, toExclusive, limit));
         }
 
         @Override
-        public WatchRegistration watchPrefix(
-                String prefix,
-                PartitionKey partitionKey,
-                Runnable invalidationCallback) {
-            return () -> { };
+        public WatchRegistration watchPrefix(String prefix, PartitionKey partitionKey, Runnable invalidationCallback) {
+            return () -> {};
         }
 
         private <T> CompletableFuture<T> invoke(java.util.concurrent.Callable<T> operation) {

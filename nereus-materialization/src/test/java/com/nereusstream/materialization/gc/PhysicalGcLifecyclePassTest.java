@@ -1,12 +1,11 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
@@ -42,8 +41,7 @@ class PhysicalGcLifecyclePassTest {
         PhysicalGcLifecyclePass pass = new PhysicalGcLifecyclePass(
                 () -> {
                     order.add("roots");
-                    return CompletableFuture.failedFuture(
-                            new IllegalStateException("root failure"));
+                    return CompletableFuture.failedFuture(new IllegalStateException("root failure"));
                 },
                 () -> {
                     order.add("registrations");
@@ -54,14 +52,12 @@ class PhysicalGcLifecyclePassTest {
                     return CompletableFuture.completedFuture(inventory());
                 });
 
-        assertThatThrownBy(() -> pass.scan().join())
-                .hasRootCauseMessage("root failure");
+        assertThatThrownBy(() -> pass.scan().join()).hasRootCauseMessage("root failure");
         assertThat(order).containsExactly("roots");
     }
 
     static PhysicalGcLifecyclePassResult result() {
-        return new PhysicalGcLifecyclePassResult(
-                roots(), registrations(), inventory());
+        return new PhysicalGcLifecyclePassResult(roots(), registrations(), inventory());
     }
 
     private static PhysicalObjectRootScanResult roots() {
@@ -71,8 +67,7 @@ class PhysicalGcLifecyclePassTest {
     private static StreamRegistrationRetirementScanResult registrations() {
         EnumMap<StreamRegistrationRetirementStatus, Long> statuses =
                 new EnumMap<>(StreamRegistrationRetirementStatus.class);
-        for (StreamRegistrationRetirementStatus status :
-                StreamRegistrationRetirementStatus.values()) {
+        for (StreamRegistrationRetirementStatus status : StreamRegistrationRetirementStatus.values()) {
             statuses.put(status, 0L);
         }
         return new StreamRegistrationRetirementScanResult(64, 0, statuses);

@@ -16,7 +16,6 @@ package com.nereusstream.managedledger.projection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamState;
@@ -58,23 +57,29 @@ class PositionProjectionTest {
     void enforcesDifferentReadableReadAndMarkDeleteRanges() {
         StreamMetadata snapshot = snapshot(2, 5);
 
-        assertThat(positions.requireReadableEntryOffset(projection, position(2), snapshot)).isEqualTo(2);
-        assertThat(positions.requireReadableEntryOffset(projection, position(4), snapshot)).isEqualTo(4);
+        assertThat(positions.requireReadableEntryOffset(projection, position(2), snapshot))
+                .isEqualTo(2);
+        assertThat(positions.requireReadableEntryOffset(projection, position(4), snapshot))
+                .isEqualTo(4);
         assertThatThrownBy(() -> positions.requireReadableEntryOffset(projection, position(1), snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
         assertThatThrownBy(() -> positions.requireReadableEntryOffset(projection, position(5), snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
 
-        assertThat(positions.requireReadPositionOffset(projection, position(2), snapshot)).isEqualTo(2);
-        assertThat(positions.requireReadPositionOffset(projection, position(5), snapshot)).isEqualTo(5);
+        assertThat(positions.requireReadPositionOffset(projection, position(2), snapshot))
+                .isEqualTo(2);
+        assertThat(positions.requireReadPositionOffset(projection, position(5), snapshot))
+                .isEqualTo(5);
         assertPosition(positions.readPosition(projection, 5, snapshot), 5);
         assertThatThrownBy(() -> positions.requireReadPositionOffset(projection, position(1), snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
         assertThatThrownBy(() -> positions.readPosition(projection, 1, snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
 
-        assertThat(positions.markDeleteOffsetAfter(projection, position(1), snapshot)).isEqualTo(2);
-        assertThat(positions.markDeleteOffsetAfter(projection, position(4), snapshot)).isEqualTo(5);
+        assertThat(positions.markDeleteOffsetAfter(projection, position(1), snapshot))
+                .isEqualTo(2);
+        assertThat(positions.markDeleteOffsetAfter(projection, position(4), snapshot))
+                .isEqualTo(5);
         assertThatThrownBy(() -> positions.markDeleteOffsetAfter(projection, position(0), snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
         assertThatThrownBy(() -> positions.markDeleteOffsetAfter(projection, position(5), snapshot))
@@ -85,22 +90,25 @@ class PositionProjectionTest {
     void convertsCursorStartToTheNextRetainedOffsetWithoutWeakeningOtherRoles() {
         StreamMetadata snapshot = snapshot(2, 5);
 
-        assertThat(positions.cursorReadOffsetAfter(projection, position(-1), snapshot)).isEqualTo(2);
-        assertThat(positions.cursorReadOffsetAfter(projection, position(0), snapshot)).isEqualTo(2);
-        assertThat(positions.cursorReadOffsetAfter(projection, position(1), snapshot)).isEqualTo(2);
-        assertThat(positions.cursorReadOffsetAfter(projection, position(2), snapshot)).isEqualTo(3);
-        assertThat(positions.cursorReadOffsetAfter(projection, position(4), snapshot)).isEqualTo(5);
-        assertThat(positions.cursorReadOffsetAfter(
-                projection, position(4), snapshot(5, 5))).isEqualTo(5);
+        assertThat(positions.cursorReadOffsetAfter(projection, position(-1), snapshot))
+                .isEqualTo(2);
+        assertThat(positions.cursorReadOffsetAfter(projection, position(0), snapshot))
+                .isEqualTo(2);
+        assertThat(positions.cursorReadOffsetAfter(projection, position(1), snapshot))
+                .isEqualTo(2);
+        assertThat(positions.cursorReadOffsetAfter(projection, position(2), snapshot))
+                .isEqualTo(3);
+        assertThat(positions.cursorReadOffsetAfter(projection, position(4), snapshot))
+                .isEqualTo(5);
+        assertThat(positions.cursorReadOffsetAfter(projection, position(4), snapshot(5, 5)))
+                .isEqualTo(5);
 
-        assertThatThrownBy(() -> positions.cursorReadOffsetAfter(
-                projection, position(-2), snapshot))
+        assertThatThrownBy(() -> positions.cursorReadOffsetAfter(projection, position(-2), snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
-        assertThatThrownBy(() -> positions.cursorReadOffsetAfter(
-                projection, position(5), snapshot))
+        assertThatThrownBy(() -> positions.cursorReadOffsetAfter(projection, position(5), snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
-        assertThatThrownBy(() -> positions.cursorReadOffsetAfter(
-                projection, PositionFactory.create(LEDGER_ID + 1, 2), snapshot))
+        assertThatThrownBy(() ->
+                        positions.cursorReadOffsetAfter(projection, PositionFactory.create(LEDGER_ID + 1, 2), snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
     }
 
@@ -108,20 +116,18 @@ class PositionProjectionTest {
     void normalizesResetReadPositionsWithoutChangingDirectReadValidation() {
         StreamMetadata snapshot = snapshot(2, 5);
 
-        assertThat(positions.normalizeResetReadPositionOffset(
-                projection, position(-1), snapshot)).isEqualTo(2);
-        assertThat(positions.normalizeResetReadPositionOffset(
-                projection, position(0), snapshot)).isEqualTo(2);
-        assertThat(positions.normalizeResetReadPositionOffset(
-                projection, position(3), snapshot)).isEqualTo(3);
-        assertThat(positions.normalizeResetReadPositionOffset(
-                projection, position(99), snapshot)).isEqualTo(5);
+        assertThat(positions.normalizeResetReadPositionOffset(projection, position(-1), snapshot))
+                .isEqualTo(2);
+        assertThat(positions.normalizeResetReadPositionOffset(projection, position(0), snapshot))
+                .isEqualTo(2);
+        assertThat(positions.normalizeResetReadPositionOffset(projection, position(3), snapshot))
+                .isEqualTo(3);
+        assertThat(positions.normalizeResetReadPositionOffset(projection, position(99), snapshot))
+                .isEqualTo(5);
 
-        assertThatThrownBy(() -> positions.normalizeResetReadPositionOffset(
-                projection, position(-2), snapshot))
+        assertThatThrownBy(() -> positions.normalizeResetReadPositionOffset(projection, position(-2), snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
-        assertThatThrownBy(() -> positions.requireReadPositionOffset(
-                projection, position(0), snapshot))
+        assertThatThrownBy(() -> positions.requireReadPositionOffset(projection, position(0), snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
     }
 
@@ -137,7 +143,7 @@ class PositionProjectionTest {
         assertPosition(positions.normalizeInclusiveMaxPosition(projection, position(99), snapshot), 4);
 
         assertThatThrownBy(() -> positions.normalizeInclusiveMaxPosition(
-                projection, PositionFactory.create(LEDGER_ID + 1, 3), snapshot))
+                        projection, PositionFactory.create(LEDGER_ID + 1, 3), snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
         assertThatThrownBy(() -> positions.normalizeInclusiveMaxPosition(projection, position(-2), snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
@@ -152,29 +158,64 @@ class PositionProjectionTest {
         assertThatThrownBy(() -> positions.requireReadableEntryOffset(recreated, stale, snapshot(0, 1, recreated)))
                 .isInstanceOf(ProjectionValidationException.class);
         assertThatThrownBy(() -> positions.requireReadableEntryOffset(
-                projection, PositionFactory.create(LEDGER_ID + 1, 0), snapshot))
+                        projection, PositionFactory.create(LEDGER_ID + 1, 0), snapshot))
                 .isInstanceOf(ProjectionValidationException.class);
 
         StreamMetadata wrongAttributes = new StreamMetadata(
-                snapshot.streamId(), snapshot.streamName(), StreamState.ACTIVE,
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of(), 0, 1, 1, 1, 0);
+                snapshot.streamId(),
+                snapshot.streamName(),
+                StreamState.ACTIVE,
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                Map.of(),
+                0,
+                1,
+                1,
+                1,
+                0);
         assertThatThrownBy(() -> positions.bounds(projection, wrongAttributes))
                 .isInstanceOf(ProjectionValidationException.class);
 
         StreamMetadata bookKeeperWalOnly = new StreamMetadata(
-                snapshot.streamId(), snapshot.streamName(), StreamState.ACTIVE,
-                StorageProfile.BOOKKEEPER_WAL_ONLY, snapshot.attributes(), 0, 1, 1, 1, 0);
-        assertThat(positions.bounds(projection, bookKeeperWalOnly).committedEndOffset()).isEqualTo(1);
+                snapshot.streamId(),
+                snapshot.streamName(),
+                StreamState.ACTIVE,
+                StorageProfile.BOOKKEEPER_WAL_ONLY,
+                snapshot.attributes(),
+                0,
+                1,
+                1,
+                1,
+                0);
+        assertThat(positions.bounds(projection, bookKeeperWalOnly).committedEndOffset())
+                .isEqualTo(1);
 
         StreamMetadata bookKeeperSync = new StreamMetadata(
-                snapshot.streamId(), snapshot.streamName(), StreamState.ACTIVE,
-                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT, snapshot.attributes(), 0, 1, 1, 1, 0);
-        assertThat(positions.bounds(projection, bookKeeperSync).committedEndOffset()).isEqualTo(1);
+                snapshot.streamId(),
+                snapshot.streamName(),
+                StreamState.ACTIVE,
+                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
+                snapshot.attributes(),
+                0,
+                1,
+                1,
+                1,
+                0);
+        assertThat(positions.bounds(projection, bookKeeperSync).committedEndOffset())
+                .isEqualTo(1);
 
         StreamMetadata bookKeeperAsync = new StreamMetadata(
-                snapshot.streamId(), snapshot.streamName(), StreamState.ACTIVE,
-                StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT, snapshot.attributes(), 0, 1, 1, 1, 0);
-        assertThat(positions.bounds(projection, bookKeeperAsync).committedEndOffset()).isEqualTo(1);
+                snapshot.streamId(),
+                snapshot.streamName(),
+                StreamState.ACTIVE,
+                StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+                snapshot.attributes(),
+                0,
+                1,
+                1,
+                1,
+                0);
+        assertThat(positions.bounds(projection, bookKeeperAsync).committedEndOffset())
+                .isEqualTo(1);
     }
 
     @Test
@@ -202,9 +243,7 @@ class PositionProjectionTest {
     }
 
     private static StreamMetadata snapshot(
-            long trimOffset,
-            long committedEndOffset,
-            VirtualLedgerProjection projection) {
+            long trimOffset, long committedEndOffset, VirtualLedgerProjection projection) {
         return new StreamMetadata(
                 projection.streamId(),
                 ManagedLedgerProjectionNames.streamName(NAME, projection.incarnation()),

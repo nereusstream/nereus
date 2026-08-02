@@ -12,5 +12,7 @@
  * limitations under the License.
  */
 
-/** Protocol-neutral Phase 4 materialization, publication, recovery, and GC orchestration. */
+/**
+ * Protocol-neutral Phase 4 materialization, publication, recovery, and GC orchestration.
+ */
 package com.nereusstream.materialization;

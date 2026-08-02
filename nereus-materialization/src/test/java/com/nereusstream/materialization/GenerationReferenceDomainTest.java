@@ -1,16 +1,16 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.core.physical.GcGlobalReferenceScopeSnapshot;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceQueryKind;
-import com.nereusstream.core.physical.GcGlobalReferenceScopeSnapshot;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.materialization.gc.GenerationReferenceDomain;
@@ -37,17 +37,13 @@ class GenerationReferenceDomainTest {
 
     @Test
     void scansBothViewsAndRevalidatesTheExactQueryWithoutProcessLocalContext() {
-        VersionedGenerationZeroIndex first = MaterializationPlannerTestSupport.zero(
-                "/index/domain-2", 0, 2, 0, 100, 2);
-        VersionedGenerationZeroIndex second = MaterializationPlannerTestSupport.zero(
-                "/index/domain-4", 2, 4, 100, 100, 4);
-        AtomicReference<List<VersionedGenerationCandidate>> candidates =
-                new AtomicReference<>(List.of(first, second));
+        VersionedGenerationZeroIndex first = MaterializationPlannerTestSupport.zero("/index/domain-2", 0, 2, 0, 100, 2);
+        VersionedGenerationZeroIndex second =
+                MaterializationPlannerTestSupport.zero("/index/domain-4", 2, 4, 100, 100, 4);
+        AtomicReference<List<VersionedGenerationCandidate>> candidates = new AtomicReference<>(List.of(first, second));
         AtomicInteger scans = new AtomicInteger();
         GenerationReferenceDomain domain = new GenerationReferenceDomain(
-                MaterializationPlannerTestSupport.CLUSTER,
-                store(candidates, scans),
-                PhysicalGcConfig.defaults());
+                MaterializationPlannerTestSupport.CLUSTER, store(candidates, scans), PhysicalGcConfig.defaults());
         GcReferenceQuery query = query(first);
 
         var snapshot = domain.snapshot(query).join();
@@ -69,8 +65,8 @@ class GenerationReferenceDomainTest {
 
     @Test
     void multiStreamWalObjectRemainsReferencedWhileAnyStreamSliceIsLive() {
-        VersionedGenerationZeroIndex first = MaterializationPlannerTestSupport.zero(
-                "/index/shared-object-first", 0, 2, 0, 100, 2);
+        VersionedGenerationZeroIndex first =
+                MaterializationPlannerTestSupport.zero("/index/shared-object-first", 0, 2, 0, 100, 2);
         StreamId secondStream = new StreamId("stream-planner-second");
         OffsetIndexEntry firstValue = first.value();
         OffsetIndexEntry secondValue = new OffsetIndexEntry(
@@ -89,13 +85,8 @@ class GenerationReferenceDomainTest {
                 firstValue.tombstoned(),
                 firstValue.metadataVersion());
         VersionedGenerationZeroIndex second = new VersionedGenerationZeroIndex(
-                "/index/shared-object-second",
-                first.encoding(),
-                secondValue,
-                first.metadataVersion(),
-                sha('f'));
-        AtomicReference<List<VersionedGenerationCandidate>> candidates =
-                new AtomicReference<>(List.of(first, second));
+                "/index/shared-object-second", first.encoding(), secondValue, first.metadataVersion(), sha('f'));
+        AtomicReference<List<VersionedGenerationCandidate>> candidates = new AtomicReference<>(List.of(first, second));
         GenerationReferenceDomain domain = new GenerationReferenceDomain(
                 MaterializationPlannerTestSupport.CLUSTER,
                 store(candidates, new AtomicInteger()),
@@ -125,17 +116,13 @@ class GenerationReferenceDomainTest {
 
     @Test
     void configuredLimitAndOwnerlessEnumerationFailClosed() {
-        VersionedGenerationZeroIndex first = MaterializationPlannerTestSupport.zero(
-                "/index/limit-2", 0, 2, 0, 100, 2);
-        VersionedGenerationZeroIndex second = MaterializationPlannerTestSupport.zero(
-                "/index/limit-4", 2, 4, 100, 100, 4);
-        AtomicReference<List<VersionedGenerationCandidate>> candidates =
-                new AtomicReference<>(List.of(first, second));
+        VersionedGenerationZeroIndex first = MaterializationPlannerTestSupport.zero("/index/limit-2", 0, 2, 0, 100, 2);
+        VersionedGenerationZeroIndex second =
+                MaterializationPlannerTestSupport.zero("/index/limit-4", 2, 4, 100, 100, 4);
+        AtomicReference<List<VersionedGenerationCandidate>> candidates = new AtomicReference<>(List.of(first, second));
         AtomicInteger scans = new AtomicInteger();
         GenerationReferenceDomain domain = new GenerationReferenceDomain(
-                MaterializationPlannerTestSupport.CLUSTER,
-                store(candidates, scans),
-                withLimits(1, 1));
+                MaterializationPlannerTestSupport.CLUSTER, store(candidates, scans), withLimits(1, 1));
 
         var limited = domain.snapshot(query(first)).join();
 
@@ -145,10 +132,7 @@ class GenerationReferenceDomainTest {
         assertThat(limited.authorities()).hasSize(1);
 
         GcReferenceQuery ownerless = GcReferenceQuery.create(
-                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
-                object(first),
-                List.of(),
-                EVIDENCE);
+                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE, object(first), List.of(), EVIDENCE);
         int beforeOwnerless = scans.get();
         var blocked = domain.snapshot(ownerless).join();
         assertThat(blocked.complete()).isFalse();
@@ -168,8 +152,7 @@ class GenerationReferenceDomainTest {
                 2,
                 MaterializationPlannerTestSupport.policy().digestSha256(),
                 MaterializationPolicy.COMMITTED_FORMAT);
-        AtomicReference<List<VersionedGenerationCandidate>> candidates =
-                new AtomicReference<>(List.of(committed));
+        AtomicReference<List<VersionedGenerationCandidate>> candidates = new AtomicReference<>(List.of(committed));
         GenerationReferenceDomain domain = new GenerationReferenceDomain(
                 MaterializationPlannerTestSupport.CLUSTER,
                 store(candidates, new AtomicInteger()),
@@ -188,34 +171,26 @@ class GenerationReferenceDomainTest {
 
     @Test
     void ownerlessGlobalScopeScansEveryAuthoritativeStreamAndRevalidatesScope() {
-        VersionedGenerationZeroIndex first = MaterializationPlannerTestSupport.zero(
-                "/index/global-domain", 0, 2, 0, 100, 2);
-        AtomicReference<List<VersionedGenerationCandidate>> candidates =
-                new AtomicReference<>(List.of(first));
+        VersionedGenerationZeroIndex first =
+                MaterializationPlannerTestSupport.zero("/index/global-domain", 0, 2, 0, 100, 2);
+        AtomicReference<List<VersionedGenerationCandidate>> candidates = new AtomicReference<>(List.of(first));
         AtomicInteger scans = new AtomicInteger();
-        AtomicReference<GcGlobalReferenceScopeSnapshot> scope =
-                new AtomicReference<>(GcGlobalScopeTestSupport.snapshot(
-                        List.of(MaterializationPlannerTestSupport.STREAM),
-                        1,
-                        GcGlobalScopeTestSupport.sha('b')));
+        AtomicReference<GcGlobalReferenceScopeSnapshot> scope = new AtomicReference<>(GcGlobalScopeTestSupport.snapshot(
+                List.of(MaterializationPlannerTestSupport.STREAM), 1, GcGlobalScopeTestSupport.sha('b')));
         GenerationReferenceDomain domain = new GenerationReferenceDomain(
                 MaterializationPlannerTestSupport.CLUSTER,
                 store(candidates, scans),
                 PhysicalGcConfig.defaults(),
                 () -> CompletableFuture.completedFuture(scope.get()));
         GcReferenceQuery ownerless = GcReferenceQuery.create(
-                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
-                object(first),
-                List.of(),
-                EVIDENCE);
+                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE, object(first), List.of(), EVIDENCE);
 
         var snapshot = domain.snapshot(ownerless).join();
 
         assertThat(snapshot.complete()).isTrue();
         assertThat(snapshot.veto()).isFalse();
-        assertThat(snapshot.references()).singleElement()
-                .satisfies(reference -> assertThat(reference.referenceType())
-                        .isEqualTo("generation-zero-index"));
+        assertThat(snapshot.references()).singleElement().satisfies(reference -> assertThat(reference.referenceType())
+                .isEqualTo("generation-zero-index"));
         assertThat(snapshot.authorities())
                 .extracting(value -> value.authorityKey())
                 .contains("/global/reference-scope", first.key());
@@ -223,9 +198,7 @@ class GenerationReferenceDomainTest {
         assertThat(domain.stillMatches(ownerless, snapshot).join()).isTrue();
 
         scope.set(GcGlobalScopeTestSupport.snapshot(
-                List.of(MaterializationPlannerTestSupport.STREAM),
-                2,
-                GcGlobalScopeTestSupport.sha('c')));
+                List.of(MaterializationPlannerTestSupport.STREAM), 2, GcGlobalScopeTestSupport.sha('c')));
         assertThat(domain.stillMatches(ownerless, snapshot).join()).isFalse();
     }
 
@@ -296,13 +269,11 @@ class GenerationReferenceDomainTest {
                 "gc-drain",
                 Math.addExact(value.stateChangedAtMillis(), 1),
                 version);
-        return new VersionedGenerationIndex(
-                source.key(), draining, version, sha('d'));
+        return new VersionedGenerationIndex(source.key(), draining, version, sha('d'));
     }
 
     private static GenerationMetadataStore store(
-            AtomicReference<List<VersionedGenerationCandidate>> candidates,
-            AtomicInteger scans) {
+            AtomicReference<List<VersionedGenerationCandidate>> candidates, AtomicInteger scans) {
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
@@ -323,11 +294,9 @@ class GenerationReferenceDomainTest {
                             List<VersionedGenerationCandidate> values = candidates.get().stream()
                                     .filter(candidate -> stream(candidate).equals(stream))
                                     .filter(candidate -> view(candidate) == view)
-                                    .sorted(java.util.Comparator.comparing(
-                                            VersionedGenerationCandidate::key))
+                                    .sorted(java.util.Comparator.comparing(VersionedGenerationCandidate::key))
                                     .toList();
-                            yield CompletableFuture.completedFuture(
-                                    new GenerationScanPage(values, Optional.empty()));
+                            yield CompletableFuture.completedFuture(new GenerationScanPage(values, Optional.empty()));
                         }
                         case "close" -> null;
                         default -> throw new UnsupportedOperationException(method.getName());
@@ -338,7 +307,8 @@ class GenerationReferenceDomainTest {
     private static ReadView view(VersionedGenerationCandidate candidate) {
         return candidate instanceof VersionedGenerationZeroIndex
                 ? ReadView.COMMITTED
-                : ReadView.fromWireId(((VersionedGenerationIndex) candidate).value().readViewId());
+                : ReadView.fromWireId(
+                        ((VersionedGenerationIndex) candidate).value().readViewId());
     }
 
     private static StreamId stream(VersionedGenerationCandidate candidate) {
@@ -371,7 +341,6 @@ class GenerationReferenceDomainTest {
     }
 
     private static Checksum sha(char character) {
-        return new Checksum(
-                ChecksumType.SHA256, Character.toString(character).repeat(64));
+        return new Checksum(ChecksumType.SHA256, Character.toString(character).repeat(64));
     }
 }

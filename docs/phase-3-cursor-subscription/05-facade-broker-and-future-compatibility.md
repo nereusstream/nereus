@@ -116,51 +116,51 @@ registry after local non-durable creation，matching locked `ManagedLedgerImpl` 
 
 ### 2.3 ManagedLedger cursor methods
 
-| Method | F3 implementation |
-| --- | --- |
-| sync `openCursor` overloads | block only through existing ManagedLedger sync wrapper/deadline around async durable open |
-| async `openCursor` overloads | exact-name registry; durable storage open/create; callback after handle hydration |
-| `getCursors` | safe snapshot iterable of all currently registered local facades；at open callback this is the complete hydrated ACTIVE durable set，and later non-durable creates join it |
-| `getActiveCursors` | active-flag subset across both registered modes；not a retention authority |
-| `getSlowestConsumer` | root-lifecycle ACTIVE durable cursor with lowest projected mark-delete，regardless of its broker-local active flag；deterministic exact-name tie break，null when none |
-| active-entry/backlog estimates | retain the F2 ledger formulas and consume hydrated F3 mark-delete/whole-range state plus document-02 cursor formulas；never infer from local read position |
-| sync/async `deleteCursor` | registry mode dispatch：non-durable remove/close locally；durable idempotent tombstone then remove/close；missing name performs idempotent durable delete lookup |
-| `newNonDurableCursor` | F2 local construction enhanced with in-memory individual/batch ack |
-| `trimConsumedLedgersInBackground(promise)` | complete normally without calling L0 trim or the retention coordinator；F4 alone wires policy trim through `requestTrim` |
-| `asyncTruncate` | continue failed/unsupported；it cannot bypass cursor protection |
-| ledger close | close local facades/watchers; never delete durable roots |
-| topic delete | F2 stream/projection delete remains owner; cursor prefix becomes F4 reclamation input |
+| Method                                     | F3 implementation                                                                                                                                                        |
+|--------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| sync `openCursor` overloads                | block only through existing ManagedLedger sync wrapper/deadline around async durable open                                                                                |
+| async `openCursor` overloads               | exact-name registry; durable storage open/create; callback after handle hydration                                                                                        |
+| `getCursors`                               | safe snapshot iterable of all currently registered local facades；at open callback this is the complete hydrated ACTIVE durable set，and later non-durable creates join it |
+| `getActiveCursors`                         | active-flag subset across both registered modes；not a retention authority                                                                                                |
+| `getSlowestConsumer`                       | root-lifecycle ACTIVE durable cursor with lowest projected mark-delete，regardless of its broker-local active flag；deterministic exact-name tie break，null when none      |
+| active-entry/backlog estimates             | retain the F2 ledger formulas and consume hydrated F3 mark-delete/whole-range state plus document-02 cursor formulas；never infer from local read position                |
+| sync/async `deleteCursor`                  | registry mode dispatch：non-durable remove/close locally；durable idempotent tombstone then remove/close；missing name performs idempotent durable delete lookup            |
+| `newNonDurableCursor`                      | F2 local construction enhanced with in-memory individual/batch ack                                                                                                       |
+| `trimConsumedLedgersInBackground(promise)` | complete normally without calling L0 trim or the retention coordinator；F4 alone wires policy trim through `requestTrim`                                                  |
+| `asyncTruncate`                            | continue failed/unsupported；it cannot bypass cursor protection                                                                                                           |
+| ledger close                               | close local facades/watchers; never delete durable roots                                                                                                                 |
+| topic delete                               | F2 stream/projection delete remains owner; cursor prefix becomes F4 reclamation input                                                                                    |
 
 Same-name opens coalesce one in-flight future per ledger instance。Cross-ledger/broker duplicate opens are resolved by
 metadata CAS。A failed open is removed from coalescing map so a later retry can run。
 
 ## 3. ManagedCursor Compatibility Matrix
 
-| Observable area | F3 guarantee | Deliberate difference / limit |
-| --- | --- | --- |
-| cursor name/durability | exact encoded name; durable survives broker restart | no BookKeeper cursor ledger ID exposed |
-| broker ownership | fresh owner session claims retention + every ACTIVE root before open callback | mixed/stale sessions fail fenced；owner ID is not MessageId identity |
-| cumulative ack | durable before callback; position properties atomic | no callback-before-persist throttle |
-| individual ack | durable ranges/partial batches, including Shared | no truncation/redelivery caused by configured persistence cap |
-| read position | moves during live dispatch/seek/rewind | not persisted; restart redelivers from first unacked |
-| mark-delete position | same Position-facing previous-entry semantics | stored internally as first-unacked offset |
-| replay | whole-deleted positions skipped; partial Entry returned with remaining words | only retained F1 bytes before F4 compacted view |
-| reset | disconnect/fence handled by broker, root CAS is destructive boundary | force cannot resurrect trimmed bytes before F4 |
-| clear/skip/expire | durable cursor progress | no immediate physical deletion |
-| backlog entries | exact whole-entry count | message/byte counts may be documented estimates |
-| cursor properties | root CAS, internal prefix preserved | strict UTF-8/byte caps |
-| `isCursorDataFullyPersistable` | true for every admitted state | oversize mutation fails instead of truncating |
-| active/lastActive/stats | broker-local | lastActive is not a durable correctness field |
-| offload/compaction hooks | fail closed | F4 owns materialized view |
+| Observable area                | F3 guarantee                                                                  | Deliberate difference / limit                                       |
+|--------------------------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| cursor name/durability         | exact encoded name; durable survives broker restart                           | no BookKeeper cursor ledger ID exposed                              |
+| broker ownership               | fresh owner session claims retention + every ACTIVE root before open callback | mixed/stale sessions fail fenced；owner ID is not MessageId identity |
+| cumulative ack                 | durable before callback; position properties atomic                           | no callback-before-persist throttle                                 |
+| individual ack                 | durable ranges/partial batches, including Shared                              | no truncation/redelivery caused by configured persistence cap       |
+| read position                  | moves during live dispatch/seek/rewind                                        | not persisted; restart redelivers from first unacked                |
+| mark-delete position           | same Position-facing previous-entry semantics                                 | stored internally as first-unacked offset                           |
+| replay                         | whole-deleted positions skipped; partial Entry returned with remaining words  | only retained F1 bytes before F4 compacted view                     |
+| reset                          | disconnect/fence handled by broker, root CAS is destructive boundary          | force cannot resurrect trimmed bytes before F4                      |
+| clear/skip/expire              | durable cursor progress                                                       | no immediate physical deletion                                      |
+| backlog entries                | exact whole-entry count                                                       | message/byte counts may be documented estimates                     |
+| cursor properties              | root CAS, internal prefix preserved                                           | strict UTF-8/byte caps                                              |
+| `isCursorDataFullyPersistable` | true for every admitted state                                                 | oversize mutation fails instead of truncating                       |
+| active/lastActive/stats        | broker-local                                                                  | lastActive is not a durable correctness field                       |
+| offload/compaction hooks       | fail closed                                                                   | F4 owns materialized view                                           |
 
 ## 4. Supported Subscription Modes
 
-| Mode | Durable | Non-durable | Ack shape | F3 result |
-| --- | --- | --- | --- | --- |
-| Exclusive | yes | yes | cumulative and individual, whole/batch | supported |
-| Failover | yes | yes | cumulative and individual, whole/batch | supported |
-| Shared | yes | yes | individual, whole/batch | supported |
-| Key_Shared | no | no | individual + hash ownership | rejected；Future 8 |
+| Mode       | Durable | Non-durable | Ack shape                              | F3 result         |
+|------------|---------|-------------|----------------------------------------|-------------------|
+| Exclusive  | yes     | yes         | cumulative and individual, whole/batch | supported         |
+| Failover   | yes     | yes         | cumulative and individual, whole/batch | supported         |
+| Shared     | yes     | yes         | individual, whole/batch                | supported         |
+| Key_Shared | no      | no          | individual + hash ownership            | rejected；Future 8 |
 
 Consumer exclusivity、Failover active selection and Shared dispatch fairness remain broker runtime policy。F3 stores no
 subscription type, consumer ID, active broker or assignment in cursor root。
@@ -209,15 +209,15 @@ ready。A broker lacking that runtime fails topic open before `createPersistentS
 
 Topic policy changes：
 
-| Feature | F3 admission |
-| --- | --- |
-| message TTL | allow；expiry advances durable cursor only |
-| subscription expiration | allow；expiration uses idempotent cursor delete |
-| durable subscription admin | allow selected operations below |
-| retention policy / backlog eviction | keep rejected until F4 |
-| compaction / Pulsar offload / truncate | keep rejected |
-| geo replication / replicated subscription | keep rejected |
-| dedup / system-internal / entry filters / shadow/migration / auto-skip | keep rejected |
+| Feature                                                                | F3 admission                                   |
+|------------------------------------------------------------------------|------------------------------------------------|
+| message TTL                                                            | allow；expiry advances durable cursor only      |
+| subscription expiration                                                | allow；expiration uses idempotent cursor delete |
+| durable subscription admin                                             | allow selected operations below                |
+| retention policy / backlog eviction                                    | keep rejected until F4                         |
+| compaction / Pulsar offload / truncate                                 | keep rejected                                  |
+| geo replication / replicated subscription                              | keep rejected                                  |
+| dedup / system-internal / entry filters / shadow/migration / auto-skip | keep rejected                                  |
 
 TTL/subscription expiration does not authorize trim or object deletion；it only changes/deletes cursor state。
 
@@ -225,17 +225,17 @@ TTL/subscription expiration does not authorize trim or object deletion；it only
 
 The validator remains the first Nereus-specific action in `Consumer.messageAcked`。New decision table：
 
-| Check | Durable cursor | Non-durable cursor |
-| --- | --- | --- |
-| transaction bits/pending-ack path | reject | reject |
-| protocol validation error | reject before mutation | reject before mutation |
-| Exclusive/Failover cumulative | exactly one MessageId; allow whole/valid batch | same, but `requirePersistedAck` rejected |
-| Exclusive/Failover individual | allow bounded list; whole/valid batch | allow in-memory bounded list |
-| Shared individual | allow bounded list; whole/valid batch | allow in-memory bounded list |
-| Shared cumulative | reject | reject |
-| Key_Shared | reject | reject |
-| `requirePersistedAck` | allow and wait for durable callback | reject because no durable state |
-| partial batch while deletion-at-batch-index disabled | reject explicitly | reject explicitly |
+| Check                                                | Durable cursor                                 | Non-durable cursor                       |
+|------------------------------------------------------|------------------------------------------------|------------------------------------------|
+| transaction bits/pending-ack path                    | reject                                         | reject                                   |
+| protocol validation error                            | reject before mutation                         | reject before mutation                   |
+| Exclusive/Failover cumulative                        | exactly one MessageId; allow whole/valid batch | same, but `requirePersistedAck` rejected |
+| Exclusive/Failover individual                        | allow bounded list; whole/valid batch          | allow in-memory bounded list             |
+| Shared individual                                    | allow bounded list; whole/valid batch          | allow in-memory bounded list             |
+| Shared cumulative                                    | reject                                         | reject                                   |
+| Key_Shared                                           | reject                                         | reject                                   |
+| `requirePersistedAck`                                | allow and wait for durable callback            | reject because no durable state          |
+| partial batch while deletion-at-batch-index disabled | reject explicitly                              | reject explicitly                        |
 
 Validator checks command shape only。Projection ledger ID、offset bounds、batch size and Entry metadata are validated by
 facade/storage where authoritative state is available。
@@ -446,7 +446,8 @@ broker admission together。M1/M2 are repository/test milestones，not independe
 ```
 
 The locked F2 binary does not scan F3 cursor keys。Ignoring an owner-only preactivation root is safe because no cursor
-or pending retention state can coexist with a missing marker and F2 trim is a no-op。It instead fails Nereus topic open while decoding the activated
+or pending retention state can coexist with a missing marker and F2 trim is a no-op。It instead fails Nereus topic open
+while decoding the activated
 projection because its exact `ProjectionCreateRequest.canonicalProperties` rejects the reserved `nereus.*` marker。
 The F3 runtime permits only that exact internal value，filters it from user properties and preserves it through every
 property/lifecycle/delete/recreate CAS。Thus an old broker cannot expose an empty cursor view or recreate an existing
@@ -564,12 +565,12 @@ batch MessageId -> same Position plus validated batchIndex/ack-set extension
 
 It does not add an entry index per cursor or per MessageId。Ledger metadata and batch metadata remain：
 
-| Fact | Location |
-| --- | --- |
-| virtual ledger / stream incarnation | F2 Oxia projection record |
-| entry offset -> committed object slice | F1/F2 stream/offset metadata |
-| Pulsar batch size/index payload | persisted Pulsar Entry bytes |
-| cursor whole/partial ack | F3 root + referenced cursor snapshot |
+| Fact                                   | Location                             |
+|----------------------------------------|--------------------------------------|
+| virtual ledger / stream incarnation    | F2 Oxia projection record            |
+| entry offset -> committed object slice | F1/F2 stream/offset metadata         |
+| Pulsar batch size/index payload        | persisted Pulsar Entry bytes         |
+| cursor whole/partial ack               | F3 root + referenced cursor snapshot |
 
 The scale of cursor metadata is proportional to cursor ack holes, not topic entry count。
 
@@ -611,7 +612,8 @@ F4 must preserve：
 10. projection never becomes append/visibility correctness owner。
 
 For a cursorless unactivated topic，F4's first `requestTrim` carries the current writable owner session，requires the
-already-claimed owner-only retention root，and must use the F3 activation guard/marker before TRIM_PENDING。It cannot special-case “no cursor today” into a direct L0 trim，because that would
+already-claimed owner-only retention root，and must use the F3 activation guard/marker before TRIM_PENDING。It cannot
+special-case “no cursor today” into a direct L0 trim，because that would
 race the first durable cursor create。This activation is a minimum-reader fence and is expected once F4 policy/GC
 semantics are used for the topic。
 
@@ -620,12 +622,12 @@ reinterpret V1 object type/code or delete V1 objects solely from age。
 
 ## 11. Later-future Boundaries
 
-| Future | May consume from F3 | Must not overload F3 record |
-| --- | --- | --- |
-| F5 KoP | stream coordinate and retention reference API | Kafka group metadata/offsets do not become Pulsar cursor names |
-| F6 Lakehouse | committed/trim/reference facts | table snapshots do not change cursor ack truth |
-| F7 routing | topic/stream ownership | routing epochs do not become cursor generations |
-| F8 advanced Pulsar | base cursor ack state | Key_Shared ownership, pending txn ack, delayed index, replicated-sub state use separate records |
+| Future             | May consume from F3                           | Must not overload F3 record                                                                     |
+|--------------------|-----------------------------------------------|-------------------------------------------------------------------------------------------------|
+| F5 KoP             | stream coordinate and retention reference API | Kafka group metadata/offsets do not become Pulsar cursor names                                  |
+| F6 Lakehouse       | committed/trim/reference facts                | table snapshots do not change cursor ack truth                                                  |
+| F7 routing         | topic/stream ownership                        | routing epochs do not become cursor generations                                                 |
+| F8 advanced Pulsar | base cursor ack state                         | Key_Shared ownership, pending txn ack, delayed index, replicated-sub state use separate records |
 
 Each new reference domain must participate in F4 retention/GC explicitly；it cannot hide a protection offset inside
 cursor properties。

@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import java.util.ArrayList;
@@ -8,7 +9,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Exact-version deterministic backend for unchanged F4 metadata-store contract scenarios. */
+/**
+ * Exact-version deterministic backend for unchanged F4 metadata-store contract scenarios.
+ */
 public final class InMemoryPartitionedOxiaBackend implements PartitionedOxiaClient.Backend {
     private final Map<StorageKey, Stored> values = new HashMap<>();
     private final List<Watcher> watchers = new ArrayList<>();
@@ -16,19 +19,14 @@ public final class InMemoryPartitionedOxiaBackend implements PartitionedOxiaClie
 
     @Override
     public synchronized CompletableFuture<Optional<PartitionedOxiaClient.VersionedValue>> get(
-            String key,
-            PartitionKey partitionKey) {
+            String key, PartitionKey partitionKey) {
         Stored stored = values.get(new StorageKey(partitionKey.value(), key));
-        return completed(stored == null
-                ? Optional.empty()
-                : Optional.of(versioned(key, stored)));
+        return completed(stored == null ? Optional.empty() : Optional.of(versioned(key, stored)));
     }
 
     @Override
     public synchronized CompletableFuture<PartitionedOxiaClient.WriteResult> putIfAbsent(
-            String key,
-            byte[] value,
-            PartitionKey partitionKey) {
+            String key, byte[] value, PartitionKey partitionKey) {
         StorageKey storageKey = new StorageKey(partitionKey.value(), key);
         if (values.containsKey(storageKey)) {
             return failed(new F4MetadataConditionFailedException("key already exists"));
@@ -41,10 +39,7 @@ public final class InMemoryPartitionedOxiaBackend implements PartitionedOxiaClie
 
     @Override
     public synchronized CompletableFuture<PartitionedOxiaClient.WriteResult> putIfVersion(
-            String key,
-            byte[] value,
-            long expectedVersion,
-            PartitionKey partitionKey) {
+            String key, byte[] value, long expectedVersion, PartitionKey partitionKey) {
         StorageKey storageKey = new StorageKey(partitionKey.value(), key);
         Stored current = values.get(storageKey);
         if (current == null || current.version() != expectedVersion) {
@@ -58,9 +53,7 @@ public final class InMemoryPartitionedOxiaBackend implements PartitionedOxiaClie
 
     @Override
     public synchronized CompletableFuture<Void> deleteIfVersion(
-            String key,
-            long expectedVersion,
-            PartitionKey partitionKey) {
+            String key, long expectedVersion, PartitionKey partitionKey) {
         StorageKey storageKey = new StorageKey(partitionKey.value(), key);
         Stored current = values.get(storageKey);
         if (current == null || current.version() != expectedVersion) {
@@ -73,9 +66,7 @@ public final class InMemoryPartitionedOxiaBackend implements PartitionedOxiaClie
 
     @Override
     public synchronized CompletableFuture<List<String>> list(
-            String fromInclusive,
-            String toExclusive,
-            PartitionKey partitionKey) {
+            String fromInclusive, String toExclusive, PartitionKey partitionKey) {
         return completed(values.keySet().stream()
                 .filter(key -> key.partition().equals(partitionKey.value()))
                 .map(StorageKey::key)
@@ -86,10 +77,7 @@ public final class InMemoryPartitionedOxiaBackend implements PartitionedOxiaClie
 
     @Override
     public synchronized CompletableFuture<List<PartitionedOxiaClient.VersionedValue>> rangeScan(
-            String fromInclusive,
-            String toExclusive,
-            int limit,
-            PartitionKey partitionKey) {
+            String fromInclusive, String toExclusive, int limit, PartitionKey partitionKey) {
         return completed(values.entrySet().stream()
                 .filter(entry -> entry.getKey().partition().equals(partitionKey.value()))
                 .filter(entry -> entry.getKey().key().compareTo(fromInclusive) >= 0
@@ -102,9 +90,7 @@ public final class InMemoryPartitionedOxiaBackend implements PartitionedOxiaClie
 
     @Override
     public synchronized WatchRegistration watchPrefix(
-            String prefix,
-            PartitionKey partitionKey,
-            Runnable invalidationCallback) {
+            String prefix, PartitionKey partitionKey, Runnable invalidationCallback) {
         Watcher watcher = new Watcher(partitionKey.value(), prefix, invalidationCallback);
         watchers.add(watcher);
         return () -> removeWatcher(watcher);
@@ -120,8 +106,7 @@ public final class InMemoryPartitionedOxiaBackend implements PartitionedOxiaClie
 
     private void notifyWatchers(PartitionKey partitionKey, String key) {
         List<Runnable> callbacks = watchers.stream()
-                .filter(watcher -> watcher.partition().equals(partitionKey.value())
-                        && key.startsWith(watcher.prefix()))
+                .filter(watcher -> watcher.partition().equals(partitionKey.value()) && key.startsWith(watcher.prefix()))
                 .map(Watcher::callback)
                 .toList();
         callbacks.forEach(Runnable::run);
@@ -158,6 +143,5 @@ public final class InMemoryPartitionedOxiaBackend implements PartitionedOxiaClie
         }
     }
 
-    private record Watcher(String partition, String prefix, Runnable callback) {
-    }
+    private record Watcher(String partition, String prefix, Runnable callback) {}
 }

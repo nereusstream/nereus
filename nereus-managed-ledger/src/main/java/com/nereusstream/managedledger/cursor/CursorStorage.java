@@ -1,29 +1,26 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-/** Protocol-neutral durable cursor storage over the F3 root/snapshot contract. */
+/**
+ * Protocol-neutral durable cursor storage over the F3 root/snapshot contract.
+ */
 public interface CursorStorage extends AutoCloseable {
-    CompletableFuture<CursorHandle> open(
-            CursorOwnerSession owner, String cursorName, CursorOpenRequest request);
+    CompletableFuture<CursorHandle> open(CursorOwnerSession owner, String cursorName, CursorOpenRequest request);
 
-    CompletableFuture<List<CursorHandle>> claimAndLoadActiveCursors(
-            CursorOwnerSession owner);
+    CompletableFuture<List<CursorHandle>> claimAndLoadActiveCursors(CursorOwnerSession owner);
 
-    CompletableFuture<CursorMutationResult> cumulativeAck(
-            CursorHandle handle, CursorAckRequest request);
+    CompletableFuture<CursorMutationResult> cumulativeAck(CursorHandle handle, CursorAckRequest request);
 
-    CompletableFuture<CursorMutationResult> individualAck(
-            CursorHandle handle, List<CursorAckRequest> requests);
+    CompletableFuture<CursorMutationResult> individualAck(CursorHandle handle, List<CursorAckRequest> requests);
 
-    CompletableFuture<CursorMutationResult> reset(
-            CursorHandle handle, CursorResetRequest request);
+    CompletableFuture<CursorMutationResult> reset(CursorHandle handle, CursorResetRequest request);
 
-    CompletableFuture<CursorMutationResult> clearBacklog(
-            CursorHandle handle, long observedCommittedEndOffset);
+    CompletableFuture<CursorMutationResult> clearBacklog(CursorHandle handle, long observedCommittedEndOffset);
 
     CompletableFuture<CursorMutationResult> mutateCursorProperties(
             CursorHandle handle, CursorPropertyMutation mutation);

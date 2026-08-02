@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamId;
@@ -20,29 +20,25 @@ import org.junit.jupiter.api.Test;
 class CursorStorageSnapshotSpillTest {
     @Test
     void stableMissingSnapshotFailsAsMetadataInvariantWithoutFallback() {
-        try (CursorStorageTestSupport.Context context =
-                new CursorStorageTestSupport.Context(0, 2_000)) {
+        try (CursorStorageTestSupport.Context context = new CursorStorageTestSupport.Context(0, 2_000)) {
             CursorOwnerSession owner = context.owner(CursorStorageTestSupport.OWNER_1);
-            CursorHandle handle = context.storage.open(
+            CursorHandle handle = context.storage
+                    .open(
                             owner,
                             "subscription-a",
-                            new CursorOpenRequest(
-                                    new InitialCursorPosition.Earliest(),
-                                    Map.of(),
-                                    Map.of(),
-                                    0,
-                                    2_000))
+                            new CursorOpenRequest(new InitialCursorPosition.Earliest(), Map.of(), Map.of(), 0, 2_000))
                     .join();
             List<CursorAckRequest> disjoint = new ArrayList<>();
             for (int index = 0; index < 300; index++) {
-                disjoint.add(new CursorAckRequest(
-                        1 + index * 2L, Optional.empty(), Map.of()));
+                disjoint.add(new CursorAckRequest(1 + index * 2L, Optional.empty(), Map.of()));
             }
-            CursorState spilled = context.storage.individualAck(handle, disjoint).join().state();
+            CursorState spilled =
+                    context.storage.individualAck(handle, disjoint).join().state();
             CursorSnapshotReference reference = spilled.snapshotReference().orElseThrow();
             context.snapshotStore.remove(reference.objectKey());
 
-            assertThatThrownBy(() -> context.storage.claimAndLoadActiveCursors(owner).join())
+            assertThatThrownBy(() ->
+                            context.storage.claimAndLoadActiveCursors(owner).join())
                     .hasCauseInstanceOf(NereusException.class)
                     .cause()
                     .satisfies(error -> assertThat(((NereusException) error).code())
@@ -52,14 +48,14 @@ class CursorStorageSnapshotSpillTest {
 
     @Test
     void stableCorruptSnapshotFailsAsMetadataInvariantWithoutFallback() {
-        try (CursorStorageTestSupport.Context context =
-                new CursorStorageTestSupport.Context(0, 2_000)) {
+        try (CursorStorageTestSupport.Context context = new CursorStorageTestSupport.Context(0, 2_000)) {
             CursorOwnerSession owner = context.owner(CursorStorageTestSupport.OWNER_1);
             CursorState spilled = spill(context, owner, 2_000);
             context.snapshotStore.corrupt(
                     spilled.snapshotReference().orElseThrow().objectKey());
 
-            assertThatThrownBy(() -> context.storage.claimAndLoadActiveCursors(owner).join())
+            assertThatThrownBy(() ->
+                            context.storage.claimAndLoadActiveCursors(owner).join())
                     .hasCauseInstanceOf(NereusException.class)
                     .cause()
                     .satisfies(error -> assertThat(((NereusException) error).code())
@@ -69,14 +65,14 @@ class CursorStorageSnapshotSpillTest {
 
     @Test
     void transientSnapshotReadFailurePreservesItsErrorAndCanBeRetried() {
-        try (CursorStorageTestSupport.Context context =
-                new CursorStorageTestSupport.Context(0, 2_000)) {
+        try (CursorStorageTestSupport.Context context = new CursorStorageTestSupport.Context(0, 2_000)) {
             CursorOwnerSession owner = context.owner(CursorStorageTestSupport.OWNER_1);
             spill(context, owner, 2_000);
-            context.snapshotStore.failNextRead(new NereusException(
-                    ErrorCode.OBJECT_READ_FAILED, true, "transient snapshot transport failure"));
+            context.snapshotStore.failNextRead(
+                    new NereusException(ErrorCode.OBJECT_READ_FAILED, true, "transient snapshot transport failure"));
 
-            assertThatThrownBy(() -> context.storage.claimAndLoadActiveCursors(owner).join())
+            assertThatThrownBy(() ->
+                            context.storage.claimAndLoadActiveCursors(owner).join())
                     .hasCauseInstanceOf(NereusException.class)
                     .cause()
                     .satisfies(error -> {
@@ -91,20 +87,14 @@ class CursorStorageSnapshotSpillTest {
 
     @Test
     void concurrentReplacementSnapshotsLeaveOrphansButPublishTheAckUnion() {
-        try (CursorStorageTestSupport.Context context =
-                new CursorStorageTestSupport.Context(0, 5_000)) {
+        try (CursorStorageTestSupport.Context context = new CursorStorageTestSupport.Context(0, 5_000)) {
             CursorOwnerSession owner = context.owner(CursorStorageTestSupport.OWNER_1);
             CursorState base = spill(context, owner, 5_000);
             CursorHandle firstHandle = context.storage
                     .open(
                             owner,
                             "subscription-a",
-                            new CursorOpenRequest(
-                                    new InitialCursorPosition.Earliest(),
-                                    Map.of(),
-                                    Map.of(),
-                                    0,
-                                    5_000))
+                            new CursorOpenRequest(new InitialCursorPosition.Earliest(), Map.of(), Map.of(), 0, 5_000))
                     .join();
             DefaultCursorStorage secondStorage = secondStorage(context);
             ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -114,22 +104,16 @@ class CursorStorageSnapshotSpillTest {
                                 owner,
                                 "subscription-a",
                                 new CursorOpenRequest(
-                                        new InitialCursorPosition.Earliest(),
-                                        Map.of(),
-                                        Map.of(),
-                                        0,
-                                        5_000))
+                                        new InitialCursorPosition.Earliest(), Map.of(), Map.of(), 0, 5_000))
                         .join();
                 List<CursorAckRequest> left = disjointAcks(1_001, 4, 257);
                 List<CursorAckRequest> right = disjointAcks(1_003, 4, 257);
                 context.metadataStore.barrierNextCursorCas(2);
 
                 CompletableFuture<CursorMutationResult> first = CompletableFuture.supplyAsync(
-                        () -> context.storage.individualAck(firstHandle, left).join(),
-                        executor);
+                        () -> context.storage.individualAck(firstHandle, left).join(), executor);
                 CompletableFuture<CursorMutationResult> second = CompletableFuture.supplyAsync(
-                        () -> secondStorage.individualAck(secondHandle, right).join(),
-                        executor);
+                        () -> secondStorage.individualAck(secondHandle, right).join(), executor);
                 CompletableFuture.allOf(first, second).join();
 
                 CursorState durable = context.storage
@@ -141,23 +125,23 @@ class CursorStorageSnapshotSpillTest {
                 assertThat(durable.snapshotReference()).isPresent();
                 assertThat(durable.snapshotReference()).isNotEqualTo(base.snapshotReference());
                 assertThat(context.snapshotStore.objectCount()).isGreaterThanOrEqualTo(3);
-                left.forEach(request -> assertThat(durable
-                                .acknowledgements()
-                                .isWholeEntryAcknowledged(request.entryOffset()))
+                left.forEach(request -> assertThat(
+                                durable.acknowledgements().isWholeEntryAcknowledged(request.entryOffset()))
                         .isTrue());
-                right.forEach(request -> assertThat(durable
-                                .acknowledgements()
-                                .isWholeEntryAcknowledged(request.entryOffset()))
+                right.forEach(request -> assertThat(
+                                durable.acknowledgements().isWholeEntryAcknowledged(request.entryOffset()))
                         .isTrue());
 
-                var roots = context.metadataStore.scanCursors(
+                var roots = context.metadataStore
+                        .scanCursors(
                                 CursorStorageTestSupport.CLUSTER,
                                 new StreamId(context.ledger.projection().streamId()),
                                 Optional.empty(),
                                 context.config.cursorScanPageSize())
                         .join()
                         .records();
-                var retention = context.metadataStore.getRetention(
+                var retention = context.metadataStore
+                        .getRetention(
                                 CursorStorageTestSupport.CLUSTER,
                                 new StreamId(context.ledger.projection().streamId()))
                         .join()
@@ -175,7 +159,8 @@ class CursorStorageSnapshotSpillTest {
                 assertThat(active.deletionVetoed()).isFalse();
                 assertThat(active.stillMatches(retention, roots)).isTrue();
 
-                context.retention.beginProtection(
+                context.retention
+                        .beginProtection(
                                 owner,
                                 new CursorRetentionCoordinator.ProtectionRequest(
                                         CursorRetentionView.PendingProtection.Kind.CREATE,
@@ -188,7 +173,8 @@ class CursorStorageSnapshotSpillTest {
                                         Map.of(),
                                         Map.of()))
                         .join();
-                var protectionPending = context.metadataStore.getRetention(
+                var protectionPending = context.metadataStore
+                        .getRetention(
                                 CursorStorageTestSupport.CLUSTER,
                                 new StreamId(context.ledger.projection().streamId()))
                         .join()
@@ -209,18 +195,12 @@ class CursorStorageSnapshotSpillTest {
     }
 
     private static CursorState spill(
-            CursorStorageTestSupport.Context context,
-            CursorOwnerSession owner,
-            long endOffset) {
-        CursorHandle handle = context.storage.open(
+            CursorStorageTestSupport.Context context, CursorOwnerSession owner, long endOffset) {
+        CursorHandle handle = context.storage
+                .open(
                         owner,
                         "subscription-a",
-                        new CursorOpenRequest(
-                                new InitialCursorPosition.Earliest(),
-                                Map.of(),
-                                Map.of(),
-                                0,
-                                endOffset))
+                        new CursorOpenRequest(new InitialCursorPosition.Earliest(), Map.of(), Map.of(), 0, endOffset))
                 .join();
         CursorState spilled = context.storage
                 .individualAck(handle, disjointAcks(1, 2, 300))
@@ -230,18 +210,15 @@ class CursorStorageSnapshotSpillTest {
         return spilled;
     }
 
-    private static List<CursorAckRequest> disjointAcks(
-            long firstOffset, long step, int count) {
+    private static List<CursorAckRequest> disjointAcks(long firstOffset, long step, int count) {
         List<CursorAckRequest> requests = new ArrayList<>();
         for (int index = 0; index < count; index++) {
-            requests.add(new CursorAckRequest(
-                    firstOffset + index * step, Optional.empty(), Map.of()));
+            requests.add(new CursorAckRequest(firstOffset + index * step, Optional.empty(), Map.of()));
         }
         return List.copyOf(requests);
     }
 
-    private static DefaultCursorStorage secondStorage(
-            CursorStorageTestSupport.Context context) {
+    private static DefaultCursorStorage secondStorage(CursorStorageTestSupport.Context context) {
         return new DefaultCursorStorage(
                 CursorStorageTestSupport.CLUSTER,
                 context.streamStorage,
@@ -251,8 +228,7 @@ class CursorStorageSnapshotSpillTest {
                 context.retention,
                 ignored -> CompletableFuture.completedFuture(null),
                 new CursorStateMachine(context.config),
-                new CursorStatePersistencePlanner(
-                        CursorStorageTestSupport.CLUSTER, context.config),
+                new CursorStatePersistencePlanner(CursorStorageTestSupport.CLUSTER, context.config),
                 context.config,
                 CursorStorageTestSupport.CLOCK,
                 context.scheduler);

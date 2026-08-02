@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.managedledger.cursor.TestCursorStorage;
@@ -37,8 +37,7 @@ class NereusManagedCursorPropertiesTest {
         Clock clock = Clock.systemUTC();
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
-        FakeManagedLedgerProjectionMetadataStore projections =
-                new FakeManagedLedgerProjectionMetadataStore();
+        FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();
         DefaultStreamStorage streamStorage = new DefaultStreamStorage(
                 StreamStorageConfig.defaults("cluster/a", "cursor-property-test"),
                 metadata,
@@ -50,11 +49,7 @@ class NereusManagedCursorPropertiesTest {
         try (NereusManagedLedgerRuntime runtime =
                 ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections, cursorStorage)) {
             NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
-                    runtime,
-                    fixedGuard(1),
-                    config(),
-                    new ManagedLedgerFactoryConfig(),
-                    false);
+                    runtime, fixedGuard(1), config(), new ManagedLedgerFactoryConfig(), false);
             NereusManagedLedger ledger = (NereusManagedLedger) factory.open(NAME, config());
             ManagedCursor cursor = ledger.openCursor("durable");
             assertThat(cursor.putProperty("old", 1L)).isTrue();
@@ -81,10 +76,7 @@ class NereusManagedCursorPropertiesTest {
         }
     }
 
-    private static CompletableFuture<Position> reset(
-            ManagedCursor cursor,
-            Position position,
-            boolean force) {
+    private static CompletableFuture<Position> reset(ManagedCursor cursor, Position position, boolean force) {
         CompletableFuture<Position> result = new CompletableFuture<>();
         cursor.asyncResetCursor(position, force, new AsyncCallbacks.ResetCursorCallback() {
             @Override
@@ -93,9 +85,7 @@ class NereusManagedCursorPropertiesTest {
             }
 
             @Override
-            public void resetFailed(
-                    org.apache.bookkeeper.mledger.ManagedLedgerException exception,
-                    Object context) {
+            public void resetFailed(org.apache.bookkeeper.mledger.ManagedLedgerException exception, Object context) {
                 result.completeExceptionally(exception);
             }
         });

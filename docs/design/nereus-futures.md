@@ -1,7 +1,7 @@
 # Nereus Capability Tracks and Delivery Plan
 
 > 状态：Current roadmap
-> `Future 1-8` 是稳定的能力轨道编号，不是“全部尚未开始”的阶段标签。
+> `Future 1-9` 是稳定的能力轨道编号，不是“全部尚未开始”的阶段标签。
 
 ## 1. 交付原则
 
@@ -26,16 +26,17 @@ protocol/table state = projection
 
 ## 2. 当前交付状态
 
-| Track | Delivery mapping | Status | Next gate |
-| --- | --- | --- | --- |
-| F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 + F1-BK BK-M0-M6 | Implemented/final-gated；F1-BK BK-M0–M6 complete | F5/F6/F7/F8 may consume the stable lower-storage contracts；online WAL-profile migration remains separate |
-| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete） | F3/F4 consume the locked facade/storage boundary |
-| F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Implemented/final-gated | F4/F5/F8 consume stable cursor/reference semantics |
-| F4 Materialization/Compaction | Phase 4 F4-M0-M6 | Implemented/final-gated；M4 implements recovery/retirement/physical+cursor GC、activation/global domains、restart/scale/late-PUT cuts、atomic readiness rollover and retry-disabled real source deletion；M5 implements durable registration/readiness/activation、protected async Object-WAL、pre-I/O lag admission、coupled production materialization、versioned exact-evidence retention/F3 trim、durable backlog eviction and exact Pulsar policy/admin routing，then final-gates MessageIds、unload/failover/rejoin/post-trim IO and BookKeeper coexistence；M6 BD–BQ close scale/failure/compatibility and the clean 203/203-task aggregate；safe defaults keep production deletion disabled | F5/F6/F8 may consume the final-gated F4 contracts |
-| F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
-| F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
-| F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
-| F8 Advanced Pulsar | later phase | Designed | F2/F3/F4/F7 foundations |
+| Track                          | Delivery mapping                                     | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Next gate                                                                                                |
+|--------------------------------|------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| F1 Core Stream Storage         | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 + F1-BK BK-M0-M6 | Implemented/final-gated；F1-BK BK-M0–M6 complete                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | F5/F6/F7/F8 may consume the stable lower-storage contracts；online WAL-profile migration remains separate |
+| F2 ManagedLedger Facade        | Phase 2 F2-M0-M6                                     | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | F3/F4 consume the locked facade/storage boundary                                                         |
+| F3 Cursor/Subscription         | Phase 3 F3-M0-M6                                     | Implemented/final-gated                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | F4/F5/F8 consume stable cursor/reference semantics                                                       |
+| F4 Materialization/Compaction  | Phase 4 F4-M0-M6                                     | Implemented/final-gated；M4 implements recovery/retirement/physical+cursor GC、activation/global domains、restart/scale/late-PUT cuts、atomic readiness rollover and retry-disabled real source deletion；M5 implements durable registration/readiness/activation、protected async Object-WAL、pre-I/O lag admission、coupled production materialization、versioned exact-evidence retention/F3 trim、durable backlog eviction and exact Pulsar policy/admin routing，then final-gates MessageIds、unload/failover/rejoin/post-trim IO and BookKeeper coexistence；M6 BD–BQ close scale/failure/compatibility and the clean 203/203-task aggregate；safe defaults keep production deletion disabled | F5/F6/F8 may consume the final-gated F4 contracts                                                        |
+| F5 KoP/Kafka                   | later phase                                          | Designed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | F2 facade + stable offset/projection + txn boundary                                                      |
+| F6 Lakehouse                   | later phase                                          | Designed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | F4 compacted generation and GC references                                                                |
+| F7 Routing/Elasticity          | later phase                                          | Designed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | F1 session/fencing + F2/F5 lookup projections                                                            |
+| F8 Advanced Pulsar             | later phase                                          | Designed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | F2/F3/F4/F7 foundations                                                                                  |
+| F9 Native Kafka Shared Storage | Phase 9 F9-M0-M7                                     | Implemented/final-gated for the exact 2026-07-30 product/Kafka/Pulsar/AutoMQ source tuple；native coordinator/internal-topic recovery、retention/compaction、five-profile process coverage、scale/chaos/compatibility/performance and all 146 scenarios pass                                                                                                                                                                                                                                                                                                                                                                                                                              | newer product source must produce a fresh clean final receipt before inheriting current-source PASS      |
 
 Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Phase 1.5 changes the L0 abstraction/recovery/lifecycle
 foundation but intentionally keeps that executable-profile boundary。Future 2 consumes the same strict Object-WAL
@@ -43,7 +44,7 @@ profile from the completed P15-M6 surface。Future 4's explicit production compo
 `OBJECT_WAL_ASYNC_OBJECT` without changing that legacy boundary；BK-M5 now installs BK_ONLY、BK_ASYNC_OBJECT and
 BK_SYNC_OBJECT in production behind exact activation/capability admission and immutable first-create profile binding。
 The exact F1-BK target is
-`../phase-bk-bookkeeper-primary-wal/README.md`；it is not Future 5 and does not renumber F5–F8。
+`../phase-bk-bookkeeper-primary-wal/README.md`；it is not Future 5 and does not renumber F5–F9。
 
 ## 3. Dependency graph
 
@@ -66,6 +67,10 @@ flowchart LR
     F4 --> F8
     F7 --> F8
     F5 -. shared retention/txn contracts .-> F8
+    P15 --> F9["F9 Native Kafka Shared Storage"]
+    F4 --> F9
+    FBK --> F9
+    F7 -. optional placement projection .-> F9
 ```
 
 这不是所有设计工作的严格串行计划。F2-M0R2 新发现的 P15-M6 cumulative-result handoff 与 F2-M1-M6
@@ -137,7 +142,9 @@ No online profile migration exists。
 
 Detailed design: `nereus-future2-managed-ledger-facade.md`
 Code-level design: `../phase-2-managed-ledger-facade/README.md`
-Current milestone: F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete/final-gated；production facade/cursor、generation-safe write-fence handoff、shared-store peer lifecycle、real dual-broker restart/failover and scenarios 1–19 are implemented and gated
+Current milestone: F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete/final-gated；production facade/cursor、generation-safe
+write-fence handoff、shared-store peer lifecycle、real dual-broker restart/failover and scenarios 1–19 are implemented and
+gated
 
 ### Owns
 
@@ -206,7 +213,8 @@ Current milestone: F3-M0/M0R design-gated；F3-M1-M6 implemented/final-gated
 Detailed design: `nereus-future4-compaction-generation.md`
 Code-level target contract: `../phase-4-compaction-generation/README.md`
 Current milestone: F4-M0 source audit/design gate complete；F4-M1 API/metadata/object IO、F4-M2 committed
-generation publication/read/pin/fallback and F4-M3 materialization paths implemented/final-gated. M3 includes the real Parquet
+generation publication/read/pin/fallback and F4-M3 materialization paths implemented/final-gated. M3 includes the real
+Parquet
 writer/strict-reader/full verifier、NTC1 facade、core adapter and deterministic policy/planner/task/recovery/registry
 scanner landed. The exact-source claim-to-output-ready worker、task-protection crash-cut recovery、advisory checkpoint
 reconciliation、bounded service lifecycle and Pulsar Entry/NCP1 exact-byte round trip checkpoints are also implemented,
@@ -331,23 +339,70 @@ Detailed design: `nereus-future8-advanced-pulsar-semantics.md`
 - system topic bootstrap has a resumable order；
 - geo-replication stores explicit source/target offset translation。
 
-## 12. Cross-track verification waves
+## 12. F9 — Native Kafka Shared-Storage Integration
+
+Detailed design: `nereus-future9-kafka-native-storage.md`
+Code-level target contract: `../phase-9-kafka-native-storage/README.md`
+
+F9-M0 source/design review completed on 2026-07-23；the dated evidence is
+`../phase-9-kafka-native-storage/09-f9-m0-design-review-2026-07-23.md`。The clean 2026-07-30 final receipt at product
+`efd9142fc5ff991ec78dccda3b6ec7347714ef31`、Kafka fork
+`76f62f3b83e882105219b6c7687dbde594a8b8a2`、Pulsar
+`50fc70fe4620febcf0fd31d97ff7d2be447af3d4` and AutoMQ
+`1c648d84819d5c3fef2af585f02149c397584870` closes F9-M1–M7。It covers exact ranged-log IO、binding/session/checkpoint
+recovery、native coordinator/internal-topic continuation、retention/compaction、Object and BookKeeper five-profile
+takeover/recovery、controller/store-publication failure cuts、scale、chaos、client compatibility、performance observation
+and the exact 146-row final aggregate。The full gate reports 218 JUnit suites / 798 tests and 146/146 scenario PASS with
+zero skipped、failures or errors。This completion is source-qualified：later product source changes must rerun
+`./gradlew phase9FinalCheck --rerun-tasks` before a newer HEAD may claim `PASSED_CURRENT_SOURCE`.
+
+F9 is deliberately separate from F5. F5 projects the Kafka protocol through KoP on the Pulsar facade；F9 integrates
+a KRaft Kafka broker fork directly with Nereus as the partition log. The two tracks share logical storage primitives
+but do not share coordinator-state ownership or payload mapping.
+
+### Owns
+
+- cluster-wide native Kafka/Nereus activation and RF=1 controller constraints；
+- `topicId + partition` to Nereus stream binding and partition lifecycle；
+- exact Kafka `RecordBatch` bytes mapped to ranged Nereus entries；
+- native Produce/Fetch、LEO/HW/LSO、leader-epoch and recovery integration；
+- Kafka producer-state、transaction/time/virtual-segment checkpoints derived from the committed stream；
+- native Kafka retention、DeleteRecords and F4-backed log compaction；
+- broker admission、failure mapping、observability and rolling-upgrade gates。
+
+### Entry/exit gates
+
+- one Kafka `RecordBatch` is one `AppendEntry` and consumes its complete Kafka offset span；
+- public Nereus append/read contracts support expected-start and containing-entry semantics without changing the
+  default exact-start behavior consumed by Pulsar；
+- append authority can be fenced immediately by a strictly newer KRaft leader epoch；
+- Produce success is emitted only after a stable Nereus append result；unknown completion write-fences and recovers
+  the partition before any later append；
+- Kafka coordinator truth stays in native compacted internal topics；Oxia does not become a second group or
+  transaction log；
+- NCP2/NTC2 preserve ranged entries and Kafka batch semantics；NCP1/NTC1 bytes are never reinterpreted；
+- KRaft metadata is protocol truth，Nereus stream head is logical data truth，and object checkpoints are derived；
+- stock Kafka local-log cleaner and local disk are never alternate correctness owners；
+- the full code-level scenario matrix passes before the capability can be called implemented。
+
+## 13. Cross-track verification waves
 
 Verification follows architecture dependencies rather than waiting for all tracks：
 
-| Wave | Scope |
-| --- | --- |
-| V1 | F1 deterministic unit/contract/failure-injection tests |
-| V1.5 | Phase 1.5 mixed-metadata、generic target、exact recovery and lifecycle tests |
-| V2 | F2/F3 Pulsar facade and cursor compatibility suites |
-| V3 | F4 materialization lag、generation、GC and corruption tests |
-| V4 | F5/F7 protocol routing/failover compatibility |
-| V5 | F6/F8 catalog、advanced semantics、geo/txn integration |
+| Wave | Scope                                                                                             |
+|------|---------------------------------------------------------------------------------------------------|
+| V1   | F1 deterministic unit/contract/failure-injection tests                                            |
+| V1.5 | Phase 1.5 mixed-metadata、generic target、exact recovery and lifecycle tests                        |
+| V2   | F2/F3 Pulsar facade and cursor compatibility suites                                               |
+| V3   | F4 materialization lag、generation、GC and corruption tests                                         |
+| V4   | F5/F7 protocol routing/failover compatibility                                                     |
+| V5   | F6/F8 catalog、advanced semantics、geo/txn integration                                              |
+| V6   | F9 native Kafka produce/fetch、recovery、transactions、compaction、retention and multi-broker fencing |
 
 Benchmark、chaos、model checking 和 production profile claims 只能在对应 implementation gate
 之后使用；不能用 future design 文本代替证据。
 
-## 13. Document template
+## 14. Document template
 
 每个 capability document 至少包含：
 

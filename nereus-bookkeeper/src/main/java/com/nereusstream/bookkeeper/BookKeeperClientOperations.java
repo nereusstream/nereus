@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import io.netty.buffer.ByteBuf;
@@ -35,5 +36,6 @@ public interface BookKeeperClientOperations {
             ReadHandle handle, long firstEntryId, long lastEntryIdInclusive, BookKeeperOperationDeadline deadline);
 
     CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline);
+
     CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline);
 }

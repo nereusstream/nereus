@@ -44,9 +44,7 @@ final class TrimOperationDeadline {
         cancellation.complete(null);
     }
 
-    <T> CompletableFuture<T> bound(
-            Supplier<CompletableFuture<T>> operation,
-            String operationName) {
+    <T> CompletableFuture<T> bound(Supplier<CompletableFuture<T>> operation, String operationName) {
         try {
             check(operationName);
         } catch (RuntimeException e) {

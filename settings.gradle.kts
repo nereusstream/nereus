@@ -40,17 +40,17 @@ val pulsarCheckout = configuredPulsarCheckout?.let(::file)
 val pulsarSourceRequired = gradle.startParameter.taskNames.any { requested ->
     val task = requested.substringAfterLast(':')
     (!requested.contains(':') && task in setOf("assemble", "build", "check", "publish", "test"))
-        || task.startsWith("phase2")
-        || task.startsWith("phase3")
-        || task.startsWith("phase4")
-        || task.startsWith("bookKeeperPrimaryWal")
-        || requested.contains(":nereus-managed-ledger:")
-        || requested.contains(":nereus-pulsar-adapter:")
+            || task.startsWith("phase2")
+            || task.startsWith("phase3")
+            || task.startsWith("phase4")
+            || task.startsWith("bookKeeperPrimaryWal")
+            || requested.contains(":nereus-managed-ledger:")
+            || requested.contains(":nereus-pulsar-adapter:")
 }
 
 require(pulsarCheckout != null || !pulsarSourceRequired) {
     "The requested task requires the locked Pulsar source composite. Set -PpulsarCheckout=/path/to/pulsar " +
-        "or NEREUS_PULSAR_CHECKOUT; the source-build selector is not a published Maven snapshot."
+            "or NEREUS_PULSAR_CHECKOUT; the source-build selector is not a published Maven snapshot."
 }
 
 if (pulsarCheckout != null) {
@@ -72,4 +72,5 @@ include("nereus-bookkeeper")
 include("nereus-managed-ledger")
 include("nereus-pulsar-adapter")
 include("nereus-kop-adapter")
+include("nereus-kafka-adapter")
 include("nereus-admin")

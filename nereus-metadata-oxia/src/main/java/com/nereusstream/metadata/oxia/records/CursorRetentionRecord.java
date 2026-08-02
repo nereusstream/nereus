@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.metadata.oxia.CursorIds;
@@ -7,7 +8,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-/** Single-key authority for conservative per-stream cursor retention and pending barriers. */
+/**
+ * Single-key authority for conservative per-stream cursor retention and pending barriers.
+ */
 public record CursorRetentionRecord(
         long metadataVersion,
         ManagedLedgerProjectionIdentity projection,
@@ -34,8 +37,7 @@ public record CursorRetentionRecord(
         if (lastCompletedTrimOffset < 0 || protectedFloorOffset < lastCompletedTrimOffset) {
             throw new IllegalArgumentException("retention floor/trim offsets are invalid");
         }
-        pendingProtectionIntent = Objects.requireNonNull(
-                pendingProtectionIntent, "pendingProtectionIntent");
+        pendingProtectionIntent = Objects.requireNonNull(pendingProtectionIntent, "pendingProtectionIntent");
         pendingTrimAttemptId = Objects.requireNonNull(pendingTrimAttemptId, "pendingTrimAttemptId");
         pendingTrimOffset = Objects.requireNonNull(pendingTrimOffset, "pendingTrimOffset");
         pendingTrimReason = Objects.requireNonNull(pendingTrimReason, "pendingTrimReason");
@@ -43,8 +45,8 @@ public record CursorRetentionRecord(
             throw new IllegalArgumentException("retention updatedAtMillis must be non-negative");
         }
         switch (lifecycle) {
-            case ACTIVE -> requireNoPending(
-                    pendingProtectionIntent, pendingTrimAttemptId, pendingTrimOffset, pendingTrimReason);
+            case ACTIVE ->
+                requireNoPending(pendingProtectionIntent, pendingTrimAttemptId, pendingTrimOffset, pendingTrimReason);
             case PROTECTION_PENDING -> {
                 if (pendingProtectionIntent.isEmpty()
                         || pendingTrimAttemptId.isPresent()
@@ -64,8 +66,8 @@ public record CursorRetentionRecord(
                         || pendingTrimReason.isEmpty()) {
                     throw new IllegalArgumentException("TRIM_PENDING retention has invalid pending fields");
                 }
-                String attemptId = CursorIds.requireRandomId(
-                        pendingTrimAttemptId.orElseThrow(), "pendingTrimAttemptId");
+                String attemptId =
+                        CursorIds.requireRandomId(pendingTrimAttemptId.orElseThrow(), "pendingTrimAttemptId");
                 long trimOffset = pendingTrimOffset.getAsLong();
                 if (trimOffset < lastCompletedTrimOffset || trimOffset != protectedFloorOffset) {
                     throw new IllegalArgumentException("pending trim offset must freeze the protected floor");

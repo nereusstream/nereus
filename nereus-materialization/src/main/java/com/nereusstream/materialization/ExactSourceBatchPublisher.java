@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
@@ -15,12 +16,16 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Cold sequential exact-source concat publisher used by both topic-compaction passes. */
+/**
+ * Cold sequential exact-source concat publisher used by both topic-compaction passes.
+ */
 final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, AutoCloseable {
     private final List<SourceGeneration> sources;
     private final ExactSourceRangeReader reader;
     private final ReadOptions options;
     private final SerialExecutor serial;
+    private final boolean rangedEntries;
+    private final boolean verifySourceIdentity;
     private final AtomicBoolean subscribed = new AtomicBoolean();
     private final AtomicBoolean closeRequested = new AtomicBoolean();
 
@@ -35,16 +40,40 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
     private boolean terminal;
 
     ExactSourceBatchPublisher(
+            MaterializationTask task, ExactSourceRangeReader reader, ReadOptions options, Executor callbackExecutor) {
+        this(task, reader, options, callbackExecutor, false);
+    }
+
+    ExactSourceBatchPublisher(
             MaterializationTask task,
             ExactSourceRangeReader reader,
             ReadOptions options,
-            Executor callbackExecutor) {
+            Executor callbackExecutor,
+            boolean rangedEntries) {
         MaterializationTask exactTask = Objects.requireNonNull(task, "task");
         this.sources = exactTask.sources();
         this.reader = Objects.requireNonNull(reader, "reader");
         this.options = Objects.requireNonNull(options, "options");
         this.serial = new SerialExecutor(Objects.requireNonNull(callbackExecutor, "callbackExecutor"));
+        this.rangedEntries = rangedEntries;
+        this.verifySourceIdentity = false;
         this.expectedOffset = exactTask.coverage().startOffset();
+    }
+
+    ExactSourceBatchPublisher(
+            ExactSourceSet sourceSet,
+            ExactSourceRangeReader reader,
+            ReadOptions options,
+            Executor callbackExecutor,
+            boolean rangedEntries) {
+        ExactSourceSet exactSources = Objects.requireNonNull(sourceSet, "sourceSet");
+        this.sources = exactSources.sources();
+        this.reader = Objects.requireNonNull(reader, "reader");
+        this.options = Objects.requireNonNull(options, "options");
+        this.serial = new SerialExecutor(Objects.requireNonNull(callbackExecutor, "callbackExecutor"));
+        this.rangedEntries = rangedEntries;
+        this.verifySourceIdentity = true;
+        this.expectedOffset = exactSources.coverage().startOffset();
     }
 
     @Override
@@ -70,10 +99,10 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
                     @Override
                     public void cancel() {
                         closeRequested.set(true);
-                        submit(() -> fail(new NereusException(
-                                ErrorCode.CANCELLED,
-                                false,
-                                "exact source batch subscriber cancelled"), false));
+                        submit(() -> fail(
+                                new NereusException(
+                                        ErrorCode.CANCELLED, false, "exact source batch subscriber cancelled"),
+                                false));
                     }
                 });
             } catch (Throwable failure) {
@@ -85,8 +114,8 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
     @Override
     public void close() {
         closeRequested.set(true);
-        submit(() -> fail(new NereusException(
-                ErrorCode.CANCELLED, false, "exact source batch publisher closed"), false));
+        submit(() ->
+                fail(new NereusException(ErrorCode.CANCELLED, false, "exact source batch publisher closed"), false));
     }
 
     private void requestOnSerial(long count) {
@@ -103,19 +132,21 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
 
     private void advance() {
         if (closeRequested.get() && !terminal) {
-            fail(new NereusException(
-                    ErrorCode.CANCELLED, false, "exact source batch publisher closed"), false);
+            fail(new NereusException(ErrorCode.CANCELLED, false, "exact source batch publisher closed"), false);
             return;
         }
-        if (terminal || demand == 0 || opening != null) {
+        if (terminal || opening != null) {
+            return;
+        }
+        if (current == null && sourceIndex == sources.size()) {
+            complete();
+            return;
+        }
+        if (demand == 0) {
             return;
         }
         if (current == null) {
-            if (sourceIndex == sources.size()) {
-                complete();
-            } else {
-                openSource();
-            }
+            openSource();
             return;
         }
         requestUpstream();
@@ -180,15 +211,22 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
         upstreamRequested = false;
         try {
             ReadBatch exact = Objects.requireNonNull(batch, "batch");
-            if (exact.range().recordCount() != 1
+            if ((!rangedEntries && exact.range().recordCount() != 1)
                     || exact.range().startOffset() != expectedOffset
                     || !source.range().contains(expectedOffset)
+                    || exact.range().endOffset() > source.range().endOffset()
+                    || (verifySourceIdentity
+                            && (!exact.source().resolvedRange().equals(source.range())
+                                    || exact.source().generation() != source.generation()
+                                    || exact.source().commitVersion() != source.commitVersion()
+                                    || !exact.source().target().equals(source.readTarget())
+                                    || !exact.source().targetIdentity().equals(source.targetIdentitySha256())))
                     || exact.payloadFormat() != source.payloadFormat()
                     || !exact.schemaRefs().equals(source.schemaRefs())
                     || !exact.projectionRef().equals(source.projectionRef())) {
-                throw invariant("exact source batch is not one dense task record");
+                throw invariant("exact source batch is not a dense task entry");
             }
-            expectedOffset = Math.addExact(expectedOffset, 1);
+            expectedOffset = exact.range().endOffset();
             demand--;
             downstream.onNext(exact);
         } catch (Throwable failure) {
@@ -203,31 +241,33 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
             return;
         }
         ExactSourceRead completed = current;
-        completed.completion().whenComplete((summary, failure) -> submit(() -> {
-            if (terminal || current != completed) {
-                completed.close();
-                return;
-            }
-            if (failure != null) {
-                fail(unwrap(failure), true);
-                return;
-            }
-            try {
-                requireSummary(source, summary);
-                if (expectedOffset != source.range().endOffset()) {
-                    throw invariant("exact source ended before dense task coverage");
-                }
-            } catch (Throwable validationFailure) {
-                fail(validationFailure, true);
-                return;
-            }
-            completed.close();
-            current = null;
-            upstream = null;
-            upstreamRequested = false;
-            sourceIndex++;
-            advance();
-        }));
+        completed
+                .completion()
+                .whenComplete((summary, failure) -> submit(() -> {
+                    if (terminal || current != completed) {
+                        completed.close();
+                        return;
+                    }
+                    if (failure != null) {
+                        fail(unwrap(failure), true);
+                        return;
+                    }
+                    try {
+                        requireSummary(source, summary);
+                        if (expectedOffset != source.range().endOffset()) {
+                            throw invariant("exact source ended before dense task coverage");
+                        }
+                    } catch (Throwable validationFailure) {
+                        fail(validationFailure, true);
+                        return;
+                    }
+                    completed.close();
+                    current = null;
+                    upstream = null;
+                    upstreamRequested = false;
+                    sourceIndex++;
+                    advance();
+                }));
     }
 
     private void complete() {
@@ -274,11 +314,13 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
         try {
             serial.execute(action);
         } catch (RejectedExecutionException failure) {
-            fail(new NereusException(
-                    ErrorCode.STORAGE_CLOSED,
-                    false,
-                    "exact source callback executor rejected admitted work",
-                    failure), true);
+            fail(
+                    new NereusException(
+                            ErrorCode.STORAGE_CLOSED,
+                            false,
+                            "exact source callback executor rejected admitted work",
+                            failure),
+                    true);
         }
     }
 
@@ -298,8 +340,8 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
     private static void reject(Flow.Subscriber<?> subscriber) {
         try {
             subscriber.onSubscribe(NoopSubscription.INSTANCE);
-            subscriber.onError(new IllegalStateException(
-                    "exact source batch publisher permits exactly one subscriber"));
+            subscriber.onError(
+                    new IllegalStateException("exact source batch publisher permits exactly one subscriber"));
         } catch (Throwable ignored) {
         }
     }
@@ -311,8 +353,7 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = failure;
-        while ((current instanceof CompletionException
-                        || current instanceof java.util.concurrent.ExecutionException)
+        while ((current instanceof CompletionException || current instanceof java.util.concurrent.ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -323,12 +364,10 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
         INSTANCE;
 
         @Override
-        public void request(long count) {
-        }
+        public void request(long count) {}
 
         @Override
-        public void cancel() {
-        }
+        public void cancel() {}
     }
 
     private final class SourceSubscriber implements Flow.Subscriber<ReadBatch> {

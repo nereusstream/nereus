@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.recovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -61,31 +61,27 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class CheckpointAppendReplayTest {
     private static final String CLUSTER = "checkpoint-replay-cluster";
     private static final StreamId STREAM = new StreamId("checkpoint-replay-stream");
-    private static final Clock CLOCK = Clock.fixed(
-            Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
+    private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
 
     @TempDir
     Path temporaryDirectory;
 
     @Test
-    void findsExactAppendAfterLiveCommitKeyRetirementAndReleasesReadPin()
-            throws Exception {
+    void findsExactAppendAfterLiveCommitKeyRetirementAndReleasesReadPin() throws Exception {
         CommitAppendRequest request = request("writer");
         try (Fixture fixture = fixture(request, false)) {
-            AppendReplayResolution result = fixture.reader().search(
-                    request, 16, 4, TIMEOUT).join();
+            AppendReplayResolution result =
+                    fixture.reader().search(request, 16, 4, TIMEOUT).join();
 
             assertThat(result.status()).isEqualTo(AppendReplayStatus.FOUND);
-            assertThat(result.evidenceSource())
-                    .contains(AppendReplayEvidenceSource.RECOVERY_CHECKPOINT);
+            assertThat(result.evidenceSource()).contains(AppendReplayEvidenceSource.RECOVERY_CHECKPOINT);
             assertThat(result.committedAppend().orElseThrow().committedAppend().commitId())
                     .isEqualTo(request.commitId());
             assertThat(result.scannedLiveCommits()).isZero();
@@ -95,36 +91,31 @@ class CheckpointAppendReplayTest {
     }
 
     @Test
-    void restartsWhenRootChangesDuringPinAndNeverAliasesAnotherCommit()
-            throws Exception {
+    void restartsWhenRootChangesDuringPinAndNeverAliasesAnotherCommit() throws Exception {
         CommitAppendRequest committed = request("writer");
         try (Fixture fixture = fixture(committed, true)) {
-            AppendReplayResolution found = fixture.reader().search(
-                    committed, 16, 4, TIMEOUT).join();
-            AppendReplayResolution different = fixture.reader().search(
-                    request("different-writer"), 16, 4, TIMEOUT).join();
+            AppendReplayResolution found =
+                    fixture.reader().search(committed, 16, 4, TIMEOUT).join();
+            AppendReplayResolution different = fixture.reader()
+                    .search(request("different-writer"), 16, 4, TIMEOUT)
+                    .join();
 
             assertThat(found.status()).isEqualTo(AppendReplayStatus.FOUND);
-            assertThat(different.status())
-                    .isEqualTo(AppendReplayStatus.PROVEN_NOT_COMMITTED);
+            assertThat(different.status()).isEqualTo(AppendReplayStatus.PROVEN_NOT_COMMITTED);
             assertThat(fixture.rootReads()).hasValueGreaterThanOrEqualTo(7);
             assertThat(fixture.pins().released())
                     .hasValue(fixture.pins().acquired().get());
         }
     }
 
-    private Fixture fixture(
-            CommitAppendRequest request,
-            boolean changeRootDuringFirstPin) throws Exception {
-        LocalFileObjectStore objects = new LocalFileObjectStore(
-                temporaryDirectory.resolve("objects-" + request.writerId()));
-        StagingFileManager staging = staging(
-                temporaryDirectory.resolve("staging-" + request.writerId()));
-        DefaultRecoveryCheckpointCodecV1 codec = new DefaultRecoveryCheckpointCodecV1(
-                objects, staging, Runnable::run, verifier());
+    private Fixture fixture(CommitAppendRequest request, boolean changeRootDuringFirstPin) throws Exception {
+        LocalFileObjectStore objects =
+                new LocalFileObjectStore(temporaryDirectory.resolve("objects-" + request.writerId()));
+        StagingFileManager staging = staging(temporaryDirectory.resolve("staging-" + request.writerId()));
+        DefaultRecoveryCheckpointCodecV1 codec =
+                new DefaultRecoveryCheckpointCodecV1(objects, staging, Runnable::run, verifier());
         StreamCommitTargetRecord commit = commit(request);
-        byte[] canonical = MetadataRecordCodecFactory.encodeEnvelope(
-                commit, StreamCommitTargetRecord.class);
+        byte[] canonical = MetadataRecordCodecFactory.encodeEnvelope(commit, StreamCommitTargetRecord.class);
         RecoveryCheckpointWriteRequest header = new RecoveryCheckpointWriteRequest(
                 CLUSTER,
                 STREAM,
@@ -158,9 +149,7 @@ class CheckpointAppendReplayTest {
                 sha(canonical),
                 List.of(0));
         RecoveryCheckpointWriteResult written = codec.write(
-                        header,
-                        publisher(List.of(publication)),
-                        publisher(List.of(entry)))
+                        header, publisher(List.of(publication)), publisher(List.of(entry)))
                 .join();
         objects.putObject(
                         written.objectKey(),
@@ -177,19 +166,12 @@ class CheckpointAppendReplayTest {
         VersionedRecoveryCheckpointRoot first = root(reference, 10, "root-10");
         VersionedRecoveryCheckpointRoot second = root(reference, 11, "root-11");
         AtomicInteger rootReads = new AtomicInteger();
-        GenerationMetadataStore generations = generationStore(
-                first, second, rootReads, changeRootDuringFirstPin);
+        GenerationMetadataStore generations = generationStore(first, second, rootReads, changeRootDuringFirstPin);
         OxiaMetadataStore l0 = l0Store();
         TrackingPinManager pins = new TrackingPinManager();
         CheckpointAppendReplayReader reader = new CheckpointAppendReplayReader(
-                CLUSTER,
-                generations,
-                new AnchorAwareCommitWalker(CLUSTER, l0, generations),
-                codec,
-                pins,
-                CLOCK);
-        return new Fixture(
-                objects, staging, written, reader, pins, rootReads);
+                CLUSTER, generations, new AnchorAwareCommitWalker(CLUSTER, l0, generations), codec, pins, CLOCK);
+        return new Fixture(objects, staging, written, reader, pins, rootReads);
     }
 
     private static OxiaMetadataStore l0Store() {
@@ -198,8 +180,7 @@ class CheckpointAppendReplayTest {
                 new Class<?>[] {OxiaMetadataStore.class},
                 (proxy, method, arguments) -> switch (method.getName()) {
                     case "readAppendRecoveryTail" -> {
-                        AppendRecoveryAnchor anchor =
-                                (AppendRecoveryAnchor) arguments[2];
+                        AppendRecoveryAnchor anchor = (AppendRecoveryAnchor) arguments[2];
                         AppendRecoveryHead head = new AppendRecoveryHead(
                                 STREAM,
                                 anchor.lastCommitId(),
@@ -208,17 +189,11 @@ class CheckpointAppendReplayTest {
                                 anchor.commitVersion(),
                                 20);
                         yield CompletableFuture.completedFuture(
-                                new AppendRecoveryTailPage(
-                                        anchor,
-                                        head,
-                                        List.of(),
-                                        true,
-                                        Optional.empty()));
+                                new AppendRecoveryTailPage(anchor, head, List.of(), true, Optional.empty()));
                     }
                     case "close" -> null;
                     case "toString" -> "checkpoint-replay-l0";
-                    default -> throw new UnsupportedOperationException(
-                            method.getName());
+                    default -> throw new UnsupportedOperationException(method.getName());
                 });
     }
 
@@ -233,21 +208,17 @@ class CheckpointAppendReplayTest {
                 (proxy, method, arguments) -> switch (method.getName()) {
                     case "getRecoveryRoot" -> {
                         int read = reads.incrementAndGet();
-                        VersionedRecoveryCheckpointRoot value =
-                                changeRoot && read >= 3 ? second : first;
-                        yield CompletableFuture.completedFuture(
-                                Optional.of(value));
+                        VersionedRecoveryCheckpointRoot value = changeRoot && read >= 3 ? second : first;
+                        yield CompletableFuture.completedFuture(Optional.of(value));
                     }
                     case "close" -> null;
                     case "toString" -> "checkpoint-replay-generation";
-                    default -> throw new UnsupportedOperationException(
-                            method.getName());
+                    default -> throw new UnsupportedOperationException(method.getName());
                 });
     }
 
     private static RecoveryCheckpointReferenceRecord reference(
-            RecoveryCheckpointWriteRequest header,
-            RecoveryCheckpointWriteResult written) {
+            RecoveryCheckpointWriteRequest header, RecoveryCheckpointWriteResult written) {
         return new RecoveryCheckpointReferenceRecord(
                 header.checkpointSequence(),
                 header.checkpointAttemptId(),
@@ -264,8 +235,7 @@ class CheckpointAppendReplayTest {
                 header.projectionIdentitySha256().value(),
                 written.objectId().value(),
                 written.objectKey().value(),
-                RecoveryCheckpointFormatV1.objectKeyHash(
-                        written.objectKey()).value(),
+                RecoveryCheckpointFormatV1.objectKeyHash(written.objectKey()).value(),
                 written.objectLength(),
                 written.storageCrc32c().value(),
                 written.contentSha256().value(),
@@ -274,9 +244,7 @@ class CheckpointAppendReplayTest {
     }
 
     private static VersionedRecoveryCheckpointRoot root(
-            RecoveryCheckpointReferenceRecord reference,
-            long metadataVersion,
-            String digestSeed) {
+            RecoveryCheckpointReferenceRecord reference, long metadataVersion, String digestSeed) {
         RecoveryCheckpointRootRecord value = new RecoveryCheckpointRootRecord(
                 1,
                 STREAM.value(),
@@ -290,17 +258,14 @@ class CheckpointAppendReplayTest {
                 reference.firstCommitId(),
                 reference.lastCommitId(),
                 List.of(reference),
-                RecoveryCheckpointRootDigests.checkpointSetSha256(
-                        List.of(reference)).value(),
+                RecoveryCheckpointRootDigests.checkpointSetSha256(List.of(reference))
+                        .value(),
                 reference.sourceHeadCommitId(),
                 reference.sourceHeadCommitVersion(),
                 2,
                 metadataVersion);
         return new VersionedRecoveryCheckpointRoot(
-                new F4Keyspace(CLUSTER).recoveryRootKey(STREAM),
-                value,
-                metadataVersion,
-                sha(digestSeed));
+                new F4Keyspace(CLUSTER).recoveryRootKey(STREAM), value, metadataVersion, sha(digestSeed));
     }
 
     private static CommitAppendRequest request(String writer) {
@@ -344,8 +309,7 @@ class CheckpointAppendReplayTest {
                 Optional.empty());
     }
 
-    private static StreamCommitTargetRecord commit(
-            CommitAppendRequest request) {
+    private static StreamCommitTargetRecord commit(CommitAppendRequest request) {
         return new StreamCommitTargetRecord(
                 STREAM.value(),
                 request.commitId(),
@@ -376,31 +340,21 @@ class CheckpointAppendReplayTest {
         return new RecoveryCheckpointVerifier() {
             @Override
             public void verifyPublication(
-                    RecoveryCheckpointWriteRequest header,
-                    RecoveryCheckpointPublication publication) {
-            }
+                    RecoveryCheckpointWriteRequest header, RecoveryCheckpointPublication publication) {}
 
             @Override
-            public void verifyEntry(
-                    RecoveryCheckpointWriteRequest header,
-                    RecoveryCheckpointEntry entry) {
+            public void verifyEntry(RecoveryCheckpointWriteRequest header, RecoveryCheckpointEntry entry) {
                 MetadataRecordCodecFactory.decodeEnvelope(
-                        bytes(entry.canonicalCommitRecord()),
-                        StreamCommitTargetRecord.class);
+                        bytes(entry.canonicalCommitRecord()), StreamCommitTargetRecord.class);
             }
         };
     }
 
     private static StagingFileManager staging(Path directory) throws Exception {
         Files.createDirectory(directory);
-        Files.setPosixFilePermissions(
-                directory, PosixFilePermissions.fromString("rwx------"));
+        Files.setPosixFilePermissions(directory, PosixFilePermissions.fromString("rwx------"));
         return new StagingFileManager(
-                directory,
-                32L << 20,
-                StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
-                Duration.ofHours(1),
-                Runnable::run);
+                directory, 32L << 20, StagingFileManager.MIN_UPLOAD_CHUNK_BYTES, Duration.ofHours(1), Runnable::run);
     }
 
     private static <T> Flow.Publisher<T> publisher(List<T> values) {
@@ -415,8 +369,7 @@ class CheckpointAppendReplayTest {
                 }
                 if (count != 1) {
                     complete = true;
-                    subscriber.onError(new AssertionError(
-                            "checkpoint writer demand must be one"));
+                    subscriber.onError(new AssertionError("checkpoint writer demand must be one"));
                     return;
                 }
                 subscriber.onNext(values.get(index++));
@@ -452,15 +405,14 @@ class CheckpointAppendReplayTest {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(
-                            MessageDigest.getInstance("SHA-256").digest(value)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
         } catch (Exception failure) {
             throw new AssertionError(failure);
         }
     }
 
-    private static final class TrackingPinManager
-            implements ObjectReadPinManager {
+    private static final class TrackingPinManager implements ObjectReadPinManager {
         private final AtomicInteger acquired = new AtomicInteger();
         private final AtomicInteger released = new AtomicInteger();
 
@@ -506,8 +458,7 @@ class CheckpointAppendReplayTest {
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
 
         private AtomicInteger acquired() {
             return acquired;
@@ -524,7 +475,8 @@ class CheckpointAppendReplayTest {
             RecoveryCheckpointWriteResult written,
             CheckpointAppendReplayReader reader,
             TrackingPinManager pins,
-            AtomicInteger rootReads) implements AutoCloseable {
+            AtomicInteger rootReads)
+            implements AutoCloseable {
         @Override
         public void close() {
             written.close();

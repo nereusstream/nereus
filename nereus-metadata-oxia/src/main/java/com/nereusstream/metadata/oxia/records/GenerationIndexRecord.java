@@ -1,11 +1,14 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.records;
 
 import com.nereusstream.api.SchemaRef;
 import java.util.List;
 import java.util.Objects;
 
-/** Single-key publication truth for one higher-generation physical range. */
+/**
+ * Single-key publication truth for one higher-generation physical range.
+ */
 public record GenerationIndexRecord(
         int schemaVersion,
         String streamId,
@@ -52,14 +55,14 @@ public record GenerationIndexRecord(
         policySha256 = F4RecordValidation.requireSha256(policySha256, "policySha256");
         Objects.requireNonNull(readTarget, "readTarget");
         targetIdentitySha256 = F4RecordValidation.requireSha256(targetIdentitySha256, "targetIdentitySha256");
-        materializationPolicySha256 = F4RecordValidation.requireSha256(
-                materializationPolicySha256, "materializationPolicySha256");
+        materializationPolicySha256 =
+                F4RecordValidation.requireSha256(materializationPolicySha256, "materializationPolicySha256");
         if (!policySha256.equals(materializationPolicySha256)) {
             throw new IllegalArgumentException("generation policy digests must agree");
         }
         payloadFormat = F4RecordValidation.requireText(payloadFormat, "payloadFormat");
         F4RecordValidation.requireNonNegative(outputRecordCount, "outputRecordCount");
-        F4RecordValidation.requirePositive(entryCount, "entryCount");
+        F4RecordValidation.requireNonNegative(entryCount, "entryCount");
         F4RecordValidation.requireNonNegative(logicalBytes, "logicalBytes");
         F4RecordValidation.requireNonNegative(cumulativeSizeAtStart, "cumulativeSizeAtStart");
         if (cumulativeSizeAtEnd < cumulativeSizeAtStart) {
@@ -73,19 +76,22 @@ public record GenerationIndexRecord(
         projectionRef = F4RecordValidation.requireOptionalText(projectionRef, "projectionRef", 4096);
         F4RecordValidation.requireNonNegative(createdAtMillis, "createdAtMillis");
         F4RecordValidation.requireNonNegative(committedAtMillis, "committedAtMillis");
-        stateReason = F4RecordValidation.requireOptionalText(
-                stateReason, "stateReason", F4RecordValidation.MAX_REASON_BYTES);
+        stateReason =
+                F4RecordValidation.requireOptionalText(stateReason, "stateReason", F4RecordValidation.MAX_REASON_BYTES);
         if (stateChangedAtMillis < createdAtMillis) {
             throw new IllegalArgumentException("state change cannot precede record creation");
         }
         F4RecordValidation.requireMetadataVersion(metadataVersion);
         if (readViewId == 1) {
-            if (outputRecordCount != sourceRecordCount
+            if (entryCount == 0
+                    || outputRecordCount != sourceRecordCount
                     || Math.subtractExact(cumulativeSizeAtEnd, cumulativeSizeAtStart) != logicalBytes) {
                 throw new IllegalArgumentException("COMMITTED generation must be dense and byte-accounting exact");
             }
-        } else if (outputRecordCount > sourceRecordCount) {
-            throw new IllegalArgumentException("TOPIC_COMPACTED output cannot exceed source count");
+        } else if (outputRecordCount > sourceRecordCount
+                || (entryCount == 0) != (outputRecordCount == 0)
+                || (entryCount == 0 && logicalBytes != 0)) {
+            throw new IllegalArgumentException("TOPIC_COMPACTED output accounting is inconsistent");
         }
         boolean visible = lifecycle == GenerationLifecycle.COMMITTED
                 || lifecycle == GenerationLifecycle.QUARANTINED
@@ -105,11 +111,35 @@ public record GenerationIndexRecord(
 
     public GenerationIndexRecord withMetadataVersion(long version) {
         return new GenerationIndexRecord(
-                schemaVersion, streamId, readViewId, offsetStart, offsetEnd, generation, publicationId,
-                taskId, lifecycle, sourceSetSha256, policySha256, readTarget, targetIdentitySha256,
-                materializationPolicySha256, payloadFormat, sourceRecordCount, outputRecordCount,
-                entryCount, logicalBytes, cumulativeSizeAtStart, cumulativeSizeAtEnd, firstCommitVersion,
-                lastCommitVersion, schemaRefs, projectionRef, createdAtMillis, committedAtMillis,
-                stateReason, stateChangedAtMillis, version);
+                schemaVersion,
+                streamId,
+                readViewId,
+                offsetStart,
+                offsetEnd,
+                generation,
+                publicationId,
+                taskId,
+                lifecycle,
+                sourceSetSha256,
+                policySha256,
+                readTarget,
+                targetIdentitySha256,
+                materializationPolicySha256,
+                payloadFormat,
+                sourceRecordCount,
+                outputRecordCount,
+                entryCount,
+                logicalBytes,
+                cumulativeSizeAtStart,
+                cumulativeSizeAtEnd,
+                firstCommitVersion,
+                lastCommitVersion,
+                schemaRefs,
+                projectionRef,
+                createdAtMillis,
+                committedAtMillis,
+                stateReason,
+                stateChangedAtMillis,
+                version);
     }
 }

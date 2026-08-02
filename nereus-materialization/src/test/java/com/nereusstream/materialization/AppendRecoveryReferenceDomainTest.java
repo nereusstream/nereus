@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.materialization;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.PayloadFormat;
@@ -39,8 +39,8 @@ class AppendRecoveryReferenceDomainTest {
 
     @Test
     void liveTailReferenceVetoesAndExactRescanDetectsHeadOrCommitDrift() {
-        VersionedGenerationZeroIndex source = MaterializationPlannerTestSupport.zero(
-                "/index/append-domain", 0, 2, 0, 100, 2);
+        VersionedGenerationZeroIndex source =
+                MaterializationPlannerTestSupport.zero("/index/append-domain", 0, 2, 0, 100, 2);
         ObjectSliceReadTarget target = (ObjectSliceReadTarget) source.value().readTarget();
         AppendRecoveryTailPage live = page(target);
         AtomicReference<AppendRecoveryTailPage> pages = new AtomicReference<>(live);
@@ -74,11 +74,12 @@ class AppendRecoveryReferenceDomainTest {
 
     @Test
     void unrelatedLiveTailAndOwnerlessQueriesRemainConservative() {
-        VersionedGenerationZeroIndex source = MaterializationPlannerTestSupport.zero(
-                "/index/append-source", 0, 2, 0, 100, 2);
-        VersionedGenerationZeroIndex unrelated = MaterializationPlannerTestSupport.zero(
-                "/index/append-unrelated", 2, 4, 100, 100, 4);
-        ObjectSliceReadTarget sourceTarget = (ObjectSliceReadTarget) source.value().readTarget();
+        VersionedGenerationZeroIndex source =
+                MaterializationPlannerTestSupport.zero("/index/append-source", 0, 2, 0, 100, 2);
+        VersionedGenerationZeroIndex unrelated =
+                MaterializationPlannerTestSupport.zero("/index/append-unrelated", 2, 4, 100, 100, 4);
+        ObjectSliceReadTarget sourceTarget =
+                (ObjectSliceReadTarget) source.value().readTarget();
         ObjectSliceReadTarget unrelatedTarget =
                 (ObjectSliceReadTarget) unrelated.value().readTarget();
         AtomicInteger rootReads = new AtomicInteger();
@@ -95,10 +96,7 @@ class AppendRecoveryReferenceDomainTest {
         assertThat(clear.references()).isEmpty();
 
         GcReferenceQuery ownerless = GcReferenceQuery.create(
-                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
-                object(unrelatedTarget),
-                List.of(),
-                EVIDENCE);
+                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE, object(unrelatedTarget), List.of(), EVIDENCE);
         int rootsBefore = rootReads.get();
         int tailsBefore = tailReads.get();
         var blocked = domain.snapshot(ownerless).join();
@@ -110,11 +108,12 @@ class AppendRecoveryReferenceDomainTest {
 
     @Test
     void ownerlessGlobalScopeScansRecoveryRootAndLiveTailForEveryRegisteredStream() {
-        VersionedGenerationZeroIndex source = MaterializationPlannerTestSupport.zero(
-                "/index/global-append-source", 0, 2, 0, 100, 2);
-        VersionedGenerationZeroIndex unrelated = MaterializationPlannerTestSupport.zero(
-                "/index/global-append-unrelated", 2, 4, 100, 100, 4);
-        ObjectSliceReadTarget sourceTarget = (ObjectSliceReadTarget) source.value().readTarget();
+        VersionedGenerationZeroIndex source =
+                MaterializationPlannerTestSupport.zero("/index/global-append-source", 0, 2, 0, 100, 2);
+        VersionedGenerationZeroIndex unrelated =
+                MaterializationPlannerTestSupport.zero("/index/global-append-unrelated", 2, 4, 100, 100, 4);
+        ObjectSliceReadTarget sourceTarget =
+                (ObjectSliceReadTarget) source.value().readTarget();
         ObjectSliceReadTarget unrelatedTarget =
                 (ObjectSliceReadTarget) unrelated.value().readTarget();
         AtomicInteger rootReads = new AtomicInteger();
@@ -124,13 +123,9 @@ class AppendRecoveryReferenceDomainTest {
                 l0Store(new AtomicReference<>(page(sourceTarget)), tailReads),
                 generationStore(rootReads),
                 PhysicalGcConfig.defaults(),
-                GcGlobalScopeTestSupport.complete(
-                        MaterializationPlannerTestSupport.STREAM));
+                GcGlobalScopeTestSupport.complete(MaterializationPlannerTestSupport.STREAM));
         GcReferenceQuery ownerless = GcReferenceQuery.create(
-                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
-                object(unrelatedTarget),
-                List.of(),
-                EVIDENCE);
+                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE, object(unrelatedTarget), List.of(), EVIDENCE);
 
         var snapshot = domain.snapshot(ownerless).join();
 
@@ -145,15 +140,9 @@ class AppendRecoveryReferenceDomainTest {
     }
 
     private static AppendRecoveryTailPage page(ObjectSliceReadTarget target) {
-        AppendRecoveryAnchor anchor = AppendRecoveryAnchor.genesis(
-                MaterializationPlannerTestSupport.STREAM);
-        AppendRecoveryHead head = new AppendRecoveryHead(
-                MaterializationPlannerTestSupport.STREAM,
-                "commit-1",
-                2,
-                100,
-                1,
-                11);
+        AppendRecoveryAnchor anchor = AppendRecoveryAnchor.genesis(MaterializationPlannerTestSupport.STREAM);
+        AppendRecoveryHead head =
+                new AppendRecoveryHead(MaterializationPlannerTestSupport.STREAM, "commit-1", 2, 100, 1, 11);
         StreamCommitTargetRecord record = new StreamCommitTargetRecord(
                 MaterializationPlannerTestSupport.STREAM.value(),
                 "commit-1",
@@ -187,22 +176,14 @@ class AppendRecoveryReferenceDomainTest {
                 sha('a'),
                 ByteBuffer.wrap(canonical),
                 sha(canonical));
-        return new AppendRecoveryTailPage(
-                anchor, head, List.of(commit), true, Optional.empty());
+        return new AppendRecoveryTailPage(anchor, head, List.of(commit), true, Optional.empty());
     }
 
     private static AppendRecoveryTailPage genesisPage() {
-        AppendRecoveryAnchor anchor = AppendRecoveryAnchor.genesis(
-                MaterializationPlannerTestSupport.STREAM);
+        AppendRecoveryAnchor anchor = AppendRecoveryAnchor.genesis(MaterializationPlannerTestSupport.STREAM);
         return new AppendRecoveryTailPage(
                 anchor,
-                new AppendRecoveryHead(
-                        MaterializationPlannerTestSupport.STREAM,
-                        "",
-                        0,
-                        0,
-                        0,
-                        12),
+                new AppendRecoveryHead(MaterializationPlannerTestSupport.STREAM, "", 0, 0, 0, 12),
                 List.of(),
                 true,
                 Optional.empty());
@@ -244,8 +225,7 @@ class AppendRecoveryReferenceDomainTest {
                 });
     }
 
-    private static OxiaMetadataStore l0Store(
-            AtomicReference<AppendRecoveryTailPage> pages, AtomicInteger tailReads) {
+    private static OxiaMetadataStore l0Store(AtomicReference<AppendRecoveryTailPage> pages, AtomicInteger tailReads) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class},
@@ -263,15 +243,15 @@ class AppendRecoveryReferenceDomainTest {
     }
 
     private static Checksum sha(char character) {
-        return new Checksum(
-                ChecksumType.SHA256, Character.toString(character).repeat(64));
+        return new Checksum(ChecksumType.SHA256, Character.toString(character).repeat(64));
     }
 
     private static Checksum sha(byte[] value) {
         try {
             return new Checksum(
                     ChecksumType.SHA256,
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
+                    HexFormat.of()
+                            .formatHex(MessageDigest.getInstance("SHA-256").digest(value)));
         } catch (Exception failure) {
             throw new AssertionError(failure);
         }

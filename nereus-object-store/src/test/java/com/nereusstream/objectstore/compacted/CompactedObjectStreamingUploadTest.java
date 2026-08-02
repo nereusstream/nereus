@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.objectstore.staging.StagingFileManager;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -20,17 +20,13 @@ class CompactedObjectStreamingUploadTest {
 
     @Test
     void requestsOneRowAtATimeAndReturnsReplayableSealedBytes() throws Exception {
-        List<CompactedObjectRow> rows = List.of(
-                row(10, "first"),
-                row(11, "second"),
-                row(12, "third"));
+        List<CompactedObjectRow> rows = List.of(row(10, "first"), row(11, "second"), row(12, "third"));
         TrackingPublisher publisher = new TrackingPublisher(rows);
-        long logicalBytes = rows.stream().mapToLong(row -> row.exactPayload().remaining()).sum();
-        CompactedObjectWriteRequest request =
-                CompactedParquetTestSupport.committedRequest(3, logicalBytes, 2, "ZSTD");
+        long logicalBytes =
+                rows.stream().mapToLong(row -> row.exactPayload().remaining()).sum();
+        CompactedObjectWriteRequest request = CompactedParquetTestSupport.committedRequest(3, logicalBytes, 2, "ZSTD");
 
-        try (StagingFileManager staging =
-                        CompactedParquetTestSupport.staging(temporaryDirectory, 32L << 20);
+        try (StagingFileManager staging = CompactedParquetTestSupport.staging(temporaryDirectory, 32L << 20);
                 CompactedObjectWriteResult result = new ParquetCompactedObjectWriter(staging, Runnable::run)
                         .write(request, publisher)
                         .join()) {
@@ -49,10 +45,8 @@ class CompactedObjectStreamingUploadTest {
     @Test
     void cancellingAnAdmittedWriterCancelsThePublisherAndReleasesStaging() throws Exception {
         NeverPublisher publisher = new NeverPublisher();
-        CompactedObjectWriteRequest request =
-                CompactedParquetTestSupport.committedRequest(1, 1, 1, "UNCOMPRESSED");
-        try (StagingFileManager staging =
-                CompactedParquetTestSupport.staging(temporaryDirectory, 32L << 20)) {
+        CompactedObjectWriteRequest request = CompactedParquetTestSupport.committedRequest(1, 1, 1, "UNCOMPRESSED");
+        try (StagingFileManager staging = CompactedParquetTestSupport.staging(temporaryDirectory, 32L << 20)) {
             CompletableFuture<CompactedObjectWriteResult> future =
                     new ParquetCompactedObjectWriter(staging, Runnable::run).write(request, publisher);
             assertThat(publisher.subscribed()).isTrue();
@@ -63,9 +57,7 @@ class CompactedObjectStreamingUploadTest {
     }
 
     private static CompactedObjectRow row(long offset, String value) {
-        return CompactedParquetTestSupport.denseRow(
-                offset,
-                value.getBytes(StandardCharsets.UTF_8));
+        return CompactedParquetTestSupport.denseRow(offset, value.getBytes(StandardCharsets.UTF_8));
     }
 
     private static final class TrackingPublisher implements Flow.Publisher<CompactedObjectRow> {

@@ -15,7 +15,6 @@
 package com.nereusstream.core.append;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
@@ -66,8 +65,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class AsyncAppendPhysicalProtectionTest {
-    private static final Clock CLOCK = Clock.fixed(
-            Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
+    private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(10_000), ZoneOffset.UTC);
 
     @TempDir
     Path temporaryDirectory;
@@ -75,28 +73,21 @@ class AsyncAppendPhysicalProtectionTest {
     @Test
     void failedSecondaryProtectionNeverRevokesStableWalAcknowledgement() {
         var stable = AsyncObjectWalAppendCoordinatorTest.stable();
-        MaterializedGenerationZero materialized =
-                AsyncObjectWalAppendCoordinatorTest.materialized(
-                        stable.reachableAppend().committedAppend());
+        MaterializedGenerationZero materialized = AsyncObjectWalAppendCoordinatorTest.materialized(
+                stable.reachableAppend().committedAppend());
         AsyncObjectWalAppendCoordinatorTest.ControlledPublisher publisher =
                 new AsyncObjectWalAppendCoordinatorTest.ControlledPublisher();
-        AsyncObjectWalAppendCoordinator coordinator =
-                new AsyncObjectWalAppendCoordinator(
-                        append -> CompletableFuture.completedFuture(
-                                materialized),
-                        publisher,
-                        Duration.ofSeconds(5),
-                        Runnable::run);
+        AsyncObjectWalAppendCoordinator coordinator = new AsyncObjectWalAppendCoordinator(
+                append -> CompletableFuture.completedFuture(materialized),
+                publisher,
+                Duration.ofSeconds(5),
+                Runnable::run);
 
-        var acknowledged = coordinator.completeAfterStableCommit(
-                stable,
-                DurabilityLevel.WAL_DURABLE,
-                Duration.ofMillis(1));
-        publisher.visible.completeExceptionally(
-                new IllegalStateException("protection unavailable"));
+        var acknowledged =
+                coordinator.completeAfterStableCommit(stable, DurabilityLevel.WAL_DURABLE, Duration.ofMillis(1));
+        publisher.visible.completeExceptionally(new IllegalStateException("protection unavailable"));
 
-        assertThat(acknowledged).isCompletedWithValue(
-                stable.reachableAppend().committedAppend());
+        assertThat(acknowledged).isCompletedWithValue(stable.reachableAppend().committedAppend());
         assertThat(coordinator.inFlightBackgroundRepairCount()).isZero();
         assertThat(coordinator.backgroundRepairFailureCount()).isOne();
     }
@@ -104,62 +95,42 @@ class AsyncAppendPhysicalProtectionTest {
     @Test
     void strictBoundaryPropagatesTheSameProtectionFailure() {
         var stable = AsyncObjectWalAppendCoordinatorTest.stable();
-        MaterializedGenerationZero materialized =
-                AsyncObjectWalAppendCoordinatorTest.materialized(
-                        stable.reachableAppend().committedAppend());
+        MaterializedGenerationZero materialized = AsyncObjectWalAppendCoordinatorTest.materialized(
+                stable.reachableAppend().committedAppend());
         AsyncObjectWalAppendCoordinatorTest.ControlledPublisher publisher =
                 new AsyncObjectWalAppendCoordinatorTest.ControlledPublisher();
-        AsyncObjectWalAppendCoordinator coordinator =
-                new AsyncObjectWalAppendCoordinator(
-                        append -> CompletableFuture.completedFuture(
-                                materialized),
-                        publisher,
-                        Duration.ofSeconds(5),
-                        Runnable::run);
+        AsyncObjectWalAppendCoordinator coordinator = new AsyncObjectWalAppendCoordinator(
+                append -> CompletableFuture.completedFuture(materialized),
+                publisher,
+                Duration.ofSeconds(5),
+                Runnable::run);
 
         var strict = coordinator.completeAfterStableCommit(
-                stable,
-                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
-                Duration.ofSeconds(5));
-        publisher.visible.completeExceptionally(
-                new IllegalStateException("protection unavailable"));
+                stable, DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED, Duration.ofSeconds(5));
+        publisher.visible.completeExceptionally(new IllegalStateException("protection unavailable"));
 
         assertThat(strict).isCompletedExceptionally();
     }
 
     @Test
     void fullAppendReturnsAtProtectedHeadAndDetachedRepairPublishesProtection() {
-        StreamStorageConfig config =
-                StreamStorageConfig.defaults("async-cluster", "writer");
-        FakeOxiaMetadataStore metadata =
-                new FakeOxiaMetadataStore(CLOCK::millis);
-        CompletableFuture<MaterializedGenerationZero> delayedMaterialization =
-                new CompletableFuture<>();
-        AtomicReference<ReachableCommittedAppend> reachable =
-                new AtomicReference<>();
-        OxiaMetadataStore delayed = delayMaterialization(
-                metadata, delayedMaterialization, reachable);
-        LocalFileObjectStore objects =
-                new LocalFileObjectStore(temporaryDirectory.resolve("objects"));
-        DefaultObjectProtectionManager protections =
-                new DefaultObjectProtectionManager(
-                        config.cluster(),
-                        metadata,
-                        Duration.ofMinutes(10),
-                        Duration.ZERO,
-                        Duration.ofHours(24),
-                        CLOCK);
+        StreamStorageConfig config = StreamStorageConfig.defaults("async-cluster", "writer");
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
+        CompletableFuture<MaterializedGenerationZero> delayedMaterialization = new CompletableFuture<>();
+        AtomicReference<ReachableCommittedAppend> reachable = new AtomicReference<>();
+        OxiaMetadataStore delayed = delayMaterialization(metadata, delayedMaterialization, reachable);
+        LocalFileObjectStore objects = new LocalFileObjectStore(temporaryDirectory.resolve("objects"));
+        DefaultObjectProtectionManager protections = new DefaultObjectProtectionManager(
+                config.cluster(), metadata, Duration.ofMinutes(10), Duration.ZERO, Duration.ofHours(24), CLOCK);
         GenerationZeroPhysicalReferencePublisher physicalReferences =
-                new DefaultGenerationZeroPhysicalReferencePublisher(
-                        config.cluster(), delayed, metadata, protections);
+                new DefaultGenerationZeroPhysicalReferencePublisher(config.cluster(), delayed, metadata, protections);
         DefaultStreamStorage storage = new DefaultStreamStorage(
                 config,
                 delayed,
                 new DefaultWalObjectWriter(objects, "test-writer", CLOCK),
                 new DefaultWalObjectReader(objects),
                 physicalReferences,
-                new MetadataAppendRecoverySearcher(
-                        config.cluster(), delayed),
+                new MetadataAppendRecoverySearcher(config.cluster(), delayed),
                 new Phase4StorageProfileResolver(),
                 CLOCK,
                 Runnable::run,
@@ -168,10 +139,7 @@ class AsyncAppendPhysicalProtectionTest {
         try {
             var stream = storage.createOrGetStream(
                             new StreamName("async-object-wal"),
-                            new StreamCreateOptions(
-                                    StorageProfile
-                                            .OBJECT_WAL_ASYNC_OBJECT,
-                                    Map.of()))
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_ASYNC_OBJECT, Map.of()))
                     .join();
 
             var append = storage.append(
@@ -188,31 +156,23 @@ class AsyncAppendPhysicalProtectionTest {
             assertThat(append.committedEndOffset()).isOne();
             assertThat(reachable).doesNotHaveValue(null);
             assertThat(delayedMaterialization).isNotDone();
-            assertThat(metadata.getCommittedEndOffset(
-                            config.cluster(), stream.streamId())
-                    .join()
-                    .committedEndOffset())
+            assertThat(metadata.getCommittedEndOffset(config.cluster(), stream.streamId())
+                            .join()
+                            .committedEndOffset())
                     .isOne();
 
-            MaterializedGenerationZero materialized =
-                    metadata.materializeGenerationZero(
-                                    config.cluster(), reachable.get())
-                            .join();
+            MaterializedGenerationZero materialized = metadata.materializeGenerationZero(
+                            config.cluster(), reachable.get())
+                    .join();
             delayedMaterialization.complete(materialized);
 
-            ObjectKeyHash object = ObjectKeyHash.from(
-                    ((ObjectSliceReadTarget) append.readTarget())
-                            .objectKey());
-            assertThat(metadata.scanProtections(
-                                    config.cluster(),
-                                    object,
-                                    Optional.empty(),
-                                    16)
+            ObjectKeyHash object = ObjectKeyHash.from(((ObjectSliceReadTarget) append.readTarget()).objectKey());
+            assertThat(metadata.scanProtections(config.cluster(), object, Optional.empty(), 16)
                             .join()
                             .values())
-                    .anyMatch(value -> ObjectProtectionType.fromWireId(
-                                    value.value().protectionTypeId())
-                            == ObjectProtectionType.VISIBLE_GENERATION);
+                    .anyMatch(value ->
+                            ObjectProtectionType.fromWireId(value.value().protectionTypeId())
+                                    == ObjectProtectionType.VISIBLE_GENERATION);
         } finally {
             storage.close();
             metadata.close();
@@ -222,51 +182,35 @@ class AsyncAppendPhysicalProtectionTest {
 
     @Test
     void headRemainsUnchangedWhileReachableAppendProtectionIsPending() {
-        StreamStorageConfig config = StreamStorageConfig.defaults(
-                "protected-head-order-cluster", "writer");
-        FakeOxiaMetadataStore metadata =
-                new FakeOxiaMetadataStore(CLOCK::millis);
-        LocalFileObjectStore objects = new LocalFileObjectStore(
-                temporaryDirectory.resolve("protected-head-order"));
-        DefaultObjectProtectionManager protections =
-                new DefaultObjectProtectionManager(
-                        config.cluster(),
-                        metadata,
-                        Duration.ofMinutes(10),
-                        Duration.ZERO,
-                        Duration.ofHours(24),
-                        CLOCK);
+        StreamStorageConfig config = StreamStorageConfig.defaults("protected-head-order-cluster", "writer");
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
+        LocalFileObjectStore objects = new LocalFileObjectStore(temporaryDirectory.resolve("protected-head-order"));
+        DefaultObjectProtectionManager protections = new DefaultObjectProtectionManager(
+                config.cluster(), metadata, Duration.ofMinutes(10), Duration.ZERO, Duration.ofHours(24), CLOCK);
         GenerationZeroPhysicalReferencePublisher delegate =
-                new DefaultGenerationZeroPhysicalReferencePublisher(
-                        config.cluster(), metadata, metadata, protections);
+                new DefaultGenerationZeroPhysicalReferencePublisher(config.cluster(), metadata, metadata, protections);
         CompletableFuture<Void> allowProtection = new CompletableFuture<>();
         AtomicReference<PreparedStableAppend> prepared = new AtomicReference<>();
-        GenerationZeroPhysicalReferencePublisher blocked =
-                new GenerationZeroPhysicalReferencePublisher() {
-                    @Override
-                    public CompletableFuture<Void> authorizeUpload(
-                            AppendSession session,
-                            PhysicalObjectIdentity object,
-                            Duration timeout) {
-                        return delegate.authorizeUpload(session, object, timeout);
-                    }
+        GenerationZeroPhysicalReferencePublisher blocked = new GenerationZeroPhysicalReferencePublisher() {
+            @Override
+            public CompletableFuture<Void> authorizeUpload(
+                    AppendSession session, PhysicalObjectIdentity object, Duration timeout) {
+                return delegate.authorizeUpload(session, object, timeout);
+            }
 
-                    @Override
-                    public CompletableFuture<ProtectedStableAppend> protectBeforeHead(
-                            PreparedStableAppend append,
-                            Duration timeout) {
-                        prepared.set(append);
-                        return allowProtection.thenCompose(
-                                ignored -> delegate.protectBeforeHead(append, timeout));
-                    }
+            @Override
+            public CompletableFuture<ProtectedStableAppend> protectBeforeHead(
+                    PreparedStableAppend append, Duration timeout) {
+                prepared.set(append);
+                return allowProtection.thenCompose(ignored -> delegate.protectBeforeHead(append, timeout));
+            }
 
-                    @Override
-                    public CompletableFuture<ProtectedGenerationZero> protectVisibleIndex(
-                            MaterializedGenerationZero append,
-                            Duration timeout) {
-                        return delegate.protectVisibleIndex(append, timeout);
-                    }
-                };
+            @Override
+            public CompletableFuture<ProtectedGenerationZero> protectVisibleIndex(
+                    MaterializedGenerationZero append, Duration timeout) {
+                return delegate.protectVisibleIndex(append, timeout);
+            }
+        };
         DefaultStreamStorage storage = new DefaultStreamStorage(
                 config,
                 metadata,
@@ -282,25 +226,18 @@ class AsyncAppendPhysicalProtectionTest {
         try {
             var stream = storage.createOrGetStream(
                             new StreamName("protected-head-order"),
-                            new StreamCreateOptions(
-                                    StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
-                                    Map.of()))
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_ASYNC_OBJECT, Map.of()))
                     .join();
 
             CompletableFuture<?> append = storage.append(
                     stream.streamId(),
                     batch("head-must-wait"),
                     new AppendOptions(
-                            Optional.empty(),
-                            DurabilityLevel.WAL_DURABLE,
-                            Duration.ofSeconds(5),
-                            true,
-                            Map.of()));
+                            Optional.empty(), DurabilityLevel.WAL_DURABLE, Duration.ofSeconds(5), true, Map.of()));
 
             assertThat(prepared).doesNotHaveValue(null);
             assertThat(append).isNotDone();
-            assertThat(metadata.getCommittedEndOffset(
-                                    config.cluster(), stream.streamId())
+            assertThat(metadata.getCommittedEndOffset(config.cluster(), stream.streamId())
                             .join()
                             .committedEndOffset())
                     .isZero();
@@ -308,21 +245,15 @@ class AsyncAppendPhysicalProtectionTest {
             allowProtection.complete(null);
 
             assertThat(append.join()).isNotNull();
-            assertThat(metadata.getCommittedEndOffset(
-                                    config.cluster(), stream.streamId())
+            assertThat(metadata.getCommittedEndOffset(config.cluster(), stream.streamId())
                             .join()
                             .committedEndOffset())
                     .isOne();
-            assertThat(metadata.scanProtections(
-                                    config.cluster(),
-                                    prepared.get().objectKeyHash(),
-                                    Optional.empty(),
-                                    16)
+            assertThat(metadata.scanProtections(config.cluster(), prepared.get().objectKeyHash(), Optional.empty(), 16)
                             .join()
                             .values())
-                    .anySatisfy(value -> assertThat(
-                                    ObjectProtectionType.fromWireId(
-                                            value.value().protectionTypeId()))
+                    .anySatisfy(value -> assertThat(ObjectProtectionType.fromWireId(
+                                    value.value().protectionTypeId()))
                             .isEqualTo(ObjectProtectionType.REACHABLE_APPEND));
         } finally {
             storage.close();
@@ -333,59 +264,36 @@ class AsyncAppendPhysicalProtectionTest {
 
     @Test
     void serializedAdmissionCompletesBeforePrimaryWalPreparation() {
-        StreamStorageConfig config =
-                StreamStorageConfig.defaults(
-                        "async-admission-cluster", "writer");
-        FakeOxiaMetadataStore metadata =
-                new FakeOxiaMetadataStore(CLOCK::millis);
-        LocalFileObjectStore objects =
-                new LocalFileObjectStore(
-                        temporaryDirectory.resolve(
-                                "admission-objects"));
-        DefaultObjectProtectionManager protections =
-                new DefaultObjectProtectionManager(
-                        config.cluster(),
-                        metadata,
-                        Duration.ofMinutes(10),
-                        Duration.ZERO,
-                        Duration.ofHours(24),
-                        CLOCK);
+        StreamStorageConfig config = StreamStorageConfig.defaults("async-admission-cluster", "writer");
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
+        LocalFileObjectStore objects = new LocalFileObjectStore(temporaryDirectory.resolve("admission-objects"));
+        DefaultObjectProtectionManager protections = new DefaultObjectProtectionManager(
+                config.cluster(), metadata, Duration.ofMinutes(10), Duration.ZERO, Duration.ofHours(24), CLOCK);
         GenerationZeroPhysicalReferencePublisher physicalReferences =
-                new DefaultGenerationZeroPhysicalReferencePublisher(
-                        config.cluster(),
-                        metadata,
-                        metadata,
-                        protections);
-        DefaultWalObjectWriter delegate =
-                new DefaultWalObjectWriter(
-                        objects, "test-writer", CLOCK);
+                new DefaultGenerationZeroPhysicalReferencePublisher(config.cluster(), metadata, metadata, protections);
+        DefaultWalObjectWriter delegate = new DefaultWalObjectWriter(objects, "test-writer", CLOCK);
         AtomicInteger prepares = new AtomicInteger();
         WalObjectWriter writer = new WalObjectWriter() {
             @Override
-            public PreparedWalObject prepare(
-                    WalWriteRequest request) {
+            public PreparedWalObject prepare(WalWriteRequest request) {
                 prepares.incrementAndGet();
                 return delegate.prepare(request);
             }
 
             @Override
-            public CompletableFuture<WalWriteResult> upload(
-                    PreparedWalObject preparedObject) {
+            public CompletableFuture<WalWriteResult> upload(PreparedWalObject preparedObject) {
                 return delegate.upload(preparedObject);
             }
         };
-        CompletableFuture<Void> admission =
-                new CompletableFuture<>();
-        AtomicReference<AppendAdmissionRequest> admitted =
-                new AtomicReference<>();
+        CompletableFuture<Void> admission = new CompletableFuture<>();
+        AtomicReference<AppendAdmissionRequest> admitted = new AtomicReference<>();
         DefaultStreamStorage storage = new DefaultStreamStorage(
                 config,
                 metadata,
                 writer,
                 new DefaultWalObjectReader(objects),
                 physicalReferences,
-                new MetadataAppendRecoverySearcher(
-                        config.cluster(), metadata),
+                new MetadataAppendRecoverySearcher(config.cluster(), metadata),
                 new Phase4StorageProfileResolver(),
                 request -> {
                     admitted.set(request);
@@ -397,12 +305,8 @@ class AsyncAppendPhysicalProtectionTest {
                 TrimMetricsObserver.noop());
         try {
             var stream = storage.createOrGetStream(
-                            new StreamName(
-                                    "async-admission-object-wal"),
-                            new StreamCreateOptions(
-                                    StorageProfile
-                                            .OBJECT_WAL_ASYNC_OBJECT,
-                                    Map.of()))
+                            new StreamName("async-admission-object-wal"),
+                            new StreamCreateOptions(StorageProfile.OBJECT_WAL_ASYNC_OBJECT, Map.of()))
                     .join();
 
             CompletableFuture<?> append = storage.append(
@@ -410,24 +314,19 @@ class AsyncAppendPhysicalProtectionTest {
                     batch("admitted-payload"),
                     new AppendOptions(
                             Optional.empty(),
-                            DurabilityLevel
-                                    .WAL_DURABLE_AND_INDEX_COMMITTED,
+                            DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
                             Duration.ofSeconds(5),
                             true,
                             Map.of()));
 
             assertThat(admitted).doesNotHaveValue(null);
-            assertThat(admitted.get().streamId())
-                    .isEqualTo(stream.streamId());
-            assertThat(admitted.get().storageProfile())
-                    .isEqualTo(StorageProfile
-                            .OBJECT_WAL_ASYNC_OBJECT);
+            assertThat(admitted.get().streamId()).isEqualTo(stream.streamId());
+            assertThat(admitted.get().storageProfile()).isEqualTo(StorageProfile.OBJECT_WAL_ASYNC_OBJECT);
             assertThat(prepares).hasValue(0);
             assertThat(append).isNotDone();
-            assertThat(metadata.getCommittedEndOffset(
-                            config.cluster(), stream.streamId())
-                    .join()
-                    .committedEndOffset())
+            assertThat(metadata.getCommittedEndOffset(config.cluster(), stream.streamId())
+                            .join()
+                            .committedEndOffset())
                     .isZero();
 
             admission.complete(null);
@@ -449,10 +348,8 @@ class AsyncAppendPhysicalProtectionTest {
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class},
                 (proxy, method, arguments) -> {
-                    if (method.getName().equals(
-                            "materializeGenerationZero")) {
-                        reachable.set(
-                                (ReachableCommittedAppend) arguments[1]);
+                    if (method.getName().equals("materializeGenerationZero")) {
+                        reachable.set((ReachableCommittedAppend) arguments[1]);
                         return delayed;
                     }
                     try {

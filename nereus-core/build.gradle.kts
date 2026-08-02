@@ -66,3 +66,20 @@ tasks.register<Test>("bkM6GenerationScaleTest") {
         includeTestsMatching("com.nereusstream.core.read.GenerationReadResolverTest")
     }
 }
+
+tasks.register<Test>("rangedEntryTest") {
+    group = "verification"
+    description = "Run the F9-M1 ranged read, exact format dispatch, and capability admission contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.core.DefaultStreamStorageAppendTest")
+        includeTestsMatching("com.nereusstream.core.DefaultStreamStorageReadTest")
+        includeTestsMatching("com.nereusstream.core.append.AppendResultValidatorTest")
+        includeTestsMatching("com.nereusstream.core.read.ReadTargetDispatcherTest")
+        includeTestsMatching("com.nereusstream.core.read.ReadTargetReaderRegistryTest")
+        includeTestsMatching("com.nereusstream.core.read.ParquetV2CompactedTargetReaderTest")
+        includeTestsMatching("com.nereusstream.core.capability.PhysicalFormatCapabilityRegistryTest")
+    }
+}

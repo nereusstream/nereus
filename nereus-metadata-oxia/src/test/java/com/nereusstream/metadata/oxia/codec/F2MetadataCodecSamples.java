@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.api.StorageProfile;
@@ -16,8 +17,7 @@ final class F2MetadataCodecSamples {
     static final String NAME = "tenant/ns/persistent/topic";
     static final long LEDGER_ID = ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID + 7;
 
-    private F2MetadataCodecSamples() {
-    }
+    private F2MetadataCodecSamples() {}
 
     static List<Sample<?>> samples() {
         TopicProjectionRecord topic = topic(0);
@@ -25,12 +25,17 @@ final class F2MetadataCodecSamples {
         return List.of(
                 new Sample<>(new LedgerIdAllocatorRecord(LEDGER_ID + 1, 8, 0), LedgerIdAllocatorRecord.class),
                 new Sample<>(topic, TopicProjectionRecord.class),
-                new Sample<>(new VirtualLedgerProjectionRecord(
-                        NAME, topic.managedLedgerNameHash(), identity, 0, 1, 0),
+                new Sample<>(
+                        new VirtualLedgerProjectionRecord(NAME, topic.managedLedgerNameHash(), identity, 0, 1, 0),
                         VirtualLedgerProjectionRecord.class),
-                new Sample<>(new PositionIndexRecord(
-                        NAME, topic.managedLedgerNameHash(), identity, 1,
-                        ManagedLedgerProjectionNames.POSITION_FORMULA_V1, 0),
+                new Sample<>(
+                        new PositionIndexRecord(
+                                NAME,
+                                topic.managedLedgerNameHash(),
+                                identity,
+                                1,
+                                ManagedLedgerProjectionNames.POSITION_FORMULA_V1,
+                                0),
                         PositionIndexRecord.class));
     }
 
@@ -54,6 +59,5 @@ final class F2MetadataCodecSamples {
                 metadataVersion);
     }
 
-    record Sample<T>(T record, Class<T> recordClass) {
-    }
+    record Sample<T>(T record, Class<T> recordClass) {}
 }

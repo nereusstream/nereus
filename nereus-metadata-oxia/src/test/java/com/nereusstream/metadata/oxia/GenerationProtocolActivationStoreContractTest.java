@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.metadata.oxia.records.GenerationBackfillProofRecord;
@@ -23,50 +23,44 @@ class GenerationProtocolActivationStoreContractTest {
     void exactClusterAuthorityBootstrapsAndAdvancesCapabilitiesAcrossRuntimes() {
         InMemoryPartitionedOxiaBackend backend = new InMemoryPartitionedOxiaBackend();
         Clock clock = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
-        GenerationProtocolActivationStore first = store(
-                backend, clock, F4MetadataTestValues.PROCESS, F4MetadataTestValues.referenceDomains());
-        GenerationProtocolActivationStore second = store(
-                backend, clock, "e".repeat(26), F4MetadataTestValues.referenceDomains());
+        GenerationProtocolActivationStore first =
+                store(backend, clock, F4MetadataTestValues.PROCESS, F4MetadataTestValues.referenceDomains());
+        GenerationProtocolActivationStore second =
+                store(backend, clock, "e".repeat(26), F4MetadataTestValues.referenceDomains());
         try {
             assertThat(first.get(F4MetadataTestValues.CLUSTER).join()).isEmpty();
 
-            VersionedGenerationProtocolActivation prepared = first
-                    .getOrCreate(F4MetadataTestValues.CLUSTER)
-                    .join();
-            assertThat(prepared.key()).isEqualTo(new F4Keyspace(F4MetadataTestValues.CLUSTER)
-                    .generationProtocolActivationKey());
-            assertThat(prepared.value().lifecycle())
-                    .isEqualTo(GenerationProtocolActivationLifecycle.PREPARED);
+            VersionedGenerationProtocolActivation prepared =
+                    first.getOrCreate(F4MetadataTestValues.CLUSTER).join();
+            assertThat(prepared.key())
+                    .isEqualTo(new F4Keyspace(F4MetadataTestValues.CLUSTER).generationProtocolActivationKey());
+            assertThat(prepared.value().lifecycle()).isEqualTo(GenerationProtocolActivationLifecycle.PREPARED);
             assertThat(prepared.value().requiredReferenceDomains())
                     .containsExactlyElementsOf(F4MetadataTestValues.referenceDomains());
             assertThat(prepared.value().preparedAtMillis()).isEqualTo(1_000);
-            assertThat(second.getOrCreate(F4MetadataTestValues.CLUSTER).join())
-                    .isEqualTo(prepared);
+            assertThat(second.getOrCreate(F4MetadataTestValues.CLUSTER).join()).isEqualTo(prepared);
 
             VersionedGenerationProtocolActivation publication = first.compareAndSet(
-                    F4MetadataTestValues.CLUSTER,
-                    publication(prepared.value()),
-                    prepared.metadataVersion()).join();
+                            F4MetadataTestValues.CLUSTER, publication(prepared.value()), prepared.metadataVersion())
+                    .join();
             assertThat(publication.value().publicationEnabled()).isTrue();
             assertThat(publication.value().physicalDeleteEnabled()).isFalse();
 
             VersionedGenerationProtocolActivation deletion = second.compareAndSet(
-                    F4MetadataTestValues.CLUSTER,
-                    deletion(publication.value()),
-                    publication.metadataVersion()).join();
+                            F4MetadataTestValues.CLUSTER, deletion(publication.value()), publication.metadataVersion())
+                    .join();
             assertThat(deletion.value().physicalDeleteEnabled()).isTrue();
             assertThat(deletion.value().cursorSnapshotDeleteEnabled()).isTrue();
-            assertThat(first.get(F4MetadataTestValues.CLUSTER).join())
-                    .contains(deletion);
+            assertThat(first.get(F4MetadataTestValues.CLUSTER).join()).contains(deletion);
 
             assertConditionFailure(() -> first.compareAndSet(
-                    F4MetadataTestValues.CLUSTER,
-                    deletion.value().withMetadataVersion(0),
-                    publication.metadataVersion()).join());
+                            F4MetadataTestValues.CLUSTER,
+                            deletion.value().withMetadataVersion(0),
+                            publication.metadataVersion())
+                    .join());
             assertInvariant(() -> first.compareAndSet(
-                    F4MetadataTestValues.CLUSTER,
-                    publication(deletion.value()),
-                    deletion.metadataVersion()).join());
+                            F4MetadataTestValues.CLUSTER, publication(deletion.value()), deletion.metadataVersion())
+                    .join());
         } finally {
             first.close();
             second.close();
@@ -93,8 +87,7 @@ class GenerationProtocolActivationStoreContractTest {
                 active.activatedAtMillis(),
                 active.updatedAtMillis() + 1);
 
-        assertInvariant(() -> GenerationProtocolActivationTransitions.requireValidReplacement(
-                active, replacement));
+        assertInvariant(() -> GenerationProtocolActivationTransitions.requireValidReplacement(active, replacement));
     }
 
     private static GenerationProtocolActivationStore store(
@@ -106,8 +99,7 @@ class GenerationProtocolActivationStoreContractTest {
                 new PartitionedOxiaClient(backend), clock, brokerRunId, domains);
     }
 
-    private static GenerationProtocolActivationRecord publication(
-            GenerationProtocolActivationRecord current) {
+    private static GenerationProtocolActivationRecord publication(GenerationProtocolActivationRecord current) {
         return copy(
                 current,
                 GenerationProtocolActivationLifecycle.ACTIVE,
@@ -126,8 +118,7 @@ class GenerationProtocolActivationStoreContractTest {
                 Math.max(current.updatedAtMillis() + 1, 1_100));
     }
 
-    private static GenerationProtocolActivationRecord deletion(
-            GenerationProtocolActivationRecord current) {
+    private static GenerationProtocolActivationRecord deletion(GenerationProtocolActivationRecord current) {
         return copy(
                 current,
                 GenerationProtocolActivationLifecycle.ACTIVE,
@@ -144,12 +135,8 @@ class GenerationProtocolActivationStoreContractTest {
                 1_203);
     }
 
-    private static GenerationBackfillProofRecord complete(
-            String runId,
-            String coverageSha256,
-            long completedAtMillis) {
-        return new GenerationBackfillProofRecord(
-                runId, 6, coverageSha256, true, completedAtMillis);
+    private static GenerationBackfillProofRecord complete(String runId, String coverageSha256, long completedAtMillis) {
+        return new GenerationBackfillProofRecord(runId, 6, coverageSha256, true, completedAtMillis);
     }
 
     private static GenerationProtocolActivationRecord copy(
@@ -187,17 +174,15 @@ class GenerationProtocolActivationStoreContractTest {
     }
 
     private static void assertConditionFailure(Runnable operation) {
-        assertThatThrownBy(operation::run)
-                .satisfies(failure -> assertThat(unwrap(failure))
-                        .isInstanceOf(F4MetadataConditionFailedException.class));
+        assertThatThrownBy(operation::run).satisfies(failure -> assertThat(unwrap(failure))
+                .isInstanceOf(F4MetadataConditionFailedException.class));
     }
 
     private static void assertInvariant(Runnable operation) {
         assertThatThrownBy(operation::run).satisfies(failure -> {
             Throwable exact = unwrap(failure);
             assertThat(exact).isInstanceOf(NereusException.class);
-            assertThat(((NereusException) exact).code())
-                    .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION);
+            assertThat(((NereusException) exact).code()).isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION);
         });
     }
 

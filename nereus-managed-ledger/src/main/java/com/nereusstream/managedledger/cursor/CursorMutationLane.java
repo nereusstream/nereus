@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.managedledger.cursor;
 
 import java.util.ArrayDeque;
@@ -9,7 +10,9 @@ import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 
-/** Bounded FIFO lane for one local cursor handle; Oxia CAS remains the distributed lock. */
+/**
+ * Bounded FIFO lane for one local cursor handle; Oxia CAS remains the distributed lock.
+ */
 final class CursorMutationLane {
     private final int maximumPending;
     private final Executor executor;
@@ -38,8 +41,7 @@ final class CursorMutationLane {
             }
             if (pendingOperations >= maximumPending) {
                 return CompletableFuture.failedFuture(
-                        new ManagedLedgerException.TooManyRequestsException(
-                                "durable cursor mutation queue is full"));
+                        new ManagedLedgerException.TooManyRequestsException("durable cursor mutation queue is full"));
             }
             queue.addLast(pending);
             pendingOperations++;
@@ -163,8 +165,8 @@ final class CursorMutationLane {
 
         private CompletableFuture<T> start() {
             try {
-                operationResult = Objects.requireNonNull(
-                        operation.get(), "cursor mutation operation returned null future");
+                operationResult =
+                        Objects.requireNonNull(operation.get(), "cursor mutation operation returned null future");
             } catch (Throwable error) {
                 operationResult = CompletableFuture.failedFuture(error);
             }

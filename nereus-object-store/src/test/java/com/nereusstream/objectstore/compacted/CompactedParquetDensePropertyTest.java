@@ -1,8 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.objectstore.compacted;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import com.nereusstream.objectstore.staging.StagingFileManager;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import java.nio.ByteBuffer;
@@ -21,14 +21,10 @@ class CompactedParquetDensePropertyTest {
     @Test
     void randomizedDenseFilesRoundTripAcrossRowGroupsAndCodecs() throws Exception {
         Random random = new Random(0x4e435031L);
-        try (StagingFileManager staging =
-                        CompactedParquetTestSupport.staging(temporaryDirectory, 64L << 20);
-                LocalFileObjectStore store =
-                        new LocalFileObjectStore(temporaryDirectory.resolve("objects"))) {
-            ParquetCompactedObjectWriter writer =
-                    new ParquetCompactedObjectWriter(staging, Runnable::run);
-            ParquetCompactedObjectReader reader =
-                    new ParquetCompactedObjectReader(store, Runnable::run);
+        try (StagingFileManager staging = CompactedParquetTestSupport.staging(temporaryDirectory, 64L << 20);
+                LocalFileObjectStore store = new LocalFileObjectStore(temporaryDirectory.resolve("objects"))) {
+            ParquetCompactedObjectWriter writer = new ParquetCompactedObjectWriter(staging, Runnable::run);
+            ParquetCompactedObjectReader reader = new ParquetCompactedObjectReader(store, Runnable::run);
             CompactedObjectVerifier verifier = new CompactedObjectVerifier(store, reader);
 
             for (int trial = 0; trial < 24; trial++) {
@@ -46,20 +42,14 @@ class CompactedParquetDensePropertyTest {
                     logicalBytes += payload.length;
                 }
                 CompactedObjectWriteRequest request = CompactedParquetTestSupport.committedRequest(
-                        records,
-                        logicalBytes,
-                        rowGroupRecords,
-                        compression);
+                        records, logicalBytes, rowGroupRecords, compression);
 
-                try (CompactedObjectWriteResult result = writer
-                        .write(request, CompactedParquetTestSupport.publisher(rows))
+                try (CompactedObjectWriteResult result = writer.write(
+                                request, CompactedParquetTestSupport.publisher(rows))
                         .join()) {
                     CompactedParquetTestSupport.upload(store, result);
                     CompactedObjectVerificationRequest verification =
-                            CompactedObjectVerificationRequest.from(
-                                    request,
-                                    result,
-                                    Duration.ofSeconds(20));
+                            CompactedObjectVerificationRequest.from(request, result, Duration.ofSeconds(20));
                     verifier.verifyExact(verification, request).join();
 
                     CompactedObjectReadResult read = reader.read(new CompactedObjectReadRequest(
@@ -76,8 +66,7 @@ class CompactedParquetDensePropertyTest {
                     assertThat(read.rows()).hasSize(records);
                     for (int index = 0; index < records; index++) {
                         assertThat(read.rows().get(index).streamOffset()).isEqualTo(10L + index);
-                        assertThat(bytes(read.rows().get(index).exactPayload()))
-                                .containsExactly(payloads.get(index));
+                        assertThat(bytes(read.rows().get(index).exactPayload())).containsExactly(payloads.get(index));
                     }
                 }
             }

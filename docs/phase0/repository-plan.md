@@ -11,7 +11,9 @@ Phase 0 established the standalone `nereusstream/nereus` repository.
 - Use Gradle Kotlin DSL, aligned with Apache Pulsar's current build style.
 - Keep Pulsar and KoP source-tree changes in organization-owned fork repositories.
 - Keep authoritative design and code-level documents in the repository under `docs/`.
-- Build a Java 21 Gradle monorepo that can grow into the Future 1-8 plan.
+- Build a Java 21 Gradle monorepo that can grow into the original Future 1-8 plan. F9 native Kafka was appended in
+  2026 and is governed by `../phase-9-kafka-native-storage/README.md` and ADR 0005；this historical Phase 0 goal does
+  not imply that F9 is implemented.
 
 ## Non-goals
 
@@ -23,15 +25,15 @@ Phase 0 established the standalone `nereusstream/nereus` repository.
 
 ## Module Boundaries
 
-| Module | Purpose |
-| --- | --- |
-| `nereus-api` | Protocol-neutral internal API and value types |
-| `nereus-core` | L0 StreamStorage implementation |
-| `nereus-metadata-oxia` | Oxia metadata and coordination adapter |
-| `nereus-object-store` | Object WAL and object IO boundary |
-| `nereus-managed-ledger` | ManagedLedger facade implementation |
-| `nereus-pulsar-adapter` | Pulsar broker integration boundary |
-| `nereus-kop-adapter` | KoP/Kafka projection boundary |
+| Module                  | Purpose                                       |
+|-------------------------|-----------------------------------------------|
+| `nereus-api`            | Protocol-neutral internal API and value types |
+| `nereus-core`           | L0 StreamStorage implementation               |
+| `nereus-metadata-oxia`  | Oxia metadata and coordination adapter        |
+| `nereus-object-store`   | Object WAL and object IO boundary             |
+| `nereus-managed-ledger` | ManagedLedger facade implementation           |
+| `nereus-pulsar-adapter` | Pulsar broker integration boundary            |
+| `nereus-kop-adapter`    | KoP/Kafka projection boundary                 |
 
 ## Fork Workflow
 

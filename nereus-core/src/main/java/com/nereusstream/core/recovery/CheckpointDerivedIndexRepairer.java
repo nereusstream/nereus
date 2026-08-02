@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.recovery;
 
 import com.nereusstream.api.Checksum;
@@ -8,7 +9,6 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectKeyHash;
-import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StorageProfile;
@@ -36,7 +36,6 @@ import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
-import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedMaterializationStreamRegistration;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.VersionedRecoveryCheckpointRoot;
@@ -70,7 +69,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-/** Restores the highest healthy committed generation index from a root-stable NRC1 prefix. */
+/**
+ * Restores the highest healthy committed generation index from a root-stable NRC1 prefix.
+ */
 public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepairer {
     private static final int MAX_ROOT_RESTARTS = 8;
 
@@ -87,8 +88,7 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
     private final int maxLiveCommits;
     private final int livePageSize;
     private final Clock clock;
-    private final GenerationIndexRecordCodecV1 generationCodec =
-            new GenerationIndexRecordCodecV1();
+    private final GenerationIndexRecordCodecV1 generationCodec = new GenerationIndexRecordCodecV1();
 
     public CheckpointDerivedIndexRepairer(
             String cluster,
@@ -113,8 +113,7 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
                 pinManager,
                 protections,
                 activationGuard,
-                new MetadataGenerationIndexRepairer(
-                        cluster, l0Store, maxLiveCommits),
+                new MetadataGenerationIndexRepairer(cluster, l0Store, maxLiveCommits),
                 maxLiveCommits,
                 livePageSize,
                 clock);
@@ -136,27 +135,19 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
             Clock clock) {
         this.cluster = requireText(cluster, "cluster");
         this.l0Store = Objects.requireNonNull(l0Store, "l0Store");
-        this.generationStore = Objects.requireNonNull(
-                generationStore, "generationStore");
-        this.physicalStore = Objects.requireNonNull(
-                physicalStore, "physicalStore");
+        this.generationStore = Objects.requireNonNull(generationStore, "generationStore");
+        this.physicalStore = Objects.requireNonNull(physicalStore, "physicalStore");
         this.walker = Objects.requireNonNull(walker, "walker");
         this.codec = Objects.requireNonNull(codec, "codec");
         this.pinManager = Objects.requireNonNull(pinManager, "pinManager");
         this.protections = Objects.requireNonNull(protections, "protections");
-        this.activationGuard = Objects.requireNonNull(
-                activationGuard, "activationGuard");
-        if (maxLiveCommits <= 0
-                || livePageSize <= 0
-                || livePageSize > maxLiveCommits
-                || livePageSize > 1_000) {
-            throw new IllegalArgumentException(
-                    "live repair bounds are invalid");
+        this.activationGuard = Objects.requireNonNull(activationGuard, "activationGuard");
+        if (maxLiveCommits <= 0 || livePageSize <= 0 || livePageSize > maxLiveCommits || livePageSize > 1_000) {
+            throw new IllegalArgumentException("live repair bounds are invalid");
         }
         this.maxLiveCommits = maxLiveCommits;
         this.livePageSize = livePageSize;
-        this.liveRepairer = Objects.requireNonNull(
-                liveRepairer, "liveRepairer");
+        this.liveRepairer = Objects.requireNonNull(liveRepairer, "liveRepairer");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -168,114 +159,77 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
             throw new IllegalArgumentException("targetOffset must be non-negative");
         }
         RepairDeadline deadline = new RepairDeadline(timeout, clock);
-        return repairAttempt(streamId, targetOffset, deadline, 0)
-                .whenComplete((ignored, failure) -> deadline.close());
+        return repairAttempt(streamId, targetOffset, deadline, 0).whenComplete((ignored, failure) -> deadline.close());
     }
 
     private CompletableFuture<GenerationIndexRepairResult> repairAttempt(
-            StreamId streamId,
-            long targetOffset,
-            RepairDeadline deadline,
-            int rootRestarts) {
+            StreamId streamId, long targetOffset, RepairDeadline deadline, int rootRestarts) {
         CompletableFuture<GenerationIndexRepairResult> attempt = deadline.bound(
                         () -> l0Store.getStreamSnapshot(cluster, streamId),
                         "load stream snapshot for generation repair")
-                .thenCompose(snapshot -> admitTarget(
-                        streamId, targetOffset, snapshot))
+                .thenCompose(snapshot -> admitTarget(streamId, targetOffset, snapshot))
                 .thenCompose(initial -> initial.isPresent()
-                        ? CompletableFuture.completedFuture(
-                                initial.orElseThrow())
+                        ? CompletableFuture.completedFuture(initial.orElseThrow())
                         : deadline.bound(
-                                        () -> walker.walk(
-                                                streamId,
-                                                maxLiveCommits,
-                                                livePageSize),
+                                        () -> walker.walk(streamId, maxLiveCommits, livePageSize),
                                         "walk root-stable live tail for generation repair")
-                                .thenCompose(walk -> route(
-                                        streamId,
-                                        targetOffset,
-                                        walk,
-                                        deadline)));
+                                .thenCompose(walk -> route(streamId, targetOffset, walk, deadline)));
         return attempt.handle((value, failure) -> {
-            if (failure == null) {
-                return CompletableFuture.completedFuture(value);
-            }
-            Throwable exact = unwrap(failure);
-            if (exact instanceof TargetTrimmedException) {
-                return CompletableFuture.completedFuture(
-                        GenerationIndexRepairResult.trimmed(
-                                streamId, targetOffset));
-            }
-            if (exact instanceof RecoveryRootChangedException
-                    && rootRestarts + 1 < MAX_ROOT_RESTARTS) {
-                return repairAttempt(
-                        streamId,
-                        targetOffset,
-                        deadline,
-                        rootRestarts + 1);
-            }
-            if (exact instanceof RecoveryRootChangedException) {
-                return CompletableFuture.<GenerationIndexRepairResult>failedFuture(
-                        condition("recovery root changed throughout index repair"));
-            }
-            return CompletableFuture.<GenerationIndexRepairResult>failedFuture(exact);
-        }).thenCompose(Function.identity());
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(value);
+                    }
+                    Throwable exact = unwrap(failure);
+                    if (exact instanceof TargetTrimmedException) {
+                        return CompletableFuture.completedFuture(
+                                GenerationIndexRepairResult.trimmed(streamId, targetOffset));
+                    }
+                    if (exact instanceof RecoveryRootChangedException && rootRestarts + 1 < MAX_ROOT_RESTARTS) {
+                        return repairAttempt(streamId, targetOffset, deadline, rootRestarts + 1);
+                    }
+                    if (exact instanceof RecoveryRootChangedException) {
+                        return CompletableFuture.<GenerationIndexRepairResult>failedFuture(
+                                condition("recovery root changed throughout index repair"));
+                    }
+                    return CompletableFuture.<GenerationIndexRepairResult>failedFuture(exact);
+                })
+                .thenCompose(Function.identity());
     }
 
     private CompletableFuture<Optional<GenerationIndexRepairResult>> admitTarget(
-            StreamId streamId,
-            long targetOffset,
-            StreamMetadataSnapshot snapshot) {
+            StreamId streamId, long targetOffset, StreamMetadataSnapshot snapshot) {
         requireSnapshotStream(streamId, snapshot);
         if (targetOffset < snapshot.trim().trimOffset()) {
-            return CompletableFuture.completedFuture(Optional.of(
-                    GenerationIndexRepairResult.trimmed(
-                            streamId, targetOffset)));
+            return CompletableFuture.completedFuture(
+                    Optional.of(GenerationIndexRepairResult.trimmed(streamId, targetOffset)));
         }
         if (targetOffset >= snapshot.committedEnd().committedEndOffset()) {
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.READ_RESOLUTION_FAILED,
-                    true,
-                    "generation repair target is not a committed offset"));
+                    ErrorCode.READ_RESOLUTION_FAILED, true, "generation repair target is not a committed offset"));
         }
         return CompletableFuture.completedFuture(Optional.empty());
     }
 
     private CompletableFuture<GenerationIndexRepairResult> route(
-            StreamId streamId,
-            long targetOffset,
-            AnchorAwareCommitWalk walk,
-            RepairDeadline deadline) {
+            StreamId streamId, long targetOffset, AnchorAwareCommitWalk walk, RepairDeadline deadline) {
         if (!walk.anchorReached()) {
             return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.READ_RESOLUTION_FAILED,
-                    true,
-                    "generation repair live tail exceeds its bounded scan"));
+                    ErrorCode.READ_RESOLUTION_FAILED, true, "generation repair live tail exceeds its bounded scan"));
         }
         if (!walk.observedHead().streamId().equals(streamId)
                 || targetOffset >= walk.observedHead().offsetEnd()) {
-            return CompletableFuture.failedFuture(invariant(
-                    "generation repair walk does not contain the committed target", null));
+            return CompletableFuture.failedFuture(
+                    invariant("generation repair walk does not contain the committed target", null));
         }
-        Optional<VersionedRecoveryCheckpointRoot> optionalRoot =
-                walk.recoveryRoot();
+        Optional<VersionedRecoveryCheckpointRoot> optionalRoot = walk.recoveryRoot();
         if (optionalRoot.isEmpty()
                 || optionalRoot.orElseThrow().value().checkpoints().isEmpty()) {
             requireLiveCoverage(targetOffset, walk);
-            return repairLive(
-                    streamId,
-                    targetOffset,
-                    optionalRoot,
-                    deadline);
+            return repairLive(streamId, targetOffset, optionalRoot, deadline);
         }
         VersionedRecoveryCheckpointRoot root = optionalRoot.orElseThrow();
         if (targetOffset >= root.value().coveredEndOffset()) {
             requireLiveCoverage(targetOffset, walk);
-            return repairLive(
-                    streamId,
-                    targetOffset,
-                    optionalRoot,
-                    deadline);
+            return repairLive(streamId, targetOffset, optionalRoot, deadline);
         }
         if (targetOffset < root.value().coveredStartOffset()) {
             return deadline.bound(
@@ -285,8 +239,7 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
                         requireSnapshotStream(streamId, snapshot);
                         if (targetOffset < snapshot.trim().trimOffset()) {
                             return CompletableFuture.completedFuture(
-                                    GenerationIndexRepairResult.trimmed(
-                                            streamId, targetOffset));
+                                    GenerationIndexRepairResult.trimmed(streamId, targetOffset));
                         }
                         return CompletableFuture.failedFuture(new NereusException(
                                 ErrorCode.METADATA_UNAVAILABLE,
@@ -294,15 +247,9 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
                                 "untrimmed offset precedes retained recovery evidence"));
                     });
         }
-        RecoveryCheckpointReferenceRecord reference =
-                referenceCovering(root, targetOffset);
+        RecoveryCheckpointReferenceRecord reference = referenceCovering(root, targetOffset);
         return repairCheckpoint(
-                streamId,
-                targetOffset,
-                walk.commitsNewestFirst().size(),
-                root,
-                reference,
-                deadline);
+                streamId, targetOffset, walk.commitsNewestFirst().size(), root, reference, deadline);
     }
 
     private CompletableFuture<GenerationIndexRepairResult> repairLive(
@@ -312,14 +259,10 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
             RepairDeadline deadline) {
         return deadline.bound(
                         () -> liveRepairer.repair(
-                                streamId,
-                                targetOffset,
-                                deadline.remaining(
-                                        "repair index from live commit evidence")),
+                                streamId, targetOffset, deadline.remaining("repair index from live commit evidence")),
                         "repair index from live commit evidence")
                 .thenCompose(result -> requireExactRoot(streamId, expectedRoot)
-                        .thenCompose(ignored -> requireUntrimmed(
-                                        streamId, targetOffset, deadline)
+                        .thenCompose(ignored -> requireUntrimmed(streamId, targetOffset, deadline)
                                 .thenApply(unused -> result)));
     }
 
@@ -333,19 +276,12 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
         PhysicalObjectIdentity checkpointObject = checkpointIdentity(reference);
         CompletableFuture<ObjectReadLease> acquired = deadline.bound(
                 () -> pinManager.acquire(
-                        checkpointObject,
-                        deadline.maximumReadDeadlineMillis(),
-                        () -> requireExactRoot(root)),
+                        checkpointObject, deadline.maximumReadDeadlineMillis(), () -> requireExactRoot(root)),
                 "acquire recovery checkpoint read pin for index repair");
-        return withLease(acquired, ignored -> openAndRepair(
-                        streamId,
-                        targetOffset,
-                        scannedLiveRecords,
-                        root,
-                        reference,
-                        deadline))
-                .thenCompose(result -> requireExactRoot(root)
-                        .thenApply(unused -> result));
+        return withLease(
+                        acquired,
+                        ignored -> openAndRepair(streamId, targetOffset, scannedLiveRecords, root, reference, deadline))
+                .thenCompose(result -> requireExactRoot(root).thenApply(unused -> result));
     }
 
     private CompletableFuture<GenerationIndexRepairResult> openAndRepair(
@@ -359,11 +295,8 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
                         () -> codec.openAndVerify(
                                 new ObjectKey(reference.objectKey()),
                                 reference.objectLength(),
-                                new Checksum(
-                                        ChecksumType.SHA256,
-                                        reference.contentSha256()),
-                                deadline.remaining(
-                                        "open NRC1 for index repair")),
+                                new Checksum(ChecksumType.SHA256, reference.contentSha256()),
+                                deadline.remaining("open NRC1 for index repair")),
                         "open NRC1 for index repair")
                 .thenCompose(checkpoint -> {
                     requireExactReference(root, reference, checkpoint);
@@ -371,27 +304,18 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
                                     () -> codec.findCommitCoveringOffset(
                                             checkpoint,
                                             targetOffset,
-                                            deadline.remaining(
-                                                    "find NRC1 commit for index repair")),
+                                            deadline.remaining("find NRC1 commit for index repair")),
                                     "find NRC1 commit for index repair")
                             .thenCompose(optional -> loadReferencedPublications(
                                     checkpoint,
-                                    optional.orElseThrow(() -> invariant(
-                                            "NRC1 has no commit for a covered repair offset",
-                                            null)),
+                                    optional.orElseThrow(
+                                            () -> invariant("NRC1 has no commit for a covered repair offset", null)),
                                     deadline));
                 })
-                .thenCompose(publications -> prepareCandidates(
-                        streamId, targetOffset, publications))
-                .thenCompose(candidates -> loadActivation(
-                                streamId, reference, deadline)
+                .thenCompose(publications -> prepareCandidates(streamId, targetOffset, publications))
+                .thenCompose(candidates -> loadActivation(streamId, reference, deadline)
                         .thenCompose(activation -> selectHealthyCandidate(
-                                streamId,
-                                targetOffset,
-                                root,
-                                candidates,
-                                0,
-                                deadline)
+                                        streamId, targetOffset, root, candidates, 0, deadline)
                                 .thenCompose(selected -> restoreSelected(
                                         streamId,
                                         targetOffset,
@@ -402,26 +326,18 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
                                         deadline))));
     }
 
-    private CompletableFuture<List<RecoveryCheckpointPublication>>
-            loadReferencedPublications(
-                    RecoveryCheckpointObject checkpoint,
-                    RecoveryCheckpointEntry entry,
-                    RepairDeadline deadline) {
+    private CompletableFuture<List<RecoveryCheckpointPublication>> loadReferencedPublications(
+            RecoveryCheckpointObject checkpoint, RecoveryCheckpointEntry entry, RepairDeadline deadline) {
         return loadReferencedPublication(
-                checkpoint,
-                entry.coveringPublicationIndexes(),
-                0,
-                new ArrayList<>(),
-                deadline);
+                checkpoint, entry.coveringPublicationIndexes(), 0, new ArrayList<>(), deadline);
     }
 
-    private CompletableFuture<List<RecoveryCheckpointPublication>>
-            loadReferencedPublication(
-                    RecoveryCheckpointObject checkpoint,
-                    List<Integer> indexes,
-                    int cursor,
-                    List<RecoveryCheckpointPublication> accumulated,
-                    RepairDeadline deadline) {
+    private CompletableFuture<List<RecoveryCheckpointPublication>> loadReferencedPublication(
+            RecoveryCheckpointObject checkpoint,
+            List<Integer> indexes,
+            int cursor,
+            List<RecoveryCheckpointPublication> accumulated,
+            RepairDeadline deadline) {
         if (cursor == indexes.size()) {
             return CompletableFuture.completedFuture(List.copyOf(accumulated));
         }
@@ -431,62 +347,45 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
                                 checkpoint,
                                 OptionalInt.of(publicationIndex),
                                 1,
-                                deadline.remaining(
-                                        "load NRC1 publication for index repair")),
+                                deadline.remaining("load NRC1 publication for index repair")),
                         "load NRC1 publication for index repair")
                 .thenCompose(page -> {
                     if (page.values().size() != 1) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "NRC1 publication index did not resolve exactly one row",
-                                null));
+                        return CompletableFuture.failedFuture(
+                                invariant("NRC1 publication index did not resolve exactly one row", null));
                     }
                     accumulated.add(page.values().get(0));
-                    return loadReferencedPublication(
-                            checkpoint,
-                            indexes,
-                            cursor + 1,
-                            accumulated,
-                            deadline);
+                    return loadReferencedPublication(checkpoint, indexes, cursor + 1, accumulated, deadline);
                 });
     }
 
     private CompletableFuture<List<IndexCandidate>> prepareCandidates(
-            StreamId streamId,
-            long targetOffset,
-            List<RecoveryCheckpointPublication> publications) {
+            StreamId streamId, long targetOffset, List<RecoveryCheckpointPublication> publications) {
         List<IndexCandidate> result = publications.stream()
-                .map(publication -> decodeCandidate(
-                        streamId, targetOffset, publication))
+                .map(publication -> decodeCandidate(streamId, targetOffset, publication))
                 .sorted(Comparator.comparingLong(
-                                (IndexCandidate value) ->
-                                        value.record().generation())
+                                (IndexCandidate value) -> value.record().generation())
                         .reversed()
-                        .thenComparing(value ->
-                                value.record().publicationId()))
+                        .thenComparing(value -> value.record().publicationId()))
                 .toList();
         for (int index = 1; index < result.size(); index++) {
             if (result.get(index - 1).record().generation()
                     == result.get(index).record().generation()) {
-                return CompletableFuture.failedFuture(invariant(
-                        "NRC1 repair candidates reuse one generation number",
-                        null));
+                return CompletableFuture.failedFuture(
+                        invariant("NRC1 repair candidates reuse one generation number", null));
             }
         }
         return CompletableFuture.completedFuture(result);
     }
 
     private IndexCandidate decodeCandidate(
-            StreamId streamId,
-            long targetOffset,
-            RecoveryCheckpointPublication publication) {
-        byte[] canonical = bytes(
-                publication.canonicalGenerationIndexRecord());
+            StreamId streamId, long targetOffset, RecoveryCheckpointPublication publication) {
+        byte[] canonical = bytes(publication.canonicalGenerationIndexRecord());
         GenerationIndexRecord record;
         try {
             record = generationCodec.decode(canonical);
         } catch (RuntimeException failure) {
-            throw invariant(
-                    "cannot decode NRC1 generation index during repair", failure);
+            throw invariant("cannot decode NRC1 generation index during repair", failure);
         }
         if (!Arrays.equals(canonical, generationCodec.encode(record))
                 || !GenerationIndexDigests.canonicalRecordSha256(record)
@@ -496,52 +395,33 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
                 || record.readViewId() != ReadView.COMMITTED.wireId()
                 || !record.streamId().equals(streamId.value())
                 || record.generation() != publication.generation()
-                || !record.publicationId().equals(
-                        publication.publicationId().value())
-                || record.offsetStart()
-                        != publication.coverage().startOffset()
+                || !record.publicationId().equals(publication.publicationId().value())
+                || record.offsetStart() != publication.coverage().startOffset()
                 || record.offsetEnd() != publication.coverage().endOffset()
                 || record.offsetStart() > targetOffset
                 || targetOffset >= record.offsetEnd()
-                || !record.targetIdentitySha256().equals(
-                        record.readTarget().identityChecksumValue())) {
-            throw invariant(
-                    "NRC1 generation index is non-canonical or does not cover the repair target",
-                    null);
+                || !record.targetIdentitySha256().equals(record.readTarget().identityChecksumValue())) {
+            throw invariant("NRC1 generation index is non-canonical or does not cover the repair target", null);
         }
         Checksum durableDigest = GenerationIndexDigests.durableValueSha256(record);
-        String indexKey = new F4Keyspace(cluster).generationIndexKey(
-                streamId,
-                ReadView.COMMITTED,
-                record.offsetEnd(),
-                record.generation());
+        String indexKey = new F4Keyspace(cluster)
+                .generationIndexKey(streamId, ReadView.COMMITTED, record.offsetEnd(), record.generation());
         return new IndexCandidate(
-                publication,
-                record,
-                publication.generationIndexRecordSha256(),
-                durableDigest,
-                indexKey);
+                publication, record, publication.generationIndexRecordSha256(), durableDigest, indexKey);
     }
 
     private CompletableFuture<Activation> loadActivation(
-            StreamId streamId,
-            RecoveryCheckpointReferenceRecord reference,
-            RepairDeadline deadline) {
+            StreamId streamId, RecoveryCheckpointReferenceRecord reference, RepairDeadline deadline) {
         return deadline.bound(
-                        () -> generationStore.getStreamRegistration(
-                                cluster, streamId),
+                        () -> generationStore.getStreamRegistration(cluster, streamId),
                         "load stream registration for checkpoint index repair")
                 .thenCompose(optional -> {
                     VersionedMaterializationStreamRegistration registration =
-                            optional.orElseThrow(() -> condition(
-                                    "materialization stream registration is absent"));
-                    LiveProjectionSubject subject = subject(
-                            streamId, reference, registration);
+                            optional.orElseThrow(() -> condition("materialization stream registration is absent"));
+                    LiveProjectionSubject subject = subject(streamId, reference, registration);
                     return deadline.bound(
                                     () -> activationGuard.requireReady(
-                                            GenerationOperation.GENERATION_PUBLISH,
-                                            subject,
-                                            false),
+                                            GenerationOperation.GENERATION_PUBLISH, subject, false),
                                     "admit checkpoint-derived index repair")
                             .thenApply(proof -> new Activation(subject, proof));
                 });
@@ -552,37 +432,26 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
             RecoveryCheckpointReferenceRecord reference,
             VersionedMaterializationStreamRegistration registration) {
         MaterializationStreamRegistrationRecord value = registration.value();
-        String expectedKey = new F4Keyspace(cluster)
-                .materializationRegistryKey(streamId);
+        String expectedKey = new F4Keyspace(cluster).materializationRegistryKey(streamId);
         ProjectionRef projection;
         StorageProfile profile;
         try {
             projection = ProjectionIdentity.decode(value.projectionRef())
-                    .orElseThrow(() -> invariant(
-                            "checkpoint repair registration has no projection identity",
-                            null));
+                    .orElseThrow(() -> invariant("checkpoint repair registration has no projection identity", null));
             profile = StorageProfile.valueOf(value.storageProfile()).canonical();
         } catch (NereusException failure) {
             throw failure;
         } catch (RuntimeException failure) {
-            throw invariant(
-                    "checkpoint repair registration is malformed", failure);
+            throw invariant("checkpoint repair registration is malformed", failure);
         }
         if (!registration.key().equals(expectedKey)
                 || !value.streamId().equals(streamId.value())
-                || !value.projectionIdentitySha256().equals(
-                        reference.projectionIdentitySha256())
+                || !value.projectionIdentitySha256().equals(reference.projectionIdentitySha256())
                 || !profile.objectMaterializationEnabled()) {
-            throw invariant(
-                    "checkpoint repair registration differs from NRC1 projection identity",
-                    null);
+            throw invariant("checkpoint repair registration differs from NRC1 projection identity", null);
         }
         return new LiveProjectionSubject(
-                streamId,
-                projection,
-                new Checksum(
-                        ChecksumType.SHA256,
-                        value.projectionIdentitySha256()));
+                streamId, projection, new Checksum(ChecksumType.SHA256, value.projectionIdentitySha256()));
     }
 
     private CompletableFuture<SelectedCandidate> selectHealthyCandidate(
@@ -602,72 +471,49 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
         return loadTargetIdentity(candidate.record(), deadline)
                 .handle((identity, failure) -> {
                     if (failure == null) {
-                        return CompletableFuture.completedFuture(
-                                new SelectedCandidate(candidate, identity));
+                        return CompletableFuture.completedFuture(new SelectedCandidate(candidate, identity));
                     }
                     Throwable exact = unwrap(failure);
                     if (exact instanceof CandidateUnavailableException) {
-                        return selectHealthyCandidate(
-                                streamId,
-                                targetOffset,
-                                root,
-                                candidates,
-                                index + 1,
-                                deadline);
+                        return selectHealthyCandidate(streamId, targetOffset, root, candidates, index + 1, deadline);
                     }
-                    return CompletableFuture.<SelectedCandidate>failedFuture(
-                            exact);
+                    return CompletableFuture.<SelectedCandidate>failedFuture(exact);
                 })
                 .thenCompose(Function.identity());
     }
 
     private CompletableFuture<PhysicalObjectIdentity> loadTargetIdentity(
-            GenerationIndexRecord record,
-            RepairDeadline deadline) {
+            GenerationIndexRecord record, RepairDeadline deadline) {
         Object decoded;
         try {
-            decoded = ReadTargetCodecRegistry.phase15().decode(
-                    record.readTarget());
+            decoded = ReadTargetCodecRegistry.phase15().decode(record.readTarget());
         } catch (RuntimeException failure) {
-            return CompletableFuture.failedFuture(invariant(
-                    "NRC1 repair target cannot be decoded", failure));
+            return CompletableFuture.failedFuture(invariant("NRC1 repair target cannot be decoded", failure));
         }
         if (!(decoded instanceof ObjectSliceReadTarget target)) {
-            return CompletableFuture.failedFuture(invariant(
-                    "NRC1 repair target is not an object slice", null));
+            return CompletableFuture.failedFuture(invariant("NRC1 repair target is not an object slice", null));
         }
         ObjectKeyHash hash = ObjectKeyHash.from(target.objectKey());
-        return deadline.bound(
-                        () -> physicalStore.getRoot(cluster, hash),
-                        "load checkpoint target physical root")
+        return deadline.bound(() -> physicalStore.getRoot(cluster, hash), "load checkpoint target physical root")
                 .thenApply(optional -> {
-                    VersionedPhysicalObjectRoot root = optional.orElseThrow(
-                            CandidateUnavailableException::new);
-                    PhysicalObjectIdentity identity = PhysicalObjectIdentity.from(
-                            root.value());
-                    PhysicalObjectKind expectedKind = switch (target.objectType()) {
-                        case MULTI_STREAM_WAL_OBJECT ->
-                                PhysicalObjectKind.OBJECT_WAL;
-                        case STREAM_COMPACTED_OBJECT ->
-                                PhysicalObjectKind.COMMITTED_COMPACTED;
-                        default -> throw invariant(
-                                "NRC1 repair target object type is unsupported",
-                                null);
-                    };
+                    VersionedPhysicalObjectRoot root = optional.orElseThrow(CandidateUnavailableException::new);
+                    PhysicalObjectIdentity identity = PhysicalObjectIdentity.from(root.value());
+                    PhysicalObjectKind expectedKind =
+                            switch (target.objectType()) {
+                                case MULTI_STREAM_WAL_OBJECT -> PhysicalObjectKind.OBJECT_WAL;
+                                case STREAM_COMPACTED_OBJECT -> PhysicalObjectKind.COMMITTED_COMPACTED;
+                                default -> throw invariant("NRC1 repair target object type is unsupported", null);
+                            };
                     long requiredEnd;
                     try {
-                        requiredEnd = Math.addExact(
-                                target.objectOffset(), target.objectLength());
+                        requiredEnd = Math.addExact(target.objectOffset(), target.objectLength());
                     } catch (ArithmeticException overflow) {
-                        throw invariant(
-                                "NRC1 repair target range overflows", overflow);
+                        throw invariant("NRC1 repair target range overflows", overflow);
                     }
-                    if (root.value().lifecycle()
-                                    != PhysicalObjectLifecycle.ACTIVE
+                    if (root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
                             || !identity.objectKey().equals(target.objectKey())
                             || identity.objectId().isEmpty()
-                            || !identity.objectId().orElseThrow()
-                                    .equals(target.objectId())
+                            || !identity.objectId().orElseThrow().equals(target.objectId())
                             || identity.kind() != expectedKind
                             || requiredEnd > identity.objectLength()) {
                         throw new CandidateUnavailableException();
@@ -686,57 +532,37 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
             RepairDeadline deadline) {
         IndexCandidate candidate = selected.candidate();
         PhysicalObjectIdentity object = selected.object();
-        ObjectProtectionOwner owner =
-                RecoveryCheckpointProtectionIdentities.rootOwner(root);
+        ObjectProtectionOwner owner = RecoveryCheckpointProtectionIdentities.rootOwner(root);
         ObjectProtectionRequest request = new ObjectProtectionRequest(
                 object,
                 ObjectProtectionType.RECOVERY_CHECKPOINT_TARGET,
-                RecoveryCheckpointProtectionIdentities
-                        .checkpointTargetReferenceId(
-                                root,
-                                candidate.indexKey(),
-                                candidate.durableDigest(),
-                                object),
+                RecoveryCheckpointProtectionIdentities.checkpointTargetReferenceId(
+                        root, candidate.indexKey(), candidate.durableDigest(), object),
                 owner,
                 0);
         ObjectProtectionManager.OwnerRevalidator revalidator = actualOwner -> {
             if (!actualOwner.equals(owner)) {
-                return CompletableFuture.failedFuture(invariant(
-                        "checkpoint target protection owner changed", null));
+                return CompletableFuture.failedFuture(invariant("checkpoint target protection owner changed", null));
             }
             return requireExactRoot(root)
                     .thenCompose(ignored -> deadline.bound(
-                            () -> activationGuard.revalidate(
-                                    activation.proof()),
+                            () -> activationGuard.revalidate(activation.proof()),
                             "revalidate activation during checkpoint index repair"))
-                    .thenCompose(ignored -> requireUntrimmed(
-                            streamId, targetOffset, deadline));
+                    .thenCompose(ignored -> requireUntrimmed(streamId, targetOffset, deadline));
         };
         return deadline.bound(
                         () -> activationGuard.revalidate(activation.proof()),
                         "revalidate activation before checkpoint target protection")
                 .thenCompose(ignored -> requireExactRoot(root))
-                .thenCompose(ignored -> requireUntrimmed(
-                        streamId, targetOffset, deadline))
+                .thenCompose(ignored -> requireUntrimmed(streamId, targetOffset, deadline))
                 .thenCompose(ignored -> deadline.bound(
-                        () -> protections.acquireOrTransfer(
-                                request, revalidator),
+                        () -> protections.acquireOrTransfer(request, revalidator),
                         "acquire checkpoint target protection before index restore"))
                 .thenCompose(protection -> revalidateSelected(
-                                streamId,
-                                targetOffset,
-                                root,
-                                activation,
-                                selected,
-                                protection,
-                                revalidator,
-                                deadline)
+                                streamId, targetOffset, root, activation, selected, protection, revalidator, deadline)
                         .thenCompose(unused -> deadline.bound(
-                                () -> generationStore
-                                        .restoreCommittedFromCheckpoint(
-                                                cluster,
-                                                candidate.record(),
-                                                candidate.rawDigest()),
+                                () -> generationStore.restoreCommittedFromCheckpoint(
+                                        cluster, candidate.record(), candidate.rawDigest()),
                                 "restore committed generation index from NRC1"))
                         .thenCompose(restored -> revalidateSelected(
                                         streamId,
@@ -747,12 +573,8 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
                                         protection,
                                         revalidator,
                                         deadline)
-                                .thenApply(unused ->
-                                        GenerationIndexRepairResult.checkpoint(
-                                                streamId,
-                                                targetOffset,
-                                                scannedLiveRecords,
-                                                restored))));
+                                .thenApply(unused -> GenerationIndexRepairResult.checkpoint(
+                                        streamId, targetOffset, scannedLiveRecords, restored))));
     }
 
     private CompletableFuture<Void> revalidateSelected(
@@ -766,31 +588,22 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
             RepairDeadline deadline) {
         return requireExactRoot(root)
                 .thenCompose(ignored -> deadline.bound(
-                        () -> activationGuard.revalidate(
-                                activation.proof()),
+                        () -> activationGuard.revalidate(activation.proof()),
                         "revalidate activation around checkpoint index restore"))
-                .thenCompose(ignored -> requireUntrimmed(
-                        streamId, targetOffset, deadline))
-                .thenCompose(ignored -> loadTargetIdentity(
-                        selected.candidate().record(), deadline))
+                .thenCompose(ignored -> requireUntrimmed(streamId, targetOffset, deadline))
+                .thenCompose(ignored -> loadTargetIdentity(selected.candidate().record(), deadline))
                 .thenCompose(identity -> {
                     if (!identity.equals(selected.object())) {
-                        return CompletableFuture.failedFuture(condition(
-                                "checkpoint target physical root changed"));
+                        return CompletableFuture.failedFuture(condition("checkpoint target physical root changed"));
                     }
                     return deadline.bound(
-                                    () -> protections.revalidate(
-                                            protection,
-                                            ownerRevalidator),
+                                    () -> protections.revalidate(protection, ownerRevalidator),
                                     "revalidate checkpoint target protection")
                             .thenApply(unused -> null);
                 });
     }
 
-    private CompletableFuture<Void> requireUntrimmed(
-            StreamId streamId,
-            long targetOffset,
-            RepairDeadline deadline) {
+    private CompletableFuture<Void> requireUntrimmed(StreamId streamId, long targetOffset, RepairDeadline deadline) {
         return deadline.bound(
                         () -> l0Store.getStreamSnapshot(cluster, streamId),
                         "revalidate trim during checkpoint index repair")
@@ -799,75 +612,53 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
                     if (targetOffset < snapshot.trim().trimOffset()) {
                         throw new TargetTrimmedException();
                     }
-                    if (targetOffset
-                            >= snapshot.committedEnd().committedEndOffset()) {
-                        throw invariant(
-                                "checkpoint repair target left committed head truth",
-                                null);
+                    if (targetOffset >= snapshot.committedEnd().committedEndOffset()) {
+                        throw invariant("checkpoint repair target left committed head truth", null);
                     }
                 });
     }
 
-    private CompletableFuture<Void> requireExactRoot(
-            VersionedRecoveryCheckpointRoot expected) {
-        return requireExactRoot(
-                new StreamId(expected.value().streamId()),
-                Optional.of(expected));
+    private CompletableFuture<Void> requireExactRoot(VersionedRecoveryCheckpointRoot expected) {
+        return requireExactRoot(new StreamId(expected.value().streamId()), Optional.of(expected));
     }
 
     private CompletableFuture<Void> requireExactRoot(
-            StreamId streamId,
-            Optional<VersionedRecoveryCheckpointRoot> expected) {
-        return generationStore.getRecoveryRoot(cluster, streamId)
-                .thenAccept(actual -> {
-                    if (!actual.equals(expected)) {
-                        throw new RecoveryRootChangedException();
-                    }
-                });
+            StreamId streamId, Optional<VersionedRecoveryCheckpointRoot> expected) {
+        return generationStore.getRecoveryRoot(cluster, streamId).thenAccept(actual -> {
+            if (!actual.equals(expected)) {
+                throw new RecoveryRootChangedException();
+            }
+        });
     }
 
-    private static void requireLiveCoverage(
-            long targetOffset, AnchorAwareCommitWalk walk) {
+    private static void requireLiveCoverage(long targetOffset, AnchorAwareCommitWalk walk) {
         boolean covered = walk.commitsNewestFirst().stream()
                 .map(value -> value.canonicalCommit())
-                .anyMatch(commit -> commit.offsetStart() <= targetOffset
-                        && targetOffset < commit.offsetEnd());
+                .anyMatch(commit -> commit.offsetStart() <= targetOffset && targetOffset < commit.offsetEnd());
         if (!covered) {
-            throw invariant(
-                    "root-stable live tail does not cover its repair target",
-                    null);
+            throw invariant("root-stable live tail does not cover its repair target", null);
         }
     }
 
     private static RecoveryCheckpointReferenceRecord referenceCovering(
             VersionedRecoveryCheckpointRoot root, long offset) {
         return root.value().checkpoints().stream()
-                .filter(reference -> reference.coveredStartOffset() <= offset
-                        && offset < reference.coveredEndOffset())
+                .filter(reference -> reference.coveredStartOffset() <= offset && offset < reference.coveredEndOffset())
                 .findFirst()
-                .orElseThrow(() -> invariant(
-                        "recovery root has a gap at the repair target", null));
+                .orElseThrow(() -> invariant("recovery root has a gap at the repair target", null));
     }
 
-    private static PhysicalObjectIdentity checkpointIdentity(
-            RecoveryCheckpointReferenceRecord reference) {
+    private static PhysicalObjectIdentity checkpointIdentity(RecoveryCheckpointReferenceRecord reference) {
         PhysicalObjectIdentity identity = PhysicalObjectIdentity.create(
                 new ObjectKey(reference.objectKey()),
                 Optional.of(new ObjectId(reference.objectId())),
                 PhysicalObjectKind.RECOVERY_CHECKPOINT,
                 reference.objectLength(),
-                new Checksum(
-                        ChecksumType.CRC32C,
-                        reference.storageCrc32c()),
-                Optional.of(new Checksum(
-                        ChecksumType.SHA256,
-                        reference.contentSha256())),
+                new Checksum(ChecksumType.CRC32C, reference.storageCrc32c()),
+                Optional.of(new Checksum(ChecksumType.SHA256, reference.contentSha256())),
                 Optional.empty());
-        if (!identity.objectKeyHash().equals(
-                new ObjectKeyHash(reference.objectKeyHash()))) {
-            throw invariant(
-                    "recovery checkpoint reference has a wrong object-key hash",
-                    null);
+        if (!identity.objectKeyHash().equals(new ObjectKeyHash(reference.objectKeyHash()))) {
+            throw invariant("recovery checkpoint reference has a wrong object-key hash", null);
         }
         return identity;
     }
@@ -879,82 +670,58 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
         var header = object.header();
         if (!header.cluster().equals(cluster)
                 || !header.streamId().value().equals(root.value().streamId())
-                || header.checkpointSequence()
-                        != reference.checkpointSequence()
-                || !header.checkpointAttemptId().equals(
-                        reference.checkpointAttemptId())
-                || header.coverage().startOffset()
-                        != reference.coveredStartOffset()
-                || header.coverage().endOffset()
-                        != reference.coveredEndOffset()
-                || header.firstCommitVersion()
-                        != reference.firstCommitVersion()
-                || header.lastCommitVersion()
-                        != reference.lastCommitVersion()
-                || header.cumulativeSizeAtStart()
-                        != reference.cumulativeSizeAtStart()
-                || header.cumulativeSizeAtEnd()
-                        != reference.cumulativeSizeAtEnd()
+                || header.checkpointSequence() != reference.checkpointSequence()
+                || !header.checkpointAttemptId().equals(reference.checkpointAttemptId())
+                || header.coverage().startOffset() != reference.coveredStartOffset()
+                || header.coverage().endOffset() != reference.coveredEndOffset()
+                || header.firstCommitVersion() != reference.firstCommitVersion()
+                || header.lastCommitVersion() != reference.lastCommitVersion()
+                || header.cumulativeSizeAtStart() != reference.cumulativeSizeAtStart()
+                || header.cumulativeSizeAtEnd() != reference.cumulativeSizeAtEnd()
                 || !header.firstCommitId().equals(reference.firstCommitId())
                 || !header.lastCommitId().equals(reference.lastCommitId())
-                || !header.sourceHeadCommitId().equals(
-                        reference.sourceHeadCommitId())
-                || header.sourceHeadCommitVersion()
-                        != reference.sourceHeadCommitVersion()
-                || !header.projectionIdentitySha256().value().equals(
-                        reference.projectionIdentitySha256())
-                || header.expectedEntryCount()
-                        != reference.commitEntryCount()
-                || header.expectedPublicationCount()
-                        != reference.publicationCount()
+                || !header.sourceHeadCommitId().equals(reference.sourceHeadCommitId())
+                || header.sourceHeadCommitVersion() != reference.sourceHeadCommitVersion()
+                || !header.projectionIdentitySha256().value().equals(reference.projectionIdentitySha256())
+                || header.expectedEntryCount() != reference.commitEntryCount()
+                || header.expectedPublicationCount() != reference.publicationCount()
                 || !object.objectId().value().equals(reference.objectId())
                 || !object.objectKey().value().equals(reference.objectKey())
                 || object.objectLength() != reference.objectLength()
-                || !object.contentSha256().value().equals(
-                        reference.contentSha256())) {
-            throw invariant(
-                    "verified NRC1 object differs from recovery-root reference",
-                    null);
+                || !object.contentSha256().value().equals(reference.contentSha256())) {
+            throw invariant("verified NRC1 object differs from recovery-root reference", null);
         }
     }
 
-    private static void requireSnapshotStream(
-            StreamId streamId, StreamMetadataSnapshot snapshot) {
+    private static void requireSnapshotStream(StreamId streamId, StreamMetadataSnapshot snapshot) {
         if (!snapshot.metadata().streamId().equals(streamId.value())
                 || !snapshot.committedEnd().streamId().equals(streamId.value())
                 || !snapshot.trim().streamId().equals(streamId.value())) {
-            throw invariant(
-                    "generation repair snapshot belongs to another stream",
-                    null);
+            throw invariant("generation repair snapshot belongs to another stream", null);
         }
     }
 
     private static <T> CompletableFuture<T> withLease(
-            CompletableFuture<ObjectReadLease> acquired,
-            Function<ObjectReadLease, CompletableFuture<T>> operation) {
+            CompletableFuture<ObjectReadLease> acquired, Function<ObjectReadLease, CompletableFuture<T>> operation) {
         return acquired.thenCompose(lease -> {
             CompletableFuture<T> source;
             try {
-                source = Objects.requireNonNull(
-                        operation.apply(lease), "checkpoint repair operation");
+                source = Objects.requireNonNull(operation.apply(lease), "checkpoint repair operation");
             } catch (Throwable failure) {
                 source = CompletableFuture.failedFuture(failure);
             }
             CompletableFuture<T> result = new CompletableFuture<>();
-            source.whenComplete((value, failure) -> lease.release()
-                    .whenComplete((ignored, releaseFailure) -> {
-                        if (failure == null && releaseFailure == null) {
-                            result.complete(value);
-                            return;
-                        }
-                        Throwable exact = failure == null
-                                ? unwrap(releaseFailure)
-                                : unwrap(failure);
-                        if (failure != null && releaseFailure != null) {
-                            exact.addSuppressed(unwrap(releaseFailure));
-                        }
-                        result.completeExceptionally(exact);
-                    }));
+            source.whenComplete((value, failure) -> lease.release().whenComplete((ignored, releaseFailure) -> {
+                if (failure == null && releaseFailure == null) {
+                    result.complete(value);
+                    return;
+                }
+                Throwable exact = failure == null ? unwrap(releaseFailure) : unwrap(failure);
+                if (failure != null && releaseFailure != null) {
+                    exact.addSuppressed(unwrap(releaseFailure));
+                }
+                result.completeExceptionally(exact);
+            }));
             return result;
         });
     }
@@ -968,8 +735,7 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
 
     private static Throwable unwrap(Throwable failure) {
         Throwable current = Objects.requireNonNull(failure, "failure");
-        while ((current instanceof CompletionException
-                        || current instanceof ExecutionException)
+        while ((current instanceof CompletionException || current instanceof ExecutionException)
                 && current.getCause() != null) {
             current = current.getCause();
         }
@@ -977,17 +743,11 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
     }
 
     private static NereusException condition(String message) {
-        return new NereusException(
-                ErrorCode.METADATA_CONDITION_FAILED, true, message);
+        return new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, message);
     }
 
-    private static NereusException invariant(
-            String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                false,
-                message,
-                cause);
+    private static NereusException invariant(String message, Throwable cause) {
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static String requireText(String value, String field) {
@@ -1003,29 +763,21 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
             GenerationIndexRecord record,
             Checksum rawDigest,
             Checksum durableDigest,
-            String indexKey) {
-    }
+            String indexKey) {}
 
-    private record SelectedCandidate(
-            IndexCandidate candidate, PhysicalObjectIdentity object) {
-    }
+    private record SelectedCandidate(IndexCandidate candidate, PhysicalObjectIdentity object) {}
 
-    private record Activation(
-            LiveProjectionSubject subject, GenerationActivationProof proof) {
-    }
+    private record Activation(LiveProjectionSubject subject, GenerationActivationProof proof) {}
 
-    private static final class RecoveryRootChangedException
-            extends RuntimeException {
+    private static final class RecoveryRootChangedException extends RuntimeException {
         private static final long serialVersionUID = 1L;
     }
 
-    private static final class TargetTrimmedException
-            extends RuntimeException {
+    private static final class TargetTrimmedException extends RuntimeException {
         private static final long serialVersionUID = 1L;
     }
 
-    private static final class CandidateUnavailableException
-            extends RuntimeException {
+    private static final class CandidateUnavailableException extends RuntimeException {
         private static final long serialVersionUID = 1L;
     }
 
@@ -1046,9 +798,7 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
                 timeoutNanos = Long.MAX_VALUE;
             }
             long now = System.nanoTime();
-            expiresAtNanos = timeoutNanos >= Long.MAX_VALUE - now
-                    ? Long.MAX_VALUE
-                    : now + timeoutNanos;
+            expiresAtNanos = timeoutNanos >= Long.MAX_VALUE - now ? Long.MAX_VALUE : now + timeoutNanos;
         }
 
         private Duration remaining(String action) {
@@ -1059,37 +809,32 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
             return Duration.ofNanos(remaining);
         }
 
-        private <T> CompletableFuture<T> bound(
-                Supplier<CompletableFuture<T>> operation, String action) {
+        private <T> CompletableFuture<T> bound(Supplier<CompletableFuture<T>> operation, String action) {
             long remaining = remaining(action).toNanos();
             CompletableFuture<T> source;
             try {
-                source = Objects.requireNonNull(
-                        operation.get(), "operation future");
+                source = Objects.requireNonNull(operation.get(), "operation future");
             } catch (Throwable failure) {
                 return CompletableFuture.failedFuture(failure);
             }
-            return source.orTimeout(remaining, TimeUnit.NANOSECONDS)
-                    .handle((value, failure) -> {
-                        if (failure == null) {
-                            return value;
-                        }
-                        Throwable exact = unwrap(failure);
-                        if (exact instanceof TimeoutException) {
-                            throw timeout(action);
-                        }
-                        if (exact instanceof RuntimeException runtime) {
-                            throw runtime;
-                        }
-                        throw new CompletionException(exact);
-                    });
+            return source.orTimeout(remaining, TimeUnit.NANOSECONDS).handle((value, failure) -> {
+                if (failure == null) {
+                    return value;
+                }
+                Throwable exact = unwrap(failure);
+                if (exact instanceof TimeoutException) {
+                    throw timeout(action);
+                }
+                if (exact instanceof RuntimeException runtime) {
+                    throw runtime;
+                }
+                throw new CompletionException(exact);
+            });
         }
 
         private long maximumReadDeadlineMillis() {
             long millis = Math.max(
-                    1L,
-                    remaining("acquire recovery checkpoint read pin")
-                            .toMillis());
+                    1L, remaining("acquire recovery checkpoint read pin").toMillis());
             try {
                 return Math.addExact(clock.millis(), millis);
             } catch (ArithmeticException overflow) {
@@ -1098,14 +843,10 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
         }
 
         private static NereusException timeout(String action) {
-            return new NereusException(
-                    ErrorCode.TIMEOUT,
-                    true,
-                    action + " exceeded the generation repair deadline");
+            return new NereusException(ErrorCode.TIMEOUT, true, action + " exceeded the generation repair deadline");
         }
 
         @Override
-        public void close() {
-        }
+        public void close() {}
     }
 }

@@ -14,13 +14,14 @@
 
 package com.nereusstream.api;
 
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import com.nereusstream.api.target.ObjectSliceReadTarget;
-
-/** Compatibility view of a generic range when its target is an object slice. */
+/**
+ * Compatibility view of a generic range when its target is an object slice.
+ */
 @Deprecated(forRemoval = true)
 public record ResolvedObjectRange(
         OffsetRange offsetRange,
@@ -51,11 +52,32 @@ public record ResolvedObjectRange(
             EntryIndexRef entryIndexRef,
             Optional<ProjectionRef> projectionRef,
             long commitVersion) {
-        this(offsetRange, generation, objectId, objectKey, objectType, objectOffset, objectLength, sliceChecksum,
-                payloadFormat, schemaRefs, entryIndexRef, projectionRef, commitVersion,
-                new ObjectSliceReadTarget(1, objectId, objectKey, objectType, "WAL_OBJECT_V1", "OPAQUE_SLICE",
-                        "legacy-" + objectId.value() + "-" + objectOffset, objectOffset, Math.max(1, objectLength),
-                        sliceChecksum, entryIndexRef));
+        this(
+                offsetRange,
+                generation,
+                objectId,
+                objectKey,
+                objectType,
+                objectOffset,
+                objectLength,
+                sliceChecksum,
+                payloadFormat,
+                schemaRefs,
+                entryIndexRef,
+                projectionRef,
+                commitVersion,
+                new ObjectSliceReadTarget(
+                        1,
+                        objectId,
+                        objectKey,
+                        objectType,
+                        "WAL_OBJECT_V1",
+                        "OPAQUE_SLICE",
+                        "legacy-" + objectId.value() + "-" + objectOffset,
+                        objectOffset,
+                        Math.max(1, objectLength),
+                        sliceChecksum,
+                        entryIndexRef));
     }
 
     public ResolvedObjectRange {
@@ -78,7 +100,8 @@ public record ResolvedObjectRange(
                 || readTarget.objectType() != objectType
                 || readTarget.objectOffset() != objectOffset
                 || (readTarget.objectLength() != objectLength
-                        && !(objectLength == 0 && readTarget.objectLength() == 1
+                        && !(objectLength == 0
+                                && readTarget.objectLength() == 1
                                 && readTarget.sliceId().startsWith("legacy-")))
                 || !readTarget.sliceChecksum().equals(sliceChecksum)
                 || !readTarget.entryIndexRef().equals(entryIndexRef)) {

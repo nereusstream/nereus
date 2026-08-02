@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.core.physical;
 
 import com.nereusstream.api.Checksum;
@@ -7,7 +8,9 @@ import com.nereusstream.api.StreamId;
 import java.util.List;
 import java.util.Objects;
 
-/** Complete bounded query identity passed unchanged to every GC reference domain. */
+/**
+ * Complete bounded query identity passed unchanged to every GC reference domain.
+ */
 public record GcReferenceQuery(
         GcReferenceQueryKind kind,
         PhysicalObjectIdentity object,
@@ -34,8 +37,7 @@ public record GcReferenceQuery(
         }
         candidateEvidenceSha256 = requireSha256(candidateEvidenceSha256, "candidateEvidenceSha256");
         queryIdentitySha256 = requireSha256(queryIdentitySha256, "queryIdentitySha256");
-        Checksum expected = PhysicalValueDigests.query(
-                kind, object, affectedStreams, candidateEvidenceSha256);
+        Checksum expected = PhysicalValueDigests.query(kind, object, affectedStreams, candidateEvidenceSha256);
         if (!expected.equals(queryIdentitySha256)) {
             throw new IllegalArgumentException("queryIdentitySha256 does not match canonical query fields");
         }

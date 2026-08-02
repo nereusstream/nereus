@@ -90,14 +90,14 @@ OPEN/TERMINATED -> DELETING -> DELETED
 Admission changes state before an operation is enqueued, under one short facade lock/atomic transition。The exact
 matrix is：
 
-| State | append | read/getter | terminate | logical delete | local close |
-| --- | --- | --- | --- | --- | --- |
-| `OPEN` | admit | admit | install barrier | install delete barrier | install close barrier |
-| `TERMINATING` | reject | admit | join same future | delete supersedes after terminate resolution | join/queue close |
-| `TERMINATED` | terminated failure | admit | return final LAC | admit delete | admit close |
-| `WRITE_FENCED` | reject with current fence | admit | fail before L0 CAS | fail before L0 CAS | admit/detach |
-| `CLOSING/CLOSED` | reject | reject | reject | reject | join/idempotent |
-| `DELETING/DELETED` | reject | reject | reject | join/idempotent | join local cleanup |
+| State              | append                    | read/getter | terminate          | logical delete                               | local close           |
+|--------------------|---------------------------|-------------|--------------------|----------------------------------------------|-----------------------|
+| `OPEN`             | admit                     | admit       | install barrier    | install delete barrier                       | install close barrier |
+| `TERMINATING`      | reject                    | admit       | join same future   | delete supersedes after terminate resolution | join/queue close      |
+| `TERMINATED`       | terminated failure        | admit       | return final LAC   | admit delete                                 | admit close           |
+| `WRITE_FENCED`     | reject with current fence | admit       | fail before L0 CAS | fail before L0 CAS                           | admit/detach          |
+| `CLOSING/CLOSED`   | reject                    | reject      | reject             | reject                                       | join/idempotent       |
+| `DELETING/DELETED` | reject                    | reject      | reject             | join/idempotent                              | join local cleanup    |
 
 Once a terminate/delete/close barrier is installed, a later append is rejected before byte copying even if the
 barrier has not yet reached the ordered lane。Delete may supersede a pending terminate, but both share the same lane
@@ -117,14 +117,14 @@ supersedes durable lifecycle work；it waits for an already accepted terminate/d
 
 Lifecycle completion rules close timeout/CAS ambiguity：
 
-| Observation after operation failure/timeout | Facade result/state |
-| --- | --- |
-| fresh L0 remains `ACTIVE` and no lifecycle CAS could have landed | fail mapped error；remove barrier and return `OPEN` |
-| fresh L0 is `SEALED` during terminate | succeed with its final LAC；state `TERMINATED`；repair mirror asynchronously |
-| fresh L0 is `DELETING/DELETED` during delete | continue/resume to `DELETED`, then succeed；state `DELETED` |
-| fresh L0 is later than requested transition | accept the later authoritative state；never report rollback |
-| L0 state cannot be reread before deadline | fail operation and keep the lifecycle barrier/facade non-writable；open-time reconciliation is required before reuse |
-| projection mirror alone fails after L0 terminal | operation still succeeds；bounded mirror repair is scheduled |
+| Observation after operation failure/timeout                      | Facade result/state                                                                                                 |
+|------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
+| fresh L0 remains `ACTIVE` and no lifecycle CAS could have landed | fail mapped error；remove barrier and return `OPEN`                                                                  |
+| fresh L0 is `SEALED` during terminate                            | succeed with its final LAC；state `TERMINATED`；repair mirror asynchronously                                          |
+| fresh L0 is `DELETING/DELETED` during delete                     | continue/resume to `DELETED`, then succeed；state `DELETED`                                                          |
+| fresh L0 is later than requested transition                      | accept the later authoritative state；never report rollback                                                          |
+| L0 state cannot be reread before deadline                        | fail operation and keep the lifecycle barrier/facade non-writable；open-time reconciliation is required before reuse |
+| projection mirror alone fails after L0 terminal                  | operation still succeeds；bounded mirror repair is scheduled                                                         |
 
 The implementation never restores `OPEN` from a timeout based only on the original exceptional completion。
 
@@ -171,16 +171,16 @@ internal recovery state but cannot invoke a callback in the ended domain.
 
 Outcome handling:
 
-| L0 outcome | Facade action |
-| --- | --- |
-| Normal `AppendResult` | Validate, return `addComplete` |
-| `KNOWN_NOT_COMMITTED` | `addFailed` with mapped error |
-| `KNOWN_COMMITTED` + attempt ID | `recoverAppend` the exact retained physical attempt, then `addComplete` |
-| `MAY_HAVE_COMMITTED` + attempt ID | `recoverAppend`; never submit a new WAL object |
-| Recovery proves `KNOWN_NOT_COMMITTED` | One failure callback if still pending; release the retained attempt/lane and permit the local write fence to clear |
-| Recovery remains retryably uncertain at callback deadline | One failure callback; ledger remains `WRITE_FENCED` while background recovery continues |
-| Recovery reaches permanent invariant/corruption | One failure callback if still pending; stop retrying and leave the facade permanently `WRITE_FENCED` |
-| Non-known outcome without attempt ID | invariant failure and permanent local `WRITE_FENCED` |
+| L0 outcome                                                | Facade action                                                                                                      |
+|-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| Normal `AppendResult`                                     | Validate, return `addComplete`                                                                                     |
+| `KNOWN_NOT_COMMITTED`                                     | `addFailed` with mapped error                                                                                      |
+| `KNOWN_COMMITTED` + attempt ID                            | `recoverAppend` the exact retained physical attempt, then `addComplete`                                            |
+| `MAY_HAVE_COMMITTED` + attempt ID                         | `recoverAppend`; never submit a new WAL object                                                                     |
+| Recovery proves `KNOWN_NOT_COMMITTED`                     | One failure callback if still pending; release the retained attempt/lane and permit the local write fence to clear |
+| Recovery remains retryably uncertain at callback deadline | One failure callback; ledger remains `WRITE_FENCED` while background recovery continues                            |
+| Recovery reaches permanent invariant/corruption           | One failure callback if still pending; stop retrying and leave the facade permanently `WRITE_FENCED`               |
+| Non-known outcome without attempt ID                      | invariant failure and permanent local `WRITE_FENCED`                                                               |
 
 F2 has no producer-level dedup. A caller retry after a genuinely uncertain publish can create a second
 entry. The facade must preserve the uncertainty classification; it cannot promise deduplication.
@@ -260,37 +260,37 @@ review summary; they do not replace the complete matrix.
 
 ### ManagedLedgerFactory
 
-| Group | F2 behavior |
-| --- | --- |
-| open/asyncOpen | Implement |
-| read-only cursor/ledger open | Implement |
-| get info/async info | Synthesize one virtual ledger and mark it Nereus in Nereus-specific metrics/logs |
-| exists | Read topic projection plus exact L0 state; missing current L0 is corruption, DELETING/DELETED is false |
-| properties | Implement with topic-record CAS |
-| delete/asyncDelete | Implement logical delete after L0 lifecycle API exists |
-| open-ledger map | Return immutable snapshot |
-| cache manager/stats/config thresholds | F2 zero-capacity compatibility manager; no BookKeeper cache delegation |
-| unloaded backlog estimate | Exact retained entry count/lifetime logical size from L0 metadata; add one virtual detail when accurate |
-| shutdown/shutdownAsync | Implement idempotent lifecycle |
+| Group                                 | F2 behavior                                                                                             |
+|---------------------------------------|---------------------------------------------------------------------------------------------------------|
+| open/asyncOpen                        | Implement                                                                                               |
+| read-only cursor/ledger open          | Implement                                                                                               |
+| get info/async info                   | Synthesize one virtual ledger and mark it Nereus in Nereus-specific metrics/logs                        |
+| exists                                | Read topic projection plus exact L0 state; missing current L0 is corruption, DELETING/DELETED is false  |
+| properties                            | Implement with topic-record CAS                                                                         |
+| delete/asyncDelete                    | Implement logical delete after L0 lifecycle API exists                                                  |
+| open-ledger map                       | Return immutable snapshot                                                                               |
+| cache manager/stats/config thresholds | F2 zero-capacity compatibility manager; no BookKeeper cache delegation                                  |
+| unloaded backlog estimate             | Exact retained entry count/lifetime logical size from L0 metadata; add one virtual detail when accurate |
+| shutdown/shutdownAsync                | Implement idempotent lifecycle                                                                          |
 
 ### ManagedLedger
 
-| Group | F2 behavior |
-| --- | --- |
-| add overloads | Implement through one async core；sync overloads add no independent timer and wait for that core's deadline/recovery terminal |
-| direct read | Implement |
-| LAC, first/next/previous/after-N, counts and size | Role-aware exact formulas; first position is before-first; size is exact lifetime logical bytes |
-| properties | Implement through authoritative topic record |
-| open read-only/non-durable cursor | Implement; a concrete non-durable start Position is already consumed and the first read is its next retained Entry; null/`LATEST`/future consult `InitialPosition`, and the two-argument overload defaults Latest |
-| open durable cursor | Basic boundary only; mutation methods explicitly unsupported until F3 |
-| terminate/isTerminated | Implement with L0 seal |
-| close | Implement local close |
-| delete | Implement logical delete |
-| ledger info map | Synthesize exactly one virtual ledger |
-| offload methods/properties | Fail unsupported; never call a BookKeeper offloader |
-| migrate/truncate | Fail unsupported in F2 |
-| rollover/create-new-ledger methods | No physical rollover; never clear an unresolved write fence |
-| interceptor | Reject every non-null interceptor configuration in F2 before IO; getter returns null |
+| Group                                             | F2 behavior                                                                                                                                                                                                       |
+|---------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| add overloads                                     | Implement through one async core；sync overloads add no independent timer and wait for that core's deadline/recovery terminal                                                                                      |
+| direct read                                       | Implement                                                                                                                                                                                                         |
+| LAC, first/next/previous/after-N, counts and size | Role-aware exact formulas; first position is before-first; size is exact lifetime logical bytes                                                                                                                   |
+| properties                                        | Implement through authoritative topic record                                                                                                                                                                      |
+| open read-only/non-durable cursor                 | Implement; a concrete non-durable start Position is already consumed and the first read is its next retained Entry; null/`LATEST`/future consult `InitialPosition`, and the two-argument overload defaults Latest |
+| open durable cursor                               | Basic boundary only; mutation methods explicitly unsupported until F3                                                                                                                                             |
+| terminate/isTerminated                            | Implement with L0 seal                                                                                                                                                                                            |
+| close                                             | Implement local close                                                                                                                                                                                             |
+| delete                                            | Implement logical delete                                                                                                                                                                                          |
+| ledger info map                                   | Synthesize exactly one virtual ledger                                                                                                                                                                             |
+| offload methods/properties                        | Fail unsupported; never call a BookKeeper offloader                                                                                                                                                               |
+| migrate/truncate                                  | Fail unsupported in F2                                                                                                                                                                                            |
+| rollover/create-new-ledger methods                | No physical rollover; never clear an unresolved write fence                                                                                                                                                       |
+| interceptor                                       | Reject every non-null interceptor configuration in F2 before IO; getter returns null                                                                                                                              |
 
 Returning `null`, silently succeeding, or fabricating BookKeeper metadata is not an unsupported-method
 implementation.
@@ -304,16 +304,16 @@ extent as a real BookKeeper ledger。
 
 ### ManagedCursor
 
-| Group | F2 behavior |
-| --- | --- |
-| read/read-or-wait/skip/seek/rewind | Implement for non-durable and durable-boundary cursor; direct seek has no start-position `+1`, non-force seek cannot cross local mark-delete, and rewind uses next-valid after mark-delete; ReadOnlyCursor has its locked subset |
-| read position/count/backlog | Exact offset formulas for read-only/non-durable cursor |
-| active/inactive/close/cancel waiter | Implement local state |
-| durable open/state view | Expose basic local boundary and report `isCursorDataFullyPersistable=false` |
-| non-durable cumulative mark-delete/clear/reset | Implement locally only; reset treats its Position as the direct read target and normalizes sentinels/trim/tail separately from cursor creation |
-| durable mark-delete and all individual delete/ack sets | Fail unsupported until F3 |
-| durable reset/properties persistence | Fail unsupported until F3 |
-| replay overloads | Direct non-mutating reread; return locally mark-deleted positions as skipped, honor sort flag, and do not infer individual ack holes |
+| Group                                                  | F2 behavior                                                                                                                                                                                                                      |
+|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| read/read-or-wait/skip/seek/rewind                     | Implement for non-durable and durable-boundary cursor; direct seek has no start-position `+1`, non-force seek cannot cross local mark-delete, and rewind uses next-valid after mark-delete; ReadOnlyCursor has its locked subset |
+| read position/count/backlog                            | Exact offset formulas for read-only/non-durable cursor                                                                                                                                                                           |
+| active/inactive/close/cancel waiter                    | Implement local state                                                                                                                                                                                                            |
+| durable open/state view                                | Expose basic local boundary and report `isCursorDataFullyPersistable=false`                                                                                                                                                      |
+| non-durable cumulative mark-delete/clear/reset         | Implement locally only; reset treats its Position as the direct read target and normalizes sentinels/trim/tail separately from cursor creation                                                                                   |
+| durable mark-delete and all individual delete/ack sets | Fail unsupported until F3                                                                                                                                                                                                        |
+| durable reset/properties persistence                   | Fail unsupported until F3                                                                                                                                                                                                        |
+| replay overloads                                       | Direct non-mutating reread; return locally mark-deleted positions as skipped, honor sort flag, and do not infer individual ack holes                                                                                             |
 
 At the broker boundary F2 accepts only a non-durable cumulative acknowledgement covering a whole Entry：one Position,
 no transaction bits and no `AckSetState` extension。`Consumer.messageAcked` performs this validation before ack
@@ -326,22 +326,22 @@ durable Consumer subscription recovery.
 
 ## 8. Error Mapping
 
-| Nereus error | Managed-ledger exception |
-| --- | --- |
-| `INVALID_ARGUMENT` | `ManagedLedgerException` or `InvalidCursorPositionException` by context |
-| `STREAM_NOT_FOUND` | `ManagedLedgerNotFoundException` |
-| `STREAM_NOT_ACTIVE` when sealed | `ManagedLedgerTerminatedException` |
-| `FENCED_APPEND`, expired session | `ManagedLedgerFencedException` |
-| `BACKPRESSURE_REJECTED` | `TooManyRequestsException` |
-| `STORAGE_CLOSED` | `ManagedLedgerAlreadyClosedException` / factory-closed variant |
-| `OFFSET_TRIMMED` | `InvalidCursorPositionException` |
-| `OFFSET_NOT_AVAILABLE` | `NoMoreEntriesToReadException` for terminal reads; an ordinary tail cursor returns empty/waits by method contract |
-| metadata unavailable/condition failed | `MetaStoreException` / `BadVersionException` |
-| metadata invariant/checksum/corruption | `NonRecoverableLedgerException` |
-| primary-WAL write/read availability failure | generic managed-ledger storage exception preserving retriable/cause |
-| primary-WAL target not found/checksum mismatch | `NonRecoverableLedgerException` |
-| unsupported profile/format/operation | explicit `ManagedLedgerException` with stable Nereus error code in message/cause |
-| timeout/cancel | managed-ledger timeout/cancel wrapper preserving cause |
+| Nereus error                                   | Managed-ledger exception                                                                                          |
+|------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `INVALID_ARGUMENT`                             | `ManagedLedgerException` or `InvalidCursorPositionException` by context                                           |
+| `STREAM_NOT_FOUND`                             | `ManagedLedgerNotFoundException`                                                                                  |
+| `STREAM_NOT_ACTIVE` when sealed                | `ManagedLedgerTerminatedException`                                                                                |
+| `FENCED_APPEND`, expired session               | `ManagedLedgerFencedException`                                                                                    |
+| `BACKPRESSURE_REJECTED`                        | `TooManyRequestsException`                                                                                        |
+| `STORAGE_CLOSED`                               | `ManagedLedgerAlreadyClosedException` / factory-closed variant                                                    |
+| `OFFSET_TRIMMED`                               | `InvalidCursorPositionException`                                                                                  |
+| `OFFSET_NOT_AVAILABLE`                         | `NoMoreEntriesToReadException` for terminal reads; an ordinary tail cursor returns empty/waits by method contract |
+| metadata unavailable/condition failed          | `MetaStoreException` / `BadVersionException`                                                                      |
+| metadata invariant/checksum/corruption         | `NonRecoverableLedgerException`                                                                                   |
+| primary-WAL write/read availability failure    | generic managed-ledger storage exception preserving retriable/cause                                               |
+| primary-WAL target not found/checksum mismatch | `NonRecoverableLedgerException`                                                                                   |
+| unsupported profile/format/operation           | explicit `ManagedLedgerException` with stable Nereus error code in message/cause                                  |
+| timeout/cancel                                 | managed-ledger timeout/cancel wrapper preserving cause                                                            |
 
 A callback-time unresolved exact recovery uses the ordinary mapped storage exception for the Pulsar callback while
 the concrete ledger exposes its nonempty `NereusWriteFenceView`。It is intentionally not mapped to
@@ -355,12 +355,12 @@ Retriability comes from the Nereus exception classification, not string matching
 
 F2 caches are discardable:
 
-| Cache | Truth |
-| --- | --- |
-| topic projection | authoritative topic Oxia record |
-| derived projection | topic record + repair |
-| stream snapshot/LAC | L0 stream head |
-| Position/entry | L0 offset index + Object WAL bytes |
+| Cache               | Truth                              |
+|---------------------|------------------------------------|
+| topic projection    | authoritative topic Oxia record    |
+| derived projection  | topic record + repair              |
+| stream snapshot/LAC | L0 stream head                     |
+| Position/entry      | L0 offset index + Object WAL bytes |
 
 The first F2 implementation locks the Pulsar `EntryCacheManager` to zero capacity. L0 resolver/object caches may still
 operate under their own bounds. BookKeeper `ReadHandle` methods on the compatibility cache fail explicitly; a virtual

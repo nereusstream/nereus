@@ -1,4 +1,5 @@
 /* Licensed under the Apache License, Version 2.0 */
+
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.Checksum;
@@ -10,7 +11,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Objects;
 
-/** Authoritative durable activation plus the exact key/version/value identity that produced it. */
+/**
+ * Authoritative durable activation plus the exact key/version/value identity that produced it.
+ */
 public record BookKeeperProtocolActivation(
         BookKeeperProtocolActivationValue value,
         long metadataVersion,
@@ -30,7 +33,9 @@ public record BookKeeperProtocolActivation(
                 value.ledgerIdNamespaceSha256());
     }
 
-    /** Exact NBKA1 record identity used by deletion proofs; any CAS creates a new identity. */
+    /**
+     * Exact NBKA1 record identity used by deletion proofs; any CAS creates a new identity.
+     */
     public Checksum activationRecordSha256() {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -38,11 +43,10 @@ public record BookKeeperProtocolActivation(
             byte[] key = canonicalKey.getBytes(StandardCharsets.UTF_8);
             digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(key.length).array());
             digest.update(key);
-            digest.update(ByteBuffer.allocate(Long.BYTES).putLong(metadataVersion).array());
+            digest.update(
+                    ByteBuffer.allocate(Long.BYTES).putLong(metadataVersion).array());
             digest.update(HexFormat.of().parseHex(storedValueSha256.value()));
-            return new Checksum(
-                    ChecksumType.SHA256,
-                    HexFormat.of().formatHex(digest.digest()));
+            return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest()));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }
@@ -57,8 +61,7 @@ public record BookKeeperProtocolActivation(
      */
     public Checksum publicationActivationSha256() {
         if (!supportsAllPublications()) {
-            throw new IllegalStateException(
-                    "all BookKeeper primary-WAL publications are not active");
+            throw new IllegalStateException("all BookKeeper primary-WAL publications are not active");
         }
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -74,9 +77,7 @@ public record BookKeeperProtocolActivation(
             frame(digest, Boolean.toString(value.walOnlyPublicationEnabled()));
             frame(digest, Boolean.toString(value.asyncPublicationEnabled()));
             frame(digest, Boolean.toString(value.syncPublicationEnabled()));
-            return new Checksum(
-                    ChecksumType.SHA256,
-                    HexFormat.of().formatHex(digest.digest()));
+            return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(digest.digest()));
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }
@@ -90,8 +91,7 @@ public record BookKeeperProtocolActivation(
     }
 
     public BookKeeperProtocolActivationProof deletionProof() {
-        if (value.lifecycle() != BookKeeperProtocolActivationLifecycle.ACTIVE
-                || !value.ledgerDeletionEnabled()) {
+        if (value.lifecycle() != BookKeeperProtocolActivationLifecycle.ACTIVE || !value.ledgerDeletionEnabled()) {
             throw new IllegalStateException("BookKeeper ledger deletion is not active");
         }
         return new BookKeeperProtocolActivationProof(
