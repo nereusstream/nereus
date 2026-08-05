@@ -20,6 +20,15 @@ require_literal() {
     fi
 }
 
+require_pattern() {
+    local pattern="$1"
+    local path="$2"
+    if ! rg -UPq -- "$pattern" "$path"; then
+        echo "missing Phase 4 M6 abandoned-append contract pattern '$pattern' in $path" >&2
+        exit 1
+    fi
+}
+
 reject_literal() {
     local literal="$1"
     local path="$2"
@@ -58,7 +67,7 @@ reject_literal "deleteCommitNode" "$planner"
 
 require_literal "inspection.protectionRemovals()" "$ownerless"
 require_literal "inspection.metadataRemovals()" "$ownerless"
-require_literal "abandonedAppendIntents.reload(" "$ownerless"
+require_pattern 'abandonedAppendIntents\s*\.\s*reload\(' "$ownerless"
 require_literal "abandonedAppendIntents.reload(candidate, expected)" "$runtime"
 require_literal "new GenerationZeroCommitRetirementHandler(" "$runtime"
 require_literal "public StreamCommitKeyIdentity parseStreamCommitKey(" "$keyspace"
