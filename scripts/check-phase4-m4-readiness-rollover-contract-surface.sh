@@ -26,6 +26,15 @@ require_literal() {
     fi
 }
 
+require_pattern() {
+    local pattern="$1"
+    local path="$2"
+    if ! rg -UPq -- "$pattern" "$repo_root/$path"; then
+        echo "missing Phase 4 M4 readiness-rollover contract pattern '$pattern' in $path" >&2
+        exit 1
+    fi
+}
+
 require_pulsar_file() {
     local path="$1"
     if [[ ! -f "$pulsar_root/$path" ]]; then
@@ -96,7 +105,7 @@ require_literal "readinessRollover.rollover(" "$proof_coordinator"
 require_literal "ManagedLedgerPhysicalDeletionActivationRequest" "$proof_coordinator"
 require_literal ".MAX_CONCURRENT_STREAMS" "$proof_coordinator"
 require_literal "Deadline.start(requireTimeout(timeout), nanoTime)" "$proof_coordinator"
-require_literal "deadline.callWithRemaining(remaining ->" "$proof_coordinator"
+require_pattern 'deadline\s*\.\s*callWithRemaining\(\s*remaining\s*->' "$proof_coordinator"
 require_literal "future.orTimeout(" "$proof_coordinator"
 require_literal "completeGenerationRegistrationBackfill(" "$factory"
 
