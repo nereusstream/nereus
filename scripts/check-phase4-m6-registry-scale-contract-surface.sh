@@ -12,6 +12,15 @@ require_literal() {
     fi
 }
 
+require_pattern() {
+    local pattern="$1"
+    local path="$2"
+    if ! rg -UPq -- "$pattern" "$repo_root/$path"; then
+        echo "missing Phase 4 M6 registry-scale contract pattern '$pattern' in $path" >&2
+        exit 1
+    fi
+}
+
 reject_literal() {
     local literal="$1"
     local path="$2"
@@ -50,7 +59,7 @@ require_literal "l0Store(StreamState.DELETED)" "$scale_test"
 reject_literal "Thread.sleep(" "$scale_test"
 
 require_literal "scanRegistryPage(shard, Optional.empty(), accumulator)" "$scanner"
-require_literal "generations.scanStreamRegistrations(" "$scanner"
+require_pattern 'generations\s*\.\s*scanStreamRegistrations\(' "$scanner"
 require_literal "page.continuation().isPresent()" "$scanner"
 
 require_literal "phase4M6RegistryScaleCheck" "build.gradle.kts"
