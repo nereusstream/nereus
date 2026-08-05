@@ -743,7 +743,8 @@ public final class ReadCoordinator implements StreamViewReader {
                             && range.readTarget().equals(batch.source().target())
                             && range.payloadFormat() == batch.payloadFormat()
                             && range.schemaRefs().equals(batch.schemaRefs())
-                            && range.projectionRef().equals(batch.projectionRef())
+                            // A generation projection reference is an admission identity; NCP1 logical batches
+                            // intentionally keep the codec's empty per-batch projection-ref surface.
                             && range.offsetRange().startOffset()
                                     <= batch.range().startOffset()
                             && batch.range().endOffset() <= range.offsetRange().endOffset());
