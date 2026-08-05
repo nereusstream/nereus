@@ -20,6 +20,15 @@ require_literal() {
     fi
 }
 
+require_pattern() {
+    local pattern="$1"
+    local path="$2"
+    if ! rg -UPq -- "$pattern" "$path"; then
+        echo "missing Phase 4 M5 logical-retention contract pattern '$pattern' in $path" >&2
+        exit 1
+    fi
+}
+
 main="$repo_root/nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/retention"
 test="$repo_root/nereus-managed-ledger/src/test/java/com/nereusstream/managedledger/retention"
 metadata_snapshot="$repo_root/nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/StreamMetadataSnapshot.java"
@@ -76,9 +85,9 @@ require_literal ".sameVersionedAuthority(head)" "$planner"
 require_literal "public boolean sameVersionedAuthority(" "$metadata_snapshot"
 
 require_literal "GenerationOperation.LOGICAL_TRIM" "$service"
-require_literal "activationGuard.revalidate(proof)" "$service"
+require_pattern 'activationGuard\s*\.\s*revalidate\(proof\)' "$service"
 require_literal "planner.revalidate(" "$service"
-require_literal "cursorRetention.requestTrim(" "$service"
+require_pattern 'cursorRetention\s*\.\s*requestTrim\(' "$service"
 require_literal "logical retention callback completion" "$service"
 require_literal "completedTrimObserver.accept(view)" "$service"
 

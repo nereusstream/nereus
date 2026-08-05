@@ -79,7 +79,7 @@ require_literal "physicalReferences.protectVisibleIndex" "$scanner"
 require_literal "repair target belongs to recovery-checkpoint evidence" "$scanner"
 require_literal "implements GenerationIndexRepairer" "$read_repair"
 require_literal "GenerationIndexRepairer liveRepairer" "$checkpoint_repair"
-require_literal "profile.objectMaterializationEnabled()))" "$generation_resolver"
+require_literal "profile.objectMaterializationEnabled()," "$generation_resolver"
 
 require_literal "walDurableReturnsBeforeDetachedGenerationZeroWorkStarts" "$async_test"
 require_literal "strictDurabilityWaitsForExactVisibleGenerationProtection" "$async_test"
