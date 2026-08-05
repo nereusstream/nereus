@@ -403,7 +403,7 @@ run_nerdctl build \
   --build-arg "PULSAR_CLIENT_PYTHON_VERSION=${PULSAR_CLIENT_PYTHON_VERSION}" \
   --build-arg "SNAPPY_VERSION=${SNAPPY_VERSION}" \
   --build-arg "IMAGE_JDK_MAJOR_VERSION=${IMAGE_JDK_MAJOR_VERSION}" \
-  "${proxy_build_args[@]}" \
+  ${proxy_build_args[@]+"${proxy_build_args[@]}"} \
   "${apache_context}"
 
 echo "building ${nereus_tag}"
@@ -426,7 +426,7 @@ run_nerdctl build \
   --build-arg "PULSAR_CLIENT_PYTHON_VERSION=${PULSAR_CLIENT_PYTHON_VERSION}" \
   --build-arg "SNAPPY_VERSION=${SNAPPY_VERSION}" \
   --build-arg "IMAGE_JDK_MAJOR_VERSION=${IMAGE_JDK_MAJOR_VERSION}" \
-  "${proxy_build_args[@]}" \
+  ${proxy_build_args[@]+"${proxy_build_args[@]}"} \
   "${nereus_context}"
 
 echo "building ${admin_tag}"
@@ -438,7 +438,7 @@ run_nerdctl build \
   --tag "${admin_tag}" \
   --build-arg "NEREUS_ADMIN_BASE_IMAGE=${admin_base_image}" \
   --build-arg "NEREUS_COMMIT=${nereus_source_sha}" \
-  "${proxy_build_args[@]}" \
+  ${proxy_build_args[@]+"${proxy_build_args[@]}"} \
   --label "org.opencontainers.image.title=Nereus-Admin" \
   --label "org.opencontainers.image.version=v0.1.0" \
   --label "org.opencontainers.image.revision=${nereus_source_sha}" \
