@@ -21,6 +21,15 @@ require_literal() {
     fi
 }
 
+require_pattern() {
+    local pattern="$1"
+    local path="$2"
+    if ! rg -UPq -- "$pattern" "$path"; then
+        echo "missing Phase 4 M5 retention-runtime contract pattern '$pattern' in $path" >&2
+        exit 1
+    fi
+}
+
 managed_main="$repo_root/nereus-managed-ledger/src/main/java/com/nereusstream/managedledger"
 managed_test="$repo_root/nereus-managed-ledger/src/test/java/com/nereusstream/managedledger"
 adapter_main="$repo_root/nereus-pulsar-adapter/src/main/java/com/nereusstream/pulsar"
@@ -73,7 +82,7 @@ require_literal "fromCanonicalMinutesAndMebibytes" "$policy"
 require_literal "nereus-retention-policy-v1" "$policy"
 require_literal "public void installRetentionPolicy(" "$ledger"
 require_literal "public void trimConsumedLedgersInBackground(" "$ledger"
-require_literal "runtime.retentionRuntime().trim(" "$ledger"
+require_pattern 'runtime\.retentionRuntime\(\)\s*\.trim\(' "$ledger"
 require_literal "this::snapshotRetentionPolicy" "$ledger"
 require_literal "public boolean hasRetentionRuntime()" "$managed_runtime"
 
