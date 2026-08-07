@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -96,7 +97,9 @@ class KafkaPartitionMaintenanceRuntimeTest {
             operations.get(second).complete(null);
             operations.get(third).complete(null);
 
+            close.orTimeout(5, TimeUnit.SECONDS).join();
             assertThat(close).isCompletedWithValue(null);
+            assertThat(active).hasValue(0);
             assertThat(timer.isShutdown()).isFalse();
         } finally {
             timer.shutdownNow();
