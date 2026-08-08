@@ -21,8 +21,8 @@ if [[ "${actual_head}" != "${EXPECTED_HEAD}" ]]; then
   exit 1
 fi
 
-if [[ -n "$(git -C "${PULSAR_CHECKOUT}" status --porcelain --untracked-files=no)" ]]; then
-  echo "Pulsar checkout has tracked modifications: ${PULSAR_CHECKOUT}" >&2
+if [[ -n "$(git -C "${PULSAR_CHECKOUT}" status --porcelain --untracked-files=all)" ]]; then
+  echo "Pulsar checkout has tracked or untracked modifications: ${PULSAR_CHECKOUT}" >&2
   exit 1
 fi
 
