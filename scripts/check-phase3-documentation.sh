@@ -23,12 +23,10 @@ forbid_literal() {
 }
 
 authoritative_docs=(
-    "$repo_root/README.md"
     "$repo_root/docs/phase-3-cursor-subscription/README.md"
     "$repo_root/docs/phase-3-cursor-subscription/01-pulsar-api-and-call-path-audit.md"
     "$repo_root/docs/phase-3-cursor-subscription/05-facade-broker-and-future-compatibility.md"
     "$repo_root/docs/phase-3-cursor-subscription/06-implementation-plan-and-gates.md"
-    "$repo_root/docs/design/nereus-design-index.md"
     "$repo_root/docs/design/nereus-future3-cursor-subscription.md"
 )
 
@@ -76,7 +74,10 @@ for stale in \
     "F3-M1-M5" \
     "F3 cursor protocol 已通过 design-only M0/M0R 并冻结到代码级但尚未实现" \
     "Status: F3-M0/M0R design-gated；not implemented"; do
-    forbid_literal "$stale" "$repo_root/README.md" "$repo_root/docs"
+    forbid_literal \
+        "$stale" \
+        "$repo_root/docs/phase-3-cursor-subscription" \
+        "$repo_root/docs/design/nereus-future3-cursor-subscription.md"
 done
 
 link_docs=(

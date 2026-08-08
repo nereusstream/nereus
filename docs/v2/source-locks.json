@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "sourceTupleId": "v2-m0",
+  "productLine": "V2",
+  "developmentVersion": "0.2.0-SNAPSHOT",
+  "v2M0Base": {
+    "repository": "https://github.com/nereusstream/nereus.git",
+    "branch": "main",
+    "commit": "191fbbe5a0430cc4c88b9a2be61cb5a492ec3494",
+    "role": "documentation-baseline-parent",
+    "evidenceStatus": "BASE_ONLY"
+  },
+  "v1Archive": {
+    "repository": "https://github.com/nereusstream/nereus.git",
+    "branch": "v0.1",
+    "commit": "a14d925da5763f36208f8ddca7bef31f3eb90b0b",
+    "tag": null,
+    "evidenceStatus": "HISTORICAL_ONLY"
+  },
+  "legacyMainImplementationBaselines": [
+    {
+      "id": "ordinary-build-pulsar-api",
+      "repository": "https://github.com/nereusstream/pulsar.git",
+      "commit": "100d3ef0ff7c7da36d497453b141ddff6f34a9d3",
+      "role": "V1_RESIDUE_BUILD_ONLY",
+      "evidenceStatus": "HISTORICAL_ONLY"
+    }
+  ],
+  "forkDevelopmentBases": [
+    {
+      "id": "pulsar-v2-development-base",
+      "repository": "https://github.com/nereusstream/pulsar.git",
+      "branch": "5.0.0-M1-nereus",
+      "commit": "11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9",
+      "v1ArchiveBranch": "nereus-V1",
+      "evidenceStatus": "DEVELOPMENT_BASE_ONLY"
+    },
+    {
+      "id": "kafka-v2-development-base",
+      "repository": "https://github.com/nereusstream/kafka.git",
+      "branch": "nereus/future9-native-kafka-storage",
+      "commit": "76f62f3b83e882105219b6c7687dbde594a8b8a2",
+      "v1ArchiveBranch": "nereus-V1",
+      "evidenceStatus": "DEVELOPMENT_BASE_ONLY"
+    }
+  ],
+  "researchBaselines": [
+    {
+      "id": "automq-architecture-review",
+      "repository": "https://github.com/AutoMQ/automq.git",
+      "commit": "2296e0c9e636dc46f6e369bad5a1815bbaf89f1f",
+      "evidenceStatus": "RESEARCH_ONLY"
+    },
+    {
+      "id": "automq-fast-reassignment",
+      "repository": "https://github.com/AutoMQ/automq.git",
+      "commit": "38c2a786084ec97069010ed35c985cbd860e0680",
+      "evidenceStatus": "RESEARCH_ONLY"
+    },
+    {
+      "id": "automq-compaction-follow-up",
+      "repository": "https://github.com/AutoMQ/automq.git",
+      "commit": "76286e94572afab37741efddcfce713e0fbd61ff",
+      "evidenceStatus": "RESEARCH_ONLY"
+    },
+    {
+      "id": "automq-list-offsets",
+      "repository": "https://github.com/AutoMQ/automq.git",
+      "commit": "79b76185553a1332961b85925ca851c21139f3fa",
+      "evidenceStatus": "RESEARCH_ONLY"
+    }
+  ],
+  "acceptanceBaselines": {
+    "automqComparison": {
+      "status": "NOT_PINNED",
+      "commit": null,
+      "receipt": null
+    },
+    "pulsarNativeParity": {
+      "status": "NOT_PINNED",
+      "commit": null,
+      "receipt": null
+    }
+  }
+}

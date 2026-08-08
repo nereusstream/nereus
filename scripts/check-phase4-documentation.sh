@@ -15,22 +15,18 @@ require_literal() {
 }
 
 lock_docs=(
-    README.md
     docs/phase-4-compaction-generation/README.md
     docs/phase-4-compaction-generation/01-current-contract-and-source-audit.md
     docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md
-    docs/design/nereus-design-index.md
 )
 for path in "${lock_docs[@]}"; do
     require_literal "$current_pulsar_lock" "$path"
 done
 
 acceptance_docs=(
-    README.md
     docs/phase-4-compaction-generation/README.md
     docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md
     docs/phase-4-compaction-generation/08-m6-scenario-evidence-matrix.md
-    docs/design/nereus-design-index.md
     docs/design/nereus-future4-compaction-generation.md
     docs/automq-like-stream-storage/README.md
 )
@@ -335,10 +331,6 @@ require_literal "Checkpoint AG implements and validates this value type" \
     "docs/phase-4-compaction-generation/06-pulsar-rollout-operations-and-compatibility.md"
 require_literal "Checkpoint AH implements the shared per-stream coalescing lane" \
     "docs/phase-4-compaction-generation/06-pulsar-rollout-operations-and-compatibility.md"
-require_literal "checkpoints AG–AI retention planner" \
-    "docs/design/nereus-overall-architecture.md"
-require_literal 'Future 4 materialization/compaction | `Implemented / final-gated`' \
-    "docs/design/nereus-design-index.md"
 require_literal "F4-M1–M6 are final-gated" \
     "docs/design/nereus-future4-compaction-generation.md"
 require_literal "Implemented / final-gated；F4-M1–M6" \

@@ -1,5 +1,8 @@
 # Nereus Commit Protocol
 
+> 产品线：V1 implementation evidence；不是 V2 append authority。V2 合同见
+> [Correctness and append](../v2/01-correctness-and-append.md)。
+>
 > 状态：Current cross-track protocol
 > Append truth 已与 Phase 1 stream-head CAS 实现合同对齐；Phase 1.5 generic target/recovery/lifecycle 已实现并
 > final-gated；F3 cursor protocol 已完成 M0/M0R design gate 与 M1-M6 implementation/final gates；F4-M1–M6

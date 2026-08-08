@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "sourceTuple": "v2-m0",
+  "generatedFrom": "docs/v2/09-scenario-evidence-matrix.md",
+  "scenarios": [
+    {
+      "id": "V2-APP-001",
+      "milestone": "M1",
+      "contract": "ACK covers one dense range in the selected primary WAL",
+      "ownerDoc": "docs/v2/01-correctness-and-append.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-APP-002",
+      "milestone": "M1",
+      "contract": "normal admitted append performs zero remote control-metadata reads and mutations",
+      "ownerDoc": "docs/v2/01-correctness-and-append.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-APP-003",
+      "milestone": "M2",
+      "contract": "uncertain and fenced completions converge without duplicate range success",
+      "ownerDoc": "docs/v2/01-correctness-and-append.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-PROFILE-001",
+      "milestone": "M1",
+      "contract": "topic semantic profile is immutable while operational policy remains mutable",
+      "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-001",
+      "milestone": "M3",
+      "contract": "Object WAL ACK waits for verified group durability and no second durability upload",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-002",
+      "milestone": "M3",
+      "contract": "one stalled stream cannot block unrelated per-stream durable-prefix advancement",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-003",
+      "milestone": "M3",
+      "contract": "PUT-response loss and bounded WalRun recovery verify bytes without trusting ETag alone",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-001",
+      "milestone": "M2",
+      "contract": "both BookKeeper profiles ACK at quorum without synchronous Object dependency",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-002",
+      "milestone": "M2",
+      "contract": "Pulsar async offload preserves native ledger cursor retention and fallback authority",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-003",
+      "milestone": "M2",
+      "contract": "Kafka BookKeeper layout passes 10k and 100k partition resource spikes",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-001",
+      "milestone": "M4",
+      "contract": "manifest publication exposes one logical view with protected source fallback",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-002",
+      "milestone": "M5",
+      "contract": "logical trim and physical GC revalidate every protocol and source protection",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-META-001",
+      "milestone": "M2",
+      "contract": "KRaft and MetadataStore backends satisfy fencing and monotonic-root conformance",
+      "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-HO-001",
+      "milestone": "M7",
+      "contract": "missing stale or corrupt handoff hints fall back to bounded durable recovery",
+      "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-001",
+      "milestone": "M8",
+      "contract": "Kafka Object profile passes exact-source AutoMQ non-regression and advantage thresholds",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-PUL-001",
+      "milestone": "M8",
+      "contract": "Pulsar BookKeeper path passes exact-source native feature and performance parity",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KOP-001",
+      "milestone": "M0",
+      "contract": "KoP design remains present and explicitly deferred from 0.2 runtime and release gates",
+      "ownerDoc": "docs/design/nereus-future5-kop-compatibility.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    }
+  ]
+}

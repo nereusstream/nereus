@@ -710,9 +710,26 @@ tasks.register<Exec>("checkPhase3ContractSurface") {
     )
 }
 
+tasks.register<Exec>("v2DocumentationCheck") {
+    group = "verification"
+    description = "Verify the V2 authority, profiles, source locks, scenarios, tradeoffs, receipts, and links."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-documentation.sh")
+}
+
+tasks.register("v2M0Check") {
+    group = "verification"
+    description = "Verify the documentation-only V2 M0 baseline without claiming runtime implementation."
+    dependsOn("v2DocumentationCheck")
+}
+
+tasks.named("check") {
+    dependsOn("v2DocumentationCheck")
+}
+
 tasks.register<Exec>("checkPhase3Documentation") {
     group = "verification"
-    description = "Verify Phase 3 docs carry the implemented M6 contract, source lock, gates, and F4 handoff."
+    description = "Verify V1 Phase 3 evidence carries its M6 contract, source lock, gates, and F4 handoff."
     workingDir = layout.projectDirectory.asFile
     commandLine("bash", "scripts/check-phase3-documentation.sh")
 }
@@ -812,14 +829,14 @@ tasks.register<Exec>("checkPhase4ContractSurface") {
 
 tasks.register<Exec>("checkPhase4Documentation") {
     group = "verification"
-    description = "Verify current F4 implementation status, source lock, gates, and documentation links."
+    description = "Verify legacy V1 F4 implementation evidence, source lock, gates, and documentation links."
     workingDir = layout.projectDirectory.asFile
     commandLine("bash", "scripts/check-phase4-documentation.sh")
 }
 
 tasks.register<Exec>("bookKeeperPrimaryWalDocumentationCheck") {
     group = "verification"
-    description = "Verify the F1-BK code-level design, source locks, BK-M1 status, and documentation links."
+    description = "Verify V1 F1-BK code-level evidence, source locks, milestone status, and documentation links."
     workingDir = layout.projectDirectory.asFile
     commandLine("bash", "scripts/check-bookkeeper-primary-wal-documentation.sh")
 }

@@ -1,5 +1,7 @@
 # Nereus Terminology
 
+> 产品线：V1 implementation evidence；V2 术语由 [V2 design index](../v2/README.md) 及其规范文件定义。
+>
 > 状态：Current
 > 适用范围：总体设计、Future 1-9、Phase 1/1.5/2/3/4 实现合同、F1-BK target contract、F9 implemented/final-gated contract
 > 和实现注释

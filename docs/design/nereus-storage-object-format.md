@@ -1,5 +1,9 @@
 # Nereus Storage Object Format
 
+> 产品线：V1 implementation evidence；不是 V2 durable-format authority。V2 合同见
+> [Object WAL](../v2/03-object-wal.md) 和
+> [Manifest/read/retention/GC](../v2/05-manifest-read-retention-gc.md)。
+>
 > 状态：Object WAL v1 `Implemented`；cursor snapshot V1 已通过 F3-M1 implementation/final gate，并在 F4-M4
 > checkpoint V 接入 guarded upload、pending/permanent protection 与 durable read pin，checkpoint W 又把
 > exact Object-WAL 与 cursor-snapshot identities 纳入 all-shard physical/cursor live-reference backfill；

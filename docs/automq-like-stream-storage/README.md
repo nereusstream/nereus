@@ -1,5 +1,8 @@
 # AutoMQ-like Async Materialization Profile
 
+> 产品线：V1 implementation evidence；不是 V2 Object WAL 合同。V2 见
+> [Object WAL](../v2/03-object-wal.md) 和 [profile/ACK ADR](../decisions/0008-v2-storage-profiles-and-ack-boundaries.md)。
+>
 > 状态：Implemented / final-gated；F4-M1–M6 与 Phase 4 aggregate compatibility gate complete；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；

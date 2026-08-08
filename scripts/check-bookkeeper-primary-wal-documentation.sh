@@ -453,14 +453,10 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-primary-wal-m5-admin-routing-con
 fi
 
 global_links=(
-    README.md
-    docs/design/README.md
-    docs/design/nereus-design-index.md
     docs/design/nereus-futures.md
     docs/design/nereus-future1-core-stream-storage.md
     docs/design/nereus-future4-compaction-generation.md
     docs/design/nereus-commit-protocol.md
-    docs/design/nereus-overall-architecture.md
     docs/design/nereus-terminology.md
     docs/phase-1.5-core-storage-foundation/README.md
     docs/phase-4-compaction-generation/README.md

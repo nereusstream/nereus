@@ -1,5 +1,8 @@
 # Nereus Capability Tracks and Delivery Plan
 
+> 产品线：V1 delivery roadmap；不是 V2 实施计划。V2 M0-M8 见
+> [V2 implementation plan](../v2/08-implementation-plan-and-gates.md)。
+>
 > 状态：Current roadmap
 > `Future 1-9` 是稳定的能力轨道编号，不是“全部尚未开始”的阶段标签。
 

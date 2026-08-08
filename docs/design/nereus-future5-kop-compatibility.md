@@ -1,6 +1,19 @@
+---
+productLine: V1DesignReference
+designStatus: Designed
+implementationStatus: Deferred
+evidenceStatus: NotApplicableToV2
+authority: HistoricalDesignInput
+sourceTuple: v0.1
+---
+
 # 技术细节：KoP/Kafka Compatibility on Nereus Storage
 
-> 状态：Designed；`nereus-kop-adapter` 当前只有 marker class
+> V2 状态：Designed / deferred from the 0.2 runtime and release gates；文档保留，不删除。
+> 本文主体是 V1/Future 5 设计输入，不是 V2 runtime contract；重新启用 KoP 前必须按 V2
+> TopicStorageBinding、protocol-native Kafka 路径和当时的 KoP 源码重新审计。
+>
+> V1 状态：Designed；`nereus-kop-adapter` 只有 marker class
 > 前置：Future 1 stable append/read、Future 2 projection boundary、Future 4 generation reader
 
 本文定义 KoP/Kafka 协议在 Nereus shared storage 上的映射、风险和兼容性边界。它仍是 Future 5

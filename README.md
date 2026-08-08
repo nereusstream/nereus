@@ -1,5 +1,24 @@
 # Nereus
 
+> Product line: V2 on `main` at `0.2.0-SNAPSHOT`.
+> M0 is a documentation baseline; V2 Java implementation and runtime evidence are not started.
+
+Nereus V2 replaces the V1 per-append remote-metadata correctness model with primary-WAL durability, protocol-native
+Kafka/Pulsar data paths, and immutable topic-level storage profiles:
+
+- `OBJECT_WAL`: cost-first; ACK waits for durable Object WAL group coverage;
+- `BOOKKEEPER_WAL_ONLY`: performance-first; ACK waits for BookKeeper quorum and does not write Object storage;
+- `BOOKKEEPER_WAL_ASYNC_OBJECT`: performance-first; ACK waits for BookKeeper quorum and sealed ranges offload later.
+
+Start with the [V2 design index](docs/v2/README.md), [overall architecture](docs/design/nereus-overall-architecture.md),
+and [implementation plan](docs/v2/08-implementation-plan-and-gates.md). The current source tuple is
+[v2-m0](docs/v2/source-locks.json), and `./gradlew v2M0Check` verifies the documentation baseline.
+
+V1 is preserved at `v0.1@a14d925da5763f36208f8ddca7bef31f3eb90b0b`. Existing Phase/Future implementation notes below
+are V1 historical evidence until their source slices are replaced; they are not V2 architecture or current-source PASS.
+
+## V1 historical delivery log
+
 F9 final current-source result（2026-07-30，supersedes the open wording in the incremental notes below）：clean
 `main@efd9142fc5ff991ec78dccda3b6ec7347714ef31` completed
 `./gradlew phase9FinalCheck --rerun-tasks` against Kafka fork

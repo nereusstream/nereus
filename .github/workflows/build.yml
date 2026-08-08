@@ -33,6 +33,8 @@ jobs:
         run: bash scripts/check-pulsar-source-lock.sh "$NEREUS_PULSAR_CHECKOUT" 100d3ef0ff7c7da36d497453b141ddff6f34a9d3
       - name: Check scaffold
         run: ./gradlew checkPhase0
+      - name: V2 documentation baseline
+        run: ./gradlew v2M0Check
       - name: Check code style
         run: ./gradlew spotlessCheck checkstyleMain checkstyleTest
       - name: Build
