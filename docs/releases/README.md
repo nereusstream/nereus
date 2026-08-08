@@ -4,6 +4,10 @@ This document defines the required process for freezing a Nereus release commit 
 Release branches are temporary stabilization lines; `main` remains the owner of reusable product, test, admin, and
 build capabilities. Deleting a release branch is a separate decision and is never part of this procedure.
 
+Release records:
+
+- [`v0.1.0`](v0.1.0.md): V1 branch freeze; annotated tag and artifact publication pending.
+
 ## 1. Naming and version authority
 
 - Use `v<major>.<minor>` for a stabilization branch, for example `v0.2`.

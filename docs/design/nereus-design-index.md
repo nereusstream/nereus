@@ -291,6 +291,7 @@ decision behind items 14 and 16-18。
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation                                                     | accepted ADR                                                                                                                                                                         |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md`      | Phase 1.5 sequencing、dual-read/new-write and F2 gate                                | accepted ADR                                                                                                                                                                         |
 | `../decisions/0005-native-kafka-fork-and-adapter-boundary.md`           | F9 dedicated Apache Kafka fork、adapter and F5 isolation boundary                    | accepted；F9 implementation final-gated for the recorded exact-source tuple                                                                                                           |
+| `../decisions/0006-v0.2-clean-break-from-v0.1.md`                       | `v0.1` preservation、V2 fresh-deployment boundary and compatibility policy           | accepted for `main@0.2.0-SNAPSHOT`                                                                                                                                                   |
 
 ## 7. 能力轨道文档
 

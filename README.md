@@ -809,6 +809,8 @@ Phase 4 只计划实现
 
 Start with `docs/design/nereus-design-index.md` for document authority and current status. Use
 `docs/releases/README.md` for release freeze and immutable tag procedures. Use
+`docs/decisions/0006-v0.2-clean-break-from-v0.1.md` for the accepted `v0.1` preservation and
+`main@0.2.0-SNAPSHOT` clean-break boundary. Use
 `docs/phase-1-core-stream-storage/README.md` for the implemented L0 contract and
 `docs/phase-1.5-core-storage-foundation/README.md` for the active L0 evolution contract. Use
 `docs/phase-2-managed-ledger-facade/README.md` for the implemented F2 contract，and
