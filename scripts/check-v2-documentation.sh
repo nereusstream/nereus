@@ -67,6 +67,10 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0012-v2-storage-epochs-and-profile-evolution.md"
     "$repo_root/docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
     "$repo_root/docs/decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md"
+    "$repo_root/docs/decisions/0015-v2-0.2-storage-epoch-runtime-scope.md"
+    "$repo_root/docs/decisions/0016-v2-0.2-cross-protocol-runtime-scope.md"
+    "$repo_root/docs/decisions/0017-v2-pulsar-managed-ledger-offload-authority.md"
+    "$repo_root/docs/decisions/0018-v2-object-wal-uncertain-put-proof.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -88,18 +92,38 @@ require_literal "At most one epoch admits new positions at a time" "docs/decisio
 require_literal "simultaneous native writers for one Topic Incarnation" "docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
 require_literal "Every Protocol Cell nevertheless owns a distinct" "docs/decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md"
 require_literal "Object WAL groups never cross Protocol Cells in 0.2" "docs/decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md"
+require_literal "creates exactly one initial Storage Epoch" "docs/decisions/0015-v2-0.2-storage-epoch-runtime-scope.md"
+require_literal "does not implement" "docs/decisions/0016-v2-0.2-cross-protocol-runtime-scope.md"
+require_literal "sole offload and lifecycle authority" "docs/decisions/0017-v2-pulsar-managed-ledger-offload-authority.md"
+require_literal "ETag alone is never sufficient" "docs/decisions/0018-v2-object-wal-uncertain-put-proof.md"
+require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
+require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
+require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
 require_literal "NonNormativeQuestionLog" "docs/v2/open-questions.md"
 require_literal "NonNormativeSessionRecord" "docs/v2/grill-notes/01-protocol-position-fabric-and-migration.md"
 require_literal 'This closes `V2-OPEN-FABRIC-01`' "docs/v2/grill-notes/02-provider-sharing-and-protocol-cell-isolation.md"
 require_literal "Restarted Grill 2 frontier" "docs/v2/grill-notes/03-restarted-grill-2-scope-and-offload-frontier.md"
+require_literal "全部按推荐确认" "docs/v2/grill-notes/03-restarted-grill-2-scope-and-offload-frontier.md"
+require_literal "Restarted Grill 2 round 2" "docs/v2/grill-notes/04-restarted-grill-2-initial-authority-and-object-identity.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-META-01`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-BK-03`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-OBJ-04`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-PUL-OBJ-01`' "docs/v2/open-questions.md"
 require_literal "resolved by ADR 0014" "docs/v2/open-questions.md"
 
-if rg -Fq '| `V2-OPEN-FABRIC-01` |' "$repo_root/docs/v2/README.md"; then
-    fail "V2-OPEN-FABRIC-01 remains in the active gate table"
-fi
+for resolved_gate in \
+    V2-OPEN-FABRIC-01 \
+    V2-OPEN-MIGRATION-01 \
+    V2-OPEN-PROJECTION-SCOPE-01 \
+    V2-OPEN-BK-01 \
+    V2-OPEN-OBJ-02; do
+    if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
+        fail "$resolved_gate remains in the active gate table"
+    fi
+done
 
 active_contracts=(
     "$repo_root/docs/v2"
@@ -113,6 +137,10 @@ active_contracts=(
     "$repo_root/docs/decisions/0012-v2-storage-epochs-and-profile-evolution.md"
     "$repo_root/docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
     "$repo_root/docs/decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md"
+    "$repo_root/docs/decisions/0015-v2-0.2-storage-epoch-runtime-scope.md"
+    "$repo_root/docs/decisions/0016-v2-0.2-cross-protocol-runtime-scope.md"
+    "$repo_root/docs/decisions/0017-v2-pulsar-managed-ledger-offload-authority.md"
+    "$repo_root/docs/decisions/0018-v2-object-wal-uncertain-put-proof.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )
@@ -292,7 +320,7 @@ if missing_tradeoffs:
 
 contract_paths = list((root / "docs/v2").glob("*.md"))
 contract_paths += list((root / "docs/decisions").glob("000[7-9]-*.md"))
-contract_paths += list((root / "docs/decisions").glob("001[0-4]-*.md"))
+contract_paths += list((root / "docs/decisions").glob("001[0-8]-*.md"))
 contract_text = "\n".join(
     path.read_text() for path in contract_paths if path != tradeoff_path
 )
@@ -331,6 +359,10 @@ link_docs=(
     "$repo_root/docs/decisions/0012-v2-storage-epochs-and-profile-evolution.md"
     "$repo_root/docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
     "$repo_root/docs/decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md"
+    "$repo_root/docs/decisions/0015-v2-0.2-storage-epoch-runtime-scope.md"
+    "$repo_root/docs/decisions/0016-v2-0.2-cross-protocol-runtime-scope.md"
+    "$repo_root/docs/decisions/0017-v2-pulsar-managed-ledger-offload-authority.md"
+    "$repo_root/docs/decisions/0018-v2-object-wal-uncertain-put-proof.md"
 )
 
 while IFS=: read -r source match; do

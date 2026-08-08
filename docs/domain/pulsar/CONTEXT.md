@@ -29,3 +29,9 @@ _Avoid_: Universal position domain
 **Pulsar Native Write Authority**:
 The Pulsar broker and ManagedLedger ownership permitted to allocate new Pulsar Positions for a bound Topic Incarnation.
 _Avoid_: Object writer authority, Kafka leader authority
+
+**Pulsar Offload Authority**:
+For `BOOKKEEPER_WAL_ASYNC_OBJECT`, native ManagedLedger ledger/offload metadata is the sole authority for attempt,
+completion, offloaded read/fallback, and BookKeeper deletion eligibility. A Nereus `LedgerOffloader` writes Object
+bytes; a Nereus manifest is derived.
+_Avoid_: Parallel manifest authority, generic cross-protocol offload state

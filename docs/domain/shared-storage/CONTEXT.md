@@ -77,7 +77,8 @@ _Avoid_: Global end offset, untyped watermark
 
 **Storage Epoch**:
 One immutable interval in a Topic Protocol Binding's append-only storage history, with one profile and protocol-native
-start/sealed-end frontiers. Lifecycle changes are append-only state history; the exact state vocabulary is open.
+start/sealed-end frontiers. Lifecycle changes are append-only state history. In 0.2 one initial epoch is created per
+Topic Incarnation and no online transition runtime exists; the exact future transition vocabulary is deferred.
 _Avoid_: Mutable profile, storage mode flag
 
 ## Projection and migration
@@ -88,7 +89,8 @@ granting the target protocol position-allocation authority.
 _Avoid_: Dual-native topic, shared writer
 
 **Projection Map**:
-A durable mapping between source and target Protocol Coverage for an Access Projection or migration.
+A future durable mapping between source and target Protocol Coverage for an Access Projection or migration. The term is
+retained in 0.2, but no Projection Map store/runtime is shipped.
 _Avoid_: Global offset map, per-message control-plane commit
 
 **Migration Link**:

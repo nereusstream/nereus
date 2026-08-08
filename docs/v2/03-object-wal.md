@@ -50,12 +50,19 @@ binding before the layout is frozen.
 
 ## PUT-response loss
 
-Object provider capability is explicit. Recovery requires deterministic create identity, strong read-after-write for
-the selected operation, and byte verification using length plus a trustworthy checksum or version identity. ETag is
-not assumed to be a content hash, especially under multipart upload or server-side encryption.
+Object provider capability is explicit. `OBJECT_WAL` requires deterministic immutable create, overwrite prevention,
+the required read-after-write behavior, and bounded verification. A provider or operation mode that lacks any of these
+capabilities is rejected for this profile.
 
-If metadata cannot prove the checksum, recovery performs a bounded range or full GET. A mismatched existing object is
-quarantined and fails closed; it is never overwritten under the original immutable identity.
+After a lost PUT response, `HEAD` proves success only when it returns the exact expected length plus a trustworthy
+whole-content checksum bound to the same immutable object identity/version. Otherwise recovery performs a bounded full
+GET and recomputes the expected checksum. ETag alone is never accepted as content identity, especially under multipart
+upload or server-side encryption.
+
+A missing object may be retried only under the same deterministic identity with conditional-create semantics. A
+mismatched existing object is quarantined and fails closed; it is never overwritten. Exhausting the verification budget
+does not produce an ACK: the operation remains uncertain for bounded reconciliation while admission prevents unbounded
+retention. ADR 0018 is the authoritative proof contract.
 
 ## WalRun and bounded recovery
 
@@ -79,4 +86,5 @@ and close lifecycle. A compatible lower-level transport may be pooled, but a cel
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
 Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001`, `V2-OBJ-002`,
-`V2-OBJ-003`, and `V2-FABRIC-002`.
+`V2-OBJ-003`, and `V2-FABRIC-002`. See
+[ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md).

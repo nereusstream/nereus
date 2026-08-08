@@ -24,8 +24,9 @@ Shared contracts are separated into:
 Conformance suites verify fencing, monotonic roots, idempotency, response-loss recovery, and bounded enumeration. They
 do not require both backends to implement the same ephemeral lease primitive.
 
-If Access Projection or Migration Link runtime support is later accepted, its `ProjectionMapStore` and authority
-transfer contract remain separate capabilities. They may not create a per-append cross-protocol metadata dependency.
+ADR 0016 excludes Access Projection and Migration Link runtime from 0.2. The M1 model rejects a second Native Write
+Authority but does not expose `ProjectionMapStore`. A future accepted runtime must keep its map and authority-transfer
+contracts as separate capabilities and may not create a per-append cross-protocol metadata dependency.
 
 ## Kafka backend
 
@@ -42,7 +43,9 @@ authority remain cell-scoped. Shared capacity never creates a cross-cell publica
 
 Pulsar uses MetadataStore/Oxia for Nereus-owned Topic Protocol Binding, Storage Epoch, and lifecycle roots while
 retaining native ManagedLedger, cursor, and broker ownership semantics. A Nereus record cannot overrule stock Pulsar
-metadata that still authorizes a ledger, cursor, transaction, or offload source.
+metadata that still authorizes a ledger, cursor, transaction, or offload source. For Pulsar
+`BOOKKEEPER_WAL_ASYNC_OBJECT`, native ManagedLedger ledger/offload metadata is the sole offload/lifecycle authority; any
+Nereus manifest is derived.
 
 ## Ownership token
 

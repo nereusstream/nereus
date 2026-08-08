@@ -9,8 +9,9 @@ sourceTuple: v2-m0
 
 # BookKeeper and Pulsar
 
-The profile and ACK boundaries and protocol-native position model are accepted. Exact Kafka ledger layout and Pulsar
-offload authority remain proposed until the M2 spikes close `V2-OPEN-BK-01` and `V2-OPEN-BK-02`.
+The profile and ACK boundaries, protocol-native position model, and Pulsar ManagedLedger offload authority are accepted.
+Exact Kafka ledger layout remains proposed until the M2 scale spike closes `V2-OPEN-BK-02`; Pulsar offload execution
+mechanics remain open under `V2-OPEN-BK-03`.
 
 ## Shared BookKeeper contract
 
@@ -54,10 +55,14 @@ ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.
 ## Async Object offload authority
 
 For Kafka `BOOKKEEPER_WAL_ASYNC_OBJECT`, the Nereus manifest joins sealed Kafka Offset Range coverage to the preferred
-Object Extent while retaining the BookKeeper Extent as protected fallback. For Pulsar, the preferred direction is a
-native ManagedLedger offload integration or custom offloader. Pulsar ledger metadata must continue to authorize cursor,
-retention, offload fallback, and source deletion. A Nereus manifest may be a derived read index or an explicitly
-integrated extension; it cannot independently delete a ledger that stock ManagedLedger still references.
+Object Extent while retaining the BookKeeper Extent as protected fallback.
+
+For Pulsar, native ManagedLedger ledger/offload metadata is the sole authority for attempt identity, completion,
+offloaded read selection and fallback, and BookKeeper deletion eligibility. Nereus implements a custom
+`LedgerOffloader` that produces the accepted immutable Object format and completes only after its bytes and authoritative
+root are durable and readable. A Nereus manifest is a rebuildable derived read/materialization index; it cannot complete
+a native offload, overrule fallback, or independently authorize ledger deletion. Disagreement fails closed in favor of
+ManagedLedger. ADR 0017 is authoritative.
 
 A BookKeeper source becomes physically deletable only after all of these are durable and revalidated:
 
@@ -68,6 +73,9 @@ A BookKeeper source becomes physically deletable only after all of these are dur
 - no cursor, reader pin, recovery root, task, or source protection references it;
 - grace and response-loss reconciliation completed.
 
+Offloader completion creates deletion eligibility; it does not itself bypass the remaining native retention, cursor,
+read-pin, deletion-lag, or Nereus source-protection checks.
+
 ## Lag policy
 
 Async offload exposes pending ledgers/bytes/age and the oldest unmaterialized typed Protocol Frontier. Policy may alert,
@@ -75,4 +83,5 @@ throttle, or stop new admission before BookKeeper capacity is exhausted. It neve
 into a synchronous Object write.
 
 Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, and `T-POSITION-01`. Required scenarios:
-`V2-BK-001`, `V2-BK-002`, `V2-BK-003`, and `V2-POSITION-001`.
+`V2-BK-001`, `V2-BK-002`, `V2-BK-003`, and `V2-POSITION-001`. See
+[ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md).

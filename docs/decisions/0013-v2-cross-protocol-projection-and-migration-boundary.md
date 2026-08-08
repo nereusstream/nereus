@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted as an architectural boundary. Kafka/Pulsar projection and migration runtime delivery are not committed to 0.2.
+Accepted as an architectural boundary. ADR 0016 excludes Kafka/Pulsar projection and migration runtime from 0.2.
 
 ## Context
 
@@ -30,8 +30,8 @@ semantic translations.
 
 - Shared read access and authority migration are distinct domain concepts.
 - A Storage Epoch changes physical placement under one protocol; a Migration Link changes protocol authority.
-- Projection maps may be segment-granular, but the exact format and lifecycle require a later accepted decision.
+- Projection-map granularity, format, and lifecycle require a later accepted decision.
 - KoP remains outside the current session and 0.2 runtime scope.
 
-This decision is tracked by `T-PROJECTION-01`, `V2-PROJECTION-001`, and the
-[V2 open questions](../v2/open-questions.md).
+This decision is refined by [ADR 0016](0016-v2-0.2-cross-protocol-runtime-scope.md) and tracked by
+`T-PROJECTION-01`, `V2-PROJECTION-001`, and the [V2 open questions](../v2/open-questions.md).

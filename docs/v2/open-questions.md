@@ -13,30 +13,42 @@ This file records proposals that have not been accepted as runtime contracts and
 traceability. An answer moves into a normative document or ADR only after explicit confirmation; editing this file
 alone cannot close a gate.
 
-## Restarted Grill 2 frontier
+## Restarted Grill 2: current frontier
 
-ADR 0014 resolved the earlier Provider-sharing question. After that document update, the current independent decision
+The user explicitly confirmed the previous four recommendations. ADRs 0015 through 0018 now resolve
+`V2-OPEN-MIGRATION-01`, `V2-OPEN-PROJECTION-SCOPE-01`, `V2-OPEN-BK-01`, and `V2-OPEN-OBJ-02`. The next independent
 frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-MIGRATION-01` | how much online Storage Epoch transition runtime belongs in 0.2 | keep the chain/invariants, but ship no online transition API/state machine in 0.2 |
-| `V2-OPEN-PROJECTION-SCOPE-01` | whether Kafka/Pulsar projection or authority migration runtime belongs in 0.2 | retain only the model and dual-authority rejection in 0.2 |
-| `V2-OPEN-BK-01` | who authorizes Pulsar BookKeeper-to-Object offload, fallback, and deletion | native ManagedLedger metadata plus a Nereus LedgerOffloader |
-| `V2-OPEN-OBJ-02` | how Object WAL resolves a lost PUT response | capability-tiered HEAD proof or bounded GET; never ETag alone |
+| `V2-OPEN-META-01` | how Topic Protocol Binding and its one initial Storage Epoch become atomically visible | publish one atomic aggregate when the backend supports it; otherwise use an idempotent `CREATING` intent and reject incomplete opens |
+| `V2-OPEN-BK-03` | whether Pulsar async offload starts with sealed-ledger or streaming/current-ledger execution | offload sealed non-current ledgers only in 0.2 |
+| `V2-OPEN-OBJ-04` | which exact byte domains Object WAL checksums protect | use a canonical provider-request-body digest plus independent decoded-frame payload checksums |
+| `V2-OPEN-PUL-OBJ-01` | who allocates Pulsar Object-WAL virtual ledger IDs and orders the ledger chain | use a Pulsar-cell MetadataStore/Oxia virtual-ledger authority; never derive positions from Object keys |
 
-The complete rationale and source observations are in
-[the restarted Grill 2 record](grill-notes/03-restarted-grill-2-scope-and-offload-frontier.md). All four answers still
-require explicit confirmation.
+The complete questions and recommendations are in
+[the next Grill 2 round](grill-notes/04-restarted-grill-2-initial-authority-and-object-identity.md). None of these four
+new recommendations is accepted yet.
+
+## Initial binding and epoch publication
+
+### `V2-OPEN-META-01`: atomic visible create
+
+0.2 creates one immutable Topic Protocol Binding and exactly one initial Storage Epoch. Can a reader/writer ever observe
+only one half after create timeout, retry, controller/store failover, or concurrent topic open?
+
+Current recommendation, not a decision: expose binding plus initial epoch as one visible aggregate. KRaft should publish
+the records in one replay-atomic controller batch. A MetadataStore/Oxia backend should use one transaction when its
+exact API satisfies the conformance contract; otherwise it persists a deterministic `CREATING` intent and idempotently
+completes both records before changing the aggregate to `ACTIVE`. Open, append, and read reject or recover an incomplete
+aggregate; they never invent a default epoch.
 
 ## Object WAL durability verification
 
-### `V2-OPEN-OBJ-02`: PUT-response-loss proof
+### `V2-OPEN-OBJ-02`: resolved PUT-response-loss proof
 
-Which provider proof is sufficient when the immutable Object WAL PUT may have succeeded but the caller lost the
-response?
-
-Current recommendation, not a decision:
+Resolved by [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md). When an immutable Object WAL PUT may have
+succeeded but the response was lost:
 
 1. use HEAD only when it returns exact length plus a trustworthy content checksum bound to the immutable object
    identity/version;
@@ -45,11 +57,22 @@ Current recommendation, not a decision:
 4. do not admit a provider to `OBJECT_WAL` when deterministic immutable create, the required read-after-write
    behavior, or bounded verification cannot be established.
 
-This closes a design contract only. M3 still needs real-provider response-loss and checksum-drift evidence.
+This closes the design choice only. M3 still needs real-provider response-loss and checksum-drift evidence.
+
+### `V2-OPEN-OBJ-04`: checksum byte domains
+
+The uncertain-PUT proof now requires an expected checksum, but encryption, compression, payload decoding, and provider
+checksum headers can refer to different byte streams.
+
+Current recommendation, not a decision: use two explicit layers. The Object Extent carries a digest of the canonical
+request body presented to the provider after Nereus compression and client-side encryption; a provider checksum proves
+durability only when its documented scope matches that byte stream and the immutable version. Each frame separately
+carries a checksum over the decoded protocol payload/record bytes. Recovery validates the stored-object layer before
+decode, then frame checksums after decode. The two fields use distinct names and cannot substitute for one another.
 
 ## Storage Epoch transitions
 
-### `V2-OPEN-MIGRATION-01`: initial transition matrix
+### `V2-OPEN-MIGRATION-01`: resolved 0.2 transition scope
 
 Which profile transitions are implemented in 0.2, and which remain domain-model capability only?
 
@@ -59,13 +82,14 @@ Earlier transition ordering proposal, retained as input rather than a decision:
 2. Kafka `OBJECT_WAL` ↔ a BookKeeper profile can cut at a Kafka Offset frontier.
 3. Pulsar BookKeeper ↔ Object WAL is substantially harder because native ManagedLedger ledger-chain semantics change.
 
-Restarted Grill 2 recommendation, not a decision: 0.2 persists the Storage Epoch chain model and enforces typed-cut and
-single-admitting-epoch invariants, but exposes no online transition API/state machine. The runtime creates one initial
-epoch per Topic Incarnation; later releases may activate transitions without changing the durable model.
+Resolved by [ADR 0015](../decisions/0015-v2-0.2-storage-epoch-runtime-scope.md): 0.2 persists the Storage Epoch chain model
+and enforces typed-cut and single-admitting-epoch invariants, but exposes no online transition API/state machine. The
+runtime creates one initial epoch per Topic Incarnation; later releases may activate transitions only after accepting
+their own contracts.
 
 ### `V2-OPEN-MIGRATION-02`: transition state machine
 
-The proposed states are:
+Deferred beyond the 0.2 runtime. The historical proposed states are retained as future design input:
 
 ```text
 ACTIVE_OLD
@@ -78,31 +102,51 @@ RETIRING_OLD_PHYSICAL
 COMPLETED
 ```
 
-The design still needs exact authority, retry, cancellation, response-loss, crash-cut, rollback, and operator-visible
-semantics for every transition. In particular, it must define what happens after the old epoch is sealed but activation
-of the new epoch is uncertain.
+A future transition feature still needs exact authority, retry, cancellation, response-loss, crash-cut, rollback, and
+operator-visible semantics. This question does not block 0.2.
 
 ### `V2-OPEN-MIGRATION-03`: historical data movement
 
-Must a profile transition backfill old Protocol Coverage into the new physical profile, or may the reader retain a
-permanent multi-epoch history? If backfill is optional, which cost/latency policies trigger it and when may the old
-Physical Extent be retired?
+Deferred beyond the 0.2 runtime. Must a future profile transition backfill old Protocol Coverage into the new physical
+profile, or may the reader retain a permanent multi-epoch history? If backfill is optional, which cost/latency policies
+trigger it and when may the old Physical Extent be retired?
 
 ## Pulsar BookKeeper/Object evolution
 
-### `V2-OPEN-BK-01`: Pulsar async Object authority
+### `V2-OPEN-BK-01`: resolved Pulsar async Object authority
 
-For Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`, which authority records offload attempts/completion, serves fallback, and
-permits BookKeeper deletion?
-
-Current recommendation, not a decision: retain native ManagedLedger ledger/offload metadata as authority and implement
-the Nereus Object format through a `LedgerOffloader`. A Nereus manifest may remain a derived read/materialization index
-but cannot independently authorize native ledger deletion.
+Resolved by [ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md): native ManagedLedger
+ledger/offload metadata is the sole authority for attempts/completion, read/fallback, and BookKeeper deletion
+eligibility. Nereus implements its Object format through a `LedgerOffloader`; a Nereus manifest is derived and cannot
+independently authorize native ledger deletion.
 
 The local Pulsar checkout already records an attempt UUID before calling the offloader, marks completion afterward,
 opens offloaded reads from ledger metadata, and consults the offload context before BookKeeper deletion. Reusing that
-state machine best preserves the “not weaker than native Pulsar” requirement. Initial sealed-ledger versus streaming
-offload mechanics depend on this authority decision and belong to a later frontier.
+state machine best preserves the “not weaker than native Pulsar” requirement.
+
+### `V2-OPEN-BK-03`: sealed-ledger or streaming offload
+
+The pinned Pulsar development source exposes both ledger-based `offload(ReadHandle, UUID, ...)` and an evolving
+`streamingOffload(...)` API shape. Its ordinary prefix-offload path selects non-current ledgers and completes native
+metadata around a ledger offload attempt.
+
+Current recommendation, not a decision: 0.2 offloads only sealed, non-current ManagedLedger ledgers through the
+ledger-based offloader. It does not stream the active ledger into Object storage. This keeps offload completion aligned
+with an immutable ledger coverage and native fallback/deletion semantics. The cost is cold-copy lag of up to one ledger
+rollover; ledger size/age limits and lag admission policy bound that delay.
+
+## Pulsar Object WAL
+
+### `V2-OPEN-PUL-OBJ-01`: virtual ledger identity and chain authority
+
+`OBJECT_WAL` still has to expose stable `PulsarPosition(ledgerId, entryId)` and MessageId without turning Object group
+keys, byte offsets, or shared group sequence into protocol positions.
+
+Current recommendation, not a decision: a Pulsar-cell `PulsarVirtualLedgerStore` in MetadataStore/Oxia allocates unique
+virtual ledger IDs from an explicitly reserved identity domain and publishes their append-only Ledger Chain order.
+Entry IDs are allocated serially inside that virtual ledger; chain order comes from metadata, never numeric ledger-ID
+sorting. Object WAL groups remain Physical Extents and may contain frames from multiple bindings in the same cell, so an
+object key can never be a ledger ID. Ledger creation/rollover is low-frequency control metadata, not a per-append commit.
 
 ### `V2-OPEN-PUL-MIGRATION-01`: new incarnation or HybridManagedLedger
 
@@ -115,27 +159,21 @@ recovery, compaction, replication, transactions, and rollback.
 
 ## Cross-protocol access and migration
 
-### `V2-OPEN-PROJECTION-SCOPE-01`: 0.2 runtime scope
+### `V2-OPEN-PROJECTION-SCOPE-01`: resolved 0.2 runtime scope
 
-Should 0.2 deliver Kafka/Pulsar Access Projection or Migration Link runtime, or only retain their domain boundary and
-reject dual Native Write Authorities?
-
-Current recommendation, not a decision: 0.2 retains the types, invariants, and scenario-level rejection of a second
-Native Write Authority, but does not implement Projection Map storage, secondary-protocol serving, semantic state
-translation, or authority-transfer runtime. This keeps 0.2 focused on beating the Kafka and native Pulsar baselines.
-
-If runtime delivery is deferred, `V2-OPEN-PROJECTION-01..03` stay documented but do not block the 0.2 release. If it is
-selected, all three become release-blocking design gates.
+Resolved by [ADR 0016](../decisions/0016-v2-0.2-cross-protocol-runtime-scope.md): 0.2 retains the domain identities,
+invariants, and rejection of a second Native Write Authority, but does not implement Projection Map storage,
+secondary-protocol serving, semantic state translation, or authority-transfer runtime.
 
 ### `V2-OPEN-PROJECTION-01`: Projection Map granularity
 
-Should Projection Map entries be segment-level coverage mappings, ledger-level mappings, batch mappings, or a hybrid?
-The proposal avoids one control-metadata mutation per message, but random seek, partial batch ACK, and corruption repair
-must remain bounded.
+Deferred beyond the 0.2 runtime. Should future Projection Map entries be segment-level coverage mappings, ledger-level
+mappings, batch mappings, or a hybrid? The proposal avoids one control-metadata mutation per message, but random seek,
+partial batch ACK, and corruption repair must remain bounded.
 
 ### `V2-OPEN-PROJECTION-02`: Migration Link state machine
 
-The proposed Kafka/Pulsar authority-transfer saga is:
+Deferred beyond the 0.2 runtime. The historical proposed Kafka/Pulsar authority-transfer saga is:
 
 ```text
 SOURCE_ACTIVE
@@ -153,7 +191,7 @@ to allocate native positions.
 
 ### `V2-OPEN-PROJECTION-03`: semantic transfer contract
 
-The mapping must decide how to translate:
+A future runtime must decide how to translate:
 
 - Kafka consumer groups and Pulsar subscription cursors;
 - Pulsar batch indexes and Kafka record offsets;
@@ -169,6 +207,18 @@ For example, one Pulsar entry with batch indexes `0..2` might map to one Kafka O
 input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
+
+### Restarted Grill 2 decisions: resolved by ADRs 0015 through 0018
+
+Resolved on 2026-08-09 after explicit confirmation:
+
+- `V2-OPEN-MIGRATION-01` → [ADR 0015](../decisions/0015-v2-0.2-storage-epoch-runtime-scope.md);
+- `V2-OPEN-PROJECTION-SCOPE-01` → [ADR 0016](../decisions/0016-v2-0.2-cross-protocol-runtime-scope.md);
+- `V2-OPEN-BK-01` → [ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md);
+- `V2-OPEN-OBJ-02` → [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md).
+
+Their original recommendations and source rationale remain in
+[the restarted Grill 2 record](grill-notes/03-restarted-grill-2-scope-and-offload-frontier.md).
 
 ### `V2-OPEN-FABRIC-01`: resolved by ADR 0014
 

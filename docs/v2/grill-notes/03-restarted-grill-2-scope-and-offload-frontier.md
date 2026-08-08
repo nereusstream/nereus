@@ -11,9 +11,9 @@ sourceTuple: v2-m0
 
 Date: 2026-08-09
 
-This record recomputes Grill 2 after the latest documentation updates. It contains questions and recommendations only;
-none of them is an accepted runtime contract. Explicit user answers must be synchronized into the affected ADR,
-normative contract, tradeoff, open-question state, and scenarios before they become authoritative.
+This record recomputes Grill 2 after the latest documentation updates and preserves the questions and recommendations
+that were presented. The user subsequently confirmed all four recommendations. The accepted contracts are ADRs 0015
+through 0018; this session record is not runtime evidence.
 
 ## Why the frontier changed
 
@@ -84,3 +84,22 @@ PUT 会增加 GET 成本，收益是 ACK/recovery 不依赖 provider-specific ET
 - `V2-OPEN-OBJ-01` is an M3 proof gate, not a product choice.
 - `V2-OPEN-BK-02` requires the 10k/100k Kafka partition resource spike; that fact must not be guessed from prose.
 - benchmark commit/threshold selection remains an M8 source/evidence task.
+
+## Confirmed answer and authoritative synchronization
+
+The user answered: “全部按推荐确认”. The decisions were synchronized as follows:
+
+- Q1 / `V2-OPEN-MIGRATION-01` →
+  [ADR 0015](../../decisions/0015-v2-0.2-storage-epoch-runtime-scope.md): one initial Storage Epoch per Topic
+  Incarnation and no 0.2 online transition runtime;
+- Q2 / `V2-OPEN-PROJECTION-SCOPE-01` →
+  [ADR 0016](../../decisions/0016-v2-0.2-cross-protocol-runtime-scope.md): retain boundary/dual-authority rejection, no
+  0.2 projection or migration runtime;
+- Q3 / `V2-OPEN-BK-01` →
+  [ADR 0017](../../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md): ManagedLedger metadata is sole Pulsar
+  offload/lifecycle authority and Nereus manifest is derived;
+- Q4 / `V2-OPEN-OBJ-02` →
+  [ADR 0018](../../decisions/0018-v2-object-wal-uncertain-put-proof.md): capability-tiered HEAD/full-GET proof, never
+  ETag alone, and reject unverifiable providers.
+
+Implementation and executable evidence remain NotStarted.

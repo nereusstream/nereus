@@ -50,9 +50,16 @@ A Topic Protocol Binding is immutable for one Topic Incarnation and fixes Protoc
 payload mapping, and Native Write Authority. Kafka Offset and Pulsar Position are separate truths; shared storage uses
 typed Protocol Coverage and never creates a universal logical offset.
 
-A profile is immutable within one Storage Epoch. A binding may have an append-only epoch chain with protocol-native
-cutover frontiers, but the supported online transition matrix and exact transition state machine are not yet accepted.
-Operational batching, cache, throttling, and compaction policy remain separately mutable.
+A profile is immutable within one Storage Epoch. The durable model permits an append-only epoch chain with
+protocol-native cutover frontiers, but ADR 0015 limits 0.2 to exactly one initial epoch per Topic Incarnation and no
+online profile-transition API/state machine. Operational batching, cache, throttling, and compaction policy remain
+separately mutable.
+
+ADR 0016 retains Access Projection/Migration Link identities and rejects a second Native Write Authority, while
+excluding cross-protocol serving and authority-transfer runtime from 0.2. For Pulsar
+`BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole lifecycle authority and Nereus supplies
+a `LedgerOffloader`; any Nereus manifest is derived. Object WAL uncertain PUTs use ADR 0018's capability-tiered
+HEAD/full-GET proof and never trust ETag alone.
 
 Provider sharing is physical, not authoritative. Multiple cells may use the same external Object Storage or BookKeeper
 infrastructure, while each cell owns its Cell Provider Scope/session, namespace, credential/KMS and operator scope,
@@ -85,21 +92,29 @@ Accepted decisions:
 - [ADR 0012: Storage Epochs and profile evolution](../decisions/0012-v2-storage-epochs-and-profile-evolution.md)
 - [ADR 0013: cross-protocol projection and migration boundary](../decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md)
 - [ADR 0014: provider sharing and Protocol Cell isolation](../decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md)
+- [ADR 0015: 0.2 Storage Epoch runtime scope](../decisions/0015-v2-0.2-storage-epoch-runtime-scope.md)
+- [ADR 0016: 0.2 cross-protocol runtime scope](../decisions/0016-v2-0.2-cross-protocol-runtime-scope.md)
+- [ADR 0017: Pulsar ManagedLedger offload authority](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md)
+- [ADR 0018: Object WAL uncertain PUT proof](../decisions/0018-v2-object-wal-uncertain-put-proof.md)
 
 ## Open design gates
 
-`V2-OPEN-FABRIC-01` was resolved by ADR 0014. The rows below are the remaining active gates.
+`V2-OPEN-FABRIC-01` was resolved by ADR 0014. ADRs 0015 through 0018 also resolve
+`V2-OPEN-MIGRATION-01`, `V2-OPEN-PROJECTION-SCOPE-01`, `V2-OPEN-BK-01`, and `V2-OPEN-OBJ-02`. The rows below are the
+remaining active 0.2 decisions or evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
+| `V2-OPEN-META-01` | freeze atomic visibility and retry semantics for Topic Protocol Binding plus its initial Storage Epoch | M1 binding/epoch store freeze |
 | `V2-OPEN-OBJ-01` | prove per-binding typed durable frontiers inside a multi-binding Object group without shard-wide HOL | M3 layout freeze |
-| `V2-OPEN-OBJ-02` | freeze provider verification for PUT-response loss; ETag alone is insufficient | M3 provider contract |
-| `V2-OPEN-BK-01` | choose native ManagedLedger offload authority or an exact metadata integration | M2 Pulsar async-object implementation |
+| `V2-OPEN-OBJ-04` | freeze the stored-object and decoded-frame checksum byte domains | M3 Object format/provider contract |
 | `V2-OPEN-BK-02` | validate one-active-ledger-per-Kafka-partition at 10k and 100k partitions | M2 Kafka BK layout freeze |
-| `V2-OPEN-MIGRATION-01..03` | freeze supported profile transitions, runtime states, and historical-data policy | any online profile-transition implementation |
-| `V2-OPEN-PUL-MIGRATION-01` | choose new-incarnation cutover or a proven hybrid ledger model | Pulsar BookKeeper/Object transition |
-| `V2-OPEN-PROJECTION-01..03` | freeze map granularity, authority-transfer failure semantics, and protocol semantics | Kafka/Pulsar projection or migration runtime |
+| `V2-OPEN-BK-03` | choose sealed-ledger or streaming/current-ledger Pulsar async offload | M2 Pulsar offloader execution freeze |
+| `V2-OPEN-PUL-OBJ-01` | freeze virtual ledger ID allocation and Ledger Chain authority for Pulsar Object WAL | M2/M3 Pulsar Object path freeze |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |
+
+`V2-OPEN-MIGRATION-02..03`, `V2-OPEN-PUL-MIGRATION-01`, and `V2-OPEN-PROJECTION-01..03` remain recorded as deferred
+future-design questions. ADRs 0015 and 0016 make them non-blocking for 0.2.
 
 ## Maintenance rule
 

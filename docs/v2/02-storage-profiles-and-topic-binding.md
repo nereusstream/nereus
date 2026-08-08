@@ -59,9 +59,11 @@ end frontier is assigned once and cannot be moved. Epoch coverage is ordered by 
 universal offset. At most one epoch may admit newly allocated positions at a time, and a cutover may not create
 overlapping Native Write Authorities or require synchronous dual write.
 
-This is a domain contract, not a claim that every transition is supported in 0.2. The initial transition matrix, exact
-runtime state machine, rollback points, historical-data movement, and Pulsar BookKeeper/Object strategy remain
-non-normative questions in [V2 open questions](open-questions.md).
+ADR 0015 fixes the 0.2 runtime to exactly one initial Storage Epoch per Topic Incarnation. The release exposes no online
+profile-transition API/state machine and may not create a second epoch for an existing incarnation. The append-only
+chain shape and typed-cut/single-admitting-epoch invariants remain durable model contracts for future evolution; they do
+not advertise a 0.2 transition feature. Exact future transitions remain deferred in
+[V2 open questions](open-questions.md).
 
 ## Operational policy
 
@@ -97,14 +99,15 @@ The profile explicitly accepts BookKeeper cost in exchange for low-latency quoru
 ACK has the same BookKeeper boundary as the WAL-only profile. Sealed Protocol Coverage is asynchronously materialized
 to Object storage. Lag policy may throttle or stop admission, but it never changes a completed ACK into a synchronous
 Object wait.
-BookKeeper source deletion requires the manifest/offload and protocol-native safety proof in
-[BookKeeper and Pulsar](04-bookkeeper-and-pulsar.md).
+For Kafka, BookKeeper source deletion requires the Nereus manifest and source-protection proof. For Pulsar, native
+ManagedLedger ledger/offload metadata is the sole offload and deletion-eligibility authority; a Nereus manifest is
+derived and cannot independently delete a native ledger. See [BookKeeper and Pulsar](04-bookkeeper-and-pulsar.md).
 
 ## System topics
 
 Kafka internal topics and Pulsar system topics use explicit initial-epoch profile policy; they never inherit a tenant
-default without validation. A protocol adapter may restrict the allowed profile set or transition set when its recovery
-or transaction authority cannot yet satisfy the contract.
+default without validation. A protocol adapter may restrict the allowed initial profile set when its recovery or
+transaction authority cannot satisfy the contract. No adapter exposes an online transition set in 0.2.
 
 Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-OBJECT-01`, and `T-BK-01`. Required scenarios:
 `V2-PROFILE-001` and `V2-MIGRATION-001`.

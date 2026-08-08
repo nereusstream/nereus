@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted as the V2 domain model. The supported transition matrix and runtime state machine remain open design gates.
+Accepted as the V2 domain model. ADR 0015 fixes the 0.2 runtime scope to one initial epoch per Topic Incarnation and no
+online transition API/state machine.
 
 ## Context
 
@@ -25,9 +26,9 @@ durably establish one exact protocol-native cutover frontier and prevent overlap
 require dual write or a cross-protocol global offset. The exact order of drain, seal, activation, failure recovery, and
 rollback remains open. Readers resolve historical coverage through the epoch chain and its physical extents.
 
-This decision permits future profile evolution without promising that every transition is implemented in 0.2. Exact
-states, operator API, rollback boundary, and the initial Kafka/Pulsar transition matrix remain in
-[V2 open questions](../v2/open-questions.md).
+This decision permits future profile evolution. ADR 0015 explicitly does not activate it in 0.2: the runtime creates one
+initial epoch and rejects same-incarnation profile transition. Exact future states, rollback boundaries, transition
+matrix, and historical-data policy remain deferred in [V2 open questions](../v2/open-questions.md).
 
 ## Consequences
 
@@ -38,4 +39,5 @@ states, operator API, rollback boundary, and the initial Kafka/Pulsar transition
 - Pulsar BookKeeper/Object transitions cannot be assumed to work inside one native ManagedLedger until their dedicated
   open gate is closed.
 
-This decision is tracked by `T-PROFILE-01`, `T-MIGRATION-01`, `V2-PROFILE-001`, and `V2-MIGRATION-001`.
+This decision is refined by [ADR 0015](0015-v2-0.2-storage-epoch-runtime-scope.md) and tracked by `T-PROFILE-01`,
+`T-MIGRATION-01`, `V2-PROFILE-001`, and `V2-MIGRATION-001`.

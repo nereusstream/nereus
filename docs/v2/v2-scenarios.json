@@ -78,7 +78,7 @@
     {
       "id": "V2-MIGRATION-001",
       "milestone": "M1",
-      "contract": "Storage Epoch history uses exact typed cuts and cannot expose two append-admitting epochs",
+      "contract": "0.2 creates one initial Storage Epoch per Topic Incarnation, preserves the append-only typed-cut model, and rejects a second append-admitting epoch",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -86,7 +86,7 @@
     {
       "id": "V2-PROJECTION-001",
       "milestone": "M1",
-      "contract": "Access Projection and Migration Link cannot grant a second Native Write Authority",
+      "contract": "0.2 retains projection and migration identities only for topology validation and cannot grant a second Native Write Authority or production runtime capability",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -110,7 +110,7 @@
     {
       "id": "V2-OBJ-003",
       "milestone": "M3",
-      "contract": "PUT-response loss and bounded WalRun recovery verify bytes without trusting ETag alone",
+      "contract": "lost PUT response uses trustworthy length checksum and version proof or bounded full GET without trusting ETag alone",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -126,7 +126,7 @@
     {
       "id": "V2-BK-002",
       "milestone": "M2",
-      "contract": "Pulsar async offload preserves native ledger cursor retention and fallback authority",
+      "contract": "ManagedLedger metadata is sole Pulsar async offload authority and Nereus LedgerOffloader or derived indexes cannot bypass fallback or deletion safety",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null

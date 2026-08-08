@@ -63,8 +63,9 @@ The acceptance source is an exact clean AutoMQ commit and receipt, never the mov
 ## Pulsar native path
 
 `BOOKKEEPER_WAL_ONLY` must preserve the native ManagedLedger call path and feature behavior before Nereus-specific
-advantages are counted. `BOOKKEEPER_WAL_ASYNC_OBJECT` adds a native-compatible offload lifecycle. `OBJECT_WAL` uses
-an explicit ObjectManagedLedger path and accepts its cost-first latency tradeoff. Every path keeps
+advantages are counted. `BOOKKEEPER_WAL_ASYNC_OBJECT` uses ManagedLedger ledger/offload metadata as sole lifecycle
+authority and a Nereus `LedgerOffloader` for the Object format. `OBJECT_WAL` uses an explicit ObjectManagedLedger path
+and accepts its cost-first latency tradeoff. Every path keeps
 `PulsarPosition(ledgerId, entryId)`, MessageId, and the ledger chain as protocol truth; Object/BookKeeper coordinates
 remain Physical Extents.
 
@@ -87,9 +88,10 @@ The same business data may be exposed through the other protocol only as an Acce
 Projection Map. The target is not a second Native Write Authority. Changing protocol authority uses a Migration Link
 between source and target Topic Protocol Bindings; it is not a Storage Epoch transition.
 
-The boundary is accepted, but projection mapping, state transfer, batch/transaction/cursor semantics, failure rollback,
-and runtime delivery are not committed to 0.2. They remain in [V2 open questions](open-questions.md). No design or
-implementation may use a universal logical offset as a shortcut or allow simultaneous Kafka and Pulsar native writers.
+ADR 0016 retains that boundary and dual-authority rejection but excludes projection mapping, secondary-protocol serving,
+semantic state transfer, and authority-migration runtime from 0.2. Their detailed questions are deferred and do not
+block the release. No design or implementation may use a universal logical offset as a shortcut or allow simultaneous
+Kafka and Pulsar native writers.
 
 ## KoP
 

@@ -23,13 +23,13 @@ the documentation gate proves synchronization only and does not promote runtime 
 | V2-FABRIC-001 | M1 | cells sharing physical provider infrastructure retain distinct Provider scopes/sessions, namespace/security scope, and lifecycle | scope identity/configuration, namespace/credential isolation, independent close and foreign-access rejection | PLANNED |
 | V2-FABRIC-002 | M3 | Object groups never cross Protocol Cells and cell-local throttle/credential/close faults cannot mutate another session | shared-provider dual-cell shard, admission, credential, response-loss, drain and close cuts | PLANNED |
 | V2-FABRIC-003 | M5 | shared worker/cache/GC capacity cannot cross cell queue, task, cache, publication, or delete authority | noisy-neighbor, cache-key collision, stale task, foreign publication/delete and shared-executor restart cuts | PLANNED |
-| V2-MIGRATION-001 | M1 | Storage Epoch history uses exact typed cuts and cannot expose two append-admitting epochs | epoch-chain schema/invariant tests; runtime transition matrix remains open | PLANNED |
-| V2-PROJECTION-001 | M1 | Access Projection and Migration Link cannot grant a second Native Write Authority | model validation and dual-authority rejection tests; runtime mapping remains open | PLANNED |
+| V2-MIGRATION-001 | M1 | 0.2 creates one initial Storage Epoch per Topic Incarnation, preserves the append-only typed-cut model, and rejects a second append-admitting epoch | initial-epoch create/open, immutable fields, chain validation, and second-epoch/transition API rejection | PLANNED |
+| V2-PROJECTION-001 | M1 | 0.2 retains projection/migration identities only for topology validation and cannot grant a second Native Write Authority or production runtime capability | model validation, dual-authority rejection, and absent runtime/store capability tests | PLANNED |
 | V2-OBJ-001 | M3 | Object ACK waits for verified group durability | real provider completion and restart | PLANNED |
 | V2-OBJ-002 | M3 | unrelated bindings avoid shard-wide typed-frontier HOL | stalled/corrupt binding concurrency test | PLANNED |
-| V2-OBJ-003 | M3 | response-loss recovery verifies bytes and remains bounded | real provider lost-response, checksum drift, budget tests | PLANNED |
+| V2-OBJ-003 | M3 | lost PUT response uses trustworthy length/checksum/version proof or bounded full GET, never ETag alone | real-provider success/lost-response, missing/mismatched object, conditional-create race, checksum drift, and budget tests | PLANNED |
 | V2-BK-001 | M2 | BookKeeper ACK never waits for Object | real quorum plus unavailable Object matrix | PLANNED |
-| V2-BK-002 | M2 | Pulsar async offload preserves native ledger authority | native ManagedLedger/offload/cursor/retention gate | PLANNED |
+| V2-BK-002 | M2 | ManagedLedger metadata is sole Pulsar async-offload authority and Nereus `LedgerOffloader`/derived indexes cannot bypass fallback or deletion safety | native attempt/completion recovery, offloaded read/fallback, cursor/retention, disagreement, and source-deletion cuts | PLANNED |
 | V2-BK-003 | M2 | Kafka ledger layout is viable at 10k/100k partitions | memory, handle, metadata, recovery, rollover spike | PLANNED |
 | V2-READ-001 | M4 | one binding-scoped typed logical view survives publication, damage, and fallback | publication cuts, corruption quarantine, protected fallback | PLANNED |
 | V2-READ-002 | M5 | trim/GC cannot delete a live or ambiguously owned source | multi-reader/worker and response-loss matrix | PLANNED |
