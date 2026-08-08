@@ -4,13 +4,15 @@
 
 1. [Design index](nereus-design-index.md)
 2. [V2 overall architecture](nereus-overall-architecture.md)
-3. [Normative V2 contracts](../v2/README.md)
-4. [Accepted decisions](../decisions/)
+3. [V2 Context Map](../../CONTEXT-MAP.md)
+4. [Normative V2 contracts](../v2/README.md)
+5. [Accepted decisions](../decisions/)
+6. [Open questions](../v2/open-questions.md)
 
 ## Authority boundary
 
-Files under `docs/v2/` and ADR 0006-0010 define V2. M0 is documentation-only; current Java and runtime evidence have
-not yet been promoted to V2.
+Accepted ADRs, the Context Map/glossaries, and normative files under `docs/v2/` define V2. ADR 0010 is superseded by
+ADR 0012. M0 is documentation-only; current Java and runtime evidence have not yet been promoted to V2.
 
 The following design and Phase/Future files remain as V1 implementation evidence while matching V1 code still exists
 on `main`:
@@ -33,5 +35,6 @@ from the 0.2 runtime and release gates and requires a fresh V2 audit before acti
 
 ## Maintenance
 
-Every V2 implementation milestone updates its normative contract, tradeoff/open-decision state, scenario JSON/Markdown,
-source tuple, and gate receipt together. `./gradlew v2M0Check` owns the M0 documentation baseline.
+Every V2 implementation milestone updates its normative contract, affected ADR/context language,
+tradeoff/open-decision state, scenario JSON/Markdown, source tuple, and gate receipt together.
+`./gradlew v2M0Check` owns the M0 documentation baseline.

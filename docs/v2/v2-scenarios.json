@@ -6,7 +6,7 @@
     {
       "id": "V2-APP-001",
       "milestone": "M1",
-      "contract": "ACK covers one dense range in the selected primary WAL",
+      "contract": "ACK covers the complete binding-scoped typed Protocol Coverage in the selected primary WAL",
       "ownerDoc": "docs/v2/01-correctness-and-append.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -22,7 +22,7 @@
     {
       "id": "V2-APP-003",
       "milestone": "M2",
-      "contract": "uncertain and fenced completions converge without duplicate range success",
+      "contract": "uncertain and fenced completions converge without duplicate protocol-position success",
       "ownerDoc": "docs/v2/01-correctness-and-append.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -30,8 +30,40 @@
     {
       "id": "V2-PROFILE-001",
       "milestone": "M1",
-      "contract": "topic semantic profile is immutable while operational policy remains mutable",
+      "contract": "Topic Protocol Binding is immutable, profile is immutable within a Storage Epoch, and operational policy remains mutable",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-001",
+      "milestone": "M1",
+      "contract": "Kafka Offset and Pulsar Position remain binding and incarnation scoped typed domains without a universal logical offset",
+      "ownerDoc": "docs/v2/01-correctness-and-append.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-MULTIPROTOCOL-001",
+      "milestone": "M1",
+      "contract": "one Storage Fabric hosts independent Kafka and Pulsar Protocol Cells without shared position or write authority",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-MIGRATION-001",
+      "milestone": "M1",
+      "contract": "Storage Epoch history uses exact typed cuts and cannot expose two append-admitting epochs",
+      "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-PROJECTION-001",
+      "milestone": "M1",
+      "contract": "Access Projection and Migration Link cannot grant a second Native Write Authority",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
@@ -46,7 +78,7 @@
     {
       "id": "V2-OBJ-002",
       "milestone": "M3",
-      "contract": "one stalled stream cannot block unrelated per-stream durable-prefix advancement",
+      "contract": "one stalled binding cannot block an unrelated binding's typed Durable Frontier",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -86,7 +118,7 @@
     {
       "id": "V2-READ-001",
       "milestone": "M4",
-      "contract": "manifest publication exposes one logical view with protected source fallback",
+      "contract": "manifest publication exposes one binding-scoped typed logical view with protected source fallback",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -110,7 +142,7 @@
     {
       "id": "V2-HO-001",
       "milestone": "M7",
-      "contract": "missing stale or corrupt handoff hints fall back to bounded durable recovery",
+      "contract": "missing stale or corrupt typed handoff hints fall back to bounded durable recovery",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
       "status": "PLANNED",
       "evidenceReceipt": null

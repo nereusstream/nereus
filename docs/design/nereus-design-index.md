@@ -22,17 +22,18 @@ that line unless a document explicitly declares `productLine: V2`.
 
 V2 replaces V1's per-append remote-metadata commit model with:
 
-- exclusive writer epochs and protocol-native serialized writer lanes;
-- process-local dense offset allocation;
-- ACK after a contiguous range is durable in the selected primary WAL;
+- exclusive Owner Epochs and protocol-native serialized writer lanes;
+- process-local position allocation inside the binding's Kafka or Pulsar Position Domain;
+- ACK after the returned typed Protocol Coverage is durable in the selected primary WAL;
 - zero remote control-metadata reads and mutations on normal admitted append;
 - immutable manifests and asynchronous read-optimized materialization;
-- topic-level immutable semantic profiles;
+- immutable Topic Protocol Bindings plus append-only, profile-bearing Storage Epochs;
 - Kafka KRaft and Pulsar MetadataStore/Oxia control backends;
-- protocol-native Kafka and Pulsar hot paths over shared storage lifecycle contracts.
+- independent Kafka and Pulsar Protocol Cells over shared storage lifecycle contracts.
 
 The architecture is summarized in [Nereus overall architecture](nereus-overall-architecture.md). Normative details start
-at the [V2 design index](../v2/README.md).
+at the [V2 design index](../v2/README.md); domain boundaries and vocabulary start at the
+[V2 Context Map](../../CONTEXT-MAP.md).
 
 ## V2 authority
 
@@ -50,7 +51,10 @@ Current accepted decisions:
 - [ADR 0007: WAL-linearized append](../decisions/0007-v2-wal-linearized-append.md)
 - [ADR 0008: storage profiles and ACK boundaries](../decisions/0008-v2-storage-profiles-and-ack-boundaries.md)
 - [ADR 0009: protocol-native data paths](../decisions/0009-v2-protocol-native-data-paths.md)
-- [ADR 0010: topic profile binding](../decisions/0010-v2-topic-profile-binding.md)
+- [ADR 0010: topic profile binding](../decisions/0010-v2-topic-profile-binding.md) — superseded by ADR 0012
+- [ADR 0011: position domains and multi-protocol Storage Fabric](../decisions/0011-v2-position-domains-and-multi-protocol-fabric.md)
+- [ADR 0012: Storage Epochs and profile evolution](../decisions/0012-v2-storage-epochs-and-profile-evolution.md)
+- [ADR 0013: cross-protocol projection and migration boundary](../decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md)
 
 ## V2 document map
 
@@ -58,22 +62,23 @@ Current accepted decisions:
 | --- | --- | --- | --- |
 | [V2 index](../v2/README.md) | Accepted | NotStarted | authority, reading order, open gates |
 | [Correctness and append](../v2/01-correctness-and-append.md) | Accepted | NotStarted | ownership, WAL linearization, uncertain append |
-| [Profiles and topic binding](../v2/02-storage-profiles-and-topic-binding.md) | Accepted | NotStarted | three profiles and immutable semantic binding |
-| [Object WAL](../v2/03-object-wal.md) | Accepted | NotStarted | group objects, per-stream durable prefix, recovery |
-| [BookKeeper and Pulsar](../v2/04-bookkeeper-and-pulsar.md) | Proposed | NotStarted | native path plus open offload/ledger decisions |
-| [Manifest/read/retention/GC](../v2/05-manifest-read-retention-gc.md) | Accepted | NotStarted | logical read view and physical lifecycle |
+| [Protocol binding and Storage Epochs](../v2/02-storage-profiles-and-topic-binding.md) | Accepted | NotStarted | immutable protocol identity and epoch-scoped profiles |
+| [Object WAL](../v2/03-object-wal.md) | Accepted | NotStarted | group objects, per-binding typed durable frontier, recovery |
+| [BookKeeper and Pulsar](../v2/04-bookkeeper-and-pulsar.md) | Proposed | NotStarted | native positions plus open offload/ledger-layout decisions |
+| [Manifest/read/retention/GC](../v2/05-manifest-read-retention-gc.md) | Accepted | NotStarted | typed logical read view and physical lifecycle |
 | [Metadata and handoff](../v2/06-metadata-backends-and-handoff.md) | Accepted | NotStarted | KRaft/Oxia capability backends and hint semantics |
 | [Protocol integrations](../v2/07-protocol-integrations.md) | Accepted | NotStarted | Kafka targets, Pulsar parity, KoP deferral |
 | [Implementation plan](../v2/08-implementation-plan-and-gates.md) | Accepted | NotStarted | M0-M8 and evidence rules |
 | [Scenario matrix](../v2/09-scenario-evidence-matrix.md) | Accepted | NotStarted | evidence promotion contract |
 | [Tradeoff register](../v2/tradeoffs.md) | Accepted | NotStarted | stable decision IDs, costs, mitigations |
+| [Open questions](../v2/open-questions.md) | Proposed | NotStarted | non-normative proposals awaiting explicit confirmation |
 
 Structured sources:
 
 - [V2 source locks](../v2/source-locks.json)
 - [V2 scenarios](../v2/v2-scenarios.json)
 
-## Storage profiles
+## Topic profiles and Storage Epochs
 
 V2 exposes exactly:
 
@@ -81,10 +86,14 @@ V2 exposes exactly:
 | --- | --- | --- |
 | `OBJECT_WAL` | verified durable Object WAL group | cost first |
 | `BOOKKEEPER_WAL_ONLY` | BookKeeper quorum | performance first |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper quorum; Object offload remains background | performance first with later cold-cost reduction |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper quorum; sealed Protocol Coverage offloads in background | performance first with later cold-cost reduction |
 
 Object API calls are asynchronous, but an Object WAL ACK waits for object durability. The later background operation is
 materialization, not a second durability upload. BookKeeper does not synchronously dual-write Object storage.
+
+A Topic Protocol Binding fixes protocol identity, Position Domain, payload mapping, and Native Write Authority for one
+Topic Incarnation. Its append-only Storage Epoch chain selects profiles over protocol-native frontier intervals. A
+profile is immutable within an epoch; the supported transition matrix and runtime transition state machine remain open.
 
 ## Implementation and evidence status
 
@@ -129,8 +138,8 @@ deleted as part of the core V2 rewrite.
 
 Every V2 milestone synchronizes:
 
-1. normative design and any affected ADR;
-2. tradeoff/open-decision state;
+1. normative design, affected ADR, and context language;
+2. tradeoff/open-question state;
 3. Markdown and JSON scenarios;
 4. source locks;
 5. implementation gate and exact-source receipt.

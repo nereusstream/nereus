@@ -4,14 +4,17 @@
 > M0 is a documentation baseline; V2 Java implementation and runtime evidence are not started.
 
 Nereus V2 replaces the V1 per-append remote-metadata correctness model with primary-WAL durability, protocol-native
-Kafka/Pulsar data paths, and immutable topic-level storage profiles:
+Kafka/Pulsar position domains, and topic-level storage profiles selected per Storage Epoch:
 
 - `OBJECT_WAL`: cost-first; ACK waits for durable Object WAL group coverage;
 - `BOOKKEEPER_WAL_ONLY`: performance-first; ACK waits for BookKeeper quorum and does not write Object storage;
-- `BOOKKEEPER_WAL_ASYNC_OBJECT`: performance-first; ACK waits for BookKeeper quorum and sealed ranges offload later.
+- `BOOKKEEPER_WAL_ASYNC_OBJECT`: performance-first; ACK waits for BookKeeper quorum and sealed Protocol Coverage is
+  offloaded later.
 
-Start with the [V2 design index](docs/v2/README.md), [overall architecture](docs/design/nereus-overall-architecture.md),
-and [implementation plan](docs/v2/08-implementation-plan-and-gates.md). The current source tuple is
+Kafka and Pulsar may share one Storage Fabric, but they do not share a universal logical offset or native write
+authority. Start with the [V2 Context Map](CONTEXT-MAP.md), [V2 design index](docs/v2/README.md),
+[overall architecture](docs/design/nereus-overall-architecture.md), and
+[implementation plan](docs/v2/08-implementation-plan-and-gates.md). The current source tuple is
 [v2-m0](docs/v2/source-locks.json), and `./gradlew v2M0Check` verifies the documentation baseline.
 
 V1 is preserved at `v0.1@a14d925da5763f36208f8ddca7bef31f3eb90b0b`. Existing Phase/Future implementation notes below

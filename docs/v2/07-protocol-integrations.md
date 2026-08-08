@@ -9,6 +9,20 @@ sourceTuple: v2-m0
 
 # Protocol integrations and product gates
 
+## Storage Fabric boundary
+
+One Nereus Storage Fabric may contain multiple Kafka and Pulsar Protocol Cells. The cells may share Object Storage,
+BookKeeper, materialization/verification workers, cache, GC infrastructure, and observability, subject to the still-open
+resource/failure-isolation contract. Sharing never makes their control planes, positions, or Native Write Authorities
+interchangeable.
+
+| Protocol/profile path | Protocol position truth | Protocol Coverage | Physical Extent |
+| --- | --- | --- | --- |
+| Kafka / `OBJECT_WAL` | Kafka Offset | Kafka Offset Range | Object Extent |
+| Kafka / BookKeeper profiles | Kafka Offset | Kafka Offset Range | BookKeeper Extent |
+| Pulsar / BookKeeper profiles | Pulsar Position/MessageId | ledger-keyed Pulsar Coverage | BookKeeper Extent |
+| Pulsar / `OBJECT_WAL` | Pulsar Position/MessageId | ledger-keyed Pulsar Coverage | Object Extent |
+
 ## Kafka native path
 
 The Kafka fork retains stock Kafka protocol and state-machine semantics around a Nereus-backed log:
@@ -21,10 +35,11 @@ The Kafka fork retains stock Kafka protocol and state-machine semantics around a
 - topic compaction, retention, timestamp lookup, and leader-epoch queries;
 - stock clients and admin APIs.
 
-Nereus replaces the local segment durability path, not Kafka's protocol truth. The Object profile absorbs useful AutoMQ
-patterns such as group WAL, immutable objects, asynchronous materialization, bounded handoff hints, parallel timestamp
-lookup, and inflight limits. The exact research commits are recorded in [source locks](source-locks.json); research is
-not executable acceptance evidence.
+Nereus replaces the local segment durability path, not Kafka's protocol truth. Every Kafka Topic Protocol Binding keeps
+Kafka Offset as its Position Domain across Storage Epochs. The Object profile absorbs useful AutoMQ patterns such as
+group WAL, immutable objects, asynchronous materialization, bounded handoff hints, parallel timestamp lookup, and
+inflight limits. The exact research commits are recorded in [source locks](source-locks.json); research is not executable
+acceptance evidence.
 
 ### Kafka product target
 
@@ -43,7 +58,9 @@ The acceptance source is an exact clean AutoMQ commit and receipt, never the mov
 
 `BOOKKEEPER_WAL_ONLY` must preserve the native ManagedLedger call path and feature behavior before Nereus-specific
 advantages are counted. `BOOKKEEPER_WAL_ASYNC_OBJECT` adds a native-compatible offload lifecycle. `OBJECT_WAL` uses
-an explicit ObjectManagedLedger projection and accepts its cost-first latency tradeoff.
+an explicit ObjectManagedLedger path and accepts its cost-first latency tradeoff. Every path keeps
+`PulsarPosition(ledgerId, entryId)`, MessageId, and the ledger chain as protocol truth; Object/BookKeeper coordinates
+remain Physical Extents.
 
 The parity matrix covers at least:
 
@@ -58,6 +75,16 @@ The parity matrix covers at least:
 
 The native baseline and thresholds are not pinned at M0. No V1 Pulsar receipt is inherited as V2 parity evidence.
 
+## Kafka/Pulsar secondary access and authority migration
+
+The same business data may be exposed through the other protocol only as an Access Projection backed by a durable
+Projection Map. The target is not a second Native Write Authority. Changing protocol authority uses a Migration Link
+between source and target Topic Protocol Bindings; it is not a Storage Epoch transition.
+
+The boundary is accepted, but projection mapping, state transfer, batch/transaction/cursor semantics, failure rollback,
+and runtime delivery are not committed to 0.2. They remain in [V2 open questions](open-questions.md). No design or
+implementation may use a universal logical offset as a shortcut or allow simultaneous Kafka and Pulsar native writers.
+
 ## KoP
 
 KoP is intentionally outside the 0.2 runtime and release gates. Its existing design is retained at
@@ -65,5 +92,6 @@ KoP is intentionally outside the 0.2 runtime and release gates. Its existing des
 delete that design or claim its payload/coordinator mapping is implemented. Before activation it requires a fresh audit
 against V2 bindings, protocol-native Kafka work, and the then-current KoP source.
 
-Relevant tradeoffs: `T-PROTOCOL-01`, `T-BENCH-01`, and `T-KOP-01`. Required scenarios: `V2-KAF-001`,
+Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-PROJECTION-01`, `T-BENCH-01`, and
+`T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-PROJECTION-001`, `V2-KAF-001`,
 `V2-PUL-001`, and `V2-KOP-001`.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for the V2 design. Implementation and runtime evidence are not started at M0.
+Accepted for the V2 design and refined by ADR 0012. Implementation and runtime evidence are not started at M0.
 
 ## Context
 
@@ -12,13 +12,13 @@ predictable quorum durability.
 
 ## Decision
 
-V2 exposes exactly three topic-level storage profiles:
+V2 exposes exactly three topic-level storage profiles, selected immutably within each Storage Epoch:
 
 | Profile | Acknowledgement boundary | Background object work | Optimization target |
 | --- | --- | --- | --- |
-| `OBJECT_WAL` | the complete range is durable in an Object WAL group | materialize Object WAL into read-optimized Object segments | storage cost |
-| `BOOKKEEPER_WAL_ONLY` | the complete range is acknowledged by the configured BookKeeper quorum | none | write latency and predictable hot-path performance |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | the complete range is acknowledged by the configured BookKeeper quorum | offload sealed BookKeeper ranges into read-optimized Object segments | hot-path performance plus eventual cold-cost reduction |
+| `OBJECT_WAL` | the complete typed Protocol Coverage is durable in an Object WAL group | materialize Object WAL into read-optimized Object segments | storage cost |
+| `BOOKKEEPER_WAL_ONLY` | the complete typed Protocol Coverage is acknowledged by the configured BookKeeper quorum | none | write latency and predictable hot-path performance |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | the complete typed Protocol Coverage is acknowledged by the configured BookKeeper quorum | offload sealed BookKeeper coverage into read-optimized Object segments | hot-path performance plus eventual cold-cost reduction |
 
 There is no BookKeeper profile that waits synchronously for both BookKeeper and Object storage. Such a path would pay
 the latency and request cost of both systems without improving the normal product objective. A future compliance-driven
@@ -35,4 +35,5 @@ materialization, indexing, compaction, and safe retirement.
 - Performance claims must compare profiles under their declared objective; BookKeeper latency cannot be presented as an
   equal-cost Object comparison.
 
-This decision is tracked by `T-OBJECT-01`, `T-BK-01`, and scenarios `V2-OBJ-001`, `V2-BK-001`, and `V2-BK-002`.
+This decision is tracked by `T-PROFILE-01`, `T-OBJECT-01`, `T-BK-01`, and scenarios `V2-PROFILE-001`,
+`V2-OBJ-001`, `V2-BK-001`, and `V2-BK-002`.

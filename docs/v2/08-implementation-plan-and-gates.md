@@ -13,11 +13,11 @@ sourceTuple: v2-m0
 
 | Milestone | Scope | Status at M0 | Required aggregate |
 | --- | --- | --- | --- |
-| M0 | V1 archive references, V2 ADRs/contracts, source/scenario manifests, tradeoff register, documentation gate | DocumentationGated | `v2M0Check` |
-| M1 | new V2 API, format identities, capability-split metadata SPI; remove superseded V1 API | Planned | `v2M1Check` |
-| M2 | owner lane, offset contract, BookKeeper foundation, Pulsar offload/position spikes | Planned | `v2M2Check` |
-| M3 | Object WAL groups, per-stream durable prefix, provider-response-loss recovery | Planned | `v2M3Check` |
-| M4 | manifest, offset/timestamp indexes, resolver, readable active tail | Planned | `v2M4Check` |
+| M0 | V1 archive references, Context Map/glossaries, V2 ADRs/contracts, open-question/session logs, source/scenario manifests, tradeoff register, documentation gate | DocumentationGated | `v2M0Check` |
+| M1 | new V2 API and identities for Protocol Cell, Topic Protocol Binding, Position Domain, Protocol Coverage, Physical Extent, and Storage Epoch; capability-split metadata SPI; remove superseded V1 API | Planned | `v2M1Check` |
+| M2 | Owner Epoch lane, typed frontier contract, BookKeeper foundation, Pulsar offload-authority spike, Kafka ledger-layout scale spike | Planned | `v2M2Check` |
+| M3 | Object WAL groups, per-binding typed durable frontier, provider-response-loss recovery | Planned | `v2M3Check` |
+| M4 | manifest, protocol-position/timestamp indexes, Storage Epoch resolver, readable active tail | Planned | `v2M4Check` |
 | M5 | materialization, compaction, retention, source protection, physical GC | Planned | `v2M5Check` |
 | M6 | Kafka KRaft integration and protocol compatibility | Planned | `v2M6Check` |
 | M7 | fencing, planned handoff, bounded recovery, mixed-profile operations | Planned | `v2M7Check` |
@@ -25,12 +25,16 @@ sourceTuple: v2-m0
 
 Only M0 tasks are registered at M0. A future task name in this plan is not an implementation or PASS claim.
 
+The accepted Storage Epoch domain model does not schedule an online profile-transition matrix by itself. Kafka/Pulsar
+Access Projection and Migration Link runtime, Pulsar BookKeeper/Object transition strategy, and KoP remain outside the
+0.2 implementation plan until their named open questions are explicitly closed.
+
 ## Milestone delivery contract
 
 Every implementation milestone must land one coherent set:
 
 1. production and test implementation;
-2. the affected normative V2 contract and ADR/open-decision update;
+2. the affected normative V2 contract, ADR/context language, and open-question update;
 3. scenario Markdown and JSON statuses;
 4. tradeoff status or mitigation changes;
 5. source-lock changes, when an external or fork source changed;
@@ -58,9 +62,10 @@ receipt to be present in the same change.
 
 ## M0 gate
 
-`v2DocumentationCheck` validates required files and front matter, the three-profile vocabulary, JSON structure,
-source/archive identity, tradeoff IDs, scenario synchronization, local Markdown links, and receipt/status consistency.
-`v2M0Check` is the M0 aggregate and is wired into CI.
+`v2DocumentationCheck` validates required files and front matter, Context Map/glossaries, accepted/superseded ADR
+state, the three-profile vocabulary, typed-position and Storage Epoch contracts, JSON structure, source/archive identity,
+tradeoff IDs, scenario synchronization, local Markdown links, and receipt/status consistency. `v2M0Check` is the M0
+aggregate and is wired into CI.
 
 The legacy Phase 3, Phase 4, and BookKeeper documentation checks remain available for V1 implementation evidence, but
 their literal requirements no longer govern the V2 overview/index.

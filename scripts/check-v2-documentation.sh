@@ -28,6 +28,7 @@ required_v2_docs=(
     07-protocol-integrations.md
     08-implementation-plan-and-gates.md
     09-scenario-evidence-matrix.md
+    open-questions.md
     tradeoffs.md
 )
 
@@ -57,6 +58,19 @@ for path in "$repo_root/docs/design/nereus-design-index.md" "$repo_root/docs/des
     rg -q "^sourceTuple: ${source_tuple}$" "$path" || fail "${path#"$repo_root/"} does not use source tuple $source_tuple"
 done
 
+required_domain_docs=(
+    "$repo_root/CONTEXT-MAP.md"
+    "$repo_root/docs/domain/shared-storage/CONTEXT.md"
+    "$repo_root/docs/domain/kafka/CONTEXT.md"
+    "$repo_root/docs/domain/pulsar/CONTEXT.md"
+    "$repo_root/docs/decisions/0011-v2-position-domains-and-multi-protocol-fabric.md"
+    "$repo_root/docs/decisions/0012-v2-storage-epochs-and-profile-evolution.md"
+    "$repo_root/docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
+)
+for path in "${required_domain_docs[@]}"; do
+    [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
+done
+
 [[ -f "$repo_root/docs/design/nereus-future5-kop-compatibility.md" ]] || fail "KoP design document was removed"
 
 require_literal "nereusVersion=0.2.0-SNAPSHOT" "gradle.properties"
@@ -66,6 +80,13 @@ require_literal "191fbbe5a0430cc4c88b9a2be61cb5a492ec3494" "docs/v2/source-locks
 require_literal "v2DocumentationCheck" "build.gradle.kts"
 require_literal "v2M0Check" "build.gradle.kts"
 require_literal "V2 documentation baseline" ".github/workflows/build.yml"
+require_literal "Superseded by ADR 0012." "docs/decisions/0010-v2-topic-profile-binding.md"
+require_literal "Kafka and Pulsar do not share a universal numeric position" "docs/decisions/0011-v2-position-domains-and-multi-protocol-fabric.md"
+require_literal 'V2 does not persist `ledgerBase + entryId`' "docs/decisions/0011-v2-position-domains-and-multi-protocol-fabric.md"
+require_literal "At most one epoch admits new positions at a time" "docs/decisions/0012-v2-storage-epochs-and-profile-evolution.md"
+require_literal "simultaneous native writers for one Topic Incarnation" "docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
+require_literal "NonNormativeQuestionLog" "docs/v2/open-questions.md"
+require_literal "NonNormativeSessionRecord" "docs/v2/grill-notes/01-protocol-position-fabric-and-migration.md"
 
 active_contracts=(
     "$repo_root/docs/v2"
@@ -75,6 +96,11 @@ active_contracts=(
     "$repo_root/docs/decisions/0008-v2-storage-profiles-and-ack-boundaries.md"
     "$repo_root/docs/decisions/0009-v2-protocol-native-data-paths.md"
     "$repo_root/docs/decisions/0010-v2-topic-profile-binding.md"
+    "$repo_root/docs/decisions/0011-v2-position-domains-and-multi-protocol-fabric.md"
+    "$repo_root/docs/decisions/0012-v2-storage-epochs-and-profile-evolution.md"
+    "$repo_root/docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
+    "$repo_root/CONTEXT-MAP.md"
+    "$repo_root/docs/domain"
 )
 
 for stale in OBJECT_WAL_SYNC_OBJECT OBJECT_WAL_ASYNC_OBJECT BOOKKEEPER_WAL_SYNC_OBJECT; do
@@ -85,6 +111,10 @@ done
 
 if rg -Fn -- "release/0.1" "${active_contracts[@]}"; then
     fail "active V2 contracts contain the obsolete V1 release branch name"
+fi
+
+if rg -Fn -- "V2-OPEN-PUL-01" "${active_contracts[@]}"; then
+    fail "active V2 contracts still treat native Pulsar position mapping as open"
 fi
 
 python3 - "$repo_root" <<'PY'
@@ -214,6 +244,8 @@ if len(scenario_ids) != len(set(scenario_ids)):
 
 required_scenarios = {
     "V2-APP-001", "V2-APP-002", "V2-APP-003", "V2-PROFILE-001",
+    "V2-POSITION-001", "V2-MULTIPROTOCOL-001", "V2-MIGRATION-001",
+    "V2-PROJECTION-001",
     "V2-OBJ-001", "V2-OBJ-002", "V2-OBJ-003",
     "V2-BK-001", "V2-BK-002", "V2-BK-003",
     "V2-READ-001", "V2-READ-002", "V2-META-001", "V2-HO-001",
@@ -233,7 +265,9 @@ tradeoff_ids = [row[0] for row in tradeoff_rows]
 if len(set(tradeoff_ids)) != len(tradeoff_ids):
     fail("tradeoff register IDs must be unique")
 required_tradeoffs = {
-    "T-APPEND-01", "T-PROTOCOL-01", "T-PROFILE-01", "T-OBJECT-01",
+    "T-APPEND-01", "T-PROTOCOL-01", "T-POSITION-01",
+    "T-MULTIPROTOCOL-01", "T-PROFILE-01", "T-MIGRATION-01",
+    "T-PROJECTION-01", "T-OBJECT-01",
     "T-BK-01", "T-LEDGER-01", "T-META-01", "T-MANIFEST-01",
     "T-HANDOFF-01", "T-COMPAT-01", "T-BENCH-01", "T-KOP-01",
 }
@@ -243,7 +277,7 @@ if missing_tradeoffs:
 
 contract_paths = list((root / "docs/v2").glob("*.md"))
 contract_paths += list((root / "docs/decisions").glob("000[7-9]-*.md"))
-contract_paths += list((root / "docs/decisions").glob("0010-*.md"))
+contract_paths += list((root / "docs/decisions").glob("001[0-3]-*.md"))
 contract_text = "\n".join(
     path.read_text() for path in contract_paths if path != tradeoff_path
 )
@@ -266,6 +300,8 @@ PY
 
 link_docs=(
     "$repo_root/README.md"
+    "$repo_root/CONTEXT-MAP.md"
+    "$repo_root/docs/domain"
     "$repo_root/docs/v2"
     "$repo_root/docs/design/README.md"
     "$repo_root/docs/design/nereus-design-index.md"
@@ -276,6 +312,9 @@ link_docs=(
     "$repo_root/docs/decisions/0008-v2-storage-profiles-and-ack-boundaries.md"
     "$repo_root/docs/decisions/0009-v2-protocol-native-data-paths.md"
     "$repo_root/docs/decisions/0010-v2-topic-profile-binding.md"
+    "$repo_root/docs/decisions/0011-v2-position-domains-and-multi-protocol-fabric.md"
+    "$repo_root/docs/decisions/0012-v2-storage-epochs-and-profile-evolution.md"
+    "$repo_root/docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
 )
 
 while IFS=: read -r source match; do
@@ -296,4 +335,4 @@ while IFS=: read -r source match; do
     [[ -e "$resolved" ]] || fail "broken local Markdown link in ${source#"$repo_root/"}: $target"
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "V2 documentation baseline: profiles, authority, source locks, scenarios, tradeoffs, receipts, and links verified."
+echo "V2 documentation baseline: contexts, positions, epochs, profiles, authority, source locks, scenarios, tradeoffs, receipts, and links verified."
