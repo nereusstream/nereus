@@ -91,6 +91,10 @@ require_literal "Object WAL groups never cross Protocol Cells in 0.2" "docs/deci
 require_literal "NonNormativeQuestionLog" "docs/v2/open-questions.md"
 require_literal "NonNormativeSessionRecord" "docs/v2/grill-notes/01-protocol-position-fabric-and-migration.md"
 require_literal 'This closes `V2-OPEN-FABRIC-01`' "docs/v2/grill-notes/02-provider-sharing-and-protocol-cell-isolation.md"
+require_literal "Restarted Grill 2 frontier" "docs/v2/grill-notes/03-restarted-grill-2-scope-and-offload-frontier.md"
+require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
 require_literal "resolved by ADR 0014" "docs/v2/open-questions.md"
 
 if rg -Fq '| `V2-OPEN-FABRIC-01` |' "$repo_root/docs/v2/README.md"; then
