@@ -46,6 +46,26 @@ abstract class DevelopmentCoordinateVerificationTask : DefaultTask() {
     }
 }
 
+abstract class ReleaseVersionVerificationTask : DefaultTask() {
+    @get:Input
+    abstract val actualVersion: Property<String>
+
+    @get:Input
+    abstract val expectedVersion: Property<String>
+
+    @TaskAction
+    fun verifyReleaseVersion() {
+        val actual = actualVersion.get()
+        val expected = expectedVersion.get()
+        check(Regex("[0-9]+\\.[0-9]+\\.[0-9]+").matches(expected)) {
+            "Release version must use stable X.Y.Z form, got $expected"
+        }
+        check(actual == expected) {
+            "Release candidate version mismatch: expected $expected, got $actual"
+        }
+    }
+}
+
 plugins {
     `base`
     `maven-publish`
@@ -53,8 +73,16 @@ plugins {
 }
 
 group = providers.gradleProperty("nereusGroup").get()
-val phase2DevelopmentVersion = "0.1.0-f2-dev"
-val phase9DevelopmentVersion = "0.1.0-f9-dev"
+val configuredNereusVersion = providers.gradleProperty("nereusVersion").get()
+val releaseLineVersion = configuredNereusVersion
+    .removeSuffix("-SNAPSHOT")
+    .removeSuffix("-f2-dev")
+    .removeSuffix("-f9-dev")
+check(Regex("[0-9]+\\.[0-9]+\\.[0-9]+").matches(releaseLineVersion)) {
+    "nereusVersion must derive from X.Y.Z, X.Y.Z-SNAPSHOT, X.Y.Z-f2-dev, or X.Y.Z-f9-dev"
+}
+val phase2DevelopmentVersion = "$releaseLineVersion-f2-dev"
+val phase9DevelopmentVersion = "$releaseLineVersion-f9-dev"
 val pulsarDevelopmentGateRequested = gradle.startParameter.taskNames.any { requested ->
     requested.substringAfterLast(':').startsWith("phase2")
             || requested.substringAfterLast(':').startsWith("phase3")
@@ -121,7 +149,7 @@ version = gradle.startParameter.projectProperties["nereusVersion"]
     } else if (kafkaDevelopmentGateRequested) {
         phase9DevelopmentVersion
     } else {
-        providers.gradleProperty("nereusVersion").getOrElse("0.1.0-SNAPSHOT")
+        configuredNereusVersion
     }
 if (pulsarDevelopmentGateRequested) {
     check(version.toString() == phase2DevelopmentVersion) {
@@ -132,6 +160,13 @@ if (kafkaDevelopmentGateRequested) {
     check(version.toString() == phase9DevelopmentVersion) {
         "Kafka F9 development gates require version $phase9DevelopmentVersion, got $version"
     }
+}
+
+tasks.register<ReleaseVersionVerificationTask>("verifyReleaseVersion") {
+    group = "verification"
+    description = "Verify that the configured project version exactly matches a stable release version."
+    actualVersion.set(version.toString())
+    expectedVersion.set(providers.gradleProperty("releaseVersion"))
 }
 
 val javaLanguageVersion = providers.gradleProperty("javaVersion").map(String::toInt).getOrElse(21)

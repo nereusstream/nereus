@@ -229,6 +229,8 @@ nereus/
   nereus-pulsar-adapter/                Pulsar broker integration boundary
   nereus-kop-adapter/                   KoP/Kafka projection boundary
   nereus-kafka-adapter/                 F9 Kafka metadata/checkpoint/recovery and byte-exact batch boundary
+  nereus-admin/                         release verification and deployment administration CLI
+  docs/releases/                        release freeze, tag, evidence, and branch-retention process
   docs/design/                          north-star and capability-track designs
   docs/phase-1-core-stream-storage/     implemented Phase 1 contracts and milestones
   docs/phase-1.5-core-storage-foundation/ implemented L0 evolution and gates
@@ -806,6 +808,7 @@ Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 
 Start with `docs/design/nereus-design-index.md` for document authority and current status. Use
+`docs/releases/README.md` for release freeze and immutable tag procedures. Use
 `docs/phase-1-core-stream-storage/README.md` for the implemented L0 contract and
 `docs/phase-1.5-core-storage-foundation/README.md` for the active L0 evolution contract. Use
 `docs/phase-2-managed-ledger-facade/README.md` for the implemented F2 contract，and
