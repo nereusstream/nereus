@@ -869,9 +869,7 @@ class DefaultStreamStorageReadTest {
                 });
     }
 
-    private static OxiaMetadataStore delayCommit(
-            OxiaMetadataStore delegate,
-            CountDownLatch commitStarted) {
+    private static OxiaMetadataStore delayCommit(OxiaMetadataStore delegate, CountDownLatch commitStarted) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class, PhysicalObjectMetadataStore.class},

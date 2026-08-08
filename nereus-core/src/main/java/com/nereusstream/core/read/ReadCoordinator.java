@@ -734,7 +734,7 @@ public final class ReadCoordinator implements StreamViewReader {
         return new SemanticPhysicalRead(readResult, coverageEndOffset);
     }
 
-    private static void requireExactLogicalSources(List<ResolvedRange> ranges, List<ReadBatch> batches) {
+    static void requireExactLogicalSources(List<ResolvedRange> ranges, List<ReadBatch> batches) {
         for (ReadBatch batch : batches) {
             boolean exactSource = ranges.stream()
                     .anyMatch(range -> range.offsetRange().equals(batch.source().resolvedRange())
@@ -743,7 +743,7 @@ public final class ReadCoordinator implements StreamViewReader {
                             && range.readTarget().equals(batch.source().target())
                             && range.payloadFormat() == batch.payloadFormat()
                             && range.schemaRefs().equals(batch.schemaRefs())
-                            && range.projectionRef().equals(batch.projectionRef())
+                            && projectionRefMatches(range, batch)
                             && range.offsetRange().startOffset()
                                     <= batch.range().startOffset()
                             && batch.range().endOffset() <= range.offsetRange().endOffset());
@@ -754,6 +754,18 @@ public final class ReadCoordinator implements StreamViewReader {
                         "physical reader returned logical facts outside its exact resolved source");
             }
         }
+    }
+
+    private static boolean projectionRefMatches(ResolvedRange range, ReadBatch batch) {
+        if (range.projectionRef().equals(batch.projectionRef())) {
+            return true;
+        }
+        ReadTargetReaderKey key = ReadTargetReaderKey.from(range.readTarget());
+        boolean ncp1 = key.equals(ParquetCompactedTargetReader.KEY)
+                || key.equals(ParquetCompactedTargetReader.LEGACY_OPAQUE_KEY);
+        // NCP1 keeps the projection identity at generation admission. Its locked logical payload codec deliberately
+        // preserves the empty per-batch projection-ref surface; every other reader must return an exact match.
+        return ncp1 && batch.projectionRef().isEmpty();
     }
 
     private static Throwable unwrap(Throwable error) {
