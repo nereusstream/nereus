@@ -29,7 +29,8 @@ V2 replaces V1's per-append remote-metadata commit model with:
 - immutable manifests and asynchronous read-optimized materialization;
 - immutable Topic Protocol Bindings plus append-only, profile-bearing Storage Epochs;
 - Kafka KRaft and Pulsar MetadataStore/Oxia control backends;
-- independent Kafka and Pulsar Protocol Cells over shared storage lifecycle contracts.
+- independent Kafka and Pulsar Protocol Cells over shared storage lifecycle contracts;
+- Cell-scoped Provider scopes/sessions over optionally shared physical provider infrastructure.
 
 The architecture is summarized in [Nereus overall architecture](nereus-overall-architecture.md). Normative details start
 at the [V2 design index](../v2/README.md); domain boundaries and vocabulary start at the
@@ -55,6 +56,7 @@ Current accepted decisions:
 - [ADR 0011: position domains and multi-protocol Storage Fabric](../decisions/0011-v2-position-domains-and-multi-protocol-fabric.md)
 - [ADR 0012: Storage Epochs and profile evolution](../decisions/0012-v2-storage-epochs-and-profile-evolution.md)
 - [ADR 0013: cross-protocol projection and migration boundary](../decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md)
+- [ADR 0014: provider sharing and Protocol Cell isolation](../decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md)
 
 ## V2 document map
 

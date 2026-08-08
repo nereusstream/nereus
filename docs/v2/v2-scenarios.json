@@ -52,6 +52,30 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-FABRIC-001",
+      "milestone": "M1",
+      "contract": "cells sharing physical provider infrastructure retain distinct provider scopes, sessions, namespace and security scope, and lifecycle",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-FABRIC-002",
+      "milestone": "M3",
+      "contract": "Object WAL groups never cross Protocol Cells and cell-local throttle, credential, drain, or close faults cannot mutate another provider session",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-FABRIC-003",
+      "milestone": "M5",
+      "contract": "shared worker, cache, and GC capacity cannot cross cell queue, task, cache, publication, or physical-delete authority",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-MIGRATION-001",
       "milestone": "M1",
       "contract": "Storage Epoch history uses exact typed cuts and cannot expose two append-admitting epochs",

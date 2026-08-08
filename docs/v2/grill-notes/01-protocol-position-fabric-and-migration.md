@@ -14,6 +14,10 @@ Date: 2026-08-08
 This record preserves all user feedback from Grill 1. “Confirmed” items are normative only through the linked ADRs and
 contracts. “Proposal/open” items remain non-normative and are copied to [open questions](../open-questions.md).
 
+Later refinement: Grill 2 and [ADR 0014](../../decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md)
+freeze physical provider sharing behind Cell-scoped Provider scopes/sessions and prohibit cross-cell Object groups in
+0.2. The original input below is preserved for traceability.
+
 ## Confirmed: protocol positions and shared storage
 
 Kafka and Pulsar do not share one `long logicalOffset`, but they may share one Nereus Storage Fabric.

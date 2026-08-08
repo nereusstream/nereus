@@ -9,8 +9,9 @@ sourceTuple: v2-m0
 
 # V2 open questions
 
-This file records proposals that have not been accepted as runtime contracts. An answer moves into a normative document
-or ADR only after explicit confirmation; editing this file alone cannot close a gate.
+This file records proposals that have not been accepted as runtime contracts and retains resolved gate IDs for
+traceability. An answer moves into a normative document or ADR only after explicit confirmation; editing this file
+alone cannot close a gate.
 
 ## Storage Epoch transitions
 
@@ -103,10 +104,15 @@ The mapping must decide how to translate:
 For example, one Pulsar entry with batch indexes `0..2` might map to one Kafka Offset Range of length three. This is an
 input example, not an accepted canonical payload mapping.
 
-## Shared Storage Fabric isolation
+## Resolved questions
 
-### `V2-OPEN-FABRIC-01`: shared provider failure and isolation domain
+### `V2-OPEN-FABRIC-01`: resolved by ADR 0014
 
-Kafka and Pulsar Protocol Cells may share Object Storage, BookKeeper, materialization workers, cache, GC, and
-observability. The design still needs to freeze namespace, quota, encryption, noisy-neighbor, failure-containment, and
-operator-ownership boundaries so that shared infrastructure does not create shared protocol authority.
+Resolved on 2026-08-09. Multiple Protocol Cells may share physical provider infrastructure, compatible transport
+capacity, worker processes, and observability. Each cell owns a distinct Cell Provider Scope/session, namespace,
+credential/KMS and operator scope, admission/retry/circuit-breaker state, queue/cache accounting, task root, GC
+capability, drain, and close lifecycle. Object groups do not cross cells in 0.2. Dedicated provider infrastructure is an
+optional stronger deployment topology; an outage of shared physical infrastructure may affect all attached cells.
+
+The normative contract is [ADR 0014](../decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md). This ID is no
+longer an active design gate.

@@ -66,6 +66,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0011-v2-position-domains-and-multi-protocol-fabric.md"
     "$repo_root/docs/decisions/0012-v2-storage-epochs-and-profile-evolution.md"
     "$repo_root/docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
+    "$repo_root/docs/decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -85,8 +86,16 @@ require_literal "Kafka and Pulsar do not share a universal numeric position" "do
 require_literal 'V2 does not persist `ledgerBase + entryId`' "docs/decisions/0011-v2-position-domains-and-multi-protocol-fabric.md"
 require_literal "At most one epoch admits new positions at a time" "docs/decisions/0012-v2-storage-epochs-and-profile-evolution.md"
 require_literal "simultaneous native writers for one Topic Incarnation" "docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
+require_literal "Every Protocol Cell nevertheless owns a distinct" "docs/decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md"
+require_literal "Object WAL groups never cross Protocol Cells in 0.2" "docs/decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md"
 require_literal "NonNormativeQuestionLog" "docs/v2/open-questions.md"
 require_literal "NonNormativeSessionRecord" "docs/v2/grill-notes/01-protocol-position-fabric-and-migration.md"
+require_literal 'This closes `V2-OPEN-FABRIC-01`' "docs/v2/grill-notes/02-provider-sharing-and-protocol-cell-isolation.md"
+require_literal "resolved by ADR 0014" "docs/v2/open-questions.md"
+
+if rg -Fq '| `V2-OPEN-FABRIC-01` |' "$repo_root/docs/v2/README.md"; then
+    fail "V2-OPEN-FABRIC-01 remains in the active gate table"
+fi
 
 active_contracts=(
     "$repo_root/docs/v2"
@@ -99,6 +108,7 @@ active_contracts=(
     "$repo_root/docs/decisions/0011-v2-position-domains-and-multi-protocol-fabric.md"
     "$repo_root/docs/decisions/0012-v2-storage-epochs-and-profile-evolution.md"
     "$repo_root/docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
+    "$repo_root/docs/decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )
@@ -244,7 +254,8 @@ if len(scenario_ids) != len(set(scenario_ids)):
 
 required_scenarios = {
     "V2-APP-001", "V2-APP-002", "V2-APP-003", "V2-PROFILE-001",
-    "V2-POSITION-001", "V2-MULTIPROTOCOL-001", "V2-MIGRATION-001",
+    "V2-POSITION-001", "V2-MULTIPROTOCOL-001",
+    "V2-FABRIC-001", "V2-FABRIC-002", "V2-FABRIC-003", "V2-MIGRATION-001",
     "V2-PROJECTION-001",
     "V2-OBJ-001", "V2-OBJ-002", "V2-OBJ-003",
     "V2-BK-001", "V2-BK-002", "V2-BK-003",
@@ -266,7 +277,7 @@ if len(set(tradeoff_ids)) != len(tradeoff_ids):
     fail("tradeoff register IDs must be unique")
 required_tradeoffs = {
     "T-APPEND-01", "T-PROTOCOL-01", "T-POSITION-01",
-    "T-MULTIPROTOCOL-01", "T-PROFILE-01", "T-MIGRATION-01",
+    "T-MULTIPROTOCOL-01", "T-FABRIC-01", "T-PROFILE-01", "T-MIGRATION-01",
     "T-PROJECTION-01", "T-OBJECT-01",
     "T-BK-01", "T-LEDGER-01", "T-META-01", "T-MANIFEST-01",
     "T-HANDOFF-01", "T-COMPAT-01", "T-BENCH-01", "T-KOP-01",
@@ -277,7 +288,7 @@ if missing_tradeoffs:
 
 contract_paths = list((root / "docs/v2").glob("*.md"))
 contract_paths += list((root / "docs/decisions").glob("000[7-9]-*.md"))
-contract_paths += list((root / "docs/decisions").glob("001[0-3]-*.md"))
+contract_paths += list((root / "docs/decisions").glob("001[0-4]-*.md"))
 contract_text = "\n".join(
     path.read_text() for path in contract_paths if path != tradeoff_path
 )
@@ -315,6 +326,7 @@ link_docs=(
     "$repo_root/docs/decisions/0011-v2-position-domains-and-multi-protocol-fabric.md"
     "$repo_root/docs/decisions/0012-v2-storage-epochs-and-profile-evolution.md"
     "$repo_root/docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
+    "$repo_root/docs/decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md"
 )
 
 while IFS=: read -r source match; do
@@ -335,4 +347,4 @@ while IFS=: read -r source match; do
     [[ -e "$resolved" ]] || fail "broken local Markdown link in ${source#"$repo_root/"}: $target"
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "V2 documentation baseline: contexts, positions, epochs, profiles, authority, source locks, scenarios, tradeoffs, receipts, and links verified."
+echo "V2 documentation baseline: contexts, positions, epochs, profiles, cell-scoped providers, authority, source locks, scenarios, tradeoffs, receipts, and links verified."

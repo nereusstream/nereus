@@ -11,9 +11,10 @@ sourceTuple: v2-m0
 
 ## Cost model and group commit
 
-One PUT per append is not the V2 cost target. `OBJECT_WAL` batches frames into bounded group objects by provider,
-region, format, encryption/checksum family, and admission class. Protocol Cell, tenant, or topic isolation may further
-split a shard when retention coupling, noisy-neighbor risk, or compliance requires it.
+One PUT per append is not the V2 cost target. `OBJECT_WAL` batches frames into bounded group objects by Protocol Cell,
+Cell Provider Scope, provider endpoint, region, format, encryption/checksum family, and admission class. Protocol Cell
+is a mandatory shard boundary; tenant or topic policy may split it further when retention coupling, noisy-neighbor risk,
+or compliance requires it.
 
 Group close is triggered by bounded bytes, frame count, linger, deadline, memory pressure, or owner handoff. Every
 limit is configured and observable; no open group may grow or wait indefinitely.
@@ -33,9 +34,9 @@ The group object is an `ObjectExtent`. Every frame independently carries:
 - idempotency identity;
 - flags required by the protocol payload mapping.
 
-One group may contain multiple bindings. Whether one group may cross Protocol Cells remains part of
-`V2-OPEN-FABRIC-01`. Therefore a group-level shard epoch cannot authorize every frame and its physical ordering cannot
-compare protocol positions.
+One group may contain multiple compatible bindings from exactly one Protocol Cell. Object groups never cross Protocol
+Cells in 0.2. A group-level shard epoch cannot authorize every frame and its physical ordering cannot compare protocol
+positions.
 
 ## ACK and head-of-line isolation
 
@@ -73,4 +74,9 @@ materialization lag. When limits are exhausted, the writer rejects or waits befo
 possible.
 The implementation must not create unbounded futures or retain payloads after completion/cancellation.
 
-Relevant tradeoff: `T-OBJECT-01`. Required scenarios: `V2-OBJ-001`, `V2-OBJ-002`, and `V2-OBJ-003`.
+Each Cell Provider Session owns its admission, retry/circuit-breaker state, open groups, in-flight accounting, drain,
+and close lifecycle. A compatible lower-level transport may be pooled, but a cell-local throttle, credential failure, or
+close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
+
+Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001`, `V2-OBJ-002`,
+`V2-OBJ-003`, and `V2-FABRIC-002`.

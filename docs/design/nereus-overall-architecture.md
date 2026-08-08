@@ -20,8 +20,8 @@ Nereus V2 is a multi-protocol Storage Fabric with topic-level storage choices:
 - KoP design remains available but is deferred from the 0.2 runtime.
 
 The product does not force all objectives through one WAL or one universal position. Kafka and Pulsar retain independent
-Protocol Cells, Position Domains, and Native Write Authorities while sharing correctness, immutable physical
-descriptors, lifecycle, and observability contracts.
+Protocol Cells, Position Domains, Native Write Authorities, and Cell Provider Sessions while sharing correctness,
+immutable physical descriptors, lifecycle contracts, and optional external provider infrastructure.
 
 ## 2. Architecture
 
@@ -29,11 +29,14 @@ descriptors, lifecycle, and observability contracts.
 Nereus Storage Fabric
 ├── Kafka Protocol Cell
 │   ├── Kafka protocol-native runtime / KRaft / UnifiedLog semantics
-│   └── Kafka Topic Protocol Bindings -> Kafka Position Domain
+│   ├── Kafka Topic Protocol Bindings -> Kafka Position Domain
+│   └── Cell Provider Scopes / Sessions
 ├── Pulsar Protocol Cell
 │   ├── Pulsar protocol-native runtime / MetadataStore / ManagedLedger semantics
-│   └── Pulsar Topic Protocol Bindings -> Pulsar Position Domain
+│   ├── Pulsar Topic Protocol Bindings -> Pulsar Position Domain
+│   └── Cell Provider Scopes / Sessions
 └── Shared Data Plane
+    ├── optional shared Object Storage / BookKeeper / transport capacity
     ├── append-only Storage Epoch chains
     ├── Protocol Coverage
     │   ├── Kafka Offset Range
@@ -63,6 +66,18 @@ matrix and transition state machine remain open; at most one epoch may admit new
 
 Ownership grants an exclusive Owner Epoch inside that binding. Kafka uses KRaft; Pulsar uses MetadataStore/Oxia plus
 native broker/ManagedLedger authority. Owner Epoch and Storage Epoch are distinct.
+
+### Provider boundary
+
+Multiple Protocol Cells may use the same external Object Storage or BookKeeper infrastructure. Each cell nevertheless
+owns a distinct Cell Provider Scope and independently drainable/closeable sessions. Namespace, credential/KMS and
+operator scope, admission/quota, retry/circuit-breaker state, cache/task roots, and physical-GC authorization are
+cell-scoped. Compatible lower-level transport may be pooled, but it owns no protocol, manifest, task, cache, or deletion
+authority.
+
+Object groups never cross Protocol Cells in 0.2. Shared worker processes and executors use cell-scoped queues, budgets,
+fencing, and authorities. Dedicated provider infrastructure remains an optional deployment topology; intentionally
+shared physical infrastructure remains a common physical failure domain.
 
 ### WAL
 
@@ -176,8 +191,8 @@ Detailed contract: [Protocol integrations](../v2/07-protocol-integrations.md).
 
 The normative [tradeoff register](../v2/tradeoffs.md) records the benefit, cost, mitigation, and evidence gate for every
 accepted or provisional compromise. Important examples are group-commit latency, protocol-native position domains,
-multi-protocol shared-infrastructure isolation, two metadata backends, protocol-boundary duplication, epoch-scoped
-profiles, physical generation overlap, no synchronous BK/Object double write, and the clean V1 break.
+cell-scoped Provider sessions over optional shared infrastructure, two metadata backends, protocol-boundary duplication,
+epoch-scoped profiles, physical generation overlap, no synchronous BK/Object double write, and the clean V1 break.
 
 ## 11. Status and historical boundary
 

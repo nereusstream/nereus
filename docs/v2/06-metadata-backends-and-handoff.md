@@ -35,6 +35,8 @@ be versioned and replay-deterministic.
 
 High-churn materialization heartbeats, cache state, and per-append data do not belong in the KRaft log. Background work
 uses deterministic assignment from durable roots or a separately bounded coordinator whose loss only delays work.
+When a coordinator or executor serves multiple Protocol Cells, assignment roots, queues, quotas, fencing, and task
+authority remain cell-scoped. Shared capacity never creates a cross-cell publication or deletion authority.
 
 ## Pulsar backend
 
@@ -73,4 +75,5 @@ For admitted normal append, both remote metadata read and mutation counters must
 topic-open, rollover publication, trim, and background lifecycle work are separately labeled and budgeted so they cannot
 hide in an aggregate append metric.
 
-Relevant tradeoffs: `T-META-01` and `T-HANDOFF-01`. Required scenarios: `V2-META-001` and `V2-HO-001`.
+Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, and `T-FABRIC-01`. Required scenarios: `V2-META-001`,
+`V2-HO-001`, and `V2-FABRIC-001`.

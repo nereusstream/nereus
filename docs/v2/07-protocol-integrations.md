@@ -11,10 +11,16 @@ sourceTuple: v2-m0
 
 ## Storage Fabric boundary
 
-One Nereus Storage Fabric may contain multiple Kafka and Pulsar Protocol Cells. The cells may share Object Storage,
-BookKeeper, materialization/verification workers, cache, GC infrastructure, and observability, subject to the still-open
-resource/failure-isolation contract. Sharing never makes their control planes, positions, or Native Write Authorities
-interchangeable.
+One Nereus Storage Fabric may contain multiple Kafka and Pulsar Protocol Cells. Cells may use the same external Object
+Storage or BookKeeper infrastructure and may share worker processes, compatible transport capacity, and observability.
+Each cell nevertheless owns a distinct Cell Provider Scope/session, namespace, credential/KMS and operator scope,
+admission/retry/circuit-breaker state, queue and cache accounting, task root, GC capability, drain, and close lifecycle.
+Object groups do not cross cells in 0.2.
+
+Sharing never makes control planes, positions, Native Write Authorities, provider sessions, or physical-delete authority
+interchangeable. A cell-local close, throttle, credential failure, stale task, or GC request cannot mutate another cell.
+An outage of intentionally shared physical infrastructure may still affect every attached cell. Dedicated provider
+infrastructure is an optional deployment topology for stronger SLO, compliance, or physical-failure isolation.
 
 | Protocol/profile path | Protocol position truth | Protocol Coverage | Physical Extent |
 | --- | --- | --- | --- |
@@ -92,6 +98,6 @@ KoP is intentionally outside the 0.2 runtime and release gates. Its existing des
 delete that design or claim its payload/coordinator mapping is implemented. Before activation it requires a fresh audit
 against V2 bindings, protocol-native Kafka work, and the then-current KoP source.
 
-Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-PROJECTION-01`, `T-BENCH-01`, and
-`T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-PROJECTION-001`, `V2-KAF-001`,
-`V2-PUL-001`, and `V2-KOP-001`.
+Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `T-PROJECTION-01`, `T-BENCH-01`,
+and `T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`,
+`V2-PROJECTION-001`, `V2-KAF-001`, `V2-PUL-001`, and `V2-KOP-001`.

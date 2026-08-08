@@ -54,6 +54,11 @@ A profile is immutable within one Storage Epoch. A binding may have an append-on
 cutover frontiers, but the supported online transition matrix and exact transition state machine are not yet accepted.
 Operational batching, cache, throttling, and compaction policy remain separately mutable.
 
+Provider sharing is physical, not authoritative. Multiple cells may use the same external Object Storage or BookKeeper
+infrastructure, while each cell owns its Cell Provider Scope/session, namespace, credential/KMS and operator scope,
+admission, task/cache roots, and GC authority. Object groups do not cross Protocol Cells in 0.2. Compatible transport
+pooling is optional and remains below the independently owned sessions.
+
 ## Reading order
 
 1. [V2 Context Map](../../CONTEXT-MAP.md) and the linked Kafka, Pulsar, and Shared Storage glossaries
@@ -79,8 +84,11 @@ Accepted decisions:
 - [ADR 0011: position domains and multi-protocol Storage Fabric](../decisions/0011-v2-position-domains-and-multi-protocol-fabric.md)
 - [ADR 0012: Storage Epochs and profile evolution](../decisions/0012-v2-storage-epochs-and-profile-evolution.md)
 - [ADR 0013: cross-protocol projection and migration boundary](../decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md)
+- [ADR 0014: provider sharing and Protocol Cell isolation](../decisions/0014-v2-provider-sharing-and-protocol-cell-isolation.md)
 
 ## Open design gates
+
+`V2-OPEN-FABRIC-01` was resolved by ADR 0014. The rows below are the remaining active gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
@@ -91,7 +99,6 @@ Accepted decisions:
 | `V2-OPEN-MIGRATION-01..03` | freeze supported profile transitions, runtime states, and historical-data policy | any online profile-transition implementation |
 | `V2-OPEN-PUL-MIGRATION-01` | choose new-incarnation cutover or a proven hybrid ledger model | Pulsar BookKeeper/Object transition |
 | `V2-OPEN-PROJECTION-01..03` | freeze map granularity, authority-transfer failure semantics, and protocol semantics | Kafka/Pulsar projection or migration runtime |
-| `V2-OPEN-FABRIC-01` | freeze namespace, quota, credentials, and failure isolation across cells | production multi-cell provider sharing |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |
 
 ## Maintenance rule

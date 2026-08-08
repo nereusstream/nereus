@@ -19,5 +19,6 @@ KoP is outside the current V2 Kafka/Pulsar design session. Its existing design r
   binding-scoped Pulsar Coverage over physical extents.
 - **Kafka ↔ Pulsar**: neither context compares or allocates the other's positions. Shared access uses an Access
   Projection with one Native Write Authority; an authority transfer uses a separate Migration Link.
-- **Protocol Cells ↔ Storage Fabric**: multiple Kafka and Pulsar Protocol Cells may share one Storage Fabric without
-  sharing a position domain or write authority.
+- **Protocol Cells ↔ Storage Fabric**: multiple Kafka and Pulsar Protocol Cells may share external provider
+  infrastructure and capacity pools, but each cell owns a separate Cell Provider Scope/session, resource accounting,
+  task/cache namespace, and GC authority; they never share a position domain or write authority.

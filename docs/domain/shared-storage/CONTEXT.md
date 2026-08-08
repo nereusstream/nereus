@@ -15,6 +15,23 @@ One Kafka or Pulsar control-and-runtime domain whose protocol authority is indep
 Storage Fabric.
 _Avoid_: Storage tenant, broker group
 
+**Provider Infrastructure**:
+An external Object Storage service/account or BookKeeper cluster that may be used by multiple Protocol Cells. Sharing it
+is a deployment choice and may create a common physical failure domain.
+_Avoid_: Cell Provider Session, logical isolation guarantee
+
+**Cell Provider Scope**:
+The Protocol-Cell-owned binding of provider endpoint identity, exclusive namespace, credential/security scope, allowed
+encryption/KMS scope, admission/quota scope, operator owner, and physical-delete capability. Stable secret references or
+identity versions may be bound; secret values are not persisted in the scope.
+_Avoid_: Shared credential context, provider class name
+
+**Cell Provider Session**:
+A process-local, independently drainable/closeable provider adapter for one Cell Provider Scope. It owns cell-local
+admission, retry/circuit-breaker state, open groups, in-flight accounting, and metrics. It may borrow compatible
+lower-level transport, but that transport owns no protocol or lifecycle authority.
+_Avoid_: Cross-cell batching authority, shared correctness state
+
 **Topic Protocol Binding**:
 The immutable association between one Topic Incarnation, one Protocol Cell, one Position Domain, one payload mapping,
 and one Native Write Authority kind. The current leader/broker holder is represented separately by an Owner Epoch.
@@ -79,8 +96,12 @@ The explicit authority-transfer relationship between a source Topic Protocol Bin
 Binding.
 _Avoid_: Storage Epoch, profile switch
 
-## Open question
+## Provider and failure boundary
 
-The minimum hard resource/failure-isolation boundary for Protocol Cells is not yet frozen. Namespace, quota,
-credentials, encryption, noisy-neighbor containment, and operator ownership remain tracked by
-[`V2-OPEN-FABRIC-01`](../../v2/open-questions.md).
+Protocol Cell is the minimum logical failure-attribution and provider-authorization boundary. Provider Infrastructure,
+worker processes, executors, and observability may be shared, but sessions, namespaces, admission, retry/circuit-breaker
+state, task/cache roots, and GC authorization remain cell-scoped. Object WAL groups do not cross cells in 0.2.
+
+Shared physical infrastructure may still fail all attached cells. Dedicated provider infrastructure is an optional
+deployment topology for stronger SLO, compliance, or physical-failure isolation. Tenant policies may further subdivide
+a Protocol Cell; a Cell is not redefined as a storage tenant.

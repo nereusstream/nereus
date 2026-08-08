@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted for the V2 design and refined by ADR 0011 and ADR 0013. Implementation and runtime evidence are not started
-at M0.
+Accepted for the V2 design and refined by ADR 0011, ADR 0013, and ADR 0014. Implementation and runtime evidence are not
+started at M0.
 
 ## Context
 
@@ -22,9 +22,11 @@ V2 shares storage lifecycle concepts but keeps protocol-native execution paths:
 - Shared code owns binding-scoped Protocol Coverage, immutable Physical Extent descriptors, manifest generation rules,
   checksums, cache policy, task identity, materialization, and physical-GC proof.
 
-One Storage Fabric may host multiple independent Kafka and Pulsar Protocol Cells. Sharing providers or lifecycle workers
-does not permit cross-cell position comparison or grant another cell Native Write Authority. Secondary protocol access
-uses an Access Projection; protocol-authority transfer uses a Migration Link.
+One Storage Fabric may host multiple independent Kafka and Pulsar Protocol Cells. Cells may share external provider
+infrastructure and worker processes, but each cell owns its Cell Provider Scope, session lifecycle, resource accounting,
+task/cache namespace, and GC authority. Object groups do not cross cells in 0.2. Sharing never permits cross-cell
+position comparison or grants another cell Native Write Authority. Secondary protocol access uses an Access Projection;
+protocol-authority transfer uses a Migration Link.
 
 The control plane is split by capability rather than represented by one universal metadata interface:
 
@@ -45,5 +47,5 @@ Fast handoff records are hints and never replace the durable primary WAL plus ow
 - Some logic is deliberately duplicated at the protocol boundary to preserve native behavior.
 - The Shared Storage Context cannot require every protocol to expose a common numeric range.
 
-This decision is tracked by `T-PROTOCOL-01`, `T-META-01`, `T-MULTIPROTOCOL-01`, and scenarios
-`V2-META-001`, `V2-MULTIPROTOCOL-001`, `V2-KAF-001`, and `V2-PUL-001`.
+This decision is tracked by `T-PROTOCOL-01`, `T-META-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, and scenarios
+`V2-META-001`, `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`, `V2-KAF-001`, and `V2-PUL-001`.

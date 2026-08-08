@@ -22,6 +22,10 @@ describes data with a typed `ProtocolCoverage`—`KafkaOffsetRange` or ledger-ke
 describes placement with `PhysicalExtent`—Object or BookKeeper. BookKeeper entry coordinates do not become Kafka
 offsets, and Object keys do not become Pulsar positions.
 
+ADR 0014 defines the sharing boundary: cells may use the same external Provider Infrastructure, but each cell keeps a
+distinct Cell Provider Scope and independently owned sessions, queues, cache/task namespaces, and GC authority. Shared
+infrastructure does not imply shared runtime correctness state or cross-cell Object groups.
+
 The valid typed combinations are:
 
 | Protocol/storage path | Protocol Coverage | Physical Extent |
@@ -38,9 +42,10 @@ ledger chain. V2 does not persist `ledgerBase + entryId` as a second Pulsar posi
 
 - Shared manifests, handoff, trim, recovery, and GC carry binding-scoped typed coverage and frontiers.
 - Shared algorithms must dispatch ordering/adjacency through the binding's Position Domain.
-- Multiple protocol cells may share Object Storage, BookKeeper, workers, cache, GC, and observability without sharing
-  native ownership.
+- Multiple protocol cells may share physical Object Storage or BookKeeper infrastructure, compatible transport pools,
+  worker processes, and observability while retaining cell-scoped sessions, resource accounting, cache/task roots, and
+  physical-delete authority.
 - A Topic Incarnation has exactly one Position Domain and one Native Write Authority at a time.
 
-This refines ADR 0007 and ADR 0009 and is tracked by `T-POSITION-01`, `T-MULTIPROTOCOL-01`,
-`V2-POSITION-001`, and `V2-MULTIPROTOCOL-001`.
+This refines ADR 0007 and ADR 0009 and is further refined by ADR 0014. It is tracked by `T-POSITION-01`,
+`T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `V2-POSITION-001`, `V2-MULTIPROTOCOL-001`, and `V2-FABRIC-001..003`.
