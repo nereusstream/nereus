@@ -602,10 +602,11 @@ class DefaultStreamStorageReadTest {
     }
 
     @Test
-    void uploadedManifestWithoutReachableHeadCommitRemainsInvisible() {
+    void uploadedManifestWithoutReachableHeadCommitRemainsInvisible() throws Exception {
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
-        OxiaMetadataStore delayedCommit = delayCommit(metadata);
+        CountDownLatch commitStarted = new CountDownLatch(1);
+        OxiaMetadataStore delayedCommit = delayCommit(metadata, commitStarted);
         DefaultStreamStorage storage = storage(
                 defaultConfig(false),
                 delayedCommit,
@@ -626,7 +627,10 @@ class DefaultStreamStorageReadTest {
                     Duration.ofSeconds(2),
                     true,
                     Map.of());
-            NereusException uncertain = failure(storage.append(streamId, batch(List.of(), "not-visible"), shortAppend));
+            CompletableFuture<AppendResult> append =
+                    storage.append(streamId, batch(List.of(), "not-visible"), shortAppend);
+            assertThat(commitStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            NereusException uncertain = failure(append);
             assertThat(uncertain.appendOutcome()).contains(AppendOutcome.MAY_HAVE_COMMITTED);
             assertThat(metadata.storedMetadataValuesForTesting())
                     .anyMatch(value -> value.recordType().equals("ObjectManifestRecord"));
@@ -865,12 +869,15 @@ class DefaultStreamStorageReadTest {
                 });
     }
 
-    private static OxiaMetadataStore delayCommit(OxiaMetadataStore delegate) {
+    private static OxiaMetadataStore delayCommit(
+            OxiaMetadataStore delegate,
+            CountDownLatch commitStarted) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class, PhysicalObjectMetadataStore.class},
                 (proxy, method, args) -> {
                     if (method.getName().equals("commitPreparedStableAppend")) {
+                        commitStarted.countDown();
                         return new CompletableFuture<>();
                     }
                     try {
