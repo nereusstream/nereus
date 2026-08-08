@@ -21,6 +21,15 @@ require_literal() {
     fi
 }
 
+require_pattern() {
+    local pattern="$1"
+    local path="$2"
+    if ! rg -UPq -- "$pattern" "$repo_root/$path"; then
+        echo "missing Phase 4 M4 cursor-protection contract pattern '$pattern' in $path" >&2
+        exit 1
+    fi
+}
+
 production_artifacts=(
     CursorSnapshotWriteAuthority.java
     CursorSnapshotPublication.java
@@ -57,7 +66,7 @@ require_literal "CursorSnapshotPublication" "$snapshot_api"
 require_literal "(key, providerAttempt) -> authorizeUpload" "$snapshot_store"
 require_literal "ObjectProtectionType.CURSOR_SNAPSHOT_PENDING" "$snapshot_store"
 require_literal "ObjectProtectionType.CURSOR_SNAPSHOT_ROOT" "$snapshot_store"
-require_literal "protections.acquireOrTransfer" "$snapshot_store"
+require_pattern 'protections\s*\.\s*acquireOrTransfer' "$snapshot_store"
 require_literal "protections.release(" "$snapshot_store"
 require_literal "protectLiveReference(" "$snapshot_store"
 require_literal "readPins.acquire(" "$snapshot_store"
@@ -66,7 +75,7 @@ require_literal "loadLiveReferenceRoot(" "$snapshot_store"
 
 require_literal "snapshotStore.prepareWrite" "$cursor_storage"
 require_literal "metadataStore.compareAndSetCursor" "$cursor_storage"
-require_literal "snapshotStore.completeWrite" "$cursor_storage"
+require_pattern 'snapshotStore\s*\.\s*completeWrite' "$cursor_storage"
 
 require_literal "DefaultObjectReadPinManager" "$provider"
 require_literal '"f4-reader/" + streamConfig.processRunId()' "$provider"
@@ -81,8 +90,9 @@ require_literal "phase4M4CursorProtectionCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 prepare_line="$(rg -n -F 'snapshotStore.prepareWrite' "$repo_root/$cursor_storage" | tail -1 | cut -d: -f1)"
-complete_line="$(rg -n -F 'snapshotStore.completeWrite' "$repo_root/$cursor_storage" | tail -1 | cut -d: -f1)"
-cas_line="$(rg -n -F 'metadataStore.compareAndSetCursor(' "$repo_root/$cursor_storage" \
+complete_line="$(rg -n -UP 'snapshotStore\s*\.\s*completeWrite' \
+        "$repo_root/$cursor_storage" | tail -1 | cut -d: -f1)"
+cas_line="$(rg -n -UP 'metadataStore\s*\.\s*compareAndSetCursor\(' "$repo_root/$cursor_storage" \
         | awk -F: -v prepare="$prepare_line" '$1 > prepare { print $1; exit }')"
 if [[ -z "$prepare_line" || -z "$cas_line" || -z "$complete_line" \
         || "$prepare_line" -ge "$cas_line" || "$cas_line" -ge "$complete_line" ]]; then
@@ -90,7 +100,7 @@ if [[ -z "$prepare_line" || -z "$cas_line" || -z "$complete_line" \
     exit 1
 fi
 
-permanent_line="$(rg -n -F 'protections.acquireOrTransfer(request, revalidator)' \
+permanent_line="$(rg -n -UP 'protections\s*\.\s*acquireOrTransfer\(request,\s*revalidator\)' \
         "$repo_root/$snapshot_store" | head -1 | cut -d: -f1)"
 pending_release_line="$(rg -n -F 'protections.release(' "$repo_root/$snapshot_store" | head -1 | cut -d: -f1)"
 if [[ -z "$permanent_line" || -z "$pending_release_line" \

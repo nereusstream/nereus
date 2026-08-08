@@ -12,6 +12,15 @@ require_literal() {
     fi
 }
 
+require_pattern() {
+    local pattern="$1"
+    local path="$2"
+    if ! rg -UPq -- "$pattern" "$repo_root/$path"; then
+        echo "missing Phase 4 M4 lifecycle contract pattern '$pattern' in $path" >&2
+        exit 1
+    fi
+}
+
 reject_literal() {
     local literal="$1"
     local path="$2"
@@ -24,16 +33,16 @@ reject_literal() {
 require_ordered() {
     local path="$1"
     shift
-    local previous=0
+    local previous=-1
     local literal
     for literal in "$@"; do
-        local line
-        line="$(rg -n -F -- "$literal" "$repo_root/$path" | head -n 1 | cut -d: -f1)"
-        if [[ -z "$line" || "$line" -le "$previous" ]]; then
+        local position
+        position="$(rg -n -o -b -F -- "$literal" "$repo_root/$path" | head -n 1 | cut -d: -f2)"
+        if [[ -z "$position" || "$position" -le "$previous" ]]; then
             echo "Phase 4 M4 lifecycle ordering is missing or invalid at '$literal' in $path" >&2
             exit 1
         fi
-        previous="$line"
+        previous="$position"
     done
 }
 
@@ -97,8 +106,8 @@ require_literal 'abandonedAppendIntents.inspectActive(active)' "$ownerless"
 require_literal 'inspection.protectionRemovals()' "$ownerless"
 require_literal 'inspection.metadataRemovals()' "$ownerless"
 require_literal 'abandonedAppendIntents.inspectMarked(marked)' "$ownerless"
-require_literal 'referenceDomains.snapshotForDeletion(' "$ownerless"
-require_literal 'abandonedAppendIntents.reload(' "$ownerless"
+require_pattern 'referenceDomains\s*\.\s*snapshotForDeletion\(' "$ownerless"
+require_pattern 'abandonedAppendIntents\s*\.\s*reload\(' "$ownerless"
 reject_literal 'scanProtections(' "$ownerless"
 require_literal "OWNERLESS_ORPHAN_CANDIDATE" "$ownerless"
 require_literal "PLAN_DRIFT_UNMARKED" "$ownerless_test"

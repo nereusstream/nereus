@@ -1081,7 +1081,7 @@ PhysicalObjectGarbageCollectorModelTest
 PhysicalObjectGarbageCollectorFailureInjectionTest
 PhysicalGcConfigTest                                      implemented checkpoint H
 GcPlanTest                                                implemented checkpoint H
-F4MetadataCodecGoldenTest                                activation plus task-V2 foundation (50 vectors)
+F4MetadataCodecGoldenTest                                activation plus task-V2/Kafka foundation (52 vectors)
 F4RecordValidationTest                                   extended checkpoint S activation contradictions
 GenerationProtocolActivationStoreContractTest            implemented checkpoint S exact-key/CAS contract
 GcRetirementJournalMetadataStoreContractTest             implemented checkpoint L durable-store parity

@@ -21,6 +21,15 @@ require_literal() {
     fi
 }
 
+require_pattern() {
+    local pattern="$1"
+    local path="$2"
+    if ! rg -UPq -- "$pattern" "$repo_root/$path"; then
+        echo "missing Phase 4 M4 generation-retirement contract pattern '$pattern' in $path" >&2
+        exit 1
+    fi
+}
+
 production_artifacts=(
     GenerationCandidateKeyIdentity.java
     GenerationZeroIndexRetirementHandler.java
@@ -112,7 +121,7 @@ require_literal "implements GcPlanMetadataRevalidator" "$source_planner"
 require_literal "findCommitCoveringOffset" "$source_planner"
 require_literal "canonicalCommitRecordSha256" "$source_planner"
 require_literal "getRecoveryRoot(cluster, stream)" "$source_planner"
-require_literal "recovery root changed while source facts were frozen" "$source_planner"
+require_pattern 'recovery root changed while\s*"\s*\+\s*"source facts were\s*"\s*\+\s*"frozen' "$source_planner"
 require_literal "higherEligibility.prove" "$source_planner"
 require_literal "completedTrim.proveIfCompleted" "$source_planner"
 require_literal "scanPublications" "$replacement_verifier"
@@ -138,7 +147,7 @@ require_literal "loadCurrentHealthy" "$replacement_verifier"
 require_literal "TOPIC_COMPACTED source has no current healthy same-view replacement" "$topic_replacement"
 require_literal "revalidateSameView" "$topic_replacement"
 require_literal "trim.proveIfCompleted" "$higher_eligibility"
-require_literal "topicCompacted.prove" "$higher_eligibility"
+require_pattern 'topicCompacted\s*\.\s*prove' "$higher_eligibility"
 
 require_literal "physical-gc-pre-drain:" "$pre_drain"
 require_literal "GenerationLifecycle.COMMITTED" "$pre_drain"

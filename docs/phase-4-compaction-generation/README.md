@@ -237,8 +237,7 @@ metadata checkpoint 还新增了全分片内存 Oxia backend、generation/regist
 store contract tests、record contradiction tests，以及 production/fake 共用的 physical-root lifecycle transition
 validator；
 generation index/task 的 create-response-loss recovery 会核对 immutable identity，checkpoint 同版本则核对 policy digest。
-当前 registry 已冻结覆盖全部 lifecycle/optional branch、retirement-journal 和 activation/task-V2 schema 的 50 个 envelope
-vectors，并把 generation index、task、
+当前 registry 已冻结覆盖全部 lifecycle/optional branch、retirement-journal 和 activation/task-V2 schema 的 50 个 envelope vectors，并把 generation index、task、
 checkpoint、retention stats、stream registration 和 recovery root 的 ordinary CAS identity/monotonic transition
 guards 接入 production adapter。真实 Oxia gate 进一步验证了 slash-aware fixed-depth key ranges、restart、CAS、
 pagination 和 conditional metadata delete；pinned LocalStack gate 验证了 guarded upload 必须同时等待 SDK response

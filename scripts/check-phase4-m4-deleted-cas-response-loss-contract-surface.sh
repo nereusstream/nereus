@@ -12,6 +12,15 @@ require_literal() {
     fi
 }
 
+require_pattern() {
+    local pattern="$1"
+    local path="$2"
+    if ! rg -UPq -- "$pattern" "$repo_root/$path"; then
+        echo "missing Phase 4 M4 DELETED-CAS response-loss contract pattern '$pattern' in $path" >&2
+        exit 1
+    fi
+}
+
 reject_literal() {
     local literal="$1"
     local path="$2"
@@ -35,7 +44,7 @@ require_literal "lostDeletedRootCasResponseReloadsExactDurableReplacementWithout
 require_literal "PhysicalStoreDecorator.loseDeletedRootCasResponse(" "$integration"
 require_literal "replacement.lifecycle() == PhysicalObjectLifecycle.DELETED" "$integration"
 require_literal "targetDeleteCompleted.get()" "$integration"
-require_literal "CompletableFuture<?> applied = (CompletableFuture<?>)" "$integration"
+require_pattern 'CompletableFuture<\?>\s+applied\s*=\s*\(CompletableFuture<\?>\)' "$integration"
 require_literal "invokeDelegate(raw, method, arguments)" "$integration"
 require_literal "return applied.thenCompose(ignored ->" "$integration"
 require_literal "injected response loss after successful DELETED root CAS" "$integration"

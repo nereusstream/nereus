@@ -12,6 +12,15 @@ require_literal() {
     fi
 }
 
+require_pattern() {
+    local pattern="$1"
+    local path="$2"
+    if ! rg -UPq -- "$pattern" "$repo_root/$path"; then
+        echo "missing Phase 4 M4 source/protection-cut contract pattern '$pattern' in $path" >&2
+        exit 1
+    fi
+}
+
 coordinator="nereus-materialization/src/main/java/com/nereusstream/materialization/gc/SourceRetirementCoordinator.java"
 unit_test="nereus-materialization/src/test/java/com/nereusstream/materialization/gc/SourceRetirementCoordinatorTest.java"
 integration_test="nereus-pulsar-adapter/src/f4M4IntegrationTest/java/com/nereusstream/pulsar/Phase4PhysicalGcOxiaS3IntegrationTest.java"
@@ -26,7 +35,7 @@ done
 require_literal \
     "return retireMetadata(context, journal.plannedMetadataRemovals(), counts, deadline)" \
     "$coordinator"
-require_literal "thenCompose(authenticated -> retireProtections(" "$coordinator"
+require_pattern 'thenCompose\(\s*authenticated\s*->\s*retireProtections\(' "$coordinator"
 require_literal "thenCompose(authenticated -> deletePhysicalObject(authenticated, deadline)" \
     "$coordinator"
 require_literal "conditionally delete journaled object protection" "$coordinator"

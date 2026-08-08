@@ -12,6 +12,15 @@ require_literal() {
     fi
 }
 
+require_pattern() {
+    local pattern="$1"
+    local path="$2"
+    if ! rg -UPq -- "$pattern" "$repo_root/$path"; then
+        echo "missing Phase 4 M4 cursor-snapshot GC contract pattern '$pattern' in $path" >&2
+        exit 1
+    fi
+}
+
 reject_literal() {
     local literal="$1"
     local path="$2"
@@ -47,7 +56,7 @@ require_literal "METADATA_LIMIT_EXCEEDED" "$scanner"
 require_literal "public CompletableFuture<Boolean> revalidate(Candidate candidate)" "$scanner"
 require_literal "Strict inverse used by F4 inventory" "$keys"
 require_literal "FinalCandidateRevalidator" "$collector"
-require_literal "revalidate candidate-specific inventory before delete intent" "$collector"
+require_pattern 'revalidate candidate-specific inventory before delete\s*"\s*\+\s*"intent' "$collector"
 require_literal "PLAN_DRIFT_UNMARKED" "$collector_test"
 require_literal "ObjectProtectionType.CURSOR_SNAPSHOT_PENDING" "$scanner_test"
 require_literal "scanner.revalidate(candidate).join()" "$scanner_test"
