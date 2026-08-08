@@ -77,6 +77,11 @@ public final class BookKeeperPrimaryWalAdministration {
                 configuration.wal(), configuration.deploymentId(), operatorEvidenceSha256, timeout);
     }
 
+    /** Reads and validates the exact active namespace without creating or updating metadata. */
+    public CompletableFuture<BookKeeperLedgerIdNamespaceReservation> verifyNamespace(Duration timeout) {
+        return namespaceVerifier.requireActive(configuration.wal(), Objects.requireNonNull(timeout, "timeout"));
+    }
+
     public CompletableFuture<BookKeeperLedgerIdNamespaceReservation> revokeNamespace(
             String revocationEvidenceSha256, long expectedMetadataVersion, Duration timeout) {
         return namespaceCoordinator.revoke(
