@@ -7,7 +7,7 @@
 | Release commit | `FULL_SHA` |
 | Annotated tag | `vX.Y.Z` |
 | Gradle version | `X.Y.Z` |
-| Release branch | `release/X.Y` |
+| Release branch | `vX.Y` |
 | Freeze timestamp (UTC) | `YYYY-MM-DDTHH:MM:SSZ` |
 
 ## External source locks

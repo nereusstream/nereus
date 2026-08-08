@@ -6,8 +6,10 @@ build capabilities. Deleting a release branch is a separate decision and is neve
 
 ## 1. Naming and version authority
 
-- Use `release/<major>.<minor>` for a stabilization branch, for example `release/0.2`.
+- Use `v<major>.<minor>` for a stabilization branch, for example `v0.2`.
 - Use `v<major>.<minor>.<patch>` for the immutable annotated tag, for example `v0.2.0`.
+- Branch and tag names intentionally differ by component count. When a historical branch has the same short name as
+  a release tag, use fully qualified `refs/heads/...` and `refs/tags/...` names until that branch is archived.
 - `gradle.properties:nereusVersion` is the single product-version authority.
 - During normal development it is `X.Y.Z-SNAPSHOT`; the release-freeze commit changes it to the exact `X.Y.Z`.
 - Phase 2 and Phase 9 development coordinates are derived automatically as `X.Y.Z-f2-dev` and `X.Y.Z-f9-dev`.
@@ -48,7 +50,7 @@ Start only from a clean, current `main` and cut the stabilization branch late:
 git fetch origin --prune --tags
 git switch main
 git pull --ff-only origin main
-git switch -c release/0.2
+git switch -c v0.2
 ```
 
 Complete all release changes before the freeze commit:
@@ -86,7 +88,7 @@ After the freeze commit and its required CI/final gates pass:
 release_sha="$(git rev-parse HEAD)"
 git tag -a v0.2.0 "${release_sha}" -m 'Nereus v0.2.0'
 test "$(git rev-list -n 1 v0.2.0)" = "${release_sha}"
-git push origin release/0.2
+git push origin v0.2
 git push origin refs/tags/v0.2.0
 ```
 
