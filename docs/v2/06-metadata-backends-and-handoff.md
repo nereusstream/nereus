@@ -54,10 +54,13 @@ only `[2,2]`; level 1 remains V1 and is rejected. Generic runtime 0/1-to-2 updat
 At level 2, a successful native CreateTopics item publishes the aggregate in the same atomic result; validate-only and
 native failed items publish nothing.
 
-Kafka represents the aggregate as a generated typed wire-v0 `TopicBindingAggregateRecord` owned directly by
-`TopicImage`. Completed snapshots write `TopicRecord -> TopicBindingAggregateRecord -> PartitionRecord*` for each
-topic, and `RemoveTopicRecord` removes the aggregate with the topic. Complete batch/snapshot publication rejects every
-missing, duplicate, unknown-topic, unknown-version, or invalid aggregate instead of publishing a partial image.
+Kafka reserves metadata extension keys `32000..32767`; API key 32000 is the generated non-flexible wire-v0
+`TopicBindingAggregateRecord` owned directly by `TopicImage`. Completed snapshots write
+`TopicRecord -> TopicBindingAggregateRecord -> PartitionRecord*` for each topic, and `RemoveTopicRecord` removes the
+aggregate with the topic. At the actual MetadataLoader publication boundary, ordinary deltas validate only
+touched/created/removed topics in the resulting image; snapshot/bootstrap scans every live topic after
+`finishSnapshot`. No raw multi-batch transaction fragment is published or forced through a full scan, and correctness
+validation cannot be disabled.
 
 High-churn materialization heartbeats, cache state, and per-append data do not belong in the KRaft log. Background work
 uses deterministic assignment from durable roots or a separately bounded coordinator whose loss only delays work.
@@ -77,6 +80,11 @@ durable `DELETED(generation)`. An incarnation-scoped full aggregate may be exact
 reference-free retirement with a same-key `RetiredTopicIncarnationTombstone`; the key never becomes absent or reusable.
 Selectors/tombstones count against hard lifetime metadata limits.
 
+Selector creation/deletion uses exact `RESERVED -> ACTIVE -> DELETING -> DELETED` single-key CAS transitions around
+immutable aggregate creation/native deletion. Topic open, ownership acquisition, and metadata-version change validate
+ACTIVE plus exact aggregate identity and install a local versioned fence. Watch/cache state may accelerate this control
+path but normal append/read performs no Oxia call; stale state blocks admission until revalidation.
+
 A single bounded deployment-level Virtual Ledger Namespace Registry is allocation authority for non-overlapping,
 never-reused cell slices from `[2^62, 2^63 - 2]` and records native-exclusion evidence for the entire interval. Its
 canonical complete assignment table uses one-key CAS and a monotonic registry epoch. Per-cell lookup/watch state is
@@ -85,10 +93,12 @@ capacity-exhausted registry state blocks allocation. Reservation checks are low-
 normal append metadata I/O.
 
 Every assignment is owned by an immutable Pulsar Protocol Cell tuple and follows
-`ACTIVE -> RETIRING -> RETIRED`; retired rows and bounds remain forever. Each Cell has one immutable aligned `2^k`
-slice, while numeric and encoded/lifetime registry limits jointly bound capacity. Broker/session/provider changes do not
+`ACTIVE -> RETIRING -> RETIRED`; retired rows and bounds remain forever. Each Cell has one immutable aligned `2^40`
+slice, while 65,536 canonical registry bytes, 256 lifetime assignments, and a 192-byte row maximum jointly bound
+capacity. Broker/session/provider changes do not
 change ownership or consume another assignment. 0.2 never resizes, relocates, extends, or attaches another slice;
-exhaustion fails closed and additional capacity uses a new Protocol Cell.
+exhaustion fails closed and additional capacity uses a new Protocol Cell. A registry-exhausted domain can be replaced
+only by a bootstrap-proven disjoint ledger-ID namespace or an independent deployment/cluster, not a new logical label.
 
 ## Object WalRun control records
 
@@ -97,6 +107,10 @@ separate immutable `WalRunSealRecord` records terminal sequence and typed covera
 successor Root binds predecessor Root+Seal identities, and one exact-version CAS advances `CurrentWalRunPointer` only
 after the successor exists. Lost create/CAS responses converge by exact reread equality. These are rollover/recovery
 cuts; normal admitted append performs no metadata read or mutation.
+
+Asynchronous checkpoint pages cover at most 256 contiguous extents/64 KiB each. Their cadence is Cell x shard policy,
+but finite uncovered extent/byte/age limits always force progress, backpressure, or rollover. Open recovery/handoff LISTs
+the uncovered tail, and the Seal binds the final mandatory gap-free page chain. Policy changes begin with the next Root.
 
 ## Ownership token
 
@@ -129,5 +143,6 @@ For admitted normal append, both remote metadata read and mutation counters must
 topic-open, rollover publication, trim, and background lifecycle work are separately labeled and budgeted so they cannot
 hide in an aggregate append metric.
 
-Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, and `T-FABRIC-01`. Required scenarios: `V2-META-001..005`,
-`V2-KAF-META-001..002`, `V2-HO-001`, `V2-FABRIC-001`, and `V2-POSITION-002..008`.
+Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios:
+`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015`, `V2-HO-001`, `V2-FABRIC-001`,
+`V2-POLICY-001`, and `V2-POSITION-002..009`.

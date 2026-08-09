@@ -30,16 +30,20 @@ and the retirement-proof digest. That incarnation key is never deleted or reused
 resurrect the full aggregate. A later generation uses a new incarnation key and does not wait for old payload
 compaction. Hard lifetime row/count/byte admission includes every selector and tombstone, including retired history.
 
+ADR 0051 refines selector publication to exact `RESERVED -> ACTIVE -> DELETING -> DELETED` single-key CAS transitions.
+ACTIVE plus exact aggregate identity is revalidated on topic open, ownership acquisition, and metadata-version change,
+then cached as a local versioned fence; normal append/read performs no per-access Oxia operation.
+
 ## Consequences
 
 - `V2-OPEN-PUL-META-01` is resolved.
 - One small permanent row per historical incarnation is accepted to release the full aggregate without reopening an
   ABA window.
 - Topic-name recreation does not reuse generation, key, binding ID, or initial Storage Epoch ID.
-- Exact selector/tombstone wire, retirement receipt, exhaustive reference domains, audit grace, and response-loss
-  reconciliation remain downstream metadata gates.
+- Selector state/recovery and cached admission are refined by ADR 0051. Tombstone wire, retirement receipt, exhaustive
+  reference domains, and audit grace remain downstream metadata gates.
 - M1/M5 must prove monotonic selection, durable deletion, overflow rejection, stale-create response loss, exact
   replacement ordering, reference vetoes, tombstone capacity accounting, and same-name recreation isolation.
 
-This decision refines ADRs 0023, 0028, and 0033 and is tracked by `T-META-01`, `T-GC-01`,
-`V2-META-002/003/005`, and `V2-GC-003`.
+This decision is refined by ADR 0051, refines ADRs 0023, 0028, and 0033, and is tracked by `T-META-01`, `T-GC-01`,
+`V2-META-002/003/005/006`, and `V2-GC-003`.

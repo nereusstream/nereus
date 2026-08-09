@@ -30,7 +30,15 @@
     {
       "id": "V2-PROFILE-001",
       "milestone": "M1",
-      "contract": "Topic Protocol Binding is immutable, profile is immutable within a Storage Epoch, and operational policy remains mutable",
+      "contract": "Topic Protocol Binding is immutable profile is immutable within a Storage Epoch and operational policy changes only at contract defined activation boundaries",
+      "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POLICY-001",
+      "milestone": "M1/M2/M3",
+      "contract": "correctness is never configurable and typed topic tenant cell shard and host scopes resolve budgets by minimum while persisting byte and recovery choices at their activation boundary",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -68,6 +76,14 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-META-006",
+      "milestone": "M1",
+      "contract": "Pulsar selector uses exact reserved active deleting deleted CAS recovery and normal access checks a cached versioned active aggregate fence",
+      "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-KAF-META-001",
       "milestone": "M1/M6",
       "contract": "Kafka V2 activates only at fresh bootstrap nereus storage version 2 and rejects V1 plus every runtime upgrade or downgrade",
@@ -78,7 +94,15 @@
     {
       "id": "V2-KAF-META-002",
       "milestone": "M1",
-      "contract": "Kafka owns one generated typed aggregate record in TopicImage and validates exactly one per live topic at complete batch and snapshot cuts",
+      "contract": "Kafka owns one generated typed aggregate record in TopicImage and validates exactly one at the actual complete image publication boundary",
+      "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-META-003",
+      "milestone": "M1/M6",
+      "contract": "Kafka reserves API key 32000 strict non flexible wire v0 and ordinary publication validates only touched topics while snapshot and bootstrap scan all live topics",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -143,6 +167,14 @@
       "id": "V2-POSITION-008",
       "milestone": "M1/M3",
       "contract": "0.2 never resizes relocates extends or attaches another virtual ledger slice and exhaustion fails before allocation",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-009",
+      "milestone": "M1/M3",
+      "contract": "virtual ledger bootstrap fixes k 40 64 KiB registry bytes 256 lifetime assignments and 192 byte rows and any replacement domain proves a disjoint ledger ID namespace",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -308,6 +340,14 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-OBJ-015",
+      "milestone": "M3/M7",
+      "contract": "asynchronous checkpoint pages are Cell shard scoped with mandatory uncovered tail limits open tail LIST and a sealed final gap free canonical chain",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-BK-001",
       "milestone": "M2",
       "contract": "both BookKeeper profiles ACK at quorum without synchronous Object dependency",
@@ -383,6 +423,14 @@
       "id": "V2-BK-010",
       "milestone": "M2",
       "contract": "one ManagedLedger owned dual source handle uses source specific range pins and drains BookKeeper pins before the native deletion CAS",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-011",
+      "milestone": "M2/M5",
+      "contract": "persisted retain BK or delete after verified policy uses irreversible BK delete none intent done and the compatibility boolean never proves physical deletion",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null

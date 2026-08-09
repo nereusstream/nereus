@@ -32,7 +32,8 @@ Read source selection is:
 
 - before offload completion: BookKeeper only;
 - `complete && !bookkeeperDeleted`: both sources are eligible under the bounded one-shot rules below;
-- `bookkeeperDeleted=true`: Object only, even if physical BookKeeper residue still exists.
+- `bookkeeperDeleted=true`: Object only, even if physical BookKeeper residue still exists. ADR 0052 defines this as the
+  compatibility read fence for `BK_DELETE_INTENT` or `BK_DELETE_DONE`; only DONE proves physical absence.
 
 For an Object-first read, missing, timeout, unavailable, short-read, digest, or format failure releases all partial
 entries and retries the entire inclusive range from BookKeeper at most once. For a BookKeeper-first read, only the
@@ -49,10 +50,10 @@ vetoes source deletion even when BookKeeper fallback succeeds.
 - `V2-OPEN-BK-07` and `V2-OPEN-BK-08` are resolved.
 - Final source deletion pays another bounded Object verification, while reads gain one native-authorized availability
   fallback without hiding corruption.
-- ManagedLedger-owned read pins and composite-handle lifecycle are refined by ADR 0045. Physical-delete intent/fact
-  state and restart reconciliation remain downstream gates.
+- ManagedLedger-owned read pins and composite-handle lifecycle are refined by ADR 0045. ADR 0052 owns physical-delete
+  intent/fact, retention policy, and restart reconciliation.
 - M2 must prove the exact state/error table, whole-range source purity, partial-entry release, no fallback loops,
   quarantine/deletion veto, CAS recheck cuts, timeout retention, and deletion-versus-read concurrency.
 
-This decision is refined by ADRs 0044/0045, refines ADRs 0017/0020/0029/0035, and is tracked by `T-BK-01`,
-`V2-BK-002`, and `V2-BK-005..010`.
+This decision is refined by ADRs 0044/0045/0052, refines ADRs 0017/0020/0029/0035, and is tracked by `T-BK-01`,
+`V2-BK-002`, and `V2-BK-005..011`.

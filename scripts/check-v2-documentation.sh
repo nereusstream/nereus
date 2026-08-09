@@ -101,6 +101,12 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md"
     "$repo_root/docs/decisions/0047-v2-walrun-root-seal-and-successor-publication.md"
     "$repo_root/docs/decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md"
+    "$repo_root/docs/decisions/0049-v2-configuration-scopes-and-persisted-semantics.md"
+    "$repo_root/docs/decisions/0050-v2-kafka-aggregate-wire-and-publication-validation.md"
+    "$repo_root/docs/decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md"
+    "$repo_root/docs/decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md"
+    "$repo_root/docs/decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md"
+    "$repo_root/docs/decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -156,6 +162,12 @@ require_literal '`DualSourceReadHandle`' "docs/decisions/0045-v2-pulsar-dual-sou
 require_literal '`AES-256-GCM/HKDF-SHA-256 v1`' "docs/decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md"
 require_literal '`WalRunSealRecord`' "docs/decisions/0047-v2-walrun-root-seal-and-successor-publication.md"
 require_literal '0.2 forbids slice resize' "docs/decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md"
+require_literal 'Correctness invariants, recovery semantics, and durable compatibility contracts are never feature flags' "docs/decisions/0049-v2-configuration-scopes-and-persisted-semantics.md"
+require_literal '`TopicBindingAggregateRecord` uses `apiKey=32000`' "docs/decisions/0050-v2-kafka-aggregate-wire-and-publication-validation.md"
+require_literal '`RESERVED -> ACTIVE -> DELETING -> DELETED`' "docs/decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md"
+require_literal '`BK_DELETE_NONE -> BK_DELETE_INTENT -> BK_DELETE_DONE`' "docs/decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md"
+require_literal '`maxUncheckpointedExtents`' "docs/decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md"
+require_literal '`maxAssignmentsEver=256`' "docs/decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -175,7 +187,10 @@ require_literal "The user answered: “全部按推荐确认”" "docs/v2/grill-
 require_literal "Restarted Grill 2 round 6" "docs/v2/grill-notes/08-restarted-grill-2-runtime-ownership-and-crypto.md"
 require_literal "The user answered: “全部按推荐确认”" "docs/v2/grill-notes/08-restarted-grill-2-runtime-ownership-and-crypto.md"
 require_literal "Restarted Grill 2 round 7" "docs/v2/grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md"
-require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md"
+require_literal "Round 7 不按原推荐整体确认" "docs/v2/grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md"
+require_literal "Q3 / \`V2-OPEN-BK-11\`, Q5 / \`V2-OPEN-OBJ-17\`, and Q8 / \`V2-OPEN-PUL-OBJ-09\` remain open" "docs/v2/grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md"
+require_literal "Restarted Grill 2 round 8" "docs/v2/grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md"
+require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -256,23 +271,26 @@ for resolved_gate in \
     V2-OPEN-BK-10 \
     V2-OPEN-OBJ-15 \
     V2-OPEN-OBJ-16 \
-    V2-OPEN-PUL-OBJ-07; do
+    V2-OPEN-PUL-OBJ-07 \
+    V2-OPEN-KAF-META-03 \
+    V2-OPEN-PUL-META-02 \
+    V2-OPEN-BK-12 \
+    V2-OPEN-OBJ-18 \
+    V2-OPEN-PUL-OBJ-08; do
     if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$resolved_gate remains in the active gate table"
     fi
 done
 
 for active_gate in \
-    V2-OPEN-KAF-META-03 \
-    V2-OPEN-PUL-META-02 \
     V2-OPEN-BK-11 \
-    V2-OPEN-BK-12 \
+    V2-OPEN-BK-13 \
     V2-OPEN-OBJ-17 \
-    V2-OPEN-OBJ-18 \
-    V2-OPEN-PUL-OBJ-08 \
-    V2-OPEN-PUL-OBJ-09; do
+    V2-OPEN-OBJ-19 \
+    V2-OPEN-PUL-OBJ-09 \
+    V2-OPEN-PUL-OBJ-10; do
     require_literal "\`$active_gate\`" "docs/v2/open-questions.md"
-    require_literal "\`$active_gate\`" "docs/v2/grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md"
+    require_literal "\`$active_gate\`" "docs/v2/grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md"
     if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$active_gate is missing from the active gate table"
     fi
@@ -324,6 +342,12 @@ active_contracts=(
     "$repo_root/docs/decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md"
     "$repo_root/docs/decisions/0047-v2-walrun-root-seal-and-successor-publication.md"
     "$repo_root/docs/decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md"
+    "$repo_root/docs/decisions/0049-v2-configuration-scopes-and-persisted-semantics.md"
+    "$repo_root/docs/decisions/0050-v2-kafka-aggregate-wire-and-publication-validation.md"
+    "$repo_root/docs/decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md"
+    "$repo_root/docs/decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md"
+    "$repo_root/docs/decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md"
+    "$repo_root/docs/decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )

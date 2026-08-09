@@ -15,23 +15,27 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-The user explicitly confirmed all seven round-6 recommendations. ADRs 0042 through 0048 now resolve that complete
-frontier. The next independent frontier is:
+The user did not confirm Round 7 as one package. They accepted a cross-cutting configuration-scope contract and the
+adjusted Q1, Q2, Q4, Q6, and Q7. ADRs 0049 through 0054 own those accepted parts. Q3, Q5, and Q8 remain open. The next
+independent frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-KAF-META-03` | exact Kafka extension API key, generated wire fields, and final-image validation hook | reserve API key 32000, use strict explicit wire-v0 fields, and validate at completed batch/snapshot apply |
-| `V2-OPEN-PUL-META-02` | selector/tombstone wire and separate-key create/delete/recreate state machine | use exact `RESERVED -> ACTIVE -> DELETING -> DELETED` CAS recovery around the immutable aggregate |
-| `V2-OPEN-BK-11` | exact NPD1 object/block wire, limits, codecs, and crypto envelope | use bounded big-endian block headers/directories, native-size-aware admission, ZSTD/NONE, and one wrapped attempt key |
-| `V2-OPEN-BK-12` | persisted physical BookKeeper delete intent/fact and restart behavior | make Object-only INTENT durable before delete, retry on restart, and mark DONE only after success/absence proof |
-| `V2-OPEN-OBJ-17` | exact NWG1 clear header, HKDF, nonce, AAD, and encrypted-directory framing | use a fixed header, length-framed HKDF inputs, fixed domain/ordinal nonces, and descriptor-bound AAD |
-| `V2-OPEN-OBJ-18` | checkpoint-page authority and handoff treatment of an uncovered open tail | publish bounded pages asynchronously, require LIST for uncovered open tail, and bind final pages into the Seal |
-| `V2-OPEN-PUL-OBJ-08` | exact slice exponent and one-record lifetime caps | use `k=40`, 64 KiB registry bytes, 256 lifetime assignments, and fixed bounded rows |
-| `V2-OPEN-PUL-OBJ-09` | allocator reservation, Ledger Chain head publication, and response-loss recovery | serialize one Cell reservation, publish immutable node then exact head CAS, and burn conflicts as gaps |
+| `V2-OPEN-BK-11` | exact NPD1/NPO1 fixed rows and format/deployment hard caps | use a 96-byte NPO1 sparse row, retain 65,536 rows by explicit 8-MiB root arithmetic, and propose 64-MiB block hard caps |
+| `V2-OPEN-BK-13` | finite NPD1 block-target/compression policy classes and default-selection evidence | persist a small candidate class in each attempt and leave the default unpinned until cold-read/CPU/request benchmarks |
+| `V2-OPEN-OBJ-17` | NWG1 hard context/frame/directory/prefix caps and initial cold-range sequence | cap 256 contexts, 4,096 frames, and 1-MiB encrypted directory, then use header GET plus exact directory GET |
+| `V2-OPEN-OBJ-19` | finite NWG1 compression/linger/group-target policy classes | use a few combined typed classes, skip recompression for protocol-marked compressed/opaque payloads, and persist resolved policy |
+| `V2-OPEN-PUL-OBJ-10` | target-scale STRICT_SERIALIZED admission/HOL evidence plan before choosing allocator mode | measure all four writes, synchronized rollover storms, queueing, RTT sensitivity, crash recovery, and reject STRICT if bounded thresholds fail |
 
 The complete questions and recommendations are in
-[round 7](grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md). None of these eight recommendations
-is accepted yet.
+[round 8](grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md). None of these five
+recommendations is accepted yet.
+
+## Configuration scope
+
+Correctness/recovery/compatibility are non-configurable; Topic/Tenant typed intent, Protocol Cell/shard budgets, and
+host/process ceilings resolve by minimum, and durable byte/recovery choices persist at epoch/run/attempt boundaries.
+Resolved by [ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md).
 
 ## Initial binding and epoch publication
 
@@ -79,19 +83,17 @@ Resolved by [ADR 0043](../decisions/0043-v2-pulsar-topic-generation-selector-and
 name-scoped selector retains monotonic generation and durable deletion; only exact reference-free proof may replace a
 full aggregate with a compact permanent same-key tombstone. Neither key nor generation is reused.
 
-### `V2-OPEN-KAF-META-03`: Kafka aggregate generated wire and validation hook
+### `V2-OPEN-KAF-META-03`: resolved Kafka aggregate generated wire and validation hook
 
-Which non-conflicting metadata API key, explicit field wire, and final replay hook implement ADR 0042? The current
-recommendation reserves Nereus API-key band `32000..32767`, assigns the aggregate key 32000 with strict non-flexible v0
-typed fields, accumulates transient state in `TopicDelta`, and rejects missing/duplicate/invalid aggregates only at the
-completed batch/snapshot apply boundary. This is not yet accepted.
+Resolved by [ADR 0050](../decisions/0050-v2-kafka-aggregate-wire-and-publication-validation.md). Kafka reserves
+`32000..32767`, uses API key 32000 strict non-flexible wire v0, validates only touched topics at ordinary actual image
+publication, and scans all live topics only for snapshot/bootstrap. The correctness check cannot be disabled.
 
-### `V2-OPEN-PUL-META-02`: Pulsar selector and aggregate CAS state machine
+### `V2-OPEN-PUL-META-02`: resolved Pulsar selector and aggregate CAS state machine
 
-How do separate selector and aggregate keys recover without pretending Oxia offers a multi-key transaction? The
-current recommendation uses exact `RESERVED -> ACTIVE -> DELETING -> DELETED` selector CAS transitions, exact immutable
-aggregate creation between RESERVED and ACTIVE, fail-closed admission until ACTIVE, and same-key permanent incarnation
-tombstones after later reference-free retirement. This is not yet accepted.
+Resolved by [ADR 0051](../decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md). Exact
+`RESERVED -> ACTIVE -> DELETING -> DELETED` CAS transitions recover separate keys; open/ownership/version change
+validates ACTIVE plus aggregate identity and installs a local versioned fence, so normal append/read has no Oxia call.
 
 ## Object WAL durability verification
 
@@ -192,16 +194,24 @@ A sealed run is never reopened.
 
 ### `V2-OPEN-OBJ-17`: exact NWG1 cryptographic framing
 
-Which header, HKDF input, nonce bytes, AAD, and encrypted-directory layout implement ADR 0046? The current recommendation
-uses a fixed 256-byte big-endian clear header, length-framed Root-salted HKDF inputs, fixed `NDIR`/`NFRM` domain+ordinal
-nonces, and directory/frame-descriptor-bound AAD before trusting any frame range. This is not yet accepted.
+The user retained AES-256-GCM/HKDF-SHA-256, the fixed header direction, nonce domains, descriptor-bound AAD, and
+authenticated directory but did not accept the wire without hard parser/read-amplification caps. The remaining gate
+must freeze `maxBindingContexts`, `maxFrames`, `maxDirectoryBytes`, `maxHeaderAndDirectoryPrefixBytes`, exact row wire,
+and either bounded prefix GET or header GET plus exact directory GET. Correctness crypto cannot be disabled; policy and
+resource concurrency follow ADR 0049. This remains open.
 
-### `V2-OPEN-OBJ-18`: WalRun checkpoint pages and open-tail handoff
+### `V2-OPEN-OBJ-18`: resolved WalRun checkpoint pages and open-tail handoff
 
-When may asynchronous checkpoint pages become authoritative? The current recommendation publishes bounded immutable
-pages and a head after ACK, always uses strong LIST for uncovered open-tail state, falls back to full bounded LIST on an
-invalid chain, and lets only a final gap-free page chain bound by `WalRunSealRecord` become the sealed-run inventory.
-This is not yet accepted.
+Resolved by [ADR 0053](../decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md). Pages publish
+asynchronously at Protocol Cell x shard scope; finite extent/byte/age limits remain mandatory even if proactive cadence
+is disabled, open uncovered tails always use bounded strong LIST, and the sealed final gap-free inventory is mandatory.
+
+### `V2-OPEN-OBJ-19`: NWG1 typed operational policy classes
+
+Which finite Topic/Storage-Epoch compression/linger/group-target classes preserve cross-topic batching without an
+unbounded flag product? The next recommendation must define eligible clear payload behavior, default no-recompression
+for protocol-marked compressed or opaque-encrypted frames, persistence/next-WalRun activation, and Cell/host resource
+caps. This remains open.
 
 ## Storage Epoch transitions
 
@@ -309,15 +319,24 @@ revalidation and native CAS, and close drains both sources.
 
 ### `V2-OPEN-BK-11`: NPD1 block wire, limits, codec, and crypto
 
-Which canonical bytes and caps implement ADR 0044 without reducing the admitted native Pulsar entry limit? The current
-recommendation uses fixed big-endian NPD1/NPB1 headers and rows, native-size-aware persisted admission below the signed
-int boundary, NONE/ZSTD codecs, and one KMS-wrapped attempt key with per-block HKDF/AES-GCM. This is not yet accepted.
+The user retained NPD1/NPB1, independent blocks, NONE/ZSTD, one wrapped attempt key, and per-block HKDF/AEAD but did not
+accept an unqualified `<2^31` bound or 8-MiB default. The gate must freeze format/deployment
+`maxBlockEncodedBytes`, `maxBlockDecodedBytes`, `maxEntriesPerBlock`, fixed NPO1 row size and root-budget-derived block
+count. Topic/Tenant block target/compression is persisted in the attempt; read buffer/prefetch/cache remains Cell/host
+capacity. This remains open.
 
-### `V2-OPEN-BK-12`: persisted BookKeeper physical-delete intent and fact
+### `V2-OPEN-BK-12`: resolved persisted BookKeeper physical-delete intent and fact
 
-How does restart reconcile physical deletion after reads become Object-only? The current recommendation persists
-attempt-scoped `BK_DELETE_NONE -> BK_DELETE_INTENT -> BK_DELETE_DONE`, retries INTENT idempotently after restart, treats
-native absence as success, never restores BK eligibility, and requires DONE before retirement. This is not yet accepted.
+Resolved by [ADR 0052](../decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md). Persisted
+`RETAIN_BK` or `DELETE_AFTER_VERIFIED` policy controls entry into irreversible
+`BK_DELETE_NONE -> BK_DELETE_INTENT -> BK_DELETE_DONE`; the compatibility boolean is only a read fence and retirement,
+audit, and physical capacity require the three-state fact.
+
+### `V2-OPEN-BK-13`: NPD1 typed block policy and default evidence
+
+Which small quantized block-target/compression classes are offered, and which becomes the default? The default remains
+unaccepted until exact native-entry-size admission plus Object cold-read p99, range bytes, request count, decompression
+CPU, memory, and compression-ratio evidence compares candidate targets. Eight MiB is a candidate, not a fixed default.
 
 ## Pulsar Object WAL
 
@@ -355,8 +374,8 @@ rather than a lifecycle state.
 ### `V2-OPEN-PUL-OBJ-06`: resolved slice geometry and registry lifetime capacity
 
 Resolved by [ADR 0041](../decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md). Every Cell gets one immutable
-equal-size aligned `2^k` slice, while numeric and encoded/lifetime registry caps both include retired Cells. Exact `k`
-and expansion policy remain downstream gates.
+equal-size aligned `2^k` slice, while numeric and encoded/lifetime registry caps both include retired Cells. The then-
+downstream expansion and exact bootstrap geometry are now resolved by ADRs 0048 and 0054.
 
 ### `V2-OPEN-PUL-OBJ-07`: resolved virtual-ledger slice expansion policy
 
@@ -364,18 +383,25 @@ Resolved by [ADR 0048](../decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-ex
 relocation, extension, and another slice; exhaustion fails before allocation, and new capacity requires a new Cell plus
 a future explicit migration contract for existing topics or ledgers.
 
-### `V2-OPEN-PUL-OBJ-08`: virtual-ledger exponent and registry lifetime caps
+### `V2-OPEN-PUL-OBJ-08`: resolved virtual-ledger exponent and registry lifetime caps
 
-Which fixed exponent and one-record caps remain safely below Oxia 0.9.0's 128 KiB batch limit? The current
-recommendation fixes `k=40`, `maxRegistryBytes=64 KiB`, `maxAssignmentsEver=256`, and a 192-byte maximum canonical row,
-with every retired row counted forever. This is not yet accepted.
+Resolved by [ADR 0054](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md). Bootstrap fixes `k=40`,
+64 KiB, 256 lifetime rows, and 192 bytes/row. A new logical reservation-domain label cannot reuse the interval; a new
+domain must prove a disjoint ledger-ID namespace or use an independent deployment/cluster.
 
 ### `V2-OPEN-PUL-OBJ-09`: virtual-ledger allocator reservation and head publication
 
-How do ID allocation and Ledger Chain head publication recover without a cross-key transaction? The current
-recommendation serializes one Cell-scoped IDLE/RESERVED allocator record, burns the candidate, creates one immutable
-ledger node, exact-CASes the ManagedLedger head, then clears the reservation. Unreferenced conflicts remain permanent
-gaps and normal entry append has no metadata I/O. This is not yet accepted.
+This remains open. The original STRICT_SERIALIZED proposal has four successful writes, not three: allocator reserve
+CAS, immutable node put, ManagedLedger head CAS, and allocator clear CAS. STRICT_SERIALIZED and RANGE_LEASED are
+different persisted fencing/recovery protocols, not host feature flags; one Cell cannot mix them. STRICT requires
+persisted mode plus Cell-level rate/queue/RTT/RESERVED-recovery admission and target-scale HOL evidence. RANGE_LEASED
+requires owner epoch, unused-ID burn, response-loss/crash, and pending-head discovery contracts before it can be
+considered.
+
+### `V2-OPEN-PUL-OBJ-10`: allocator target-scale evidence protocol
+
+Which workload/RTT/failure matrix and bounded pass criteria must run before choosing STRICT_SERIALIZED or opening the
+RANGE_LEASED design branch? This decision is the current prerequisite for `V2-OPEN-PUL-OBJ-09` and remains open.
 
 ### `V2-OPEN-PUL-MIGRATION-01`: new incarnation or HybridManagedLedger
 
@@ -436,6 +462,27 @@ For example, one Pulsar entry with batch indexes `0..2` might map to one Kafka O
 input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
+
+### Restarted Grill 2 round 7 adjusted decisions: resolved by ADRs 0049 through 0054
+
+Resolved on 2026-08-09 after explicit partial/adjusted confirmation:
+
+- cross-cutting configuration scope →
+  [ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md);
+- Q1 / `V2-OPEN-KAF-META-03` →
+  [ADR 0050](../decisions/0050-v2-kafka-aggregate-wire-and-publication-validation.md);
+- Q2 / `V2-OPEN-PUL-META-02` →
+  [ADR 0051](../decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md);
+- Q4 / `V2-OPEN-BK-12` →
+  [ADR 0052](../decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md);
+- Q6 / `V2-OPEN-OBJ-18` →
+  [ADR 0053](../decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md);
+- Q7 / `V2-OPEN-PUL-OBJ-08` →
+  [ADR 0054](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md).
+
+Q3 / `V2-OPEN-BK-11`, Q5 / `V2-OPEN-OBJ-17`, and Q8 / `V2-OPEN-PUL-OBJ-09` remain open with the user's constraints;
+they were not promoted by repetition. The exact response is preserved in
+[the round 7 record](grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md).
 
 ### Restarted Grill 2 round 5 decisions: resolved by ADRs 0033 through 0041
 

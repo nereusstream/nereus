@@ -41,13 +41,15 @@ cannot participate in aggregate visibility or override the incarnation-scoped au
 - Kafka delete/recreate ABA is fenced by its native topic UUID; Pulsar pays for an explicit generation selector and
   retained non-reuse evidence.
 - Logical schema/versioning and Kafka feature activation are refined by ADRs 0033 and 0034. Kafka image ownership and
-  Pulsar deletion/retirement ABA are refined by ADRs 0042 and 0043; exact selector/wire and executable vectors remain
-  downstream gates.
+  Pulsar deletion/retirement ABA are refined by ADRs 0042 and 0043. Kafka physical wire/publication validation and the
+  Pulsar exact selector/cache state machine are refined by ADRs 0050 and 0051; executable vectors remain downstream.
 - M1 must prove deterministic retry bytes, Kafka same-name/new-topic-ID isolation, Pulsar generation non-reuse,
   key/value collision checks, protocol discriminator checks, and rejection of retry-dependent IDs.
 
 This decision is refined by [ADRs 0033](0033-v2-topic-binding-aggregate-logical-schema-v1.md),
 [0034](0034-v2-kafka-feature-level-2-bootstrap-activation.md),
 [0042](0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md), and
-[0043](0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md), refines ADR 0023, and is tracked by
-`T-META-01`, `V2-META-002..005`, and `V2-KAF-META-001..002`.
+[0043](0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md),
+[0050](0050-v2-kafka-aggregate-wire-and-publication-validation.md), and
+[0051](0051-v2-pulsar-selector-state-machine-and-cached-fence.md), refines ADR 0023, and is tracked by `T-META-01`,
+`V2-META-002..006`, and `V2-KAF-META-001..003`.

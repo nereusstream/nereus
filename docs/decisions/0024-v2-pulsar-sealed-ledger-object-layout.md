@@ -47,5 +47,6 @@ The deterministic keys, root contract, and lifecycle order are refined by
 [ADRs 0035](0035-v2-pulsar-npo1-sealed-ledger-root-format.md) and
 [0036](0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md); NPD1 and composite source pins by
 [ADRs 0044](0044-v2-pulsar-npd1-sealed-ledger-data-blocks.md) and
-[0045](0045-v2-pulsar-dual-source-read-handle-and-pins.md). This decision refines ADRs 0017/0020 and is tracked by
-`T-BK-01`, `V2-BK-002`, and `V2-BK-004..010`.
+[0045](0045-v2-pulsar-dual-source-read-handle-and-pins.md), and BookKeeper-source deletion facts by
+[ADR 0052](0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md). This decision refines ADRs 0017/0020 and is
+tracked by `T-BK-01`, `V2-BK-002`, and `V2-BK-004..011`.

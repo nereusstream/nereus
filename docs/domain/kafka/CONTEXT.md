@@ -31,8 +31,9 @@ and every runtime upgrade/downgrade.
 _Avoid_: Online V1 migration, unsafe feature downgrade, absent feature as V2 activation
 
 **Kafka Topic Binding Aggregate Record**:
-The generated typed KRaft wire-v0 record owned by one `TopicImage`. Completed snapshots place it after `TopicRecord`
-and before partitions; `RemoveTopicRecord` removes it with the topic.
+The generated typed KRaft non-flexible wire-v0 record at API key 32000, owned by one `TopicImage`. MetadataLoader
+validates touched topics at ordinary publication and all live topics only at snapshot/bootstrap. Completed snapshots
+place it after `TopicRecord` and before partitions; `RemoveTopicRecord` removes it with the topic.
 _Avoid_: Opaque attachment, parallel aggregate image, independent aggregate delete record
 
 **Kafka Frame**:

@@ -26,11 +26,11 @@ At finalized `nereus.storage.version=2`, Kafka uses one generated, explicitly ty
 `RemoveTopicRecord(topicId)` removes the complete active topic image, including the aggregate. 0.2 has no separate
 aggregate-delete record and no parallel aggregate image with independent lifecycle.
 
-At an atomic controller-batch publication boundary or a completed-snapshot publication boundary, every live Nereus
-topic has exactly one aggregate whose topic ID and logical schema validate against its `TopicRecord`. Missing,
-duplicate, unknown-topic, unknown-version, or invalid aggregates fail closed. A transient replay state containing a
-`TopicRecord` without its aggregate may exist only inside the unpublished batch or snapshot construction; it is never
-published as a usable metadata image.
+At the actual MetadataLoader image-publication boundary, every live Nereus topic has exactly one aggregate whose topic
+ID and logical schema validate against its `TopicRecord`. Missing, duplicate, unknown-topic, unknown-version, or invalid
+aggregates fail closed. A transient replay state containing a `TopicRecord` without its aggregate may exist only inside
+unpublished delta/snapshot construction; it is never published as a usable metadata image. ADR 0050 refines ordinary
+publication to validate only touched topics and reserves full live-topic scans for snapshot/bootstrap.
 
 ## Consequences
 
@@ -38,10 +38,10 @@ published as a usable metadata image.
 - The Kafka fork must change generated metadata APIs, replay delta/image ownership, snapshot writing, removal, dump
   tooling, and tests.
 - Native topic-ID ownership and one publication boundary replace a parallel lifecycle authority.
-- Exact API key/field IDs, generated schema files, image validation hooks, and byte-level snapshot golden vectors
-  remain downstream wire gates.
+- API key, validation scope, and publication cut are refined by ADR 0050. Generated schema implementation and
+  byte-level snapshot golden vectors remain downstream implementation gates.
 - M1 must prove atomic batch visibility, canonical snapshot order, topic-cascaded removal, duplicate/unknown rejection,
   and that no completed image exposes a live Nereus topic without exactly one aggregate.
 
-This decision refines ADRs 0023, 0033, and 0034 and is tracked by `T-META-01`, `V2-META-002..004`, and
-`V2-KAF-META-001..002`.
+This decision is refined by ADR 0050, refines ADRs 0023, 0033, and 0034, and is tracked by `T-META-01`,
+`V2-META-002..004`, and `V2-KAF-META-001..003`.

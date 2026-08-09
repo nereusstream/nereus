@@ -53,7 +53,13 @@ typed Protocol Coverage and never creates a universal logical offset.
 A profile is immutable within one Storage Epoch. The durable model permits an append-only epoch chain with
 protocol-native cutover frontiers, but ADR 0015 limits 0.2 to exactly one initial epoch per Topic Incarnation and no
 online profile-transition API/state machine. Operational batching, cache, throttling, and compaction policy remain
-separately mutable.
+separately tunable only at their contract-defined activation boundaries.
+
+Correctness, recovery, and durable compatibility are never configuration switches. Topic/Tenant policy uses closed
+typed classes for latency/cost intent; Protocol Cell/shard policy owns shared scheduling and recovery budgets;
+host/process configuration only caps resources. Effective budgets use the minimum across scopes. Any resolved value
+that affects bytes or recovery is persisted in its Storage Epoch, WalRun Root, or offload attempt so failover cannot
+silently reinterpret it.
 
 ADR 0016 retains Access Projection/Migration Link identities and rejects a second Native Write Authority, while
 excluding cross-protocol serving and authority-transfer runtime from 0.2. For Pulsar
@@ -64,11 +70,13 @@ one closed logical schema v1 keyed by a typed native incarnation with determinis
 fresh-bootstrap feature level 2. Pulsar async offload uses bounded NPO1 plus native whole-range fallback and final
 deletion revalidation. Kafka owns its generated aggregate in TopicImage; Pulsar uses a permanent generation selector
 and same-key retired tombstone. Pulsar async data uses independently verifiable NPD1 blocks and a ManagedLedger-owned
-dual-source handle whose BK pins drain before deletion. Pulsar Object WAL positions use fixed aligned,
-permanent-lifecycle Cell slices from one bounded registry and fail closed rather than expand a slice. NWG1 uses
+dual-source handle whose BK pins drain before persisted BK_DELETE_INTENT/DONE; Topic/Namespace policy selects RETAIN_BK
+or DELETE_AFTER_VERIFIED. Pulsar Object WAL positions use fixed aligned `2^40`, permanent-lifecycle Cell slices from one
+64-KiB/256-assignment registry and fail closed rather than expand a slice. NWG1 uses
 object-local binding epochs, in-body append-unit authority, co-located Kafka commit sets, a KMS-wrapped run key with
 per-Object AEAD, content-addressed strong-LIST discovery, explicit provider-absent crash cuts, and immutable
-Root/Seal/successor pointer lineage.
+Root/Seal/successor pointer lineage. Asynchronous checkpoint pages have mandatory uncovered-tail bounds; open tails
+still require LIST and sealed runs require a final gap-free page inventory.
 
 Provider sharing is physical, not authoritative. Multiple cells may use the same external Object Storage or BookKeeper
 infrastructure, while each cell owns its Cell Provider Scope/session, namespace, credential/KMS and operator scope,
@@ -135,6 +143,12 @@ Accepted decisions:
 - [ADR 0046: NWG1 run key, AEAD, and authenticated directory](../decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md)
 - [ADR 0047: WalRun Root, seal, and successor publication](../decisions/0047-v2-walrun-root-seal-and-successor-publication.md)
 - [ADR 0048: Pulsar virtual-ledger fixed-slice exhaustion](../decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md)
+- [ADR 0049: configuration scopes and persisted semantics](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md)
+- [ADR 0050: Kafka aggregate wire and publication validation](../decisions/0050-v2-kafka-aggregate-wire-and-publication-validation.md)
+- [ADR 0051: Pulsar selector state machine and cached fence](../decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md)
+- [ADR 0052: Pulsar BookKeeper delete state and retention policy](../decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md)
+- [ADR 0053: WalRun checkpoint bounds and open-tail recovery](../decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md)
+- [ADR 0054: Pulsar virtual-ledger bootstrap geometry](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md)
 
 ## Open design gates
 
@@ -146,18 +160,18 @@ Accepted decisions:
 `V2-OPEN-PUL-OBJ-03`; ADRs 0033 through 0041 resolve `V2-OPEN-META-04`, `V2-OPEN-KAF-META-01`,
 `V2-OPEN-BK-06..08`, `V2-OPEN-OBJ-09..14`, and `V2-OPEN-PUL-OBJ-04..06`; ADRs 0042 through 0048 resolve
 `V2-OPEN-KAF-META-02`, `V2-OPEN-PUL-META-01`, `V2-OPEN-BK-09..10`, `V2-OPEN-OBJ-15..16`, and
-`V2-OPEN-PUL-OBJ-07`. The rows below are the remaining active 0.2 decisions or evidence gates.
+`V2-OPEN-PUL-OBJ-07`; ADRs 0049 through 0054 resolve `V2-OPEN-KAF-META-03`, `V2-OPEN-PUL-META-02`,
+`V2-OPEN-BK-12`, `V2-OPEN-OBJ-18`, and `V2-OPEN-PUL-OBJ-08`. The rows below are the remaining active 0.2 decisions or
+evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
-| `V2-OPEN-KAF-META-03` | freeze Kafka aggregate API-key band, generated wire fields, and completed-image validation hook | M1 Kafka controller schema freeze |
-| `V2-OPEN-PUL-META-02` | freeze Pulsar selector/tombstone wire plus create/delete/recreate CAS state machine | M1 Pulsar metadata lifecycle freeze |
-| `V2-OPEN-BK-11` | freeze NPD1 object/block wire, hard limits, codec, and per-attempt crypto envelope | M2 Object format freeze |
-| `V2-OPEN-BK-12` | freeze persisted BookKeeper physical-delete intent/fact and restart reconciliation | M2 native offload deletion integration |
-| `V2-OPEN-OBJ-17` | freeze exact NWG1 HKDF, nonce, AAD, clear-header, and encrypted-directory framing | M3 Object WAL format freeze |
-| `V2-OPEN-OBJ-18` | freeze WalRun checkpoint-page authority and open-tail handoff use | M3 Object WAL recovery freeze |
-| `V2-OPEN-PUL-OBJ-08` | freeze virtual-ledger slice exponent and bounded registry lifetime caps | M1 virtual-ledger registry schema freeze |
-| `V2-OPEN-PUL-OBJ-09` | freeze virtual-ledger allocator reservation and ledger-head publication recovery | M1/M3 virtual-ledger allocator freeze |
+| `V2-OPEN-BK-11` | freeze NPD1 fixed rows and format/deployment hard caps; pin typed block-target/compression default from native-size and Object cold-read evidence | M2 Object format/policy freeze |
+| `V2-OPEN-BK-13` | freeze the finite NPD1 block-target/compression classes and evidence-selected default/explicit-admission behavior | M2 offload policy freeze |
+| `V2-OPEN-OBJ-17` | freeze NWG1 hard context/frame/directory/prefix caps, exact cold-read range plan, and limited compression/group policy classes | M3 Object WAL format freeze |
+| `V2-OPEN-OBJ-19` | freeze the finite NWG1 compression/linger/group-target classes and persisted activation boundaries | M3 Object WAL policy freeze |
+| `V2-OPEN-PUL-OBJ-09` | choose persisted allocator protocol after four-write STRICT_SERIALIZED admission/HOL evidence or fully specify RANGE_LEASED fencing/recovery | M1/M3 virtual-ledger allocator freeze |
+| `V2-OPEN-PUL-OBJ-10` | freeze and execute the target-scale allocator RTT/queue/crash evidence protocol that gates the allocator-mode choice | allocator mode decision |
 | `V2-OPEN-OBJ-01` | prove per-binding typed durable frontiers inside a multi-binding Object group without shard-wide HOL | M3 layout freeze |
 | `V2-OPEN-BK-02` | validate one-active-ledger-per-Kafka-partition at 10k and 100k partitions | M2 Kafka BK layout freeze |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |

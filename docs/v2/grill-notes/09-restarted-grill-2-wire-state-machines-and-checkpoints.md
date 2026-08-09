@@ -13,7 +13,8 @@ Date: 2026-08-09
 
 The user confirmed every round-6 recommendation. ADRs 0042 through 0048 now own those accepted contracts. This record
 contains only the next independent decision frontier. None of the recommendations below is normative until the user
-explicitly confirms it.
+explicitly confirms it. The user subsequently accepted an adjusted subset and left Q3/Q5/Q8 open; the exact response
+and authoritative mapping are preserved at the end of this record.
 
 ## Source facts used for recommendations
 
@@ -166,7 +167,8 @@ candidate ID and CASes that ManagedLedger's `VirtualLedgerHeadRecord` from the e
 after head publication may entry zero be allocated; the allocator then CAS-clears the reservation. Any conflict leaves
 the candidate as a permanent gap/unreferenced receipt, never a chain member. Every uncertain write converges by exact
 reread; no step is retried under a different request ID, and normal entry append performs zero metadata I/O. The
-tradeoff is serialized Cell-level ledger rollovers and three control-plane writes per successful rollover, in return for
+tradeoff is serialized Cell-level ledger rollovers and three stated control-plane writes per successful rollover (the
+user later corrected the actual successful-write count to four; see the adjusted answer below), in return for
 bounded single-key recovery, explicit chain order, permitted gaps, and no dependence on an unbounded sequence scan.
 
 ## Deferred descendants
@@ -182,7 +184,140 @@ bounded single-key recovery, explicit chain order, permitted gaps, and no depend
 - `V2-OPEN-OBJ-01`, `V2-OPEN-BK-02`, and `V2-OPEN-BENCH-01` remain executable evidence gates rather than prose
   decisions. KoP remains documented and deferred outside the 0.2 runtime.
 
-## Awaiting explicit confirmation
+## Adjusted answer preserved verbatim
 
-No Round 7 recommendation above has been accepted. Confirmed answers must be synchronized to new ADRs and normative
-contracts before any descendant becomes the next frontier.
+The user did not confirm the round as one package and answered:
+
+> Round 7 不按原推荐整体确认，按以下方式处理。
+>
+> 先增加一个横切原则：
+>
+> 1. 正确性、恢复语义和持久化兼容合同不能做成开关。
+> 2. 可能影响性能的策略、预算和加速器可以配置，但必须明确作用域和生效边界：
+>    - Topic/Tenant：表达延迟、成本、压缩、block target、BK 保留等策略。
+>    - Protocol Cell/Shard：管理 checkpoint、allocator、group 调度、recovery budget 和共享并发。
+>    - Host/Process：只提供线程、内存、cache、I/O、KMS 等资源硬上限，不能改变持久化语义。
+> 3. 数值预算按 min(topic/tenant request, cell budget, host capacity) 计算。
+> 4. 影响持久化 bytes/恢复语义的配置必须记录在 Storage Epoch、WalRun Root 或 offload attempt 中；故障转移后不能因目标机器配置不同而静默降级。
+> 5. 避免无限组合的 per-topic flags，优先使用少量 typed policy class 和量化档位，防止破坏跨 topic batching。
+>
+> Q1：调整后确认。
+>
+> 保留 32000..32767 扩展区、apiKey=32000 和 strict typed wire v0。
+>
+> exact-one 校验应在 MetadataLoader 的实际 image publication boundary 执行，而不是简单绑定每个原始 batch。普通 delta 只增量校验 touched/created/removed topics；只有 snapshot/bootstrap 才允许扫描全部 live topics，避免 topic 数量增大后每次 metadata apply 都退化为 O(all topics)。
+>
+> 该正确性校验不可配置关闭。
+>
+> Q2：调整后确认。
+>
+> 接受 RESERVED -> ACTIVE -> DELETING -> DELETED 和 exact reread/CAS 状态机。
+>
+> ACTIVE + aggregate identity 应在 topic open、ownership acquisition 或 metadata version 变化时验证并缓存。正常 append/read 只检查本地版本化 fence，不能每次访问 Oxia。
+>
+> 状态机不可关闭；cache 大小、刷新和并发属于 Cell/host policy。
+>
+> Q3：暂不最终确认，按以下方向调整。
+>
+> 保留 NPD1/NPB1、独立 block、NONE/ZSTD、attempt-level wrapped key 和 per-block HKDF/AEAD。
+>
+> 需要区分：
+>
+> - maxBlockEncodedBytes、maxBlockDecodedBytes、maxEntriesPerBlock：format/deployment hard cap，不能由 topic 任意放大，也不能仅使用 <2^31。
+> - blockTargetBytes、compression policy：Topic/Tenant operational policy，在 offload attempt 创建时固化。
+> - read buffer、prefetch、cache：Cell/host policy。
+>
+> 8 MiB 只能是可配置 target，不能是固定默认。需要用 Object 冷读 p99、range GET bytes、解压 CPU 和 native entry size 做基准后决定默认值。最大 block 数还必须从 NPO1 8 MiB root 总预算和固定 row size 反推。
+>
+> Q4：调整后确认。
+>
+> 接受 BK_DELETE_NONE -> BK_DELETE_INTENT -> BK_DELETE_DONE。
+>
+> 必须明确：
+>
+> - bookkeeperDeleted=true 只是兼容的“BK source 已失去读取资格”fence，可对应 INTENT/DONE。
+> - 只有 BK_DELETE_DONE 才是物理删除成功或 NoSuchLedger 的事实。
+> - retirement、审计和物理容量统计只能依据三态，不能只看 boolean。
+>
+> 增加 Topic/Namespace 级策略：
+>
+> - RETAIN_BK
+> - DELETE_AFTER_VERIFIED
+>
+> 选择 DELETE_AFTER_VERIFIED 后，pin drain、Object revalidation、INTENT 和 DONE 都不可跳过。进入 INTENT 后不可回退到 RETAIN_BK。删除验证并发、带宽和重试预算属于 Cell/host policy。
+>
+> Q5：暂不最终确认，按以下方向调整。
+>
+> 保留 AES-256-GCM/HKDF-SHA-256、nonce domain、AAD、header 和 authenticated directory；这些正确性合同不能关闭。
+>
+> 需要额外冻结 format hard caps：
+>
+> - maxBindingContexts
+> - maxFrames
+> - maxDirectoryBytes
+> - maxHeaderAndDirectoryPrefixBytes
+>
+> 还要明确首次随机读取采用：
+>
+> - 一个固定上限的 prefix GET，随后缓存 header+directory；或
+> - header GET + exact directory GET。
+>
+> 不能在未定义 directory 上限时承诺“单次 directory GET”。
+>
+> Topic/Storage Epoch 可以选择有限的 compression/linger/group-target policy class；已压缩或 opaque-encrypted payload 默认不重复尝试高成本压缩。AES/CRC/HKDF 并发、run-key cache 和 direct memory 属于 Cell/host capacity。
+>
+> Q6：调整后确认。
+>
+> 接受异步 checkpoint pages、open-tail bounded LIST 和 sealed gap-free canonical page chain。
+>
+> 配置作用域必须是 Protocol Cell × shard / WalRun，不能按 topic 开关，因为一个 WalRun 可以包含多个 bindings。
+>
+> 可以配置周期 checkpoint 的 cadence 或是否启用，但：
+>
+> - maxUncheckpointedExtents/bytes/age 永远必须执行；
+> - 超限前必须 backpressure 或 rollover；
+> - open run 未覆盖 tail 永远需要 bounded strong LIST；
+> - sealed run 的最终 gap-free canonical inventory 不可关闭。
+>
+> 配置变化从下一个 WalRun 生效。
+>
+> Q7：调整后确认。
+>
+> 接受 k=40、maxRegistryBytes=64 KiB、maxAssignmentsEver=256 和 192-byte row 作为 0.2 deployment-format 常量。
+>
+> 需要修正文案：超过 256 个 lifetime Cells 后，只有新的 reservation domain 获得了不重叠的 ledger-ID namespace，或者使用独立 deployment/cluster，才能重新分配；不能仅创建一个逻辑 domain 就复用原数值区间。
+>
+> 这些值是 bootstrap contract，不是 topic 或 host 动态配置。
+>
+> Q8：保持 OPEN，不能仅通过 feature flag 解决。
+>
+> 当前步骤实际上包含四次成功写：
+>
+> 1. allocator reserve CAS
+> 2. immutable node put
+> 3. ManagedLedger head CAS
+> 4. allocator clear CAS
+>
+> 需要修正“三次 write”的描述。
+>
+> STRICT_SERIALIZED 与 RANGE_LEASED 不是普通性能开关，而是两套不同的分配、fencing 和恢复协议。如果 0.2 只实现 STRICT_SERIALIZED，需要：
+>
+> - allocator mode 固化在 Protocol Cell/allocator record；
+> - 增加 Cell 级 rollover rate、queue depth、metadata RTT 和 RESERVED recovery time admission；
+> - 用目标规模 benchmark 证明不会形成不可接受的 Cell-wide head-of-line blocking。
+>
+> 如果需要 RANGE_LEASED，则必须先补齐 lease owner epoch、未使用 ID burn、响应丢失、broker crash 和 pending head discovery 合同，不能由某台 host 临时开启，也不能让同一 Cell 的 topic 混用两种模式。
+>
+> 因此本轮可将 Q1、Q2、Q4、Q6、Q7 按上述调整确认；Q3、Q5、Q8 继续保持 OPEN，先补齐 hard cap、默认 policy、作用域、生效边界及性能证据后再确认。
+
+## Authoritative synchronization
+
+- the cross-cutting principle → [ADR 0049](../../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md);
+- Q1 → [ADR 0050](../../decisions/0050-v2-kafka-aggregate-wire-and-publication-validation.md);
+- Q2 → [ADR 0051](../../decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md);
+- Q4 → [ADR 0052](../../decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md);
+- Q6 → [ADR 0053](../../decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md);
+- Q7 → [ADR 0054](../../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md).
+
+Q3 / `V2-OPEN-BK-11`, Q5 / `V2-OPEN-OBJ-17`, and Q8 / `V2-OPEN-PUL-OBJ-09` remain open. No part of their proposed
+numeric defaults or allocator mode is normative.

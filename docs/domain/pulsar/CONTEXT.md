@@ -34,7 +34,8 @@ _Avoid_: High-bit convention, reusable cell range, allocator-local assumption
 
 **Virtual Ledger Namespace Registry**:
 The one bounded deployment-wide CAS record that canonically owns every virtual-ledger slice assignment and proves
-global non-overlap/non-reuse. Per-cell lookup and watches are derived only.
+global non-overlap/non-reuse. It uses `k=40`, at most 65,536 canonical bytes, 256 lifetime assignments, and 192 bytes
+per assignment row. Per-cell lookup and watches are derived only.
 _Avoid_: Independent authoritative slice key, watch authority, locally merged assignment table
 
 **Virtual Ledger Slice Assignment**:
@@ -44,8 +45,9 @@ bounds or attaches another slice and fails closed at exhaustion.
 _Avoid_: Broker-owned slice, provider-owned slice, deleted tombstone, resized bounds, second slice
 
 **Pulsar Topic Generation Selector**:
-The permanent name-scoped monotonic generation and `DELETED(generation)` authority used to fence same-name topic
-recreation.
+The permanent name-scoped monotonic generation authority using exact
+RESERVED→ACTIVE→DELETING→DELETED CAS transitions to fence create/delete/recreate. ACTIVE plus aggregate identity is
+cached only after control-path validation; normal data access checks the local versioned fence.
 _Avoid_: Name-only aggregate key, selector deletion, generation rollback
 
 **Retired Topic Incarnation Tombstone**:
@@ -85,8 +87,14 @@ _Avoid_: Padded scan-forward block, entry split across blocks, cross-block compr
 **Native Dual-Source Read**:
 The ManagedLedger-owned whole-range selection/fallback between an eligible Object attempt and BookKeeper source. One
 cached composite handle owns both lazy children and source pins; one range uses one source, fallback occurs at most
-once, and `bookkeeperDeleted=true` is Object-only after BK-pin drain.
+once, and `bookkeeperDeleted=true` is the Object-only compatibility fence for BK_DELETE_INTENT/DONE after BK-pin
+drain. Only BK_DELETE_DONE proves physical deletion or absence.
 _Avoid_: Mixed-source range, fallback loop, reading physical BookKeeper residue after native deletion
+
+**BookKeeper Retention Class**:
+The persisted offload-attempt policy `RETAIN_BK` or `DELETE_AFTER_VERIFIED`. The latter mandates pin drain, Object
+revalidation, BK_DELETE_INTENT, physical absence proof, and BK_DELETE_DONE; after INTENT it cannot revert.
+_Avoid_: Boolean deletion policy, host-local delete mode, skipping verification
 
 **Pulsar Frame**:
 The exact bytes of one ManagedLedger entry and one `(ledgerId, entryId)`. Client batching, compression, encryption, and

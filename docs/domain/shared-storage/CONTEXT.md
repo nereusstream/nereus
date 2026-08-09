@@ -86,6 +86,12 @@ start/sealed-end frontiers. Lifecycle changes are append-only state history. In 
 Topic Incarnation and no online transition runtime exists; the exact future transition vocabulary is deferred.
 _Avoid_: Mutable profile, storage mode flag
 
+**Resolved Policy Class**:
+A closed typed Topic/Tenant policy plus quantized values whose effective budgets are capped by Protocol Cell/shard and
+host/process limits. Any resolved value affecting bytes or recovery is persisted in its Storage Epoch, WalRun Root, or
+offload attempt; host drift cannot reinterpret it.
+_Avoid_: Arbitrary per-topic flags, host-selected durable format, configurable correctness
+
 **Topic Binding Aggregate**:
 The atomically visible create/open unit whose one immutable logical schema v1 contains a Topic Protocol Binding and its
 ordinal-zero initial Storage Epoch. Neither component has an independently writable authority; ACTIVE is derived.
@@ -121,6 +127,11 @@ _Avoid_: Root-prefix LIST, per-group pointer update, locally merged lineage
 The immutable Cell control-metadata record that binds one Root to its terminal sequence and exact typed coverage. A
 successor Root references both predecessor Root and Seal before the current pointer advances.
 _Avoid_: Mutating the Root to seal, reopening a sealed run, pointer advance before successor publication
+
+**WalRun Checkpoint Page**:
+An asynchronous immutable page of at most 256 contiguous extents and 64 KiB canonical bytes. It accelerates recovery,
+but an open uncovered tail still requires bounded strong LIST and a sealed run requires a final gap-free page chain.
+_Avoid_: Per-topic checkpoint switch, ACK dependency, checkpoint overriding provider bytes
 
 **Binding Context Table**:
 The bounded NWG1 table that binds frames to exact Topic Incarnation, binding, Storage Epoch, and Owner Epoch authority

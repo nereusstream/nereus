@@ -28,15 +28,19 @@ it never reopens the sealed run or publishes a locally merged lineage.
 Root, Seal, successor, and pointer operations are low-frequency control-plane cuts. Normal admitted group append
 performs no metadata-backend read or mutation.
 
+ADR 0053 refines the tail between Root and Seal: checkpoint pages publish asynchronously after ACK, open recovery
+always LISTs uncovered tail state, and the Seal binds a final gap-free canonical page chain. Checkpoint policy is
+Protocol Cell x shard scoped and persisted in the WalRun Root.
+
 ## Consequences
 
 - `V2-OPEN-OBJ-16` is resolved.
 - Two immutable records plus one CAS per rollover replace provider-Root discovery and mutable-Root ambiguity.
 - A sealed run can be recovered without interpreting pointer lag as permission to append.
-- Exact Root/Seal/pointer wire, checkpoint-page authority, handoff adoption, retirement frontier, and GC order remain
-  downstream recovery gates.
+- Checkpoint-page authority and open-tail handoff are refined by ADR 0053. Exact Root/Seal/pointer wire, retirement
+  frontier, and GC order remain downstream recovery gates.
 - M3 must prove lost Root/Seal/Pointer responses, sealed-pointer crash recovery, successor substitution/fork
   rejection, exact terminal coverage, and zero normal-append metadata I/O.
 
-This decision refines ADRs 0030, 0038, 0039, and 0046 and is tracked by `T-OBJECT-01`, `T-HANDOFF-01`, and
-`V2-OBJ-005/009..011/014`.
+This decision is refined by ADR 0053, refines ADRs 0030, 0038, 0039, and 0046, and is tracked by `T-OBJECT-01`,
+`T-HANDOFF-01`, and `V2-OBJ-005/009..011/014/015`.

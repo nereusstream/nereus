@@ -18,10 +18,11 @@ exactly one slice for its lifetime; `sliceAssignmentId` and inclusive bounds nev
 When the allocator reaches the slice end, allocation fails closed before assigning another virtual ledger ID. It does
 not wrap, search another interval, borrow from a retired Cell, or mutate registry geometry.
 
-Additional deployment capacity requires a new immutable Pulsar Protocol Cell ID and a new registry assignment. Moving
-an existing Topic Incarnation or ManagedLedger to that capacity requires a future explicit migration contract and is
-not implied by creating the new Cell. Deployment admission and the selected exponent `k` must cover the supported
-lifetime without assuming online expansion.
+Additional capacity inside the current reservation domain requires a new immutable Pulsar Protocol Cell ID and unused
+registry assignment. After that domain's bounded lifetime registry is exhausted, a new logical name is insufficient:
+ADR 0054 requires either a new reservation domain with bootstrap-proven non-overlapping ledger-ID namespace or an
+independent deployment/cluster. Moving an existing Topic Incarnation or ManagedLedger requires a future explicit
+migration contract and is not implied by creating either one.
 
 ## Consequences
 
@@ -29,10 +30,10 @@ lifetime without assuming online expansion.
 - Conservative capacity sizing and an unavailable exhausted Cell are accepted for one interval, one allocator, and one
   simple never-reuse proof.
 - 0.2 has no hidden multi-slice chain ordering, recovery, or ownership-transfer semantics.
-- Exact exponent `k`, registry/allocator wire, allocation response-loss recovery, ledger-head publication, rollover,
-  takeover, and `RETIRING -> RETIRED` proof remain downstream gates.
+- Exact geometry is refined by ADR 0054. Allocator wire/mode, allocation response-loss recovery, ledger-head
+  publication, rollover, takeover, and `RETIRING -> RETIRED` proof remain downstream gates.
 - M1/M3 must prove rejection of every geometry mutation, fail-closed boundary allocation, new-Cell independence, and
   absence of automatic topic/ledger migration.
 
-This decision refines ADRs 0022, 0027, 0032, and 0041 and is tracked by `T-POSITION-01`,
-`V2-POSITION-003..008`.
+This decision is refined by ADR 0054, refines ADRs 0022, 0027, 0032, and 0041, and is tracked by `T-POSITION-01`,
+`V2-POSITION-003..009`.

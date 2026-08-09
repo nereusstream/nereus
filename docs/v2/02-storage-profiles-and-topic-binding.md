@@ -59,18 +59,21 @@ complete publication/validation and is not stored. The v1 aggregate excludes `CR
 timestamps, attempts, controller offsets, backend versions, and untyped attributes. Oxia envelope schema 1 and Kafka
 controller-record wire v0 map through one logical validator and shared semantic golden vectors.
 
-At Kafka feature level 2, that physical record is one generated, typed `TopicBindingAggregateRecord` owned by
-`TopicImage`, not an opaque attachment or parallel image. Completed snapshots write feature records and then, per
-topic, `TopicRecord -> TopicBindingAggregateRecord -> PartitionRecord*`; topic removal cascades through the existing
-`RemoveTopicRecord`. Every published controller batch or completed snapshot has exactly one valid aggregate per live
-Nereus topic. Missing, duplicate, unknown-topic, or invalid records fail closed; a partial topic may exist only inside
-unpublished replay construction.
+At Kafka feature level 2, that physical record is one generated, typed, non-flexible
+`TopicBindingAggregateRecord(apiKey=32000, wireVersion=0)` owned by `TopicImage`, not an opaque attachment or parallel
+image. Completed snapshots write feature records and then, per topic,
+`TopicRecord -> TopicBindingAggregateRecord -> PartitionRecord*`; topic removal cascades through the existing
+`RemoveTopicRecord`. At actual MetadataLoader publication, ordinary deltas validate only touched/created/removed
+topics, while snapshot/bootstrap scans every live topic. Missing, duplicate, unknown-topic, or invalid records fail
+closed; a partial topic may exist only inside unpublished replay construction. Validation cannot be disabled.
 
 Pulsar additionally retains one permanent name-scoped `PulsarTopicGenerationSelector`. Its generation is monotonic and
 `DELETED(generation)` never becomes absent. A full incarnation aggregate remains immutable until exact reference-free
 retirement; then one exact-version CAS may replace it, at the same never-reused key, with a compact permanent
 `RetiredTopicIncarnationTombstone` binding the original aggregate and retirement-proof digests. Later generations use
-new keys, and lifetime metadata admission counts every selector and tombstone.
+new keys, and lifetime metadata admission counts every selector and tombstone. Selector publication uses only
+`RESERVED -> ACTIVE -> DELETING -> DELETED`; exact ACTIVE/aggregate identity is validated and cached at topic
+open/ownership/version change, while normal append/read checks the local versioned fence with zero per-access Oxia I/O.
 
 A lost create response rereads the same record and requires exact equality. Missing, mismatched, unknown, or conflicting
 aggregate state fails closed and never selects a default epoch. The generic `CREATING` fallback in ADR 0019 is not used
@@ -111,7 +114,7 @@ not advertise a 0.2 transition feature. Exact future transitions remain deferred
 
 ## Operational policy
 
-Operational policy is versioned separately and may change online:
+Operational policy is versioned separately and may change only at an explicit activation boundary:
 
 - group linger and target bytes;
 - per-topic and per-tenant admission budgets;
@@ -119,6 +122,13 @@ Operational policy is versioned separately and may change online:
 - materialization concurrency and lag thresholds;
 - retention duration and compaction cadence;
 - observability sampling.
+
+Correctness, recovery, fencing, and durable compatibility are never switches. Topic/Tenant policy uses a small closed
+set of typed classes; Protocol Cell/shard policy owns shared checkpoint/allocator/group/recovery budgets; host/process
+configuration supplies only resource ceilings. Effective numeric budgets are
+`min(topic-or-tenant request, Cell/shard budget, host capacity)`. A resolved value that affects bytes or recovery is
+persisted in the Storage Epoch, WalRun Root, or offload attempt and cannot drift after failover. Cross-topic batching
+requires compatible resolved classes rather than arbitrary per-topic flag combinations.
 
 A policy change that affects a primary WAL profile, format, Object-extent digest family, Frame-payload checksum family,
 or encryption family requires a new Storage Epoch at an exact Protocol Frontier. A materialization-only format or index
@@ -154,12 +164,16 @@ Kafka internal topics and Pulsar system topics use explicit initial-epoch profil
 default without validation. A protocol adapter may restrict the allowed initial profile set when its recovery or
 transaction authority cannot satisfy the contract. No adapter exposes an online transition set in 0.2.
 
-Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-OBJECT-01`, and `T-BK-01`. Required scenarios:
-`V2-PROFILE-001`, `V2-MIGRATION-001`, `V2-META-002..005`, and `V2-KAF-META-001..002`. See
+Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-POLICY-01`, `T-OBJECT-01`, and `T-BK-01`. Required scenarios:
+`V2-PROFILE-001`, `V2-POLICY-001`, `V2-MIGRATION-001`, `V2-META-002..006`, and
+`V2-KAF-META-001..003`. See
 [ADR 0019](../decisions/0019-v2-initial-binding-epoch-atomic-visibility.md),
 [ADR 0023](../decisions/0023-v2-topic-binding-aggregate-record.md),
 [ADR 0028](../decisions/0028-v2-topic-incarnation-keys-and-deterministic-ids.md),
 [ADR 0033](../decisions/0033-v2-topic-binding-aggregate-logical-schema-v1.md),
 [ADR 0034](../decisions/0034-v2-kafka-feature-level-2-bootstrap-activation.md),
-[ADR 0042](../decisions/0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md), and
-[ADR 0043](../decisions/0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md).
+[ADR 0042](../decisions/0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md),
+[ADR 0043](../decisions/0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md),
+[ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md),
+[ADR 0050](../decisions/0050-v2-kafka-aggregate-wire-and-publication-validation.md), and
+[ADR 0051](../decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md).

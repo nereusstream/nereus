@@ -23,9 +23,10 @@ The BookKeeper deletion cut is ordered:
 1. fence new BookKeeper source pins for the exact ledger metadata version/attempt;
 2. wait boundedly for all already admitted BookKeeper range pins to drain;
 3. perform the final Object revalidation required by ADR 0036;
-4. CAS native metadata to `bookkeeperDeleted=true` while rechecking the same attempt and version;
+4. CAS native metadata to `BK_DELETE_INTENT` and compatibility `bookkeeperDeleted=true` while rechecking the same
+   attempt and version;
 5. invalidate and close the BookKeeper child handle;
-6. issue physical BookKeeper deletion.
+6. issue physical BookKeeper deletion and publish `BK_DELETE_DONE` only after success/authoritative absence.
 
 Failure or timeout before the CAS leaves BookKeeper authoritative and eligible. During fallback, the composite handle
 releases every partial entry and the primary source pin, rechecks current source eligibility, and then acquires the
@@ -40,10 +41,10 @@ exactly once. Close completion means no accepted child read remains.
 - `V2-OPEN-BK-10` is resolved.
 - Additional per-ledger state, child handles, and possible delete delay buy a concurrency proof rather than a cache
   invalidation race.
-- Physical deletion may lag the native metadata CAS; a persisted delete-intent/fact protocol and restart
-  reconciliation remain downstream gates.
+- Physical deletion may lag the native metadata CAS; ADR 0052 owns the persisted delete intent/fact, retention class,
+  and restart reconciliation.
 - M2 must prove pin admission/fencing/drain, final CAS recheck, fallback pin transfer, no mixed ranges, close-versus-read
   races, exact-once child close, and deletion timeout retention.
 
-This decision refines ADRs 0017, 0020, 0036, and 0044 and is tracked by `T-BK-01`, `T-GC-01`, and
-`V2-BK-005/007/008/010`.
+This decision is refined by ADR 0052, refines ADRs 0017, 0020, 0036, and 0044, and is tracked by `T-BK-01`,
+`T-GC-01`, and `V2-BK-005/007/008/010/011`.

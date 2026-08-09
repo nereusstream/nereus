@@ -60,9 +60,12 @@ session, alias, and provider configuration. Lifecycle is irreversible `ACTIVE ->
 allocates, and RETIRED assignments/bounds remain permanent never-reuse tombstones. Exhaustion is derived, not a
 lifecycle state. Each Cell has one immutable equal-size aligned `2^k` slice. Numeric capacity is
 `floor((2^62 - 1) / 2^k)`, the top `2^k - 1` IDs remain unused, and separate registry-byte/lifetime-assignment limits
-include retired Cells. 0.2 forbids resize, relocation, in-place extension, and a second slice. Exhaustion fails closed
-before another ID is allocated; more capacity requires a new Protocol Cell and does not migrate existing topics or
-ledgers. Exact `k`, allocator epochs, rollover, and recovery mechanics remain open.
+include retired Cells. Bootstrap fixes `k=40`, 65,536 canonical registry bytes, 256 lifetime assignments, and a
+192-byte maximum assignment row. 0.2 forbids resize, relocation, in-place extension, and a second slice. Exhaustion
+fails closed before another ID is allocated; more capacity requires a new Protocol Cell and does not migrate existing
+topics or ledgers. After 256 lifetime Cells, only a bootstrap-proven disjoint reservation-domain namespace or
+independent deployment/cluster may allocate again; a new logical label cannot reuse the interval. Allocator
+mode/epochs, rollover, and recovery mechanics remain open.
 
 Online Pulsar BookKeeper/Object evolution is not implied by this model. New-incarnation migration versus a future hybrid
 ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.
@@ -111,7 +114,8 @@ per block, with no padding or cross-block state.
 
 Native read source eligibility is fixed by ManagedLedger metadata. Before completion it is BookKeeper-only; after
 `complete && !bookkeeperDeleted` both sources may participate in one bounded whole-range fallback; after
-`bookkeeperDeleted=true` reads are Object-only even if physical BookKeeper residue exists. Object-first integrity or
+`bookkeeperDeleted=true` reads are Object-only even if physical BookKeeper residue exists. That boolean is only the
+compatibility fence for `BK_DELETE_INTENT` or `BK_DELETE_DONE`; only DONE proves physical absence. Object-first integrity or
 availability failure may retry the complete range once from BookKeeper. BookKeeper-first may use Object only after
 native missing-ledger resolution. Partial entries are released, sources are never mixed within a range, fallback never
 loops, and Object corruption remains quarantined/deletion-vetoed even when fallback succeeds.
@@ -119,7 +123,8 @@ loops, and Object corruption remains quarantined/deletion-vetoed even when fallb
 ManagedLedger caches one `DualSourceReadHandle` per ledger, with lazy Object and BookKeeper children. Every admitted
 range owns one source pin bound to the exact native metadata version/offload attempt. Before the deletion CAS,
 ManagedLedger fences new BK pins, waits boundedly for admitted BK pins to drain, performs final Object revalidation,
-then CASes `bookkeeperDeleted=true`; only afterward does it invalidate/close the BK child and issue physical deletion.
+then CASes `BK_DELETE_INTENT` plus `bookkeeperDeleted=true`; only afterward does it invalidate/close the BK child and
+issue physical deletion. Success or authoritative `NoSuchLedger` advances the same attempt to `BK_DELETE_DONE`.
 Fallback releases partial entries and the primary pin before rechecking eligibility and pinning the secondary.
 Composite close stops admission, drains both sources, and closes each child exactly once.
 
@@ -135,10 +140,16 @@ A BookKeeper source becomes physically deletable only after all of these are dur
 Offloader completion creates deletion eligibility; it does not itself bypass the remaining native retention, cursor,
 read-pin, deletion-lag, or Nereus source-protection checks.
 
-Immediately before native `bookkeeperDeleted=true`, ManagedLedger revalidates the exact persisted attempt, complete
-NPO1/self-digest, data immutable version/length/SHA, closed-ledger facts, and production-reader first/last/sparse
-boundaries without holding the metadata mutex across Object I/O. The final native CAS rechecks the same attempt UUID and
-eligible state. Timeout, missing, or mismatch retains BookKeeper; permanent corruption quarantines the attempt.
+Each offload attempt persists Topic/Namespace retention class `RETAIN_BK` or `DELETE_AFTER_VERIFIED`. RETAIN_BK keeps
+delete state NONE. DELETE_AFTER_VERIFIED makes pin drain, final Object revalidation, INTENT, delete proof, and DONE
+mandatory; after INTENT it cannot return to retention. Retirement, audit, and physical capacity use the three-state
+fact, not the compatibility boolean. Delete concurrency/bandwidth/retries are Cell/host budgets only.
+
+Immediately before native BK_DELETE_INTENT plus `bookkeeperDeleted=true`, ManagedLedger revalidates the exact persisted
+attempt, complete NPO1/self-digest, data immutable version/length/SHA, closed-ledger facts, and production-reader
+first/last/sparse boundaries without holding the metadata mutex across Object I/O. The final native CAS rechecks the
+same attempt UUID and eligible state. Timeout, missing, or mismatch retains BookKeeper; permanent corruption
+quarantines the attempt.
 
 ## Lag policy
 
@@ -146,8 +157,8 @@ Async offload exposes pending ledgers/bytes/age and the oldest unmaterialized ty
 throttle, or stop new admission before BookKeeper capacity is exhausted. It never changes an already admitted append
 into a synchronous Object write.
 
-Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, and `T-POSITION-01`. Required scenarios:
-`V2-BK-001..010` and `V2-POSITION-001..008`. See
+Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, and `T-POLICY-01`. Required scenarios:
+`V2-BK-001..011`, `V2-POSITION-001..009`, and `V2-POLICY-001`. See
 [ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md),
 [ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md),
 [ADR 0022](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md),
@@ -159,5 +170,8 @@ Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, and `T-POSITION-0
 [ADR 0036](../decisions/0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md),
 [ADR 0041](../decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md),
 [ADR 0044](../decisions/0044-v2-pulsar-npd1-sealed-ledger-data-blocks.md),
-[ADR 0045](../decisions/0045-v2-pulsar-dual-source-read-handle-and-pins.md), and
-[ADR 0048](../decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md).
+[ADR 0045](../decisions/0045-v2-pulsar-dual-source-read-handle-and-pins.md),
+[ADR 0048](../decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md),
+[ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md),
+[ADR 0052](../decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md), and
+[ADR 0054](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md).

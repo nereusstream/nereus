@@ -29,6 +29,9 @@ Checkpoint/hint failure and fallback do not reset counters. Predicted envelope e
 rollover, throttle, or fail-closed backpressure. Actual exhaustion never authorizes skipping an object, advancing a
 frontier, publishing incomplete coverage, or executing GC.
 
+ADR 0053 makes checkpoint pages asynchronous accelerators with finite uncovered-tail extent/byte/age bounds. Open-run
+recovery always LISTs the uncovered tail, and the Seal binds a mandatory final gap-free canonical page chain.
+
 Each shard has one low-frequency CAS-published
 `CurrentWalRunPointer {walRunRootKey, walRunRootSha256, shardRunEpoch}`. Owner-open, rollover, and handoff read or update
 this pointer; normal admitted group append performs no metadata-service I/O. ADR 0047 places immutable Root and Seal
@@ -46,10 +49,10 @@ cannot reach the retirement frontier fails closed.
 - More rollover/root control-plane operations and small tail groups buy a bounded recoverable state rather than an
   eventually unscannable prefix.
 - Provider slowdown can create correctness-driven availability backpressure before capacity is exhausted.
-- Root/Seal/successor publication is refined by ADR 0047. Exact wire, checkpoint/retirement authority, handoff cuts, and
-  evidence-derived numeric values remain downstream gates.
+- Root/Seal/successor publication is refined by ADR 0047 and checkpoint/open-tail authority by ADR 0053. Exact wire,
+  retirement authority, and evidence-derived numeric values remain downstream gates.
 - M3 must prove every cap and cumulative counter, no counter reset on fallback, pre-limit rollover, uncertain CAS,
   lineage fork/cycle/depth rejection, pointer/root substitution, and zero normal-append metadata I/O.
 
-This decision is refined by ADR 0047, refines ADR 0030, and is tracked by `T-APPEND-01`, `T-OBJECT-01`,
-`T-HANDOFF-01`, and `V2-OBJ-005/009..011/014`.
+This decision is refined by ADRs 0047/0053, refines ADR 0030, and is tracked by `T-APPEND-01`, `T-OBJECT-01`,
+`T-HANDOFF-01`, and `V2-OBJ-005/009..011/014/015`.

@@ -119,7 +119,13 @@ Recovery gets the prefix from the root, performs same-prefix LIST with total con
 budgets, validates leaf identity, provider/body proof, header, frames, commit sets, typed coverage, and idempotency, then
 reconstructs independent per-binding frontiers through each Position Domain. LIST-after-PUT visibility and bounded
 pagination are required provider capabilities; a provider without them is rejected for `OBJECT_WAL`. A handoff hint or
-asynchronous checkpoint/sealed manifest may narrow scanning but cannot omit this durable open-tail fallback.
+asynchronous checkpoint page may narrow scanning but cannot omit this durable open-tail fallback.
+
+Each immutable checkpoint page covers at most 256 contiguous extents and 64 KiB canonical bytes and publishes only
+after ACK. Policy is Protocol Cell x shard scoped and persisted in the next WalRun Root. Proactive cadence may be
+disabled, but finite `maxUncheckpointedExtents/Bytes/Age` are always enforced by forced progress, backpressure, or
+rollover. Open recovery and handoff always strong-LIST uncovered tail state; missing/invalid page coverage falls back
+to full bounded run LIST. The Seal binds a mandatory final gap-free canonical page chain.
 
 Every run root fixes hard extent-count, canonical-byte, age, and recoverable-predecessor limits. Before any limit can be
 crossed, the owner stops admission, drains/reconciles, seals, and publishes a successor; run IDs and epochs are never
@@ -149,7 +155,8 @@ Each Cell Provider Session owns its admission, retry/circuit-breaker state, open
 and close lifecycle. A compatible lower-level transport may be pooled, but a cell-local throttle, credential failure, or
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
-Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..014` and `V2-FABRIC-002`. See
+Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..015`,
+`V2-POLICY-001`, and `V2-FABRIC-002`. See
 [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md),
 [ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md),
 [ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md),
@@ -160,5 +167,7 @@ Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ
 [ADR 0038](../decisions/0038-v2-object-wal-provider-absent-crash-contract.md),
 [ADR 0039](../decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md),
 [ADR 0040](../decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md),
-[ADR 0046](../decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md), and
-[ADR 0047](../decisions/0047-v2-walrun-root-seal-and-successor-publication.md).
+[ADR 0046](../decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md),
+[ADR 0047](../decisions/0047-v2-walrun-root-seal-and-successor-publication.md),
+[ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md), and
+[ADR 0053](../decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md).

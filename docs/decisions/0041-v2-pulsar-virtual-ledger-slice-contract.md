@@ -34,9 +34,9 @@ base `2^62`. The reserved domain `[2^62, 2^63 - 2]` has cardinality `2^62 - 1`, 
 enforces hard `maxRegistryBytes` and lifetime `maxAssignmentsEver`, both counting RETIRED assignments. The deployment
 capacity is the minimum of numeric and canonical-encoding limits.
 
-Exact `k` is selected only from supported-lifetime create/rollover/recovery/gap evidence. ADR 0048 forbids resize,
-relocation, extension, and a second slice in 0.2. RETIRING-to-RETIRED proof and allocator/chain epoch protocols remain
-downstream gates.
+ADR 0054 fixes `k=40`, 65,536 canonical registry bytes, 256 lifetime assignments, and a 192-byte maximum assignment
+row as bootstrap contracts. ADR 0048 forbids resize, relocation, extension, and a second slice in 0.2.
+RETIRING-to-RETIRED proof and allocator/chain epoch protocols remain downstream gates.
 
 ## Consequences
 
@@ -47,5 +47,5 @@ downstream gates.
 - M1/M3 must prove stable Cell ownership, illegal lifecycle transitions, allocation stop at RETIRING/exhaustion,
   permanent tombstones, alignment/math, numeric/encoded capacity, and provider-configuration independence.
 
-This decision is refined by ADR 0048, refines ADRs 0027/0032, and is tracked by `T-POSITION-01`,
-`V2-POSITION-003..008`.
+This decision is refined by ADRs 0048/0054, refines ADRs 0027/0032, and is tracked by `T-POSITION-01`,
+`V2-POSITION-003..009`.

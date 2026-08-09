@@ -31,6 +31,8 @@ V2 replaces V1's per-append remote-metadata commit model with:
 - Kafka KRaft and Pulsar MetadataStore/Oxia control backends;
 - independent Kafka and Pulsar Protocol Cells over shared storage lifecycle contracts;
 - Cell-scoped Provider scopes/sessions over optionally shared physical provider infrastructure.
+- typed Topic/Tenant, Protocol Cell/shard, and host/process policy scopes that cannot disable correctness or reinterpret
+  persisted state after failover.
 
 The architecture is summarized in [Nereus overall architecture](nereus-overall-architecture.md). Normative details start
 at the [V2 design index](../v2/README.md); domain boundaries and vocabulary start at the
@@ -91,6 +93,12 @@ Current accepted decisions:
 - [ADR 0046: NWG1 run key, AEAD, and authenticated directory](../decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md)
 - [ADR 0047: WalRun Root, seal, and successor publication](../decisions/0047-v2-walrun-root-seal-and-successor-publication.md)
 - [ADR 0048: Pulsar virtual-ledger fixed-slice exhaustion](../decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md)
+- [ADR 0049: configuration scopes and persisted semantics](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md)
+- [ADR 0050: Kafka aggregate wire and publication validation](../decisions/0050-v2-kafka-aggregate-wire-and-publication-validation.md)
+- [ADR 0051: Pulsar selector state machine and cached fence](../decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md)
+- [ADR 0052: Pulsar BookKeeper delete state and retention policy](../decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md)
+- [ADR 0053: WalRun checkpoint bounds and open-tail recovery](../decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md)
+- [ADR 0054: Pulsar virtual-ledger bootstrap geometry](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md)
 
 ## V2 document map
 

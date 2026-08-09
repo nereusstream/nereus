@@ -50,8 +50,10 @@ acceptance evidence.
 V2 Kafka metadata is enabled only by fresh-bootstrap finalized `nereus.storage.version=2`; the V2 build supports only
 `[2,2]`, rejects level-1 V1 state, and forbids runtime upgrade or downgrade. A successful native CreateTopics item
 atomically publishes logical aggregate schema v1 with the topic records. Validate-only and native errors publish no
-aggregate. One generated typed record is owned by `TopicImage`; completed snapshot order places it between
-`TopicRecord` and that topic's partitions, and topic removal cascades without a second delete authority.
+aggregate. One generated non-flexible typed record at API key 32000 is owned by `TopicImage`; completed snapshot order
+places it between `TopicRecord` and that topic's partitions, and topic removal cascades without a second delete
+authority. Ordinary MetadataLoader publication validates only touched topics; snapshot/bootstrap validates every live
+topic.
 
 ### Kafka product target
 
@@ -75,10 +77,13 @@ authority and offloads sealed non-current ledgers as one deterministic data/root
 path before success. The root is bounded NPO1; native dual-source reads use at most one whole-range fallback, and exact
 Object revalidation plus BK read-pin drain precedes BookKeeper-source deletion. NPO1 indexes independently verifiable,
 gap-free NPD1 multi-entry blocks, and one ManagedLedger-owned composite handle owns Object/BK children and fallback.
+`RETAIN_BK` keeps delete state NONE; `DELETE_AFTER_VERIFIED` irreversibly advances through BK_DELETE_INTENT/DONE, and
+only DONE proves physical absence.
 `OBJECT_WAL` uses an explicit ObjectManagedLedger path plus a
 reserved-slice Pulsar-cell MetadataStore/Oxia virtual-ledger authority. One bounded deployment CAS registry proves all
 slices non-overlapping and never reused. Slice owner identity is the immutable Pulsar Protocol Cell, retirement is
-permanent, fixed aligned geometry has explicit numeric/encoded lifetime caps, and 0.2 forbids every resize/second-slice
+permanent, `k=40` plus 64 KiB/256-lifetime/192-byte-row bootstrap caps bound the registry, and 0.2 forbids every
+resize/second-slice
 path and fails closed at exhaustion. The profile accepts its cost-first
 latency tradeoff. Every path keeps
 `PulsarPosition(ledgerId, entryId)`, MessageId, and the ledger chain as protocol truth; Object/BookKeeper coordinates
@@ -91,6 +96,8 @@ checksum remains independently validated. NWG1 stores its authoritative binding 
 the Object body; one Kafka commit set never spans ObjectExtents and every frame block is independently decoded. NWG1
 uses one KMS-wrapped run key, domain-separated per-Object keys, and disjoint authenticated directory/frame nonce
 domains. Immutable Root and Seal records live in Cell control metadata; one exact CAS advances the current-run pointer.
+Checkpoint pages are Cell x shard scoped async accelerators; uncovered open tails always require bounded strong LIST,
+and the sealed final gap-free inventory cannot be disabled.
 
 The parity matrix covers at least:
 
@@ -123,7 +130,7 @@ KoP is intentionally outside the 0.2 runtime and release gates. Its existing des
 delete that design or claim its payload/coordinator mapping is implemented. Before activation it requires a fresh audit
 against V2 bindings, protocol-native Kafka work, and the then-current KoP source.
 
-Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `T-PROJECTION-01`, `T-BENCH-01`,
-and `T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`,
-`V2-PROJECTION-001`, `V2-POSITION-002..008`, `V2-OBJ-004..014`, `V2-BK-005..010`, `V2-KAF-META-001..002`,
-`V2-KAF-001`, `V2-PUL-001`, and `V2-KOP-001`.
+Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `T-POLICY-01`, `T-PROJECTION-01`,
+`T-BENCH-01`, and `T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`,
+`V2-PROJECTION-001`, `V2-POSITION-002..009`, `V2-OBJ-004..015`, `V2-BK-005..011`,
+`V2-KAF-META-001..003`, `V2-POLICY-001`, `V2-KAF-001`, `V2-PUL-001`, and `V2-KOP-001`.
