@@ -31,6 +31,10 @@ When the provider cannot return that complete proof, recovery performs a bounded
 the returned canonical body. A provider/mode that cannot complete either path within the declared capability and
 recovery budgets is not admitted to `OBJECT_WAL`.
 
+This proof is a PUT-success/durability and uncertain-response recovery contract, not a prerequisite for every routine
+frame range. A normal reader authenticates the Root-bound NWG1 header/directory and selected frame locally. Missing
+version-bound `FULL_OBJECT` SHA-256 therefore does not permanently force ordinary reads onto a whole-Object GET path.
+
 The binary Object format stores the two checksum values under distinct algorithm/version type IDs; provider-specific
 base64 or header representations are adapter concerns and cannot change the canonical checksum values. An algorithm
 change requires an accepted format/Storage Epoch contract rather than mutable policy reinterpretation.
@@ -41,7 +45,8 @@ change requires an accepted format/Storage Epoch contract rather than mutable po
 - Object creation pays SHA-256 streaming cost; frame validation retains a low-cost CRC32C hot path.
 - Providers without version-bound full-object SHA-256 may pay for a rare bounded GET after response loss.
 - M3 must prove exact-byte streaming digests, provider base64 conversion, full-object/composite rejection, missing
-  version fallback, body/digest mismatch, bounded GET recomputation, and capability admission.
+  version fallback, body/digest mismatch, bounded GET recomputation, capability admission, and separation from routine
+  range planning.
 
 Object WAL persists the expected length/SHA in its content-addressed leaf identity under
 [ADR 0030](0030-v2-object-wal-run-root-and-content-addressed-discovery.md). This decision refines ADRs 0018 and 0021 and

@@ -53,9 +53,11 @@ sparse index.
 - `V2-OPEN-BK-06` is resolved.
 - Extreme ledgers must roll earlier or use larger data blocks rather than expanding the root/parser without bounds.
 - NPO1 duplicates some stock metadata intentionally to make the two-object attempt independently verifiable.
-- NPD1 data-block structure is refined by ADR 0044. Exact NPO1/NPD1 field IDs/offsets, block limits/codec/AEAD wire, and
-  golden vectors remain downstream format gates; they may not weaken the structure or hard limits above.
+- NPD1 data-block structure is refined by ADR 0044 and checked envelope/derived row by ADR 0056. Exact remaining
+  NPO1/NPD1 field IDs/offsets, numeric block/Object limits, codec thresholds, and golden vectors remain downstream
+  format gates; they may not weaken the structure or hard limits above.
 - M2 must prove every boundary/overflow/duplicate/order/trailing-byte rejection, pre-allocation limit checks,
   empty-ledger exclusion, canonical re-encode, and self-digest corruption behavior.
 
-This decision is refined by ADR 0044, refines ADRs 0024/0029, and is tracked by `T-BK-01`, `V2-BK-004..006/009`.
+This decision is refined by ADRs 0044/0056/0057, refines ADRs 0024/0029, and is tracked by `T-BK-01`,
+`V2-BK-004..006/009/012/013`.

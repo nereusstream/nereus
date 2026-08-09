@@ -101,9 +101,11 @@ exhaustion fails closed and additional capacity uses a new Protocol Cell. A regi
 only by a bootstrap-proven disjoint ledger-ID namespace or an independent deployment/cluster, not a new logical label.
 
 Allocator mode remains open. ADR 0055 requires a source-qualified native-relative workload/latency/failure receipt
-before selection and starts RANGE_LEASED correctness design in parallel with STRICT evidence. A future allocator record
-may persist only mode, protocol version, and recovery/fencing identities; observed rate/queue/latency/recovery budgets
-belong to versioned Cell policy/evidence and never to host-selected durable identity.
+before selection and starts RANGE_LEASED correctness design in parallel with STRICT evidence, including mass broker
+takeover. A future allocator record may persist only mode, protocol version, and recovery/fencing identities; observed
+rate/queue/latency/recovery budgets belong to versioned Cell policy/evidence and never to host-selected durable
+identity. RANGE grant ownership, head/cursor split, stale-candidate burn, background clear, and orphan/churn accounting
+remain open; a broker owner change cannot be assumed to require serialized reacquisition of every range.
 
 ## Object WalRun control records
 

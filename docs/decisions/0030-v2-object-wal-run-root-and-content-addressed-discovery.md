@@ -48,7 +48,8 @@ authority for an ACKed open-run tail.
 - Recovery pays bounded LIST/verification cost, and providers without qualifying LIST consistency are excluded.
 - Binding-epoch placement, provider-absent crash behavior, bounded lifecycle/root discovery, run-key AEAD, and
   immutable Root/Seal publication are refined by ADRs 0037 through 0039 and 0046/0047. Checkpoint bounds and open-tail
-  recovery are refined by ADR 0053; exact wire, GC handoff, and crash vectors remain downstream gates.
+  recovery are refined by ADR 0053 and directory-prefix capacity by ADR 0058; exact hint/lane wire, GC handoff, and
+  crash vectors remain downstream gates.
 - M3 must prove run-before-append, exact key grammar, list-after-PUT and pagination capabilities, open-tail discovery,
   gap/conflict/budget rejection, response-loss retry, and independent per-binding frontier reconstruction.
 
@@ -57,5 +58,6 @@ This decision is refined by [ADRs 0037](0037-v2-object-wal-binding-context-epoch
 [0039](0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md),
 [0046](0046-v2-nwg1-run-key-aead-and-authenticated-directory.md), and
 [0047](0047-v2-walrun-root-seal-and-successor-publication.md), plus
-[ADR 0053](0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md); it refines ADRs 0018/0025 and is tracked by
-`T-OBJECT-01`, `V2-OBJ-001/003/005/007..011/013..015`.
+[ADRs 0053](0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md) and
+[0058](0058-v2-nwg1-directory-prefix-capacity-and-evidence.md); it refines ADRs 0018/0025 and is tracked by
+`T-OBJECT-01`, `V2-OBJ-001/003/005/007..011/013..016`.

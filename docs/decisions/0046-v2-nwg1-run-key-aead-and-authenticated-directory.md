@@ -29,6 +29,11 @@ Compression happens before each frame's AEAD operation. The exact protocol-nativ
 successful authentication, decryption, and decompression. Header/directory CRC remains a corruption detector and does
 not replace AEAD authentication.
 
+For routine random reads, successful Root-bound header/directory AEAD is the local authority for the selected frame
+range; provider whole-Object proof remains a separate durability/recovery domain. ADR 0058 bounds the maximum bytes a
+reader may fetch before authenticating that directory. A hint may plan those bytes but cannot replace in-body parsing
+or AEAD.
+
 KMS unwrap and plaintext run-key caching are run-scoped and bounded by the owning Cell Provider Session. KMS key
 rotation takes effect only by sealing the current run and creating a successor Root. Per-Object KMS wrapping is not
 used by the 0.2 cost-first Object WAL hot path.
@@ -40,10 +45,10 @@ used by the 0.2 cost-first Object WAL hot path.
   KMS operations and independently authenticated range reads.
 - Loss of the Cell KMS key/version needed by a live run fails admission/recovery closed; provider metadata cannot
   substitute for the Root-bound envelope identity.
-- Exact HKDF input framing, nonce bytes, NWG1 header/directory wire, KMS envelope caps, run-key cache erasure, and
-  cryptographic golden vectors remain downstream format gates.
+- Exact HKDF input framing, nonce bytes, NWG1 header/directory wire, numeric prefix/KMS-envelope caps, run-key cache
+  erasure, hint assembly, and cryptographic golden vectors remain downstream format gates.
 - M3 must prove key/nonce uniqueness, AAD substitution rejection, directory/frame domain separation, rotation only at
   rollover, no plaintext leakage, and KMS/cache lifecycle isolation between Protocol Cells.
 
-This decision refines ADRs 0021, 0030, 0037, and 0040 and is tracked by `T-OBJECT-01`, `T-FABRIC-01`, and
-`V2-OBJ-006/007/012/013`.
+This decision is refined by ADR 0058, refines ADRs 0021, 0030, 0037, and 0040, and is tracked by `T-OBJECT-01`,
+`T-FABRIC-01`, and `V2-OBJ-006/007/012/013/016`.

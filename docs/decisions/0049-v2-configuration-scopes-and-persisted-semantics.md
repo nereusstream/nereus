@@ -28,19 +28,25 @@ Tunable policy has exactly three scopes:
    and concurrency. Capacity pressure may reject admission, backpressure, or force a contract-defined early seal or
    rollover; it cannot reinterpret persisted bytes or weaken recovery.
 
+The Product/Deployment publishes the admitted typed-policy catalog and one source-qualified base semantic default.
+Topic/Tenant-or-Namespace policy inherits or explicitly overrides that default. A Protocol Cell may reject a class or
+cap its resource use but cannot choose a different semantic default; a host never selects one. Pulsar NPD1 resolves in
+the order Deployment base -> Namespace -> explicit Topic override and persists the result in the offload attempt.
+
 For the same typed quantity, the effective runtime budget is
 `min(topic/tenant-or-namespace request, Protocol Cell/shard budget, host/process capacity)`. An absent or incompatible
 lower ceiling does not select a weaker correctness mode; admission fails or backpressures.
 
 Every resolved value that affects persisted bytes or recovery semantics is recorded at its durable activation boundary:
-`StorageEpoch`, `WalRunRootRecord`, or sealed-ledger offload-attempt facts. A failover reads that persisted value and
-does not recompute it from the target host. Changes take effect only at the next contract-defined epoch, WalRun, or
-offload attempt, never halfway through one.
+`StorageEpoch`, hard-recovery `WalRunRootRecord`, Object-group descriptor/header, or sealed-ledger offload-attempt
+facts. A failover reads that persisted value and does not recompute it from the target host. Changes take effect only
+at the next contract-defined epoch, run, Object group, or offload attempt, never halfway through one.
 
 A configurable identity is scoped to exactly one activation lifecycle. One enum or versioned class cannot combine a
-Storage-Epoch encoding choice, a WalRun packing/linger choice, a sealed-ledger offload-attempt choice, and host
+Storage-Epoch encoding choice, an Object-group packing/linger choice, a sealed-ledger offload-attempt choice, and host
 capacity. Related policies may be validated for compatibility, but each value is persisted and changed only at its own
-boundary.
+boundary. Topic-specific soft packing is not a singular WalRun Root recovery identity; the bounded scheduling-lane and
+group-recording contract remains an open Object-WAL gate.
 
 Policy compatibility is part of batching admission. Cross-topic batching uses the resolved typed policy class and
 quantized fields; V2 does not expose an unbounded map of per-topic boolean flags.
@@ -50,9 +56,10 @@ quantized fields; V2 does not expose an unbounded map of per-topic boolean flags
 - Performance tuning remains possible without making correctness or durable compatibility host-dependent.
 - Typed classes may reject some bespoke combinations and host pressure may reduce throughput rather than silently
   downgrade semantics.
-- M1/M2/M3 must prove scope resolution, minimum-budget arithmetic, hard-cap non-escalation, failover configuration
-  drift, lifecycle-specific activation boundaries, early seal/backpressure under host pressure, incompatible batching
-  rejection, and that every correctness gate remains non-disableable.
+- M1/M2/M3 must prove catalog/default resolution, minimum-budget arithmetic, hard-cap non-escalation, failover
+  configuration drift, lifecycle-specific activation boundaries, Cell/host non-reinterpretation, early
+  seal/backpressure under resource pressure, incompatible batching rejection, and that every correctness gate remains
+  non-disableable.
 
-This decision refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047 and is tracked by `T-POLICY-01`,
-`V2-POLICY-001`.
+This decision is refined by ADRs 0056 through 0058, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and is tracked
+by `T-POLICY-01`, `V2-POLICY-001`, `V2-BK-012/013`, and `V2-OBJ-016`.

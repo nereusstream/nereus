@@ -53,8 +53,9 @@ Extents; they never turn an object key or BookKeeper coordinate into a second pr
 Policy also remains typed. Topic/Tenant-or-Namespace classes express latency/cost intent, Protocol Cell/shard policy
 owns shared checkpoint/allocator/recovery budgets, and host/process policy supplies resource ceilings only. Correctness,
 parser caps, and durable compatibility cannot be switched off. Effective budgets use the minimum across scopes; host
-pressure may backpressure or early-seal. Values affecting bytes/recovery persist at their Storage Epoch, WalRun Root,
-or offload-attempt boundary, and one policy identity never crosses those lifecycles.
+pressure may backpressure or early-seal. Product/Deployment owns the base semantic default; Cell/host cannot replace
+it. Values affecting bytes/recovery persist at their Storage Epoch, hard-recovery WalRun Root, Object-group, or
+offload-attempt boundary, and one policy identity never crosses those lifecycles.
 
 ## 3. Stable component boundaries
 
@@ -162,12 +163,19 @@ current root and bounded predecessor lineage. Each conditional group key include
 the complete SHA-256; restart discovers the ACKed open tail through bounded strong same-prefix LIST, without adding a
 per-group metadata commit. Async checkpoint pages are Cell x shard accelerators with mandatory uncovered-tail
 extent/byte/age bounds. Open-tail recovery still LISTs uncovered state, and the Seal binds a final gap-free page chain.
+The Root does not carry one Topic-specific soft packing class and the shard still has one current pointer; bounded
+multi-class lane sequence/inventory remains open.
 
 NWG1 stores an authoritative in-body Binding Context Table and Append Unit Directory. Exact binding/Storage/Owner Epoch
 authority is object-local rather than singular in a multi-binding root. One Kafka commit set stays inside one extent and
 each frame block is independently compressed, authenticated, and decoded. AES-256-GCM/HKDF-SHA-256 v1 wraps one
 run-scoped data key, derives one key per ObjectExtent, and separates authenticated directory and frame nonce domains;
 KMS rotation happens only at run rollover.
+
+Routine random reads authenticate the Root-bound in-body header/directory and selected frame without first requiring a
+new full-Object provider proof. Without a hint they use header, directory, and frame GETs. ADR 0058 makes prefix bytes
+the primary cap, derives frame capacity from the directory budget, and prioritizes 4,096/16,384-frame evidence without
+adding a paginated or second-authority directory.
 
 WalRun Root and Seal are separate immutable Cell control-metadata records. A successor binds both predecessor
 identities, then one exact CAS advances the current-run pointer. A pointer left on a sealed run is recovered forward and
@@ -208,7 +216,9 @@ deferred beyond 0.2.
 
 STRICT_SERIALIZED and RANGE_LEASED remain open allocator protocols. ADR 0055 requires maximum sustainable rollover RPS
 under every predeclared SLO, actual rollover distribution/jitter/storm/failure cuts, and native Pulsar
-rollover/append-stall comparison; RANGE correctness is designed in parallel rather than hidden behind a host switch.
+rollover/append-stall comparison, including mass broker takeover. RANGE correctness is designed in parallel rather than
+hidden behind a host switch; owner-change whole-tail burn and serialized reacquisition are rejected inputs, not an
+accepted allocator.
 
 For Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole attempt, completion,
 read/fallback, and deletion-eligibility authority. Nereus provides a `LedgerOffloader`; its manifest is derived and cannot
@@ -220,6 +230,11 @@ handle owns both children and source pins. Topic/Namespace policy persists `RETA
 latter drains BK pins before exact Object revalidation and irreversible BK_DELETE_INTENT/DONE. The compatibility
 `bookkeeperDeleted=true` fence may mean INTENT or DONE, but only DONE proves physical absence. Cleanup proves root
 absent before data deletion.
+
+NPD1 uses checked 32-byte data/64-byte block envelopes and a 16-byte derived-entry-ID row. Upload, digest, and full
+verification stream or use bounded segments; the Object hard cap is not an allocation size. Block-policy evidence uses
+1/4/8/16-MiB candidates, while Product/Deployment owns the base default, Namespace/Topic may override, Cell admits /
+caps, and the resolved class persists in the offload attempt.
 
 Detailed contract: [BookKeeper and Pulsar](../v2/04-bookkeeper-and-pulsar.md).
 

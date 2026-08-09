@@ -34,19 +34,22 @@ validated before trusting bounds or membership. It is neither a third durability
 substitute for `ObjectExtentDigest` or `FramePayloadChecksum`, and CRC alone does not claim cryptographic authenticity.
 Exact field placement and canonical coverage framing remain part of the downstream NWG1 wire gate.
 
-Readers validate bounded header/directory facts before issuing frame ranges. They never infer Kafka coverage from
-record count, split a Pulsar entry, or treat physical group order as protocol order.
+Readers validate bounded header/directory facts before issuing frame ranges. Root-bound directory AEAD, not a fresh
+whole-Object durability proof, authenticates local offsets and lengths for routine random reads; the selected frame is
+then independently authenticated and checksummed. External hints can only plan the bounded prefix and never authorize
+a frame offset. Readers never infer Kafka coverage from record count, split a Pulsar entry, or treat physical group
+order as protocol order.
 
 ## Consequences
 
 - `V2-OPEN-OBJ-14` is resolved.
 - Per-frame descriptors, AEAD tags, and weaker cross-frame compression are accepted costs for native random reads and
   removal of sidecar atomicity.
-- AEAD key hierarchy and authenticated directory/frame domains are refined by ADR 0046. Exact header/directory field
-  IDs, byte layout, hard limits, nonce/AAD framing, range assembly, and compaction golden vectors remain downstream
-  format gates.
+- AEAD key hierarchy and authenticated directory/frame domains are refined by ADR 0046, and directory-prefix capacity
+  by ADR 0058. Exact header/directory field IDs, byte layout, numeric hard limits, nonce/AAD framing, hint/range
+  assembly, and compaction golden vectors remain downstream format gates.
 - M3 must prove commit-set co-location, oversize rejection before allocation, directory substitution/bounds failures,
   independent frame decode, no cross-frame compression/AEAD, and range reads that do not decode unrelated frames.
 
-This decision is refined by ADR 0046, refines ADRs 0026/0031/0037, and is tracked by `T-PROTOCOL-01`, `T-OBJECT-01`,
-and `V2-OBJ-004/006/007/012/013`.
+This decision is refined by ADRs 0046/0058, refines ADRs 0026/0031/0037, and is tracked by `T-PROTOCOL-01`,
+`T-OBJECT-01`, and `V2-OBJ-004/006/007/012/013/016`.

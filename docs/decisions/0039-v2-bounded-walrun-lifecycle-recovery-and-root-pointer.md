@@ -39,6 +39,11 @@ records in Cell control metadata, requires successor publication before pointer 
 run. Recovery walks a bounded lineage from the current pointer to the published retirement frontier. Every group
 header binds the root SHA.
 
+The one Root fixes format/encryption and hard recovery envelopes; it does not become one Topic-specific soft
+target/linger identity. 0.2 does not multiply current pointers or run lineages by packing class. Exact bounded
+scheduling lanes, sequence allocation, checkpoint inventory, and group-level audit fields remain an open policy/wire
+gate.
+
 After an uncertain pointer CAS, reread accepts only exact candidate equality or the already committed winner; local
 merge is forbidden. Missing root, hash/epoch mismatch, lineage cycle/fork, predecessor-depth excess, or a pointer that
 cannot reach the retirement frontier fails closed.
@@ -49,10 +54,11 @@ cannot reach the retirement frontier fails closed.
 - More rollover/root control-plane operations and small tail groups buy a bounded recoverable state rather than an
   eventually unscannable prefix.
 - Provider slowdown can create correctness-driven availability backpressure before capacity is exhausted.
-- Root/Seal/successor publication is refined by ADR 0047 and checkpoint/open-tail authority by ADR 0053. Exact wire,
-  retirement authority, and evidence-derived numeric values remain downstream gates.
+- Root/Seal/successor publication is refined by ADR 0047, checkpoint/open-tail authority by ADR 0053, and directory
+  capacity by ADR 0058. Exact wire, scheduling-lane inventory, retirement authority, and evidence-derived numeric
+  values remain downstream gates.
 - M3 must prove every cap and cumulative counter, no counter reset on fallback, pre-limit rollover, uncertain CAS,
   lineage fork/cycle/depth rejection, pointer/root substitution, and zero normal-append metadata I/O.
 
-This decision is refined by ADRs 0047/0053, refines ADR 0030, and is tracked by `T-APPEND-01`, `T-OBJECT-01`,
-`T-HANDOFF-01`, and `V2-OBJ-005/009..011/014/015`.
+This decision is refined by ADRs 0047/0053/0058, refines ADR 0030, and is tracked by `T-APPEND-01`, `T-OBJECT-01`,
+`T-HANDOFF-01`, and `V2-OBJ-005/009..011/014..016`.

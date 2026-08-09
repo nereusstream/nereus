@@ -33,5 +33,6 @@ KoP is outside the current V2 Kafka/Pulsar design session. Its existing design r
   task/cache namespace, and GC authority; they never share a position domain or write authority.
 - **Policy ↔ durable state**: Topic/Tenant-or-Namespace typed classes express SLO/cost intent, Protocol Cell/shard
   policy owns shared scheduling and recovery budgets, and host/process configuration only caps resources. Correctness
-  and parser caps are never switches; durable choices are persisted at their Storage Epoch, WalRun Root, or offload
-  attempt boundary, one identity never spans those lifecycles, and effective budgets are the minimum across scopes.
+  and parser caps are never switches; Product/Deployment owns the base semantic default, while Cell/host cannot replace
+  it. Durable choices are persisted at their Storage Epoch, hard-recovery WalRun Root, Object-group, or offload-attempt
+  boundary, one identity never spans those lifecycles, and effective budgets are the minimum across scopes.

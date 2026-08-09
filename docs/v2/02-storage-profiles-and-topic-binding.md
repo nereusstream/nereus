@@ -128,10 +128,13 @@ Topic/Tenant-or-Namespace policy uses a small closed set of typed classes and ca
 Cell/shard policy owns shared checkpoint/allocator/group/recovery budgets; host/process configuration supplies only
 resource ceilings and may cause backpressure or early seal. Effective numeric budgets are
 `min(topic/tenant-or-namespace request, Cell/shard budget, host capacity)`. A resolved value that affects bytes or
-recovery is persisted in the Storage Epoch, WalRun Root, or offload attempt and cannot drift after failover.
-Cross-topic batching requires compatible resolved classes rather than arbitrary per-topic flag combinations. One policy
-identity cannot combine Storage-Epoch encoding, WalRun packing, sealed-ledger offload-attempt policy, and host capacity
-because those values activate and change at different lifecycle boundaries.
+recovery is persisted at its Storage Epoch, hard-recovery WalRun Root, Object-group descriptor/header, or offload
+attempt and cannot drift after failover. Product/Deployment owns the admitted catalog and base semantic default;
+Namespace may inherit/override, Topic may explicitly override, Cell admits/caps, and host only ceilings. Cross-topic
+batching requires compatible resolved classes rather than arbitrary per-topic flag combinations. One policy identity
+cannot combine Storage-Epoch encoding, Object-group packing, sealed-ledger offload-attempt policy, and host capacity
+because those values activate and change at different lifecycle boundaries. Topic-specific soft packing is not one
+WalRun Root identity; its bounded lane/group wire remains open.
 
 A policy change that affects a primary WAL profile, format, Object-extent digest family, Frame-payload checksum family,
 or encryption family requires a new Storage Epoch at an exact Protocol Frontier. A materialization-only format or index
@@ -179,4 +182,5 @@ Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-POLICY-01`, `T-OBJECT-0
 [ADR 0043](../decisions/0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md),
 [ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md),
 [ADR 0050](../decisions/0050-v2-kafka-aggregate-wire-and-publication-validation.md), and
-[ADR 0051](../decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md).
+[ADR 0051](../decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md), with NPD1 policy authority refined
+by [ADR 0057](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md).

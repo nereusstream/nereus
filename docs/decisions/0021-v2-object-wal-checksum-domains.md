@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted for the V2 Object format and `OBJECT_WAL`. Exact initial algorithms remain an open implementation gate;
-implementation and runtime evidence are not started at M0.
+Accepted for the V2 Object format and `OBJECT_WAL`; initial algorithms are refined by ADR 0025. Implementation and
+runtime evidence are not started at M0.
 
 ## Context
 
@@ -25,11 +25,17 @@ V2 uses two explicit, non-substitutable integrity domains:
    mapping. It detects corruption across Object decoding, decompression/decryption, frame slicing, and protocol payload
    reconstruction.
 
-Recovery validates `ObjectExtentDigest` before trusting frame boundaries, then validates every relevant
-`FramePayloadChecksum` after decode. The two fields have distinct names/type IDs and cannot satisfy each other's gate.
-The immutable Object Extent descriptor carries the request-body length plus Object-extent algorithm/version/value;
-every frame carries its payload checksum algorithm/version/value. The Object-extent digest value is outside the
-canonical request body it hashes and therefore cannot create a self-referential body field.
+Uncertain-PUT reconciliation and recovery that must establish whole-Object durability validate `ObjectExtentDigest`
+before using unverified body structure to reconstruct durable coverage. Routine random read of an already admitted
+immutable extent does not perform a full GET merely to plan a range: its Root-bound in-body header/directory AEAD
+authenticates local frame bounds, then frame AEAD plus `FramePayloadChecksum` validates the selected decoded payload.
+Neither a directory hint nor local AEAD proves whole-Object durability, and neither `ProviderObjectProof` nor the
+full-body digest authorizes an unverified frame offset.
+
+The two checksum fields have distinct names/type IDs and cannot satisfy each other's gate. The immutable Object Extent
+descriptor carries the request-body length plus Object-extent algorithm/version/value; every frame carries its payload
+checksum algorithm/version/value. The Object-extent digest value is outside the canonical request body it hashes and
+therefore cannot create a self-referential body field.
 
 Storage Epoch format/checksum/encryption families fix which algorithm/version pairs are legal within that epoch. ADR
 0025 selects SHA-256/v1 and CRC32C/v1 for 0.2; ADR 0026 defines the protocol-native frame payload bytes. An algorithm or
@@ -42,13 +48,15 @@ existing checksum field.
 - V2 pays for two integrity layers and stores explicit algorithm/type metadata.
 - Provider-native checksums can avoid a response-loss GET only when their documented scope exactly matches the Object
   Extent domain; server-side implementation details or ETag do not qualify by themselves.
-- M3 must inject stored-body, encryption/compression metadata, frame-boundary, and decoded-payload corruption and prove
-  that each layer rejects only after validating its own domain.
+- M3 must inject stored-body, encryption/compression metadata, frame-boundary, and decoded-payload corruption; prove
+  that each layer rejects only after validating its own domain; and prove routine range reads do not require a
+  provider-proof/full-GET round trip.
 
 This decision is refined by
 [ADR 0025](0025-v2-initial-checksum-algorithms-and-provider-proof.md) and
 [ADR 0026](0026-v2-protocol-native-frame-payload-bytes.md), with persisted Object identity/discovery in
 [ADR 0030](0030-v2-object-wal-run-root-and-content-addressed-discovery.md) and frame granularity in
 [ADR 0031](0031-v2-protocol-frame-and-append-commit-set.md). NWG1 placement is refined by
-[ADR 0040](0040-v2-nwg1-append-unit-directory-and-colocation.md). This decision refines ADR 0018 and is tracked by
-`T-OBJECT-01`, `V2-OBJ-001`, `V2-OBJ-003..007`, and `V2-OBJ-012`.
+[ADR 0040](0040-v2-nwg1-append-unit-directory-and-colocation.md), with bounded prefix capacity in
+[ADR 0058](0058-v2-nwg1-directory-prefix-capacity-and-evidence.md). This decision refines ADR 0018 and is tracked by
+`T-OBJECT-01`, `V2-OBJ-001`, `V2-OBJ-003..007`, and `V2-OBJ-012/016`.

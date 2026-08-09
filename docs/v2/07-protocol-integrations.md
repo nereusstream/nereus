@@ -89,7 +89,8 @@ latency tradeoff. Every path keeps
 `PulsarPosition(ledgerId, entryId)`, MessageId, and the ledger chain as protocol truth; Object/BookKeeper coordinates
 remain Physical Extents. STRICT_SERIALIZED and RANGE_LEASED remain unselected; ADR 0055 requires actual rollover
 distribution/storm/crash evidence and native Pulsar rollover/append-stall comparison while RANGE fencing/recovery is
-designed in parallel.
+designed in parallel. Broker-wide takeover is an explicit scale cut, and the rejected owner-scoped range design cannot
+reacquire every ManagedLedger range through one serialized allocator.
 
 Object frames retain exact assigned Kafka RecordBatch bytes or exact Pulsar ManagedLedger entry bytes after only the
 outer Object envelope is decoded. Kafka makes all frames from one partition storage append an all-or-none commit set;
@@ -134,5 +135,5 @@ against V2 bindings, protocol-native Kafka work, and the then-current KoP source
 
 Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `T-POLICY-01`, `T-PROJECTION-01`,
 `T-BENCH-01`, and `T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`,
-`V2-PROJECTION-001`, `V2-POSITION-002..010`, `V2-OBJ-004..015`, `V2-BK-005..011`,
+`V2-PROJECTION-001`, `V2-POSITION-002..010`, `V2-OBJ-004..016`, `V2-BK-005..013`,
 `V2-KAF-META-001..003`, `V2-POLICY-001`, `V2-KAF-001`, `V2-PUL-001`, and `V2-KOP-001`.

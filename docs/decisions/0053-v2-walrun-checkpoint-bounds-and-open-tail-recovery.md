@@ -38,8 +38,10 @@ still validates the bytes; checkpoint metadata cannot override them.
   bounding normal takeover work.
 - Checkpoint cadence is an accelerator; hard uncovered-tail bounds, LIST fallback, and the sealed inventory are
   correctness contracts.
+- The current page wire assumes one contiguous extent sequence. If `V2-OPEN-OBJ-19` accepts concurrent packing lanes,
+  lane-local page/Seal inventory must refine this ADR without creating another current Root/pointer.
 - M3/M7 must prove every page-chain corruption/gap/fork, all three uncovered-tail limits, disabled proactive cadence,
   backpressure/rollover, open-tail LIST, handoff, final seal binding, and next-WalRun policy activation.
 
 This decision refines ADRs 0030, 0039, 0047, and 0049 and is tracked by `T-OBJECT-01`, `T-HANDOFF-01`,
-`T-POLICY-01`, `V2-OBJ-014/015`.
+`T-POLICY-01`, `V2-OBJ-014..016`, and `V2-OPEN-OBJ-19`.

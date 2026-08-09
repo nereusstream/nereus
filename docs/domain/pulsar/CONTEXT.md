@@ -46,9 +46,10 @@ _Avoid_: Broker-owned slice, provider-owned slice, deleted tombstone, resized bo
 
 **Virtual Ledger Allocator Evidence**:
 The ADR-0055 source-qualified comparison that measures maximum sustainable rollover RPS while every predeclared SLO
-holds across real distribution/jitter/storm/crash cuts and a native Pulsar rollover/append-stall baseline. It selects
-neither STRICT_SERIALIZED nor RANGE_LEASED by itself.
-_Avoid_: Active-ledger-count-only benchmark, serialized-p99-capacity metric, host-selected allocator mode
+holds across real distribution/jitter/storm/crash cuts, mass broker takeover, and a native Pulsar
+rollover/append-stall baseline. It selects neither STRICT_SERIALIZED nor RANGE_LEASED by itself.
+_Avoid_: Active-ledger-count-only benchmark, serialized-p99-capacity metric, owner-change range reacquisition storm,
+host-selected allocator mode
 
 **Pulsar Topic Generation Selector**:
 The permanent name-scoped monotonic generation authority using exact
@@ -87,8 +88,9 @@ _Avoid_: Stock index assumed sufficient, current-config key derivation, unbounde
 
 **Sealed-Ledger Data Block**:
 One independently decodable NPD1 multi-entry block whose NPO1 row binds its contiguous entry range, location,
-codec/encryption facts, and encoded SHA-256. Its bounded directory maps exact entry IDs to bytes.
-_Avoid_: Padded scan-forward block, entry split across blocks, cross-block compression or AEAD
+codec/encryption facts, and encoded SHA-256. Its checked 16-byte directory rows derive entry IDs from authenticated
+first-entry plus ordinal; upload/digest/full verification are streaming or bounded-segment operations.
+_Avoid_: Padded scan-forward block, repeated entry ID, data-Object-sized ByteBuffer, entry split, cross-block state
 
 **Native Dual-Source Read**:
 The ManagedLedger-owned whole-range selection/fallback between an eligible Object attempt and BookKeeper source. One

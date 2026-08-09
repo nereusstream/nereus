@@ -153,3 +153,160 @@ per-ledger rollover, bounded crash recovery, and no shared broker-local cursor a
 
 No Round 9 recommendation above is normative. Confirmed conclusions must be synchronized to ADRs/contracts; adjusted
 values and unselected allocator branches remain in the open log.
+
+## Adjusted response preserved verbatim
+
+The user first summarized the review as:
+
+> 结论：Round 9 继续收敛了，但不能全部确认。Q1/Q2/Q4 基本方向正确；真正仍有过度设计并可能损耗性能的是 Q3、Q5、Q6：
+>
+> - Q3 把“PUT 持久性证明”误当成日常 range-read 的前置条件，会让 2-GET fast path 很难命中。
+> - Q5 把 soft packing policy 固化进唯一 WalRun Root，会与“每 shard 一个 current run”冲突。
+> - Q6 在 owner 变化时烧掉整个 range，会在 broker failover 时重新制造全 Cell 串行 allocator 风暴。
+
+The user then supplied this exact disposition:
+
+> Round 9 不全部按推荐确认。Q1/Q2/Q4 基本收敛；Q3、Q5、Q6 仍需调整，其中 Q6 已经上升为 broker failover 的高优先级性能风险。
+>
+> Q1 — 部分确认。
+>
+> 确认：
+>
+> - 冻结完整的 decoded/directory/compressed/AEAD/encoded/Object 长度域。
+> - 使用 checked arithmetic，并且只按已验证的实际 count 分配。
+> - 优先采用 16-byte、派生 entryId 的 row。
+> - 增加完整 data Object 上限和 Provider capability admission。
+>
+> 调整：
+>
+> - 4 GiB 可以继续作为 0.2 hard-cap candidate，但必须使用 uint64/long 表达，并明确它只是格式和 admission 上限，不是内存分配、单次 GET 或目标对象大小。
+> - 上传、SHA-256 和响应丢失后的完整验证必须支持流式或有界分段处理，禁止构造 4 GiB ByteBuffer。
+> - 1,024 multipart parts 不应成为 NPD1 wire identity。它属于 Provider adapter/Cell 的上传操作上限，可以配置得更低；Topic 不能放大。
+> - Provider admission 必须同时检查 maxObjectSize、min/maxPartSize、maxParts、streaming upload/read，以及 multipart residue cleanup 能力。
+>
+> 因此，公式和 16-byte row 可以确认；4 GiB/1,024 parts 的最终数值仍等实现与 Provider evidence。
+>
+> Q2 — 调整默认值权威后可以确认 benchmark 方案。
+>
+> 1/4/8/16 MiB 只作为 benchmark candidates、不提前创建 wire enum，这个方向正确。
+>
+> 但“Namespace/Cell 提供默认”存在双重默认权威，应调整为：
+>
+> - 产品/Deployment 提供经过验证的基础默认；
+> - Namespace 继承或覆盖默认；
+> - Topic 只做显式 typed override；
+> - Protocol Cell 只做 class admission、上限和资源预算，不重新选择语义默认；
+> - host 只做 CPU、内存、I/O、并发 ceiling。
+>
+> 最终 resolved class 必须记录在 offload attempt 中。Cell/host 可以降低有效 target、backpressure 或拒绝 admission，但不能在 failover 后重新解释已经生成的 NPD1。
+>
+> Q3 — 不按当前推荐确认。三 GET fallback 正确，但 2-GET fast path 的证明条件过重。
+>
+> 必须区分两种证明：
+>
+> - ProviderObjectProof/full GET proof：用于 PUT 成功性、Object durability 和响应丢失恢复。
+> - header/directory AEAD：用于日常 range-read 的目录、offset、length 和 frame 身份认证。
+>
+> ProviderObjectProof 不应成为日常 prefix range planning 的强制前置条件。否则普通成功 PUT 如果没有返回 version-bound FULL_OBJECT SHA-256，读取端只能永久走三 GET；如果为了获得 fast-path proof 而额外 full GET，则优化本身失去意义。
+>
+> 建议改为：
+>
+> - 无 hint：header → directory → frame，固定三 GET fallback。
+> - 有绑定 immutable leaf identity、Root identity、directoryEnd 的 bounded hint：直接 prefix → frame。
+> - hint 必须满足 directoryEnd 不超过 wire hard cap，并绑定 exact Object key/extent sequence；如果存在 provider version，也应绑定 version。
+> - prefix 返回后仍必须解析 in-body header，并验证 directory AEAD；hint 永远不能授权 frame offset。
+> - hint 过短时复用已经取得的 header，只补读缺失 directory range；hint 过长时使用 header 声明的精确子范围，不应无条件丢弃已读 bytes 并从头重启。
+> - key/version/Root/AEAD 真正不匹配时才失败或重新走 bounded fallback。
+>
+> 需要相应收紧原有“读取 frame boundary 前必须验证完整 ObjectExtentDigest”的表述：完整 digest 是 Object durability/recovery proof；正常随机读取由 Root-bound directory/frame AEAD 提供局部认证，否则 range read 的设计目标无法成立。
+>
+> Q4 — 接受“由 directory budget 推导 frame cap”，但不建议把 65,536 作为当前同等级候选。
+>
+> 真正需要首先冻结的是 maxDirectoryPrefixBytes，而不是 maxFrames。
+>
+> 例如假设 frame row 为 64 bytes：
+>
+> - 4,096 rows 约 256 KiB；
+> - 16,384 rows 约 1 MiB；
+> - 65,536 rows 约 4 MiB。
+>
+> 首次读取一个 1 KiB frame 时，1 MiB/4 MiB prefix 分别产生约 1,024x/4,096x 的控制字节放大。即使请求数只有两个，冷读 p99 和流量成本仍可能很差。
+>
+> 建议 0.2 优先 benchmark 4,096 和 16,384；65,536 只有在 prefix 证据证明可接受时才继续考虑。不要为了支持 65,536 在 0.2 引入分页 directory 或第二套索引权威，那会再次过度设计。
+>
+> 64 MiB 继续只是 soft target。小 frame 因 directory cap 提前 seal 是正常结果，不能承诺所有消息分布都能达到 64 MiB。
+>
+> Q5 — 确认 encoding 与 packing 是不同策略，但不确认把 WalRunPackingClass 固化为 WalRun Root identity。
+>
+> 当前每个 shard 只有一个 CurrentWalRunPointer 和一个 current WalRun。如果 Root 固定一个 packing class，而同一 shard 上存在不同 Topic packing class，就只能：
+>
+> - 拒绝这些 Topic 共存；
+> - 为不同 class 增加多套 current run/pointer；
+> - 或频繁 seal/rollover 切换 class。
+>
+> 三种结果都会增加复杂度或直接损耗性能。
+>
+> soft target 和 linger 不影响历史 Object 的解码、正确性或恢复权威，因此建议：
+>
+> - Storage Epoch 的 FrameEncodingPolicyV1 保留，用于 codec family/version、eligibility 和有限 typed policy；0.2 中它在 Topic 创建时确定，在线修改仍不支持。
+> - WalRun Root 只保存 format、加密、hard recovery envelope 和最大 Object 上限，不保存单一 soft packing class。
+> - Topic/Namespace 选择 packing class；Cell/host 提供 ceiling。
+> - batcher 在同一个 WalRun 内按 resolved packing class 使用最多三个有界 scheduling lanes。
+> - 一个 Object group 只合并相同 packing class 的 binding，但同一 WalRun 可以连续产生不同 class 的 Object groups。
+> - resolved class 和实际 linger/size 可以记录在 NWG1 extent header/descriptor 中用于审计和 benchmark，但不是新的恢复权威。
+> - packing 变化从下一个 group 生效，不需要 seal 整个 WalRun。
+>
+> 这样保留 Topic 级成本/延迟配置，同时避免多个 pointer、多个 run lineage 和配置切换导致的控制面 rollover。
+>
+> Q6 — 不按当前推荐确认。ManagedLedger-scoped range 正确，但 owner epoch 丢失时烧掉整个未用 tail 过于保守，而且会造成严重 failover 放大。
+>
+> Range 应归属于 ManagedLedger incarnation，而不是归属于某个 broker owner epoch。Owner epoch 只负责控制谁可以推进 head。
+>
+> 如果 owner 变化就烧掉整个 range，那么一次 broker failover 会令其承载的所有 ManagedLedger 重新申请 range。按单一 RANGE_RESERVED、每 range 三次串行写计算，10,000 个 ManagedLedger、metadata 单步 10 ms 时，理想下界已经约为：
+>
+> 10,000 × 3 × 10 ms = 300 秒
+>
+> 这会重新制造需要 RANGE_LEASED 消除的全 Cell 串行恢复风暴。
+>
+> 建议改为：
+>
+> 1. allocator grant 永久绑定 ManagedLedger incarnation、grantId 和 range，不绑定 owner 生命周期。
+> 2. takeover 先对 ManagedLedger head 做精确 CAS，只更新 ownerEpoch，同时保留 rangeStart、rangeEnd 和 nextLedgerId。
+> 3. 旧 owner 仍然只能存在一个 candidate in-flight。
+> 4. 新 owner 对 exact nextLedgerId 做 point lookup/putIfAbsent：
+>    - 如果旧 head CAS 实际已经成功，按新 head 状态继续；
+>    - 如果发现旧 owner 创建但未发布的 stale node，不采纳它，只 burn 这一个 ledger ID，并通过 head CAS 推进 nextLedgerId；
+>    - 如果不存在冲突，新 owner继续使用同一个 range。
+> 5. 只有 Topic 删除、ManagedLedger retirement、range 协议不兼容或不可恢复损坏时，才烧掉整个未用 tail。
+> 6. orphan candidate 可以永久保留为不可复用证据，但必须计入 metadata bytes/count admission。
+> 7. allocator clear 不应位于当前 ManagedLedger 开始使用已安装 range 的关键路径；head install 完成后即可使用，clear 由恢复/后台流程完成，但下一次 grant 前必须收敛。
+> 8. “最坏 ownership churn”不能使用无界 lifetime 概念，否则任何非零 range 都无法证明。应改成预先声明的有限 churn/rate/horizon budget，并持续计算 remaining slice、committed IDs、burned IDs、orphan nodes 和 recovery reserve。
+>
+> Range size 仍属于 versioned Cell policy，Topic/host 都不能放大。此调整只完善 RANGE_LEASED 正确性，不自动选择该 allocator mode。
+>
+> 本轮结论：
+>
+> - Q1：确认公式与 16-byte row；Object/part 数值继续候选。
+> - Q2：确认 benchmark 方案，默认权威改为 Deployment/Namespace，Cell 只做 ceiling。
+> - Q3：保持 OPEN，解除 routine range read 对 ProviderObjectProof 的错误依赖。
+> - Q4：确认推导方式，优先 4,096/16,384，暂不接受 65,536。
+> - Q5：保持 OPEN；packing 应是 per-group scheduling policy，不是单一 WalRun Root identity。
+> - Q6：保持 OPEN；owner takeover 复用 ManagedLedger range，最多 burn exact stale candidate，不烧整个 tail。
+> - STRICT_SERIALIZED 与 RANGE_LEASED 仍均未被选择。
+
+The user closed with this priority statement and source pointers:
+
+> 这轮最该挡住的是 Q5/Q6：Q3 影响日常冷读，而 Q5/Q6 会在多 Topic 和 broker failover 时形成架构级放大。[当前 WalRun 合同](/Users/liusinan/apps/ideaproject/GITHUB/nereus/docs/decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md:35)明确每 shard 只有一个 current pointer，因此 packing class 不能未经 lane/group 设计就成为 Root 的单一身份；[allocator 证据合同](/Users/liusinan/apps/ideaproject/GITHUB/nereus/docs/decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md:13)也正是为了避免重新引入 Cell-wide stall。
+
+## Authoritative synchronization
+
+- Q1's checked domains, derived-ID row, streaming processing, and capability categories are accepted by
+  [ADR 0056](../../decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md); exact Object/part values remain
+  open;
+- Q2's evidence candidates and one-way Deployment/Namespace/Topic default authority are accepted by
+  [ADR 0057](../../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md); no class/default value exists yet;
+- Q4's prefix-first capacity derivation, 4,096/16,384 evidence priority, and no-pagination constraint are accepted by
+  [ADR 0058](../../decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md); exact values remain open;
+- Q3 / `V2-OPEN-OBJ-17`, Q5 / `V2-OPEN-OBJ-19`, Q6 / `V2-OPEN-PUL-OBJ-09`, and both allocator modes remain open;
+- ADRs 0021/0025/0040/0046 now separate whole-Object durability proof from routine range authentication, while ADR
+  0039 preserves one current Root/pointer and rejects a singular Topic packing identity in that Root.

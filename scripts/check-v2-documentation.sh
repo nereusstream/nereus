@@ -108,6 +108,9 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md"
     "$repo_root/docs/decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md"
     "$repo_root/docs/decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md"
+    "$repo_root/docs/decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md"
+    "$repo_root/docs/decisions/0057-v2-npd1-policy-default-authority-and-evidence.md"
+    "$repo_root/docs/decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -170,6 +173,9 @@ require_literal '`BK_DELETE_NONE -> BK_DELETE_INTENT -> BK_DELETE_DONE`' "docs/d
 require_literal '`maxUncheckpointedExtents`' "docs/decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md"
 require_literal '`maxAssignmentsEver=256`' "docs/decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md"
 require_literal 'The phrase “serialized p99 capacity” is not' "docs/decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md"
+require_literal 'directoryPlaintextBytes = entryCount * 16' "docs/decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md"
+require_literal 'Product/Deployment supplies one validated base default' "docs/decisions/0057-v2-npd1-policy-default-authority-and-evidence.md"
+require_literal 'NWG1 v1 freezes `maxHeaderAndDirectoryPrefixBytes` before it freezes `maxFrames`' "docs/decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -195,7 +201,10 @@ require_literal "Restarted Grill 2 round 8" "docs/v2/grill-notes/10-restarted-gr
 require_literal "Round 8 不全部按推荐确认" "docs/v2/grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md"
 require_literal "Q1 / \`V2-OPEN-BK-11\`, Q2 / \`V2-OPEN-BK-13\`, Q3 / \`V2-OPEN-OBJ-17\`, Q4 / \`V2-OPEN-OBJ-19\`" "docs/v2/grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md"
 require_literal "Restarted Grill 2 round 9" "docs/v2/grill-notes/11-restarted-grill-2-read-amplification-and-range-allocation.md"
-require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/11-restarted-grill-2-read-amplification-and-range-allocation.md"
+require_literal "Round 9 不全部按推荐确认" "docs/v2/grill-notes/11-restarted-grill-2-read-amplification-and-range-allocation.md"
+require_literal "Q3 / \`V2-OPEN-OBJ-17\`, Q5 / \`V2-OPEN-OBJ-19\`, Q6 / \`V2-OPEN-PUL-OBJ-09\`" "docs/v2/grill-notes/11-restarted-grill-2-read-amplification-and-range-allocation.md"
+require_literal "Restarted Grill 2 round 10" "docs/v2/grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md"
+require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -295,7 +304,7 @@ for active_gate in \
     V2-OPEN-OBJ-19 \
     V2-OPEN-PUL-OBJ-09; do
     require_literal "\`$active_gate\`" "docs/v2/open-questions.md"
-    require_literal "\`$active_gate\`" "docs/v2/grill-notes/11-restarted-grill-2-read-amplification-and-range-allocation.md"
+    require_literal "\`$active_gate\`" "docs/v2/grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md"
     if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$active_gate is missing from the active gate table"
     fi
@@ -354,6 +363,9 @@ active_contracts=(
     "$repo_root/docs/decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md"
     "$repo_root/docs/decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md"
     "$repo_root/docs/decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md"
+    "$repo_root/docs/decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md"
+    "$repo_root/docs/decisions/0057-v2-npd1-policy-default-authority-and-evidence.md"
+    "$repo_root/docs/decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )
@@ -508,9 +520,9 @@ required_scenarios = {
     "V2-PROJECTION-001",
     "V2-OBJ-001", "V2-OBJ-002", "V2-OBJ-003", "V2-OBJ-004", "V2-OBJ-005", "V2-OBJ-006",
     "V2-OBJ-007", "V2-OBJ-008", "V2-OBJ-009", "V2-OBJ-010", "V2-OBJ-011", "V2-OBJ-012",
-    "V2-OBJ-013", "V2-OBJ-014", "V2-OBJ-015",
+    "V2-OBJ-013", "V2-OBJ-014", "V2-OBJ-015", "V2-OBJ-016",
     "V2-BK-001", "V2-BK-002", "V2-BK-003", "V2-BK-004", "V2-BK-005", "V2-BK-006",
-    "V2-BK-007", "V2-BK-008", "V2-BK-009", "V2-BK-010", "V2-BK-011",
+    "V2-BK-007", "V2-BK-008", "V2-BK-009", "V2-BK-010", "V2-BK-011", "V2-BK-012", "V2-BK-013",
     "V2-READ-001", "V2-READ-002", "V2-META-001", "V2-HO-001",
     "V2-KAF-001", "V2-PUL-001", "V2-KOP-001",
 }
@@ -619,6 +631,16 @@ link_docs=(
     "$repo_root/docs/decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md"
     "$repo_root/docs/decisions/0047-v2-walrun-root-seal-and-successor-publication.md"
     "$repo_root/docs/decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md"
+    "$repo_root/docs/decisions/0049-v2-configuration-scopes-and-persisted-semantics.md"
+    "$repo_root/docs/decisions/0050-v2-kafka-aggregate-wire-and-publication-validation.md"
+    "$repo_root/docs/decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md"
+    "$repo_root/docs/decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md"
+    "$repo_root/docs/decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md"
+    "$repo_root/docs/decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md"
+    "$repo_root/docs/decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md"
+    "$repo_root/docs/decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md"
+    "$repo_root/docs/decisions/0057-v2-npd1-policy-default-authority-and-evidence.md"
+    "$repo_root/docs/decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md"
 )
 
 while IFS=: read -r source match; do
@@ -631,6 +653,9 @@ while IFS=: read -r source match; do
     esac
     target="${target%%#*}"
     target="${target//%20/ }"
+    if [[ "$target" =~ ^(.+):[0-9]+$ ]]; then
+        target="${BASH_REMATCH[1]}"
+    fi
     if [[ "$target" = /* ]]; then
         resolved="$target"
     else

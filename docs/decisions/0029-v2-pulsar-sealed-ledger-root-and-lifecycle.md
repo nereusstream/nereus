@@ -71,5 +71,7 @@ NPO1 wire/bounds and native dual-source safety are refined by
 [0036](0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md); NPD1 blocks and source pins by
 [ADRs 0044](0044-v2-pulsar-npd1-sealed-ledger-data-blocks.md) and
 [0045](0045-v2-pulsar-dual-source-read-handle-and-pins.md), and the irreversible BookKeeper deletion state by
-[ADR 0052](0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md). This decision refines ADR 0024 and is
-tracked by `T-BK-01`, `V2-BK-004..011`.
+[ADR 0052](0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md). Checked NPD1 streaming/capability and policy
+evidence are refined by [ADRs 0056](0056-v2-npd1-checked-envelope-and-derived-entry-row.md) and
+[0057](0057-v2-npd1-policy-default-authority-and-evidence.md). This decision refines ADR 0024 and is tracked by
+`T-BK-01`, `V2-BK-004..013`.

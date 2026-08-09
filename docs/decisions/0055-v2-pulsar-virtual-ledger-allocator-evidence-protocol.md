@@ -30,7 +30,9 @@ The allocator evidence protocol covers:
 - the measured production-like distribution and jitter of entry-, byte-, and age-triggered rollover, plus synchronized
   storms rather than active-ledger count alone;
 - multiple brokers and controlled metadata latency/error profiles, including 1/5/10/25-ms p99 cases;
-- crash and response loss at every candidate protocol write plus owner/takeover recovery;
+- crash and response loss at every candidate protocol write plus single-ledger and broker-wide owner/takeover recovery;
+- takeover of 10,000 and 100,000 ManagedLedgers, including allocator operations caused by failover and the time until
+  native append admission resumes without Cell-wide serial head-of-line blocking;
 - sustained rollover rate, each operation latency, queue depth/age, per-topic starvation, Cell-wide append stall,
   metadata load, recovery time, and every error/fencing outcome.
 
@@ -49,8 +51,9 @@ select a different mode or weaken the persisted recovery protocol.
 
 - `V2-OPEN-PUL-OBJ-10`'s evidence-protocol decision is resolved; its scenario remains PLANNED and cannot be cited as a
   performance pass.
-- `V2-OPEN-PUL-OBJ-09` remains open. Both allocator modes remain unselected, and RANGE_LEASED must still freeze owner
-  epoch, unused-ID burn, response-loss, crash, and pending-head discovery semantics.
+- `V2-OPEN-PUL-OBJ-09` remains open. Both allocator modes remain unselected, and RANGE_LEASED must still freeze grant
+  lifetime, owner-epoch takeover, stale-candidate versus range-tail burn, response loss, allocator clear, bounded
+  orphan accounting, and pending-head discovery semantics.
 - A simple absolute queue threshold or active-ledger-count-only test cannot admit STRICT_SERIALIZED.
 - M1/M3 must execute this protocol against the pinned source and publish a source-qualified receipt before selecting an
   allocator mode.

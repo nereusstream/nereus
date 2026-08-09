@@ -69,9 +69,11 @@ mode/epochs, rollover, and recovery mechanics remain open.
 
 ADR 0055 freezes the evidence protocol but selects neither allocator mode. It measures maximum sustainable rollover
 RPS while all predeclared queue/latency/error/recovery SLOs hold, covers real rollover distributions/jitter/storms and
-all crash cuts, and compares native Pulsar rollover/append-stall behavior. STRICT and RANGE correctness work proceed in
-parallel. Allocator identity may persist only mode, protocol version, and recovery/fencing identity; performance budgets
-remain versioned Cell policy/evidence and host capacity remains a runtime ceiling.
+all crash cuts, including broker-wide takeover of 10,000/100,000 ManagedLedgers, and compares native Pulsar
+rollover/append-stall behavior. STRICT and RANGE correctness work proceed in parallel. Allocator identity may persist
+only mode, protocol version, and recovery/fencing identity; performance budgets remain versioned Cell policy/evidence
+and host capacity remains a runtime ceiling. The RANGE grant/head/node contract remains open; owner-change whole-tail
+burn is rejected because serialized reacquisition would recreate a Cell-wide failover stall.
 
 Online Pulsar BookKeeper/Object evolution is not implied by this model. New-incarnation migration versus a future hybrid
 ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.
@@ -114,9 +116,22 @@ root to 8 MiB, sparse rows to 65,536, metadata/strings/ensemble dimensions to th
 
 The data Object uses ordered, gap-free `NPD1` multi-entry blocks. Each NPO1 sparse row binds one block ordinal,
 contiguous entry range, offset, encoded/decoded lengths, codec/encryption family, and SHA-256 of the exact encoded
-block. A bounded canonical block directory binds every entry ID/offset/length before exact ManagedLedger entry bytes.
-Entries never cross blocks; an oversize entry gets a dedicated bounded block. Compression, AEAD, and integrity reset
-per block, with no padding or cross-block state.
+block. A bounded canonical block directory uses 16-byte `{decodedOffset:uint64,payloadLength:uint32,flags:uint32}` rows;
+entry IDs derive from authenticated `firstEntryId + ordinal`. The checked domain is 32-byte NPD1 header plus the sum of
+64-byte NPB1 header, directory+compressed-payload GCM ciphertext, and 16-byte tag. Entries never cross blocks; an
+oversize entry gets a dedicated bounded block. Compression, AEAD, and integrity reset per block, with no padding or
+cross-block state. Every operation uses checked arithmetic/actual-count allocation, while upload, SHA-256, and full
+verification stream or use bounded segments rather than a data-Object-sized `ByteBuffer`.
+
+One finite data-Object hard cap is mandatory but its numeric value remains open; 4 GiB is only a candidate. Multipart
+part count is an adapter/Cell operational ceiling, not wire identity; 1,024 is only a candidate. Admission checks
+provider max Object size, min/max part size, max parts, streaming upload/read, and deterministic multipart-residue
+cleanup. Missing capability rejects the profile.
+
+NPD1 block-policy evidence compares 1/4/8/16-MiB candidates without creating wire enums and will select at most three
+classes. Product/Deployment owns the validated base default, Namespace inherits/overrides it, Topic may explicitly
+override, Cell admits/caps, and host ceilings resources. The resolved class is fixed in the offload attempt. Resource
+pressure may early-close/backpressure/reject but never reinterprets existing NPD1.
 
 Native read source eligibility is fixed by ManagedLedger metadata. Before completion it is BookKeeper-only; after
 `complete && !bookkeeperDeleted` both sources may participate in one bounded whole-range fallback; after
@@ -164,7 +179,7 @@ throttle, or stop new admission before BookKeeper capacity is exhausted. It neve
 into a synchronous Object write.
 
 Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, and `T-POLICY-01`. Required scenarios:
-`V2-BK-001..011`, `V2-POSITION-001..010`, and `V2-POLICY-001`. See
+`V2-BK-001..013`, `V2-POSITION-001..010`, and `V2-POLICY-001`. See
 [ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md),
 [ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md),
 [ADR 0022](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md),
@@ -181,4 +196,6 @@ Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, 
 [ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md),
 [ADR 0052](../decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md),
 [ADR 0054](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md), and
-[ADR 0055](../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md).
+[ADR 0055](../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md), plus
+[ADR 0056](../decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md) and
+[ADR 0057](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md).

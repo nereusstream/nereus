@@ -89,8 +89,10 @@ _Avoid_: Mutable profile, storage mode flag
 **Resolved Policy Class**:
 A closed typed Topic/Tenant-or-Namespace policy plus quantized values whose effective budgets are capped by Protocol
 Cell/shard and host/process limits. It cannot enlarge format/parser caps. Any value affecting bytes or recovery is
-persisted at its Storage Epoch, WalRun Root, or offload attempt, and one policy identity cannot cross those lifecycles.
-_Avoid_: Arbitrary per-topic flags, cross-lifecycle enum, host-selected durable format, configurable correctness
+persisted at its Storage Epoch, hard-recovery WalRun Root, Object group, or offload attempt, and one policy identity
+cannot cross those lifecycles. Product/Deployment owns the base semantic default; Cell/host never replaces it.
+_Avoid_: Arbitrary per-topic flags, Root-level soft packing identity, Cell-selected default, host-selected durable
+format, configurable correctness
 
 **Topic Binding Aggregate**:
 The atomically visible create/open unit whose one immutable logical schema v1 contains a Topic Protocol Binding and its
@@ -109,14 +111,17 @@ _Avoid_: Application-record reserialization checksum, Object extent digest
 
 **Provider Object Proof**:
 Provider-bound evidence joining one immutable object version, exact canonical-body length, full-object checksum
-algorithm/type, and value. It is distinct from Nereus user metadata and the expected Object Extent Digest descriptor.
-_Avoid_: ETag proof, user-metadata checksum echo, composite checksum
+algorithm/type, and value. It is distinct from Nereus user metadata and the expected Object Extent Digest descriptor,
+and is not a prerequisite for each routine authenticated frame range.
+_Avoid_: ETag proof, user-metadata checksum echo, composite checksum, full GET before every random read
 
 **WalRun Root**:
 The immutable Cell control-metadata authority for one Object-WAL shard run. It fixes scope, prefix, run/session
 identity, epoch-validation rules, format families, wrapped run-key identity, initial sequence, and bounded LIST recovery
-budgets; per-group descriptors are reconstructed from content-addressed leaf keys and verified headers.
-_Avoid_: Per-group metadata commit, sealed-run-only discovery, unbounded prefix scan
+budgets; per-group descriptors are reconstructed from content-addressed leaf keys and verified headers. It does not
+carry one Topic-specific soft packing class.
+_Avoid_: Per-group metadata commit, Root-level packing class, pointer per class, sealed-run-only discovery, unbounded
+prefix scan
 
 **Current WalRun Pointer**:
 The one low-frequency per-shard CAS authority binding the current WalRun Root key/SHA and shard run epoch. It anchors a
@@ -140,8 +145,10 @@ _Avoid_: Group shard epoch as topic authority, untyped binding summary
 
 **Append Unit Directory**:
 The authoritative bounded NWG1 in-body directory for frame ranges, context references, Kafka commit-set membership,
-and Pulsar entry units. Sidecars, manifests, and checkpoints are accelerators only.
-_Avoid_: Footer-only authority, commit set spanning ObjectExtents, record-count-derived coverage
+and Pulsar entry units. Prefix bytes are hard-capped before frame count is derived; sidecars, manifests, and checkpoints
+are accelerators only. Root-bound AEAD authorizes routine local ranges, not a ProviderObjectProof.
+_Avoid_: Footer-only authority, paginated/second directory authority, unbounded prefix, provider proof per random read,
+commit set spanning ObjectExtents, record-count-derived coverage
 
 **NWG1 Run Key**:
 The random 256-bit WalRun data key wrapped once under the immutable Cell KMS key/version. HKDF derives per-Object keys;

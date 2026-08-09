@@ -38,7 +38,7 @@
     {
       "id": "V2-POLICY-001",
       "milestone": "M1/M2/M3",
-      "contract": "correctness and parser caps are never configurable typed topic tenant namespace cell shard and host scopes resolve budgets by minimum and one policy identity never spans epoch run offload attempt and host lifecycles",
+      "contract": "correctness and parser caps are never configurable Product Deployment owns base semantic defaults Cell and host only cap resources and one policy identity never spans epoch run group offload attempt and host lifecycles",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -182,7 +182,7 @@
     {
       "id": "V2-POSITION-010",
       "milestone": "M1/M3",
-      "contract": "allocator selection requires maximum sustainable rollover RPS with all predeclared SLOs actual rollover distribution storm crash cuts and native Pulsar rollover append stall comparison while performance budgets remain outside allocator identity",
+      "contract": "allocator selection requires maximum sustainable rollover RPS with all predeclared SLOs actual rollover storm crash mass takeover cuts and native Pulsar comparison while performance budgets remain outside allocator identity",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -356,6 +356,14 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-OBJ-016",
+      "milestone": "M3",
+      "contract": "NWG1 hard caps header directory prefix before deriving frame capacity and routine Root bound directory frame AEAD range reads do not require ProviderObjectProof full GET",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-BK-001",
       "milestone": "M2",
       "contract": "both BookKeeper profiles ACK at quorum without synchronous Object dependency",
@@ -439,6 +447,22 @@
       "id": "V2-BK-011",
       "milestone": "M2/M5",
       "contract": "persisted retain BK or delete after verified policy uses irreversible BK delete none intent done and the compatibility boolean never proves physical deletion",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-012",
+      "milestone": "M2",
+      "contract": "NPD1 uses checked 32 byte data 64 byte block envelopes and 16 byte derived entry ID rows while Object processing streams within admitted provider capabilities",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-013",
+      "milestone": "M2",
+      "contract": "NPD1 block policy evidence uses 1 4 8 16 MiB candidates without wire enums Deployment Namespace Topic owns defaults overrides Cell host only cap and resolved class persists per attempt",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null

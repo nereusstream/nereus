@@ -13,8 +13,10 @@ sourceTuple: v2-m0
 
 One PUT per append is not the V2 cost target. `OBJECT_WAL` batches frames into bounded group objects by Protocol Cell,
 Cell Provider Scope, provider endpoint, region, format, encryption, Object-extent digest family, Frame-payload checksum
-family, and admission class. Protocol Cell is a mandatory shard boundary; tenant or topic policy may split it further
-when retention coupling, noisy-neighbor risk, or compliance requires it.
+family, and compatible group policy. Protocol Cell is a mandatory shard boundary; tenant or topic policy may split it
+further when retention coupling, noisy-neighbor risk, or compliance requires it. Topic-specific soft target/linger is
+not a singular WalRun Root identity and cannot create another current pointer. Exact bounded per-group scheduling lanes
+remain `V2-OPEN-OBJ-19`.
 
 Group close is triggered by bounded bytes, frame count, linger, deadline, memory pressure, or owner handoff. Every
 limit is configured and observable; no open group may grow or wait indefinitely.
@@ -49,6 +51,13 @@ Immediately after the fixed header, NWG1 carries one authoritative bounded
 Epoch; every frame references one context. The WalRun Root is physical/run authority and never carries a singular topic
 epoch for a multi-binding run. Directory summaries accelerate bounded lookup but cannot replace frame/context
 validation or advance a frontier.
+
+Routine random read and whole-Object durability use separate proof domains. Without a bounded external hint, the cold
+path performs header GET, exact directory GET, then frame GET. A future hint may coalesce the first two, but the reader
+still parses the in-body header and authenticates the Root-bound directory before trusting any frame range; provider
+whole-Object proof is not a per-read prerequisite. ADR 0058 makes the maximum header+directory prefix bytes primary,
+derives frame capacity from the actual directory budget, benchmarks 4,096/16,384 first, and forbids a paginated or
+second-authority directory in 0.2. Exact prefix value and hint source remain open.
 
 One Kafka Append Commit Set is complete and contiguous inside one ObjectExtent; it never crosses group objects. A group
 seals before accepting a set that would exceed its limit, and a single oversize set is rejected before position
@@ -97,6 +106,10 @@ PUT response, `HEAD` proves success only for the same immutable version, exact l
 scope. Otherwise recovery performs a bounded full GET and recomputes SHA-256. ETag, Nereus user metadata, and
 `COMPOSITE` checksums are never accepted as that proof.
 
+`ProviderObjectProof` resolves PUT durability and uncertain-response recovery. It is not required before every normal
+frame range: Root-bound directory AEAD authenticates offsets/lengths and frame AEAD plus CRC validates the selected
+payload. A planning hint cannot substitute for either local authentication layer.
+
 While the producing process still retains the exact sealed body, a missing object may be retried only under the same
 identity with conditional-create semantics. After process loss, a provider-present object is fully verified and
 reconciled. A conclusively absent, never-ACKed group permanently fences the old run at its proven contiguous frontier,
@@ -111,6 +124,8 @@ shard/run/session,
 the binding-context epoch-validation contract, exact prefix, initial sequence, format/codec/encryption/digest families,
 wrapped run-key identity, and total recovery budgets. Its key names a metadata record, not a provider Object, and
 `putIfAbsent` response loss requires exact reread equality. It does not carry one binding's Owner/Storage Epoch.
+It also does not carry one Topic-specific soft packing identity; one current Root/pointer remains authoritative while
+the exact group-lane sequence/inventory design stays open.
 Each group leaf under that prefix has the canonical form
 `<sequence19>/<body-length19>-sha256-v1-<64-lowercase-hex>.nwg`; both decimal components are zero-padded 19-digit
 non-negative values. No per-group metadata-service row is required for ACK.
@@ -155,7 +170,7 @@ Each Cell Provider Session owns its admission, retry/circuit-breaker state, open
 and close lifecycle. A compatible lower-level transport may be pooled, but a cell-local throttle, credential failure, or
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
-Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..015`,
+Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..016`,
 `V2-POLICY-001`, and `V2-FABRIC-002`. See
 [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md),
 [ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md),
@@ -170,4 +185,5 @@ Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required sc
 [ADR 0046](../decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md),
 [ADR 0047](../decisions/0047-v2-walrun-root-seal-and-successor-publication.md),
 [ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md), and
-[ADR 0053](../decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md).
+[ADR 0053](../decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md), plus
+[ADR 0058](../decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md).
