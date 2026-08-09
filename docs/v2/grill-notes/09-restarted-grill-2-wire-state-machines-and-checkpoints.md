@@ -123,7 +123,7 @@ immediately; frame ciphertext ranges follow without padding. Derive a 32-byte Ob
 `HKDF-Extract(salt=rootSha256, IKM=walRunDataKey)` then `HKDF-Expand` over a length-framed UTF-8
 `nereus/nwg1/object-key/v1` domain plus Cell/shard/run-epoch/sequence. A 96-bit nonce is `uint32 domain || uint64
 ordinal`, big-endian: directory domain `0x4e444952` (`NDIR`) at ordinal zero and frame domain `0x4e46524d` (`NFRM`) at
-the directory frame ordinal. Directory AAD is the finalized header; frame AAD is the header SHA, Root/envelope SHAs,
+the corresponding frame ordinal. Directory AAD is the finalized header; frame AAD is the header SHA, Root/envelope SHAs,
 and its canonical authenticated directory row. All limits are checked before KMS/decryption and golden vectors freeze
 header CRC, HKDF, nonce, AAD, tag, decompression, and payload CRC ordering. The tradeoff is a fixed 256-byte header and
 major-version bump for incompatible growth, in return for exact cross-language crypto, one initial directory range GET,
