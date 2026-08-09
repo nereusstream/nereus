@@ -29,8 +29,9 @@ For one Topic Protocol Binding, Topic Incarnation, Storage Epoch, and Owner Epoc
 
 1. the protocol-native owner resolves one immutable `TopicBindingAggregateRecord` containing the complete Topic
    Protocol Binding, typed protocol-native Topic Incarnation Identity, and initial Storage Epoch;
-2. a serialized writer lane validates the current ownership token and admission budget;
-3. it allocates positions through the binding's Position Domain;
+2. a serialized writer lane validates the current ownership token and atomically reserves both completion-tracker and
+   active-tail-locator capacity;
+3. only after that reservation succeeds, it allocates positions through the binding's Position Domain;
 4. the selected WAL accepts protocol-native frames carrying binding/incarnation, Storage Epoch, Owner Epoch, typed
    Protocol Coverage, commit-set membership where applicable, length, and checksum;
 5. Object WAL first resolves physical extent outcome independently from protocol order; BookKeeper uses its native
@@ -64,11 +65,13 @@ One provider-resolved shared Object may enter checkpoint while binding A waits f
 binding B advances. The lane barrier waits only for an earlier Object outcome that remains unknown or could be absent;
 it does not wait for every member's protocol ACK.
 
-Binding completion uses an owner-local, lazy, reconstructible tracker keyed by Protocol Cell, binding, incarnation,
-Storage Epoch, and Position Domain identity/version. Owner Epoch is an O(1) cached completion fence rather than durable
-frontier identity; admitted completion performs no remote metadata read. The normal serial allocation path uses a
-bounded ring/window, while recovery/sparse completion may use a bounded Position-Domain-aware ordered structure.
-Runtime gaps/futures are not persisted and do not become a new authority.
+Binding completion uses owner-local, lazy, reconstructible state keyed by Protocol Cell, binding, incarnation, Storage
+Epoch, and Position Domain identity/version. Owner Epoch is an O(1) cached completion fence rather than durable frontier
+identity; admitted completion performs no remote metadata read. One complete Kafka append commit set or Pulsar entry
+receives one checked 64-bit local `CompletionTicket` after capacity and exact coverage allocation. Full ticket equality
+fences ring-slot ABA, while exact typed coverage and Position Domain adjacency remain ordering authority. The ticket is
+not product wire/API/config or persistent state. Normal completion uses a bounded ring/window; recovery defaults to
+bounded collect/sort and fresh local tickets. Runtime gaps/futures/tickets are not persisted.
 
 ## Typed protocol frontiers
 
@@ -92,6 +95,23 @@ After provider resolution, Object request/payload/ciphertext/compression buffers
 retains only coverage, idempotency identity, an authenticated descriptor reference, and an owner-local waiting future.
 Per-binding count/descriptor-byte/future/age bounds and aggregate shard tracker bytes stop that binding before new
 position allocation; ordinary typed gaps do not fence the binding or roll the WalRun, and unrelated bindings continue.
+
+## Active-tail readable publication
+
+Object-WAL ACK requires a derived owner-local active-tail read view before manifest publication. Logical isolation is
+per Binding, but physical storage may use shard-owned segmented, Kafka-offset-range, and Pulsar-ledger/entry-range
+indexes. A generic `ProtocolCoverage` TreeMap is forbidden on the normal append/ACK hot path; no heavy object per
+Binding/unit is required.
+
+Each shared Object's digest/header/directory/AEAD validation produces one reusable `VerifiedExtent`; member publication
+adds no HEAD/GET, KMS, metadata call, whole-Object verification, or repeated directory decryption. Locator budget is
+part of the pre-position reservation. A serialized binding cut installs the next contiguous range locators hidden,
+publishes Readable and Durable frontiers, and only then ACKs. A locator behind a typed gap remains invisible even when
+already installed.
+
+Takeover rebuilds Root/checkpoint/LIST physical inventory first and then publishes each Binding view independently.
+Manifest replacement must cover the same typed range and satisfy source-protection/read-pin conditions before active
+locators retire. This correctness path cannot be disabled by Topic policy.
 
 ## Uncertain append
 
@@ -126,4 +146,5 @@ envelope. Approaching a run or recovery bound triggers rollover/backpressure bef
 the envelope. This correctness-driven availability cost is explicit and does not permit a per-group metadata mutation.
 
 Relevant tradeoffs: `T-APPEND-01` and `T-POSITION-01`. Required scenarios: `V2-APP-001`, `V2-APP-002`,
-`V2-APP-003`, `V2-POSITION-001..007`, `V2-META-002..004`, `V2-KAF-META-001`, and `V2-OBJ-002/004..012/020/021`.
+`V2-APP-003`, `V2-POSITION-001..007`, `V2-META-002..004`, `V2-KAF-META-001`,
+`V2-OBJ-002/004..012/020..023`, and `V2-READ-003`.

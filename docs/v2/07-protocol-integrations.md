@@ -106,10 +106,12 @@ through one publisher-epoch-fenced predecessor/vector chain, not one chain per l
 tails still require LIST and the sealed final vector inventory is mandatory.
 
 `LaneExtentResolvedThrough` is physical recovery order, while each binding's Position Domain owns
-`BindingDurableFrontier`. Owner-local lazy ring/window trackers dispatch verified Kafka commit sets or Pulsar entries
-independently, rebuild from authenticated descriptors after takeover, retain no payload in gaps, and perform no
-completion-path metadata read. Shared Object/header/directory failure blocks all members; a later frame/commit-set-local
-failure remains isolated to that complete binding unit.
+`BindingDurableFrontier`. Before position allocation, tracker slot and active-tail locator budget reserve together. One
+full 64-bit owner-local ticket represents one complete Kafka commit set or Pulsar entry and never enters wire/API/config.
+Normal ring/window completion and bounded collect/sort recovery perform no metadata read. One shared
+`VerifiedExtent` feeds protocol-specific, range-aggregated active-tail locators; locators publish before Readable/Durable
+frontiers and ACK. Shared Object/header/directory failure blocks all members; a later frame/commit-set-local failure
+remains isolated to that complete binding unit.
 
 The parity matrix covers at least:
 
@@ -144,5 +146,5 @@ against V2 bindings, protocol-native Kafka work, and the then-current KoP source
 
 Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `T-POLICY-01`, `T-PROJECTION-01`,
 `T-BENCH-01`, and `T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`,
-`V2-PROJECTION-001`, `V2-POSITION-002..011`, `V2-OBJ-002/004..021`, `V2-BK-005..013`,
+`V2-PROJECTION-001`, `V2-POSITION-002..011`, `V2-OBJ-002/004..023`, `V2-READ-003`, `V2-BK-005..013`,
 `V2-KAF-META-001..003`, `V2-POLICY-001`, `V2-KAF-001`, `V2-PUL-001`, and `V2-KOP-001`.

@@ -144,10 +144,32 @@ never compared with Kafka Offset or Pulsar Position.
 _Avoid_: Binding Durable Frontier alias, Object order as protocol order, typed gap consuming uncovered-tail budget
 
 **Binding Completion Tracker**:
-An owner-local lazy reconstructible ring/window, with a bounded ordered fallback for recovery/sparse completions, that
-advances one binding's Position-Domain Durable Frontier. It is not persisted and retains no payload in gap entries.
-_Avoid_: Per-topic permanent TreeMap, remote completion metadata read, persisted runtime gap map, Owner Epoch in logical
-frontier identity
+Owner-local reconstructible completion state that advances one Binding's Position-Domain Durable Frontier. Normal work
+uses a bounded ring/window; recovery defaults to bounded collect/sort and fresh tickets. Tracker slot and active-tail
+locator budget reserve together before protocol position allocation. It is not persisted and retains no payload in gap
+entries.
+_Avoid_: Per-topic permanent TreeMap, remote completion metadata read, persisted runtime gap/ticket map, Owner Epoch in
+logical frontier identity
+
+**Completion Ticket**:
+A checked 64-bit owner-local ring identity allocated after combined capacity reservation and exact Protocol Coverage.
+One complete Kafka append commit set or Pulsar entry receives one ticket; full equality fences slot ABA while Position
+Domain coverage/adjacency remains authority. Takeover discards it.
+_Avoid_: Product wire/API/config field, persistent append ordinal, separate ticket generation, ticket-based recovery
+order
+
+**Verified Extent**:
+One owner-local result proving the shared Object digest, KMS envelope, fixed header, directory parse, and directory AEAD
+have validated. All member bindings reuse it for completion and active-tail publication without repeated remote or
+cryptographic setup work.
+_Avoid_: HEAD/GET/KMS per binding, repeated whole-directory decryption, provider proof as frame-offset authority
+
+**Active-Tail Read View**:
+The owner-local derived view that makes unmanifested acknowledged coverage readable. Logical isolation is per Binding;
+physical storage may use one shard-owned segmented Kafka-offset/Pulsar-ledger-entry range index. Locators install hidden
+before Readable/Durable frontiers publish and ACK; entries behind a gap remain invisible.
+_Avoid_: Disable switch, one heavy object per Binding/unit, generic ProtocolCoverage TreeMap on the hot path, ACK before
+locator publish
 
 **Current WalRun Pointer**:
 The one low-frequency per-shard CAS authority binding the current WalRun Root key/SHA and shard run epoch. It anchors a
@@ -156,16 +178,19 @@ _Avoid_: Root-prefix LIST, per-group pointer update, locally merged lineage
 
 **WalRun Seal**:
 The immutable Cell control-metadata record that binds one Root to its terminal lane-sequence vector, one final
-checkpoint-head SHA, and exact provider-resolved inventory. A binding-frontier snapshot is at most a derived hint. A
-successor Root references both predecessor Root and Seal before the current pointer advances.
+checkpoint-head key/SHA, and minimum aggregate extent-count/body-byte completeness facts. It contains no
+binding/read frontier, ACK, gap, or per-binding coverage. A successor Root references both predecessor Root and Seal
+before the current pointer advances.
 _Avoid_: Mutating the Root to seal, reopening a sealed run, pointer advance before successor publication
 
 **WalRun Checkpoint Page**:
 An asynchronous immutable page in the one run-wide predecessor chain, with at most 256 aggregate descriptors/64 KiB
 and a per-lane provider-resolved `coveredThrough` vector. One publisher-epoch-fenced combiner admits one candidate at a
-time. It may advance any subset of lanes contiguously; open uncovered tails still require LIST and the Seal requires one
-final gap-free vector chain.
-_Avoid_: Per-topic checkpoint switch, ACK dependency, one chain/head per lane, checkpoint overriding provider bytes
+time. Root identity appears once in the page header; physical rows do not repeat it or carry binding logical state. It
+may advance any subset of lanes contiguously; open uncovered tails still require LIST and the Seal requires one final
+gap-free vector chain.
+_Avoid_: Per-row Root SHA, per-topic checkpoint switch, ACK dependency, binding frontier/coverage row, one chain/head
+per lane, checkpoint overriding provider bytes
 
 **Directory Prefix Hint**:
 The exclusive `directoryPrefixEnd19` embedded in every NWG1 leaf key. It plans a bounded prefix GET under the exact

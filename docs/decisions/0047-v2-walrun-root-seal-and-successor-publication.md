@@ -18,9 +18,9 @@ uses `putIfAbsent`; response loss is reconciled only by exact key/value reread e
 
 Sealing never mutates the Root. After the owner stops admission and reconciles the complete tail, it publishes one
 immutable `WalRunSealRecord` that binds the Root key/SHA, terminal lane-sequence vector, one final checkpoint-head SHA,
-and the final gap-free provider-resolved extent inventory. A per-binding frontier snapshot, if later admitted as a
-recovery hint, is derived and cannot limit or authorize `BindingDurableFrontier`. A successor Root references both the
-predecessor Root key/SHA and its Seal key/SHA.
+and only the minimum aggregate extent-count/canonical-body-byte facts needed to validate the final gap-free
+provider-resolved inventory. It stores no binding/read frontier, ACK, gap state, or per-binding coverage. A successor
+Root references both the predecessor Root key/SHA and its Seal key/SHA.
 
 Only after predecessor reconciliation and successor creation does the owner CAS
 `CurrentWalRunPointer` from the exact predecessor tuple to the successor tuple. If a crash leaves the pointer on a
@@ -40,11 +40,10 @@ Protocol Cell x shard scoped and persisted in the WalRun Root.
 - `V2-OPEN-OBJ-16` is resolved.
 - Two immutable records plus one CAS per rollover replace provider-Root discovery and mutable-Root ambiguity.
 - A sealed run can be recovered without interpreting pointer lag as permission to append.
-- Checkpoint-page authority and open-tail handoff are refined by ADRs 0053/0060/0063/0064. Exact remaining
-  Root/Seal/pointer wire,
-  retirement frontier, and GC order remain downstream recovery gates.
+- Checkpoint-page authority and open-tail handoff are refined by ADRs 0053/0060/0063..0065. Exact remaining
+  Root/Seal/pointer field IDs, retirement frontier, and GC order remain downstream recovery gates.
 - M3 must prove lost Root/Seal/Pointer responses, sealed-pointer crash recovery, successor substitution/fork
   rejection, exact provider-resolved terminal vectors/inventory, and zero normal-append metadata I/O.
 
-This decision is refined by ADRs 0053/0060/0063/0064, refines ADRs 0030, 0038, 0039, and 0046, and is tracked by
-`T-OBJECT-01`, `T-HANDOFF-01`, and `V2-OBJ-005/009..011/014..021`.
+This decision is refined by ADRs 0053/0060/0063..0065, refines ADRs 0030, 0038, 0039, and 0046, and is tracked by
+`T-OBJECT-01`, `T-HANDOFF-01`, and `V2-OBJ-005/009..011/014..022`.

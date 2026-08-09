@@ -41,6 +41,11 @@ advance independently. A failure inside one complete frame/commit set blocks tha
 automatically fail another binding's independently verified unit. A shared Object/header/directory failure still blocks
 all members.
 
+ADRs 0066/0067 reserve tracker/locator capacity before position allocation and assign exactly one owner-local
+completion ticket to one whole Kafka append commit set or Pulsar entry. Frames, Kafka records, and Pulsar batched
+messages never become independent ticket/ACK units. One shared verified extent feeds their compact read locators before
+frontier publication and ACK.
+
 ## Consequences
 
 - `V2-OPEN-OBJ-08` is resolved.
@@ -53,6 +58,8 @@ all members.
   Kafka batch coverage, native-checksum independence, and Object-group boundaries that do not leak into append truth.
 
 This decision is refined by [ADRs 0037](0037-v2-object-wal-binding-context-epoch-authority.md),
-[0040](0040-v2-nwg1-append-unit-directory-and-colocation.md), and
-[0064](0064-v2-object-wal-physical-and-binding-frontiers.md), refines ADR 0026, and is tracked by `T-PROTOCOL-01`,
-`T-OBJECT-01`, `V2-OBJ-002/004/006/007/012/021`.
+[0040](0040-v2-nwg1-append-unit-directory-and-colocation.md),
+[0064](0064-v2-object-wal-physical-and-binding-frontiers.md),
+[0066](0066-v2-pre-position-reservation-and-completion-ticket.md), and
+[0067](0067-v2-active-tail-readable-publication-and-index-boundary.md), refines ADR 0026, and is tracked by
+`T-PROTOCOL-01`, `T-OBJECT-01`, `V2-OBJ-002/004/006/007/012/021/023`, and `V2-READ-003`.

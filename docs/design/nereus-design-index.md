@@ -109,6 +109,9 @@ Current accepted decisions:
 - [ADR 0062: Object WAL packing catalog and leaf sequence](../decisions/0062-v2-object-wal-packing-catalog-and-leaf-sequence.md)
 - [ADR 0063: provider-resolved checkpoint publisher](../decisions/0063-v2-provider-resolved-checkpoint-publisher.md)
 - [ADR 0064: Object WAL physical and binding frontiers](../decisions/0064-v2-object-wal-physical-and-binding-frontiers.md)
+- [ADR 0065: physical checkpoint row and Seal payload](../decisions/0065-v2-physical-checkpoint-row-and-seal-payload.md)
+- [ADR 0066: pre-position reservation and completion ticket](../decisions/0066-v2-pre-position-reservation-and-completion-ticket.md)
+- [ADR 0067: active-tail readable publication and index boundary](../decisions/0067-v2-active-tail-readable-publication-and-index-boundary.md)
 
 ## V2 document map
 

@@ -169,8 +169,9 @@ commit.
 
 One publisher-epoch-fenced async combiner inventories `ProviderResolvedExtentDescriptor` values through one run-wide
 checkpoint predecessor chain and a per-lane `LaneExtentResolvedThrough` vector. It does not wait for every member's
-protocol ACK. The Seal binds one provider-resolved terminal vector/final head; three lane-specific chains, Roots, or
-pointers are not used.
+protocol ACK. Root is encoded once per page rather than repeated in 256 rows; rows and Seal contain no binding/read
+frontier, ACK, gap, or per-binding coverage. The Seal binds one provider-resolved terminal vector/final head plus
+minimum aggregate count/byte facts; three lane-specific chains, Roots, or pointers are not used.
 
 NWG1 stores an authoritative in-body Binding Context Table and Append Unit Directory. Exact binding/Storage/Owner Epoch
 authority is object-local rather than singular in a multi-binding root. One Kafka commit set stays inside one extent and
@@ -178,11 +179,16 @@ each frame block is independently compressed, authenticated, and decoded. AES-25
 run-scoped data key, derives one key per ObjectExtent, and separates authenticated directory and frame nonce domains;
 KMS rotation happens only at run rollover.
 
-Physical `LaneExtentResolvedThrough` and logical `BindingDurableFrontier` are separate. After shared Object/header/
-directory validation, owner-local lazy ring/window trackers release each binding's complete append units contiguously
-through its Position Domain. A's typed gap cannot block B or physical checkpoint progress; provider-unknown lane state
-still blocks later physical resolution. Trackers are reconstructible, perform cached O(1) owner-fence checks, retain no
-payload in gaps, and add no per-binding remote metadata authority.
+Physical `LaneExtentResolvedThrough` and logical `BindingDurableFrontier` are separate. Before position allocation, the
+owner reserves tracker slot and active-tail locator capacity together. One checked 64-bit owner-local ticket represents
+one complete Kafka commit set or Pulsar entry; coverage remains authority and tickets never enter wire/API/config.
+Normal completion uses a ring/window and recovery uses bounded collect/sort with fresh tickets.
+
+One shared `VerifiedExtent` feeds compact, range-aggregated Kafka/Pulsar locator spans in a shard-owned segmented
+active-tail index. A binding installs the next contiguous locators hidden, publishes Readable/Durable frontiers, then
+ACKs; gap-behind locators remain invisible. A generic Protocol Coverage TreeMap is forbidden on the append/ACK hot
+path, while no heavy index object per Binding/unit is frozen. A's typed gap cannot block B or physical checkpoint
+progress, and the ACK path adds no provider/KMS/metadata I/O or repeated directory decryption.
 
 Routine random reads authenticate the Root-bound in-body header/directory and selected frame without first requiring a
 new full-Object provider proof. The leaf's exclusive bounded prefix end normally gives prefix plus frame GET; without
@@ -258,6 +264,11 @@ Detailed contract: [BookKeeper and Pulsar](../v2/04-bookkeeper-and-pulsar.md).
 Within one Topic Protocol Binding and Storage Epoch chain, the reader resolves active tail, then the manifest-selected
 preferred sealed generation, then an exact protected source fallback. Cache never selects authority. A corrupt preferred
 generation is quarantined; fallback is allowed only while the source remains protected.
+
+Active-tail correctness cannot be disabled. Binding/tenant policy may choose only a conservative soft share;
+shard/Cell/host ceilings remain hard. Takeover rebuilds physical Root/checkpoint/LIST inventory first, then publishes
+Binding views independently. Locator retirement waits for manifest coverage of the same typed range and safe
+source-protection/read-pin state.
 
 Timestamp and protocol-position indexes are published with the same source cut as payload bytes. Materialization and
 compaction cannot plan from a stale local metadata snapshot without final durable revalidation.

@@ -113,10 +113,11 @@ high-priority reconciler and blocks the next grant, not current installed-range 
 
 Each Object-WAL shard stores a bounded immutable `WalRunRootRecord` in its Protocol Cell control-metadata backend. A
 separate immutable `WalRunSealRecord` records the terminal provider-resolved lane-sequence vector and final checkpoint
-head; any binding-frontier snapshot is a derived hint rather than terminal authority. Sealing never mutates the Root. A
-successor Root binds predecessor Root+Seal identities, and one exact-version CAS advances `CurrentWalRunPointer` only
-after the successor exists. Lost create/CAS responses converge by exact reread equality. These are rollover/recovery
-cuts; normal admitted append performs no metadata read or mutation.
+head/key/SHA plus minimum aggregate count/body-byte completeness facts. It records no binding/read frontier, ACK, gap,
+or per-binding coverage. Sealing never mutates the Root. A successor Root binds predecessor Root+Seal identities, and
+one exact-version CAS advances `CurrentWalRunPointer` only after the successor exists. Lost create/CAS responses
+converge by exact reread equality. These are rollover/recovery cuts; normal admitted append performs no metadata read or
+mutation.
 
 Up to three packing lanes instantiate lazily beneath that one Root/pointer and share aggregate hard budgets. One
 publisher-epoch-fenced asynchronous combiner covers at most 256 provider-resolved descriptors/64 KiB per page through
@@ -128,6 +129,11 @@ limits. Open recovery/handoff LISTs every uncovered lane tail, and the Seal bind
 Three lane-local chains are rejected. Checkpoint cadence and hard-envelope policy changes begin with the next Root;
 Topic packing changes follow the group-boundary rule and do not roll the run merely to change linger.
 
+Root SHA appears once in each page header, not in every physical row. The runtime descriptor may carry it only for
+defensive combiner validation. Recovery uses bounded parallel prefix GETs only for candidates not excluded by validated
+manifest/source authority, charges one cumulative GET/bytes/time envelope, and never uses whole-Object GET for
+directory reconstruction.
+
 ## Ownership token
 
 Every admitted writer carries a token binding Protocol Cell, Topic Protocol Binding, Topic Incarnation, Storage Epoch,
@@ -136,6 +142,11 @@ operations outside normal append.
 
 A stale token fails before new protocol-position allocation. Any in-flight completion revalidates Storage Epoch and
 Owner Epoch before advancing typed Durable/Readable Frontiers.
+
+Before position allocation, the owner reserves completion and active-tail-locator capacity together. Completion
+tickets, hidden locators, and segmented index state are owner-local and never enter handoff metadata. Takeover discards
+old tickets, reconstructs physical inventory first, then publishes Binding active-tail views independently; an
+unrelated typed gap cannot block B.
 
 ## Planned fast handoff
 
@@ -160,5 +171,5 @@ topic-open, rollover publication, trim, and background lifecycle work are separa
 hide in an aggregate append metric.
 
 Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios:
-`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015/020/021`, `V2-HO-001`, `V2-FABRIC-001`,
+`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015/020..023`, `V2-READ-003`, `V2-HO-001`, `V2-FABRIC-001`,
 `V2-POLICY-001`, and `V2-POSITION-002..011`.

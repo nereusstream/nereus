@@ -47,6 +47,11 @@ envelope, fixed header, or directory authentication still blocks every member of
 publication inventories the provider-resolved Object and does not assert that every member has advanced its typed
 frontier.
 
+ADR 0067 reuses that one successful Object/header/directory validation as one owner-local `VerifiedExtent`; member
+bindings do not repeat provider, KMS, whole-Object, or directory-decryption work before ACK. Compact active-tail
+locators may aggregate contiguous directory-row and protocol coverage spans, but one append commit set remains the
+indivisible validation/ticket/ACK unit.
+
 ## Consequences
 
 - `V2-OPEN-OBJ-14` is resolved.
@@ -58,5 +63,5 @@ frontier.
 - M3 must prove commit-set co-location, oversize rejection before allocation, directory substitution/bounds failures,
   independent frame decode, no cross-frame compression/AEAD, and range reads that do not decode unrelated frames.
 
-This decision is refined by ADRs 0046/0058/0063/0064, refines ADRs 0026/0031/0037, and is tracked by
-`T-PROTOCOL-01`, `T-OBJECT-01`, and `V2-OBJ-002/004/006/007/012/013/016..021`.
+This decision is refined by ADRs 0046/0058/0063/0064/0067, refines ADRs 0026/0031/0037, and is tracked by
+`T-PROTOCOL-01`, `T-OBJECT-01`, `V2-OBJ-002/004/006/007/012/013/016..023`, and `V2-READ-003`.

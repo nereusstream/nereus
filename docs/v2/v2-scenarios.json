@@ -350,7 +350,7 @@
     {
       "id": "V2-OBJ-014",
       "milestone": "M3/M7",
-      "contract": "immutable Root and provider resolved vector terminal Seal records plus one exact pointer CAS publish each successor without making binding frontier snapshots authority",
+      "contract": "immutable Root and physical only vector terminal Seal plus one exact pointer CAS publish each successor without binding read frontier ACK or gap state",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -358,7 +358,7 @@
     {
       "id": "V2-OBJ-015",
       "milestone": "M3/M7",
-      "contract": "one publisher epoch fenced asynchronous checkpoint chain inventories provider resolved extents under aggregate uncovered tail bounds and a sealed final gap free vector",
+      "contract": "one publisher epoch fenced asynchronous checkpoint chain inventories provider resolved physical rows under aggregate uncovered tail bounds and a sealed final gap free vector",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -398,7 +398,7 @@
     {
       "id": "V2-OBJ-020",
       "milestone": "M3/M7",
-      "contract": "a single shard WalRun publisher checkpoints only ProviderResolvedExtentDescriptors using one candidate exact head CAS component wise non regression and bounded failed epoch residue",
+      "contract": "a single shard WalRun publisher checkpoints only ProviderResolvedExtentDescriptors using one candidate exact head CAS component wise non regression bounded residue and physical only de duplicated rows",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -406,7 +406,23 @@
     {
       "id": "V2-OBJ-021",
       "milestone": "M3",
-      "contract": "LaneExtentResolvedThrough is physical while owner local lazy binding trackers advance Position Domain Durable Frontiers without persisted gaps payload retention or remote completion metadata",
+      "contract": "LaneExtentResolvedThrough is physical while owner local binding completion uses pre reserved bounded rings and Position Domain frontiers without persisted gaps tickets payload retention or remote metadata",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-022",
+      "milestone": "M3/M7",
+      "contract": "checkpoint rows and Seal remain physical only bind Root once admit only closed bounded proof fields and reconstruct only manifest uncovered active tail through cumulative envelope prefix GETs",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-023",
+      "milestone": "M3",
+      "contract": "tracker slot and active tail locator budget reserve atomically before position allocation and one checked 64 bit owner local ticket represents one complete protocol commit unit",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -518,7 +534,7 @@
     {
       "id": "V2-READ-001",
       "milestone": "M4",
-      "contract": "manifest publication exposes one binding-scoped typed logical view with protected source fallback",
+      "contract": "manifest publication exposes one binding scoped typed logical view across active tail overlap with protected source fallback",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -527,6 +543,14 @@
       "id": "V2-READ-002",
       "milestone": "M5",
       "contract": "logical trim and physical GC revalidate every protocol and source protection",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-003",
+      "milestone": "M3/M4",
+      "contract": "Object WAL ACK reuses one shared VerifiedExtent publishes compact protocol range active tail locators before Readable Durable frontiers and retires them only after exact manifest coverage plus safe pins",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null

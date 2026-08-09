@@ -15,19 +15,19 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-Round 11 accepted the permanent class/lane catalog and complete leaf grammar, provider-resolved checkpoint eligibility
-with one publisher-epoch-fenced combiner, and the separation between physical lane resolution and owner-local binding
-frontiers in ADRs 0062..0064. It introduced no per-binding remote metadata, persistent runtime gap map, or hot-path
-Owner Epoch read. Evidence-blocked numeric/class/mode decisions wait; the next independent frontier is:
+Round 12 accepted physical-only checkpoint/Seal payload, combined tracker/locator reservation before position
+allocation, owner-local 64-bit completion tickets, and shared-verified range-aggregated active-tail publication before
+Readable/Durable frontiers and ACK in ADRs 0065..0067. It deliberately leaves Java data structures and numeric budgets
+unfrozen. The next independent frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-OBJ-20` | choose the minimal physical checkpoint/Seal descriptor and whether any copied binding summary belongs there | consider physical-only extent identity with optional qualified provider proof; rebuild bindings from authenticated directories and store no frontier/ACK state |
-| `V2-OPEN-OBJ-21` | identify the O(1) normal completion ring without adding a durable append ordinal | consider an owner-local checked completion ticket plus exact coverage/predecessor validation, discarded on takeover |
-| `V2-OPEN-READ-01` | make independently ACKed Object-WAL coverage readable before checkpoint/manifest publication | consider a lazy owner-local active-tail locator index installed before contiguous Durable/Readable frontier release |
+| `V2-OPEN-OBJ-22` | define the exact authority that permits physical recovery to skip a manifest-covered extent without reading its directory | consider a separately rooted monotonic per-lane fully-manifest-covered vector; absence or a hole falls back to prefix GET and never backpressures append/checkpoint |
+| `V2-OPEN-OBJ-23` | choose the closed bounded optional qualified-provider-proof checkpoint-row variant | consider NONE or one version-bound FULL_OBJECT SHA-256 variant that stores only a bounded canonical version token because Root/row already bind scope/length/digest |
+| `V2-OPEN-READ-02` | freeze the reader-visible snapshot and pin-safe active-tail-to-manifest source handoff | consider a small owner-local Binding read-view snapshot that atomically binds frontiers, active-tail version, manifest generation, and source protection |
 
 The complete questions and recommendations are in
-[round 12](grill-notes/14-restarted-grill-2-checkpoint-payload-completion-ticket-and-active-tail.md). None of its
+[round 13](grill-notes/15-restarted-grill-2-recovery-skip-proof-provider-proof-wire-and-read-snapshot.md). None of its
 recommendations is accepted yet. `V2-OPEN-BK-11/13`, remaining `V2-OPEN-OBJ-17/19`, and
 `V2-OPEN-PUL-OBJ-09` wire/size/mode work are blocked on accepted evidence protocols rather than questions in this round.
 
@@ -103,9 +103,10 @@ validates ACTIVE plus aggregate identity and installs a local versioned fence, s
 
 Resolved by [ADR 0064](../decisions/0064-v2-object-wal-physical-and-binding-frontiers.md). Physical
 `LaneExtentResolvedThrough` is separate from each Position Domain's `BindingDurableFrontier`; an owner-local lazy
-ring/window with bounded sparse-recovery fallback advances only one binding, stores no payload/persisted gap state, and
-performs cached O(1) owner fencing. Shared Object/header/directory failures block all members, while later
-frame/commit-set-local failures isolate to that complete binding unit.
+ring/window advances only one binding, stores no payload/persisted gap state, and performs cached O(1) owner fencing.
+ADR 0066 refines takeover recovery to bounded collect/sort plus fresh tickets rather than a long-lived ordered map.
+Shared Object/header/directory failures block all members, while later frame/commit-set-local failures isolate to that
+complete binding unit.
 
 ### `V2-OPEN-OBJ-02`: resolved PUT-response-loss proof
 
@@ -230,23 +231,43 @@ The remaining gate is evidence-selected target/linger/quantized values and numer
 
 ### `V2-OPEN-OBJ-20`: physical checkpoint and Seal descriptor payload
 
-This remains open. ADR 0063 fixes provider-resolved eligibility and publisher fencing, while ADR 0064 forbids a copied
-binding frontier from becoming physical checkpoint authority. The remaining gate chooses whether pages/Seal stay
-physical-only and pay bounded directory prefix GETs during recovery, or carry any optional non-authoritative binding
-summary. Round 12 asks the current recommendation.
+Resolved by [ADR 0065](../decisions/0065-v2-physical-checkpoint-row-and-seal-payload.md). Page/Seal is physical-only,
+Root SHA appears once per page rather than once per row, optional provider proof is a closed bounded canonical field
+set with deterministic encoding, and bounded parallel prefix-only recovery charges one cumulative envelope. No
+binding/read frontier, ACK, gap, or per-binding coverage is copied.
 
 ### `V2-OPEN-OBJ-21`: owner-local completion ticket and normal-path ring
 
-This remains open. ADR 0064 accepts an O(1) normal ring and Position-Domain-aware recovery fallback but no durable
-append ordinal exists. The remaining gate must freeze a purely owner-local indexing ticket, exact coverage/predecessor
-validation, live-slot/wrap behavior, and takeover discard without creating another wire/metadata ordering domain.
+Resolved by [ADR 0066](../decisions/0066-v2-pre-position-reservation-and-completion-ticket.md). Tracker slot and
+active-tail locator budget reserve together before position allocation; one complete Kafka commit set or Pulsar entry
+receives one full 64-bit owner-local ticket, full equality fences slot ABA, exact coverage remains authority, and
+takeover rebuilds via bounded collect/sort plus fresh tickets. No ticket enters wire/API/config/metadata.
 
 ### `V2-OPEN-READ-01`: Object-WAL active-tail readability before checkpoint/manifest
 
-This remains open. A binding can ACK only after its coverage is both durable and readable, but checkpoint is now
-physical inventory and manifest materialization is asynchronous. The remaining gate must freeze the derived owner-local
-active-tail locator installation/rebuild/retirement cut that makes B readable without per-group remote metadata. Round
-12 asks the current recommendation.
+Resolved by [ADR 0067](../decisions/0067-v2-active-tail-readable-publication-and-index-boundary.md). One shared
+`VerifiedExtent` feeds range-aggregated protocol-specific locators in a possible shard-owned segmented index. Locator
+capacity reserves before position allocation; contiguous locators install hidden before Readable/Durable frontiers and
+ACK; takeover publishes Bindings independently; exact manifest coverage plus source protection/read pins precede
+retirement. Correctness and hard caps cannot be disabled.
+
+### `V2-OPEN-OBJ-22`: manifest-covered recovery-skip authority
+
+This remains open. A physical row has no Binding/coverage, so it cannot by itself prove an extent is outside active
+tail. Round 13 asks whether one separately rooted contiguous per-lane fully-manifest-covered vector should authorize
+prefix-GET omission, with every absence/hole/mismatch falling back to bounded GET.
+
+### `V2-OPEN-OBJ-23`: closed qualified-provider-proof row wire
+
+This remains open. ADR 0065 forbids opaque provider blobs but leaves the exact closed row variant/cap unsettled. Round
+13 asks whether 0.2 stores no proof or only a version-bound FULL_OBJECT SHA-256 variant containing a bounded canonical
+provider-version token while reusing Root/row scope, length, and digest.
+
+### `V2-OPEN-READ-02`: active-tail/manifest reader snapshot
+
+This remains open. ADR 0067 fixes locator/frontier/ACK ordering and pin-safe retirement without choosing the
+reader-visible source snapshot. Round 13 asks for the minimal owner-local snapshot that prevents read holes/source
+mixing during active-tail publication, manifest replacement, pin drain, and per-Binding takeover recovery.
 
 ## Storage Epoch transitions
 
@@ -500,6 +521,22 @@ For example, one Pulsar entry with batch indexes `0..2` might map to one Kafka O
 input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
+
+### Restarted Grill 2 round 12 adjusted decisions: resolved by ADRs 0065 through 0067
+
+Resolved on 2026-08-09 after explicit adjusted confirmation:
+
+- Q1 physical-only checkpoint/Seal, once-per-page Root, bounded canonical proof boundary, and active-tail prefix-only
+  recovery -> [ADR 0065](../decisions/0065-v2-physical-checkpoint-row-and-seal-payload.md);
+- Q2 pre-position tracker/locator reservation, one full 64-bit owner-local ticket per protocol unit, and bounded
+  collect/sort recovery -> [ADR 0066](../decisions/0066-v2-pre-position-reservation-and-completion-ticket.md);
+- Q3 non-disableable locator-before-frontier-before-ACK view, shared extent validation, range aggregation, segmented /
+  protocol-specific implementation freedom, independent takeover publication, and pin-safe retirement ->
+  [ADR 0067](../decisions/0067-v2-active-tail-readable-publication-and-index-boundary.md).
+
+No heavy per-Binding/per-unit Java index or generic hot-path TreeMap was frozen. Exact numeric budgets and reader
+snapshot mechanics remain open/evidence-blocked. The complete response is preserved in
+[the round 12 record](grill-notes/14-restarted-grill-2-checkpoint-payload-completion-ticket-and-active-tail.md).
 
 ### Restarted Grill 2 round 11 adjusted decisions: resolved by ADRs 0062 through 0064
 

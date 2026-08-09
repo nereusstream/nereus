@@ -88,8 +88,13 @@ Root/Seal/successor pointer lineage. Every known leaf carries its bounded exclus
 lane-local sequences build lazily, while one publisher-epoch-fenced combiner checkpoints provider-resolved extents
 through a run-wide predecessor/vector chain with aggregate bounds; member protocol ACK is not checkpoint eligibility.
 Physical `LaneExtentResolvedThrough` is separate from binding `BindingDurableFrontier`; owner-local lazy trackers
-release independent commit sets without remote metadata or persisted gap maps. Open tails still require LIST and sealed
-runs require one final physical vector inventory. Routine frame
+release independent commit sets without remote metadata or persisted gap maps. Page Root identity is encoded once,
+physical rows/Seal contain no Binding/ACK state, and active-tail recovery uses bounded prefix rather than whole-Object
+GET. Tracker plus locator capacity reserves before position allocation; one full 64-bit local ticket represents one
+Kafka commit set or Pulsar entry. One shared verified extent feeds compact protocol-range locators that publish before
+Readable/Durable frontiers and ACK; a generic Protocol Coverage TreeMap is forbidden on the hot path, without freezing
+one heavy per-Binding/unit Java index. Open tails still require LIST and sealed runs require one final physical vector
+inventory. Routine frame
 ranges authenticate the Root-bound directory/frame rather than requiring a new whole-Object provider proof or HEAD;
 prefix bytes, not frame count alone, bound cold-read amplification.
 
@@ -174,6 +179,9 @@ Accepted decisions:
 - [ADR 0062: Object WAL packing catalog and leaf sequence](../decisions/0062-v2-object-wal-packing-catalog-and-leaf-sequence.md)
 - [ADR 0063: provider-resolved checkpoint publisher](../decisions/0063-v2-provider-resolved-checkpoint-publisher.md)
 - [ADR 0064: Object WAL physical and binding frontiers](../decisions/0064-v2-object-wal-physical-and-binding-frontiers.md)
+- [ADR 0065: physical checkpoint row and Seal payload](../decisions/0065-v2-physical-checkpoint-row-and-seal-payload.md)
+- [ADR 0066: pre-position reservation and completion ticket](../decisions/0066-v2-pre-position-reservation-and-completion-ticket.md)
+- [ADR 0067: active-tail readable publication and index boundary](../decisions/0067-v2-active-tail-readable-publication-and-index-boundary.md)
 
 ## Open design gates
 
@@ -191,8 +199,10 @@ Accepted decisions:
 partially resolve NPD1 wire/policy evidence and NWG1 prefix capacity. ADRs 0059 through 0061 fix the leaf hint,
 lazy-lane/vector-checkpoint structure, and RANGE takeover constraints. ADRs 0062 through 0064 additionally fix the
 class/lane grammar, provider-resolved checkpoint publisher, and physical-versus-binding frontier split without
-selecting remaining numeric values, final RANGE wire/size, or an allocator mode. The rows below are the remaining
-active 0.2 decisions or evidence gates.
+selecting remaining numeric values, final RANGE wire/size, or an allocator mode. ADRs 0065 through 0067 resolve
+physical-only checkpoint/Seal rows, pre-position reservation/local ticket semantics, and non-disableable active-tail
+publication while leaving the recovery-skip proof, closed provider-proof row variant, reader snapshot, and evidence
+values open. The rows below are the remaining active 0.2 decisions or evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
@@ -201,9 +211,9 @@ active 0.2 decisions or evidence gates.
 | `V2-OPEN-OBJ-17` | freeze exact NWG1 header/directory/row numeric caps after ADRs 0059/0062 fixed the complete leaf grammar | M3 Object WAL format freeze |
 | `V2-OPEN-OBJ-19` | execute evidence and select target/linger/quantized values and numeric budgets without changing ADR-0062 class semantics | M3 Object WAL policy freeze |
 | `V2-OPEN-PUL-OBJ-09` | choose an allocator only after evidence plus exact reservation/head/node wire, range size, Cell reservation concurrency, and ADR 0061 conformance | M1/M3 virtual-ledger allocator freeze |
-| `V2-OPEN-OBJ-20` | freeze checkpoint/Seal physical descriptor payload and whether any binding summary is omitted or only a non-authoritative hint | M3 checkpoint wire freeze |
-| `V2-OPEN-OBJ-21` | freeze the owner-local completion-ticket/ring identity without adding a persisted append ordinal | M3 completion runtime freeze |
-| `V2-OPEN-READ-01` | freeze the owner-local active-tail read publication cut that makes an independently ACKed binding readable before checkpoint/manifest | M3 active-tail read freeze |
+| `V2-OPEN-OBJ-22` | freeze the exact durable authority that permits recovery to skip a manifest-covered physical extent without directory GET | M3/M4 recovery optimization freeze |
+| `V2-OPEN-OBJ-23` | freeze the closed bounded qualified-provider-proof checkpoint-row variant or choose NONE | M3 checkpoint wire freeze |
+| `V2-OPEN-READ-02` | freeze the owner-local reader snapshot and pin-safe active-tail-to-manifest source switch | M4 read-view freeze |
 | `V2-OPEN-BK-02` | validate one-active-ledger-per-Kafka-partition at 10k and 100k partitions | M2 Kafka BK layout freeze |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |
 

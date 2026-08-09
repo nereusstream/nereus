@@ -85,6 +85,23 @@ frontier. They do not prove member ACK/readability and cannot hide a provider-re
 discoverable by bounded provider LIST. Runtime binding trackers and gaps are reconstructed rather than persisted as a
 second manifest authority.
 
+Checkpoint rows and Seal are physical-only: Root identity appears once per page, and no row stores a binding/read
+frontier, ACK bitmap, gap state, or per-binding coverage. Recovery may skip an exact extent only through validated
+manifest/source authority; otherwise it performs a bounded prefix GET through the leaf's directory end. Only the
+manifest-uncovered active tail is reconstructed, every request/byte/time unit charges the cumulative recovery envelope,
+and this directory path never performs a whole-Object GET.
+
+The owner publishes active-tail readability before ACK. One shared `VerifiedExtent` feeds compact locator ranges in a
+shard-owned segmented, protocol-specific index; it does not repeat Object/KMS/directory validation per Binding. For one
+Binding, locators for the next contiguous range are installed hidden, Readable/Durable frontiers are published, and
+only then is ACK completed. Locators beyond a gap remain invisible. This is logical per-Binding isolation, not a
+requirement for one heavy index object per Binding or append unit.
+
+Tracker and locator capacity are reserved together before protocol position allocation. A locator retires only after
+the manifest-selected generation covers its exact typed range and source protection/read pins make replacement safe.
+The replacement view is installed before removal. Active-tail readability and hard bounds cannot be disabled; only
+binding/tenant soft shares, Cell/shard recovery concurrency, host ceilings, and materialization pressure are tunable.
+
 ## Timestamp and protocol-position indexes
 
 Kafka Offset, Pulsar Position/entry, batch, and timestamp indexes are first-class descriptor members where their
@@ -138,5 +155,5 @@ the source was safely retired and the preferred generation is corrupt, the resul
 system does not synthesize records or silently skip the requested Protocol Coverage.
 
 Relevant tradeoffs: `T-MANIFEST-01`, `T-POSITION-01`, `T-PROJECTION-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required
-scenarios: `V2-READ-001`, `V2-READ-002`, `V2-OBJ-002/020/021`, `V2-BK-007..008`, `V2-BK-011`,
+scenarios: `V2-READ-001..003`, `V2-OBJ-002/020..023`, `V2-BK-007..008`, `V2-BK-011`,
 `V2-PROJECTION-001`, `V2-POLICY-001`, and `V2-FABRIC-003`.

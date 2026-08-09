@@ -139,6 +139,11 @@ moves lane only after its prior lane work converges. Permanent IDs `0/1/2` mean
 `OBJECT_LATENCY/OBJECT_BALANCED/OBJECT_COST`; evidence-selected target/linger/quantized changes use
 `packingPolicyVersion`, and a group requires identical class/version/resolved policy.
 
+Active-tail readability and combined tracker/locator reservation are non-disableable correctness behavior. A
+Binding/tenant may request only a conservative active-tail soft share; Protocol Cell x shard owns recovery concurrency,
+and shard/Cell/host owns hard memory ceilings/materialization-pressure triggers. Topic policy cannot enlarge the hard
+cap or turn readable-before-ACK off.
+
 A policy change that affects a primary WAL profile, format, Object-extent digest family, Frame-payload checksum family,
 or encryption family requires a new Storage Epoch at an exact Protocol Frontier. A materialization-only format or index
 policy may create a new immutable generation without changing the append epoch. Neither operation rewrites the Topic

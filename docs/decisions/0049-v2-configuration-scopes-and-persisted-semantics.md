@@ -53,6 +53,11 @@ identical class/version/resolved policy is required inside one group.
 Policy compatibility is part of batching admission. Cross-topic batching uses the resolved typed policy class and
 quantized fields; V2 does not expose an unbounded map of per-topic boolean flags.
 
+Active-tail readability, pre-position tracker/locator reservation, locator-before-frontier-before-ACK publication,
+and every hard resource cap are correctness contracts and cannot be disabled. Protocol Cell x shard owns checkpoint
+cadence/recovery concurrency; binding/tenant policy may request only a conservative soft share; shard/Cell/host owns
+hard memory ceilings and materialization-pressure triggers. A Topic cannot enlarge a hard cap or disable readability.
+
 ## Consequences
 
 - Performance tuning remains possible without making correctness or durable compatibility host-dependent.
@@ -63,5 +68,6 @@ quantized fields; V2 does not expose an unbounded map of per-topic boolean flags
   seal/backpressure under resource pressure, incompatible batching rejection, and that every correctness gate remains
   non-disableable.
 
-This decision is refined by ADRs 0056 through 0064, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and is tracked
-by `T-POLICY-01`, `V2-POLICY-001`, `V2-BK-012/013`, `V2-OBJ-016..021`, and `V2-POSITION-011`.
+This decision is refined by ADRs 0056 through 0067, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and is tracked
+by `T-POLICY-01`, `V2-POLICY-001`, `V2-BK-012/013`, `V2-OBJ-016..023`, `V2-READ-003`, and
+`V2-POSITION-011`.
