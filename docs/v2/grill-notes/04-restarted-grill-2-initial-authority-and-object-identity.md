@@ -11,9 +11,9 @@ sourceTuple: v2-m0
 
 Date: 2026-08-09
 
-ADRs 0015 through 0018 resolved the previous frontier. This record contains the next independent questions and
-recommendations only. None is an accepted runtime contract until explicitly confirmed and synchronized into an ADR,
-normative contract, tradeoff, scenario, and gate.
+ADRs 0015 through 0018 resolved the previous frontier. This record preserves the next independent questions and
+recommendations that were presented. The user subsequently confirmed all four recommendations. The accepted contracts
+are ADRs 0019 through 0022; this session record is not runtime evidence.
 
 ## Source facts used for recommendations
 
@@ -66,3 +66,24 @@ payload 完整性是否共用一个 checksum？
 - virtual-ledger rollover, recovery, trim, cursor, compaction, and replication cuts depend on Q4;
 - online Storage Epoch transitions and cross-protocol projection remain outside 0.2 by ADRs 0015 and 0016;
 - Kafka BookKeeper layout and benchmark thresholds remain evidence prerequisites, not questions to answer from prose.
+
+## Confirmed answer and authoritative synchronization
+
+The user answered: “全部按推荐确认”. The decisions were synchronized as follows:
+
+- Q1 / `V2-OPEN-META-01` →
+  [ADR 0019](../../decisions/0019-v2-initial-binding-epoch-atomic-visibility.md): binding plus initial epoch have one
+  atomic visible aggregate, with deterministic `CREATING` recovery where a backend cannot atomically publish all
+  immutable records;
+- Q2 / `V2-OPEN-BK-03` →
+  [ADR 0020](../../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md): 0.2 offloads only sealed non-current Pulsar
+  ledgers and excludes active-ledger streaming;
+- Q3 / `V2-OPEN-OBJ-04` →
+  [ADR 0021](../../decisions/0021-v2-object-wal-checksum-domains.md): Object Extent Digest and decoded Frame Payload
+  Checksum are separate, non-substitutable integrity domains;
+- Q4 / `V2-OPEN-PUL-OBJ-01` →
+  [ADR 0022](../../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md): a Pulsar-cell
+  MetadataStore/Oxia authority allocates virtual ledger IDs and explicit Ledger Chain order; Object identity never
+  becomes a position.
+
+Implementation and executable evidence remain NotStarted.

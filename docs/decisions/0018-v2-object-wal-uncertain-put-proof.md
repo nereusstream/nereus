@@ -45,4 +45,5 @@ rejected for that profile rather than silently downgraded to weaker durability.
 - M3 must test real-provider successful PUT/lost response, absent object, checksum/version mismatch, conditional-create
   races, verification-budget exhaustion, and restart reconciliation.
 
-This decision is tracked by `T-OBJECT-01`, `V2-APP-003`, `V2-OBJ-001`, and `V2-OBJ-003`.
+Checksum byte domains are refined by [ADR 0021](0021-v2-object-wal-checksum-domains.md). This decision is tracked by
+`T-OBJECT-01`, `V2-APP-003`, `V2-OBJ-001`, and `V2-OBJ-003`.

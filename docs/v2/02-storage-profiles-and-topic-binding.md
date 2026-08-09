@@ -35,6 +35,17 @@ Missing, unknown, V1, or internally inconsistent values fail before append or re
 one Position Domain and one Native Write Authority at a time. Positions from another binding or incarnation are not
 comparable.
 
+## Atomic initial aggregate
+
+The Topic Protocol Binding and its one initial Storage Epoch become visible as one `TopicBindingAggregate`. A backend
+with replay-atomic batch/transaction support publishes the complete aggregate atomically. Another backend uses one
+deterministic `CREATING` intent, idempotently completes both immutable records, and performs one fenced activation.
+
+Only an internally complete `ACTIVE` aggregate admits open, ownership, append, or read. Missing halves, mismatched IDs,
+unknown versions, `CREATING`, and uncertain activation are recovered within bounded control-plane work or fail closed;
+they never select a default epoch. Normal admitted append does not read or mutate this aggregate remotely. ADR 0019 is
+authoritative.
+
 ## Append-only Storage Epoch chain
 
 Physical placement evolves through an append-only chain:
@@ -48,7 +59,8 @@ StorageEpoch {
   sealedEndProtocolFrontier?
   primaryWalFormat
   payloadFormat
-  checksumFamily
+  objectExtentDigestFamily
+  framePayloadChecksumFamily
   encryptionFamily
   lifecycleState/history
 }
@@ -76,9 +88,10 @@ Operational policy is versioned separately and may change online:
 - retention duration and compaction cadence;
 - observability sampling.
 
-A policy change that affects a primary WAL profile, format, checksum family, or encryption family requires a new Storage
-Epoch at an exact Protocol Frontier. A materialization-only format or index policy may create a new immutable generation
-without changing the append epoch. Neither operation rewrites the Topic Protocol Binding.
+A policy change that affects a primary WAL profile, format, Object-extent digest family, Frame-payload checksum family,
+or encryption family requires a new Storage Epoch at an exact Protocol Frontier. A materialization-only format or index
+policy may create a new immutable generation without changing the append epoch. Neither operation rewrites the Topic
+Protocol Binding.
 
 ## Profile contracts
 
@@ -110,4 +123,5 @@ default without validation. A protocol adapter may restrict the allowed initial 
 transaction authority cannot satisfy the contract. No adapter exposes an online transition set in 0.2.
 
 Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-OBJECT-01`, and `T-BK-01`. Required scenarios:
-`V2-PROFILE-001` and `V2-MIGRATION-001`.
+`V2-PROFILE-001`, `V2-MIGRATION-001`, and `V2-META-002`. See
+[ADR 0019](../decisions/0019-v2-initial-binding-epoch-atomic-visibility.md).

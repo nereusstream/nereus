@@ -16,7 +16,8 @@ KoP is outside the current V2 Kafka/Pulsar design session. Its existing design r
 - **Kafka → Shared Storage**: a Kafka Topic Protocol Binding selects the Kafka Position Domain; Kafka publishes
   binding-scoped Kafka Offset Range coverage over physical extents.
 - **Pulsar → Shared Storage**: a Pulsar Topic Protocol Binding selects the Pulsar Position Domain; Pulsar publishes
-  binding-scoped Pulsar Coverage over physical extents.
+  binding-scoped Pulsar Coverage over physical extents. In Object WAL mode, a Pulsar-cell virtual-ledger authority owns
+  ledger IDs and explicit Ledger Chain order; Object identity remains physical only.
 - **Kafka ↔ Pulsar**: neither context compares or allocates the other's positions. Shared access uses an Access
   Projection with one Native Write Authority; an authority transfer uses a separate Migration Link. ADR 0016 retains
   these boundaries but excludes their runtime from 0.2.

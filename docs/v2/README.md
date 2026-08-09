@@ -58,8 +58,9 @@ separately mutable.
 ADR 0016 retains Access Projection/Migration Link identities and rejects a second Native Write Authority, while
 excluding cross-protocol serving and authority-transfer runtime from 0.2. For Pulsar
 `BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole lifecycle authority and Nereus supplies
-a `LedgerOffloader`; any Nereus manifest is derived. Object WAL uncertain PUTs use ADR 0018's capability-tiered
-HEAD/full-GET proof and never trust ETag alone.
+a sealed-ledger `LedgerOffloader`; any Nereus manifest is derived. Binding plus initial epoch become visible atomically.
+Pulsar Object WAL positions come from a cell-owned virtual-ledger authority, never Object identity. Object WAL uncertain
+PUTs use capability-tiered HEAD/full-GET proof and separate Object-extent/payload checksum domains.
 
 Provider sharing is physical, not authoritative. Multiple cells may use the same external Object Storage or BookKeeper
 infrastructure, while each cell owns its Cell Provider Scope/session, namespace, credential/KMS and operator scope,
@@ -96,21 +97,27 @@ Accepted decisions:
 - [ADR 0016: 0.2 cross-protocol runtime scope](../decisions/0016-v2-0.2-cross-protocol-runtime-scope.md)
 - [ADR 0017: Pulsar ManagedLedger offload authority](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md)
 - [ADR 0018: Object WAL uncertain PUT proof](../decisions/0018-v2-object-wal-uncertain-put-proof.md)
+- [ADR 0019: initial binding/epoch atomic visibility](../decisions/0019-v2-initial-binding-epoch-atomic-visibility.md)
+- [ADR 0020: Pulsar sealed-ledger async offload](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md)
+- [ADR 0021: Object WAL checksum domains](../decisions/0021-v2-object-wal-checksum-domains.md)
+- [ADR 0022: Pulsar Object WAL virtual-ledger authority](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md)
 
 ## Open design gates
 
-`V2-OPEN-FABRIC-01` was resolved by ADR 0014. ADRs 0015 through 0018 also resolve
-`V2-OPEN-MIGRATION-01`, `V2-OPEN-PROJECTION-SCOPE-01`, `V2-OPEN-BK-01`, and `V2-OPEN-OBJ-02`. The rows below are the
-remaining active 0.2 decisions or evidence gates.
+`V2-OPEN-FABRIC-01` was resolved by ADR 0014. ADRs 0015 through 0018 resolve `V2-OPEN-MIGRATION-01`,
+`V2-OPEN-PROJECTION-SCOPE-01`, `V2-OPEN-BK-01`, and `V2-OPEN-OBJ-02`; ADRs 0019 through 0022 resolve
+`V2-OPEN-META-01`, `V2-OPEN-BK-03`, `V2-OPEN-OBJ-04`, and `V2-OPEN-PUL-OBJ-01`. The rows below are the remaining active
+0.2 decisions or evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
-| `V2-OPEN-META-01` | freeze atomic visibility and retry semantics for Topic Protocol Binding plus its initial Storage Epoch | M1 binding/epoch store freeze |
+| `V2-OPEN-META-02` | freeze the physical record shape behind the accepted Topic Binding Aggregate | M1 binding/epoch store freeze |
 | `V2-OPEN-OBJ-01` | prove per-binding typed durable frontiers inside a multi-binding Object group without shard-wide HOL | M3 layout freeze |
-| `V2-OPEN-OBJ-04` | freeze the stored-object and decoded-frame checksum byte domains | M3 Object format/provider contract |
+| `V2-OPEN-OBJ-05` | freeze initial extent/frame algorithms and provider-bound proof fields/fallback | M3 Object format/provider contract |
+| `V2-OPEN-OBJ-06` | freeze canonical Kafka and Pulsar frame-payload byte mappings | M3 Object format/protocol mapping |
 | `V2-OPEN-BK-02` | validate one-active-ledger-per-Kafka-partition at 10k and 100k partitions | M2 Kafka BK layout freeze |
-| `V2-OPEN-BK-03` | choose sealed-ledger or streaming/current-ledger Pulsar async offload | M2 Pulsar offloader execution freeze |
-| `V2-OPEN-PUL-OBJ-01` | freeze virtual ledger ID allocation and Ledger Chain authority for Pulsar Object WAL | M2/M3 Pulsar Object path freeze |
+| `V2-OPEN-BK-04` | freeze the sealed-ledger data extent/root layout and partial-attempt cleanup | M2 Pulsar offloader layout freeze |
+| `V2-OPEN-PUL-OBJ-02` | freeze numeric compatibility and enforceable namespace reservation for virtual ledger IDs | M1/M3 Pulsar Object path freeze |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |
 
 `V2-OPEN-MIGRATION-02..03`, `V2-OPEN-PUL-MIGRATION-01`, and `V2-OPEN-PROJECTION-01..03` remain recorded as deferred

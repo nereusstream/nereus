@@ -81,6 +81,21 @@ start/sealed-end frontiers. Lifecycle changes are append-only state history. In 
 Topic Incarnation and no online transition runtime exists; the exact future transition vocabulary is deferred.
 _Avoid_: Mutable profile, storage mode flag
 
+**Topic Binding Aggregate**:
+The atomically visible create/open unit containing one immutable Topic Protocol Binding and its one initial Storage
+Epoch. A `CREATING` or internally incomplete aggregate admits no read, append, or ownership.
+_Avoid_: Default epoch, partially visible topic
+
+**Object Extent Digest**:
+Integrity over the exact canonical Object-provider request body after Nereus compression and client-side encryption.
+It proves stored-object bytes and cannot replace a frame payload checksum.
+_Avoid_: ETag, decoded payload checksum
+
+**Frame Payload Checksum**:
+Integrity over the canonical decoded protocol payload/record bytes defined by the binding payload mapping. It cannot
+prove the exact Object-provider request body.
+_Avoid_: Object extent digest, provider version
+
 ## Projection and migration
 
 **Access Projection**:

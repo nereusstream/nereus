@@ -36,7 +36,9 @@ The valid typed combinations are:
 | Pulsar / Object WAL | `PulsarCoverage` | `ObjectExtent` |
 
 A Pulsar range crossing ledgers is a collection of per-ledger entry ranges whose order is proven by the ManagedLedger
-ledger chain. V2 does not persist `ledgerBase + entryId` as a second Pulsar position truth.
+ledger chain. For Pulsar Object WAL, ADR 0022 assigns virtual-ledger ID allocation and explicit chain order to a
+Pulsar-cell MetadataStore/Oxia authority; Object identity remains only a Physical Extent.
+V2 does not persist `ledgerBase + entryId` as a second Pulsar position truth.
 
 ## Consequences
 
@@ -47,5 +49,6 @@ ledger chain. V2 does not persist `ledgerBase + entryId` as a second Pulsar posi
   physical-delete authority.
 - A Topic Incarnation has exactly one Position Domain and one Native Write Authority at a time.
 
-This refines ADR 0007 and ADR 0009 and is further refined by ADR 0014. It is tracked by `T-POSITION-01`,
-`T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `V2-POSITION-001`, `V2-MULTIPROTOCOL-001`, and `V2-FABRIC-001..003`.
+This refines ADR 0007 and ADR 0009 and is further refined by ADR 0014 and ADR 0022. It is tracked by
+`T-POSITION-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `V2-POSITION-001..002`, `V2-MULTIPROTOCOL-001`, and
+`V2-FABRIC-001..003`.

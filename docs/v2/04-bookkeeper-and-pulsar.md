@@ -10,8 +10,8 @@ sourceTuple: v2-m0
 # BookKeeper and Pulsar
 
 The profile and ACK boundaries, protocol-native position model, and Pulsar ManagedLedger offload authority are accepted.
-Exact Kafka ledger layout remains proposed until the M2 scale spike closes `V2-OPEN-BK-02`; Pulsar offload execution
-mechanics remain open under `V2-OPEN-BK-03`.
+Exact Kafka ledger layout remains proposed until the M2 scale spike closes `V2-OPEN-BK-02`. Pulsar 0.2 offload execution
+is fixed to sealed non-current ledgers; the Object root/extent layout remains open.
 
 ## Shared BookKeeper contract
 
@@ -46,8 +46,10 @@ ManagedLedger Ledger Chain proves ordering and adjacency. V2 does not persist a 
 `logicalOffset = ledgerBase + entryId`; it also does not order ledgers by numeric ledger ID alone.
 
 For Pulsar `OBJECT_WAL`, the same Pulsar Position Domain and ledger-chain rules describe `PulsarCoverage`, while
-durable bytes use `ObjectExtent`. Exact ObjectManagedLedger encoding belongs to its implementation milestone; it may not
-replace MessageId truth with object keys or byte offsets.
+durable bytes use `ObjectExtent`. A Pulsar-cell `PulsarVirtualLedgerStore` in MetadataStore/Oxia allocates reserved-domain
+virtual ledger IDs and publishes explicit append-only Ledger Chain order. Entry IDs are allocated serially in the active
+virtual ledger; Object identity, bytes, group/run sequence, and numeric ledger-ID ordering never become MessageId truth.
+Exact rollover and recovery mechanics remain open for the implementation milestone.
 
 Online Pulsar BookKeeper/Object evolution is not implied by this model. New-incarnation migration versus a future hybrid
 ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.
@@ -63,6 +65,10 @@ offloaded read selection and fallback, and BookKeeper deletion eligibility. Nere
 root are durable and readable. A Nereus manifest is a rebuildable derived read/materialization index; it cannot complete
 a native offload, overrule fallback, or independently authorize ledger deletion. Disagreement fails closed in favor of
 ManagedLedger. ADR 0017 is authoritative.
+
+0.2 calls the ledger-based `offload(ReadHandle, UUID, ...)` only for sealed, non-current ledgers. It does not stream the
+current append-admitting ledger to Object storage. Ledger rollover bounds immutable coverage; size/entry/age policy and
+lag admission bound cold-copy delay without moving Object into the ACK path. ADR 0020 is authoritative.
 
 A BookKeeper source becomes physically deletable only after all of these are durable and revalidated:
 
@@ -83,5 +89,7 @@ throttle, or stop new admission before BookKeeper capacity is exhausted. It neve
 into a synchronous Object write.
 
 Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, and `T-POSITION-01`. Required scenarios:
-`V2-BK-001`, `V2-BK-002`, `V2-BK-003`, and `V2-POSITION-001`. See
-[ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md).
+`V2-BK-001`, `V2-BK-002`, `V2-BK-003`, and `V2-POSITION-001..002`. See
+[ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md),
+[ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md), and
+[ADR 0022](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md).

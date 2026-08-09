@@ -65,6 +65,10 @@ profile/format/checksum/encryption contract for each protocol-native frontier in
 has exactly one initial epoch and no online profile-transition API/state machine. The chain model remains explicit for
 future evolution, and at most one epoch may ever admit new positions at a time.
 
+Binding plus initial epoch form one atomically visible Topic Binding Aggregate. A transactional/replay-atomic backend
+publishes the complete aggregate together; another backend uses a deterministic `CREATING` intent and exposes `ACTIVE`
+only after both immutable components are complete. Partial state never admits I/O.
+
 Ownership grants an exclusive Owner Epoch inside that binding. Kafka uses KRaft; Pulsar uses MetadataStore/Oxia plus
 native broker/ManagedLedger authority. Owner Epoch and Storage Epoch are distinct.
 
@@ -134,7 +138,9 @@ Object WAL uses bounded group commit to control request cost. A group-level node
 Extent; every frame carries its own binding, incarnation, Storage Epoch, Owner Epoch, and typed Protocol Coverage. ACK
 frontiers advance independently per binding, so one unrelated binding does not impose a shard-wide correctness barrier.
 
-The WAL object is already the durable Object copy. Background work rewrites it into read-optimized segments and indexes.
+The WAL object is already the durable Object copy. Its Object Extent Digest covers the canonical provider request body;
+each frame independently checks the canonical decoded protocol payload. Background work rewrites the WAL into
+read-optimized segments and indexes.
 After PUT-response loss, HEAD is sufficient only with exact length and trustworthy whole-content checksum bound to the
 immutable version; otherwise recovery performs a bounded full GET. ETag alone is never sufficient, and an unverifiable
 provider is rejected for Object WAL.
@@ -148,9 +154,10 @@ BookKeeper only as a Physical Extent. Pulsar BookKeeper profiles preserve native
 ordering, and lifecycle. Cross-ledger Pulsar Coverage is a ledger-keyed range collection; V2 does not persist
 `ledgerBase + entryId` as a universal offset.
 
-The exact Kafka ledger layout and Pulsar async-offload execution mechanics remain M2 gates. Pulsar Object WAL retains
-Pulsar Position/MessageId truth over Object Extents; BookKeeper/Object profile-transition mechanics are deferred beyond
-0.2.
+The exact Kafka ledger layout remains an M2 evidence gate. Pulsar async Object offload processes sealed non-current
+ledgers only; it does not stream the current append ledger in 0.2. Pulsar Object WAL allocates virtual ledger IDs and
+explicit Ledger Chain order from a Pulsar-cell MetadataStore/Oxia authority, while Object groups remain Physical
+Extents. BookKeeper/Object profile-transition mechanics are deferred beyond 0.2.
 
 For Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole attempt, completion,
 read/fallback, and deletion-eligibility authority. Nereus provides a `LedgerOffloader`; its manifest is derived and cannot

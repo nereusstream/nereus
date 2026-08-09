@@ -27,7 +27,8 @@ Control metadata selects an owner and stores low-frequency roots. It is not cons
 
 For one Topic Protocol Binding, Topic Incarnation, Storage Epoch, and Owner Epoch:
 
-1. the protocol-native owner resolves the immutable Topic Protocol Binding and active Storage Epoch;
+1. the protocol-native owner resolves one internally complete `ACTIVE` Topic Binding Aggregate containing the
+   immutable Topic Protocol Binding and initial Storage Epoch;
 2. a serialized writer lane validates the current ownership token and admission budget;
 3. it allocates positions through the binding's Position Domain;
 4. the selected WAL accepts frames carrying binding/incarnation, Storage Epoch, Owner Epoch, typed Protocol Coverage,
@@ -37,8 +38,10 @@ For one Topic Protocol Binding, Topic Incarnation, Storage Epoch, and Owner Epoc
 7. background workers later publish sealed/read-optimized generations.
 
 Kafka allocation yields a half-open Kafka Offset Range. Pulsar allocation yields Pulsar Positions whose adjacency and
-cross-ledger order are proven by the Ledger Chain and represented as ledger-keyed Pulsar Coverage. Neither path allocates
-or persists a cross-protocol `long logicalOffset`.
+cross-ledger order are proven by the Ledger Chain and represented as ledger-keyed Pulsar Coverage. On Pulsar Object WAL,
+the serialized writer allocates entry IDs inside the current virtual ledger while a cell-owned MetadataStore/Oxia
+authority publishes low-frequency ledger identity and chain changes. Neither path allocates or persists a
+cross-protocol `long logicalOffset`.
 
 The owner must not acknowledge coverage because a local future completed if its Owner Epoch or Storage Epoch authority
 was fenced before the durability completion was validated.
@@ -69,7 +72,7 @@ deterministic identity and verifies:
 - Topic Protocol Binding, Topic Incarnation, Storage Epoch, and Owner Epoch;
 - typed Protocol Coverage and frame/entry count;
 - object/ledger identity;
-- byte length and content checksum;
+- exact byte length, `ObjectExtentDigest`, and `FramePayloadChecksum` in their declared domains where applicable;
 - contiguous predecessor coverage.
 
 A retry may return the original success or fail closed. It may not allocate different successful protocol positions for
@@ -82,9 +85,9 @@ Normal append must report both of these as zero:
 - remote control-metadata reads;
 - remote control-metadata mutations.
 
-Topic Protocol Binding, active Storage Epoch, and ownership are cached only after an explicit open/acquire operation.
+The complete active Topic Binding Aggregate and ownership are cached only after an explicit open/acquire operation.
 Cache misses stop admission and reload before allocating positions; they do not insert metadata access into the admitted
 append path.
 
 Relevant tradeoffs: `T-APPEND-01` and `T-POSITION-01`. Required scenarios: `V2-APP-001`, `V2-APP-002`,
-`V2-APP-003`, and `V2-POSITION-001`.
+`V2-APP-003`, `V2-POSITION-001..002`, and `V2-META-002`.

@@ -44,5 +44,5 @@ does not bypass cursor/read pins, deletion lag, response-loss reconciliation, or
 - M2 must prove attempt recovery, completion publication, offloaded read/fallback, retention, and BookKeeper deletion
   cuts against the exact pinned Pulsar source.
 
-This decision is tracked by `T-BK-01`, `V2-BK-001`, `V2-BK-002`, and the remaining Pulsar offload-mechanics question in
-[V2 open questions](../v2/open-questions.md).
+Execution timing is refined by [ADR 0020](0020-v2-pulsar-sealed-ledger-async-offload.md). This decision is tracked by
+`T-BK-01`, `V2-BK-001`, and `V2-BK-002`.

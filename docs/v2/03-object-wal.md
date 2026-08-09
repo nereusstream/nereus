@@ -12,17 +12,19 @@ sourceTuple: v2-m0
 ## Cost model and group commit
 
 One PUT per append is not the V2 cost target. `OBJECT_WAL` batches frames into bounded group objects by Protocol Cell,
-Cell Provider Scope, provider endpoint, region, format, encryption/checksum family, and admission class. Protocol Cell
-is a mandatory shard boundary; tenant or topic policy may split it further when retention coupling, noisy-neighbor risk,
-or compliance requires it.
+Cell Provider Scope, provider endpoint, region, format, encryption, Object-extent digest family, Frame-payload checksum
+family, and admission class. Protocol Cell is a mandatory shard boundary; tenant or topic policy may split it further
+when retention coupling, noisy-neighbor risk, or compliance requires it.
 
 Group close is triggered by bounded bytes, frame count, linger, deadline, memory pressure, or owner handoff. Every
 limit is configured and observable; no open group may grow or wait indefinitely.
 
 ## Object and frame identity
 
-A group object header identifies the object format, shard, node session, shard-run epoch, sequence, codec, checksum
-family, encryption metadata, frame count, and whole-object checksum.
+A group object header identifies the object format, shard, node session, shard-run epoch, sequence, codec,
+Object-extent digest family, encryption metadata, and frame count. The immutable Object Extent descriptor records the
+canonical request-body length and Object-extent digest algorithm/version/value outside the body; the digest value is
+never embedded in the exact bytes it hashes.
 
 The group object is an `ObjectExtent`. Every frame independently carries:
 
@@ -30,7 +32,7 @@ The group object is an `ObjectExtent`. Every frame independently carries:
 - Storage Epoch ID and Owner Epoch;
 - Position Domain ID/version and typed Protocol Coverage;
 - protocol entry/record count;
-- payload length and checksum;
+- decoded payload length and Frame-payload checksum algorithm/version/value;
 - idempotency identity;
 - flags required by the protocol payload mapping.
 
@@ -54,10 +56,15 @@ Object provider capability is explicit. `OBJECT_WAL` requires deterministic immu
 the required read-after-write behavior, and bounded verification. A provider or operation mode that lacks any of these
 capabilities is rejected for this profile.
 
-After a lost PUT response, `HEAD` proves success only when it returns the exact expected length plus a trustworthy
-whole-content checksum bound to the same immutable object identity/version. Otherwise recovery performs a bounded full
-GET and recomputes the expected checksum. ETag alone is never accepted as content identity, especially under multipart
-upload or server-side encryption.
+`ObjectExtentDigest` covers the exact canonical request body after Nereus compression and client-side encryption.
+`FramePayloadChecksum` covers canonical decoded protocol payload/record bytes. They are distinct typed fields and cannot
+satisfy each other's proof. Recovery validates the extent digest before trusting frame boundaries and validates frame
+checksums after decode.
+
+After a lost PUT response, `HEAD` proves success only when it returns the exact expected request-body length plus a
+trustworthy checksum with the same byte scope/algorithm bound to the immutable object version. Otherwise recovery
+performs a bounded full GET and recomputes `ObjectExtentDigest`. ETag alone is never accepted as content identity,
+especially under multipart upload or server-side encryption.
 
 A missing object may be retried only under the same deterministic identity with conditional-create semantics. A
 mismatched existing object is quarantined and fails closed; it is never overwritten. Exhausting the verification budget
@@ -87,4 +94,5 @@ close cannot mutate another session. A provider-wide physical outage may still a
 
 Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001`, `V2-OBJ-002`,
 `V2-OBJ-003`, and `V2-FABRIC-002`. See
-[ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md).
+[ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md) and
+[ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md).

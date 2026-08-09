@@ -64,8 +64,9 @@ The acceptance source is an exact clean AutoMQ commit and receipt, never the mov
 
 `BOOKKEEPER_WAL_ONLY` must preserve the native ManagedLedger call path and feature behavior before Nereus-specific
 advantages are counted. `BOOKKEEPER_WAL_ASYNC_OBJECT` uses ManagedLedger ledger/offload metadata as sole lifecycle
-authority and a Nereus `LedgerOffloader` for the Object format. `OBJECT_WAL` uses an explicit ObjectManagedLedger path
-and accepts its cost-first latency tradeoff. Every path keeps
+authority and offloads sealed non-current ledgers through a Nereus `LedgerOffloader`. `OBJECT_WAL` uses an explicit
+ObjectManagedLedger path plus a Pulsar-cell MetadataStore/Oxia virtual-ledger authority and accepts its cost-first
+latency tradeoff. Every path keeps
 `PulsarPosition(ledgerId, entryId)`, MessageId, and the ledger chain as protocol truth; Object/BookKeeper coordinates
 remain Physical Extents.
 
@@ -102,4 +103,4 @@ against V2 bindings, protocol-native Kafka work, and the then-current KoP source
 
 Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `T-PROJECTION-01`, `T-BENCH-01`,
 and `T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`,
-`V2-PROJECTION-001`, `V2-KAF-001`, `V2-PUL-001`, and `V2-KOP-001`.
+`V2-PROJECTION-001`, `V2-POSITION-002`, `V2-KAF-001`, `V2-PUL-001`, and `V2-KOP-001`.

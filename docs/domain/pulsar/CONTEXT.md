@@ -22,6 +22,11 @@ _Avoid_: Subtractable cross-ledger range, global logical range
 The protocol-authoritative ordering of real or virtual ledgers belonging to one Pulsar Managed Ledger.
 _Avoid_: Numerically sorted ledger IDs, global offset map
 
+**Pulsar Virtual Ledger Store**:
+The Pulsar-cell MetadataStore/Oxia authority that allocates reserved-domain virtual ledger IDs and publishes explicit
+append-only Ledger Chain order for Object WAL. Object keys and WalRun/group sequence never allocate or order positions.
+_Avoid_: Object-derived ledger ID, numeric ledger-ID ordering
+
 **Pulsar Position Domain**:
 The Position Domain whose ordering and adjacency rules are proven by the Ledger Chain and Pulsar Position semantics.
 _Avoid_: Universal position domain
@@ -33,5 +38,5 @@ _Avoid_: Object writer authority, Kafka leader authority
 **Pulsar Offload Authority**:
 For `BOOKKEEPER_WAL_ASYNC_OBJECT`, native ManagedLedger ledger/offload metadata is the sole authority for attempt,
 completion, offloaded read/fallback, and BookKeeper deletion eligibility. A Nereus `LedgerOffloader` writes Object
-bytes; a Nereus manifest is derived.
+bytes from sealed non-current ledgers only in 0.2; a Nereus manifest is derived.
 _Avoid_: Parallel manifest authority, generic cross-protocol offload state

@@ -36,10 +36,26 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-META-002",
+      "milestone": "M1",
+      "contract": "Topic Protocol Binding and its initial Storage Epoch have one atomic visible aggregate and partial or uncertain create never admits IO",
+      "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-POSITION-001",
       "milestone": "M1",
       "contract": "Kafka Offset and Pulsar Position remain binding and incarnation scoped typed domains without a universal logical offset",
       "ownerDoc": "docs/v2/01-correctness-and-append.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-002",
+      "milestone": "M1/M3",
+      "contract": "Pulsar Object WAL uses reserved domain virtual ledger IDs and explicit chain order while Object identity never becomes a position",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
@@ -94,7 +110,7 @@
     {
       "id": "V2-OBJ-001",
       "milestone": "M3",
-      "contract": "Object WAL ACK waits for verified group durability and no second durability upload",
+      "contract": "Object WAL ACK waits for verified group durability and the canonical request body Object Extent Digest",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -110,7 +126,7 @@
     {
       "id": "V2-OBJ-003",
       "milestone": "M3",
-      "contract": "lost PUT response uses trustworthy length checksum and version proof or bounded full GET without trusting ETag alone",
+      "contract": "lost PUT response verifies the Object Extent Digest by trusted provider proof or bounded full GET while frame payload checksums remain separate",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -126,7 +142,7 @@
     {
       "id": "V2-BK-002",
       "milestone": "M2",
-      "contract": "ManagedLedger metadata is sole Pulsar async offload authority and Nereus LedgerOffloader or derived indexes cannot bypass fallback or deletion safety",
+      "contract": "ManagedLedger metadata is sole Pulsar async offload authority and 0.2 offloads sealed non current ledgers only",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null

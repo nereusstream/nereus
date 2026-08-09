@@ -14,9 +14,9 @@ sourceTuple: v2-m0
 | Milestone | Scope | Status at M0 | Required aggregate |
 | --- | --- | --- | --- |
 | M0 | V1 archive references, Context Map/glossaries, V2 ADRs/contracts, open-question/session logs, source/scenario manifests, tradeoff register, documentation gate | DocumentationGated | `v2M0Check` |
-| M1 | new V2 API and identities for Protocol Cell, Cell Provider Scope/session, Topic Protocol Binding, Position Domain, Protocol Coverage, Physical Extent, and Storage Epoch; capability-split metadata SPI; remove superseded V1 API | Planned | `v2M1Check` |
-| M2 | Owner Epoch lane, typed frontier contract, BookKeeper foundation, Pulsar native-authority `LedgerOffloader` integration, Kafka ledger-layout scale spike | Planned | `v2M2Check` |
-| M3 | one-cell Object WAL groups, cell-scoped admission/session lifecycle, per-binding typed durable frontier, provider-response-loss recovery | Planned | `v2M3Check` |
+| M1 | new V2 identities; atomically visible Topic Binding Aggregate; Pulsar virtual-ledger identity/chain model; capability-split metadata SPI; remove superseded V1 API | Planned | `v2M1Check` |
+| M2 | Owner Epoch lane, typed frontier contract, BookKeeper foundation, sealed-ledger Pulsar `LedgerOffloader`, Kafka ledger-layout scale spike | Planned | `v2M2Check` |
+| M3 | one-cell Object WAL groups, two checksum domains, cell-scoped admission/session lifecycle, per-binding typed durable frontier, provider-response-loss recovery, Pulsar virtual-ledger Object path | Planned | `v2M3Check` |
 | M4 | manifest, protocol-position/timestamp indexes, Storage Epoch resolver, readable active tail | Planned | `v2M4Check` |
 | M5 | materialization, compaction, retention, source protection, per-cell cache/task isolation, physical GC | Planned | `v2M5Check` |
 | M6 | Kafka KRaft integration and protocol compatibility | Planned | `v2M6Check` |

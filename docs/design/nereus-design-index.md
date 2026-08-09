@@ -61,6 +61,10 @@ Current accepted decisions:
 - [ADR 0016: 0.2 cross-protocol runtime scope](../decisions/0016-v2-0.2-cross-protocol-runtime-scope.md)
 - [ADR 0017: Pulsar ManagedLedger offload authority](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md)
 - [ADR 0018: Object WAL uncertain PUT proof](../decisions/0018-v2-object-wal-uncertain-put-proof.md)
+- [ADR 0019: initial binding/epoch atomic visibility](../decisions/0019-v2-initial-binding-epoch-atomic-visibility.md)
+- [ADR 0020: Pulsar sealed-ledger async offload](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md)
+- [ADR 0021: Object WAL checksum domains](../decisions/0021-v2-object-wal-checksum-domains.md)
+- [ADR 0022: Pulsar Object WAL virtual-ledger authority](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md)
 
 ## V2 document map
 
@@ -70,7 +74,7 @@ Current accepted decisions:
 | [Correctness and append](../v2/01-correctness-and-append.md) | Accepted | NotStarted | ownership, WAL linearization, uncertain append |
 | [Protocol binding and Storage Epochs](../v2/02-storage-profiles-and-topic-binding.md) | Accepted | NotStarted | immutable protocol identity and epoch-scoped profiles |
 | [Object WAL](../v2/03-object-wal.md) | Accepted | NotStarted | group objects, per-binding typed durable frontier, recovery |
-| [BookKeeper and Pulsar](../v2/04-bookkeeper-and-pulsar.md) | Proposed | NotStarted | native positions and accepted offload authority; open execution/layout decisions |
+| [BookKeeper and Pulsar](../v2/04-bookkeeper-and-pulsar.md) | Proposed | NotStarted | native positions and sealed-ledger offload; open Kafka/Object layout decisions |
 | [Manifest/read/retention/GC](../v2/05-manifest-read-retention-gc.md) | Accepted | NotStarted | typed logical read view and physical lifecycle |
 | [Metadata and handoff](../v2/06-metadata-backends-and-handoff.md) | Accepted | NotStarted | KRaft/Oxia capability backends and hint semantics |
 | [Protocol integrations](../v2/07-protocol-integrations.md) | Accepted | NotStarted | Kafka targets, Pulsar parity, KoP deferral |
@@ -100,7 +104,8 @@ materialization, not a second durability upload. BookKeeper does not synchronous
 A Topic Protocol Binding fixes protocol identity, Position Domain, payload mapping, and Native Write Authority for one
 Topic Incarnation. Its append-only Storage Epoch chain selects profiles over protocol-native frontier intervals. A
 profile is immutable within an epoch. In 0.2 the runtime creates exactly one initial epoch per incarnation and exposes no
-online profile transition; the chain model is retained for future evolution.
+online profile transition; binding plus initial epoch become visible as one aggregate, and the chain model is retained
+for future evolution.
 
 ## Implementation and evidence status
 

@@ -18,7 +18,8 @@ Every physical source or materialized output has an immutable descriptor contain
 - source kind and epoch-scoped profile;
 - an `ObjectExtent` or `BookKeeperExtent`;
 - generation, format, payload mapping, and policy version;
-- byte length, protocol entry/record count, min/max timestamp, and checksums;
+- canonical Object-request-body length/Object Extent Digest, protocol entry/record count, min/max timestamp, and
+  per-frame payload checksum descriptors where applicable;
 - index descriptors required for protocol-position and timestamp lookup;
 - creation Owner Epoch/task identity.
 
@@ -53,8 +54,13 @@ The resolver first selects the Storage Epoch interval through the binding's Posi
 3. exact source generation/Physical Extent as fallback while source protection remains valid;
 4. fail closed when neither the selected generation nor a permitted source can prove the requested bytes.
 
+For Pulsar Object WAL, ledger/entry lookup first resolves the explicit virtual Ledger Chain from Pulsar authority, then
+maps ledger-keyed Pulsar Coverage to Object Extents. It never derives Ledger Chain order from a manifest, Object key, or
+numeric ledger-ID order.
+
 Cache is never authority. Cache keys and accounting include Protocol Cell and Cell Provider Scope; each cell has an
-independent capacity share. A cache hit is validated against the selected descriptor generation and checksum family.
+independent capacity share. A cache hit is validated against the selected descriptor generation and both declared
+checksum domains/families.
 
 ## Timestamp and protocol-position indexes
 
