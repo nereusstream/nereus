@@ -31,10 +31,10 @@ frontier, publishing incomplete coverage, or executing GC.
 
 Each shard has one low-frequency CAS-published
 `CurrentWalRunPointer {walRunRootKey, walRunRootSha256, shardRunEpoch}`. Owner-open, rollover, and handoff read or update
-this pointer; normal admitted group append performs no metadata-service I/O. The root may be stored as an immutable
-metadata value or provider object, but the pointer always binds its exact identity/SHA. Each successor root records its
-predecessor key/SHA, and recovery walks a bounded lineage from the current pointer to the published retirement
-frontier. Every group header binds the root SHA.
+this pointer; normal admitted group append performs no metadata-service I/O. ADR 0047 places immutable Root and Seal
+records in Cell control metadata, requires successor publication before pointer CAS, and forbids reopening a sealed
+run. Recovery walks a bounded lineage from the current pointer to the published retirement frontier. Every group
+header binds the root SHA.
 
 After an uncertain pointer CAS, reread accepts only exact candidate equality or the already committed winner; local
 merge is forbidden. Missing root, hash/epoch mismatch, lineage cycle/fork, predecessor-depth excess, or a pointer that
@@ -46,10 +46,10 @@ cannot reach the retirement frontier fails closed.
 - More rollover/root control-plane operations and small tail groups buy a bounded recoverable state rather than an
   eventually unscannable prefix.
 - Provider slowdown can create correctness-driven availability backpressure before capacity is exhausted.
-- Exact root/pointer/lineage wire, seal/checkpoint/retirement authority, handoff cuts, and evidence-derived numeric
-  values remain downstream gates.
+- Root/Seal/successor publication is refined by ADR 0047. Exact wire, checkpoint/retirement authority, handoff cuts, and
+  evidence-derived numeric values remain downstream gates.
 - M3 must prove every cap and cumulative counter, no counter reset on fallback, pre-limit rollover, uncertain CAS,
   lineage fork/cycle/depth rejection, pointer/root substitution, and zero normal-append metadata I/O.
 
-This decision refines ADR 0030 and is tracked by `T-APPEND-01`, `T-OBJECT-01`, `T-HANDOFF-01`, and
-`V2-OBJ-005/009..011`.
+This decision is refined by ADR 0047, refines ADR 0030, and is tracked by `T-APPEND-01`, `T-OBJECT-01`,
+`T-HANDOFF-01`, and `V2-OBJ-005/009..011/014`.

@@ -38,10 +38,10 @@ It does not prove provider credentials, profile capacity, or per-topic admission
 - Reusing the feature name keeps one operational namespace, but V2 deliberately breaks the former continuous-range and
   generic downgrade assumptions.
 - There is no in-place V1-to-V2 or stock-to-V2 metadata upgrade in 0.2.
-- Physical controller record IDs, image ownership, snapshot ordering, and fresh-format evidence remain downstream
-  gates.
+- Image ownership and snapshot ordering are refined by ADR 0042. Physical controller record IDs/fields and
+  fresh-format executable evidence remain downstream gates.
 - M1/M6 must prove bootstrap-only activation, rejection of every runtime transition, level-1 replay refusal, atomic
   CreateTopics behavior, validate-only zero writes, and native error preservation.
 
-This decision refines ADRs 0023 and 0033 and is tracked by `T-META-01`, `T-COMPAT-01`, `V2-META-004`, and
-`V2-KAF-META-001`.
+This decision is refined by ADR 0042, refines ADRs 0023/0033, and is tracked by `T-META-01`, `T-COMPAT-01`,
+`V2-META-004`, and `V2-KAF-META-001..002`.

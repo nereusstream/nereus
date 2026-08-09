@@ -30,6 +30,11 @@ The KRaft finalized `nereus.storage.version=2` established only during fresh sto
 and every runtime upgrade/downgrade.
 _Avoid_: Online V1 migration, unsafe feature downgrade, absent feature as V2 activation
 
+**Kafka Topic Binding Aggregate Record**:
+The generated typed KRaft wire-v0 record owned by one `TopicImage`. Completed snapshots place it after `TopicRecord`
+and before partitions; `RemoveTopicRecord` removes it with the topic.
+_Avoid_: Opaque attachment, parallel aggregate image, independent aggregate delete record
+
 **Kafka Frame**:
 One complete raw Kafka RecordBatch after broker offset and leader-epoch assignment. Its exact batch header defines
 coverage; record count does not derive the offset span.

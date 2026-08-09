@@ -42,10 +42,11 @@ record count, split a Pulsar entry, or treat physical group order as protocol or
 - `V2-OPEN-OBJ-14` is resolved.
 - Per-frame descriptors, AEAD tags, and weaker cross-frame compression are accepted costs for native random reads and
   removal of sidecar atomicity.
-- Exact header/directory field IDs, byte layout, hard limits, AEAD key/nonce envelope, range assembly, and compaction
-  golden vectors remain downstream format gates.
+- AEAD key hierarchy and authenticated directory/frame domains are refined by ADR 0046. Exact header/directory field
+  IDs, byte layout, hard limits, nonce/AAD framing, range assembly, and compaction golden vectors remain downstream
+  format gates.
 - M3 must prove commit-set co-location, oversize rejection before allocation, directory substitution/bounds failures,
   independent frame decode, no cross-frame compression/AEAD, and range reads that do not decode unrelated frames.
 
-This decision refines ADRs 0026, 0031, and 0037 and is tracked by `T-PROTOCOL-01`, `T-OBJECT-01`, and
-`V2-OBJ-004/006/007/012`.
+This decision is refined by ADR 0046, refines ADRs 0026/0031/0037, and is tracked by `T-PROTOCOL-01`, `T-OBJECT-01`,
+and `V2-OBJ-004/006/007/012/013`.

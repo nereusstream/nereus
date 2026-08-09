@@ -60,9 +60,25 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-META-005",
+      "milestone": "M1/M5",
+      "contract": "Pulsar keeps a permanent monotonic topic generation selector and replaces a reference free full aggregate only with a same key permanent retired tombstone",
+      "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-KAF-META-001",
       "milestone": "M1/M6",
       "contract": "Kafka V2 activates only at fresh bootstrap nereus storage version 2 and rejects V1 plus every runtime upgrade or downgrade",
+      "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-META-002",
+      "milestone": "M1",
+      "contract": "Kafka owns one generated typed aggregate record in TopicImage and validates exactly one per live topic at complete batch and snapshot cuts",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -119,6 +135,14 @@
       "id": "V2-POSITION-007",
       "milestone": "M1",
       "contract": "every Cell has one immutable aligned power of two slice and deployment capacity is bounded by numeric and lifetime encoded registry limits",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-008",
+      "milestone": "M1/M3",
+      "contract": "0.2 never resizes relocates extends or attaches another virtual ledger slice and exhaustion fails before allocation",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -268,6 +292,22 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-OBJ-013",
+      "milestone": "M3",
+      "contract": "NWG1 uses one KMS wrapped WalRun key unique HKDF derived Object keys and disjoint authenticated directory and frame nonce domains",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-014",
+      "milestone": "M3/M7",
+      "contract": "immutable control metadata Root and Seal records plus one exact pointer CAS publish each WalRun successor without reopening a sealed run",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-BK-001",
       "milestone": "M2",
       "contract": "both BookKeeper profiles ACK at quorum without synchronous Object dependency",
@@ -327,6 +367,22 @@
       "id": "V2-BK-008",
       "milestone": "M2",
       "contract": "native dual source reads allow at most one whole range single source fallback while both sources remain eligible",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-009",
+      "milestone": "M2",
+      "contract": "NPO1 indexes ordered gap free independently verifiable NPD1 multi entry blocks with bounded entry directories and no cross block state",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-010",
+      "milestone": "M2",
+      "contract": "one ManagedLedger owned dual source handle uses source specific range pins and drains BookKeeper pins before the native deletion CAS",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null

@@ -114,7 +114,9 @@ rule does not grant a Nereus manifest native ManagedLedger deletion authority.
 Before ManagedLedger commits `bookkeeperDeleted=true`, it performs bounded final NPO1/data/read-path revalidation, then
 rechecks the same attempt and eligible state in the native metadata CAS. Object I/O does not hold the metadata mutex.
 Failure retains BookKeeper; permanent mismatch quarantines the Object attempt. Reader pins and physical-delete
-intent/fact recovery remain required descendants of this final eligibility cut.
+intent/fact recovery remain required descendants of this final eligibility cut. The cached `DualSourceReadHandle`
+fences new BookKeeper range pins and drains every already admitted BK range before revalidation/CAS. Physical deletion
+starts only after the flag commits and the BK child is invalidated/closed; composite close drains both sources.
 
 A GC executor may be shared only as a capacity pool. Every request enters through a cell-scoped task root and delete
 capability, and foreign provider keys, ledgers, scopes, or credentials fail closed before provider I/O.

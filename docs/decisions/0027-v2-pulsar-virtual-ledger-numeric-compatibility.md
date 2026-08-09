@@ -40,5 +40,6 @@ This decision does not activate online BookKeeper/Object migration or a hybrid l
 
 The deployment registry's physical authority is refined by
 [ADR 0032](0032-v2-pulsar-virtual-ledger-reservation-registry.md), and the slice contract by
-[ADR 0041](0041-v2-pulsar-virtual-ledger-slice-contract.md). This decision refines ADR 0022 and is tracked by
-`T-POSITION-01`, `V2-POSITION-002..007`.
+[ADR 0041](0041-v2-pulsar-virtual-ledger-slice-contract.md) plus
+[ADR 0048](0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md). This decision refines ADR 0022 and is tracked by
+`T-POSITION-01`, `V2-POSITION-002..008`.

@@ -15,22 +15,23 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-The user explicitly confirmed all fourteen round-5 recommendations. ADRs 0033 through 0041 now resolve that complete
+The user explicitly confirmed all seven round-6 recommendations. ADRs 0042 through 0048 now resolve that complete
 frontier. The next independent frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-KAF-META-02` | where the Kafka aggregate record lives and how replay/snapshot/delete own it | use one explicit generated record owned by `TopicImage`, with topic-cascaded deletion and final image validation |
-| `V2-OPEN-PUL-META-01` | when a deleted Pulsar incarnation's full aggregate may be retired | keep a permanent generation selector and replace the full aggregate with a compact same-key tombstone only after exact proof |
-| `V2-OPEN-BK-09` | which independently verifiable unit NPO1 indexes inside its data Object | use ordered `NPD1` multi-entry blocks with bounded entry directories and per-block integrity/codec boundaries |
-| `V2-OPEN-BK-10` | which layer owns dual-source handles and source-specific read pins | use one ManagedLedger-owned composite handle whose BK pin drain precedes native deletion CAS |
-| `V2-OPEN-OBJ-15` | which NWG1 key hierarchy, AEAD, nonce, and directory-authentication contract applies | wrap one run key, derive unique object keys, and independently authenticate the directory and every frame |
-| `V2-OPEN-OBJ-16` | where immutable WalRun roots live and how seal/successor publication works | store immutable root/seal records in control metadata and advance one exact CAS pointer only after sealing |
-| `V2-OPEN-PUL-OBJ-07` | whether a fixed virtual-ledger slice may be resized or extended | forbid resize, relocation, extension, and second slices in 0.2; exhaustion fails closed |
+| `V2-OPEN-KAF-META-03` | exact Kafka extension API key, generated wire fields, and final-image validation hook | reserve API key 32000, use strict explicit wire-v0 fields, and validate at completed batch/snapshot apply |
+| `V2-OPEN-PUL-META-02` | selector/tombstone wire and separate-key create/delete/recreate state machine | use exact `RESERVED -> ACTIVE -> DELETING -> DELETED` CAS recovery around the immutable aggregate |
+| `V2-OPEN-BK-11` | exact NPD1 object/block wire, limits, codecs, and crypto envelope | use bounded big-endian block headers/directories, native-size-aware admission, ZSTD/NONE, and one wrapped attempt key |
+| `V2-OPEN-BK-12` | persisted physical BookKeeper delete intent/fact and restart behavior | make Object-only INTENT durable before delete, retry on restart, and mark DONE only after success/absence proof |
+| `V2-OPEN-OBJ-17` | exact NWG1 clear header, HKDF, nonce, AAD, and encrypted-directory framing | use a fixed header, length-framed HKDF inputs, fixed domain/ordinal nonces, and descriptor-bound AAD |
+| `V2-OPEN-OBJ-18` | checkpoint-page authority and handoff treatment of an uncovered open tail | publish bounded pages asynchronously, require LIST for uncovered open tail, and bind final pages into the Seal |
+| `V2-OPEN-PUL-OBJ-08` | exact slice exponent and one-record lifetime caps | use `k=40`, 64 KiB registry bytes, 256 lifetime assignments, and fixed bounded rows |
+| `V2-OPEN-PUL-OBJ-09` | allocator reservation, Ledger Chain head publication, and response-loss recovery | serialize one Cell reservation, publish immutable node then exact head CAS, and burn conflicts as gaps |
 
 The complete questions and recommendations are in
-[round 6](grill-notes/08-restarted-grill-2-runtime-ownership-and-crypto.md). None of these seven recommendations is
-accepted yet.
+[round 7](grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md). None of these eight recommendations
+is accepted yet.
 
 ## Initial binding and epoch publication
 
@@ -66,20 +67,31 @@ Resolved by [ADR 0034](../decisions/0034-v2-kafka-feature-level-2-bootstrap-acti
 `nereus.storage.version=2` only at fresh KRaft format/bootstrap, advertises `[2,2]`, permanently rejects level-1 V1
 state, and forbids every runtime upgrade/downgrade.
 
-### `V2-OPEN-KAF-META-02`: Kafka aggregate record and image ownership
+### `V2-OPEN-KAF-META-02`: resolved Kafka aggregate record and image ownership
 
-Should level-2 Kafka store the aggregate as an opaque attachment, a parallel image, or one generated metadata record
-owned by `TopicImage`? The current recommendation is an explicit typed wire-v0 record ordered between `TopicRecord`
-and `PartitionRecord`s, topic-cascaded removal with no second delete record, and fatal complete-image validation at
-atomic batch or completed-snapshot publication. This is not yet accepted.
+Resolved by [ADR 0042](../decisions/0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md). One generated
+typed wire-v0 record belongs to `TopicImage`, completed snapshots order it between topic and partitions, topic removal
+cascades, and every published complete image requires exactly one valid aggregate per live Nereus topic.
 
-### `V2-OPEN-PUL-META-01`: Pulsar aggregate retirement and recreation ABA
+### `V2-OPEN-PUL-META-01`: resolved Pulsar aggregate retirement and recreation ABA
 
-Must every full immutable Pulsar aggregate remain forever, or may reference-free deleted incarnations release most of
-that metadata? The current recommendation keeps a permanent compact name/generation selector and, only after the exact
-incarnation is deleted, unreferenced, drained, and past audit grace, CAS-replaces the full aggregate with a compact
-permanent tombstone at the same incarnation key. The key is never absent or reusable, so a late `putIfAbsent` cannot
-resurrect it. This is not yet accepted.
+Resolved by [ADR 0043](../decisions/0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md). A permanent
+name-scoped selector retains monotonic generation and durable deletion; only exact reference-free proof may replace a
+full aggregate with a compact permanent same-key tombstone. Neither key nor generation is reused.
+
+### `V2-OPEN-KAF-META-03`: Kafka aggregate generated wire and validation hook
+
+Which non-conflicting metadata API key, explicit field wire, and final replay hook implement ADR 0042? The current
+recommendation reserves Nereus API-key band `32000..32767`, assigns the aggregate key 32000 with strict non-flexible v0
+typed fields, accumulates transient state in `TopicDelta`, and rejects missing/duplicate/invalid aggregates only at the
+completed batch/snapshot apply boundary. This is not yet accepted.
+
+### `V2-OPEN-PUL-META-02`: Pulsar selector and aggregate CAS state machine
+
+How do separate selector and aggregate keys recover without pretending Oxia offers a multi-key transaction? The
+current recommendation uses exact `RESERVED -> ACTIVE -> DELETING -> DELETED` selector CAS transitions, exact immutable
+aggregate creation between RESERVED and ACTIVE, fail-closed admission until ACTIVE, and same-key permanent incarnation
+tombstones after later reference-free retirement. This is not yet accepted.
 
 ## Object WAL durability verification
 
@@ -166,19 +178,30 @@ Resolved by [ADR 0040](../decisions/0040-v2-nwg1-append-unit-directory-and-coloc
 authoritative in-body binding-context/append-unit directory, co-locates every Kafka commit set in one ObjectExtent, and
 independently compresses/authenticates/checks each frame block.
 
-### `V2-OPEN-OBJ-15`: NWG1 key hierarchy, AEAD, and authenticated directory
+### `V2-OPEN-OBJ-15`: resolved NWG1 key hierarchy, AEAD, and authenticated directory
 
-Should NWG1 pay a KMS wrap per ObjectExtent, share one raw key, or use a bounded key hierarchy? The current
-recommendation wraps one random WalRun key under an immutable Cell KMS version, derives a unique AES-256 object key per
-run sequence with HKDF-SHA-256, assigns disjoint fixed nonces to directory and frame ordinals, and authenticates the
-range-readable directory plus every independently compressed frame. This is not yet accepted.
+Resolved by [ADR 0046](../decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md). NWG1 mandates
+AES-256-GCM/HKDF-SHA-256 v1, wraps one random run key under the immutable Cell KMS version, derives unique per-Object
+keys, and uses disjoint authenticated directory/frame nonce domains with rotation only at rollover.
 
-### `V2-OPEN-OBJ-16`: WalRun Root home and immutable seal publication
+### `V2-OPEN-OBJ-16`: resolved WalRun Root home and immutable seal publication
 
-Should a WalRun Root be a provider Object or control-metadata record, and does sealing mutate it? The current
-recommendation uses immutable root and seal records in the Cell's control-metadata backend, then creates a successor
-bound to both and advances `CurrentWalRunPointer` with one exact CAS. A sealed run is never reopened. This is not yet
-accepted.
+Resolved by [ADR 0047](../decisions/0047-v2-walrun-root-seal-and-successor-publication.md). Immutable Root and Seal
+records live in Cell control metadata; a successor binds both and one exact pointer CAS advances only after publication.
+A sealed run is never reopened.
+
+### `V2-OPEN-OBJ-17`: exact NWG1 cryptographic framing
+
+Which header, HKDF input, nonce bytes, AAD, and encrypted-directory layout implement ADR 0046? The current recommendation
+uses a fixed 256-byte big-endian clear header, length-framed Root-salted HKDF inputs, fixed `NDIR`/`NFRM` domain+ordinal
+nonces, and directory/frame-descriptor-bound AAD before trusting any frame range. This is not yet accepted.
+
+### `V2-OPEN-OBJ-18`: WalRun checkpoint pages and open-tail handoff
+
+When may asynchronous checkpoint pages become authoritative? The current recommendation publishes bounded immutable
+pages and a head after ACK, always uses strong LIST for uncovered open-tail state, falls back to full bounded LIST on an
+invalid chain, and lets only a final gap-free page chain bound by `WalRunSealRecord` become the sealed-run inventory.
+This is not yet accepted.
 
 ## Storage Epoch transitions
 
@@ -272,18 +295,29 @@ Resolved by [ADR 0036](../decisions/0036-v2-pulsar-native-dual-source-read-and-d
 permits at most one whole-range, single-source fallback while both sources remain eligible; Object corruption remains a
 deletion veto, and `bookkeeperDeleted=true` is permanently Object-only.
 
-### `V2-OPEN-BK-09`: sealed-ledger NPD1 data-block contract
+### `V2-OPEN-BK-09`: resolved sealed-ledger NPD1 data-block contract
 
-Which physical unit does NPO1's sparse index authorize inside the data Object? The current recommendation is an
-ordered, gap-free `NPD1` sequence of independently verifiable multi-entry blocks. Each root row binds an exact block
-range and digest; each block has a bounded entry directory, never splits an entry, resets compression/AEAD/integrity,
-and gives an oversize entry one dedicated bounded block. This is not yet accepted.
+Resolved by [ADR 0044](../decisions/0044-v2-pulsar-npd1-sealed-ledger-data-blocks.md). NPO1 indexes ordered, gap-free,
+independently verifiable NPD1 multi-entry blocks with bounded directories, no split entries or cross-block state, and
+dedicated bounded oversize blocks.
 
-### `V2-OPEN-BK-10`: ManagedLedger dual-source handle and read pins
+### `V2-OPEN-BK-10`: resolved ManagedLedger dual-source handle and read pins
 
-Which layer owns fallback and prevents BookKeeper deletion from racing admitted reads? The current recommendation is a
-ManagedLedger-owned composite handle with lazy Object/BK children and source-specific range pins. Deletion fences new
-BK pins, drains existing pins, revalidates Object, and only then CASes native deletion state. This is not yet accepted.
+Resolved by [ADR 0045](../decisions/0045-v2-pulsar-dual-source-read-handle-and-pins.md). ManagedLedger owns one cached
+composite handle with lazy children and exact source pins; deletion fences/drains BK pins before final Object
+revalidation and native CAS, and close drains both sources.
+
+### `V2-OPEN-BK-11`: NPD1 block wire, limits, codec, and crypto
+
+Which canonical bytes and caps implement ADR 0044 without reducing the admitted native Pulsar entry limit? The current
+recommendation uses fixed big-endian NPD1/NPB1 headers and rows, native-size-aware persisted admission below the signed
+int boundary, NONE/ZSTD codecs, and one KMS-wrapped attempt key with per-block HKDF/AES-GCM. This is not yet accepted.
+
+### `V2-OPEN-BK-12`: persisted BookKeeper physical-delete intent and fact
+
+How does restart reconcile physical deletion after reads become Object-only? The current recommendation persists
+attempt-scoped `BK_DELETE_NONE -> BK_DELETE_INTENT -> BK_DELETE_DONE`, retries INTENT idempotently after restart, treats
+native absence as success, never restores BK eligibility, and requires DONE before retirement. This is not yet accepted.
 
 ## Pulsar Object WAL
 
@@ -324,12 +358,24 @@ Resolved by [ADR 0041](../decisions/0041-v2-pulsar-virtual-ledger-slice-contract
 equal-size aligned `2^k` slice, while numeric and encoded/lifetime registry caps both include retired Cells. Exact `k`
 and expansion policy remain downstream gates.
 
-### `V2-OPEN-PUL-OBJ-07`: virtual-ledger slice expansion policy
+### `V2-OPEN-PUL-OBJ-07`: resolved virtual-ledger slice expansion policy
 
-May a Cell resize, relocate, extend, or attach another interval after exhausting its fixed slice? The current
-recommendation forbids all four in 0.2: exhaustion fails closed, and added capacity requires a new Protocol Cell ID and
-new slice plus a future explicit topic-migration contract. Exact `k` and admission must cover the supported lifetime.
-This is not yet accepted.
+Resolved by [ADR 0048](../decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md). 0.2 forbids resize,
+relocation, extension, and another slice; exhaustion fails before allocation, and new capacity requires a new Cell plus
+a future explicit migration contract for existing topics or ledgers.
+
+### `V2-OPEN-PUL-OBJ-08`: virtual-ledger exponent and registry lifetime caps
+
+Which fixed exponent and one-record caps remain safely below Oxia 0.9.0's 128 KiB batch limit? The current
+recommendation fixes `k=40`, `maxRegistryBytes=64 KiB`, `maxAssignmentsEver=256`, and a 192-byte maximum canonical row,
+with every retired row counted forever. This is not yet accepted.
+
+### `V2-OPEN-PUL-OBJ-09`: virtual-ledger allocator reservation and head publication
+
+How do ID allocation and Ledger Chain head publication recover without a cross-key transaction? The current
+recommendation serializes one Cell-scoped IDLE/RESERVED allocator record, burns the candidate, creates one immutable
+ledger node, exact-CASes the ManagedLedger head, then clears the reservation. Unreferenced conflicts remain permanent
+gaps and normal entry append has no metadata I/O. This is not yet accepted.
 
 ### `V2-OPEN-PUL-MIGRATION-01`: new incarnation or HybridManagedLedger
 

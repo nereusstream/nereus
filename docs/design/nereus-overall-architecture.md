@@ -73,6 +73,11 @@ derivations. One closed logical aggregate schema v1 maps to Oxia and Kafka physi
 fresh-bootstrap `nereus.storage.version=2`; V1 and runtime transitions are rejected. Partial or conflicting state never
 admits I/O.
 
+Kafka's generated wire-v0 record is owned by `TopicImage`, snapshots place it between the topic and partitions, and
+`RemoveTopicRecord` removes it with the topic. Pulsar instead retains a permanent name/generation selector and may
+replace a fully retired incarnation aggregate, by exact CAS at the same never-reused key, with a compact permanent
+tombstone. These native lifecycle fences prevent partial Kafka images and same-name Pulsar recreation ABA.
+
 Ownership grants an exclusive Owner Epoch inside that binding. Kafka uses KRaft; Pulsar uses MetadataStore/Oxia plus
 native broker/ManagedLedger authority. Owner Epoch and Storage Epoch are distinct.
 
@@ -150,7 +155,13 @@ per-group metadata commit. Async checkpoint pages only accelerate it.
 
 NWG1 stores an authoritative in-body Binding Context Table and Append Unit Directory. Exact binding/Storage/Owner Epoch
 authority is object-local rather than singular in a multi-binding root. One Kafka commit set stays inside one extent and
-each frame block is independently compressed, authenticated, and decoded.
+each frame block is independently compressed, authenticated, and decoded. AES-256-GCM/HKDF-SHA-256 v1 wraps one
+run-scoped data key, derives one key per ObjectExtent, and separates authenticated directory and frame nonce domains;
+KMS rotation happens only at run rollover.
+
+WalRun Root and Seal are separate immutable Cell control-metadata records. A successor binds both predecessor
+identities, then one exact CAS advances the current-run pointer. A pointer left on a sealed run is recovered forward and
+never authorizes reopening it.
 
 The WAL object is already the durable Object copy. SHA-256/v1 protects the exact canonical provider request body;
 CRC32C/v1 independently protects exact assigned Kafka batch bytes or exact Pulsar ManagedLedger entry bytes after the
@@ -179,7 +190,8 @@ The exact Kafka ledger layout remains an M2 evidence gate. Pulsar async Object o
 ledgers only; one native attempt publishes one bounded data Object followed by one deterministic sparse-index/root
 Object. It does not stream the current append ledger in 0.2. Pulsar Object WAL allocates increasing virtual ledger IDs
 from one fixed aligned, never-reused Cell slice assigned by a bounded lifetime CAS registry. Slice ownership survives
-broker/provider change and retirement leaves a permanent tombstone. Explicit MetadataStore/Oxia links remain Ledger
+broker/provider change and retirement leaves a permanent tombstone. 0.2 never resizes, relocates, extends, or adds a
+second slice; exhaustion fails closed and new capacity uses a new Cell. Explicit MetadataStore/Oxia links remain Ledger
 Chain authority, while Object groups remain Physical Extents. BookKeeper/Object profile-transition mechanics are
 deferred beyond 0.2.
 
@@ -188,8 +200,9 @@ read/fallback, and deletion-eligibility authority. Nereus provides a `LedgerOffl
 delete a ledger or overrule native lifecycle state. The offloader exposes the deterministic data/root pair as one
 ledger-equivalent `ReadHandle`; persisted attempt location/key derivation survives config drift, the bounded root binds
 sealed metadata and contiguous data coverage using NPO1 hard parser limits. While both sources are eligible, native
-reads allow one whole-range fallback; exact Object revalidation precedes `bookkeeperDeleted=true`. Cleanup proves root
-absent before data deletion.
+reads allow one whole-range fallback over independently verifiable NPD1 blocks. One ManagedLedger-owned composite
+handle owns both children and source pins; BK pins drain before exact Object revalidation and
+`bookkeeperDeleted=true`. Cleanup proves root absent before data deletion.
 
 Detailed contract: [BookKeeper and Pulsar](../v2/04-bookkeeper-and-pulsar.md).
 

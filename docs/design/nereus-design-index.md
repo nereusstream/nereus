@@ -84,6 +84,13 @@ Current accepted decisions:
 - [ADR 0039: bounded WalRun lifecycle, recovery, and root pointer](../decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md)
 - [ADR 0040: NWG1 append-unit directory and co-location](../decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md)
 - [ADR 0041: Pulsar virtual-ledger slice contract](../decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md)
+- [ADR 0042: Kafka topic aggregate KRaft record and image ownership](../decisions/0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md)
+- [ADR 0043: Pulsar topic generation selector and retired tombstone](../decisions/0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md)
+- [ADR 0044: Pulsar NPD1 sealed-ledger data blocks](../decisions/0044-v2-pulsar-npd1-sealed-ledger-data-blocks.md)
+- [ADR 0045: Pulsar dual-source read handle and source pins](../decisions/0045-v2-pulsar-dual-source-read-handle-and-pins.md)
+- [ADR 0046: NWG1 run key, AEAD, and authenticated directory](../decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md)
+- [ADR 0047: WalRun Root, seal, and successor publication](../decisions/0047-v2-walrun-root-seal-and-successor-publication.md)
+- [ADR 0048: Pulsar virtual-ledger fixed-slice exhaustion](../decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md)
 
 ## V2 document map
 

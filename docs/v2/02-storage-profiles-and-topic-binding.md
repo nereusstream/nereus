@@ -59,10 +59,23 @@ complete publication/validation and is not stored. The v1 aggregate excludes `CR
 timestamps, attempts, controller offsets, backend versions, and untyped attributes. Oxia envelope schema 1 and Kafka
 controller-record wire v0 map through one logical validator and shared semantic golden vectors.
 
+At Kafka feature level 2, that physical record is one generated, typed `TopicBindingAggregateRecord` owned by
+`TopicImage`, not an opaque attachment or parallel image. Completed snapshots write feature records and then, per
+topic, `TopicRecord -> TopicBindingAggregateRecord -> PartitionRecord*`; topic removal cascades through the existing
+`RemoveTopicRecord`. Every published controller batch or completed snapshot has exactly one valid aggregate per live
+Nereus topic. Missing, duplicate, unknown-topic, or invalid records fail closed; a partial topic may exist only inside
+unpublished replay construction.
+
+Pulsar additionally retains one permanent name-scoped `PulsarTopicGenerationSelector`. Its generation is monotonic and
+`DELETED(generation)` never becomes absent. A full incarnation aggregate remains immutable until exact reference-free
+retirement; then one exact-version CAS may replace it, at the same never-reused key, with a compact permanent
+`RetiredTopicIncarnationTombstone` binding the original aggregate and retirement-proof digests. Later generations use
+new keys, and lifetime metadata admission counts every selector and tombstone.
+
 A lost create response rereads the same record and requires exact equality. Missing, mismatched, unknown, or conflicting
 aggregate state fails closed and never selects a default epoch. The generic `CREATING` fallback in ADR 0019 is not used
 by this 0.2 single-record representation. Normal admitted append does not read or mutate the aggregate remotely. ADRs
-0019, 0023, 0028, 0033, and 0034 are authoritative. Kafka activates this schema only at fresh-bootstrap finalized
+0019, 0023, 0028, 0033, 0034, 0042, and 0043 are authoritative. Kafka activates this schema only at fresh-bootstrap finalized
 `nereus.storage.version=2`; level-1 replay and runtime upgrade/downgrade are rejected.
 
 ## Append-only Storage Epoch chain
@@ -142,9 +155,11 @@ default without validation. A protocol adapter may restrict the allowed initial 
 transaction authority cannot satisfy the contract. No adapter exposes an online transition set in 0.2.
 
 Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-OBJECT-01`, and `T-BK-01`. Required scenarios:
-`V2-PROFILE-001`, `V2-MIGRATION-001`, `V2-META-002..004`, and `V2-KAF-META-001`. See
+`V2-PROFILE-001`, `V2-MIGRATION-001`, `V2-META-002..005`, and `V2-KAF-META-001..002`. See
 [ADR 0019](../decisions/0019-v2-initial-binding-epoch-atomic-visibility.md),
 [ADR 0023](../decisions/0023-v2-topic-binding-aggregate-record.md),
 [ADR 0028](../decisions/0028-v2-topic-incarnation-keys-and-deterministic-ids.md),
-[ADR 0033](../decisions/0033-v2-topic-binding-aggregate-logical-schema-v1.md), and
-[ADR 0034](../decisions/0034-v2-kafka-feature-level-2-bootstrap-activation.md).
+[ADR 0033](../decisions/0033-v2-topic-binding-aggregate-logical-schema-v1.md),
+[ADR 0034](../decisions/0034-v2-kafka-feature-level-2-bootstrap-activation.md),
+[ADR 0042](../decisions/0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md), and
+[ADR 0043](../decisions/0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md).

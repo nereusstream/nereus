@@ -48,9 +48,10 @@ must preserve exact aggregate equality.
 - `V2-OPEN-META-04` is resolved.
 - Whole-record schema evolution is heavier than independently versioning children, but eliminates reader-version
   combination explosion and preserves exact retry equality.
-- Deletion/retirement, Kafka image ownership and snapshot order, physical field/API IDs, and a future schema-v2
-  evolution protocol remain downstream gates.
+- Kafka image ownership/snapshot order and Pulsar deletion/retirement are refined by ADRs 0042/0043. Physical field/API
+  IDs, exact selector wire, and a future schema-v2 evolution protocol remain downstream gates.
 - M1 must prove closed-discriminator rejection, required/`NONE` combinations, ordinal/back-reference validation,
   backend-to-logical equality, deterministic re-encode, and exclusion of every mutable/retry-dependent field.
 
-This decision refines ADRs 0023 and 0028 and is tracked by `T-META-01`, `V2-META-002..004`.
+This decision is refined by ADRs 0042/0043, refines ADRs 0023/0028, and is tracked by `T-META-01`,
+`V2-META-002..005`, and `V2-KAF-META-002`.

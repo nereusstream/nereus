@@ -94,6 +94,13 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md"
     "$repo_root/docs/decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md"
     "$repo_root/docs/decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md"
+    "$repo_root/docs/decisions/0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md"
+    "$repo_root/docs/decisions/0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md"
+    "$repo_root/docs/decisions/0044-v2-pulsar-npd1-sealed-ledger-data-blocks.md"
+    "$repo_root/docs/decisions/0045-v2-pulsar-dual-source-read-handle-and-pins.md"
+    "$repo_root/docs/decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md"
+    "$repo_root/docs/decisions/0047-v2-walrun-root-seal-and-successor-publication.md"
+    "$repo_root/docs/decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -142,6 +149,13 @@ require_literal "broker-local exact-ciphertext recovery journal" "docs/decisions
 require_literal "CurrentWalRunPointer" "docs/decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md"
 require_literal '`BindingContextTable + AppendUnitDirectory`' "docs/decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md"
 require_literal '`ACTIVE -> RETIRING -> RETIRED`' "docs/decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md"
+require_literal '`TopicImage` owns exactly one validated aggregate' "docs/decisions/0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md"
+require_literal '`PulsarTopicGenerationSelector`' "docs/decisions/0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md"
+require_literal 'distinct `NPD1` major format' "docs/decisions/0044-v2-pulsar-npd1-sealed-ledger-data-blocks.md"
+require_literal '`DualSourceReadHandle`' "docs/decisions/0045-v2-pulsar-dual-source-read-handle-and-pins.md"
+require_literal '`AES-256-GCM/HKDF-SHA-256 v1`' "docs/decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md"
+require_literal '`WalRunSealRecord`' "docs/decisions/0047-v2-walrun-root-seal-and-successor-publication.md"
+require_literal '0.2 forbids slice resize' "docs/decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -159,7 +173,9 @@ require_literal "The user answered: “全部按推荐确认”" "docs/v2/grill-
 require_literal "Restarted Grill 2 round 5" "docs/v2/grill-notes/07-restarted-grill-2-wire-recovery-and-slice-contracts.md"
 require_literal "The user answered: “全部按推荐确认”" "docs/v2/grill-notes/07-restarted-grill-2-wire-recovery-and-slice-contracts.md"
 require_literal "Restarted Grill 2 round 6" "docs/v2/grill-notes/08-restarted-grill-2-runtime-ownership-and-crypto.md"
-require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/08-restarted-grill-2-runtime-ownership-and-crypto.md"
+require_literal "The user answered: “全部按推荐确认”" "docs/v2/grill-notes/08-restarted-grill-2-runtime-ownership-and-crypto.md"
+require_literal "Restarted Grill 2 round 7" "docs/v2/grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md"
+require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -191,6 +207,13 @@ require_literal '`V2-OPEN-OBJ-14`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PUL-OBJ-04`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PUL-OBJ-05`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PUL-OBJ-06`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-KAF-META-02`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-PUL-META-01`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-BK-09`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-BK-10`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-OBJ-15`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-OBJ-16`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-PUL-OBJ-07`' "docs/v2/open-questions.md"
 require_literal "resolved by ADR 0014" "docs/v2/open-questions.md"
 
 for resolved_gate in \
@@ -226,13 +249,7 @@ for resolved_gate in \
     V2-OPEN-OBJ-14 \
     V2-OPEN-PUL-OBJ-04 \
     V2-OPEN-PUL-OBJ-05 \
-    V2-OPEN-PUL-OBJ-06; do
-    if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
-        fail "$resolved_gate remains in the active gate table"
-    fi
-done
-
-for active_gate in \
+    V2-OPEN-PUL-OBJ-06 \
     V2-OPEN-KAF-META-02 \
     V2-OPEN-PUL-META-01 \
     V2-OPEN-BK-09 \
@@ -240,8 +257,22 @@ for active_gate in \
     V2-OPEN-OBJ-15 \
     V2-OPEN-OBJ-16 \
     V2-OPEN-PUL-OBJ-07; do
+    if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
+        fail "$resolved_gate remains in the active gate table"
+    fi
+done
+
+for active_gate in \
+    V2-OPEN-KAF-META-03 \
+    V2-OPEN-PUL-META-02 \
+    V2-OPEN-BK-11 \
+    V2-OPEN-BK-12 \
+    V2-OPEN-OBJ-17 \
+    V2-OPEN-OBJ-18 \
+    V2-OPEN-PUL-OBJ-08 \
+    V2-OPEN-PUL-OBJ-09; do
     require_literal "\`$active_gate\`" "docs/v2/open-questions.md"
-    require_literal "\`$active_gate\`" "docs/v2/grill-notes/08-restarted-grill-2-runtime-ownership-and-crypto.md"
+    require_literal "\`$active_gate\`" "docs/v2/grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md"
     if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$active_gate is missing from the active gate table"
     fi
@@ -286,6 +317,13 @@ active_contracts=(
     "$repo_root/docs/decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md"
     "$repo_root/docs/decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md"
     "$repo_root/docs/decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md"
+    "$repo_root/docs/decisions/0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md"
+    "$repo_root/docs/decisions/0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md"
+    "$repo_root/docs/decisions/0044-v2-pulsar-npd1-sealed-ledger-data-blocks.md"
+    "$repo_root/docs/decisions/0045-v2-pulsar-dual-source-read-handle-and-pins.md"
+    "$repo_root/docs/decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md"
+    "$repo_root/docs/decisions/0047-v2-walrun-root-seal-and-successor-publication.md"
+    "$repo_root/docs/decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )
@@ -433,13 +471,15 @@ required_scenarios = {
     "V2-APP-001", "V2-APP-002", "V2-APP-003", "V2-PROFILE-001",
     "V2-POSITION-001", "V2-MULTIPROTOCOL-001",
     "V2-POSITION-002", "V2-POSITION-003", "V2-POSITION-004", "V2-POSITION-005", "V2-POSITION-006",
-    "V2-POSITION-007", "V2-META-002", "V2-META-003", "V2-META-004", "V2-KAF-META-001",
+    "V2-POSITION-007", "V2-POSITION-008", "V2-META-002", "V2-META-003", "V2-META-004",
+    "V2-META-005", "V2-KAF-META-001", "V2-KAF-META-002",
     "V2-FABRIC-001", "V2-FABRIC-002", "V2-FABRIC-003", "V2-MIGRATION-001",
     "V2-PROJECTION-001",
     "V2-OBJ-001", "V2-OBJ-002", "V2-OBJ-003", "V2-OBJ-004", "V2-OBJ-005", "V2-OBJ-006",
     "V2-OBJ-007", "V2-OBJ-008", "V2-OBJ-009", "V2-OBJ-010", "V2-OBJ-011", "V2-OBJ-012",
+    "V2-OBJ-013", "V2-OBJ-014",
     "V2-BK-001", "V2-BK-002", "V2-BK-003", "V2-BK-004", "V2-BK-005", "V2-BK-006",
-    "V2-BK-007", "V2-BK-008",
+    "V2-BK-007", "V2-BK-008", "V2-BK-009", "V2-BK-010",
     "V2-READ-001", "V2-READ-002", "V2-META-001", "V2-HO-001",
     "V2-KAF-001", "V2-PUL-001", "V2-KOP-001",
 }
@@ -475,7 +515,7 @@ contract_paths += list((root / "docs/decisions").glob("002[0-7]-*.md"))
 contract_paths += list((root / "docs/decisions").glob("002[8-9]-*.md"))
 contract_paths += list((root / "docs/decisions").glob("003[0-2]-*.md"))
 contract_paths += list((root / "docs/decisions").glob("003[3-9]-*.md"))
-contract_paths += list((root / "docs/decisions").glob("004[0-1]-*.md"))
+contract_paths += list((root / "docs/decisions").glob("004[0-8]-*.md"))
 contract_text = "\n".join(
     path.read_text() for path in contract_paths if path != tradeoff_path
 )
@@ -541,6 +581,13 @@ link_docs=(
     "$repo_root/docs/decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md"
     "$repo_root/docs/decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md"
     "$repo_root/docs/decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md"
+    "$repo_root/docs/decisions/0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md"
+    "$repo_root/docs/decisions/0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md"
+    "$repo_root/docs/decisions/0044-v2-pulsar-npd1-sealed-ledger-data-blocks.md"
+    "$repo_root/docs/decisions/0045-v2-pulsar-dual-source-read-handle-and-pins.md"
+    "$repo_root/docs/decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md"
+    "$repo_root/docs/decisions/0047-v2-walrun-root-seal-and-successor-publication.md"
+    "$repo_root/docs/decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md"
 )
 
 while IFS=: read -r source match; do

@@ -49,10 +49,10 @@ vetoes source deletion even when BookKeeper fallback succeeds.
 - `V2-OPEN-BK-07` and `V2-OPEN-BK-08` are resolved.
 - Final source deletion pays another bounded Object verification, while reads gain one native-authorized availability
   fallback without hiding corruption.
-- ManagedLedger-owned BookKeeper read pin/drain, composite handle lifecycle, physical-delete intent/fact state, and
-  restart reconciliation remain downstream gates.
+- ManagedLedger-owned read pins and composite-handle lifecycle are refined by ADR 0045. Physical-delete intent/fact
+  state and restart reconciliation remain downstream gates.
 - M2 must prove the exact state/error table, whole-range source purity, partial-entry release, no fallback loops,
   quarantine/deletion veto, CAS recheck cuts, timeout retention, and deletion-versus-read concurrency.
 
-This decision refines ADRs 0017, 0020, 0029, and 0035 and is tracked by `T-BK-01`, `V2-BK-002`, and
-`V2-BK-005..008`.
+This decision is refined by ADRs 0044/0045, refines ADRs 0017/0020/0029/0035, and is tracked by `T-BK-01`,
+`V2-BK-002`, and `V2-BK-005..010`.

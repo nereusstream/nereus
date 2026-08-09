@@ -11,9 +11,9 @@ sourceTuple: v2-m0
 
 Date: 2026-08-09
 
-The user confirmed every round-5 recommendation. ADRs 0033 through 0041 now own those accepted contracts. This record
-contains only the next independent decision frontier. None of the recommendations below is normative until the user
-explicitly confirms it.
+The user confirmed every round-5 recommendation. ADRs 0033 through 0041 own those contracts. This record preserves the
+next independent decision frontier that was presented to the user. The user subsequently confirmed all seven round-6
+recommendations; ADRs 0042 through 0048 now own the accepted contracts. This session record is not runtime evidence.
 
 ## Source facts used for recommendations
 
@@ -156,7 +156,30 @@ never-reuse proof, and no hidden multi-slice ordering or recovery semantics in 0
 - `V2-OPEN-OBJ-01`, `V2-OPEN-BK-02`, and `V2-OPEN-BENCH-01` remain executable evidence gates rather than prose
   decisions. KoP remains documented and deferred outside the 0.2 runtime.
 
-## Awaiting explicit confirmation
+## Confirmed answer and authoritative synchronization
 
-No Round 6 recommendation above has been accepted. Confirmed answers must be synchronized to new ADRs and normative
-contracts before any descendant becomes the next frontier.
+The user answered: “全部按推荐确认”. The decisions were synchronized as follows:
+
+- Q1 / `V2-OPEN-KAF-META-02` →
+  [ADR 0042](../../decisions/0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md): a generated typed
+  wire-v0 record is owned by `TopicImage`, ordered canonically in snapshots, and removed with the topic;
+- Q2 / `V2-OPEN-PUL-META-01` →
+  [ADR 0043](../../decisions/0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md): the permanent
+  name/generation selector and same-key retired tombstone close recreation ABA without retaining the full aggregate;
+- Q3 / `V2-OPEN-BK-09` →
+  [ADR 0044](../../decisions/0044-v2-pulsar-npd1-sealed-ledger-data-blocks.md): NPD1 uses ordered, gap-free,
+  independently verifiable multi-entry blocks with bounded directories;
+- Q4 / `V2-OPEN-BK-10` →
+  [ADR 0045](../../decisions/0045-v2-pulsar-dual-source-read-handle-and-pins.md): ManagedLedger owns one composite
+  dual-source handle and drains source-specific BookKeeper pins before its native deletion CAS;
+- Q5 / `V2-OPEN-OBJ-15` →
+  [ADR 0046](../../decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md): mandatory
+  AES-256-GCM/HKDF-SHA-256 v1 uses one wrapped run key, derived Object keys, and disjoint directory/frame nonce domains;
+- Q6 / `V2-OPEN-OBJ-16` →
+  [ADR 0047](../../decisions/0047-v2-walrun-root-seal-and-successor-publication.md): immutable Root and Seal records
+  live in Cell control metadata and one exact pointer CAS publishes the successor;
+- Q7 / `V2-OPEN-PUL-OBJ-07` →
+  [ADR 0048](../../decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md): 0.2 forbids every slice geometry
+  change or second slice and fails closed at exhaustion.
+
+Implementation and executable evidence remain NotStarted.

@@ -54,6 +54,11 @@ only `[2,2]`; level 1 remains V1 and is rejected. Generic runtime 0/1-to-2 updat
 At level 2, a successful native CreateTopics item publishes the aggregate in the same atomic result; validate-only and
 native failed items publish nothing.
 
+Kafka represents the aggregate as a generated typed wire-v0 `TopicBindingAggregateRecord` owned directly by
+`TopicImage`. Completed snapshots write `TopicRecord -> TopicBindingAggregateRecord -> PartitionRecord*` for each
+topic, and `RemoveTopicRecord` removes the aggregate with the topic. Complete batch/snapshot publication rejects every
+missing, duplicate, unknown-topic, unknown-version, or invalid aggregate instead of publishing a partial image.
+
 High-churn materialization heartbeats, cache state, and per-append data do not belong in the KRaft log. Background work
 uses deterministic assignment from durable roots or a separately bounded coordinator whose loss only delays work.
 When a coordinator or executor serves multiple Protocol Cells, assignment roots, queues, quotas, fencing, and task
@@ -67,6 +72,11 @@ cannot overrule stock Pulsar metadata that still authorizes a ledger, cursor, tr
 `BOOKKEEPER_WAL_ASYNC_OBJECT`, native ManagedLedger ledger/offload metadata is the sole offload/lifecycle authority; any
 Nereus manifest is derived.
 
+For topic incarnation ABA, one name-scoped `PulsarTopicGenerationSelector` permanently retains monotonic generation and
+durable `DELETED(generation)`. An incarnation-scoped full aggregate may be exact-version CAS-replaced only after exact
+reference-free retirement with a same-key `RetiredTopicIncarnationTombstone`; the key never becomes absent or reusable.
+Selectors/tombstones count against hard lifetime metadata limits.
+
 A single bounded deployment-level Virtual Ledger Namespace Registry is allocation authority for non-overlapping,
 never-reused cell slices from `[2^62, 2^63 - 2]` and records native-exclusion evidence for the entire interval. Its
 canonical complete assignment table uses one-key CAS and a monotonic registry epoch. Per-cell lookup/watch state is
@@ -77,7 +87,16 @@ normal append metadata I/O.
 Every assignment is owned by an immutable Pulsar Protocol Cell tuple and follows
 `ACTIVE -> RETIRING -> RETIRED`; retired rows and bounds remain forever. Each Cell has one immutable aligned `2^k`
 slice, while numeric and encoded/lifetime registry limits jointly bound capacity. Broker/session/provider changes do not
-change ownership or consume another assignment.
+change ownership or consume another assignment. 0.2 never resizes, relocates, extends, or attaches another slice;
+exhaustion fails closed and additional capacity uses a new Protocol Cell.
+
+## Object WalRun control records
+
+Each Object-WAL shard stores a bounded immutable `WalRunRootRecord` in its Protocol Cell control-metadata backend. A
+separate immutable `WalRunSealRecord` records terminal sequence and typed coverage; sealing never mutates the Root. A
+successor Root binds predecessor Root+Seal identities, and one exact-version CAS advances `CurrentWalRunPointer` only
+after the successor exists. Lost create/CAS responses converge by exact reread equality. These are rollover/recovery
+cuts; normal admitted append performs no metadata read or mutation.
 
 ## Ownership token
 
@@ -110,5 +129,5 @@ For admitted normal append, both remote metadata read and mutation counters must
 topic-open, rollover publication, trim, and background lifecycle work are separately labeled and budgeted so they cannot
 hide in an aggregate append metric.
 
-Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, and `T-FABRIC-01`. Required scenarios: `V2-META-001..004`,
-`V2-KAF-META-001`, `V2-HO-001`, `V2-FABRIC-001`, and `V2-POSITION-002..007`.
+Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, and `T-FABRIC-01`. Required scenarios: `V2-META-001..005`,
+`V2-KAF-META-001..002`, `V2-HO-001`, `V2-FABRIC-001`, and `V2-POSITION-002..008`.

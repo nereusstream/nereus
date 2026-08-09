@@ -1,0 +1,47 @@
+# ADR 0042: V2 Kafka topic aggregate KRaft record and image ownership
+
+## Status
+
+Accepted for the 0.2 Kafka metadata integration. Implementation and runtime evidence are not started at M0.
+
+## Context
+
+ADRs 0033 and 0034 freeze the logical aggregate schema and bootstrap-only Kafka feature level, but do not decide
+whether the physical aggregate is an opaque controller attachment, a parallel image, or native topic metadata. A
+parallel lifecycle authority would have to reproduce topic replay, snapshot, and deletion ordering and could expose a
+half-created topic at an externally visible publication cut.
+
+## Decision
+
+At finalized `nereus.storage.version=2`, Kafka uses one generated, explicitly typed
+`TopicBindingAggregateRecord` at physical wire version 0. It is not an opaque byte blob or attributes map.
+
+`TopicImage` owns exactly one validated aggregate beside the topic's partition images. The canonical snapshot order is:
+
+1. finalized feature records;
+2. for each topic, `TopicRecord`;
+3. that topic's `TopicBindingAggregateRecord`;
+4. that topic's `PartitionRecord` values.
+
+`RemoveTopicRecord(topicId)` removes the complete active topic image, including the aggregate. 0.2 has no separate
+aggregate-delete record and no parallel aggregate image with independent lifecycle.
+
+At an atomic controller-batch publication boundary or a completed-snapshot publication boundary, every live Nereus
+topic has exactly one aggregate whose topic ID and logical schema validate against its `TopicRecord`. Missing,
+duplicate, unknown-topic, unknown-version, or invalid aggregates fail closed. A transient replay state containing a
+`TopicRecord` without its aggregate may exist only inside the unpublished batch or snapshot construction; it is never
+published as a usable metadata image.
+
+## Consequences
+
+- `V2-OPEN-KAF-META-02` is resolved.
+- The Kafka fork must change generated metadata APIs, replay delta/image ownership, snapshot writing, removal, dump
+  tooling, and tests.
+- Native topic-ID ownership and one publication boundary replace a parallel lifecycle authority.
+- Exact API key/field IDs, generated schema files, image validation hooks, and byte-level snapshot golden vectors
+  remain downstream wire gates.
+- M1 must prove atomic batch visibility, canonical snapshot order, topic-cascaded removal, duplicate/unknown rejection,
+  and that no completed image exposes a live Nereus topic without exactly one aggregate.
+
+This decision refines ADRs 0023, 0033, and 0034 and is tracked by `T-META-01`, `V2-META-002..004`, and
+`V2-KAF-META-001..002`.

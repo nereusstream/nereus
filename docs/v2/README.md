@@ -62,9 +62,13 @@ a sealed-ledger `LedgerOffloader`; one attempt writes one data/root Object pair 
 Persisted attempt scope pins deterministic keys and a bounded root/read/delete lifecycle. Binding plus initial epoch use
 one closed logical schema v1 keyed by a typed native incarnation with deterministic IDs; Kafka activates it only at
 fresh-bootstrap feature level 2. Pulsar async offload uses bounded NPO1 plus native whole-range fallback and final
-deletion revalidation. Pulsar Object WAL positions use fixed aligned, permanent-lifecycle Cell slices from one bounded
-registry. NWG1 uses object-local binding epochs, in-body append-unit authority, co-located Kafka commit sets,
-content-addressed strong-LIST discovery, explicit provider-absent crash cuts, and a bounded run/recovery/pointer lineage.
+deletion revalidation. Kafka owns its generated aggregate in TopicImage; Pulsar uses a permanent generation selector
+and same-key retired tombstone. Pulsar async data uses independently verifiable NPD1 blocks and a ManagedLedger-owned
+dual-source handle whose BK pins drain before deletion. Pulsar Object WAL positions use fixed aligned,
+permanent-lifecycle Cell slices from one bounded registry and fail closed rather than expand a slice. NWG1 uses
+object-local binding epochs, in-body append-unit authority, co-located Kafka commit sets, a KMS-wrapped run key with
+per-Object AEAD, content-addressed strong-LIST discovery, explicit provider-absent crash cuts, and immutable
+Root/Seal/successor pointer lineage.
 
 Provider sharing is physical, not authoritative. Multiple cells may use the same external Object Storage or BookKeeper
 infrastructure, while each cell owns its Cell Provider Scope/session, namespace, credential/KMS and operator scope,
@@ -124,6 +128,13 @@ Accepted decisions:
 - [ADR 0039: bounded WalRun lifecycle, recovery, and root pointer](../decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md)
 - [ADR 0040: NWG1 append-unit directory and co-location](../decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md)
 - [ADR 0041: Pulsar virtual-ledger slice contract](../decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md)
+- [ADR 0042: Kafka topic aggregate KRaft record and image ownership](../decisions/0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md)
+- [ADR 0043: Pulsar topic generation selector and retired tombstone](../decisions/0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md)
+- [ADR 0044: Pulsar NPD1 sealed-ledger data blocks](../decisions/0044-v2-pulsar-npd1-sealed-ledger-data-blocks.md)
+- [ADR 0045: Pulsar dual-source read handle and source pins](../decisions/0045-v2-pulsar-dual-source-read-handle-and-pins.md)
+- [ADR 0046: NWG1 run key, AEAD, and authenticated directory](../decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md)
+- [ADR 0047: WalRun Root, seal, and successor publication](../decisions/0047-v2-walrun-root-seal-and-successor-publication.md)
+- [ADR 0048: Pulsar virtual-ledger fixed-slice exhaustion](../decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md)
 
 ## Open design gates
 
@@ -133,18 +144,20 @@ Accepted decisions:
 `V2-OPEN-META-02`, `V2-OPEN-BK-04`, `V2-OPEN-OBJ-05`, `V2-OPEN-OBJ-06`, and `V2-OPEN-PUL-OBJ-02`; ADRs 0028 through
 0032 resolve `V2-OPEN-META-03`, `V2-OPEN-BK-05`, `V2-OPEN-OBJ-07`, `V2-OPEN-OBJ-08`, and
 `V2-OPEN-PUL-OBJ-03`; ADRs 0033 through 0041 resolve `V2-OPEN-META-04`, `V2-OPEN-KAF-META-01`,
-`V2-OPEN-BK-06..08`, `V2-OPEN-OBJ-09..14`, and `V2-OPEN-PUL-OBJ-04..06`. The rows below are the remaining active 0.2
-decisions or evidence gates.
+`V2-OPEN-BK-06..08`, `V2-OPEN-OBJ-09..14`, and `V2-OPEN-PUL-OBJ-04..06`; ADRs 0042 through 0048 resolve
+`V2-OPEN-KAF-META-02`, `V2-OPEN-PUL-META-01`, `V2-OPEN-BK-09..10`, `V2-OPEN-OBJ-15..16`, and
+`V2-OPEN-PUL-OBJ-07`. The rows below are the remaining active 0.2 decisions or evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
-| `V2-OPEN-KAF-META-02` | freeze Kafka aggregate record/image ownership, snapshot order, and cascaded removal | M1 Kafka controller schema freeze |
-| `V2-OPEN-PUL-META-01` | freeze Pulsar generation-selector permanence and full-aggregate retirement boundary | M1 Pulsar metadata lifecycle freeze |
-| `V2-OPEN-BK-09` | freeze the sealed-ledger NPD1 data-block/index boundary | M2 Object format freeze |
-| `V2-OPEN-BK-10` | freeze ManagedLedger dual-source handle, read-pin, drain, and close ownership | M2 native offload integration |
-| `V2-OPEN-OBJ-15` | freeze NWG1 key hierarchy, AEAD, nonce, and authenticated-directory contract | M3 Object WAL format freeze |
-| `V2-OPEN-OBJ-16` | freeze WalRun root storage plus immutable seal/successor publication | M3 Object WAL recovery freeze |
-| `V2-OPEN-PUL-OBJ-07` | freeze virtual-ledger slice expansion and exhaustion behavior | M1 virtual-ledger registry schema freeze |
+| `V2-OPEN-KAF-META-03` | freeze Kafka aggregate API-key band, generated wire fields, and completed-image validation hook | M1 Kafka controller schema freeze |
+| `V2-OPEN-PUL-META-02` | freeze Pulsar selector/tombstone wire plus create/delete/recreate CAS state machine | M1 Pulsar metadata lifecycle freeze |
+| `V2-OPEN-BK-11` | freeze NPD1 object/block wire, hard limits, codec, and per-attempt crypto envelope | M2 Object format freeze |
+| `V2-OPEN-BK-12` | freeze persisted BookKeeper physical-delete intent/fact and restart reconciliation | M2 native offload deletion integration |
+| `V2-OPEN-OBJ-17` | freeze exact NWG1 HKDF, nonce, AAD, clear-header, and encrypted-directory framing | M3 Object WAL format freeze |
+| `V2-OPEN-OBJ-18` | freeze WalRun checkpoint-page authority and open-tail handoff use | M3 Object WAL recovery freeze |
+| `V2-OPEN-PUL-OBJ-08` | freeze virtual-ledger slice exponent and bounded registry lifetime caps | M1 virtual-ledger registry schema freeze |
+| `V2-OPEN-PUL-OBJ-09` | freeze virtual-ledger allocator reservation and ledger-head publication recovery | M1/M3 virtual-ledger allocator freeze |
 | `V2-OPEN-OBJ-01` | prove per-binding typed durable frontiers inside a multi-binding Object group without shard-wide HOL | M3 layout freeze |
 | `V2-OPEN-BK-02` | validate one-active-ledger-per-Kafka-partition at 10k and 100k partitions | M2 Kafka BK layout freeze |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |

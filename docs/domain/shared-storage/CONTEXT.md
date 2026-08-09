@@ -107,15 +107,20 @@ algorithm/type, and value. It is distinct from Nereus user metadata and the expe
 _Avoid_: ETag proof, user-metadata checksum echo, composite checksum
 
 **WalRun Root**:
-The immutable pre-append authority for one Object-WAL shard run. It fixes scope, prefix, run/session identity,
-epoch-validation rules, format families, initial sequence, and bounded LIST recovery budgets; per-group descriptors are
-reconstructed from content-addressed leaf keys and verified headers.
+The immutable Cell control-metadata authority for one Object-WAL shard run. It fixes scope, prefix, run/session
+identity, epoch-validation rules, format families, wrapped run-key identity, initial sequence, and bounded LIST recovery
+budgets; per-group descriptors are reconstructed from content-addressed leaf keys and verified headers.
 _Avoid_: Per-group metadata commit, sealed-run-only discovery, unbounded prefix scan
 
 **Current WalRun Pointer**:
 The one low-frequency per-shard CAS authority binding the current WalRun Root key/SHA and shard run epoch. It anchors a
 bounded predecessor lineage; normal admitted group append does not mutate it.
 _Avoid_: Root-prefix LIST, per-group pointer update, locally merged lineage
+
+**WalRun Seal**:
+The immutable Cell control-metadata record that binds one Root to its terminal sequence and exact typed coverage. A
+successor Root references both predecessor Root and Seal before the current pointer advances.
+_Avoid_: Mutating the Root to seal, reopening a sealed run, pointer advance before successor publication
 
 **Binding Context Table**:
 The bounded NWG1 table that binds frames to exact Topic Incarnation, binding, Storage Epoch, and Owner Epoch authority
@@ -126,6 +131,11 @@ _Avoid_: Group shard epoch as topic authority, untyped binding summary
 The authoritative bounded NWG1 in-body directory for frame ranges, context references, Kafka commit-set membership,
 and Pulsar entry units. Sidecars, manifests, and checkpoints are accelerators only.
 _Avoid_: Footer-only authority, commit set spanning ObjectExtents, record-count-derived coverage
+
+**NWG1 Run Key**:
+The random 256-bit WalRun data key wrapped once under the immutable Cell KMS key/version. HKDF derives per-Object keys;
+directory and frame AEAD use disjoint fixed nonce domains.
+_Avoid_: Per-PUT KMS wrap, topic-wide key, reused run epoch/sequence/nonce
 
 **Recovery Envelope**:
 The cumulative worst-case bound over all work required to recover admitted Object-WAL state. Normal ACK/admission must

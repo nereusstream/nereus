@@ -39,8 +39,19 @@ _Avoid_: Independent authoritative slice key, watch authority, locally merged as
 
 **Virtual Ledger Slice Assignment**:
 One immutable aligned `2^k` interval owned by a durable Pulsar Protocol Cell identity. Lifecycle is
-ACTIVE→RETIRING→RETIRED; retired assignments and bounds remain permanent never-reuse evidence.
-_Avoid_: Broker-owned slice, provider-owned slice, deleted tombstone, resized bounds
+ACTIVE→RETIRING→RETIRED; retired assignments and bounds remain permanent never-reuse evidence. 0.2 never changes its
+bounds or attaches another slice and fails closed at exhaustion.
+_Avoid_: Broker-owned slice, provider-owned slice, deleted tombstone, resized bounds, second slice
+
+**Pulsar Topic Generation Selector**:
+The permanent name-scoped monotonic generation and `DELETED(generation)` authority used to fence same-name topic
+recreation.
+_Avoid_: Name-only aggregate key, selector deletion, generation rollback
+
+**Retired Topic Incarnation Tombstone**:
+The compact permanent same-key replacement for an exactly reference-free full aggregate, binding its incarnation,
+original aggregate digest, and retirement-proof digest.
+_Avoid_: Deleting the incarnation key, reusable tombstone, compaction before reference-free proof
 
 **Pulsar Position Domain**:
 The Position Domain whose ordering and adjacency rules are proven by the Ledger Chain and Pulsar Position semantics.
@@ -66,9 +77,15 @@ The bounded canonical NPO1 root that binds one offload attempt to sanitized clos
 outer format, contiguous sparse index, and its own integrity domain under fixed parser limits.
 _Avoid_: Stock index assumed sufficient, current-config key derivation, unbounded offsets
 
+**Sealed-Ledger Data Block**:
+One independently decodable NPD1 multi-entry block whose NPO1 row binds its contiguous entry range, location,
+codec/encryption facts, and encoded SHA-256. Its bounded directory maps exact entry IDs to bytes.
+_Avoid_: Padded scan-forward block, entry split across blocks, cross-block compression or AEAD
+
 **Native Dual-Source Read**:
 The ManagedLedger-owned whole-range selection/fallback between an eligible Object attempt and BookKeeper source. One
-range uses one source, fallback occurs at most once, and `bookkeeperDeleted=true` is Object-only.
+cached composite handle owns both lazy children and source pins; one range uses one source, fallback occurs at most
+once, and `bookkeeperDeleted=true` is Object-only after BK-pin drain.
 _Avoid_: Mixed-source range, fallback loop, reading physical BookKeeper residue after native deletion
 
 **Pulsar Frame**:

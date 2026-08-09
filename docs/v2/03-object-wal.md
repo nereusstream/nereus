@@ -57,6 +57,14 @@ NWG1 has no whole-group AEAD stream. An internal header/directory CRC32C/v1 prot
 and membership without substituting for either semantic checksum domain; frame CRC32C protects decoded native payload,
 and Object SHA-256 protects the final body. No extra commit-set CRC is added.
 
+NWG1 mandates `AES-256-GCM/HKDF-SHA-256 v1`. One random 256-bit WalRun data key is wrapped once under the immutable
+Cell KMS key identity/version recorded by the Root. A domain-separated HKDF derives a unique key for each shard/run
+epoch/extent sequence. The encrypted/authenticated context+directory unit and frame ordinals use disjoint fixed 96-bit
+nonce domains; run epochs, sequences, and nonces are never reused. The fixed header, exact Root SHA, and wrapped-key
+envelope identity are AAD. Compression precedes frame AEAD, and payload CRC is checked only after successful
+authentication/decryption/decompression. KMS unwrap/cache is run-scoped and rotation seals the run; the Object hot path
+does not perform one KMS wrap per PUT.
+
 One group may contain multiple compatible bindings from exactly one Protocol Cell. Object groups never cross Protocol
 Cells in 0.2. A group-level shard epoch cannot authorize every frame and its physical ordering cannot compare protocol
 positions.
@@ -98,9 +106,11 @@ existing object is quarantined and never overwritten. Exhausting the verificatio
 
 ## WalRun and bounded recovery
 
-Before append opens, one immutable `WalRunRoot` binds Cell/provider scope, Protocol Cell, shard/run/session,
+Before append opens, one immutable control-metadata `WalRunRootRecord` binds Cell/provider scope, Protocol Cell,
+shard/run/session,
 the binding-context epoch-validation contract, exact prefix, initial sequence, format/codec/encryption/digest families,
-and total recovery budgets. It does not carry one binding's Owner/Storage Epoch.
+wrapped run-key identity, and total recovery budgets. Its key names a metadata record, not a provider Object, and
+`putIfAbsent` response loss requires exact reread equality. It does not carry one binding's Owner/Storage Epoch.
 Each group leaf under that prefix has the canonical form
 `<sequence19>/<body-length19>-sha256-v1-<64-lowercase-hex>.nwg`; both decimal components are zero-padded 19-digit
 non-negative values. No per-group metadata-service row is required for ACK.
@@ -117,10 +127,13 @@ reused. ACK/admission preserves one cumulative worst-case envelope over roots/ru
 work, decoded units, memory/concurrency/retries, and wall time. Fallback cannot reset counters. Predicted exhaustion
 causes rollover/backpressure; actual exhaustion never skips coverage, advances a frontier, or permits GC.
 
-Each shard has one low-frequency CAS `CurrentWalRunPointer` binding the exact root key/SHA and shard run epoch.
-Successors link exact predecessor key/SHA, recovery walks a bounded lineage to the retirement frontier, and every group
-header binds its root SHA. Missing/hash-mismatched/cyclic/forked/over-depth lineage fails closed. Owner-open, rollover,
-and handoff use the pointer; normal admitted group append performs no metadata-service I/O.
+Sealing never mutates the Root. After admission stops and the tail is reconciled, one immutable `WalRunSealRecord`
+binds the Root key/SHA, terminal sequence, and exact typed terminal coverage. A successor Root references both
+predecessor Root and Seal identities. Each shard then CASes `CurrentWalRunPointer` from the exact predecessor tuple to
+the successor tuple. A crash that leaves the pointer on a sealed Root finishes/adopts the matching successor and never
+reopens that run. Recovery walks the bounded lineage to the retirement frontier, and every group header binds its Root
+SHA. Missing/hash-mismatched/cyclic/forked/over-depth lineage fails closed. Owner-open, rollover, and handoff use these
+records; normal admitted group append performs no metadata-service I/O.
 
 Acknowledged group objects remain directly readable. Materialization creates a preferred read generation but is not
 required to make ACKed data durable or readable.
@@ -136,7 +149,7 @@ Each Cell Provider Session owns its admission, retry/circuit-breaker state, open
 and close lifecycle. A compatible lower-level transport may be pooled, but a cell-local throttle, credential failure, or
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
-Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..012` and `V2-FABRIC-002`. See
+Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..014` and `V2-FABRIC-002`. See
 [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md),
 [ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md),
 [ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md),
@@ -145,5 +158,7 @@ Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ
 [ADR 0031](../decisions/0031-v2-protocol-frame-and-append-commit-set.md),
 [ADR 0037](../decisions/0037-v2-object-wal-binding-context-epoch-authority.md),
 [ADR 0038](../decisions/0038-v2-object-wal-provider-absent-crash-contract.md),
-[ADR 0039](../decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md), and
-[ADR 0040](../decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md).
+[ADR 0039](../decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md),
+[ADR 0040](../decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md),
+[ADR 0046](../decisions/0046-v2-nwg1-run-key-aead-and-authenticated-directory.md), and
+[ADR 0047](../decisions/0047-v2-walrun-root-seal-and-successor-publication.md).
