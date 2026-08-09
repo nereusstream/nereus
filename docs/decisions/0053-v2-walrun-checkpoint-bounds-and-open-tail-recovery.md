@@ -33,9 +33,9 @@ Each page may advance one or several lanes but must advance every changed vector
 predecessor. Each component is `LaneExtentResolvedThrough`; it is not `BindingDurableFrontier`. Open-run recovery
 validates the one predecessor/vector chain and then always performs bounded strong LIST for every uncovered lane tail.
 A missing or invalid chain falls back to the run's full bounded LIST envelope. Handoff may use the same validated head
-but cannot skip that LIST. Directory reconstruction issues bounded parallel prefix GETs only for candidates not safely
-excluded by manifest/source authority; unknown coverage is conservatively included. This path never expands to a
-whole-Object GET and all GET/bytes/time work charges the cumulative recovery envelope.
+but cannot skip that LIST. 0.2 has no partial-run omission vector: except for an authoritative whole-WalRun retirement
+frontier, every discovered/checkpointed extent in the current non-retired run receives a bounded parallel prefix GET.
+This path never expands to a whole-Object GET and all GET/bytes/time work charges the cumulative recovery envelope.
 
 Rollover flushes the single final gap-free vector chain and `WalRunSealRecord` binds one final checkpoint-head SHA, the
 exact terminal sequence vector, and minimum aggregate count/byte completeness facts before successor publication. This
@@ -57,5 +57,5 @@ the bytes; checkpoint metadata cannot override them or assert that every binding
 - M3/M7 must prove every page-chain corruption/gap/fork, all three uncovered-tail limits, disabled proactive cadence,
   backpressure/rollover, open-tail LIST, handoff, final seal binding, and next-WalRun policy activation.
 
-This decision is refined by ADRs 0060/0063..0065, refines ADRs 0030, 0039, 0047, and 0049 and is tracked by
-`T-OBJECT-01`, `T-HANDOFF-01`, `T-POLICY-01`, `V2-OBJ-014..022`, and `V2-OPEN-OBJ-19/22/23`.
+This decision is refined by ADRs 0060/0063..0065/0068, refines ADRs 0030, 0039, 0047, and 0049 and is tracked by
+`T-OBJECT-01`, `T-HANDOFF-01`, `T-POLICY-01`, `V2-OBJ-014..024`, and `V2-OPEN-OBJ-19/22/24`.

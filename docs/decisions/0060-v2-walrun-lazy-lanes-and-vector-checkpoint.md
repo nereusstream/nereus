@@ -4,9 +4,10 @@
 
 Accepted as a partial 0.2 `OBJECT_WAL` scheduling/recovery refinement. The maximum lane structure, lane-local
 sequencing, and one run-wide vector checkpoint chain are fixed. ADR 0062 fixes packing-class/lane semantics and key
-encoding; ADRs 0063/0064 fix physical checkpoint eligibility and the two-frontier split; ADRs 0065..0067 fix the
-physical-only row/Seal, local ticket, and readable-tail publication boundaries. Exact target/linger values, numeric
-resource values, and benchmark evidence remain open; implementation has not started at M0.
+encoding; ADRs 0063/0064 fix physical checkpoint eligibility and the two-frontier split; ADRs 0065..0069 fix the
+physical-only row/Seal, local ticket, readable-tail, provider-proof, and logical read-view boundaries. Exact
+target/linger values, numeric resource values, and benchmark evidence remain open; implementation has not started at
+M0.
 
 ## Context
 
@@ -83,5 +84,5 @@ does not reserve 84 MiB per shard or multiply that number by hidden copies.
   vector continuity, partial-lane advancement, CAS response loss/conflict, low-traffic age forcing, and final Seal
   equality.
 
-This decision is refined by ADRs 0062..0067, refines ADRs 0030, 0038, 0039, 0046, 0047, 0049, and 0053 and is tracked
-by `T-OBJECT-01`, `T-POLICY-01`, `V2-OBJ-014..023`, `V2-READ-003`, and `V2-OPEN-OBJ-19`.
+This decision is refined by ADRs 0062..0069, refines ADRs 0030, 0038, 0039, 0046, 0047, 0049, and 0053 and is tracked
+by `T-OBJECT-01`, `T-POLICY-01`, `V2-OBJ-014..024`, `V2-READ-003/004`, and `V2-OPEN-OBJ-19`.

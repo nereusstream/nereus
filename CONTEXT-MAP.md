@@ -42,4 +42,6 @@ KoP is outside the current V2 Kafka/Pulsar design session. Its existing design r
   typed Durable Frontier, so physical checkpoint progress never waits for every member's protocol ACK. Before position
   allocation, tracker and active-tail locator capacity reserve together; one shared verified extent feeds compact
   protocol-specific locator ranges, which publish before Readable/Durable frontiers and ACK. The mechanism and hard
-  caps cannot be disabled by Topic policy.
+  caps cannot be disabled by Topic policy. Provider-proof mode/canonicalizer/token cap belong to the WalRun Root and
+  default to `NONE`. A logical Binding read snapshot separates allocation-free high-frequency frontier publication
+  from low-frequency source-selection generations and bounded read pins; neither becomes a Topic switch.

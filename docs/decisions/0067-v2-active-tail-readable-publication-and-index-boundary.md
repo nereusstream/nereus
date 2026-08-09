@@ -53,8 +53,9 @@ reuses one verified extent/directory result across all of that extent's bindings
 accepted cumulative envelope.
 
 A locator is reclaimable only after a manifest-selected generation covers the same typed range and source
-protection/read pins make removal safe. The replacement view must be installed before locator retirement; cache or
-local materialization intent is never sufficient.
+protection/read pins make removal safe. ADR 0069 separates high-frequency frontier publication from low-frequency
+source-selection generations and requires two-stage locator/protection retirement. The replacement view must be
+installed before locator retirement; cache or local materialization intent is never sufficient.
 
 Correctness/publication order and hard caps cannot be configured off. Configuration is limited to:
 
@@ -74,9 +75,10 @@ No Topic may disable active-tail readability or enlarge a hard cap.
 - M3/M4 must quantify ACK p99 increment, allocation bytes per commit unit, active-tail bytes per unit/range, GC/allocation
   pressure, materialization-trigger behavior, and takeover GET/bytes/time, and must prove gap invisibility, A/B recovery
   independence, exact publication order, and pin-safe retirement.
-- Exact reader snapshot/source-switch mechanics remain the next frontier; this ADR requires the ordering but does not
-  yet choose a versioned local read-view representation.
+- ADR 0069 resolves logical read-snapshot scope, pin granularity, source mixing, and reclamation stages without
+  requiring a per-ACK snapshot or per-read allocation. Exact coherent capture and durable protection-release cuts
+  remain open.
 
-This decision refines ADRs 0007, 0008, 0031, 0040, 0049, 0053, 0064, and 0066 and is tracked by `T-APPEND-01`,
-`T-MANIFEST-01`, `T-OBJECT-01`, `V2-APP-001..003`, `V2-OBJ-002/006/021/023`, `V2-READ-001/003`, and
-`V2-OPEN-READ-02`.
+This decision is refined by ADR 0069, refines ADRs 0007, 0008, 0031, 0040, 0049, 0053, 0064, and 0066 and is tracked by
+`T-APPEND-01`, `T-MANIFEST-01`, `T-OBJECT-01`, `V2-APP-001..003`, `V2-OBJ-002/006/021/023`,
+`V2-READ-001/003/004`, and `V2-OPEN-READ-03/04`.

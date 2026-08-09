@@ -15,21 +15,20 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-Round 12 accepted physical-only checkpoint/Seal payload, combined tracker/locator reservation before position
-allocation, owner-local 64-bit completion tickets, and shared-verified range-aggregated active-tail publication before
-Readable/Durable frontiers and ACK in ADRs 0065..0067. It deliberately leaves Java data structures and numeric budgets
-unfrozen. The next independent frontier is:
+Round 13 kept partial recovery omission open/evidence-gated, accepted `NONE`-default compact checkpoint provider proof
+in ADR 0068, and accepted the logical allocation-free Binding read-view/pin boundary in ADR 0069. It deliberately does
+not add `FullyManifestCoveredThrough`, per-ACK snapshots, per-read heap pins, or a global refcount. The next independent
+frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-OBJ-22` | define the exact authority that permits physical recovery to skip a manifest-covered extent without reading its directory | consider a separately rooted monotonic per-lane fully-manifest-covered vector; absence or a hole falls back to prefix GET and never backpressures append/checkpoint |
-| `V2-OPEN-OBJ-23` | choose the closed bounded optional qualified-provider-proof checkpoint-row variant | consider NONE or one version-bound FULL_OBJECT SHA-256 variant that stores only a bounded canonical version token because Root/row already bind scope/length/digest |
-| `V2-OPEN-READ-02` | freeze the reader-visible snapshot and pin-safe active-tail-to-manifest source handoff | consider a small owner-local Binding read-view snapshot that atomically binds frontiers, active-tail version, manifest generation, and source protection |
+| `V2-OPEN-READ-03` | freeze allocation-free coherent capture across a low-frequency source generation and high-frequency frontier | consider a Binding-local generation pointer plus preallocated reader slots with capture-before-final-reload validation and generation-specific drain |
+| `V2-OPEN-READ-04` | freeze durable no-fallback publication, old-owner quiescence, and the source-protection release crash cut | consider separate immutable `PREFERRED_WITH_FALLBACK`/`PREFERRED_ONLY` generations plus planned drain or authority-backed expiry; otherwise retain protection |
 
 The complete questions and recommendations are in
-[round 13](grill-notes/15-restarted-grill-2-recovery-skip-proof-provider-proof-wire-and-read-snapshot.md). None of its
-recommendations is accepted yet. `V2-OPEN-BK-11/13`, remaining `V2-OPEN-OBJ-17/19`, and
-`V2-OPEN-PUL-OBJ-09` wire/size/mode work are blocked on accepted evidence protocols rather than questions in this round.
+[round 14](grill-notes/16-restarted-grill-2-allocation-free-read-capture-and-durable-handoff.md). None of its
+recommendations is accepted yet. `V2-OPEN-OBJ-22/24`, `V2-OPEN-BK-11/13`, remaining `V2-OPEN-OBJ-17/19`, and
+`V2-OPEN-PUL-OBJ-09` are evidence-blocked rather than questions in this round.
 
 ## Configuration scope
 
@@ -253,21 +252,48 @@ retirement. Correctness and hard caps cannot be disabled.
 
 ### `V2-OPEN-OBJ-22`: manifest-covered recovery-skip authority
 
-This remains open. A physical row has no Binding/coverage, so it cannot by itself prove an extent is outside active
-tail. Round 13 asks whether one separately rooted contiguous per-lane fully-manifest-covered vector should authorize
-prefix-GET omission, with every absence/hole/mismatch falling back to bounded GET.
+This remains open and evidence-blocked. 0.2 does not admit `FullyManifestCoveredThrough`, a bitmap, per-Binding row, or
+partial extent certificate. Apart from an authoritative whole-WalRun retirement frontier, recovery performs bounded
+parallel prefix GET under one cumulative envelope. Only an M3/M7 recovery-SLO miss plus useful measured skip hit rate
+may reopen the branch; whole-WalRun retirement reuse is preferred before an explicit Root/Seal-bound,
+non-regressing `ActiveTailRetiredThrough` or `RecoverySkipCertificate`. Such a certificate would additionally depend on
+the accepted read-view handoff and permanent active-tail responsibility transfer and could never authorize ACK,
+checkpoint, Seal, or GC. M3/M4 may measure hypothetical skip hit rate with read-view recovery; only the combined M3/M7
+end-to-end SLO and hit-rate evidence can reopen the design.
 
 ### `V2-OPEN-OBJ-23`: closed qualified-provider-proof row wire
 
-This remains open. ADR 0065 forbids opaque provider blobs but leaves the exact closed row variant/cap unsettled. Round
-13 asks whether 0.2 stores no proof or only a version-bound FULL_OBJECT SHA-256 variant containing a bounded canonical
-provider-version token while reusing Root/row scope, length, and digest.
+Resolved by [ADR 0068](../decisions/0068-v2-checkpoint-provider-proof-mode-and-row-encoding.md). `NONE` is the default;
+an evidenced Provider may enable the version-bound FULL_OBJECT SHA-256 family at the next Root. Root fixes adapter /
+canonicalizer and token cap; the row stores only tag, length, and bounded canonical binary token. Invalid candidate
+proof becomes `NONE` before row seal, while malformed persisted wire fails closed. `NONE` adds no routine full GET.
+
+### `V2-OPEN-OBJ-24`: provider token admission evidence
+
+This remains evidence-blocked. Before any Root admits the optional version-bound mode, M3 must prove canonical binary
+token encoding/cap, immutable-version binding, FULL_OBJECT SHA-256 scope, version-pinned range benefit, and acceptable
+rows/page. Without a current-source receipt the Root remains `NONE`.
 
 ### `V2-OPEN-READ-02`: active-tail/manifest reader snapshot
 
-This remains open. ADR 0067 fixes locator/frontier/ACK ordering and pin-safe retirement without choosing the
-reader-visible source snapshot. Round 13 asks for the minimal owner-local snapshot that prevents read holes/source
-mixing during active-tail publication, manifest replacement, pin drain, and per-Binding takeover recovery.
+Resolved by [ADR 0069](../decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md).
+`BindingReadViewSnapshot` is logical rather than one heap object per ACK/read; append release-publishes frontiers while
+low-frequency source generations use allocation-free read-batch pins. One snapshot may span disjoint manifest/tail
+ranges, but atomic append units and declared whole-range fallback stay source-pure. Locator and protection retirement
+use two bounded drain stages; pressure never deletes early.
+
+### `V2-OPEN-READ-03`: allocation-free coherent capture
+
+This remains open. ADR 0069 fixes the logical capture and pin unit but not the acquire/retire race protocol. Round 14
+asks whether a Binding-local generation pointer plus preallocated reader slots should publish G, coherently capture
+the frontier/view, and only then reload/validate G before reading.
+
+### `V2-OPEN-READ-04`: durable fallback-removal cut
+
+This remains open. ADR 0069 requires a later no-fallback view and a second pin drain but does not establish the durable
+crash/restart or cross-owner quiescence authority. Round 14 asks whether separate immutable
+`PREFERRED_WITH_FALLBACK` and `PREFERRED_ONLY` manifest generations plus planned old-owner drain or an
+authority-backed expiry/grace proof must precede exact source-protection release; absent either, protection stays.
 
 ## Storage Epoch transitions
 
@@ -521,6 +547,23 @@ For example, one Pulsar entry with batch indexes `0..2` might map to one Kafka O
 input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
+
+### Restarted Grill 2 round 13 adjusted decisions: Q2/Q3 resolved by ADRs 0068/0069; Q1 remains open
+
+Resolved on 2026-08-09 after explicit adjusted confirmation:
+
+- Q1 rejected `FullyManifestCoveredThrough` for the 0.2 baseline and remains `V2-OPEN-OBJ-22`; bounded prefix recovery
+  plus whole-WalRun retirement continues until M3/M7 evidence justifies reopening a partial certificate;
+- Q2 `NONE`-default, conditionally admitted version-bound proof, Root mode/canonicalizer/cap, compact binary row, and
+  no-routine-full-GET semantics ->
+  [ADR 0068](../decisions/0068-v2-checkpoint-provider-proof-mode-and-row-encoding.md);
+- Q3 logical rather than per-object snapshot, append-versus-handoff split, protocol-read-batch pin, mixed-source
+  boundary, two-stage locator/protection reclamation, hard backlog bounds, and independent takeover ->
+  [ADR 0069](../decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md).
+
+Exact Provider/token values, allocation-free coherent capture, durable fallback-removal cut, and all numeric pin/view
+budgets remain open or evidence-blocked. The complete response is preserved in
+[the round 13 record](grill-notes/15-restarted-grill-2-recovery-skip-proof-provider-proof-wire-and-read-snapshot.md).
 
 ### Restarted Grill 2 round 12 adjusted decisions: resolved by ADRs 0065 through 0067
 

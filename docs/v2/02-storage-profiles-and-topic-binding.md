@@ -144,6 +144,11 @@ Binding/tenant may request only a conservative active-tail soft share; Protocol 
 and shard/Cell/host owns hard memory ceilings/materialization-pressure triggers. Topic policy cannot enlarge the hard
 cap or turn readable-before-ACK off.
 
+Checkpoint provider-proof semantics are also not a Topic policy. Each WalRun Root fixes `NONE` or the admitted
+version-bound proof mode plus Provider adapter/canonicalizer version and token hard cap; `NONE` is the default and a
+future Root is required for a mode/cap change. Read-view pin and retired-generation hard bounds cannot be disabled or
+enlarged by Topic policy; exact evidence-selected ceilings remain Cell/host admission inputs.
+
 A policy change that affects a primary WAL profile, format, Object-extent digest family, Frame-payload checksum family,
 or encryption family requires a new Storage Epoch at an exact Protocol Frontier. A materialization-only format or index
 policy may create a new immutable generation without changing the append epoch. Neither operation rewrites the Topic

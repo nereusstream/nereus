@@ -86,10 +86,15 @@ discoverable by bounded provider LIST. Runtime binding trackers and gaps are rec
 second manifest authority.
 
 Checkpoint rows and Seal are physical-only: Root identity appears once per page, and no row stores a binding/read
-frontier, ACK bitmap, gap state, or per-binding coverage. Recovery may skip an exact extent only through validated
-manifest/source authority; otherwise it performs a bounded prefix GET through the leaf's directory end. Only the
-manifest-uncovered active tail is reconstructed, every request/byte/time unit charges the cumulative recovery envelope,
-and this directory path never performs a whole-Object GET.
+frontier, ACK bitmap, gap state, or per-binding coverage. 0.2 admits no partial-run skip vector or manifest-derived
+extent omission. Apart from an authoritative whole-WalRun retirement frontier, recovery performs a bounded prefix GET
+through every discovered/checkpointed extent in the current non-retired run. Every request/byte/time unit charges the
+cumulative recovery envelope, and this directory path never performs a whole-Object GET.
+
+Provider-proof mode defaults to `NONE` and is fixed by the WalRun Root, not Topic policy. An evidenced version-bound
+mode stores only a closed proof tag, checked token length, and bounded canonical binary version bytes. The token may pin
+a range read but cannot replace Root/key identity or directory/frame AEAD. `NONE` does not add a whole-Object recovery
+read because checkpoint rows already describe provider-resolved extents.
 
 The owner publishes active-tail readability before ACK. One shared `VerifiedExtent` feeds compact locator ranges in a
 shard-owned segmented, protocol-specific index; it does not repeat Object/KMS/directory validation per Binding. For one
@@ -101,6 +106,16 @@ Tracker and locator capacity are reserved together before protocol position allo
 the manifest-selected generation covers its exact typed range and source protection/read pins make replacement safe.
 The replacement view is installed before removal. Active-tail readability and hard bounds cannot be disabled; only
 binding/tenant soft shares, Cell/shard recovery concurrency, host ceilings, and materialization pressure are tunable.
+
+`BindingReadViewSnapshot` is logical. Append does not create a snapshot generation: hidden locators precede a release-
+published frontier and ACK. Low-frequency source-selection generations are pinned allocation-free for one
+Binding-scoped protocol read batch. One snapshot may select disjoint manifest and active-tail ranges, while one atomic
+append unit and every declared whole-range fallback remain source-pure.
+
+Reclamation publishes preferred+protected-fallback first and drains older pins before retiring obsolete index state.
+Protection remains until a later view removes fallback and every fallback-bearing pin drains. Retired-view/pin count,
+bytes, age, and deadline are hard-bounded; capacity pressure may block handoff/retirement or new read admission but
+never removes a locator/protection early. Exact local coherent capture and the durable no-fallback cut remain open.
 
 ## Timestamp and protocol-position indexes
 
@@ -155,5 +170,5 @@ the source was safely retired and the preferred generation is corrupt, the resul
 system does not synthesize records or silently skip the requested Protocol Coverage.
 
 Relevant tradeoffs: `T-MANIFEST-01`, `T-POSITION-01`, `T-PROJECTION-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required
-scenarios: `V2-READ-001..003`, `V2-OBJ-002/020..023`, `V2-BK-007..008`, `V2-BK-011`,
+scenarios: `V2-READ-001..004`, `V2-OBJ-002/020..024`, `V2-BK-007..008`, `V2-BK-011`,
 `V2-PROJECTION-001`, `V2-POLICY-001`, and `V2-FABRIC-003`.

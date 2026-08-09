@@ -113,6 +113,18 @@ Takeover rebuilds Root/checkpoint/LIST physical inventory first and then publish
 Manifest replacement must cover the same typed range and satisfy source-protection/read-pin conditions before active
 locators retire. This correctness path cannot be disabled by Topic policy.
 
+Append and source handoff have different publication lifetimes. Normal append installs hidden locators,
+release-publishes Readable/Durable frontiers, and ACKs without creating a snapshot object. Low-frequency manifest
+handoff publishes a source-selection generation. A logical `BindingReadViewSnapshot` captures Binding/incarnation,
+Storage Epoch/Position Domain version, owner fence, Readable Frontier, active-tail version, manifest generation, and
+source-protection generation for one Binding-scoped protocol read batch. Allocation-free local pins are bounded; one
+record/message/frame, a whole connection, and an unbounded stream are not pin units.
+
+The same snapshot may serve disjoint manifest and active-tail ranges, but one atomic append unit and every explicitly
+declared whole-range fallback stay source-pure. Locator retirement follows old-view pin drain. Source protection remains
+until a later view no longer names fallback and every fallback-bearing pin drains. Pin/backlog pressure may block
+handoff or new reads but never authorizes early reclaim, frontier advance, or GC.
+
 ## Uncertain append
 
 A timeout, connection reset, or lost provider response yields an uncertain result. Resolution preserves the original
@@ -147,4 +159,4 @@ the envelope. This correctness-driven availability cost is explicit and does not
 
 Relevant tradeoffs: `T-APPEND-01` and `T-POSITION-01`. Required scenarios: `V2-APP-001`, `V2-APP-002`,
 `V2-APP-003`, `V2-POSITION-001..007`, `V2-META-002..004`, `V2-KAF-META-001`,
-`V2-OBJ-002/004..012/020..023`, and `V2-READ-003`.
+`V2-OBJ-002/004..012/020..024`, and `V2-READ-003/004`.

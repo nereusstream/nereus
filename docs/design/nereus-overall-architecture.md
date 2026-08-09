@@ -173,6 +173,11 @@ protocol ACK. Root is encoded once per page rather than repeated in 256 rows; ro
 frontier, ACK, gap, or per-binding coverage. The Seal binds one provider-resolved terminal vector/final head plus
 minimum aggregate count/byte facts; three lane-specific chains, Roots, or pointers are not used.
 
+The Root also fixes checkpoint provider-proof mode, adapter/canonicalizer version, and token hard cap. `NONE` is the
+default. Only an evidenced Provider may admit a version-bound FULL_OBJECT SHA-256 token; a row then stores only tag,
+length, and bounded canonical binary token bytes. It never repeats Root scope or row length/SHA and never makes a
+whole-Object GET part of routine recovery.
+
 NWG1 stores an authoritative in-body Binding Context Table and Append Unit Directory. Exact binding/Storage/Owner Epoch
 authority is object-local rather than singular in a multi-binding root. One Kafka commit set stays inside one extent and
 each frame block is independently compressed, authenticated, and decoded. AES-256-GCM/HKDF-SHA-256 v1 wraps one
@@ -190,11 +195,26 @@ ACKs; gap-behind locators remain invisible. A generic Protocol Coverage TreeMap 
 path, while no heavy index object per Binding/unit is frozen. A's typed gap cannot block B or physical checkpoint
 progress, and the ACK path adds no provider/KMS/metadata I/O or repeated directory decryption.
 
+`BindingReadViewSnapshot` is a logical capture, not one object per ACK/read. Append only installs hidden locators,
+release-publishes Readable/Durable frontiers, and ACKs. Low-frequency manifest handoff publishes source-selection
+generations that readers pin for one Binding-scoped protocol read batch through allocation-free local RCU/epoch/hazard
+or reader-slot state. A request may read disjoint manifest and active-tail ranges, but one append unit and any declared
+whole-range fallback remain source-pure.
+
+Locator and source-protection retirement are two stages: publish preferred+protected-fallback, drain older-view pins,
+then publish a view without fallback and drain all fallback-bearing pins before protection release/GC. Retired-view and
+pin count/bytes/age/deadline are hard-bounded; pressure may block handoff or new reads but never delete early.
+
 Routine random reads authenticate the Root-bound in-body header/directory and selected frame without first requiring a
 new full-Object provider proof. The leaf's exclusive bounded prefix end normally gives prefix plus frame GET; without
 it, recovery uses header, directory, and frame GETs. Short/long hints reuse already read bytes, and the hint cannot
 authorize an offset. ADR 0058 makes prefix bytes the primary cap and prioritizes 4,096/16,384-frame evidence without a
 paginated or second-authority directory. The exposed approximate directory size is an accepted key-metadata tradeoff.
+
+0.2 has no partial-run recovery-skip vector. Except for an already authoritative whole-WalRun retirement frontier,
+takeover uses bounded parallel directory-prefix GETs under one cumulative GET/bytes/time envelope. A partial
+Root/Seal-bound certificate is reconsidered only if M3/M7 proves this baseline misses its recovery SLO and would have
+useful skip hit rate.
 
 WalRun Root and Seal are separate immutable Cell control-metadata records. A successor binds both predecessor
 identities, then one exact CAS advances the current-run pointer. A pointer left on a sealed run is recovered forward and

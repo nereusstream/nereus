@@ -64,4 +64,4 @@ indivisible validation/ticket/ACK unit.
   independent frame decode, no cross-frame compression/AEAD, and range reads that do not decode unrelated frames.
 
 This decision is refined by ADRs 0046/0058/0063/0064/0067, refines ADRs 0026/0031/0037, and is tracked by
-`T-PROTOCOL-01`, `T-OBJECT-01`, `V2-OBJ-002/004/006/007/012/013/016..023`, and `V2-READ-003`.
+`T-PROTOCOL-01`, `T-OBJECT-01`, `V2-OBJ-002/004/006/007/012/013/016..024`, and `V2-READ-003/004`.

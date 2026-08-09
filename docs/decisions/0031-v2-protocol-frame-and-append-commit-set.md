@@ -62,4 +62,4 @@ This decision is refined by [ADRs 0037](0037-v2-object-wal-binding-context-epoch
 [0064](0064-v2-object-wal-physical-and-binding-frontiers.md),
 [0066](0066-v2-pre-position-reservation-and-completion-ticket.md), and
 [0067](0067-v2-active-tail-readable-publication-and-index-boundary.md), refines ADR 0026, and is tracked by
-`T-PROTOCOL-01`, `T-OBJECT-01`, `V2-OBJ-002/004/006/007/012/021/023`, and `V2-READ-003`.
+`T-PROTOCOL-01`, `T-OBJECT-01`, `V2-OBJ-002/004/006/007/012/021/023`, and `V2-READ-003/004`.

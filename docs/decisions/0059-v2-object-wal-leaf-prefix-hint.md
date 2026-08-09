@@ -51,6 +51,9 @@ ADR 0065 additionally encodes Root SHA once in the checkpoint page header rather
 each row. Active-tail recovery uses bounded prefix GET through this end; directory reconstruction does not expand to a
 whole-Object GET.
 
+ADR 0068 defaults checkpoint provider proof to `NONE`; an admitted bounded binary version token may pin the same range
+GET but is only an accelerator. Its absence never adds HEAD or whole-Object GET and never changes this hint's authority.
+
 A reader with the leaf requests `[0, directoryPrefixEnd)`, then parses the in-body fixed header and verifies the
 Root-bound directory AEAD before issuing a frame range. If the authenticated in-body end is smaller, it reuses the
 exact valid subrange and ignores safe extra bytes. If the in-body end is larger but remains within all hard bounds, it
@@ -67,5 +70,5 @@ fails or enters the bounded three-GET fallback. No hint authorizes a frame offse
 - M3 must prove every end-boundary case, short/long byte reuse, structured key reconstruction, wrong Root/key/version,
   AEAD failure, three-GET fallback, absence of per-descriptor full-key duplication, and two-GET request/byte evidence.
 
-This decision is refined by ADRs 0062/0065, refines ADRs 0021, 0025, 0030, 0040, 0046, 0053, and 0058 and is tracked by
-`T-OBJECT-01`, `V2-OBJ-016/017/022`, and `V2-OPEN-OBJ-17/22/23`.
+This decision is refined by ADRs 0062/0065/0068, refines ADRs 0021, 0025, 0030, 0040, 0046, 0053, and 0058 and is
+tracked by `T-OBJECT-01`, `V2-OBJ-016/017/022/024`, and `V2-OPEN-OBJ-17/22/24`.

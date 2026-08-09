@@ -171,6 +171,20 @@ before Readable/Durable frontiers publish and ACK; entries behind a gap remain i
 _Avoid_: Disable switch, one heavy object per Binding/unit, generic ProtocolCoverage TreeMap on the hot path, ACK before
 locator publish
 
+**Binding Read View Snapshot**:
+The logical state captured for one Binding-scoped protocol read batch. It binds incarnation, epoch/Position Domain,
+owner fence, Readable Frontier, active-tail view, manifest generation, and source-protection generation, but need not be
+a heap object. Append release-publishes frontiers without creating generations; source handoff publishes and drains
+low-frequency pinned generations.
+_Avoid_: Snapshot object per ACK/read, record/message/frame pin, connection-lifetime pin, remote metadata read, one
+process-global refcount
+
+**Read View Pin**:
+An allocation-free bounded owner-local RCU/epoch/hazard or reader-slot claim on one source-selection generation for one
+complete protocol read batch. Retired-view count/bytes/age/deadline are hard-bounded; pressure may stop handoff or new
+read admission but never release referenced locators/protection early.
+_Avoid_: Unbounded streaming pin, early deletion to recover capacity, pin as durable authority
+
 **Current WalRun Pointer**:
 The one low-frequency per-shard CAS authority binding the current WalRun Root key/SHA and shard run epoch. It anchors a
 bounded predecessor lineage; normal admitted group append does not mutate it.
@@ -191,6 +205,14 @@ may advance any subset of lanes contiguously; open uncovered tails still require
 gap-free vector chain.
 _Avoid_: Per-row Root SHA, per-topic checkpoint switch, ACK dependency, binding frontier/coverage row, one chain/head
 per lane, checkpoint overriding provider bytes
+
+**Checkpoint Provider Proof Mode**:
+The Root-fixed `NONE` default or conditionally admitted version-bound FULL_OBJECT SHA-256 proof family. Root fixes
+Provider adapter/canonicalizer and token cap; a row carries only proof tag, token length, and bounded canonical binary
+version bytes. An absent, oversized, or incomplete candidate becomes `NONE` before row seal; malformed persisted wire
+fails closed. `NONE` does not trigger routine whole-Object recovery.
+_Avoid_: Topic switch, String normalization, ETag, header/SDK blob, repeated body length/SHA/scope, proof as offset or
+ACK authority
 
 **Directory Prefix Hint**:
 The exclusive `directoryPrefixEnd19` embedded in every NWG1 leaf key. It plans a bounded prefix GET under the exact
@@ -218,7 +240,10 @@ _Avoid_: Per-PUT KMS wrap, topic-wide key, reused run epoch/lane/sequence/nonce
 **Recovery Envelope**:
 The cumulative worst-case bound over all work required to recover admitted Object-WAL state. Normal ACK/admission must
 preserve it; fallback cannot reset it.
-_Avoid_: Takeover timeout only, per-run counter reset, partial recovery success
+0.2 performs conservative bounded prefix recovery for current-run candidates and has no partial-run omission vector;
+an authoritative whole-WalRun retirement frontier may exclude only the retired run as a whole.
+_Avoid_: `FullyManifestCoveredThrough`, manifest/lane inference as skip proof, fallback counter reset, partial
+certificate without M3/M7 evidence, takeover timeout only, per-run counter reset, partial recovery success
 
 ## Projection and migration
 

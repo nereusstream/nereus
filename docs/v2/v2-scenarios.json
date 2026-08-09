@@ -413,8 +413,8 @@
     },
     {
       "id": "V2-OBJ-022",
-      "milestone": "M3/M7",
-      "contract": "checkpoint rows and Seal remain physical only bind Root once admit only closed bounded proof fields and reconstruct only manifest uncovered active tail through cumulative envelope prefix GETs",
+      "milestone": "M3/M4/M7",
+      "contract": "checkpoint rows and Seal remain physical only bind Root once and current run recovery uses cumulative envelope prefix GETs without a partial run omission vector",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -423,6 +423,14 @@
       "id": "V2-OBJ-023",
       "milestone": "M3",
       "contract": "tracker slot and active tail locator budget reserve atomically before position allocation and one checked 64 bit owner local ticket represents one complete protocol commit unit",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-024",
+      "milestone": "M3",
+      "contract": "WalRun Root defaults provider proof mode to NONE and conditionally admits one bounded canonical binary version bound FULL_OBJECT SHA256 tag without duplicating Root or identity fields",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -534,7 +542,7 @@
     {
       "id": "V2-READ-001",
       "milestone": "M4",
-      "contract": "manifest publication exposes one binding scoped typed logical view across active tail overlap with protected source fallback",
+      "contract": "one binding scoped logical read snapshot survives active tail manifest publication protected fallback and two stage reclamation",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -551,6 +559,14 @@
       "id": "V2-READ-003",
       "milestone": "M3/M4",
       "contract": "Object WAL ACK reuses one shared VerifiedExtent publishes compact protocol range active tail locators before Readable Durable frontiers and retires them only after exact manifest coverage plus safe pins",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-004",
+      "milestone": "M4",
+      "contract": "BindingReadViewSnapshot is a logical allocation free read batch capture append publishes no snapshot source handoff uses bounded generations and pins and locator protection retirement requires separate drains",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null

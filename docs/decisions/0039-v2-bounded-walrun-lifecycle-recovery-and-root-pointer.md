@@ -34,9 +34,13 @@ ADR 0053 makes checkpoint pages asynchronous accelerators with finite uncovered-
 uses one run-wide vector page chain over up to three lane-local sequences, and ADR 0063 counts only provider-resolved
 descriptors awaiting physical inventory. A binding's typed predecessor wait consumes tracker bounds, not the uncovered
 extent tail. ADR 0065 removes logical fields and repeated Root SHA from checkpoint rows/Seal. Open-run recovery always
-LISTs each uncovered tail, then reconstructs manifest-uncovered active-tail directories with bounded prefix GETs under
-the same cumulative envelope; this path never expands to a whole-Object GET. The Seal binds one mandatory final
-gap-free physical vector chain.
+LISTs each uncovered tail, then reconstructs every discovered or checkpointed extent in the current non-retired run
+with bounded prefix GETs under the same cumulative envelope; this path never expands to a whole-Object GET. The Seal
+binds one mandatory final gap-free physical vector chain.
+
+Round 13 rejects a partial-run `FullyManifestCoveredThrough` omission authority for 0.2. Except for an authoritative
+whole-WalRun retirement frontier, current-run candidates remain subject to bounded prefix reconstruction. M3/M7 must
+first prove recovery SLO failure and useful skip hit rate before a Root/Seal-bound partial certificate may be reopened.
 
 Each shard has one low-frequency CAS-published
 `CurrentWalRunPointer {walRunRootKey, walRunRootSha256, shardRunEpoch}`. Owner-open, rollover, and handoff read or update
@@ -63,10 +67,10 @@ cannot reach the retirement frontier fails closed.
 - Provider slowdown can create correctness-driven availability backpressure before capacity is exhausted.
 - Root/Seal/successor publication is refined by ADR 0047, checkpoint/open-tail authority by ADRs 0053/0065, directory
   capacity by ADR 0058, lazy-lane/vector inventory by ADR 0060, publisher/frontier separation by ADRs 0063/0064, and
-  pre-position/readable-tail publication by ADRs 0066/0067. Exact remaining wire, retirement authority, and
-  evidence-derived numeric values remain downstream gates.
+  pre-position/readable-tail publication by ADRs 0066/0067, and provider-proof/read-view boundaries by ADRs 0068/0069.
+  Exact remaining wire, retirement authority, and evidence-derived numeric values remain downstream gates.
 - M3 must prove every cap and cumulative counter, no counter reset on fallback, pre-limit rollover, uncertain CAS,
   lineage fork/cycle/depth rejection, pointer/root substitution, and zero normal-append metadata I/O.
 
-This decision is refined by ADRs 0047/0053/0058/0060/0062..0067, refines ADR 0030, and is tracked by `T-APPEND-01`,
-`T-OBJECT-01`, `T-HANDOFF-01`, `V2-OBJ-005/009..011/014..023`, and `V2-READ-003`.
+This decision is refined by ADRs 0047/0053/0058/0060/0062..0069, refines ADR 0030, and is tracked by `T-APPEND-01`,
+`T-OBJECT-01`, `T-HANDOFF-01`, `V2-OBJ-005/009..011/014..024`, and `V2-READ-003/004`.

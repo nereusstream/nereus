@@ -58,6 +58,11 @@ and every hard resource cap are correctness contracts and cannot be disabled. Pr
 cadence/recovery concurrency; binding/tenant policy may request only a conservative soft share; shard/Cell/host owns
 hard memory ceilings and materialization-pressure triggers. A Topic cannot enlarge a hard cap or disable readability.
 
+Checkpoint provider-proof mode, adapter/canonicalizer version, and token cap activate at the next WalRun Root and are
+never Topic policy. `NONE` is the base mode. Read-view pin/retired-generation count, byte, age, and deadline caps remain
+non-disableable ceilings; exact values may follow Cell/host evidence but cannot change captured view semantics or
+authorize early reclamation.
+
 ## Consequences
 
 - Performance tuning remains possible without making correctness or durable compatibility host-dependent.
@@ -68,6 +73,6 @@ hard memory ceilings and materialization-pressure triggers. A Topic cannot enlar
   seal/backpressure under resource pressure, incompatible batching rejection, and that every correctness gate remains
   non-disableable.
 
-This decision is refined by ADRs 0056 through 0067, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and is tracked
-by `T-POLICY-01`, `V2-POLICY-001`, `V2-BK-012/013`, `V2-OBJ-016..023`, `V2-READ-003`, and
+This decision is refined by ADRs 0056 through 0069, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and is tracked
+by `T-POLICY-01`, `V2-POLICY-001`, `V2-BK-012/013`, `V2-OBJ-016..024`, `V2-READ-003/004`, and
 `V2-POSITION-011`.

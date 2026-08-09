@@ -130,9 +130,14 @@ Three lane-local chains are rejected. Checkpoint cadence and hard-envelope polic
 Topic packing changes follow the group-boundary rule and do not roll the run merely to change linger.
 
 Root SHA appears once in each page header, not in every physical row. The runtime descriptor may carry it only for
-defensive combiner validation. Recovery uses bounded parallel prefix GETs only for candidates not excluded by validated
-manifest/source authority, charges one cumulative GET/bytes/time envelope, and never uses whole-Object GET for
-directory reconstruction.
+defensive combiner validation. 0.2 has no partial-run recovery-skip vector: except for an authoritative whole-WalRun
+retirement frontier, recovery uses bounded parallel prefix GETs for every discovered/checkpointed extent in the current
+non-retired run, charges one cumulative GET/bytes/time envelope, and never uses whole-Object GET for directory
+reconstruction.
+
+The Root fixes checkpoint provider-proof mode, Provider adapter/canonicalizer version, and token hard cap. `NONE` is
+the default. A conditionally admitted version-bound row stores only proof tag, token length, and bounded canonical
+binary token; proof absence does not change recovery or cause a whole-Object GET.
 
 ## Ownership token
 
@@ -147,6 +152,11 @@ Before position allocation, the owner reserves completion and active-tail-locato
 tickets, hidden locators, and segmented index state are owner-local and never enter handoff metadata. Takeover discards
 old tickets, reconstructs physical inventory first, then publishes Binding active-tail views independently; an
 unrelated typed gap cannot block B.
+
+The logical Binding read snapshot and its allocation-free read-batch pins also remain owner-local. Append does not
+publish a new source generation per ACK. Manifest handoff publishes low-frequency source-selection generations and
+uses two pin drains: one before retiring old index structures, another after a later no-fallback view before releasing
+source protection. The exact durable second-view/protection-release cut remains open.
 
 ## Planned fast handoff
 
@@ -171,5 +181,5 @@ topic-open, rollover publication, trim, and background lifecycle work are separa
 hide in an aggregate append metric.
 
 Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios:
-`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015/020..023`, `V2-READ-003`, `V2-HO-001`, `V2-FABRIC-001`,
+`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015/020..024`, `V2-READ-003/004`, `V2-HO-001`, `V2-FABRIC-001`,
 `V2-POLICY-001`, and `V2-POSITION-002..011`.

@@ -141,6 +141,13 @@ scope. Otherwise recovery performs a bounded full GET and recomputes SHA-256. ET
 frame range: Root-bound directory AEAD authenticates offsets/lengths and frame AEAD plus CRC validates the selected
 payload. A planning hint cannot substitute for either local authentication layer.
 
+Checkpoint proof mode defaults to `NONE`. Only an M3-evidenced Provider may let a new Root admit
+`VERSION_BOUND_FULL_OBJECT_SHA256_V1`; that Root fixes adapter/canonicalizer version and token hard cap. Rows store only
+proof tag, token length, and bounded canonical binary version bytes because Root/row already provide scope, body length,
+and SHA-256. Absent/oversized candidate evidence becomes `NONE` before row seal; malformed persisted wire fails closed.
+No String normalization, ETag, header/SDK object, or extension blob is accepted. `NONE` never adds a routine
+whole-Object GET.
+
 While the producing process still retains the exact sealed body, a missing object may be retried only under the same
 identity with conditional-create semantics. After process loss, a provider-present object is fully verified and
 reconciled. A conclusively absent, never-ACKed lane candidate stops admission for the old run, terminates that lane
@@ -169,12 +176,13 @@ sequence proceeds until the candidate retries the same body/identity to converge
 causes the old run to stop after proven absence/unrecoverable pre-PUT failure.
 
 Recovery gets the prefix from the Root, performs same-prefix LIST with total continuation-page, object, byte, and time
-budgets, and rebuilds the provider-resolved physical inventory. It excludes exact extents only when manifest/source
-authority safely proves they are outside the active-tail view; unknown candidates remain included. Remaining candidates
-use bounded parallel `[0,directoryPrefixEnd)` GETs, not whole-Object GETs, to validate leaf/header/directory and rebuild
-independent Binding views through each Position Domain. All GET/bytes/decode/time work shares one cumulative envelope.
-LIST-after-PUT visibility and bounded pagination are required provider capabilities; a provider without them is
-rejected for `OBJECT_WAL`.
+budgets, and rebuilds the provider-resolved physical inventory. 0.2 has no partial-run recovery-skip vector: apart from
+an authoritative whole-WalRun retirement frontier that excludes an entire retired run, every discovered/checkpointed
+extent in the current non-retired run receives a bounded parallel `[0,directoryPrefixEnd)` GET. Lane order or one
+Binding's manifest cannot authorize omission. Prefix reads, not whole-Object GETs, validate leaf/header/directory and
+rebuild independent Binding views through each Position Domain. All GET/bytes/decode/time work shares one cumulative
+envelope. LIST-after-PUT visibility and bounded pagination are required provider capabilities; a provider without them
+is rejected for `OBJECT_WAL`.
 
 Each immutable checkpoint page covers at most 256 provider-resolved descriptors and 64 KiB canonical bytes in
 aggregate. One shard/WalRun-publisher-epoch-fenced combiner, one run-wide predecessor chain, and one checkpoint-head CAS
@@ -182,11 +190,11 @@ carry a `coveredThrough` vector of `LaneExtentResolvedThrough` values. A page ma
 changed component is contiguous. Member protocol ACKs are not checkpoint eligibility: A's typed gap cannot consume the
 uncovered physical-tail limits after its Object resolves.
 
-The page header binds Root once. A physical row stores only lane ID/sequence, directory-prefix end, body length,
-Object SHA-256, and an optional closed, bounded, canonical, deterministic
-`optionalProviderVersionAndQualifiedProof` field. It does not repeat Root SHA or the complete key and contains no
-binding/read frontier, ACK, gap, or per-binding coverage. Runtime descriptors may retain Root SHA for defensive
-combiner admission.
+The page header binds Root once. A physical row stores lane ID/sequence, directory-prefix end, body length, Object
+SHA-256, and at most `proofTag + tokenLength + boundedCanonicalVersionTokenBytes`. It does not repeat Root SHA,
+complete key, Provider scope, proof algorithm/scope, or binding state. Runtime descriptors may retain Root SHA for
+defensive combiner admission. A page remains bounded by both 256 actual rows and 64 KiB canonical bytes, so admitted
+token bytes may reduce rows/page.
 
 The combiner admits one page candidate at a time. Candidate identity derives from Root, ordinal, predecessor SHA, and
 page-body SHA. Takeover CASes only publisher epoch while preserving the committed head/vector; unknown responses accept
@@ -223,6 +231,23 @@ append still waits for its lane's physical recovery condition. Materialization c
 is not required to make ACKed data durable or readable. Locator retirement waits for exact manifest coverage plus
 source protection/read-pin safety.
 
+`BindingReadViewSnapshot` is a logical per-read-batch capture, not an immutable object created for each ACK/read. Append
+continues to install locators hidden and release-publish frontiers. Low-frequency source-selection generations are
+pinned through bounded allocation-free RCU/epoch/hazard or event-loop reader slots; ordinary reads perform no metadata
+I/O, heap-pin allocation, or process-global refcount contention by default. One partition fetch/range or ManagedLedger
+`readEntries` call is a pin unit, not each record/message/frame or an unbounded session.
+
+The captured logical scope binds Binding/incarnation, Storage Epoch/Position Domain version, owner fence, Readable
+Frontier, active-tail view version, manifest view identity/generation, and source-protection generation. One snapshot
+may read disjoint manifest and active-tail ranges; one Kafka commit set/Pulsar entry and every separately declared
+whole-range fallback remain source-pure.
+
+Reclamation is two-stage. First publish preferred+protected-fallback, drain older-view pins, and retire only obsolete
+index structures. Protection remains while any successor names fallback. Then publish a view without fallback, drain
+all fallback-bearing pins, and only afterward release protection/admit GC. Retired-view/pin count, bytes, age, and
+deadline are hard-bounded; leaks may block handoff/retirement or new read admission, never delete early. Exact coherent
+capture and the durable no-fallback/protection-release cut remain open.
+
 ## Backpressure
 
 Admission is bounded by pending bytes/frames, open groups, provider requests, deadline, per-cell/per-tenant share, and
@@ -243,8 +268,8 @@ Each Cell Provider Session owns its admission, retry/circuit-breaker state, open
 and close lifecycle. A compatible lower-level transport may be pooled, but a cell-local throttle, credential failure, or
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
-Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..023`,
-`V2-READ-003`, `V2-POLICY-001`, and `V2-FABRIC-002`. See
+Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..024`,
+`V2-READ-003/004`, `V2-POLICY-001`, and `V2-FABRIC-002`. See
 [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md),
 [ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md),
 [ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md),
@@ -267,4 +292,6 @@ Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required sc
 [ADR 0064](../decisions/0064-v2-object-wal-physical-and-binding-frontiers.md), plus
 [ADR 0065](../decisions/0065-v2-physical-checkpoint-row-and-seal-payload.md),
 [ADR 0066](../decisions/0066-v2-pre-position-reservation-and-completion-ticket.md), and
-[ADR 0067](../decisions/0067-v2-active-tail-readable-publication-and-index-boundary.md).
+[ADR 0067](../decisions/0067-v2-active-tail-readable-publication-and-index-boundary.md), plus
+[ADR 0068](../decisions/0068-v2-checkpoint-provider-proof-mode-and-row-encoding.md) and
+[ADR 0069](../decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md).

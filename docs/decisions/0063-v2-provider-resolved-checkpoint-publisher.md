@@ -59,7 +59,8 @@ ordinary Seal/retirement authority permits it.
 ADR 0065 fixes the physical wire boundary: the runtime descriptor may carry `walRunRootSha` for defensive admission,
 but a Root-bound page row does not repeat it. Rows carry no binding/read frontier, ACK, gap, or per-binding coverage.
 Any optional provider-version/qualified-proof field is a closed, bounded, canonical, deterministic field set rather
-than an opaque provider blob.
+than an opaque provider blob. ADR 0068 defaults it to `NONE`; an admitted row stores only proof tag, checked length,
+and bounded canonical binary version bytes under the Root-fixed adapter/canonicalizer/cap.
 
 ## Consequences
 
@@ -72,5 +73,5 @@ than an opaque provider blob.
 - Multiple publishers may be reconsidered only after the single combiner fails a predeclared SLO under the accepted
   aggregate bounds.
 
-This decision is refined by ADR 0065, refines ADRs 0039, 0047, 0049, 0053, and 0060 and is tracked by
-`T-OBJECT-01`, `T-HANDOFF-01`, `V2-OBJ-002/014/015/018/020/022`.
+This decision is refined by ADRs 0065/0068, refines ADRs 0039, 0047, 0049, 0053, and 0060 and is tracked by
+`T-OBJECT-01`, `T-HANDOFF-01`, `V2-OBJ-002/014/015/018/020/022/024`.
