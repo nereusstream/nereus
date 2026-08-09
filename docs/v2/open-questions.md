@@ -15,21 +15,30 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-The user explicitly confirmed all five round-3 recommendations. ADRs 0023 through 0027 now resolve
-`V2-OPEN-META-02`, `V2-OPEN-BK-04`, `V2-OPEN-OBJ-05`, `V2-OPEN-OBJ-06`, and `V2-OPEN-PUL-OBJ-02`. The next
+The user explicitly confirmed all five round-4 recommendations. ADRs 0028 through 0032 now resolve
+`V2-OPEN-META-03`, `V2-OPEN-BK-05`, `V2-OPEN-OBJ-07`, `V2-OPEN-OBJ-08`, and `V2-OPEN-PUL-OBJ-03`. The next
 independent frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-META-03` | which protocol-native incarnation, authority key, and deterministic IDs identify one aggregate | use Kafka topic UUID or Pulsar persistence name + generation, then domain-separated deterministic IDs |
-| `V2-OPEN-BK-05` | which exact keys, root-v1 facts, publication verification, and delete order make the two-object attempt ledger-equivalent | use attempt-derived conditional keys and a bounded self-checking root; verify data then root/read, delete root then data |
-| `V2-OPEN-OBJ-07` | where each group's expected length/SHA lives and how a crashed owner discovers every ACKed extent without per-group metadata | use one pre-open WalRun root plus scoped seq/length/SHA leaf keys and bounded strong prefix LIST |
-| `V2-OPEN-OBJ-08` | what one Kafka/Pulsar frame is and which multi-frame append unit is atomic | one assigned Kafka RecordBatch per frame plus an all-or-none partition commit set; one Pulsar entry per frame |
-| `V2-OPEN-PUL-OBJ-03` | which physical registry record atomically proves deployment-wide virtual-ledger slice non-overlap | use one bounded canonical deployment registry updated by single-key CAS; derive per-cell lookup indexes |
+| `V2-OPEN-META-04` | which logical v1 fields and compatibility axis freeze the aggregate schema | use one whole-record schema version, a closed immutable payload, and one shared logical validator across backends |
+| `V2-OPEN-KAF-META-01` | how Kafka activates the clean-break V2 metadata format | reuse `nereus.storage.version` at fresh-format-only level 2 and reject V1/runtime upgrade or downgrade |
+| `V2-OPEN-BK-06` | which canonical wire and hard parser limits freeze sealed-ledger root v1 | use a bounded self-digesting big-endian `NPO1` format with four ordered sections |
+| `V2-OPEN-BK-07` | which final proof is required before native BookKeeper source deletion | revalidate the exact root/data/read path, then recheck native attempt state under CAS |
+| `V2-OPEN-BK-08` | which one-shot Object/BookKeeper fallback states and errors are legal | use whole-range, single-source fallback only while native metadata says both sources remain eligible |
+| `V2-OPEN-OBJ-09` | where exact per-binding epochs live in a multi-binding WalRun | keep the root physical/run-scoped and put binding incarnation plus exact epochs in object-local binding/frame context |
+| `V2-OPEN-OBJ-10` | whether crash recovery of a provider-absent unACKed group requires a local ciphertext journal | avoid a local durability prerequisite; burn the old run/sequence and require an idempotent fresh retry |
+| `V2-OPEN-OBJ-11` | which bounded WalRun lifecycle prevents an eventually unrecoverable prefix | cap count, bytes, age, and recoverable predecessors, then drain/seal/roll over before any bound is crossed |
+| `V2-OPEN-OBJ-12` | whether the worst-case recovery envelope constrains normal ACK/admission | make the full cumulative recovery envelope an append-admission invariant |
+| `V2-OPEN-OBJ-13` | which authority discovers the current WalRun Root and bounded lineage | use one low-frequency per-shard CAS pointer bound to the exact root hash and run epoch |
+| `V2-OPEN-OBJ-14` | where the authoritative append-unit directory lives and whether a commit set may span extents | put a bounded directory in a new `NWG1` body and prohibit one commit set from crossing an ObjectExtent |
+| `V2-OPEN-PUL-OBJ-04` | which durable identity owns a virtual-ledger slice | bind it to deployment/reservation domain and immutable Pulsar Protocol Cell identity |
+| `V2-OPEN-PUL-OBJ-05` | which irreversible slice lifecycle preserves never-reuse | use `ACTIVE -> RETIRING -> RETIRED`; keep exhaustion derived and retired rows forever |
+| `V2-OPEN-PUL-OBJ-06` | which slice geometry and lifetime caps keep the registry bounded | use one fixed aligned `2^k` slice per Cell plus independent encoded-registry limits |
 
 The complete questions and recommendations are in
-[round 4](grill-notes/06-restarted-grill-2-schema-discovery-and-registry.md). None of these five new recommendations is
-accepted yet.
+[round 5](grill-notes/07-restarted-grill-2-wire-recovery-and-slice-contracts.md). None of these fourteen new
+recommendations is accepted yet.
 
 ## Initial binding and epoch publication
 
@@ -46,13 +55,26 @@ Resolved by [ADR 0023](../decisions/0023-v2-topic-binding-aggregate-record.md). 
 `CreateTopics`; MetadataStore/Oxia creates one key and resolves response loss by exact reread equality. Logical stores
 are typed projections, and 0.2 does not use a cross-key `CREATING` saga.
 
-### `V2-OPEN-META-03`: aggregate incarnation, key, and deterministic IDs
+### `V2-OPEN-META-03`: resolved aggregate incarnation, key, and deterministic IDs
 
-Open. The current recommendation is to use Kafka's native topic UUID as the Kafka incarnation/ABA fence and Pulsar's
-canonical persistence name plus binding generation as the Pulsar incarnation. Aggregate keys would be scoped by that
-typed incarnation, while binding and initial-epoch IDs would be domain-separated deterministic hashes rather than
-random or time/backend-dependent values. Exact schema/version, delete/recreate retirement, and replay rules depend on
-this choice and are intentionally deferred.
+Resolved by [ADR 0028](../decisions/0028-v2-topic-incarnation-keys-and-deterministic-ids.md). Kafka native topic UUID or
+Pulsar canonical persistence/name facts plus binding generation form a protocol-discriminated incarnation. Aggregate
+keys are incarnation-scoped, values repeat the complete identity, and binding/initial-epoch IDs are separate
+domain-separated deterministic SHA-256 derivations with no retry-dependent input.
+
+### `V2-OPEN-META-04`: aggregate logical schema v1
+
+Open. The current recommendation is one `aggregateSchemaVersion=1` compatibility axis over an immutable, closed
+`TopicBindingAggregateV1` payload containing the complete binding plus ordinal-zero epoch. It would exclude lifecycle,
+attempt, timestamp, controller-offset, backend-version, and extension-map state; Kafka and Oxia would share validation
+and golden vectors without requiring byte-identical physical records. Confirmation must precede the M1 schema freeze.
+
+### `V2-OPEN-KAF-META-01`: Kafka V2 feature activation
+
+Open. The current recommendation reuses `nereus.storage.version`, makes level 2 the only feature level accepted by V2
+nodes, and permits it only at a fresh KRaft storage format/bootstrap. Level 1 remains the V1 format and runtime
+0/1-to-2 upgrades or 2-to-0/1 downgrades would be rejected. This clean-break choice and its controller validation must
+be confirmed before the Kafka metadata schema is frozen.
 
 ## Object WAL durability verification
 
@@ -89,20 +111,59 @@ Resolved by [ADR 0026](../decisions/0026-v2-protocol-native-frame-payload-bytes.
 Kafka `MemoryRecords`/batch bytes or exact Pulsar ManagedLedger entry bytes after only the outer Object envelope is
 decoded. Application records/messages are not reserialized, and native protocol checksums remain independent.
 
-### `V2-OPEN-OBJ-07`: Object WAL group identity and crash discovery
+### `V2-OPEN-OBJ-07`: resolved Object WAL group identity and crash discovery
 
-Open. The current recommendation is to persist one immutable WalRun root before opening append, encode fixed-width
-sequence plus exact body length and SHA-256 in every scoped conditional-create leaf key, and discover ACKed extents by
-a strongly consistent, globally bounded prefix LIST. Periodic descriptor pages may accelerate recovery but would not be
-the ACKed tail authority. This deliberately trades recovery LIST work and a narrower provider admission set for no
-per-group metadata-service commit in the cost-first ACK path.
+Resolved by [ADR 0030](../decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md). One immutable root
+is persisted before opening a run; every group key carries fixed-width sequence, exact body length, and full SHA-256.
+Bounded strong same-prefix LIST discovers an ACKed open tail without per-group metadata publication. Async checkpoint
+pages are accelerators only, and non-qualifying providers are rejected for `OBJECT_WAL`.
 
-### `V2-OPEN-OBJ-08`: protocol frame and append commit-set granularity
+### `V2-OPEN-OBJ-08`: resolved protocol frame and append commit-set granularity
 
-Open. The current recommendation is one complete broker-assigned Kafka RecordBatch per frame, with all frames decoded
-from one partition `MemoryRecords` storage append forming an all-or-none `KafkaAppendCommitSet`. One exact Pulsar
-ManagedLedger entry would be one frame and one commit set. ObjectExtent groups, network requests, transactions, and
-individual Pulsar batched messages would not redefine protocol append atomicity.
+Resolved by [ADR 0031](../decisions/0031-v2-protocol-frame-and-append-commit-set.md). One assigned Kafka RecordBatch is a
+frame and every frame from one partition storage append is one all-or-none commit set. One Pulsar ManagedLedger entry is
+one frame/commit set. Object groups, requests, transactions, and individual batched messages do not redefine append
+atomicity.
+
+### `V2-OPEN-OBJ-09`: multi-binding WalRun epoch placement
+
+Open. The current recommendation preserves cross-binding batching: the root would carry only Cell/provider/shard/run
+authority and format/recovery contracts, while each object-local binding context and frame would carry the exact typed
+incarnation, Storage Epoch, and Owner Epoch. A singular topic epoch in the root would instead require one run per
+binding/epoch and change the cost objective.
+
+### `V2-OPEN-OBJ-10`: provider-absent in-flight group after process loss
+
+Open. A root plus LIST can recover provider-present extents but cannot recreate exact final ciphertext for a proven
+absent, never-ACKed group. The current recommendation avoids a broker-local fsync journal: permanently burn the old
+run/sequence, return to the proven Durable Frontier, and let protocol idempotency rebuild a fresh attempt. Requiring
+same-key retry across process loss would instead require journaling exact post-encryption bytes and completion state.
+
+### `V2-OPEN-OBJ-11`: bounded WalRun lifecycle
+
+Open. The current recommendation caps every run by extent count, canonical bytes, age, and recoverable predecessor
+count. Admission would stop before a cap, then drain/reconcile and seal before publishing a successor. Exact numeric
+limits remain evidence-derived, while seal/checkpoint/retirement authority and handoff order remain descendants.
+
+### `V2-OPEN-OBJ-12`: recovery envelope as an admission invariant
+
+Open. The current recommendation makes worst-case recovery cost constrain normal ACK/admission across roots/runs,
+LIST pages/keys/bytes, HEAD/GET/full-GET work, decoded units, memory, concurrency, retries, and wall time. Fallback may
+not reset counters; predicted exhaustion would trigger rollover or backpressure, and actual exhaustion would fail
+closed without skipping coverage or advancing the frontier.
+
+### `V2-OPEN-OBJ-13`: current WalRun Root discovery authority
+
+Open. The current recommendation is one low-frequency per-shard CAS `CurrentWalRunPointer` containing the exact root
+key/hash and shard run epoch. A successor would link to its predecessor so recovery can walk a bounded lineage to the
+retirement frontier. Exact pointer/root wire and lineage bounds depend on the epoch-placement and lifecycle decisions.
+
+### `V2-OPEN-OBJ-14`: in-object append-unit directory and co-location
+
+Open. The current recommendation introduces a new `NWG1` major format with one bounded authoritative
+`BindingContextTable + AppendUnitDirectory` near the fixed header. One Kafka append commit set must remain complete in
+one ObjectExtent; every frame block would be independently decodable and integrity checked. Exact fields and limits
+remain a descendant after this authority/co-location decision.
 
 ## Storage Epoch transitions
 
@@ -171,13 +232,33 @@ bounded immutable data Object plus one deterministic sparse-index/root Object. D
 success proves both objects, `0..LAC` coverage, integrity, and a ledger-equivalent `ReadHandle`. Both cleanup keys remain
 derivable when the root is absent.
 
-### `V2-OPEN-BK-05`: sealed-ledger keys, root v1, and lifecycle order
+### `V2-OPEN-BK-05`: resolved sealed-ledger keys, root v1, and lifecycle order
 
-Open. The current recommendation is to derive conditional-create data/root keys only from persisted provider scope,
-ledger ID, attempt UUID, and key-derivation version. A bounded canonical root would bind the attempt, sanitized sealed
-ledger metadata, data length/SHA-256, outer format, contiguous sparse index, and an independent root self-digest.
-Publication would verify data, then root, then the real offloaded read path before success; deletion would prove root
-absent before deleting data and would cover attempt-scoped multipart residue.
+Resolved by [ADR 0029](../decisions/0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md). Persisted attempt scope and key
+version derive both conditional-create keys. A bounded root binds attempt/sealed metadata, data SHA/format, contiguous
+index, and self-digest. Publication verifies data, root, and the real read path; cleanup proves root then data absent and
+covers attempt-scoped multipart residue.
+
+### `V2-OPEN-BK-06`: sealed-ledger root v1 wire and parser limits
+
+Open. The current recommendation is an independent, big-endian `NPO1` canonical binary with a fixed header, exactly
+four ordered typed sections, and a trailing SHA-256 over all preceding canonical bytes. Strict count/string/object
+limits would be checked before allocation or index trust; HEAD would first enforce the 8 MiB root limit. The full
+proposed limit table remains preserved in the round-5 record pending confirmation.
+
+### `V2-OPEN-BK-07`: Object revalidation before BookKeeper source deletion
+
+Open. The current recommendation adds a narrow final revalidation of the exact attempt/root, data identity and digest,
+sealed-ledger facts, and production reader boundaries before setting native `bookkeeperDeleted=true`; the native
+metadata CAS would then recheck the same eligible attempt. Failure retains BookKeeper and backs off, while permanent
+Object mismatch quarantines the attempt.
+
+### `V2-OPEN-BK-08`: native Object/BookKeeper read fallback
+
+Open. The current recommendation allows at most one whole-range fallback while native metadata says both sources are
+eligible: Object-first may fall back for availability/integrity failure, while BookKeeper-first falls back only after
+native missing-ledger resolution. One range must come wholly from one source; source deletion makes Object-only final.
+The BK read-pin/drain mechanism needed to make this safe remains a descendant.
 
 ## Pulsar Object WAL
 
@@ -194,13 +275,30 @@ Resolved by [ADR 0027](../decisions/0027-v2-pulsar-virtual-ledger-numeric-compat
 increasing with gaps and no reuse. Numeric order preserves stock comparison only; explicit predecessor/head metadata
 remains Ledger Chain authority.
 
-### `V2-OPEN-PUL-OBJ-03`: deployment reservation registry authority
+### `V2-OPEN-PUL-OBJ-03`: resolved deployment reservation registry authority
 
-Open. The current recommendation is one bounded deployment-wide
-`PulsarVirtualLedgerNamespaceRegistryRecord`, whose canonically sorted assignment table is updated by single-key CAS.
-Per-cell lookup records would be repairable derived indexes, not allocation authority. This avoids relying on a
-multi-key transaction that the pinned MetadataStore/Oxia surface does not expose; exact capacity, slice lifecycle,
-allocator, and Ledger Chain protocols depend on this root choice.
+Resolved by [ADR 0032](../decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md). One bounded deployment-wide
+registry is slice-allocation authority; its canonical assignment table advances through single-key CAS. Per-cell lookup
+and watches are derived. Exact capacity, slice lifecycle, allocator, and Ledger Chain protocols remain descendants.
+
+### `V2-OPEN-PUL-OBJ-04`: durable slice owner identity
+
+Open. The current recommendation binds each immutable assignment to deployment ID, reservation-domain ID, protocol,
+and immutable Pulsar Protocol Cell ID. Broker/session, display alias, and provider scope remain runtime/admission
+attributes so ordinary restart, scale, or provider rotation does not consume another finite slice.
+
+### `V2-OPEN-PUL-OBJ-05`: slice lifecycle and retirement
+
+Open. The current recommendation is the irreversible lifecycle `ACTIVE -> RETIRING -> RETIRED`: retirement stops new
+allocation first, then retains the final assignment forever as a never-reuse tombstone. Exhaustion would be derived
+from counter/bounds rather than stored as a lifecycle state. The exact proof permitting RETIRED remains a descendant.
+
+### `V2-OPEN-PUL-OBJ-06`: slice geometry and registry lifetime capacity
+
+Open. The current recommendation gives every Cell exactly one immutable, equal-size, aligned `2^k` contiguous slice
+inside the reserved numeric domain, with separate hard `maxRegistryBytes` and lifetime `maxAssignmentsEver` caps that
+include retired Cells. Exact `k`, resize, and second-slice policy remain downstream choices requiring workload and
+support-lifetime evidence.
 
 ### `V2-OPEN-PUL-MIGRATION-01`: new incarnation or HybridManagedLedger
 
@@ -261,6 +359,19 @@ For example, one Pulsar entry with batch indexes `0..2` might map to one Kafka O
 input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
+
+### Restarted Grill 2 round 4 decisions: resolved by ADRs 0028 through 0032
+
+Resolved on 2026-08-09 after explicit confirmation:
+
+- `V2-OPEN-META-03` → [ADR 0028](../decisions/0028-v2-topic-incarnation-keys-and-deterministic-ids.md);
+- `V2-OPEN-BK-05` → [ADR 0029](../decisions/0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md);
+- `V2-OPEN-OBJ-07` → [ADR 0030](../decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md);
+- `V2-OPEN-OBJ-08` → [ADR 0031](../decisions/0031-v2-protocol-frame-and-append-commit-set.md);
+- `V2-OPEN-PUL-OBJ-03` → [ADR 0032](../decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md).
+
+Their original recommendations and source rationale remain in
+[the round 4 record](grill-notes/06-restarted-grill-2-schema-discovery-and-registry.md).
 
 ### Restarted Grill 2 round 3 decisions: resolved by ADRs 0023 through 0027
 

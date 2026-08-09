@@ -67,7 +67,9 @@ future evolution, and at most one epoch may ever admit new positions at a time.
 
 Binding plus initial epoch are one immutable `TopicBindingAggregateRecord`. Kafka adds it to the atomic `CreateTopics`
 result; MetadataStore/Oxia creates one key and resolves a lost response by exact reread equality. Binding and epoch APIs
-are typed projections, not separately writable authorities. Partial or conflicting state never admits I/O.
+are typed projections, not separately writable authorities. Kafka native topic UUID or Pulsar persistence-name plus
+generation is the typed incarnation/ABA fence; aggregate and binding/initial-epoch IDs are retry-stable deterministic
+derivations. Partial or conflicting state never admits I/O.
 
 Ownership grants an exclusive Owner Epoch inside that binding. Kafka uses KRaft; Pulsar uses MetadataStore/Oxia plus
 native broker/ManagedLedger authority. Owner Epoch and Storage Epoch are distinct.
@@ -138,10 +140,18 @@ Object WAL uses bounded group commit to control request cost. A group-level node
 Extent; every frame carries its own binding, incarnation, Storage Epoch, Owner Epoch, and typed Protocol Coverage. ACK
 frontiers advance independently per binding, so one unrelated binding does not impose a shard-wide correctness barrier.
 
+One pre-open WalRun Root fixes scope, prefix, run/session identity, epoch-validation rules, format families, and bounded
+recovery budgets. Each conditional group key includes fixed-width sequence/body length plus the complete SHA-256;
+restart discovers the ACKed open tail through bounded strong same-prefix LIST, without adding a per-group metadata
+commit. Async checkpoint pages only accelerate it.
+
 The WAL object is already the durable Object copy. SHA-256/v1 protects the exact canonical provider request body;
 CRC32C/v1 independently protects exact assigned Kafka batch bytes or exact Pulsar ManagedLedger entry bytes after the
 outer Object envelope is decoded. Native protocol checksums remain separate. Background work rewrites the WAL into
 read-optimized segments and indexes.
+
+One assigned Kafka RecordBatch is one frame, while every frame from one partition storage append is one all-or-none
+commit set. One Pulsar ManagedLedger entry is one frame/commit set. Object grouping does not change either boundary.
 
 After PUT-response loss, HEAD is sufficient only when a typed Provider Object Proof matches immutable version, exact
 length, SHA-256, and `FULL_OBJECT` scope; otherwise recovery performs a bounded full GET. ETag, application user
@@ -159,13 +169,15 @@ ordering, and lifecycle. Cross-ledger Pulsar Coverage is a ledger-keyed range co
 The exact Kafka ledger layout remains an M2 evidence gate. Pulsar async Object offload processes sealed non-current
 ledgers only; one native attempt publishes one bounded data Object followed by one deterministic sparse-index/root
 Object. It does not stream the current append ledger in 0.2. Pulsar Object WAL allocates increasing virtual ledger IDs
-from a deployment-reserved, native-excluded cell slice. Explicit MetadataStore/Oxia links remain Ledger Chain authority,
-while Object groups remain Physical Extents. BookKeeper/Object profile-transition mechanics are deferred beyond 0.2.
+from a native-excluded cell slice assigned by one bounded deployment-wide CAS registry. Explicit MetadataStore/Oxia
+links remain Ledger Chain authority, while Object groups remain Physical Extents. BookKeeper/Object profile-transition
+mechanics are deferred beyond 0.2.
 
 For Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole attempt, completion,
 read/fallback, and deletion-eligibility authority. Nereus provides a `LedgerOffloader`; its manifest is derived and cannot
 delete a ledger or overrule native lifecycle state. The offloader exposes the deterministic data/root pair as one
-ledger-equivalent `ReadHandle` and can derive both cleanup keys even when the root is missing.
+ledger-equivalent `ReadHandle`; persisted attempt location/key derivation survives config drift, the bounded root binds
+sealed metadata and contiguous data coverage, and cleanup proves root absent before data deletion.
 
 Detailed contract: [BookKeeper and Pulsar](../v2/04-bookkeeper-and-pulsar.md).
 

@@ -49,9 +49,11 @@ For Pulsar `OBJECT_WAL`, the same Pulsar Position Domain and ledger-chain rules 
 durable bytes use `ObjectExtent`. A Pulsar-cell `PulsarVirtualLedgerStore` in MetadataStore/Oxia allocates reserved-domain
 virtual ledger IDs and publishes explicit append-only Ledger Chain order. Entry IDs are allocated serially in the active
 virtual ledger. The deployment excludes `[2^62, 2^63 - 2]` from native allocation and assigns each cell one
-non-overlapping, never-reused slice; the cell allocator issues increasing IDs with permitted gaps. Numeric monotonicity
-keeps stock MessageId comparison compatible, but explicit predecessor/head metadata remains chain authority. Object
-identity, bytes, and group/run sequence never become MessageId truth. Exact rollover and recovery mechanics remain open.
+non-overlapping, never-reused slice. One bounded deployment registry is allocation authority: its canonical complete
+assignment table advances through single-key CAS, while per-cell lookups/watches are derived only. The cell allocator
+issues increasing IDs with permitted gaps. Numeric monotonicity keeps stock MessageId comparison compatible, but
+explicit predecessor/head metadata remains chain authority. Object identity, bytes, and group/run sequence never become
+MessageId truth. Exact slice lifecycle, allocator, rollover, and recovery mechanics remain open.
 
 Online Pulsar BookKeeper/Object evolution is not implied by this model. New-incarnation migration versus a future hybrid
 ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.
@@ -78,6 +80,14 @@ transfer may construct the single data Object. Offload completes only after both
 digests, and one ledger-equivalent `ReadHandle` are verified. Reads present one sealed ledger; idempotent cleanup derives
 both keys even when the root is absent. ADR 0024 is authoritative.
 
+Key-derivation v1 uses
+`pulsar-offload/v1/ledger-<ledgerId>/attempt-<uuid>/{data|root}` beneath the persisted Cell Provider Scope; native driver
+metadata retains exact location/prefix/version so current configuration cannot reinterpret an old attempt. The bounded
+canonical root binds attempt identity, sanitized closed-ledger metadata, data length/SHA-256 and outer format, contiguous
+sparse rows, and a separate root self-digest. Publication verifies data, root, then the actual offloaded read path before
+success. Cleanup proves root absent before data absent and covers attempt-scoped multipart residue. ADR 0029 is
+authoritative.
+
 A BookKeeper source becomes physically deletable only after all of these are durable and revalidated:
 
 - the exact sealed Kafka Offset Range or ledger-keyed Pulsar Coverage and checksum were materialized;
@@ -97,9 +107,11 @@ throttle, or stop new admission before BookKeeper capacity is exhausted. It neve
 into a synchronous Object write.
 
 Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, and `T-POSITION-01`. Required scenarios:
-`V2-BK-001..004` and `V2-POSITION-001..003`. See
+`V2-BK-001..005` and `V2-POSITION-001..004`. See
 [ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md),
-[ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md), and
+[ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md),
 [ADR 0022](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md),
-[ADR 0024](../decisions/0024-v2-pulsar-sealed-ledger-object-layout.md), and
-[ADR 0027](../decisions/0027-v2-pulsar-virtual-ledger-numeric-compatibility.md).
+[ADR 0024](../decisions/0024-v2-pulsar-sealed-ledger-object-layout.md),
+[ADR 0027](../decisions/0027-v2-pulsar-virtual-ledger-numeric-compatibility.md),
+[ADR 0029](../decisions/0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md), and
+[ADR 0032](../decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md).

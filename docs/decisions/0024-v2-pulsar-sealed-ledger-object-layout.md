@@ -42,4 +42,6 @@ attempt-inventory and partial-delete contract.
 - M2 must prove data-before-root publication, root/coverage corruption rejection, multipart response-loss cleanup,
   whole-ledger `ReadHandle` equivalence, idempotent two-key deletion, and UUID isolation.
 
-This decision refines ADRs 0017 and 0020 and is tracked by `T-BK-01`, `V2-BK-002`, and `V2-BK-004`.
+The deterministic keys, root contract, and lifecycle order are refined by
+[ADR 0029](0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md). This decision refines ADRs 0017 and 0020 and is tracked
+by `T-BK-01`, `V2-BK-002`, `V2-BK-004`, and `V2-BK-005`.

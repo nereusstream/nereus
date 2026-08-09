@@ -19,8 +19,7 @@ TopicProtocolBinding {
   bindingVersion
   protocolCellId
   protocolKind
-  durableTopicId
-  topicIncarnation
+  topicIncarnationIdentity
   positionDomain
   payloadMapping
   nativeWriteAuthorityKind
@@ -35,6 +34,11 @@ Missing, unknown, V1, or internally inconsistent values fail before append or re
 one Position Domain and one Native Write Authority at a time. Positions from another binding or incarnation are not
 comparable.
 
+`TopicIncarnationIdentity` is protocol-discriminated. Kafka uses its native topic UUID as authority and retains the
+canonical topic name only for cross-checking. Pulsar uses canonical persistence/name facts plus a positive binding
+generation, whose prior generation must be durably deleted before a new incarnation is created. Topic names alone are
+never authority keys.
+
 ## Atomic initial aggregate
 
 The Topic Protocol Binding and its one initial Storage Epoch are physically stored as one immutable
@@ -42,10 +46,16 @@ The Topic Protocol Binding and its one initial Storage Epoch are physically stor
 MetadataStore/Oxia creates one aggregate key with `putIfAbsent`. The logical binding and epoch stores are typed views of
 that record and cannot mutate one component independently.
 
+Aggregate authority keys include the protocol kind and complete typed incarnation: Kafka keys use the canonical topic
+UUID, while Pulsar keys use a domain-separated canonical-persistence-name digest plus fixed-width generation. Values
+repeat the identity and are validated against the key. `bindingId` and the ordinal-zero `storageEpochId` are separate
+domain-separated SHA-256 derivations from canonical framed Cell/incarnation facts; random attempts, time, log offsets,
+and backend versions cannot influence them.
+
 A lost create response rereads the same record and requires exact equality. Missing, mismatched, unknown, or conflicting
 aggregate state fails closed and never selects a default epoch. The generic `CREATING` fallback in ADR 0019 is not used
 by this 0.2 single-record representation. Normal admitted append does not read or mutate the aggregate remotely. ADRs
-0019 and 0023 are authoritative.
+0019, 0023, and 0028 are authoritative.
 
 ## Append-only Storage Epoch chain
 
@@ -124,6 +134,7 @@ default without validation. A protocol adapter may restrict the allowed initial 
 transaction authority cannot satisfy the contract. No adapter exposes an online transition set in 0.2.
 
 Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-OBJECT-01`, and `T-BK-01`. Required scenarios:
-`V2-PROFILE-001`, `V2-MIGRATION-001`, and `V2-META-002`. See
+`V2-PROFILE-001`, `V2-MIGRATION-001`, and `V2-META-002..003`. See
 [ADR 0019](../decisions/0019-v2-initial-binding-epoch-atomic-visibility.md) and
-[ADR 0023](../decisions/0023-v2-topic-binding-aggregate-record.md).
+[ADR 0023](../decisions/0023-v2-topic-binding-aggregate-record.md) and
+[ADR 0028](../decisions/0028-v2-topic-incarnation-keys-and-deterministic-ids.md).

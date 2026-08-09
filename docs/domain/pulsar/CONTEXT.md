@@ -32,6 +32,11 @@ The deployment authority that excludes one high signed-long domain from native a
 never-reused slices to Pulsar Protocol Cells.
 _Avoid_: High-bit convention, reusable cell range, allocator-local assumption
 
+**Virtual Ledger Namespace Registry**:
+The one bounded deployment-wide CAS record that canonically owns every virtual-ledger slice assignment and proves
+global non-overlap/non-reuse. Per-cell lookup and watches are derived only.
+_Avoid_: Independent authoritative slice key, watch authority, locally merged assignment table
+
 **Pulsar Position Domain**:
 The Position Domain whose ordering and adjacency rules are proven by the Ledger Chain and Pulsar Position semantics.
 _Avoid_: Universal position domain
@@ -50,3 +55,13 @@ _Avoid_: Parallel manifest authority, generic cross-protocol offload state
 The one bounded data Object and one sparse-index/root Object that together represent a native sealed-ledger offload
 attempt. Both identities are deterministic and attempt-scoped.
 _Avoid_: Independent child extents, manifest-authorized offload completion
+
+**Sealed-Ledger Root**:
+The bounded canonical root that binds one offload attempt to sanitized closed-ledger metadata, data length/SHA-256,
+outer format, contiguous sparse index, and its own integrity domain.
+_Avoid_: Stock index assumed sufficient, current-config key derivation, unbounded offsets
+
+**Pulsar Frame**:
+The exact bytes of one ManagedLedger entry and one `(ledgerId, entryId)`. Client batching, compression, encryption, and
+transaction markers remain within their native entry boundary.
+_Avoid_: Individual batched message, publish request, transaction

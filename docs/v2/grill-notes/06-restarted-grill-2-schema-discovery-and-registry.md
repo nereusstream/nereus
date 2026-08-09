@@ -12,8 +12,8 @@ sourceTuple: v2-m0
 Date: 2026-08-09
 
 ADRs 0023 through 0027 resolved the previous frontier. This record preserves the next independent questions and
-recommendations presented to the user. None of the recommendations below is an accepted runtime contract until the
-user explicitly confirms it.
+recommendations presented to the user. The user subsequently confirmed all five recommendations. The accepted
+contracts are ADRs 0028 through 0032; this session record is not runtime evidence.
 
 ## Source facts used for recommendations
 
@@ -125,8 +125,24 @@ lifecycle/耗尽、allocator epochs 和 chain state machine 都依赖这个根�
 - `V2-OPEN-OBJ-01`, `V2-OPEN-BK-02`, and `V2-OPEN-BENCH-01` remain executable evidence gates rather than prose
   questions.
 
-## Awaiting explicit confirmation
+## Confirmed answer and authoritative synchronization
 
-No recommendation in this round has been promoted into an ADR or normative contract. The user may confirm all five,
-confirm a subset by question number, or revise any recommendation. Confirmed answers will be synchronized immediately;
-unconfirmed alternatives remain only in this session record and the open-question log.
+The user answered: “全部按推荐确认”. The decisions were synchronized as follows:
+
+- Q1 / `V2-OPEN-META-03` →
+  [ADR 0028](../../decisions/0028-v2-topic-incarnation-keys-and-deterministic-ids.md): protocol-native typed
+  incarnations, incarnation-scoped keys, and retry-stable deterministic binding/epoch IDs;
+- Q2 / `V2-OPEN-BK-05` →
+  [ADR 0029](../../decisions/0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md): deterministic attempt keys, bounded
+  root v1, data/root/read publication verification, and root-before-data cleanup;
+- Q3 / `V2-OPEN-OBJ-07` →
+  [ADR 0030](../../decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md): one pre-open WalRun root,
+  sequence/length/SHA leaf identities, and bounded strong-LIST crash discovery without per-group metadata commits;
+- Q4 / `V2-OPEN-OBJ-08` →
+  [ADR 0031](../../decisions/0031-v2-protocol-frame-and-append-commit-set.md): one assigned Kafka batch per frame with an
+  all-or-none partition commit set, and one Pulsar entry per frame/commit set;
+- Q5 / `V2-OPEN-PUL-OBJ-03` →
+  [ADR 0032](../../decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md): one bounded deployment-wide
+  single-key-CAS registry is slice-allocation authority and per-cell lookups are derived.
+
+Implementation and executable evidence remain NotStarted.

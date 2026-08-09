@@ -14,9 +14,9 @@ sourceTuple: v2-m0
 | Milestone | Scope | Status at M0 | Required aggregate |
 | --- | --- | --- | --- |
 | M0 | V1 archive references, Context Map/glossaries, V2 ADRs/contracts, open-question/session logs, source/scenario manifests, tradeoff register, documentation gate | DocumentationGated | `v2M0Check` |
-| M1 | new V2 identities; one physical Topic Binding Aggregate record; reserved-slice Pulsar virtual-ledger identity/chain model; capability-split metadata SPI; remove superseded V1 API | Planned | `v2M1Check` |
-| M2 | Owner Epoch lane, typed frontier contract, BookKeeper foundation, sealed-ledger Pulsar data/root Object pair and `LedgerOffloader`, Kafka ledger-layout scale spike | Planned | `v2M2Check` |
-| M3 | one-cell Object WAL groups; SHA-256 extent/CRC32C protocol-native frames; provider proof; cell-scoped admission/session lifecycle; per-binding typed durable frontier; Pulsar virtual-ledger Object path | Planned | `v2M3Check` |
+| M1 | typed protocol-native incarnations and deterministic aggregate IDs; one physical aggregate; deployment-wide virtual-ledger registry/chain model; capability-split metadata SPI; remove superseded V1 API | Planned | `v2M1Check` |
+| M2 | Owner Epoch lane, typed frontier contract, BookKeeper foundation, Pulsar deterministic data/root keys and bounded root/read/delete lifecycle, Kafka ledger-layout scale spike | Planned | `v2M2Check` |
+| M3 | one-cell Object WAL groups; pre-open WalRun roots and bounded strong-LIST discovery; SHA-256 extents; CRC32C protocol frames and Kafka commit sets; provider proof/session lifecycle; per-binding frontier; Pulsar virtual-ledger Object path | Planned | `v2M3Check` |
 | M4 | manifest, protocol-position/timestamp indexes, Storage Epoch resolver, readable active tail | Planned | `v2M4Check` |
 | M5 | materialization, compaction, retention, source protection, per-cell cache/task isolation, physical GC | Planned | `v2M5Check` |
 | M6 | Kafka KRaft integration and protocol compatibility | Planned | `v2M6Check` |

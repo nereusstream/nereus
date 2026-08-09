@@ -24,3 +24,13 @@ _Avoid_: Universal position domain
 **Kafka Native Write Authority**:
 The Kafka partition leadership and protocol state permitted to allocate Kafka Offsets for a bound Topic Incarnation.
 _Avoid_: BookKeeper writer, Pulsar broker authority
+
+**Kafka Frame**:
+One complete raw Kafka RecordBatch after broker offset and leader-epoch assignment. Its exact batch header defines
+coverage; record count does not derive the offset span.
+_Avoid_: Produce request, individual record, transaction
+
+**Kafka Append Commit Set**:
+All Kafka Frames decoded from one partition's single MemoryRecords storage append. Every member is durable and valid
+before any member becomes visible or acknowledged.
+_Avoid_: Object group, partial batch-prefix success, cross-partition request atomicity

@@ -38,4 +38,6 @@ This decision does not activate online BookKeeper/Object migration or a hybrid l
 - M1/M3 must prove native-range exclusion, cross-cell slice isolation, monotonic allocation with gaps, no reuse,
   reservation drift/revoke fencing, stock comparison compatibility, and explicit-chain-only recovery.
 
-This decision refines ADR 0022 and is tracked by `T-POSITION-01`, `V2-POSITION-002`, and `V2-POSITION-003`.
+The deployment registry's physical authority is refined by
+[ADR 0032](0032-v2-pulsar-virtual-ledger-reservation-registry.md). This decision refines ADR 0022 and is tracked by
+`T-POSITION-01`, `V2-POSITION-002..004`.

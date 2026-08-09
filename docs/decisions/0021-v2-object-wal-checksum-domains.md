@@ -47,5 +47,7 @@ existing checksum field.
 
 This decision is refined by
 [ADR 0025](0025-v2-initial-checksum-algorithms-and-provider-proof.md) and
-[ADR 0026](0026-v2-protocol-native-frame-payload-bytes.md). It refines ADR 0018 and is tracked by `T-OBJECT-01`,
-`V2-OBJ-001`, `V2-OBJ-003`, and `V2-OBJ-004`.
+[ADR 0026](0026-v2-protocol-native-frame-payload-bytes.md), with persisted Object identity/discovery in
+[ADR 0030](0030-v2-object-wal-run-root-and-content-addressed-discovery.md) and frame granularity in
+[ADR 0031](0031-v2-protocol-frame-and-append-commit-set.md). It refines ADR 0018 and is tracked by `T-OBJECT-01`,
+`V2-OBJ-001`, and `V2-OBJ-003..006`.

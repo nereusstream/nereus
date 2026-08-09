@@ -47,5 +47,6 @@ rejected for that profile rather than silently downgraded to weaker durability.
 
 Checksum byte domains are refined by [ADR 0021](0021-v2-object-wal-checksum-domains.md), and the initial algorithms and
 provider-proof fields are refined by
-[ADR 0025](0025-v2-initial-checksum-algorithms-and-provider-proof.md). This decision is tracked by `T-OBJECT-01`,
-`V2-APP-003`, `V2-OBJ-001`, and `V2-OBJ-003`.
+[ADR 0025](0025-v2-initial-checksum-algorithms-and-provider-proof.md). Run/group identity and discovery are refined by
+[ADR 0030](0030-v2-object-wal-run-root-and-content-addressed-discovery.md). This decision is tracked by `T-OBJECT-01`,
+`V2-APP-003`, `V2-OBJ-001`, `V2-OBJ-003`, and `V2-OBJ-005`.

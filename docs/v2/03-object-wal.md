@@ -22,9 +22,10 @@ limit is configured and observable; no open group may grow or wait indefinitely.
 ## Object and frame identity
 
 A group object header identifies the object format, shard, node session, shard-run epoch, sequence, codec,
-Object-extent digest family, encryption metadata, and frame count. The immutable Object Extent descriptor records the
-canonical request-body length and Object-extent digest algorithm/version/value outside the body; the digest value is
-never embedded in the exact bytes it hashes.
+Object-extent digest family, encryption metadata, and frame count. After the final canonical body is sealed, its scoped
+conditional-create leaf key encodes fixed-width sequence, body length, and complete SHA-256/v1. That leaf key plus the
+verified header reconstructs the immutable Object Extent descriptor outside the body; the key/digest is never embedded
+in the exact bytes it hashes.
 
 The group object is an `ObjectExtent`. Every frame independently carries:
 
@@ -35,6 +36,12 @@ The group object is an `ObjectExtent`. Every frame independently carries:
 - exact protocol-native payload length and CRC32C/v1 Frame-payload checksum value;
 - idempotency identity;
 - flags required by the protocol payload mapping.
+
+One Kafka frame is one complete raw broker-assigned RecordBatch. All frames from one partition `MemoryRecords` storage
+append form one `KafkaAppendCommitSet`: membership, every frame, and all coverage must be durable and valid before any
+member is visible or acknowledged. One Pulsar frame/commit set is one exact ManagedLedger entry and one
+`(ledgerId, entryId)`. Object groups, network requests, transactions, and individual Pulsar batched messages do not
+redefine these boundaries.
 
 One group may contain multiple compatible bindings from exactly one Protocol Cell. Object groups never cross Protocol
 Cells in 0.2. A group-level shard epoch cannot authorize every frame and its physical ordering cannot compare protocol
@@ -75,10 +82,18 @@ retention. ADR 0018 is the authoritative proof contract.
 
 ## WalRun and bounded recovery
 
-A `WalRun` bounds one shard-session sequence interval and records immutable Object Extents plus coarse, per-binding
-typed Protocol Coverage summaries. Recovery discovers candidate runs from durable roots, validates objects, reconstructs
-per-binding frontiers through each Position Domain, and stops at configured page, object, byte, and time budgets. A
-handoff hint may narrow the first scan but cannot omit the durable fallback.
+Before append opens, one immutable `WalRunRoot` binds Cell/provider scope, Protocol Cell, shard/run/session,
+the required Owner/Storage-Epoch validation contract, exact prefix, initial sequence, format/codec/encryption/digest
+families, and total recovery budgets. Exact run-level versus per-binding epoch placement remains an open format gate.
+Each group leaf under that prefix has the canonical form
+`<sequence19>/<body-length19>-sha256-v1-<64-lowercase-hex>.nwg`; both decimal components are zero-padded 19-digit
+non-negative values. No per-group metadata-service row is required for ACK.
+
+Recovery gets the prefix from the root, performs same-prefix LIST with total continuation-page, object, byte, and time
+budgets, validates leaf identity, provider/body proof, header, frames, commit sets, typed coverage, and idempotency, then
+reconstructs independent per-binding frontiers through each Position Domain. LIST-after-PUT visibility and bounded
+pagination are required provider capabilities; a provider without them is rejected for `OBJECT_WAL`. A handoff hint or
+asynchronous checkpoint/sealed manifest may narrow scanning but cannot omit this durable open-tail fallback.
 
 Acknowledged group objects remain directly readable. Materialization creates a preferred read generation but is not
 required to make ACKed data durable or readable.
@@ -94,8 +109,10 @@ Each Cell Provider Session owns its admission, retry/circuit-breaker state, open
 and close lifecycle. A compatible lower-level transport may be pooled, but a cell-local throttle, credential failure, or
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
-Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..004` and `V2-FABRIC-002`. See
+Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..006` and `V2-FABRIC-002`. See
 [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md),
 [ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md),
-[ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md), and
-[ADR 0026](../decisions/0026-v2-protocol-native-frame-payload-bytes.md).
+[ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md),
+[ADR 0026](../decisions/0026-v2-protocol-native-frame-payload-bytes.md),
+[ADR 0030](../decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md), and
+[ADR 0031](../decisions/0031-v2-protocol-frame-and-append-commit-set.md).

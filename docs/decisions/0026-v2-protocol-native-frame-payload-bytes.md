@@ -26,8 +26,8 @@ and decompressed. It does not mean decoded or reserialized application records/m
   never relabeled or reused as the V2 frame checksum.
 - V2 does not introduce an additional per-application-record/message checksum in 0.2.
 
-The exact append-to-frame granularity and per-frame internal index encoding remain downstream format gates; they cannot
-change the canonical byte identity above.
+Append-to-frame granularity is refined by ADR 0031. Per-frame/commit-set binary and index encoding remains a downstream
+format gate and cannot change the canonical byte identity above.
 
 ## Consequences
 
@@ -38,4 +38,5 @@ change the canonical byte identity above.
 - M3 must prove exact byte round-trip, outer compression/encryption decode, native-checksum independence, corrupted
   boundary/length rejection, Kafka multi-batch handling, and Pulsar batched/encrypted entry handling.
 
-This decision refines ADR 0021 and is tracked by `T-OBJECT-01`, `T-PROTOCOL-01`, and `V2-OBJ-004`.
+This decision is refined by [ADR 0031](0031-v2-protocol-frame-and-append-commit-set.md), refines ADR 0021, and is tracked
+by `T-OBJECT-01`, `T-PROTOCOL-01`, `V2-OBJ-004`, and `V2-OBJ-006`.

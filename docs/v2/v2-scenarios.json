@@ -44,6 +44,14 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-META-003",
+      "milestone": "M1",
+      "contract": "aggregate authority uses a typed Kafka UUID or Pulsar persistence name generation incarnation and deterministic binding and initial epoch IDs",
+      "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-POSITION-001",
       "milestone": "M1",
       "contract": "Kafka Offset and Pulsar Position remain binding and incarnation scoped typed domains without a universal logical offset",
@@ -63,6 +71,14 @@
       "id": "V2-POSITION-003",
       "milestone": "M1/M3",
       "contract": "virtual ledger IDs increase inside non overlapping never reused cell slices excluded from native allocation",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-004",
+      "milestone": "M1",
+      "contract": "one bounded deployment registry is virtual ledger slice allocation authority and per cell lookups are derived",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -148,6 +164,22 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-OBJ-005",
+      "milestone": "M3",
+      "contract": "one pre open WalRun root plus sequence length SHA leaf keys and bounded strong LIST discovers every ACKed open run group without per group metadata",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-006",
+      "milestone": "M3",
+      "contract": "one Kafka frame is one assigned RecordBatch and one partition append is an all or none commit set while one Pulsar entry is one frame commit set",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-BK-001",
       "milestone": "M2",
       "contract": "both BookKeeper profiles ACK at quorum without synchronous Object dependency",
@@ -175,6 +207,14 @@
       "id": "V2-BK-004",
       "milestone": "M2",
       "contract": "one sealed Pulsar ledger attempt uses one bounded data Object plus one deterministic sparse index root Object",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-005",
+      "milestone": "M2",
+      "contract": "persisted attempt scope derives deterministic data root keys and a bounded canonical root verifies publication and root first cleanup",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null

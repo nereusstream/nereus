@@ -30,8 +30,9 @@ and its one initial Storage Epoch:
 - Topic open caches the complete record after validation. Normal admitted append performs no remote aggregate read or
   mutation.
 
-Exact field encoding, key derivation, schema evolution, deletion/recreation tombstones, and snapshot/replay conformance
-remain downstream implementation gates.
+Topic incarnation, authority-key, and deterministic-ID rules are refined by ADR 0028. Exact aggregate field encoding,
+schema evolution, deletion/recreation retirement, and snapshot/replay conformance remain downstream implementation
+gates.
 
 ## Consequences
 
@@ -41,4 +42,5 @@ remain downstream implementation gates.
 - M1 must prove atomic Kafka replay/snapshot publication, Oxia create-response-loss convergence, conflicting retry
   rejection, typed-view equality, and absence of independently writable child records.
 
-This decision refines ADR 0019 and is tracked by `T-META-01`, `V2-PROFILE-001`, and `V2-META-002`.
+This decision is refined by [ADR 0028](0028-v2-topic-incarnation-keys-and-deterministic-ids.md), refines ADR 0019, and is
+tracked by `T-META-01`, `V2-PROFILE-001`, `V2-META-002`, and `V2-META-003`.

@@ -30,6 +30,11 @@ do not require both backends to implement the same ephemeral lease primitive.
 and epoch stores are projections rather than independent authorities. This is create/open control-plane work, not
 normal append.
 
+The aggregate key is protocol/incarnation-scoped: native Kafka topic UUID or Pulsar canonical persistence-name digest
+plus generation. Its value repeats the complete discriminated identity, and binding/initial-epoch IDs are deterministic
+domain-separated SHA-256 derivations. Name-only keys, random IDs, time, log offsets, and backend versions cannot define
+durable aggregate identity.
+
 ADR 0016 excludes Access Projection and Migration Link runtime from 0.2. The M1 model rejects a second Native Write
 Authority but does not expose `ProjectionMapStore`. A future accepted runtime must keep its map and authority-transfer
 contracts as separate capabilities and may not create a per-append cross-protocol metadata dependency.
@@ -53,10 +58,12 @@ cannot overrule stock Pulsar metadata that still authorizes a ledger, cursor, tr
 `BOOKKEEPER_WAL_ASYNC_OBJECT`, native ManagedLedger ledger/offload metadata is the sole offload/lifecycle authority; any
 Nereus manifest is derived.
 
-A deployment-level Virtual Ledger Reservation registry assigns non-overlapping, never-reused cell slices from
-`[2^62, 2^63 - 2]` and fences native allocation out of the entire interval. The cell's CAS allocator operates only
-inside its current slice; missing, overlapping, drifted, or revoked reservation state blocks Object-WAL admission and
-allocation. Reservation checks are low-frequency control-plane work, not normal append metadata I/O.
+A single bounded deployment-level Virtual Ledger Namespace Registry is allocation authority for non-overlapping,
+never-reused cell slices from `[2^62, 2^63 - 2]` and records native-exclusion evidence for the entire interval. Its
+canonical complete assignment table uses one-key CAS and a monotonic registry epoch. Per-cell lookup/watch state is
+derived. The cell's allocator operates only inside its current slice; missing, overlapping, drifted, revoked, or
+capacity-exhausted registry state blocks allocation. Reservation checks are low-frequency control-plane work, not
+normal append metadata I/O.
 
 ## Ownership token
 
@@ -89,5 +96,5 @@ For admitted normal append, both remote metadata read and mutation counters must
 topic-open, rollover publication, trim, and background lifecycle work are separately labeled and budgeted so they cannot
 hide in an aggregate append metric.
 
-Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, and `T-FABRIC-01`. Required scenarios: `V2-META-001`,
-`V2-META-002`, `V2-HO-001`, `V2-FABRIC-001`, and `V2-POSITION-002..003`.
+Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, and `T-FABRIC-01`. Required scenarios: `V2-META-001..003`,
+`V2-HO-001`, `V2-FABRIC-001`, and `V2-POSITION-002..004`.

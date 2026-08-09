@@ -43,4 +43,6 @@ change requires an accepted format/Storage Epoch contract rather than mutable po
 - M3 must prove exact-byte streaming digests, provider base64 conversion, full-object/composite rejection, missing
   version fallback, body/digest mismatch, bounded GET recomputation, and capability admission.
 
-This decision refines ADRs 0018 and 0021 and is tracked by `T-OBJECT-01`, `V2-OBJ-001`, and `V2-OBJ-003`.
+Object WAL persists the expected length/SHA in its content-addressed leaf identity under
+[ADR 0030](0030-v2-object-wal-run-root-and-content-addressed-discovery.md). This decision refines ADRs 0018 and 0021 and
+is tracked by `T-OBJECT-01`, `V2-OBJ-001`, `V2-OBJ-003`, and `V2-OBJ-005`.

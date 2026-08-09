@@ -42,5 +42,6 @@ replication, and transaction recovery remain downstream gates.
   rollover/restart recovery, and rejection of Object-derived or numerically sorted positions.
 
 Numeric compatibility and reservation enforcement are refined by
-[ADR 0027](0027-v2-pulsar-virtual-ledger-numeric-compatibility.md). This decision refines ADR 0011 and is tracked by
-`T-POSITION-01`, `V2-POSITION-001..003`.
+[ADR 0027](0027-v2-pulsar-virtual-ledger-numeric-compatibility.md), and registry authority by
+[ADR 0032](0032-v2-pulsar-virtual-ledger-reservation-registry.md). This decision refines ADR 0011 and is tracked by
+`T-POSITION-01`, `V2-POSITION-001..004`.

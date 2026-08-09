@@ -70,6 +70,11 @@ Current accepted decisions:
 - [ADR 0025: initial checksum algorithms and provider proof](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md)
 - [ADR 0026: protocol-native frame payload bytes](../decisions/0026-v2-protocol-native-frame-payload-bytes.md)
 - [ADR 0027: Pulsar virtual-ledger numeric compatibility](../decisions/0027-v2-pulsar-virtual-ledger-numeric-compatibility.md)
+- [ADR 0028: Topic incarnation keys and deterministic IDs](../decisions/0028-v2-topic-incarnation-keys-and-deterministic-ids.md)
+- [ADR 0029: Pulsar sealed-ledger root and lifecycle](../decisions/0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md)
+- [ADR 0030: Object WAL run root and content-addressed discovery](../decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md)
+- [ADR 0031: protocol frame and append commit set](../decisions/0031-v2-protocol-frame-and-append-commit-set.md)
+- [ADR 0032: Pulsar virtual-ledger reservation registry](../decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md)
 
 ## V2 document map
 
@@ -109,8 +114,8 @@ materialization, not a second durability upload. BookKeeper does not synchronous
 A Topic Protocol Binding fixes protocol identity, Position Domain, payload mapping, and Native Write Authority for one
 Topic Incarnation. Its append-only Storage Epoch chain selects profiles over protocol-native frontier intervals. A
 profile is immutable within an epoch. In 0.2 the runtime creates exactly one initial epoch per incarnation and exposes no
-online profile transition; binding plus initial epoch are one immutable physical aggregate record, and the chain model
-is retained for future evolution.
+online profile transition. Binding plus initial epoch are one immutable physical aggregate record keyed by a typed
+protocol-native incarnation with deterministic binding/epoch IDs; the chain model is retained for future evolution.
 
 ## Implementation and evidence status
 

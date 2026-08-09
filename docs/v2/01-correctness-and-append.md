@@ -28,11 +28,11 @@ Control metadata selects an owner and stores low-frequency roots. It is not cons
 For one Topic Protocol Binding, Topic Incarnation, Storage Epoch, and Owner Epoch:
 
 1. the protocol-native owner resolves one immutable `TopicBindingAggregateRecord` containing the complete Topic
-   Protocol Binding and initial Storage Epoch;
+   Protocol Binding, typed protocol-native Topic Incarnation Identity, and initial Storage Epoch;
 2. a serialized writer lane validates the current ownership token and admission budget;
 3. it allocates positions through the binding's Position Domain;
-4. the selected WAL accepts frames carrying binding/incarnation, Storage Epoch, Owner Epoch, typed Protocol Coverage,
-   length, and checksum;
+4. the selected WAL accepts protocol-native frames carrying binding/incarnation, Storage Epoch, Owner Epoch, typed
+   Protocol Coverage, commit-set membership where applicable, length, and checksum;
 5. WAL completion advances only that binding's contiguous typed durable frontier;
 6. the protocol response succeeds only when the complete returned Protocol Coverage is durable and readable;
 7. background workers later publish sealed/read-optimized generations.
@@ -42,6 +42,10 @@ cross-ledger order are proven by the Ledger Chain and represented as ledger-keye
 the serialized writer allocates entry IDs inside the current virtual ledger while a cell-owned MetadataStore/Oxia
 authority publishes low-frequency ledger identity and chain changes. Neither path allocates or persists a
 cross-protocol `long logicalOffset`.
+
+Kafka makes all RecordBatch Frames from one partition storage append durable and visible as one all-or-none Append
+Commit Set. Pulsar makes one ManagedLedger entry one frame/commit set. An Object group may contain several such units,
+but its physical PUT boundary cannot weaken either protocol's append atomicity.
 
 The owner must not acknowledge coverage because a local future completed if its Owner Epoch or Storage Epoch authority
 was fenced before the durability completion was validated.
@@ -91,4 +95,4 @@ Cache misses stop admission and reload before allocating positions; they do not 
 append path.
 
 Relevant tradeoffs: `T-APPEND-01` and `T-POSITION-01`. Required scenarios: `V2-APP-001`, `V2-APP-002`,
-`V2-APP-003`, `V2-POSITION-001..003`, `V2-META-002`, and `V2-OBJ-004`.
+`V2-APP-003`, `V2-POSITION-001..004`, `V2-META-002..003`, and `V2-OBJ-004..006`.

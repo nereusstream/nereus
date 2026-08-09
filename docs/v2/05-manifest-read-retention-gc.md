@@ -66,6 +66,11 @@ The Object Extent descriptor remains outside the canonical body it digests. A Pr
 verification but cannot replace the expected descriptor, and protocol-native Kafka/Pulsar bytes remain exact across
 cache and materialization boundaries unless a new format explicitly defines a rewrite.
 
+For an open Object-WAL run, the canonical sequence/length/SHA leaf key plus verified group header reconstructs that
+descriptor; the pre-open WalRun Root supplies its exact scope/prefix and recovery budgets. Asynchronous descriptor pages
+or sealed manifests may become preferred indexes, but cannot hide an ACKed tail that remains discoverable by bounded
+provider LIST.
+
 ## Timestamp and protocol-position indexes
 
 Kafka Offset, Pulsar Position/entry, batch, and timestamp indexes are first-class descriptor members where their
@@ -96,6 +101,10 @@ Logical trim advances a binding-scoped typed Trim Frontier independently from ph
 
 Deletion is metadata-first, retry-safe, and fail-closed. A provider success with lost response must converge without
 deleting a recreated foreign object or repeating an unsafe operation.
+
+Pulsar sealed-ledger offload cleanup is root-first: deterministic persisted attempt facts derive both keys, root absence
+is proven before data deletion, and completion requires both objects plus covered multipart residue absent. This pair
+rule does not grant a Nereus manifest native ManagedLedger deletion authority.
 
 A GC executor may be shared only as a capacity pool. Every request enters through a cell-scoped task root and delete
 capability, and foreign provider keys, ledgers, scopes, or credentials fail closed before provider I/O.

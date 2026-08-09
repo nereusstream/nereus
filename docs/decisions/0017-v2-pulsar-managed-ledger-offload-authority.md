@@ -44,6 +44,7 @@ does not bypass cursor/read pins, deletion lag, response-loss reconciliation, or
 - M2 must prove attempt recovery, completion publication, offloaded read/fallback, retention, and BookKeeper deletion
   cuts against the exact pinned Pulsar source.
 
-Execution timing is refined by [ADR 0020](0020-v2-pulsar-sealed-ledger-async-offload.md), and the sealed-ledger Object
-pair is refined by [ADR 0024](0024-v2-pulsar-sealed-ledger-object-layout.md). This decision is tracked by `T-BK-01`,
-`V2-BK-001`, `V2-BK-002`, and `V2-BK-004`.
+Execution timing is refined by [ADR 0020](0020-v2-pulsar-sealed-ledger-async-offload.md), the Object pair by
+[ADR 0024](0024-v2-pulsar-sealed-ledger-object-layout.md), and its root/lifecycle by
+[ADR 0029](0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md). This decision is tracked by `T-BK-01`, `V2-BK-001`,
+`V2-BK-002`, `V2-BK-004`, and `V2-BK-005`.

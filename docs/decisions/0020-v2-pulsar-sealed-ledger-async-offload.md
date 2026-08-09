@@ -40,5 +40,6 @@ one Object or to multiple bounded Object Extents behind one root.
 - M2 must prove rollover-triggered eligibility, non-current-ledger selection, attempt retry/cleanup, unavailable Object
   behavior, lag throttling, offloaded read/fallback, and native source-deletion cuts.
 
-The 0.2 Object pair is refined by [ADR 0024](0024-v2-pulsar-sealed-ledger-object-layout.md). This decision refines
-ADR 0017 and is tracked by `T-BK-01`, `V2-BK-001`, `V2-BK-002`, and `V2-BK-004`.
+The 0.2 Object pair is refined by [ADR 0024](0024-v2-pulsar-sealed-ledger-object-layout.md), and its deterministic
+root/lifecycle by [ADR 0029](0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md). This decision refines ADR 0017 and is
+tracked by `T-BK-01`, `V2-BK-001`, `V2-BK-002`, `V2-BK-004`, and `V2-BK-005`.

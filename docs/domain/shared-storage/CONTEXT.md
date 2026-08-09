@@ -42,6 +42,11 @@ One lifetime of a durable topic identity; deleting and recreating a topic create
 external name is reused.
 _Avoid_: Topic name, stream name
 
+**Topic Incarnation Identity**:
+The protocol-discriminated ABA fence for one Topic Incarnation: Kafka topic UUID plus canonical name, or Pulsar
+canonical persistence/name facts plus binding generation. It deterministically derives aggregate authority and IDs.
+_Avoid_: Name-only key, random durable topic ID, backend version
+
 **Position Domain**:
 The protocol-specific rules that define valid positions, ordering, adjacency, and frontiers for a Topic Protocol
 Binding.
@@ -100,6 +105,12 @@ _Avoid_: Application-record reserialization checksum, Object extent digest
 Provider-bound evidence joining one immutable object version, exact canonical-body length, full-object checksum
 algorithm/type, and value. It is distinct from Nereus user metadata and the expected Object Extent Digest descriptor.
 _Avoid_: ETag proof, user-metadata checksum echo, composite checksum
+
+**WalRun Root**:
+The immutable pre-append authority for one Object-WAL shard run. It fixes scope, prefix, run/session identity,
+epoch-validation rules, format families, initial sequence, and bounded LIST recovery budgets; per-group descriptors are
+reconstructed from content-addressed leaf keys and verified headers.
+_Avoid_: Per-group metadata commit, sealed-run-only discovery, unbounded prefix scan
 
 ## Projection and migration
 
