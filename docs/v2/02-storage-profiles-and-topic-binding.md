@@ -123,12 +123,15 @@ Operational policy is versioned separately and may change only at an explicit ac
 - retention duration and compaction cadence;
 - observability sampling.
 
-Correctness, recovery, fencing, and durable compatibility are never switches. Topic/Tenant policy uses a small closed
-set of typed classes; Protocol Cell/shard policy owns shared checkpoint/allocator/group/recovery budgets; host/process
-configuration supplies only resource ceilings. Effective numeric budgets are
-`min(topic-or-tenant request, Cell/shard budget, host capacity)`. A resolved value that affects bytes or recovery is
-persisted in the Storage Epoch, WalRun Root, or offload attempt and cannot drift after failover. Cross-topic batching
-requires compatible resolved classes rather than arbitrary per-topic flag combinations.
+Correctness, recovery, fencing, security/parser hard caps, and durable compatibility are never switches.
+Topic/Tenant-or-Namespace policy uses a small closed set of typed classes and cannot enlarge a format cap; Protocol
+Cell/shard policy owns shared checkpoint/allocator/group/recovery budgets; host/process configuration supplies only
+resource ceilings and may cause backpressure or early seal. Effective numeric budgets are
+`min(topic/tenant-or-namespace request, Cell/shard budget, host capacity)`. A resolved value that affects bytes or
+recovery is persisted in the Storage Epoch, WalRun Root, or offload attempt and cannot drift after failover.
+Cross-topic batching requires compatible resolved classes rather than arbitrary per-topic flag combinations. One policy
+identity cannot combine Storage-Epoch encoding, WalRun packing, sealed-ledger offload-attempt policy, and host capacity
+because those values activate and change at different lifecycle boundaries.
 
 A policy change that affects a primary WAL profile, format, Object-extent digest family, Frame-payload checksum family,
 or encryption family requires a new Storage Epoch at an exact Protocol Frontier. A materialization-only format or index

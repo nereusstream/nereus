@@ -120,7 +120,107 @@ in return for not shipping a hidden Cell-wide head-of-line bottleneck as a featu
 - WalRun retirement/GC and virtual-ledger RETIRING proof remain later lifecycle branches.
 - KoP remains documented and deferred outside the 0.2 runtime.
 
-## Awaiting explicit confirmation
+## Adjusted response preserved verbatim
 
-No Round 8 recommendation above has been accepted. Confirmed answers must be synchronized to new ADRs and normative
-contracts; rejected or adjusted numeric proposals remain only in this session record.
+The user first summarized the review as:
+
+> 结论：Round 8 有局部过度设计，不建议“全部按推荐确认”。性能风险最大的是 Q3 的冷读 GET 放大，以及 Q5 的全 Cell 串行 allocator；Q2/Q4 主要是配置组合和持久化边界过度复杂。Q1 的硬上限方向正确，但具体数值还缺少数据对象总大小和小 entry 开销证明。
+
+The user then supplied this exact disposition:
+
+> Round 8 不全部按推荐确认，请按以下调整继续收敛。
+>
+> 总体配置原则：
+>
+> 1. 格式正确性、安全边界和解析 hard cap 是 wire contract，不允许配置关闭。
+> 2. Topic/Namespace 只能选择少量 typed policy，不能放大格式上限。
+> 3. Cell/host 只负责并发、direct memory、I/O、KMS、CPU 等运行时 ceiling；资源不足时允许 backpressure 或提前 seal，不能静默改变已持久化语义。
+> 4. 性能优化可以配置，但必须与其生效边界一致，不能用一个枚举跨越 Storage Epoch、WalRun 和 host 三种生命周期。
+>
+> Q1 — 保持 OPEN，接受固定 wire 和 hard-cap 原则，但暂不冻结全部数值。
+>
+> 需要补充：
+>
+> - 明确定义 decoded block、encoded block、header/directory、ciphertext/tag 的长度域公式。
+> - 增加 maxDataObjectBytes、multipart part 数量以及 Provider object-size capability admission。只限制 maxBlocks 会允许理论上约 4 TiB 的单个 data object，边界并不完整。
+> - 评估 entry row 是否必须显式保存 entryId。entryId 已可由 block firstEntryId + ordinal 推导；24-byte row 对 100-byte 小 entry 会产生约 24% 的目录开销。冻结前应比较 16-byte 与 24-byte row。
+> - 65,536 可以保留为 parser 的绝对格式上限，但正常 Profile 必须使用更低的派生 admission bound，解析器也只能按实际 count 分配。
+> - NPO1 剩余 2,097,024 bytes 的计算应明确已经扣除 128 bytes 固定开销。
+>
+> Q2 — 保持 OPEN，不先把五个 class 固化成正式合同。
+>
+> 五个 class 的直接热路径损耗不大，但会扩大 benchmark、兼容性和运维矩阵。RAW_4M 与“已压缩、opaque-encrypted 或压缩无收益时写 NONE”存在重叠；COST_8M 与 SCAN_16M 是否都必要也尚无证据。
+>
+> 建议先把 1/4/8/16 MiB 作为 benchmark candidates，而不是 wire enums。证据完成后压缩为最多三个常用 class；Namespace/Cell 提供经过验证的默认值，Topic 只作为显式 override，不要求每个 Topic 永久手工配置。
+>
+> 尤其要验证随机读取放大：NPD1 必须读取并认证完整 block，16 MiB block 的随机读、解压 CPU 和内存占用可能明显高于当前约 1 MiB 的 offload read buffer。
+>
+> Q3 — 保持 OPEN，这是本轮最明确的读取性能风险。
+>
+> 当前首次冷随机 frame 读取实际需要三个 GET：
+>
+> 1. header GET；
+> 2. directory GET；
+> 3. frame GET。
+>
+> 不能只描述为两个控制 GET。
+>
+> 建议保留两阶段 header → directory 作为无可信提示时的恢复路径；如果已经验证的 metadata/manifest 提供 exact directory end 和 expected digest，则允许一次精确 prefix GET 同时取得 header + directory，验证后再读取 frame。该提示只能用于加速，Object 本体和 directory AEAD 仍是权威。
+>
+> 另外，maxFrames=4,096 与 64 MiB OBJECT_COST target 存在明显冲突：平均 frame 小于约 16 KiB 时，会先触发 frame cap。对于大量 1 KiB entry，group 大约 4 MiB 就会 seal，64 MiB cost class 实际无法生效。需要先冻结 directory row 大小，并用小消息分布验证或重新推导 maxFrames。
+>
+> Q4 — 接受 typed policy 方向，但必须拆成两个持久化维度，当前组合 class 不确认。
+>
+> 建议拆为：
+>
+> - FrameEncodingPolicy：属于 Storage Epoch，定义压缩 eligibility、算法和阈值。
+> - WalRunPackingClass：属于 WalRun Root，定义 target bytes 和 linger。
+>
+> 原因是两者的变更边界不同。把它们合并成一个 class，会让单纯修改 batching/linger 也表现为 Storage Epoch 语义变化，并增加跨 binding batching 的碎片化。
+>
+> 跨 binding batching 只要求 packing class、格式和加密上下文兼容；compression 可以按 frame 记录 codec，不必强制所有 frame 使用相同结果。
+>
+> 4/16/64 MiB 和 5/20/50 ms 暂时保留为 benchmark candidates。target 必须是 soft target；Cell/host 可以因资源 ceiling 提前 seal 或 backpressure。64 MiB 还需要验证 direct memory、in-flight PUT、响应丢失后的 full GET 校验成本。
+>
+> Q5 — 调整后确认“证据协议”，不确认 STRICT_SERIALIZED mode。
+>
+> 这里不是运行时过度设计，测试本身有必要；但当前数据已经表明 STRICT 很可能成为 Cell-wide 性能瓶颈：
+>
+> - 100,000 个 ManagedLedger、10 分钟 rollover，平均需求约 166.7 rollover/s。
+> - 每次 rollover 如果串行经过四个 metadata 写步骤，即使每步只有 1 ms，理论容量也约为 250/s；按 50% admission gate 只允许约 125/s，已经低于需求。
+> - metadata p99 为 5/10/25 ms 时差距会更大。
+>
+> 因此不要等全部测试完成后才开始定义 RANGE_LEASED；应并行补齐其正确性合同，但仍不提前选定 mode。
+>
+> 同时调整证据定义：
+>
+> - 用“满足所有 latency/queue/error SLO 时的最大可持续 rollover RPS”替代含义不清的 serialized p99 capacity。
+> - 增加 native Pulsar rollover/append-stall 基线，不能只满足 250 ms、2 s 等绝对门槛。
+> - 测试必须覆盖实际 rollover-rate 分布、抖动与 synchronized storm，而不只是 active-ledger 数量。
+> - allocator record 只持久化 allocator mode、协议版本及恢复身份；rate、queue、latency 和 recovery budgets 应进入可版本化的 Cell policy/evidence，不应冻结为 allocator 的永久身份。
+> - host 资源限制仍只作为运行时 ceiling。
+>
+> 本轮结论：
+>
+> - Q1：调整后再确认。
+> - Q2：继续收集证据并裁剪 class。
+> - Q3：必须解决冷读 GET 放大和 frame-cap/64 MiB 冲突。
+> - Q4：拆分 encoding policy 与 packing class 后再确认。
+> - Q5：确认调整后的证据协议，但 STRICT_SERIALIZED 与 RANGE_LEASED 均继续保持 OPEN。
+>
+> 请不要把 Q1–Q4 或 allocator mode 写成最终合同。
+
+The user closed with this priority statement:
+
+> 最值得优先处理的是 Q3 和 Q5：前者会直接影响冷读 p99 与 Object 请求成本；后者在 100,000 ledger 场景下已经能通过上界计算看到串行瓶颈。配置化可以降低部分风险，但不能用开关掩盖格式边界或 allocator 正确性问题。
+
+## Authoritative synchronization
+
+- the adjusted cross-lifecycle configuration principles refine
+  [ADR 0049](../../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md);
+- adjusted Q5 evidence protocol is accepted by
+  [ADR 0055](../../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md);
+- Q1 / `V2-OPEN-BK-11`, Q2 / `V2-OPEN-BK-13`, Q3 / `V2-OPEN-OBJ-17`, Q4 / `V2-OPEN-OBJ-19`, and allocator-mode
+  `V2-OPEN-PUL-OBJ-09` remain open;
+- none of the proposed block/object/frame/directory limits, class names, combined policy values, absolute allocator
+  thresholds, `STRICT_SERIALIZED`, or `RANGE_LEASED` is normative.

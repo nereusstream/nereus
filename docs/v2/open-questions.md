@@ -15,27 +15,28 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-The user did not confirm Round 7 as one package. They accepted a cross-cutting configuration-scope contract and the
-adjusted Q1, Q2, Q4, Q6, and Q7. ADRs 0049 through 0054 own those accepted parts. Q3, Q5, and Q8 remain open. The next
-independent frontier is:
+The user did not confirm Round 8 as one package. They refined the cross-lifecycle configuration contract and accepted
+only the adjusted allocator evidence protocol in ADR 0055. NPD1/NPO1 values and policies, NWG1 cold-read/cap/policy
+choices, and both allocator modes remain open. The next independent frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-BK-11` | exact NPD1/NPO1 fixed rows and format/deployment hard caps | use a 96-byte NPO1 sparse row, retain 65,536 rows by explicit 8-MiB root arithmetic, and propose 64-MiB block hard caps |
-| `V2-OPEN-BK-13` | finite NPD1 block-target/compression policy classes and default-selection evidence | persist a small candidate class in each attempt and leave the default unpinned until cold-read/CPU/request benchmarks |
-| `V2-OPEN-OBJ-17` | NWG1 hard context/frame/directory/prefix caps and initial cold-range sequence | cap 256 contexts, 4,096 frames, and 1-MiB encrypted directory, then use header GET plus exact directory GET |
-| `V2-OPEN-OBJ-19` | finite NWG1 compression/linger/group-target policy classes | use a few combined typed classes, skip recompression for protocol-marked compressed/opaque payloads, and persist resolved policy |
-| `V2-OPEN-PUL-OBJ-10` | target-scale STRICT_SERIALIZED admission/HOL evidence plan before choosing allocator mode | measure all four writes, synchronized rollover storms, queueing, RTT sensitivity, crash recovery, and reject STRICT if bounded thresholds fail |
+| `V2-OPEN-BK-11` | NPD1 length domains, 16-vs-24-byte row, whole-data-Object/part caps, and provider capability admission | define exact checked formulas; consider a 16-byte derived-entry-ID row plus conservative 4-GiB/1,024-part candidate envelope |
+| `V2-OPEN-BK-13` | NPD1 candidate evidence, default ownership, and reduction to at most three classes | benchmark 1/4/8/16 MiB without wire enums; compare native cold read and let Namespace/Cell provide the validated default |
+| `V2-OPEN-OBJ-17` | three-GET fallback, verified-prefix fast path, exact row wire, and frame/directory-cap derivation | keep body authority, use hints only to coalesce header+directory, and derive frame capacity after row widths/small-message evidence |
+| `V2-OPEN-OBJ-19` | separate Storage-Epoch frame encoding policy from WalRun packing class | accept lifecycle-specific identities before freezing candidate target/linger values |
+| `V2-OPEN-PUL-OBJ-09` | complete RANGE_LEASED owner/range/burn/response-loss/head protocol while STRICT evidence runs | prefer ManagedLedger-scoped non-reclaimable ranges with deterministic head-local pending discovery |
 
 The complete questions and recommendations are in
-[round 8](grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md). None of these five
-recommendations is accepted yet.
+[round 9](grill-notes/11-restarted-grill-2-read-amplification-and-range-allocation.md). None of these recommendations is
+accepted yet.
 
 ## Configuration scope
 
-Correctness/recovery/compatibility are non-configurable; Topic/Tenant typed intent, Protocol Cell/shard budgets, and
-host/process ceilings resolve by minimum, and durable byte/recovery choices persist at epoch/run/attempt boundaries.
-Resolved by [ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md).
+Correctness/recovery/compatibility and parser hard caps are non-configurable; Topic/Tenant-or-Namespace typed intent,
+Protocol Cell/shard budgets, and host/process ceilings resolve by minimum. Durable choices persist at their exact
+epoch/run/attempt boundary, and one enum cannot span Storage Epoch, WalRun, and host lifecycles. Resolved by
+[ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md).
 
 ## Initial binding and epoch publication
 
@@ -197,8 +198,10 @@ A sealed run is never reopened.
 The user retained AES-256-GCM/HKDF-SHA-256, the fixed header direction, nonce domains, descriptor-bound AAD, and
 authenticated directory but did not accept the wire without hard parser/read-amplification caps. The remaining gate
 must freeze `maxBindingContexts`, `maxFrames`, `maxDirectoryBytes`, `maxHeaderAndDirectoryPrefixBytes`, exact row wire,
-and either bounded prefix GET or header GET plus exact directory GET. Correctness crypto cannot be disabled; policy and
-resource concurrency follow ADR 0049. This remains open.
+and range assembly. Without a trusted hint, cold random read is header GET + directory GET + frame GET. A verified
+exact-directory-end/object-identity hint may coalesce the first two but remains non-authoritative. The former 4,096
+frame proposal conflicts with a 64-MiB target for small frames, so frame capacity must follow row-width/directory math
+and small-message evidence. Correctness crypto cannot be disabled; policy and resource concurrency follow ADR 0049.
 
 ### `V2-OPEN-OBJ-18`: resolved WalRun checkpoint pages and open-tail handoff
 
@@ -208,10 +211,10 @@ is disabled, open uncovered tails always use bounded strong LIST, and the sealed
 
 ### `V2-OPEN-OBJ-19`: NWG1 typed operational policy classes
 
-Which finite Topic/Storage-Epoch compression/linger/group-target classes preserve cross-topic batching without an
-unbounded flag product? The next recommendation must define eligible clear payload behavior, default no-recompression
-for protocol-marked compressed or opaque-encrypted frames, persistence/next-WalRun activation, and Cell/host resource
-caps. This remains open.
+The combined encoding/packing class is rejected. The remaining gate must separately define a Storage-Epoch
+`FrameEncodingPolicy` and WalRun-Root `WalRunPackingClass`; cross-binding grouping depends on packing/format/encryption
+compatibility, while each frame records its actual codec. Former 4/16/64-MiB and 5/20/50-ms values are benchmark
+candidates only. Targets are soft; host pressure may early-seal/backpressure without changing persisted policy.
 
 ## Storage Epoch transitions
 
@@ -320,10 +323,10 @@ revalidation and native CAS, and close drains both sources.
 ### `V2-OPEN-BK-11`: NPD1 block wire, limits, codec, and crypto
 
 The user retained NPD1/NPB1, independent blocks, NONE/ZSTD, one wrapped attempt key, and per-block HKDF/AEAD but did not
-accept an unqualified `<2^31` bound or 8-MiB default. The gate must freeze format/deployment
-`maxBlockEncodedBytes`, `maxBlockDecodedBytes`, `maxEntriesPerBlock`, fixed NPO1 row size and root-budget-derived block
-count. Topic/Tenant block target/compression is persisted in the attempt; read buffer/prefetch/cache remains Cell/host
-capacity. This remains open.
+accept the proposed numeric bounds. The gate must define every decoded/encoded/header/directory/ciphertext/tag length
+domain, `maxDataObjectBytes`, multipart part count, provider capability admission, and a 16-vs-24-byte entry row. The
+65,536 parser count may remain absolute, but normal admission is lower and parsing allocates only actual validated
+counts. NPO1's 2,097,024-byte remainder already deducts the exact 128-byte fixed overhead. This remains open.
 
 ### `V2-OPEN-BK-12`: resolved persisted BookKeeper physical-delete intent and fact
 
@@ -334,9 +337,10 @@ audit, and physical capacity require the three-state fact.
 
 ### `V2-OPEN-BK-13`: NPD1 typed block policy and default evidence
 
-Which small quantized block-target/compression classes are offered, and which becomes the default? The default remains
-unaccepted until exact native-entry-size admission plus Object cold-read p99, range bytes, request count, decompression
-CPU, memory, and compression-ratio evidence compares candidate targets. Eight MiB is a candidate, not a fixed default.
+The former five classes are rejected as premature. Benchmark 1/4/8/16-MiB candidates without wire enums, including
+whole-block authentication/decode against the native approximately 1-MiB read-buffer baseline, and reduce the result to
+at most three classes. Namespace/Cell supplies the validated default; Topic is an explicit override rather than a
+mandatory selection. RAW and overlapping COST/SCAN names require evidence before any enum exists.
 
 ## Pulsar Object WAL
 
@@ -394,14 +398,15 @@ domain must prove a disjoint ledger-ID namespace or use an independent deploymen
 This remains open. The original STRICT_SERIALIZED proposal has four successful writes, not three: allocator reserve
 CAS, immutable node put, ManagedLedger head CAS, and allocator clear CAS. STRICT_SERIALIZED and RANGE_LEASED are
 different persisted fencing/recovery protocols, not host feature flags; one Cell cannot mix them. STRICT requires
-persisted mode plus Cell-level rate/queue/RTT/RESERVED-recovery admission and target-scale HOL evidence. RANGE_LEASED
-requires owner epoch, unused-ID burn, response-loss/crash, and pending-head discovery contracts before it can be
-considered.
+the ADR 0055 target-scale/native-baseline evidence. RANGE_LEASED design now proceeds in parallel and still requires
+owner epoch, unused-ID burn, response-loss/crash, and bounded pending-head discovery contracts before selection.
 
 ### `V2-OPEN-PUL-OBJ-10`: allocator target-scale evidence protocol
 
-Which workload/RTT/failure matrix and bounded pass criteria must run before choosing STRICT_SERIALIZED or opening the
-RANGE_LEASED design branch? This decision is the current prerequisite for `V2-OPEN-PUL-OBJ-09` and remains open.
+Resolved by [ADR 0055](../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md). Evidence measures the
+maximum sustainable rollover RPS while all predeclared latency/queue/error/recovery SLOs hold, includes actual
+rollover-rate distribution/jitter/storms and native Pulsar rollover/append-stall baseline, and keeps performance budgets
+out of allocator durable identity. Execution remains `PLANNED`; this resolution is not a performance PASS.
 
 ### `V2-OPEN-PUL-MIGRATION-01`: new incarnation or HybridManagedLedger
 
@@ -462,6 +467,20 @@ For example, one Pulsar entry with batch indexes `0..2` might map to one Kafka O
 input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
+
+### Restarted Grill 2 round 8 adjusted decision: resolved by ADR 0055
+
+Resolved on 2026-08-09 after explicit partial/adjusted confirmation:
+
+- cross-lifecycle policy scope further refined
+  [ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md);
+- Q5 / `V2-OPEN-PUL-OBJ-10` evidence-protocol decision →
+  [ADR 0055](../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md).
+
+Q1 / `V2-OPEN-BK-11`, Q2 / `V2-OPEN-BK-13`, Q3 / `V2-OPEN-OBJ-17`, Q4 / `V2-OPEN-OBJ-19`, and allocator-mode
+`V2-OPEN-PUL-OBJ-09` remain open. No Round-8 numeric cap, class set, combined policy, absolute allocator threshold, or
+allocator mode was promoted. The complete response is preserved in
+[the round 8 record](grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md).
 
 ### Restarted Grill 2 round 7 adjusted decisions: resolved by ADRs 0049 through 0054
 

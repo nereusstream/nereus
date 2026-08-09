@@ -17,25 +17,30 @@ disabled by topic, tenant, Cell, shard, host, or process configuration.
 
 Tunable policy has exactly three scopes:
 
-1. **Topic/Tenant policy** expresses latency/cost intent through a small closed set of typed policy classes and
-   quantized levels. It may select linger, group/block target, compression eligibility, BookKeeper retention, and
-   related SLO policy. It does not alter a wire invariant, checksum, fencing rule, recovery authority, or publication
-   state machine.
+1. **Topic/Tenant-or-Namespace policy** expresses latency/cost intent through a small closed set of typed policy
+   classes and quantized levels. It may select linger, group/block target, compression eligibility, BookKeeper
+   retention, and related SLO policy. It cannot raise a format/parser hard cap or alter a wire invariant, checksum,
+   fencing rule, recovery authority, or publication state machine.
 2. **Protocol Cell/shard policy** owns shared checkpoint cadence and hard lag bounds, allocator and group scheduling,
    recovery budgets, queues, and shared concurrency. A multi-binding WalRun never accepts a topic-scoped switch that
    changes run recovery semantics.
-3. **Host/process capacity** supplies only resource ceilings for threads, memory, direct buffers, cache, I/O, KMS, and
-   concurrency. Capacity pressure may reject admission, backpressure, or force a contract-defined rollover; it cannot
-   reinterpret persisted bytes or weaken recovery.
+3. **Host/process capacity** supplies only resource ceilings for threads, memory, direct buffers, cache, I/O, KMS, CPU,
+   and concurrency. Capacity pressure may reject admission, backpressure, or force a contract-defined early seal or
+   rollover; it cannot reinterpret persisted bytes or weaken recovery.
 
 For the same typed quantity, the effective runtime budget is
-`min(topic-or-tenant request, Protocol Cell/shard budget, host/process capacity)`. An absent or incompatible lower
-ceiling does not select a weaker correctness mode; admission fails or backpressures.
+`min(topic/tenant-or-namespace request, Protocol Cell/shard budget, host/process capacity)`. An absent or incompatible
+lower ceiling does not select a weaker correctness mode; admission fails or backpressures.
 
 Every resolved value that affects persisted bytes or recovery semantics is recorded at its durable activation boundary:
 `StorageEpoch`, `WalRunRootRecord`, or sealed-ledger offload-attempt facts. A failover reads that persisted value and
 does not recompute it from the target host. Changes take effect only at the next contract-defined epoch, WalRun, or
 offload attempt, never halfway through one.
+
+A configurable identity is scoped to exactly one activation lifecycle. One enum or versioned class cannot combine a
+Storage-Epoch encoding choice, a WalRun packing/linger choice, a sealed-ledger offload-attempt choice, and host
+capacity. Related policies may be validated for compatibility, but each value is persisted and changed only at its own
+boundary.
 
 Policy compatibility is part of batching admission. Cross-topic batching uses the resolved typed policy class and
 quantized fields; V2 does not expose an unbounded map of per-topic boolean flags.
@@ -45,8 +50,9 @@ quantized fields; V2 does not expose an unbounded map of per-topic boolean flags
 - Performance tuning remains possible without making correctness or durable compatibility host-dependent.
 - Typed classes may reject some bespoke combinations and host pressure may reduce throughput rather than silently
   downgrade semantics.
-- M1/M2/M3 must prove scope resolution, minimum-budget arithmetic, failover configuration drift, persisted activation
-  boundaries, incompatible batching rejection, and that every correctness gate remains non-disableable.
+- M1/M2/M3 must prove scope resolution, minimum-budget arithmetic, hard-cap non-escalation, failover configuration
+  drift, lifecycle-specific activation boundaries, early seal/backpressure under host pressure, incompatible batching
+  rejection, and that every correctness gate remains non-disableable.
 
 This decision refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047 and is tracked by `T-POLICY-01`,
 `V2-POLICY-001`.

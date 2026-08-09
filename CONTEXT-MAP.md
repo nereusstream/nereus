@@ -31,7 +31,7 @@ KoP is outside the current V2 Kafka/Pulsar design session. Its existing design r
 - **Protocol Cells ↔ Storage Fabric**: multiple Kafka and Pulsar Protocol Cells may share external provider
   infrastructure and capacity pools, but each cell owns a separate Cell Provider Scope/session, resource accounting,
   task/cache namespace, and GC authority; they never share a position domain or write authority.
-- **Policy ↔ durable state**: Topic/Tenant typed classes express SLO/cost intent, Protocol Cell/shard policy owns shared
-  scheduling and recovery budgets, and host/process configuration only caps resources. Correctness is never a switch;
-  durable byte/recovery choices are persisted in the Storage Epoch, WalRun Root, or offload attempt and effective
-  budgets are the minimum across the three scopes.
+- **Policy ↔ durable state**: Topic/Tenant-or-Namespace typed classes express SLO/cost intent, Protocol Cell/shard
+  policy owns shared scheduling and recovery budgets, and host/process configuration only caps resources. Correctness
+  and parser caps are never switches; durable choices are persisted at their Storage Epoch, WalRun Root, or offload
+  attempt boundary, one identity never spans those lifecycles, and effective budgets are the minimum across scopes.

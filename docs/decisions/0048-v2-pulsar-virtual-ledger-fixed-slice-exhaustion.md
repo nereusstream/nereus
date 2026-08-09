@@ -35,5 +35,5 @@ migration contract and is not implied by creating either one.
 - M1/M3 must prove rejection of every geometry mutation, fail-closed boundary allocation, new-Cell independence, and
   absence of automatic topic/ledger migration.
 
-This decision is refined by ADR 0054, refines ADRs 0022, 0027, 0032, and 0041, and is tracked by `T-POSITION-01`,
-`V2-POSITION-003..009`.
+This decision is refined by ADRs 0054/0055, refines ADRs 0022, 0027, 0032, and 0041, and is tracked by
+`T-POSITION-01`, `V2-POSITION-003..010`.

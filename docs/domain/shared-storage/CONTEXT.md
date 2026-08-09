@@ -87,10 +87,10 @@ Topic Incarnation and no online transition runtime exists; the exact future tran
 _Avoid_: Mutable profile, storage mode flag
 
 **Resolved Policy Class**:
-A closed typed Topic/Tenant policy plus quantized values whose effective budgets are capped by Protocol Cell/shard and
-host/process limits. Any resolved value affecting bytes or recovery is persisted in its Storage Epoch, WalRun Root, or
-offload attempt; host drift cannot reinterpret it.
-_Avoid_: Arbitrary per-topic flags, host-selected durable format, configurable correctness
+A closed typed Topic/Tenant-or-Namespace policy plus quantized values whose effective budgets are capped by Protocol
+Cell/shard and host/process limits. It cannot enlarge format/parser caps. Any value affecting bytes or recovery is
+persisted at its Storage Epoch, WalRun Root, or offload attempt, and one policy identity cannot cross those lifecycles.
+_Avoid_: Arbitrary per-topic flags, cross-lifecycle enum, host-selected durable format, configurable correctness
 
 **Topic Binding Aggregate**:
 The atomically visible create/open unit whose one immutable logical schema v1 contains a Topic Protocol Binding and its

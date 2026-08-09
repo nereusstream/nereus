@@ -107,6 +107,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md"
     "$repo_root/docs/decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md"
     "$repo_root/docs/decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md"
+    "$repo_root/docs/decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -168,6 +169,7 @@ require_literal '`RESERVED -> ACTIVE -> DELETING -> DELETED`' "docs/decisions/00
 require_literal '`BK_DELETE_NONE -> BK_DELETE_INTENT -> BK_DELETE_DONE`' "docs/decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md"
 require_literal '`maxUncheckpointedExtents`' "docs/decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md"
 require_literal '`maxAssignmentsEver=256`' "docs/decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md"
+require_literal 'The phrase “serialized p99 capacity” is not' "docs/decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -190,7 +192,10 @@ require_literal "Restarted Grill 2 round 7" "docs/v2/grill-notes/09-restarted-gr
 require_literal "Round 7 不按原推荐整体确认" "docs/v2/grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md"
 require_literal "Q3 / \`V2-OPEN-BK-11\`, Q5 / \`V2-OPEN-OBJ-17\`, and Q8 / \`V2-OPEN-PUL-OBJ-09\` remain open" "docs/v2/grill-notes/09-restarted-grill-2-wire-state-machines-and-checkpoints.md"
 require_literal "Restarted Grill 2 round 8" "docs/v2/grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md"
-require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md"
+require_literal "Round 8 不全部按推荐确认" "docs/v2/grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md"
+require_literal "Q1 / \`V2-OPEN-BK-11\`, Q2 / \`V2-OPEN-BK-13\`, Q3 / \`V2-OPEN-OBJ-17\`, Q4 / \`V2-OPEN-OBJ-19\`" "docs/v2/grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md"
+require_literal "Restarted Grill 2 round 9" "docs/v2/grill-notes/11-restarted-grill-2-read-amplification-and-range-allocation.md"
+require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/11-restarted-grill-2-read-amplification-and-range-allocation.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -276,7 +281,8 @@ for resolved_gate in \
     V2-OPEN-PUL-META-02 \
     V2-OPEN-BK-12 \
     V2-OPEN-OBJ-18 \
-    V2-OPEN-PUL-OBJ-08; do
+    V2-OPEN-PUL-OBJ-08 \
+    V2-OPEN-PUL-OBJ-10; do
     if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$resolved_gate remains in the active gate table"
     fi
@@ -287,10 +293,9 @@ for active_gate in \
     V2-OPEN-BK-13 \
     V2-OPEN-OBJ-17 \
     V2-OPEN-OBJ-19 \
-    V2-OPEN-PUL-OBJ-09 \
-    V2-OPEN-PUL-OBJ-10; do
+    V2-OPEN-PUL-OBJ-09; do
     require_literal "\`$active_gate\`" "docs/v2/open-questions.md"
-    require_literal "\`$active_gate\`" "docs/v2/grill-notes/10-restarted-grill-2-hard-caps-policy-classes-and-allocator-evidence.md"
+    require_literal "\`$active_gate\`" "docs/v2/grill-notes/11-restarted-grill-2-read-amplification-and-range-allocation.md"
     if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$active_gate is missing from the active gate table"
     fi
@@ -348,6 +353,7 @@ active_contracts=(
     "$repo_root/docs/decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md"
     "$repo_root/docs/decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md"
     "$repo_root/docs/decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md"
+    "$repo_root/docs/decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )
@@ -492,18 +498,19 @@ if len(scenario_ids) != len(set(scenario_ids)):
     fail("scenario IDs must be unique")
 
 required_scenarios = {
-    "V2-APP-001", "V2-APP-002", "V2-APP-003", "V2-PROFILE-001",
+    "V2-APP-001", "V2-APP-002", "V2-APP-003", "V2-PROFILE-001", "V2-POLICY-001",
     "V2-POSITION-001", "V2-MULTIPROTOCOL-001",
     "V2-POSITION-002", "V2-POSITION-003", "V2-POSITION-004", "V2-POSITION-005", "V2-POSITION-006",
-    "V2-POSITION-007", "V2-POSITION-008", "V2-META-002", "V2-META-003", "V2-META-004",
-    "V2-META-005", "V2-KAF-META-001", "V2-KAF-META-002",
+    "V2-POSITION-007", "V2-POSITION-008", "V2-POSITION-009", "V2-POSITION-010",
+    "V2-META-002", "V2-META-003", "V2-META-004", "V2-META-005", "V2-META-006",
+    "V2-KAF-META-001", "V2-KAF-META-002", "V2-KAF-META-003",
     "V2-FABRIC-001", "V2-FABRIC-002", "V2-FABRIC-003", "V2-MIGRATION-001",
     "V2-PROJECTION-001",
     "V2-OBJ-001", "V2-OBJ-002", "V2-OBJ-003", "V2-OBJ-004", "V2-OBJ-005", "V2-OBJ-006",
     "V2-OBJ-007", "V2-OBJ-008", "V2-OBJ-009", "V2-OBJ-010", "V2-OBJ-011", "V2-OBJ-012",
-    "V2-OBJ-013", "V2-OBJ-014",
+    "V2-OBJ-013", "V2-OBJ-014", "V2-OBJ-015",
     "V2-BK-001", "V2-BK-002", "V2-BK-003", "V2-BK-004", "V2-BK-005", "V2-BK-006",
-    "V2-BK-007", "V2-BK-008", "V2-BK-009", "V2-BK-010",
+    "V2-BK-007", "V2-BK-008", "V2-BK-009", "V2-BK-010", "V2-BK-011",
     "V2-READ-001", "V2-READ-002", "V2-META-001", "V2-HO-001",
     "V2-KAF-001", "V2-PUL-001", "V2-KOP-001",
 }

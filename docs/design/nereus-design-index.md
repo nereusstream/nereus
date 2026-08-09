@@ -99,6 +99,7 @@ Current accepted decisions:
 - [ADR 0052: Pulsar BookKeeper delete state and retention policy](../decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md)
 - [ADR 0053: WalRun checkpoint bounds and open-tail recovery](../decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md)
 - [ADR 0054: Pulsar virtual-ledger bootstrap geometry](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md)
+- [ADR 0055: Pulsar virtual-ledger allocator evidence protocol](../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md)
 
 ## V2 document map
 

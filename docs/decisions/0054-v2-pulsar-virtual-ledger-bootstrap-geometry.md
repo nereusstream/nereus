@@ -42,5 +42,6 @@ new domain fails closed. Existing Cells still cannot resize, acquire a second sl
 - M1/M3 must prove exact encoding limits, final-row admission, retired-row accounting, `k=40` alignment/math,
   bootstrap immutability, cross-domain overlap/native-exclusion rejection, and independent-cluster behavior.
 
-This decision refines ADRs 0027, 0032, 0041, 0048, and 0049 and is tracked by `T-POSITION-01`,
-`T-POLICY-01`, `V2-POSITION-008/009`.
+Allocator-mode evidence is refined by
+[ADR 0055](0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md). This decision refines ADRs 0027, 0032, 0041,
+0048, and 0049 and is tracked by `T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-008..010`.

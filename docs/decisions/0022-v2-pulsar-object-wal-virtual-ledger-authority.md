@@ -51,5 +51,6 @@ Numeric compatibility and reservation enforcement are refined by
 [ADR 0032](0032-v2-pulsar-virtual-ledger-reservation-registry.md),
 [ADR 0041](0041-v2-pulsar-virtual-ledger-slice-contract.md), and
 [ADR 0048](0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md); exact bootstrap geometry and cross-domain
-non-overlap are refined by [ADR 0054](0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md). This decision refines ADR
-0011 and is tracked by `T-POSITION-01`, `V2-POSITION-001..009`.
+non-overlap are refined by [ADR 0054](0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md), and allocator-mode evidence
+by [ADR 0055](0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md). This decision refines ADR 0011 and is
+tracked by `T-POSITION-01`, `V2-POSITION-001..010`.

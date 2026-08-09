@@ -47,5 +47,5 @@ RETIRING-to-RETIRED proof and allocator/chain epoch protocols remain downstream 
 - M1/M3 must prove stable Cell ownership, illegal lifecycle transitions, allocation stop at RETIRING/exhaustion,
   permanent tombstones, alignment/math, numeric/encoded capacity, and provider-configuration independence.
 
-This decision is refined by ADRs 0048/0054, refines ADRs 0027/0032, and is tracked by `T-POSITION-01`,
-`V2-POSITION-003..009`.
+This decision is refined by ADRs 0048/0054/0055, refines ADRs 0027/0032, and is tracked by `T-POSITION-01`,
+`V2-POSITION-003..010`.

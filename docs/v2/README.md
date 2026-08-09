@@ -55,11 +55,12 @@ protocol-native cutover frontiers, but ADR 0015 limits 0.2 to exactly one initia
 online profile-transition API/state machine. Operational batching, cache, throttling, and compaction policy remain
 separately tunable only at their contract-defined activation boundaries.
 
-Correctness, recovery, and durable compatibility are never configuration switches. Topic/Tenant policy uses closed
-typed classes for latency/cost intent; Protocol Cell/shard policy owns shared scheduling and recovery budgets;
-host/process configuration only caps resources. Effective budgets use the minimum across scopes. Any resolved value
-that affects bytes or recovery is persisted in its Storage Epoch, WalRun Root, or offload attempt so failover cannot
-silently reinterpret it.
+Correctness, recovery, security/parser hard caps, and durable compatibility are never configuration switches.
+Topic/Tenant-or-Namespace policy uses closed typed classes for latency/cost intent and cannot enlarge a format cap;
+Protocol Cell/shard policy owns shared scheduling and recovery budgets; host/process configuration only caps resources
+and may cause backpressure or early seal. Effective budgets use the minimum across scopes. Any resolved value that
+affects bytes or recovery is persisted at its Storage Epoch, WalRun Root, or offload-attempt boundary. One configurable
+identity never spans those lifecycles or lets failover silently reinterpret state.
 
 ADR 0016 retains Access Projection/Migration Link identities and rejects a second Native Write Authority, while
 excluding cross-protocol serving and authority-transfer runtime from 0.2. For Pulsar
@@ -149,6 +150,7 @@ Accepted decisions:
 - [ADR 0052: Pulsar BookKeeper delete state and retention policy](../decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md)
 - [ADR 0053: WalRun checkpoint bounds and open-tail recovery](../decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md)
 - [ADR 0054: Pulsar virtual-ledger bootstrap geometry](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md)
+- [ADR 0055: Pulsar virtual-ledger allocator evidence protocol](../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md)
 
 ## Open design gates
 
@@ -161,17 +163,17 @@ Accepted decisions:
 `V2-OPEN-BK-06..08`, `V2-OPEN-OBJ-09..14`, and `V2-OPEN-PUL-OBJ-04..06`; ADRs 0042 through 0048 resolve
 `V2-OPEN-KAF-META-02`, `V2-OPEN-PUL-META-01`, `V2-OPEN-BK-09..10`, `V2-OPEN-OBJ-15..16`, and
 `V2-OPEN-PUL-OBJ-07`; ADRs 0049 through 0054 resolve `V2-OPEN-KAF-META-03`, `V2-OPEN-PUL-META-02`,
-`V2-OPEN-BK-12`, `V2-OPEN-OBJ-18`, and `V2-OPEN-PUL-OBJ-08`. The rows below are the remaining active 0.2 decisions or
-evidence gates.
+`V2-OPEN-BK-12`, `V2-OPEN-OBJ-18`, and `V2-OPEN-PUL-OBJ-08`; ADR 0055 resolves the
+`V2-OPEN-PUL-OBJ-10` evidence-protocol decision without selecting a mode or producing a PASS. The rows below are the
+remaining active 0.2 decisions or evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
-| `V2-OPEN-BK-11` | freeze NPD1 fixed rows and format/deployment hard caps; pin typed block-target/compression default from native-size and Object cold-read evidence | M2 Object format/policy freeze |
-| `V2-OPEN-BK-13` | freeze the finite NPD1 block-target/compression classes and evidence-selected default/explicit-admission behavior | M2 offload policy freeze |
-| `V2-OPEN-OBJ-17` | freeze NWG1 hard context/frame/directory/prefix caps, exact cold-read range plan, and limited compression/group policy classes | M3 Object WAL format freeze |
-| `V2-OPEN-OBJ-19` | freeze the finite NWG1 compression/linger/group-target classes and persisted activation boundaries | M3 Object WAL policy freeze |
-| `V2-OPEN-PUL-OBJ-09` | choose persisted allocator protocol after four-write STRICT_SERIALIZED admission/HOL evidence or fully specify RANGE_LEASED fencing/recovery | M1/M3 virtual-ledger allocator freeze |
-| `V2-OPEN-PUL-OBJ-10` | freeze and execute the target-scale allocator RTT/queue/crash evidence protocol that gates the allocator-mode choice | allocator mode decision |
+| `V2-OPEN-BK-11` | freeze NPD1 checked length domains, 16-vs-24-byte row, block/Object/part caps, lower derived admission, and provider capability contract | M2 Object format freeze |
+| `V2-OPEN-BK-13` | execute 1/4/8/16-MiB native-relative cold-read evidence, then freeze at most three classes and Namespace/Cell default/Topic override behavior | M2 offload policy freeze |
+| `V2-OPEN-OBJ-17` | freeze NWG1 three-GET fallback/verified-prefix accelerator plus row-derived frame/directory/prefix hard caps | M3 Object WAL format freeze |
+| `V2-OPEN-OBJ-19` | freeze separate Storage-Epoch frame-encoding and WalRun packing identities, then evidence-selected soft target/linger classes | M3 Object WAL policy freeze |
+| `V2-OPEN-PUL-OBJ-09` | choose a persisted allocator protocol only after ADR 0055 evidence and complete STRICT/RANGE fencing/recovery contracts | M1/M3 virtual-ledger allocator freeze |
 | `V2-OPEN-OBJ-01` | prove per-binding typed durable frontiers inside a multi-binding Object group without shard-wide HOL | M3 layout freeze |
 | `V2-OPEN-BK-02` | validate one-active-ledger-per-Kafka-partition at 10k and 100k partitions | M2 Kafka BK layout freeze |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |

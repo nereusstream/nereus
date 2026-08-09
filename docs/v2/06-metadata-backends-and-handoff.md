@@ -100,6 +100,11 @@ change ownership or consume another assignment. 0.2 never resizes, relocates, ex
 exhaustion fails closed and additional capacity uses a new Protocol Cell. A registry-exhausted domain can be replaced
 only by a bootstrap-proven disjoint ledger-ID namespace or an independent deployment/cluster, not a new logical label.
 
+Allocator mode remains open. ADR 0055 requires a source-qualified native-relative workload/latency/failure receipt
+before selection and starts RANGE_LEASED correctness design in parallel with STRICT evidence. A future allocator record
+may persist only mode, protocol version, and recovery/fencing identities; observed rate/queue/latency/recovery budgets
+belong to versioned Cell policy/evidence and never to host-selected durable identity.
+
 ## Object WalRun control records
 
 Each Object-WAL shard stores a bounded immutable `WalRunRootRecord` in its Protocol Cell control-metadata backend. A
@@ -145,4 +150,4 @@ hide in an aggregate append metric.
 
 Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios:
 `V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015`, `V2-HO-001`, `V2-FABRIC-001`,
-`V2-POLICY-001`, and `V2-POSITION-002..009`.
+`V2-POLICY-001`, and `V2-POSITION-002..010`.

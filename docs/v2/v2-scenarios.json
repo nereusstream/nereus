@@ -38,7 +38,7 @@
     {
       "id": "V2-POLICY-001",
       "milestone": "M1/M2/M3",
-      "contract": "correctness is never configurable and typed topic tenant cell shard and host scopes resolve budgets by minimum while persisting byte and recovery choices at their activation boundary",
+      "contract": "correctness and parser caps are never configurable typed topic tenant namespace cell shard and host scopes resolve budgets by minimum and one policy identity never spans epoch run offload attempt and host lifecycles",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -175,6 +175,14 @@
       "id": "V2-POSITION-009",
       "milestone": "M1/M3",
       "contract": "virtual ledger bootstrap fixes k 40 64 KiB registry bytes 256 lifetime assignments and 192 byte rows and any replacement domain proves a disjoint ledger ID namespace",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-010",
+      "milestone": "M1/M3",
+      "contract": "allocator selection requires maximum sustainable rollover RPS with all predeclared SLOs actual rollover distribution storm crash cuts and native Pulsar rollover append stall comparison while performance budgets remain outside allocator identity",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null

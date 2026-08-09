@@ -45,5 +45,6 @@ constructing a merged table locally.
 
 This decision is refined by [ADR 0041](0041-v2-pulsar-virtual-ledger-slice-contract.md),
 [ADR 0048](0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md), and
-[ADR 0054](0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md), refines ADR 0027, and is tracked by
-`T-POSITION-01`, `V2-POSITION-003..009`.
+[ADR 0054](0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md), with allocator-mode evidence refined by
+[ADR 0055](0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md); it refines ADR 0027 and is tracked by
+`T-POSITION-01`, `V2-POSITION-003..010`.

@@ -44,6 +44,12 @@ ACTIVE→RETIRING→RETIRED; retired assignments and bounds remain permanent nev
 bounds or attaches another slice and fails closed at exhaustion.
 _Avoid_: Broker-owned slice, provider-owned slice, deleted tombstone, resized bounds, second slice
 
+**Virtual Ledger Allocator Evidence**:
+The ADR-0055 source-qualified comparison that measures maximum sustainable rollover RPS while every predeclared SLO
+holds across real distribution/jitter/storm/crash cuts and a native Pulsar rollover/append-stall baseline. It selects
+neither STRICT_SERIALIZED nor RANGE_LEASED by itself.
+_Avoid_: Active-ledger-count-only benchmark, serialized-p99-capacity metric, host-selected allocator mode
+
 **Pulsar Topic Generation Selector**:
 The permanent name-scoped monotonic generation authority using exact
 RESERVED→ACTIVE→DELETING→DELETED CAS transitions to fence create/delete/recreate. ACTIVE plus aggregate identity is

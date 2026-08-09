@@ -67,6 +67,12 @@ topics or ledgers. After 256 lifetime Cells, only a bootstrap-proven disjoint re
 independent deployment/cluster may allocate again; a new logical label cannot reuse the interval. Allocator
 mode/epochs, rollover, and recovery mechanics remain open.
 
+ADR 0055 freezes the evidence protocol but selects neither allocator mode. It measures maximum sustainable rollover
+RPS while all predeclared queue/latency/error/recovery SLOs hold, covers real rollover distributions/jitter/storms and
+all crash cuts, and compares native Pulsar rollover/append-stall behavior. STRICT and RANGE correctness work proceed in
+parallel. Allocator identity may persist only mode, protocol version, and recovery/fencing identity; performance budgets
+remain versioned Cell policy/evidence and host capacity remains a runtime ceiling.
+
 Online Pulsar BookKeeper/Object evolution is not implied by this model. New-incarnation migration versus a future hybrid
 ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.
 
@@ -158,7 +164,7 @@ throttle, or stop new admission before BookKeeper capacity is exhausted. It neve
 into a synchronous Object write.
 
 Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, and `T-POLICY-01`. Required scenarios:
-`V2-BK-001..011`, `V2-POSITION-001..009`, and `V2-POLICY-001`. See
+`V2-BK-001..011`, `V2-POSITION-001..010`, and `V2-POLICY-001`. See
 [ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md),
 [ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md),
 [ADR 0022](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md),
@@ -173,5 +179,6 @@ Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, 
 [ADR 0045](../decisions/0045-v2-pulsar-dual-source-read-handle-and-pins.md),
 [ADR 0048](../decisions/0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md),
 [ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md),
-[ADR 0052](../decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md), and
-[ADR 0054](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md).
+[ADR 0052](../decisions/0052-v2-pulsar-bookkeeper-delete-state-and-retention-policy.md),
+[ADR 0054](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md), and
+[ADR 0055](../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md).

@@ -50,10 +50,11 @@ Nereus Storage Fabric
 The two position domains are not numerically comparable. Shared components join typed Protocol Coverage to Physical
 Extents; they never turn an object key or BookKeeper coordinate into a second protocol position truth.
 
-Policy also remains typed. Topic/Tenant classes express latency/cost intent, Protocol Cell/shard policy owns shared
-checkpoint/allocator/recovery budgets, and host/process policy supplies resource ceilings only. Correctness and durable
-compatibility cannot be switched off. Effective budgets use the minimum across those scopes, and any value affecting
-bytes or recovery is persisted at its Storage Epoch, WalRun Root, or offload-attempt activation boundary.
+Policy also remains typed. Topic/Tenant-or-Namespace classes express latency/cost intent, Protocol Cell/shard policy
+owns shared checkpoint/allocator/recovery budgets, and host/process policy supplies resource ceilings only. Correctness,
+parser caps, and durable compatibility cannot be switched off. Effective budgets use the minimum across scopes; host
+pressure may backpressure or early-seal. Values affecting bytes/recovery persist at their Storage Epoch, WalRun Root,
+or offload-attempt boundary, and one policy identity never crosses those lifecycles.
 
 ## 3. Stable component boundaries
 
@@ -204,6 +205,10 @@ second slice; exhaustion fails closed and new capacity uses a new Cell. After re
 is insufficient without a disjoint ledger-ID namespace or independent cluster. Explicit MetadataStore/Oxia links remain Ledger
 Chain authority, while Object groups remain Physical Extents. BookKeeper/Object profile-transition mechanics are
 deferred beyond 0.2.
+
+STRICT_SERIALIZED and RANGE_LEASED remain open allocator protocols. ADR 0055 requires maximum sustainable rollover RPS
+under every predeclared SLO, actual rollover distribution/jitter/storm/failure cuts, and native Pulsar
+rollover/append-stall comparison; RANGE correctness is designed in parallel rather than hidden behind a host switch.
 
 For Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole attempt, completion,
 read/fallback, and deletion-eligibility authority. Nereus provides a `LedgerOffloader`; its manifest is derived and cannot
