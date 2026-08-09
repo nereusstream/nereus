@@ -15,20 +15,21 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-The user explicitly confirmed the previous four recommendations. ADRs 0019 through 0022 now resolve
-`V2-OPEN-META-01`, `V2-OPEN-BK-03`, `V2-OPEN-OBJ-04`, and `V2-OPEN-PUL-OBJ-01`. The next independent frontier is:
+The user explicitly confirmed all five round-3 recommendations. ADRs 0023 through 0027 now resolve
+`V2-OPEN-META-02`, `V2-OPEN-BK-04`, `V2-OPEN-OBJ-05`, `V2-OPEN-OBJ-06`, and `V2-OPEN-PUL-OBJ-02`. The next
+independent frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-META-02` | which physical record shape implements the accepted atomic visible Topic Binding Aggregate | store one immutable composite aggregate record; project binding/epoch views from it |
-| `V2-OPEN-BK-04` | whether one sealed Pulsar ledger attempt uses one or multiple independently addressable data extents | start with one bounded data extent plus one deterministic sparse-index/root object |
-| `V2-OPEN-OBJ-05` | which initial checksum algorithms and provider-bound proof fields are frozen | use SHA-256/v1 for extents, CRC32C/v1 for frames, and a separate full-object/version proof |
-| `V2-OPEN-OBJ-06` | which exact Kafka/Pulsar bytes are canonical frame payloads | checksum exact protocol-native serialized batches/entries after Object decode, not reserialized application records |
-| `V2-OPEN-PUL-OBJ-02` | how virtual ledger IDs remain compatible with stock numeric MessageId ordering without making it authority | allocate monotonic IDs from an enforced native-excluded band; keep explicit chain metadata authoritative |
+| `V2-OPEN-META-03` | which protocol-native incarnation, authority key, and deterministic IDs identify one aggregate | use Kafka topic UUID or Pulsar persistence name + generation, then domain-separated deterministic IDs |
+| `V2-OPEN-BK-05` | which exact keys, root-v1 facts, publication verification, and delete order make the two-object attempt ledger-equivalent | use attempt-derived conditional keys and a bounded self-checking root; verify data then root/read, delete root then data |
+| `V2-OPEN-OBJ-07` | where each group's expected length/SHA lives and how a crashed owner discovers every ACKed extent without per-group metadata | use one pre-open WalRun root plus scoped seq/length/SHA leaf keys and bounded strong prefix LIST |
+| `V2-OPEN-OBJ-08` | what one Kafka/Pulsar frame is and which multi-frame append unit is atomic | one assigned Kafka RecordBatch per frame plus an all-or-none partition commit set; one Pulsar entry per frame |
+| `V2-OPEN-PUL-OBJ-03` | which physical registry record atomically proves deployment-wide virtual-ledger slice non-overlap | use one bounded canonical deployment registry updated by single-key CAS; derive per-cell lookup indexes |
 
 The complete questions and recommendations are in
-[the next Grill 2 round](grill-notes/05-restarted-grill-2-physical-proof-and-native-ordering.md). None of these five
-new recommendations is accepted yet.
+[round 4](grill-notes/06-restarted-grill-2-schema-discovery-and-registry.md). None of these five new recommendations is
+accepted yet.
 
 ## Initial binding and epoch publication
 
@@ -38,18 +39,20 @@ Resolved by [ADR 0019](../decisions/0019-v2-initial-binding-epoch-atomic-visibil
 initial Storage Epoch form one visible `TopicBindingAggregate`. Incomplete or uncertain create is recovered or rejected;
 it never admits open, append, or read and never causes a default epoch to be invented.
 
-### `V2-OPEN-META-02`: aggregate physical representation
+### `V2-OPEN-META-02`: resolved aggregate physical representation
 
-KRaft can append a bounded atomic controller record batch, while the currently pinned MetadataStore/Oxia public APIs
-offer single-key conditional puts rather than an all-conditions-or-no-writes multi-key transaction. The accepted
-visible-aggregate contract still permits one composite record, separate replay-atomic records, or an intent/root.
+Resolved by [ADR 0023](../decisions/0023-v2-topic-binding-aggregate-record.md). One immutable
+`TopicBindingAggregateRecord` physically contains the complete binding and initial epoch. Kafka adds it to atomic
+`CreateTopics`; MetadataStore/Oxia creates one key and resolves response loss by exact reread equality. Logical stores
+are typed projections, and 0.2 does not use a cross-key `CREATING` saga.
 
-Current recommendation, not a decision: 0.2 stores one immutable `TopicBindingAggregateRecord` that structurally
-contains the complete Topic Protocol Binding and initial Storage Epoch. Kafka adds that one record to the existing
-atomic `CreateTopics` controller result; MetadataStore/Oxia creates one key with `putIfAbsent` and resolves response
-loss by rereading and exact-content comparison. Logical binding and epoch stores project typed views from that record.
-Use ADR 0019's `CREATING` flow only if a future schema is forced across separately published keys. This pays for
-whole-record schema evolution and CAS, but removes cross-key partial state from the normal 0.2 design.
+### `V2-OPEN-META-03`: aggregate incarnation, key, and deterministic IDs
+
+Open. The current recommendation is to use Kafka's native topic UUID as the Kafka incarnation/ABA fence and Pulsar's
+canonical persistence name plus binding generation as the Pulsar incarnation. Aggregate keys would be scoped by that
+typed incarnation, while binding and initial-epoch IDs would be domain-separated deterministic hashes rather than
+random or time/backend-dependent values. Exact schema/version, delete/recreate retirement, and replay rules depend on
+this choice and are intentionally deferred.
 
 ## Object WAL durability verification
 
@@ -73,34 +76,33 @@ Resolved by [ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md). `Ob
 canonical provider request body, while `FramePayloadChecksum` protects the binding-defined protocol payload bytes after
 Object decode. The fields and proof domains are distinct and cannot substitute for each other.
 
-### `V2-OPEN-OBJ-05`: initial algorithms and provider-bound proof
+### `V2-OPEN-OBJ-05`: resolved initial algorithms and provider-bound proof
 
-The current S3 adapter computes CRC32C over uploaded bytes but stores it as Nereus user metadata. It does not request a
-provider checksum, enable HEAD checksum mode, or retain provider version/checksum-type fields. That metadata echo cannot
-prove ADRs 0018/0021. The pinned SDK can request SHA-256 or CRC32C and expose `FULL_OBJECT` versus `COMPOSITE`, version ID,
-and provider checksum values.
+Resolved by [ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md).
+`ObjectExtentDigest` is SHA-256/v1; `FramePayloadChecksum` is CRC32C/v1. Expected extent identity remains outside the
+body, and typed `ProviderObjectProof` must match version, length, SHA-256, and `FULL_OBJECT` scope or recovery performs a
+bounded full GET. ETag, user metadata, and composite checksums do not qualify.
 
-Current recommendation, not a decision: freeze `ObjectExtentDigest = SHA-256/v1` and
-`FramePayloadChecksum = CRC32C/v1`. Persist the expected extent digest in the immutable Object Extent descriptor outside
-the request body, and model provider evidence separately as `ProviderObjectProof` with provider version ID, canonical
-body length, checksum algorithm, checksum type, and value. A PUT/HEAD fast proof qualifies only for the same immutable
-version, exact length, same digest, and `FULL_OBJECT` scope. Providers without that proof use bounded full GET and
-SHA-256 recomputation; inability to complete either proof rejects `OBJECT_WAL`. This adds SHA-256 CPU and may add a rare
-GET, but keeps content identity collision-resistant and the hot per-frame checksum cheap.
+### `V2-OPEN-OBJ-06`: resolved canonical protocol frame bytes
 
-### `V2-OPEN-OBJ-06`: canonical protocol frame bytes
+Resolved by [ADR 0026](../decisions/0026-v2-protocol-native-frame-payload-bytes.md). Frame CRC32C covers exact assigned
+Kafka `MemoryRecords`/batch bytes or exact Pulsar ManagedLedger entry bytes after only the outer Object envelope is
+decoded. Application records/messages are not reserialized, and native protocol checksums remain independent.
 
-Kafka's native CRC32C covers only the magic-v2 batch region from attributes to batch end; Pulsar's optional native CRC
-covers metadata-size, metadata, and a possibly compressed/encrypted payload. Neither value has the exact V2 frame
-domain automatically, and decoding to application records/messages would add reserialization and can be impossible for
-opaque client-encrypted Pulsar payloads.
+### `V2-OPEN-OBJ-07`: Object WAL group identity and crash discovery
 
-Current recommendation, not a decision: in V2, “decoded frame payload” means bytes after the outer Object envelope is
-decrypted/decompressed, not decoded application messages. A Kafka frame checksums the exact assigned protocol-native
-`MemoryRecords`/complete record-batch byte sequence, including its batch boundaries; a Pulsar frame checksums the exact
-ManagedLedger entry byte sequence, preserving native compression, encryption, and batch representation. Native
-Kafka/Pulsar checksums are still validated inside their original domains. This avoids canonical re-encoding and covers
-all opaque protocol bytes, at the cost of not defining an additional per-application-record checksum.
+Open. The current recommendation is to persist one immutable WalRun root before opening append, encode fixed-width
+sequence plus exact body length and SHA-256 in every scoped conditional-create leaf key, and discover ACKed extents by
+a strongly consistent, globally bounded prefix LIST. Periodic descriptor pages may accelerate recovery but would not be
+the ACKed tail authority. This deliberately trades recovery LIST work and a narrower provider admission set for no
+per-group metadata-service commit in the cost-first ACK path.
+
+### `V2-OPEN-OBJ-08`: protocol frame and append commit-set granularity
+
+Open. The current recommendation is one complete broker-assigned Kafka RecordBatch per frame, with all frames decoded
+from one partition `MemoryRecords` storage append forming an all-or-none `KafkaAppendCommitSet`. One exact Pulsar
+ManagedLedger entry would be one frame and one commit set. ObjectExtent groups, network requests, transactions, and
+individual Pulsar batched messages would not redefine protocol append atomicity.
 
 ## Storage Epoch transitions
 
@@ -162,21 +164,20 @@ Resolved by [ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.m
 ManagedLedger ledgers through the ledger-based offloader and excludes active-ledger streaming. Rollover and lag
 admission bound cold-copy delay without adding Object latency to BookKeeper ACK.
 
-### `V2-OPEN-BK-04`: sealed-ledger Object layout
+### `V2-OPEN-BK-04`: resolved sealed-ledger Object layout
 
-Native Pulsar treats `(ledgerId, UUID)` as one atomic attempt and requires `offload` success, `readOffloaded`, and
-`deleteOffloaded` to behave as one complete ledger. It does not require one provider object; the stock offloader already
-uses deterministic data and index objects. Multiple independent data extents are possible, but a failure before the
-root exists or a root-first delete can make partial extents undiscoverable unless 0.2 adds another durable attempt
-inventory and cleanup state machine.
+Resolved by [ADR 0024](../decisions/0024-v2-pulsar-sealed-ledger-object-layout.md). One native attempt uses exactly one
+bounded immutable data Object plus one deterministic sparse-index/root Object. Data publishes before root; offload
+success proves both objects, `0..LAC` coverage, integrity, and a ledger-equivalent `ReadHandle`. Both cleanup keys remain
+derivable when the root is absent.
 
-Current recommendation, not a decision: map one sealed ledger attempt to exactly one bounded immutable data
-`ObjectExtent` plus one deterministic immutable sparse-index/root object. Multipart transfer may build the data object,
-but it remains one provider object; ledger byte/entry/age rollover bounds its size. Both keys are deterministic and
-attempt-scoped, data publishes before the root, and the offload future succeeds only after both objects, contiguous
-`0..LAC` coverage, digests, and a ledger-equivalent `ReadHandle` are verified. `deleteOffloaded` can idempotently delete
-both known keys even when the root was never published. This gives up independent extent parallelism in 0.2, but avoids
-a new partial-attempt inventory and stays close to native Pulsar's proven lifecycle shape.
+### `V2-OPEN-BK-05`: sealed-ledger keys, root v1, and lifecycle order
+
+Open. The current recommendation is to derive conditional-create data/root keys only from persisted provider scope,
+ledger ID, attempt UUID, and key-derivation version. A bounded canonical root would bind the attempt, sanitized sealed
+ledger metadata, data length/SHA-256, outer format, contiguous sparse index, and an independent root self-digest.
+Publication would verify data, then root, then the real offloaded read path before success; deletion would prove root
+absent before deleting data and would cover attempt-scoped multipart residue.
 
 ## Pulsar Object WAL
 
@@ -186,21 +187,20 @@ Resolved by [ADR 0022](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-aut
 `PulsarVirtualLedgerStore` owns virtual ledger allocation and an explicit append-only Ledger Chain. Object identity,
 byte offsets, and Object-run sequence never become Pulsar positions or chain authority.
 
-### `V2-OPEN-PUL-OBJ-02`: numeric compatibility and namespace enforcement
+### `V2-OPEN-PUL-OBJ-02`: resolved numeric compatibility and namespace enforcement
 
-The pinned Pulsar source stores ManagedLedger ledgers in a numerically sorted map and public `Position`/`MessageIdAdv`
-comparison orders ledger ID before entry ID. Native long-ledger allocation can also enter the V1 high-ID range. Thus an
-explicit chain alone does not make arbitrary or merely high-bit virtual IDs compatible with stock broker/client
-ordering, and a static high-range convention does not prove non-collision.
+Resolved by [ADR 0027](../decisions/0027-v2-pulsar-virtual-ledger-numeric-compatibility.md). The deployment reserves
+`[2^62, 2^63 - 2]`, excludes native allocation, and assigns non-overlapping never-reused cell slices. Cell allocators are
+increasing with gaps and no reuse. Numeric order preserves stock comparison only; explicit predecessor/head metadata
+remains Ledger Chain authority.
 
-Current recommendation, not a decision: reserve `[2^62, 2^63 - 2]` for virtual ledgers at the Pulsar deployment
-boundary and let one reservation registry assign non-overlapping, never-reused slices to Protocol Cells. Modify and
-verify the native ledger-ID generator so it cannot allocate anywhere in that band; fail profile admission when the
-deployment or cell reservation is absent, overlapping, drifted, or revoked. A cell-scoped single-key CAS allocator
-issues strictly increasing IDs inside its slice, permits gaps, and never reuses IDs. Explicit predecessor/head metadata
-remains the Ledger Chain authority; numeric monotonicity is only a compatibility projection for stock broker/client
-comparisons. This adds a Pulsar-fork and deployment-reservation obligation, but avoids replacing public MessageId
-ordering or accepting native/cross-cell collisions.
+### `V2-OPEN-PUL-OBJ-03`: deployment reservation registry authority
+
+Open. The current recommendation is one bounded deployment-wide
+`PulsarVirtualLedgerNamespaceRegistryRecord`, whose canonically sorted assignment table is updated by single-key CAS.
+Per-cell lookup records would be repairable derived indexes, not allocation authority. This avoids relying on a
+multi-key transaction that the pinned MetadataStore/Oxia surface does not expose; exact capacity, slice lifecycle,
+allocator, and Ledger Chain protocols depend on this root choice.
 
 ### `V2-OPEN-PUL-MIGRATION-01`: new incarnation or HybridManagedLedger
 
@@ -261,6 +261,19 @@ For example, one Pulsar entry with batch indexes `0..2` might map to one Kafka O
 input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
+
+### Restarted Grill 2 round 3 decisions: resolved by ADRs 0023 through 0027
+
+Resolved on 2026-08-09 after explicit confirmation:
+
+- `V2-OPEN-META-02` → [ADR 0023](../decisions/0023-v2-topic-binding-aggregate-record.md);
+- `V2-OPEN-BK-04` → [ADR 0024](../decisions/0024-v2-pulsar-sealed-ledger-object-layout.md);
+- `V2-OPEN-OBJ-05` → [ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md);
+- `V2-OPEN-OBJ-06` → [ADR 0026](../decisions/0026-v2-protocol-native-frame-payload-bytes.md);
+- `V2-OPEN-PUL-OBJ-02` → [ADR 0027](../decisions/0027-v2-pulsar-virtual-ledger-numeric-compatibility.md).
+
+Their original recommendations and source rationale remain in
+[the round 3 record](grill-notes/05-restarted-grill-2-physical-proof-and-native-ordering.md).
 
 ### Restarted Grill 2 round 2 decisions: resolved by ADRs 0019 through 0022
 

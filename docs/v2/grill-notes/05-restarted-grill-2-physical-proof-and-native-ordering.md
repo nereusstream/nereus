@@ -12,8 +12,8 @@ sourceTuple: v2-m0
 Date: 2026-08-09
 
 ADRs 0019 through 0022 resolved the previous frontier. This record preserves the next independent questions and
-recommendations presented for confirmation. Nothing in this file is an accepted runtime contract until the user
-explicitly confirms it and the result moves into the corresponding normative documents/ADRs.
+recommendations that were presented. The user subsequently confirmed all five recommendations. The accepted contracts
+are ADRs 0023 through 0027; this session record is not runtime evidence.
 
 ## Source facts used for recommendations
 
@@ -99,7 +99,25 @@ fork 和部署准入义务，换来不改公共 MessageId 排序、不发生 nat
   remain later descendants or outside 0.2 under the already accepted scope ADRs;
 - `V2-OPEN-OBJ-01`, `V2-OPEN-BK-02`, and `V2-OPEN-BENCH-01` require executable evidence rather than a prose answer.
 
-## Answer status
+## Confirmed answer and authoritative synchronization
 
-Awaiting explicit confirmation. Until then, `V2-OPEN-META-02`, `V2-OPEN-BK-04`, `V2-OPEN-OBJ-05`,
-`V2-OPEN-OBJ-06`, and `V2-OPEN-PUL-OBJ-02` remain open and their recommendations are non-normative.
+The user answered: “全部按推荐确认”. The decisions were synchronized as follows:
+
+- Q1 / `V2-OPEN-META-02` →
+  [ADR 0023](../../decisions/0023-v2-topic-binding-aggregate-record.md): one immutable
+  `TopicBindingAggregateRecord` is the physical authority; Kafka adds it to atomic `CreateTopics`, while Oxia uses one
+  key and exact reread comparison;
+- Q2 / `V2-OPEN-BK-04` →
+  [ADR 0024](../../decisions/0024-v2-pulsar-sealed-ledger-object-layout.md): one sealed ledger attempt uses one bounded
+  data Object plus one deterministic sparse-index/root, with data-before-root verification and two-key cleanup;
+- Q3 / `V2-OPEN-OBJ-05` →
+  [ADR 0025](../../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md): SHA-256/v1 extent digest,
+  CRC32C/v1 frame checksum, and a separate version-bound full-object provider proof with bounded-GET fallback;
+- Q4 / `V2-OPEN-OBJ-06` →
+  [ADR 0026](../../decisions/0026-v2-protocol-native-frame-payload-bytes.md): frame checksum covers exact
+  protocol-native Kafka batch/Pulsar entry bytes after only the outer Object envelope is decoded;
+- Q5 / `V2-OPEN-PUL-OBJ-02` →
+  [ADR 0027](../../decisions/0027-v2-pulsar-virtual-ledger-numeric-compatibility.md): a deployment registry assigns
+  non-overlapping cell slices from the native-excluded high range, while explicit chain metadata remains authoritative.
+
+Implementation and executable evidence remain NotStarted.

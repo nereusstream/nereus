@@ -18,8 +18,8 @@ Every physical source or materialized output has an immutable descriptor contain
 - source kind and epoch-scoped profile;
 - an `ObjectExtent` or `BookKeeperExtent`;
 - generation, format, payload mapping, and policy version;
-- canonical Object-request-body length/Object Extent Digest, protocol entry/record count, min/max timestamp, and
-  per-frame payload checksum descriptors where applicable;
+- canonical Object-request-body length plus SHA-256/v1 Object Extent Digest, typed Provider Object Proof where
+  available, protocol entry/record count, min/max timestamp, and CRC32C/v1 frame descriptors where applicable;
 - index descriptors required for protocol-position and timestamp lookup;
 - creation Owner Epoch/task identity.
 
@@ -61,6 +61,10 @@ numeric ledger-ID order.
 Cache is never authority. Cache keys and accounting include Protocol Cell and Cell Provider Scope; each cell has an
 independent capacity share. A cache hit is validated against the selected descriptor generation and both declared
 checksum domains/families.
+
+The Object Extent descriptor remains outside the canonical body it digests. A Provider Object Proof may accelerate
+verification but cannot replace the expected descriptor, and protocol-native Kafka/Pulsar bytes remain exact across
+cache and materialization boundaries unless a new format explicitly defines a rewrite.
 
 ## Timestamp and protocol-position indexes
 

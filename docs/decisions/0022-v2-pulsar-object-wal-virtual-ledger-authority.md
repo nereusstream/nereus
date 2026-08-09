@@ -41,4 +41,6 @@ replication, and transaction recovery remain downstream gates.
 - M1/M3 must prove identity uniqueness, explicit chain ordering, current-ledger fencing, zero normal-append metadata I/O,
   rollover/restart recovery, and rejection of Object-derived or numerically sorted positions.
 
-This decision refines ADR 0011 and is tracked by `T-POSITION-01`, `V2-POSITION-001`, and `V2-POSITION-002`.
+Numeric compatibility and reservation enforcement are refined by
+[ADR 0027](0027-v2-pulsar-virtual-ledger-numeric-compatibility.md). This decision refines ADR 0011 and is tracked by
+`T-POSITION-01`, `V2-POSITION-001..003`.

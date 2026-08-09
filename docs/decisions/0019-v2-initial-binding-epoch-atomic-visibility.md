@@ -43,4 +43,5 @@ replay-atomic record batch, provided the externally observable and recovery sema
 - M1 conformance must cover duplicate create, lost create/activation response, half-written records, conflicting retry,
   backend failover, concurrent open, and cleanup of an unexposed attempt.
 
-This decision refines ADR 0015 and is tracked by `T-META-01`, `V2-PROFILE-001`, `V2-META-001`, and `V2-META-002`.
+The 0.2 physical representation is refined by [ADR 0023](0023-v2-topic-binding-aggregate-record.md). This decision
+refines ADR 0015 and is tracked by `T-META-01`, `V2-PROFILE-001`, `V2-META-001`, and `V2-META-002`.

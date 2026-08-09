@@ -38,7 +38,7 @@
     {
       "id": "V2-META-002",
       "milestone": "M1",
-      "contract": "Topic Protocol Binding and its initial Storage Epoch have one atomic visible aggregate and partial or uncertain create never admits IO",
+      "contract": "one immutable TopicBindingAggregateRecord physically owns the complete binding and initial epoch",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -54,7 +54,15 @@
     {
       "id": "V2-POSITION-002",
       "milestone": "M1/M3",
-      "contract": "Pulsar Object WAL uses reserved domain virtual ledger IDs and explicit chain order while Object identity never becomes a position",
+      "contract": "Pulsar Object WAL uses explicit virtual Ledger Chain authority while Object identity never becomes a position",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-003",
+      "milestone": "M1/M3",
+      "contract": "virtual ledger IDs increase inside non overlapping never reused cell slices excluded from native allocation",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -110,7 +118,7 @@
     {
       "id": "V2-OBJ-001",
       "milestone": "M3",
-      "contract": "Object WAL ACK waits for verified group durability and the canonical request body Object Extent Digest",
+      "contract": "Object WAL ACK waits for verified group durability and SHA256 v1 over the canonical request body",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -126,7 +134,15 @@
     {
       "id": "V2-OBJ-003",
       "milestone": "M3",
-      "contract": "lost PUT response verifies the Object Extent Digest by trusted provider proof or bounded full GET while frame payload checksums remain separate",
+      "contract": "lost PUT response accepts only version bound SHA256 FULL_OBJECT provider proof or bounded full GET",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-004",
+      "milestone": "M3",
+      "contract": "CRC32C v1 covers exact assigned Kafka batch bytes or exact Pulsar ManagedLedger entry bytes after outer Object decode",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -151,6 +167,14 @@
       "id": "V2-BK-003",
       "milestone": "M2",
       "contract": "Kafka BookKeeper layout passes 10k and 100k partition resource spikes",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-004",
+      "milestone": "M2",
+      "contract": "one sealed Pulsar ledger attempt uses one bounded data Object plus one deterministic sparse index root Object",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null

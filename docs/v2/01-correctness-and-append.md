@@ -27,8 +27,8 @@ Control metadata selects an owner and stores low-frequency roots. It is not cons
 
 For one Topic Protocol Binding, Topic Incarnation, Storage Epoch, and Owner Epoch:
 
-1. the protocol-native owner resolves one internally complete `ACTIVE` Topic Binding Aggregate containing the
-   immutable Topic Protocol Binding and initial Storage Epoch;
+1. the protocol-native owner resolves one immutable `TopicBindingAggregateRecord` containing the complete Topic
+   Protocol Binding and initial Storage Epoch;
 2. a serialized writer lane validates the current ownership token and admission budget;
 3. it allocates positions through the binding's Position Domain;
 4. the selected WAL accepts frames carrying binding/incarnation, Storage Epoch, Owner Epoch, typed Protocol Coverage,
@@ -72,7 +72,8 @@ deterministic identity and verifies:
 - Topic Protocol Binding, Topic Incarnation, Storage Epoch, and Owner Epoch;
 - typed Protocol Coverage and frame/entry count;
 - object/ledger identity;
-- exact byte length, `ObjectExtentDigest`, and `FramePayloadChecksum` in their declared domains where applicable;
+- exact byte length, SHA-256/v1 `ObjectExtentDigest`, CRC32C/v1 `FramePayloadChecksum`, and provider proof in their
+  declared domains where applicable;
 - contiguous predecessor coverage.
 
 A retry may return the original success or fail closed. It may not allocate different successful protocol positions for
@@ -90,4 +91,4 @@ Cache misses stop admission and reload before allocating positions; they do not 
 append path.
 
 Relevant tradeoffs: `T-APPEND-01` and `T-POSITION-01`. Required scenarios: `V2-APP-001`, `V2-APP-002`,
-`V2-APP-003`, `V2-POSITION-001..002`, and `V2-META-002`.
+`V2-APP-003`, `V2-POSITION-001..003`, `V2-META-002`, and `V2-OBJ-004`.

@@ -75,6 +75,11 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0020-v2-pulsar-sealed-ledger-async-offload.md"
     "$repo_root/docs/decisions/0021-v2-object-wal-checksum-domains.md"
     "$repo_root/docs/decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md"
+    "$repo_root/docs/decisions/0023-v2-topic-binding-aggregate-record.md"
+    "$repo_root/docs/decisions/0024-v2-pulsar-sealed-ledger-object-layout.md"
+    "$repo_root/docs/decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md"
+    "$repo_root/docs/decisions/0026-v2-protocol-native-frame-payload-bytes.md"
+    "$repo_root/docs/decisions/0027-v2-pulsar-virtual-ledger-numeric-compatibility.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -104,6 +109,11 @@ require_literal 'form one visible `TopicBindingAggregate`' "docs/decisions/0019-
 require_literal "offloads only sealed, non-current" "docs/decisions/0020-v2-pulsar-sealed-ledger-async-offload.md"
 require_literal "two explicit, non-substitutable integrity domains" "docs/decisions/0021-v2-object-wal-checksum-domains.md"
 require_literal 'Each Pulsar Protocol Cell owns a `PulsarVirtualLedgerStore`' "docs/decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md"
+require_literal 'one immutable `TopicBindingAggregateRecord`' "docs/decisions/0023-v2-topic-binding-aggregate-record.md"
+require_literal "exactly two deterministic, attempt-scoped provider objects" "docs/decisions/0024-v2-pulsar-sealed-ledger-object-layout.md"
+require_literal '`ObjectExtentDigest = SHA-256/v1`' "docs/decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md"
+require_literal "exact protocol-native bytes after the outer Nereus Object envelope" "docs/decisions/0026-v2-protocol-native-frame-payload-bytes.md"
+require_literal '`[2^62, 2^63 - 2]`' "docs/decisions/0027-v2-pulsar-virtual-ledger-numeric-compatibility.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -115,7 +125,9 @@ require_literal "全部按推荐确认" "docs/v2/grill-notes/03-restarted-grill-
 require_literal "Restarted Grill 2 round 2" "docs/v2/grill-notes/04-restarted-grill-2-initial-authority-and-object-identity.md"
 require_literal "The user answered: “全部按推荐确认”" "docs/v2/grill-notes/04-restarted-grill-2-initial-authority-and-object-identity.md"
 require_literal "Restarted Grill 2 round 3" "docs/v2/grill-notes/05-restarted-grill-2-physical-proof-and-native-ordering.md"
-require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/05-restarted-grill-2-physical-proof-and-native-ordering.md"
+require_literal "The user answered: “全部按推荐确认”" "docs/v2/grill-notes/05-restarted-grill-2-physical-proof-and-native-ordering.md"
+require_literal "Restarted Grill 2 round 4" "docs/v2/grill-notes/06-restarted-grill-2-schema-discovery-and-registry.md"
+require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/06-restarted-grill-2-schema-discovery-and-registry.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -128,7 +140,22 @@ require_literal '`V2-OPEN-BK-04`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-05`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-06`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PUL-OBJ-02`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-META-03`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-BK-05`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-OBJ-07`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-OBJ-08`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-PUL-OBJ-03`' "docs/v2/open-questions.md"
 require_literal "resolved by ADR 0014" "docs/v2/open-questions.md"
+
+for active_decision_gate in \
+    V2-OPEN-META-03 \
+    V2-OPEN-BK-05 \
+    V2-OPEN-OBJ-07 \
+    V2-OPEN-OBJ-08 \
+    V2-OPEN-PUL-OBJ-03; do
+    rg -Fq "| \`$active_decision_gate\` |" "$repo_root/docs/v2/README.md" \
+        || fail "$active_decision_gate is missing from the active gate table"
+done
 
 for resolved_gate in \
     V2-OPEN-FABRIC-01 \
@@ -139,20 +166,14 @@ for resolved_gate in \
     V2-OPEN-META-01 \
     V2-OPEN-BK-03 \
     V2-OPEN-OBJ-04 \
-    V2-OPEN-PUL-OBJ-01; do
-    if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
-        fail "$resolved_gate remains in the active gate table"
-    fi
-done
-
-for active_gate in \
+    V2-OPEN-PUL-OBJ-01 \
     V2-OPEN-META-02 \
     V2-OPEN-BK-04 \
     V2-OPEN-OBJ-05 \
     V2-OPEN-OBJ-06 \
     V2-OPEN-PUL-OBJ-02; do
-    if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
-        fail "$active_gate is missing from the active gate table"
+    if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
+        fail "$resolved_gate remains in the active gate table"
     fi
 done
 
@@ -176,6 +197,11 @@ active_contracts=(
     "$repo_root/docs/decisions/0020-v2-pulsar-sealed-ledger-async-offload.md"
     "$repo_root/docs/decisions/0021-v2-object-wal-checksum-domains.md"
     "$repo_root/docs/decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md"
+    "$repo_root/docs/decisions/0023-v2-topic-binding-aggregate-record.md"
+    "$repo_root/docs/decisions/0024-v2-pulsar-sealed-ledger-object-layout.md"
+    "$repo_root/docs/decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md"
+    "$repo_root/docs/decisions/0026-v2-protocol-native-frame-payload-bytes.md"
+    "$repo_root/docs/decisions/0027-v2-pulsar-virtual-ledger-numeric-compatibility.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )
@@ -322,11 +348,11 @@ if len(scenario_ids) != len(set(scenario_ids)):
 required_scenarios = {
     "V2-APP-001", "V2-APP-002", "V2-APP-003", "V2-PROFILE-001",
     "V2-POSITION-001", "V2-MULTIPROTOCOL-001",
-    "V2-POSITION-002", "V2-META-002",
+    "V2-POSITION-002", "V2-POSITION-003", "V2-META-002",
     "V2-FABRIC-001", "V2-FABRIC-002", "V2-FABRIC-003", "V2-MIGRATION-001",
     "V2-PROJECTION-001",
-    "V2-OBJ-001", "V2-OBJ-002", "V2-OBJ-003",
-    "V2-BK-001", "V2-BK-002", "V2-BK-003",
+    "V2-OBJ-001", "V2-OBJ-002", "V2-OBJ-003", "V2-OBJ-004",
+    "V2-BK-001", "V2-BK-002", "V2-BK-003", "V2-BK-004",
     "V2-READ-001", "V2-READ-002", "V2-META-001", "V2-HO-001",
     "V2-KAF-001", "V2-PUL-001", "V2-KOP-001",
 }
@@ -358,7 +384,7 @@ contract_paths = list((root / "docs/v2").glob("*.md"))
 contract_paths += list((root / "docs/decisions").glob("000[7-9]-*.md"))
 contract_paths += list((root / "docs/decisions").glob("001[0-8]-*.md"))
 contract_paths += list((root / "docs/decisions").glob("0019-*.md"))
-contract_paths += list((root / "docs/decisions").glob("002[0-2]-*.md"))
+contract_paths += list((root / "docs/decisions").glob("002[0-7]-*.md"))
 contract_text = "\n".join(
     path.read_text() for path in contract_paths if path != tradeoff_path
 )
@@ -405,6 +431,11 @@ link_docs=(
     "$repo_root/docs/decisions/0020-v2-pulsar-sealed-ledger-async-offload.md"
     "$repo_root/docs/decisions/0021-v2-object-wal-checksum-domains.md"
     "$repo_root/docs/decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md"
+    "$repo_root/docs/decisions/0023-v2-topic-binding-aggregate-record.md"
+    "$repo_root/docs/decisions/0024-v2-pulsar-sealed-ledger-object-layout.md"
+    "$repo_root/docs/decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md"
+    "$repo_root/docs/decisions/0026-v2-protocol-native-frame-payload-bytes.md"
+    "$repo_root/docs/decisions/0027-v2-pulsar-virtual-ledger-numeric-compatibility.md"
 )
 
 while IFS=: read -r source match; do

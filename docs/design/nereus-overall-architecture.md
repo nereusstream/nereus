@@ -65,9 +65,9 @@ profile/format/checksum/encryption contract for each protocol-native frontier in
 has exactly one initial epoch and no online profile-transition API/state machine. The chain model remains explicit for
 future evolution, and at most one epoch may ever admit new positions at a time.
 
-Binding plus initial epoch form one atomically visible Topic Binding Aggregate. A transactional/replay-atomic backend
-publishes the complete aggregate together; another backend uses a deterministic `CREATING` intent and exposes `ACTIVE`
-only after both immutable components are complete. Partial state never admits I/O.
+Binding plus initial epoch are one immutable `TopicBindingAggregateRecord`. Kafka adds it to the atomic `CreateTopics`
+result; MetadataStore/Oxia creates one key and resolves a lost response by exact reread equality. Binding and epoch APIs
+are typed projections, not separately writable authorities. Partial or conflicting state never admits I/O.
 
 Ownership grants an exclusive Owner Epoch inside that binding. Kafka uses KRaft; Pulsar uses MetadataStore/Oxia plus
 native broker/ManagedLedger authority. Owner Epoch and Storage Epoch are distinct.
@@ -138,12 +138,14 @@ Object WAL uses bounded group commit to control request cost. A group-level node
 Extent; every frame carries its own binding, incarnation, Storage Epoch, Owner Epoch, and typed Protocol Coverage. ACK
 frontiers advance independently per binding, so one unrelated binding does not impose a shard-wide correctness barrier.
 
-The WAL object is already the durable Object copy. Its Object Extent Digest covers the canonical provider request body;
-each frame independently checks the canonical decoded protocol payload. Background work rewrites the WAL into
+The WAL object is already the durable Object copy. SHA-256/v1 protects the exact canonical provider request body;
+CRC32C/v1 independently protects exact assigned Kafka batch bytes or exact Pulsar ManagedLedger entry bytes after the
+outer Object envelope is decoded. Native protocol checksums remain separate. Background work rewrites the WAL into
 read-optimized segments and indexes.
-After PUT-response loss, HEAD is sufficient only with exact length and trustworthy whole-content checksum bound to the
-immutable version; otherwise recovery performs a bounded full GET. ETag alone is never sufficient, and an unverifiable
-provider is rejected for Object WAL.
+
+After PUT-response loss, HEAD is sufficient only when a typed Provider Object Proof matches immutable version, exact
+length, SHA-256, and `FULL_OBJECT` scope; otherwise recovery performs a bounded full GET. ETag, application user
+metadata, and composite checksum scope are insufficient, and an unverifiable provider is rejected for Object WAL.
 
 Detailed contract: [Object WAL](../v2/03-object-wal.md).
 
@@ -155,13 +157,15 @@ ordering, and lifecycle. Cross-ledger Pulsar Coverage is a ledger-keyed range co
 `ledgerBase + entryId` as a universal offset.
 
 The exact Kafka ledger layout remains an M2 evidence gate. Pulsar async Object offload processes sealed non-current
-ledgers only; it does not stream the current append ledger in 0.2. Pulsar Object WAL allocates virtual ledger IDs and
-explicit Ledger Chain order from a Pulsar-cell MetadataStore/Oxia authority, while Object groups remain Physical
-Extents. BookKeeper/Object profile-transition mechanics are deferred beyond 0.2.
+ledgers only; one native attempt publishes one bounded data Object followed by one deterministic sparse-index/root
+Object. It does not stream the current append ledger in 0.2. Pulsar Object WAL allocates increasing virtual ledger IDs
+from a deployment-reserved, native-excluded cell slice. Explicit MetadataStore/Oxia links remain Ledger Chain authority,
+while Object groups remain Physical Extents. BookKeeper/Object profile-transition mechanics are deferred beyond 0.2.
 
 For Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole attempt, completion,
 read/fallback, and deletion-eligibility authority. Nereus provides a `LedgerOffloader`; its manifest is derived and cannot
-delete a ledger or overrule native lifecycle state.
+delete a ledger or overrule native lifecycle state. The offloader exposes the deterministic data/root pair as one
+ledger-equivalent `ReadHandle` and can derive both cleanup keys even when the root is missing.
 
 Detailed contract: [BookKeeper and Pulsar](../v2/04-bookkeeper-and-pulsar.md).
 

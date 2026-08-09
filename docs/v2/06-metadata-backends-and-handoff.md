@@ -25,9 +25,10 @@ Shared contracts are separated into:
 Conformance suites verify fencing, monotonic roots, idempotency, response-loss recovery, and bounded enumeration. They
 do not require both backends to implement the same ephemeral lease primitive.
 
-`TopicBindingAggregatePublisher` gives Topic Protocol Binding plus initial Storage Epoch one atomic visible state. A
-backend may use one aggregate record, one replay-atomic batch, or a deterministic `CREATING` intent plus fenced
-activation, but partial state never admits I/O. This is create/open control-plane work, not normal append.
+`TopicBindingAggregatePublisher` writes one immutable `TopicBindingAggregateRecord`. Kafka adds it to the atomic
+`CreateTopics` result; MetadataStore/Oxia creates one key and resolves response loss by exact reread equality. Binding
+and epoch stores are projections rather than independent authorities. This is create/open control-plane work, not
+normal append.
 
 ADR 0016 excludes Access Projection and Migration Link runtime from 0.2. The M1 model rejects a second Native Write
 Authority but does not expose `ProjectionMapStore`. A future accepted runtime must keep its map and authority-transfer
@@ -51,6 +52,11 @@ and lifecycle roots while retaining native ManagedLedger, cursor, and broker own
 cannot overrule stock Pulsar metadata that still authorizes a ledger, cursor, transaction, or offload source. For Pulsar
 `BOOKKEEPER_WAL_ASYNC_OBJECT`, native ManagedLedger ledger/offload metadata is the sole offload/lifecycle authority; any
 Nereus manifest is derived.
+
+A deployment-level Virtual Ledger Reservation registry assigns non-overlapping, never-reused cell slices from
+`[2^62, 2^63 - 2]` and fences native allocation out of the entire interval. The cell's CAS allocator operates only
+inside its current slice; missing, overlapping, drifted, or revoked reservation state blocks Object-WAL admission and
+allocation. Reservation checks are low-frequency control-plane work, not normal append metadata I/O.
 
 ## Ownership token
 
@@ -84,4 +90,4 @@ topic-open, rollover publication, trim, and background lifecycle work are separa
 hide in an aggregate append metric.
 
 Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, and `T-FABRIC-01`. Required scenarios: `V2-META-001`,
-`V2-META-002`, `V2-HO-001`, `V2-FABRIC-001`, and `V2-POSITION-002`.
+`V2-META-002`, `V2-HO-001`, `V2-FABRIC-001`, and `V2-POSITION-002..003`.

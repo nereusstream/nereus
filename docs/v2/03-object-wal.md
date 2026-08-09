@@ -32,7 +32,7 @@ The group object is an `ObjectExtent`. Every frame independently carries:
 - Storage Epoch ID and Owner Epoch;
 - Position Domain ID/version and typed Protocol Coverage;
 - protocol entry/record count;
-- decoded payload length and Frame-payload checksum algorithm/version/value;
+- exact protocol-native payload length and CRC32C/v1 Frame-payload checksum value;
 - idempotency identity;
 - flags required by the protocol payload mapping.
 
@@ -56,15 +56,17 @@ Object provider capability is explicit. `OBJECT_WAL` requires deterministic immu
 the required read-after-write behavior, and bounded verification. A provider or operation mode that lacks any of these
 capabilities is rejected for this profile.
 
-`ObjectExtentDigest` covers the exact canonical request body after Nereus compression and client-side encryption.
-`FramePayloadChecksum` covers canonical decoded protocol payload/record bytes. They are distinct typed fields and cannot
-satisfy each other's proof. Recovery validates the extent digest before trusting frame boundaries and validates frame
-checksums after decode.
+`ObjectExtentDigest` is SHA-256/v1 over the exact canonical request body after Nereus compression and client-side
+encryption. `FramePayloadChecksum` is CRC32C/v1 over exact protocol-native bytes after the outer Object envelope is
+decoded: assigned Kafka `MemoryRecords`/complete batch bytes or one exact Pulsar ManagedLedger entry representation.
+Neither layer decodes and reserializes application records/messages. The two typed fields cannot satisfy each other's
+proof; native Kafka/Pulsar checksums are also revalidated independently in their original domains.
 
-After a lost PUT response, `HEAD` proves success only when it returns the exact expected request-body length plus a
-trustworthy checksum with the same byte scope/algorithm bound to the immutable object version. Otherwise recovery
-performs a bounded full GET and recomputes `ObjectExtentDigest`. ETag alone is never accepted as content identity,
-especially under multipart upload or server-side encryption.
+The immutable Object Extent descriptor stores the expected length and SHA-256 outside the body. A separate
+`ProviderObjectProof` stores provider version ID, canonical body length, checksum algorithm/type, and value. After a lost
+PUT response, `HEAD` proves success only for the same immutable version, exact length, exact SHA-256, and `FULL_OBJECT`
+scope. Otherwise recovery performs a bounded full GET and recomputes SHA-256. ETag, Nereus user metadata, and
+`COMPOSITE` checksums are never accepted as that proof.
 
 A missing object may be retried only under the same deterministic identity with conditional-create semantics. A
 mismatched existing object is quarantined and fails closed; it is never overwritten. Exhausting the verification budget
@@ -92,7 +94,8 @@ Each Cell Provider Session owns its admission, retry/circuit-breaker state, open
 and close lifecycle. A compatible lower-level transport may be pooled, but a cell-local throttle, credential failure, or
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
-Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001`, `V2-OBJ-002`,
-`V2-OBJ-003`, and `V2-FABRIC-002`. See
-[ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md) and
-[ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md).
+Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..004` and `V2-FABRIC-002`. See
+[ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md),
+[ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md),
+[ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md), and
+[ADR 0026](../decisions/0026-v2-protocol-native-frame-payload-bytes.md).

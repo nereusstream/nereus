@@ -27,6 +27,11 @@ The Pulsar-cell MetadataStore/Oxia authority that allocates reserved-domain virt
 append-only Ledger Chain order for Object WAL. Object keys and WalRun/group sequence never allocate or order positions.
 _Avoid_: Object-derived ledger ID, numeric ledger-ID ordering
 
+**Virtual Ledger Reservation**:
+The deployment authority that excludes one high signed-long domain from native allocation and assigns non-overlapping,
+never-reused slices to Pulsar Protocol Cells.
+_Avoid_: High-bit convention, reusable cell range, allocator-local assumption
+
 **Pulsar Position Domain**:
 The Position Domain whose ordering and adjacency rules are proven by the Ledger Chain and Pulsar Position semantics.
 _Avoid_: Universal position domain
@@ -40,3 +45,8 @@ For `BOOKKEEPER_WAL_ASYNC_OBJECT`, native ManagedLedger ledger/offload metadata 
 completion, offloaded read/fallback, and BookKeeper deletion eligibility. A Nereus `LedgerOffloader` writes Object
 bytes from sealed non-current ledgers only in 0.2; a Nereus manifest is derived.
 _Avoid_: Parallel manifest authority, generic cross-protocol offload state
+
+**Sealed-Ledger Object Pair**:
+The one bounded data Object and one sparse-index/root Object that together represent a native sealed-ledger offload
+attempt. Both identities are deterministic and attempt-scoped.
+_Avoid_: Independent child extents, manifest-authorized offload completion

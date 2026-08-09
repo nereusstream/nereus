@@ -37,14 +37,15 @@ comparable.
 
 ## Atomic initial aggregate
 
-The Topic Protocol Binding and its one initial Storage Epoch become visible as one `TopicBindingAggregate`. A backend
-with replay-atomic batch/transaction support publishes the complete aggregate atomically. Another backend uses one
-deterministic `CREATING` intent, idempotently completes both immutable records, and performs one fenced activation.
+The Topic Protocol Binding and its one initial Storage Epoch are physically stored as one immutable
+`TopicBindingAggregateRecord`. Kafka appends it inside the existing atomic `CreateTopics` controller result;
+MetadataStore/Oxia creates one aggregate key with `putIfAbsent`. The logical binding and epoch stores are typed views of
+that record and cannot mutate one component independently.
 
-Only an internally complete `ACTIVE` aggregate admits open, ownership, append, or read. Missing halves, mismatched IDs,
-unknown versions, `CREATING`, and uncertain activation are recovered within bounded control-plane work or fail closed;
-they never select a default epoch. Normal admitted append does not read or mutate this aggregate remotely. ADR 0019 is
-authoritative.
+A lost create response rereads the same record and requires exact equality. Missing, mismatched, unknown, or conflicting
+aggregate state fails closed and never selects a default epoch. The generic `CREATING` fallback in ADR 0019 is not used
+by this 0.2 single-record representation. Normal admitted append does not read or mutate the aggregate remotely. ADRs
+0019 and 0023 are authoritative.
 
 ## Append-only Storage Epoch chain
 
@@ -124,4 +125,5 @@ transaction authority cannot satisfy the contract. No adapter exposes an online 
 
 Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-OBJECT-01`, and `T-BK-01`. Required scenarios:
 `V2-PROFILE-001`, `V2-MIGRATION-001`, and `V2-META-002`. See
-[ADR 0019](../decisions/0019-v2-initial-binding-epoch-atomic-visibility.md).
+[ADR 0019](../decisions/0019-v2-initial-binding-epoch-atomic-visibility.md) and
+[ADR 0023](../decisions/0023-v2-topic-binding-aggregate-record.md).

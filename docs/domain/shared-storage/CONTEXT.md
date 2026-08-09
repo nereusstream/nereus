@@ -82,9 +82,9 @@ Topic Incarnation and no online transition runtime exists; the exact future tran
 _Avoid_: Mutable profile, storage mode flag
 
 **Topic Binding Aggregate**:
-The atomically visible create/open unit containing one immutable Topic Protocol Binding and its one initial Storage
-Epoch. A `CREATING` or internally incomplete aggregate admits no read, append, or ownership.
-_Avoid_: Default epoch, partially visible topic
+The atomically visible create/open unit whose one immutable identity contains a Topic Protocol Binding and its one
+initial Storage Epoch. Neither component has an independently writable authority.
+_Avoid_: Default epoch, partially visible topic, separately mutable binding/epoch
 
 **Object Extent Digest**:
 Integrity over the exact canonical Object-provider request body after Nereus compression and client-side encryption.
@@ -92,9 +92,14 @@ It proves stored-object bytes and cannot replace a frame payload checksum.
 _Avoid_: ETag, decoded payload checksum
 
 **Frame Payload Checksum**:
-Integrity over the canonical decoded protocol payload/record bytes defined by the binding payload mapping. It cannot
-prove the exact Object-provider request body.
-_Avoid_: Object extent digest, provider version
+Integrity over the exact protocol-native Kafka batch or Pulsar entry bytes after the outer Object envelope is decoded.
+It cannot prove the exact Object-provider request body.
+_Avoid_: Application-record reserialization checksum, Object extent digest
+
+**Provider Object Proof**:
+Provider-bound evidence joining one immutable object version, exact canonical-body length, full-object checksum
+algorithm/type, and value. It is distinct from Nereus user metadata and the expected Object Extent Digest descriptor.
+_Avoid_: ETag proof, user-metadata checksum echo, composite checksum
 
 ## Projection and migration
 
