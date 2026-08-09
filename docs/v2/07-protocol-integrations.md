@@ -100,9 +100,16 @@ checksum remains independently validated. NWG1 stores its authoritative binding 
 the Object body; one Kafka commit set never spans ObjectExtents and every frame block is independently decoded. NWG1
 uses one KMS-wrapped run key, domain-separated per-Object keys, and disjoint authenticated directory/frame nonce
 domains. Every known leaf carries the bounded exclusive directory-prefix end, so routine reads need no provider proof
-or extra HEAD before prefix+frame GET. Up to three lazy packing lanes bind keys/HKDF/nonces to lane-local sequences
-under one Root/pointer. Checkpoint pages remain Cell x shard async accelerators but use one run-wide predecessor/vector
-chain, not one chain per lane; uncovered tails still require LIST and the sealed final vector inventory is mandatory.
+or extra HEAD before prefix+frame GET. Permanent `OBJECT_LATENCY/BALANCED/COST` class IDs `0/1/2` bind
+keys/HKDF/nonces to lane-local sequences under one Root/pointer. Checkpoint pages inventory provider-resolved extents
+through one publisher-epoch-fenced predecessor/vector chain, not one chain per lane and not member ACK state; uncovered
+tails still require LIST and the sealed final vector inventory is mandatory.
+
+`LaneExtentResolvedThrough` is physical recovery order, while each binding's Position Domain owns
+`BindingDurableFrontier`. Owner-local lazy ring/window trackers dispatch verified Kafka commit sets or Pulsar entries
+independently, rebuild from authenticated descriptors after takeover, retain no payload in gaps, and perform no
+completion-path metadata read. Shared Object/header/directory failure blocks all members; a later frame/commit-set-local
+failure remains isolated to that complete binding unit.
 
 The parity matrix covers at least:
 
@@ -137,5 +144,5 @@ against V2 bindings, protocol-native Kafka work, and the then-current KoP source
 
 Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `T-POLICY-01`, `T-PROJECTION-01`,
 `T-BENCH-01`, and `T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`,
-`V2-PROJECTION-001`, `V2-POSITION-002..011`, `V2-OBJ-004..018`, `V2-BK-005..013`,
+`V2-PROJECTION-001`, `V2-POSITION-002..011`, `V2-OBJ-002/004..021`, `V2-BK-005..013`,
 `V2-KAF-META-001..003`, `V2-POLICY-001`, `V2-KAF-001`, `V2-PUL-001`, and `V2-KOP-001`.

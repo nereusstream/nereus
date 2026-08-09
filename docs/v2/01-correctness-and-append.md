@@ -33,9 +33,11 @@ For one Topic Protocol Binding, Topic Incarnation, Storage Epoch, and Owner Epoc
 3. it allocates positions through the binding's Position Domain;
 4. the selected WAL accepts protocol-native frames carrying binding/incarnation, Storage Epoch, Owner Epoch, typed
    Protocol Coverage, commit-set membership where applicable, length, and checksum;
-5. WAL completion advances only that binding's contiguous typed durable frontier;
-6. the protocol response succeeds only when the complete returned Protocol Coverage is durable and readable;
-7. background workers later publish sealed/read-optimized generations.
+5. Object WAL first resolves physical extent outcome independently from protocol order; BookKeeper uses its native
+   durable ledger outcome;
+6. validated append units enter only their binding's contiguous typed durable frontier;
+7. the protocol response succeeds only when the complete returned Protocol Coverage is durable and readable;
+8. background workers later publish sealed/read-optimized generations.
 
 Kafka allocation yields a half-open Kafka Offset Range. Pulsar allocation yields Pulsar Positions whose adjacency and
 cross-ledger order are proven by the Ledger Chain and represented as ledger-keyed Pulsar Coverage. On Pulsar Object WAL,
@@ -49,6 +51,24 @@ but its physical PUT boundary cannot weaken either protocol's append atomicity.
 
 The owner must not acknowledge coverage because a local future completed if its Owner Epoch or Storage Epoch authority
 was fenced before the durability completion was validated.
+
+## Physical extent resolution versus binding durability
+
+For `OBJECT_WAL`, `LaneExtentResolvedThrough` and `BindingDurableFrontier` are distinct:
+
+- the former is a per-WalRun/lane contiguous sequence of verified provider-resolved Objects and is used for physical
+  PUT ordering, checkpoint, Seal, and recovery;
+- the latter is a binding-scoped Position Domain frontier and alone decides protocol durability/ACK eligibility.
+
+One provider-resolved shared Object may enter checkpoint while binding A waits for typed predecessor coverage and
+binding B advances. The lane barrier waits only for an earlier Object outcome that remains unknown or could be absent;
+it does not wait for every member's protocol ACK.
+
+Binding completion uses an owner-local, lazy, reconstructible tracker keyed by Protocol Cell, binding, incarnation,
+Storage Epoch, and Position Domain identity/version. Owner Epoch is an O(1) cached completion fence rather than durable
+frontier identity; admitted completion performs no remote metadata read. The normal serial allocation path uses a
+bounded ring/window, while recovery/sparse completion may use a bounded Position-Domain-aware ordered structure.
+Runtime gaps/futures are not persisted and do not become a new authority.
 
 ## Typed protocol frontiers
 
@@ -67,6 +87,11 @@ owner-local resolution or recovery. Recovery never exposes an unproven gap.
 Frontiers from different Topic Protocol Bindings, Topic Incarnations, or Position Domains are not comparable. Pulsar
 cross-ledger ordering comes from the authoritative Ledger Chain; V2 does not derive a permanent
 `ledgerBase + entryId` coordinate.
+
+After provider resolution, Object request/payload/ciphertext/compression buffers are released. A pending typed gap
+retains only coverage, idempotency identity, an authenticated descriptor reference, and an owner-local waiting future.
+Per-binding count/descriptor-byte/future/age bounds and aggregate shard tracker bytes stop that binding before new
+position allocation; ordinary typed gaps do not fence the binding or roll the WalRun, and unrelated bindings continue.
 
 ## Uncertain append
 
@@ -101,4 +126,4 @@ envelope. Approaching a run or recovery bound triggers rollover/backpressure bef
 the envelope. This correctness-driven availability cost is explicit and does not permit a per-group metadata mutation.
 
 Relevant tradeoffs: `T-APPEND-01` and `T-POSITION-01`. Required scenarios: `V2-APP-001`, `V2-APP-002`,
-`V2-APP-003`, `V2-POSITION-001..007`, `V2-META-002..004`, `V2-KAF-META-001`, and `V2-OBJ-004..012`.
+`V2-APP-003`, `V2-POSITION-001..007`, `V2-META-002..004`, `V2-KAF-META-001`, and `V2-OBJ-002/004..012/020/021`.

@@ -112,18 +112,21 @@ high-priority reconciler and blocks the next grant, not current installed-range 
 ## Object WalRun control records
 
 Each Object-WAL shard stores a bounded immutable `WalRunRootRecord` in its Protocol Cell control-metadata backend. A
-separate immutable `WalRunSealRecord` records the terminal lane-sequence vector, final checkpoint head, and typed
-coverage; sealing never mutates the Root. A
+separate immutable `WalRunSealRecord` records the terminal provider-resolved lane-sequence vector and final checkpoint
+head; any binding-frontier snapshot is a derived hint rather than terminal authority. Sealing never mutates the Root. A
 successor Root binds predecessor Root+Seal identities, and one exact-version CAS advances `CurrentWalRunPointer` only
 after the successor exists. Lost create/CAS responses converge by exact reread equality. These are rollover/recovery
 cuts; normal admitted append performs no metadata read or mutation.
 
 Up to three packing lanes instantiate lazily beneath that one Root/pointer and share aggregate hard budgets. One
-run-wide asynchronous checkpoint predecessor chain covers at most 256 descriptors/64 KiB per page and carries a
-per-lane `coveredThrough` vector. Cadence is Cell x shard policy; aggregate uncovered extent/byte and per-lane age limits
-force progress. Open recovery/handoff LISTs every uncovered lane tail, and the Seal binds one mandatory final vector
-chain. Three lane-local chains are rejected. Checkpoint cadence and hard-envelope policy changes begin with the next
-Root; Topic packing changes follow the group-boundary rule in ADR 0060 and do not roll the run merely to change linger.
+publisher-epoch-fenced asynchronous combiner covers at most 256 provider-resolved descriptors/64 KiB per page through
+one predecessor chain and one `LaneExtentResolvedThrough` vector. The combiner has one candidate in flight; takeover
+CASes only publisher epoch while preserving the committed head/vector, response unknown accepts exact equality, and
+each failed epoch leaves at most one bounded unreachable page. Cadence is Cell x shard policy; aggregate uncovered
+provider-resolved extent/byte and per-lane age limits force progress. A binding's typed gap does not consume those
+limits. Open recovery/handoff LISTs every uncovered lane tail, and the Seal binds one mandatory final vector chain.
+Three lane-local chains are rejected. Checkpoint cadence and hard-envelope policy changes begin with the next Root;
+Topic packing changes follow the group-boundary rule and do not roll the run merely to change linger.
 
 ## Ownership token
 
@@ -157,5 +160,5 @@ topic-open, rollover publication, trim, and background lifecycle work are separa
 hide in an aggregate append metric.
 
 Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios:
-`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015`, `V2-HO-001`, `V2-FABRIC-001`,
+`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015/020/021`, `V2-HO-001`, `V2-FABRIC-001`,
 `V2-POLICY-001`, and `V2-POSITION-002..011`.

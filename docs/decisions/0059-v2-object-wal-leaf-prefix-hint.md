@@ -3,7 +3,8 @@
 ## Status
 
 Accepted as a partial 0.2 `OBJECT_WAL` leaf/read refinement. The hint semantics and incremental range assembly are
-fixed; the complete lane-aware key grammar, exact prefix cap, and remaining NWG1 row/header wire stay open.
+fixed; ADR 0062 fixes the complete lane-aware key grammar. Exact prefix caps and remaining NWG1 row/header wire stay
+open.
 Implementation and runtime evidence have not started at M0.
 
 ## Context
@@ -30,15 +31,16 @@ Exact content identity remains `{bodyLength, SHA-256/v1 of canonical request bod
 the physical immutable identity. A known leaf is interpreted only under the exact prefix from its WalRun Root. Any
 cache binds Root key/SHA plus the complete Object key and optional provider version.
 
-The final lane-aware key has this structural form and is frozen in one step with the canonical `laneId` encoding:
+ADR 0062 fixes the final lane-aware key as:
 
 ```text
-<wal-run-prefix>/<laneId>/<laneSequence19>/
+<wal-run-prefix>/<laneId:[0-2]>/<laneSequence19>/
   <directoryPrefixEnd19>-<bodyLength19>-sha256-v1-<64-lowercase-hex>.nwg
 ```
 
-ADR 0060 fixes the lane-local identity and sequence semantics. The exact textual `laneId` token remains the next wire
-frontier; implementations must not independently choose an encoding before that complete grammar is accepted.
+`laneId` is the one-digit permanent packing-class ID and ADR 0062 fixes the lane-local allocation cut. Exact
+prefix/header/directory numeric caps remain downstream evidence gates; implementations cannot change the accepted key
+tokens to compensate for those values.
 
 Checkpoint pages, manifests, and caches store the structured tuple
 `{laneId, laneSequence, directoryPrefixEnd, bodyLength, sha256}` and reconstruct the key from the Root prefix. They do
@@ -54,12 +56,13 @@ fails or enters the bounded three-GET fallback. No hint authorizes a frame offse
 
 ## Consequences
 
-- `V2-OPEN-OBJ-17` remains open only for the complete key/header/directory wire and numeric caps; the hint location,
+- `V2-OPEN-OBJ-17` remains open only for exact header/directory/row numeric caps; the complete key, hint location,
   proof separation, and short/long reuse rules are no longer open.
 - Known extents can normally use prefix GET then frame GET without HEAD, `ProviderObjectProof`, or remote metadata.
 - The key reveals an approximate authenticated-directory size. 0.2 accepts this Object-key metadata-leakage tradeoff.
 - M3 must prove every end-boundary case, short/long byte reuse, structured key reconstruction, wrong Root/key/version,
   AEAD failure, three-GET fallback, absence of per-descriptor full-key duplication, and two-GET request/byte evidence.
 
-This decision refines ADRs 0021, 0025, 0030, 0040, 0046, 0053, and 0058 and is tracked by `T-OBJECT-01`,
+This decision is refined by ADR 0062, refines ADRs 0021, 0025, 0030, 0040, 0046, 0053, and 0058 and is tracked by
+`T-OBJECT-01`,
 `V2-OBJ-016/017`, and `V2-OPEN-OBJ-17`.

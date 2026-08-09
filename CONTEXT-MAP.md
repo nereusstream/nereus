@@ -38,4 +38,5 @@ KoP is outside the current V2 Kafka/Pulsar design session. Its existing design r
   it. Durable choices are persisted at their Storage Epoch, hard-recovery WalRun Root, Object-group, or offload-attempt
   boundary, one identity never spans those lifecycles, and effective budgets are the minimum across scopes. Object WAL
   maps compatible classes to at most three lazy lanes under one Root/pointer and one vector checkpoint chain; all hard
-  recovery/resource budgets remain aggregate.
+  recovery/resource budgets remain aggregate. Provider-resolved lane extent order is separate from each binding's
+  typed Durable Frontier, so physical checkpoint progress never waits for every member's protocol ACK.

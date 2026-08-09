@@ -63,7 +63,9 @@ affects bytes or recovery is persisted at its Storage Epoch, hard-recovery WalRu
 boundary. Product/Deployment owns the base semantic default; Namespace/Topic may inherit or explicitly override, Cell
 admits/caps, and host only ceilings. One configurable identity never spans those lifecycles or lets failover silently
 reinterpret state. Topic-specific soft packing is not a singular WalRun Root identity: at most three lazy lanes share
-one Root/pointer, vector checkpoint chain, and aggregate hard budgets.
+one Root/pointer, vector checkpoint chain, and aggregate hard budgets. Permanent IDs map `0/1/2` to
+`OBJECT_LATENCY/BALANCED/COST`; target/linger values change by `packingPolicyVersion`. Lane sequence allocates after
+immutable group-plan admission and before HKDF/encryption/final-body seal.
 
 ADR 0016 retains Access Projection/Migration Link identities and rejects a second Native Write Authority, while
 excluding cross-protocol serving and authority-transfer runtime from 0.2. For Pulsar
@@ -83,8 +85,11 @@ unselected. NWG1 uses
 object-local binding epochs, in-body append-unit authority, co-located Kafka commit sets, a KMS-wrapped run key with
 per-Object AEAD, content-addressed strong-LIST discovery, explicit provider-absent crash cuts, and immutable
 Root/Seal/successor pointer lineage. Every known leaf carries its bounded exclusive directory-prefix end. Up to three
-lane-local sequences build lazily, while asynchronous checkpoints use one run-wide predecessor/vector chain with
-aggregate bounds; open tails still require LIST and sealed runs require one final vector inventory. Routine frame
+lane-local sequences build lazily, while one publisher-epoch-fenced combiner checkpoints provider-resolved extents
+through a run-wide predecessor/vector chain with aggregate bounds; member protocol ACK is not checkpoint eligibility.
+Physical `LaneExtentResolvedThrough` is separate from binding `BindingDurableFrontier`; owner-local lazy trackers
+release independent commit sets without remote metadata or persisted gap maps. Open tails still require LIST and sealed
+runs require one final physical vector inventory. Routine frame
 ranges authenticate the Root-bound directory/frame rather than requiring a new whole-Object provider proof or HEAD;
 prefix bytes, not frame count alone, bound cold-read amplification.
 
@@ -166,6 +171,9 @@ Accepted decisions:
 - [ADR 0059: Object WAL leaf directory-prefix hint](../decisions/0059-v2-object-wal-leaf-prefix-hint.md)
 - [ADR 0060: WalRun lazy lanes and vector checkpoint](../decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md)
 - [ADR 0061: Pulsar range-grant owner takeover](../decisions/0061-v2-pulsar-range-grant-owner-takeover.md)
+- [ADR 0062: Object WAL packing catalog and leaf sequence](../decisions/0062-v2-object-wal-packing-catalog-and-leaf-sequence.md)
+- [ADR 0063: provider-resolved checkpoint publisher](../decisions/0063-v2-provider-resolved-checkpoint-publisher.md)
+- [ADR 0064: Object WAL physical and binding frontiers](../decisions/0064-v2-object-wal-physical-and-binding-frontiers.md)
 
 ## Open design gates
 
@@ -180,19 +188,22 @@ Accepted decisions:
 `V2-OPEN-PUL-OBJ-07`; ADRs 0049 through 0054 resolve `V2-OPEN-KAF-META-03`, `V2-OPEN-PUL-META-02`,
 `V2-OPEN-BK-12`, `V2-OPEN-OBJ-18`, and `V2-OPEN-PUL-OBJ-08`; ADR 0055 resolves the
 `V2-OPEN-PUL-OBJ-10` evidence-protocol decision without selecting a mode or producing a PASS. ADRs 0056 through 0058
-partially resolve NPD1 wire/policy evidence and NWG1 prefix capacity. ADRs 0059 through 0061 additionally fix the leaf
-hint, lazy-lane/vector-checkpoint structure, and RANGE takeover constraints without selecting remaining numeric/class
-values, canonical lane encoding, final RANGE wire/size, or an allocator mode. The rows below are the remaining active
-0.2 decisions or evidence gates.
+partially resolve NPD1 wire/policy evidence and NWG1 prefix capacity. ADRs 0059 through 0061 fix the leaf hint,
+lazy-lane/vector-checkpoint structure, and RANGE takeover constraints. ADRs 0062 through 0064 additionally fix the
+class/lane grammar, provider-resolved checkpoint publisher, and physical-versus-binding frontier split without
+selecting remaining numeric values, final RANGE wire/size, or an allocator mode. The rows below are the remaining
+active 0.2 decisions or evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
 | `V2-OPEN-BK-11` | select exact NPD1 block/Object/adapter numeric maxima, lower admission, and provider evidence after ADR 0056's checked wire/streaming contract | M2 Object format freeze |
 | `V2-OPEN-BK-13` | execute ADR 0057's 1/4/8/16-MiB native-relative evidence, then select at most three classes and the Deployment base default | M2 offload policy freeze |
-| `V2-OPEN-OBJ-17` | freeze exact NWG1 prefix/directory/row numeric wire plus canonical lane token after ADR 0059's leaf-hint contract | M3 Object WAL format freeze |
-| `V2-OPEN-OBJ-19` | freeze canonical lane-to-class binding/encoding and evidence-selected packing values after ADR 0060's lazy-lane/vector-chain contract | M3 Object WAL policy freeze |
+| `V2-OPEN-OBJ-17` | freeze exact NWG1 header/directory/row numeric caps after ADRs 0059/0062 fixed the complete leaf grammar | M3 Object WAL format freeze |
+| `V2-OPEN-OBJ-19` | execute evidence and select target/linger/quantized values and numeric budgets without changing ADR-0062 class semantics | M3 Object WAL policy freeze |
 | `V2-OPEN-PUL-OBJ-09` | choose an allocator only after evidence plus exact reservation/head/node wire, range size, Cell reservation concurrency, and ADR 0061 conformance | M1/M3 virtual-ledger allocator freeze |
-| `V2-OPEN-OBJ-01` | prove per-binding typed durable frontiers inside a multi-binding Object group without shard-wide HOL | M3 layout freeze |
+| `V2-OPEN-OBJ-20` | freeze checkpoint/Seal physical descriptor payload and whether any binding summary is omitted or only a non-authoritative hint | M3 checkpoint wire freeze |
+| `V2-OPEN-OBJ-21` | freeze the owner-local completion-ticket/ring identity without adding a persisted append ordinal | M3 completion runtime freeze |
+| `V2-OPEN-READ-01` | freeze the owner-local active-tail read publication cut that makes an independently ACKed binding readable before checkpoint/manifest | M3 active-tail read freeze |
 | `V2-OPEN-BK-02` | validate one-active-ledger-per-Kafka-partition at 10k and 100k partitions | M2 Kafka BK layout freeze |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |
 

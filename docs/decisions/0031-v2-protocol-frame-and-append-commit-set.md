@@ -35,6 +35,12 @@ group/PUT boundaries do not redefine protocol append atomicity. A network reques
 record, or individual message inside a Pulsar batch is not a frame or commit set. Native protocol checksum and semantic
 validation remain independent of the V2 frame checksum.
 
+ADR 0064 separates the shared Object's physical resolution from each commit set's typed frontier. After the Object,
+KMS envelope, fixed header, and directory authenticate, a complete Kafka commit set or Pulsar entry may validate and
+advance independently. A failure inside one complete frame/commit set blocks that unit; it does not split the unit or
+automatically fail another binding's independently verified unit. A shared Object/header/directory failure still blocks
+all members.
+
 ## Consequences
 
 - `V2-OPEN-OBJ-08` is resolved.
@@ -46,6 +52,7 @@ validation remain independent of the V2 frame checksum.
 - M3 must prove Kafka multi-batch all-or-none cuts and corrupted membership rejection, Pulsar entry identity, empty
   Kafka batch coverage, native-checksum independence, and Object-group boundaries that do not leak into append truth.
 
-This decision is refined by [ADRs 0037](0037-v2-object-wal-binding-context-epoch-authority.md) and
-[0040](0040-v2-nwg1-append-unit-directory-and-colocation.md), refines ADR 0026, and is tracked by `T-PROTOCOL-01`,
-`T-OBJECT-01`, `V2-OBJ-004/006/007/012`.
+This decision is refined by [ADRs 0037](0037-v2-object-wal-binding-context-epoch-authority.md),
+[0040](0040-v2-nwg1-append-unit-directory-and-colocation.md), and
+[0064](0064-v2-object-wal-physical-and-binding-frontiers.md), refines ADR 0026, and is tracked by `T-PROTOCOL-01`,
+`T-OBJECT-01`, `V2-OBJ-002/004/006/007/012/021`.

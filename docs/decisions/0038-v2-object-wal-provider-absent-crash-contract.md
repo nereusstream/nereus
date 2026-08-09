@@ -19,14 +19,16 @@ After process loss, recovery handles an in-flight group as follows:
 
 1. if the exact content-addressed object is present, validate its key-derived length/SHA, provider/body proof, root
    binding, header, contexts, frames, commit sets, coverage, and idempotency before reconciling it;
-2. if qualified LIST/HEAD/GET behavior proves the old conditional PUT absent and the group was never acknowledged,
+2. if qualified LIST/HEAD/GET behavior proves the old conditional PUT absent and the candidate never became
+   provider-resolved,
    stop the old run, terminate the affected lane before that candidate, and burn the old run/lane-sequence identity;
 3. only after that absence/fence proof may protocol idempotency rebuild the request in a fresh run/group;
 4. if presence versus absence cannot be resolved inside the accepted recovery envelope, remain fail-closed and do not
    start a conflicting fresh attempt or advance a frontier.
 
 The new owner never claims it can reproduce the original key/body and never continues that lane across the burned gap.
-ADR 0060 permits other lanes to retain every verified ACKed extent, but the entire run stops admission and completes
+ADRs 0060/0064 permit other lanes to retain every provider-resolved extent and their independently advanced binding
+frontiers, but the entire run stops admission and completes
 bounded reconciliation/seal before a successor opens. Any provider-present unacknowledged tail is reconciled by its
 verified idempotency/coverage facts or quarantined; it is not exposed merely because LIST found it.
 
@@ -45,5 +47,5 @@ and completion state. Deterministic nonce generation alone is insufficient.
 - M3 must prove present/absent/unknown cuts, no reuse after a burned gap, no duplicate protocol positions, client retry
   convergence, and rejection of deterministic-nonce-only replay claims.
 
-This decision is refined by ADR 0060, refines ADRs 0018 and 0030, and is tracked by `T-APPEND-01`, `T-OBJECT-01`,
-`V2-APP-003`, and `V2-OBJ-003/005/008/018`.
+This decision is refined by ADRs 0060/0062/0064, refines ADRs 0018 and 0030, and is tracked by `T-APPEND-01`,
+`T-OBJECT-01`, `V2-APP-003`, and `V2-OBJ-003/005/008/018/019/021`.

@@ -15,21 +15,21 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-Round 10 accepted the leaf prefix hint, at most three lazy lane-local sequences with one vector checkpoint chain, and
-the owner-takeover correctness constraints for any RANGE candidate in ADRs 0059..0061. It explicitly rejected three
-lane-local checkpoint chains and still selected neither allocator mode. Evidence-blocked numeric/class/mode decisions
-wait; the next independent design frontier is:
+Round 11 accepted the permanent class/lane catalog and complete leaf grammar, provider-resolved checkpoint eligibility
+with one publisher-epoch-fenced combiner, and the separation between physical lane resolution and owner-local binding
+frontiers in ADRs 0062..0064. It introduced no per-binding remote metadata, persistent runtime gap map, or hot-path
+Owner Epoch read. Evidence-blocked numeric/class/mode decisions wait; the next independent frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-OBJ-17`, `V2-OPEN-OBJ-19` | choose canonical lane binding/encoding and freeze the complete leaf grammar without a first-use map or Root-level soft-class identity | consider stable product-catalog packing IDs `0..2` as one-digit lane tokens with zero-based lane-local sequences |
-| `V2-OPEN-OBJ-19` | freeze one checkpoint combiner/head response-loss and takeover protocol for the accepted vector chain | consider one shard-owner-fenced async combiner; exact reread equality, successor-only retry, and bounded unreferenced-page residue |
-| `V2-OPEN-OBJ-01` | make independent per-binding contiguous ACK/frontier progress executable inside valid multi-binding Objects | consider bounded binding-scoped commit trackers/gap maps with aggregate resource ceilings and no physical-order sorting |
+| `V2-OPEN-OBJ-20` | choose the minimal physical checkpoint/Seal descriptor and whether any copied binding summary belongs there | consider physical-only extent identity with optional qualified provider proof; rebuild bindings from authenticated directories and store no frontier/ACK state |
+| `V2-OPEN-OBJ-21` | identify the O(1) normal completion ring without adding a durable append ordinal | consider an owner-local checked completion ticket plus exact coverage/predecessor validation, discarded on takeover |
+| `V2-OPEN-READ-01` | make independently ACKed Object-WAL coverage readable before checkpoint/manifest publication | consider a lazy owner-local active-tail locator index installed before contiguous Durable/Readable frontier release |
 
 The complete questions and recommendations are in
-[round 11](grill-notes/13-restarted-grill-2-lane-binding-checkpoint-publisher-and-frontiers.md). None of its
-recommendations is accepted yet. `V2-OPEN-BK-11/13` and remaining `V2-OPEN-PUL-OBJ-09` wire/size/mode work are blocked
-on their accepted evidence protocols rather than questions in this round.
+[round 12](grill-notes/14-restarted-grill-2-checkpoint-payload-completion-ticket-and-active-tail.md). None of its
+recommendations is accepted yet. `V2-OPEN-BK-11/13`, remaining `V2-OPEN-OBJ-17/19`, and
+`V2-OPEN-PUL-OBJ-09` wire/size/mode work are blocked on accepted evidence protocols rather than questions in this round.
 
 ## Configuration scope
 
@@ -101,11 +101,11 @@ validates ACTIVE plus aggregate identity and installs a local versioned fence, s
 
 ### `V2-OPEN-OBJ-01`: per-binding frontier and cross-binding head-of-line isolation
 
-This remains open. One valid group PUT may contain commit sets from several bindings, but physical lane/Object order
-cannot become a shared protocol frontier. The remaining gate must freeze bounded per-binding contiguous completion,
-gap storage/backpressure, recovery ordering, and aggregate resource accounting so one binding's predecessor gap does
-not block another binding from the same verified Object. Failure of the shared Object/directory still affects every
-member. Round 11 asks the current recommendation.
+Resolved by [ADR 0064](../decisions/0064-v2-object-wal-physical-and-binding-frontiers.md). Physical
+`LaneExtentResolvedThrough` is separate from each Position Domain's `BindingDurableFrontier`; an owner-local lazy
+ring/window with bounded sparse-recovery fallback advances only one binding, stores no payload/persisted gap state, and
+performs cached O(1) owner fencing. Shared Object/header/directory failures block all members, while later
+frame/commit-set-local failures isolate to that complete binding unit.
 
 ### `V2-OPEN-OBJ-02`: resolved PUT-response-loss proof
 
@@ -143,9 +143,10 @@ decoded. Application records/messages are not reserialized, and native protocol 
 ### `V2-OPEN-OBJ-07`: resolved Object WAL group identity and crash discovery
 
 Resolved by [ADR 0030](../decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md). One immutable root
-is persisted before opening a run; every group key carries fixed-width sequence, exact body length, and full SHA-256.
-Bounded strong same-prefix LIST discovers an ACKed open tail without per-group metadata publication. Async checkpoint
-pages are accelerators only, and non-qualifying providers are rejected for `OBJECT_WAL`.
+is persisted before opening a run; ADRs 0059/0062 refine every group key to the final one-digit lane, fixed-width
+sequence/prefix-end/body-length, and full SHA-256 grammar. Bounded strong same-prefix LIST discovers a
+provider-resolved open tail without per-group metadata publication. Async checkpoint pages are accelerators only, and
+non-qualifying providers are rejected for `OBJECT_WAL`.
 
 ### `V2-OPEN-OBJ-08`: resolved protocol frame and append commit-set granularity
 
@@ -208,8 +209,8 @@ ADR 0058 makes `maxHeaderAndDirectoryPrefixBytes` primary, derives frame capacit
 4,096/16,384 first, and rejects pagination/secondary authority. ADR 0059 places an exclusive bounded
 `directoryPrefixEnd19` in every leaf, keeps it outside content digest identity, uses structured descriptors instead of
 full-key repetition, and fixes short/long incremental range reuse. Routine reads need neither ProviderObjectProof nor
-HEAD. The remaining gate must freeze exact prefix/directory/row numeric wire plus the canonical lane token/complete key
-grammar; exact key/Root/version/AEAD mismatch still fails or uses bounded fallback.
+HEAD. ADR 0062 fixes the one-digit `0..2` lane token and complete key grammar. The remaining gate must freeze only exact
+prefix/header/directory/row numeric caps; exact key/Root/version/AEAD mismatch still fails or uses bounded fallback.
 
 ### `V2-OPEN-OBJ-18`: resolved WalRun checkpoint pages and open-tail handoff
 
@@ -220,10 +221,32 @@ is disabled, open uncovered tails always use bounded strong LIST, and the sealed
 ### `V2-OPEN-OBJ-19`: NWG1 typed operational policy classes
 
 Encoding and packing remain separate. ADR 0060 fixes one Root/pointer with at most three lazily instantiated lanes,
-lane-local sequence/ACK barriers, binding-move drain, lane-aware key/HKDF/nonce/header identity, aggregate hard budgets,
-and one run-wide checkpoint/Seal vector chain. Three lane-local chains and eager target-sized allocation are rejected.
-The remaining gate must freeze canonical lane-to-class binding/encoding, one checkpoint combiner/head conflict protocol,
-and evidence-selected class values. Former 4/16/64-MiB and 5/20/50-ms values remain candidates only.
+lane-local extent-resolution barriers, binding-move drain, lane-aware key/HKDF/nonce/header identity, aggregate hard
+budgets, and one run-wide checkpoint/Seal vector chain. Three lane-local chains and eager target-sized allocation are
+rejected.
+ADR 0062 permanently maps `0/1/2` to `OBJECT_LATENCY/BALANCED/COST` and ADR 0063 fixes the one-combiner protocol.
+The remaining gate is evidence-selected target/linger/quantized values and numeric budgets; former 4/16/64-MiB and
+5/20/50-ms values remain candidates only and cannot change class meanings.
+
+### `V2-OPEN-OBJ-20`: physical checkpoint and Seal descriptor payload
+
+This remains open. ADR 0063 fixes provider-resolved eligibility and publisher fencing, while ADR 0064 forbids a copied
+binding frontier from becoming physical checkpoint authority. The remaining gate chooses whether pages/Seal stay
+physical-only and pay bounded directory prefix GETs during recovery, or carry any optional non-authoritative binding
+summary. Round 12 asks the current recommendation.
+
+### `V2-OPEN-OBJ-21`: owner-local completion ticket and normal-path ring
+
+This remains open. ADR 0064 accepts an O(1) normal ring and Position-Domain-aware recovery fallback but no durable
+append ordinal exists. The remaining gate must freeze a purely owner-local indexing ticket, exact coverage/predecessor
+validation, live-slot/wrap behavior, and takeover discard without creating another wire/metadata ordering domain.
+
+### `V2-OPEN-READ-01`: Object-WAL active-tail readability before checkpoint/manifest
+
+This remains open. A binding can ACK only after its coverage is both durable and readable, but checkpoint is now
+physical inventory and manifest materialization is asynchronous. The remaining gate must freeze the derived owner-local
+active-tail locator installation/rebuild/retirement cut that makes B readable without per-group remote metadata. Round
+12 asks the current recommendation.
 
 ## Storage Epoch transitions
 
@@ -477,6 +500,24 @@ For example, one Pulsar entry with batch indexes `0..2` might map to one Kafka O
 input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
+
+### Restarted Grill 2 round 11 adjusted decisions: resolved by ADRs 0062 through 0064
+
+Resolved on 2026-08-09 after explicit adjusted confirmation:
+
+- Q1 permanent `0/1/2 = OBJECT_LATENCY/BALANCED/COST`, complete leaf grammar, policy-version compatibility, and
+  post-plan/pre-HKDF sequence allocation ->
+  [ADR 0062](../decisions/0062-v2-object-wal-packing-catalog-and-leaf-sequence.md);
+- Q2 one publisher-epoch-fenced combiner/candidate, exact takeover/CAS, bounded residue, and provider-resolved
+  checkpoint eligibility -> [ADR 0063](../decisions/0063-v2-provider-resolved-checkpoint-publisher.md);
+- Q3 physical `LaneExtentResolvedThrough` versus logical `BindingDurableFrontier`, owner-local reconstructible
+  ring/window, bounded sparse fallback, early buffer release, and layered failure isolation ->
+  [ADR 0064](../decisions/0064-v2-object-wal-physical-and-binding-frontiers.md).
+
+The confirmed “canonical body seal before sequence” wording is clarified by the already accepted cryptographic
+dependency: immutable group membership/policy plan seals first, sequence then feeds HKDF/nonce, and final ciphertext
+body seals afterward. Exact numeric values remain evidence-blocked. The complete response is preserved in
+[the round 11 record](grill-notes/13-restarted-grill-2-lane-binding-checkpoint-publisher-and-frontiers.md).
 
 ### Restarted Grill 2 round 10 adjusted decisions: partially resolved by ADRs 0059 through 0061
 

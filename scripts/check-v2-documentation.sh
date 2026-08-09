@@ -114,6 +114,9 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0059-v2-object-wal-leaf-prefix-hint.md"
     "$repo_root/docs/decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md"
     "$repo_root/docs/decisions/0061-v2-pulsar-range-grant-owner-takeover.md"
+    "$repo_root/docs/decisions/0062-v2-object-wal-packing-catalog-and-leaf-sequence.md"
+    "$repo_root/docs/decisions/0063-v2-provider-resolved-checkpoint-publisher.md"
+    "$repo_root/docs/decisions/0064-v2-object-wal-physical-and-binding-frontiers.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -182,6 +185,9 @@ require_literal 'NWG1 v1 freezes `maxHeaderAndDirectoryPrefixBytes` before it fr
 require_literal 'fixedHeaderBytes <= directoryPrefixEnd <= bodyLength' "docs/decisions/0059-v2-object-wal-leaf-prefix-hint.md"
 require_literal 'one run-wide predecessor chain and one checkpoint-head CAS' "docs/decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md"
 require_literal 'response unknown: exact reread accepts candidate/head/grant equality' "docs/decisions/0061-v2-pulsar-range-grant-owner-takeover.md"
+require_literal '`OBJECT_LATENCY`' "docs/decisions/0062-v2-object-wal-packing-catalog-and-leaf-sequence.md"
+require_literal '`ProviderResolvedExtentDescriptor`' "docs/decisions/0063-v2-provider-resolved-checkpoint-publisher.md"
+require_literal '`LaneExtentResolvedThrough`' "docs/decisions/0064-v2-object-wal-physical-and-binding-frontiers.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -213,7 +219,11 @@ require_literal "Restarted Grill 2 round 10" "docs/v2/grill-notes/12-restarted-g
 require_literal "Round 10 不全部按原推荐确认" "docs/v2/grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md"
 require_literal "不确认每个 lane 一条独立 checkpoint chain" "docs/v2/grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md"
 require_literal "Restarted Grill 2 round 11" "docs/v2/grill-notes/13-restarted-grill-2-lane-binding-checkpoint-publisher-and-frontiers.md"
-require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/13-restarted-grill-2-lane-binding-checkpoint-publisher-and-frontiers.md"
+require_literal "Round 11 不全部按原文直接确认" "docs/v2/grill-notes/13-restarted-grill-2-lane-binding-checkpoint-publisher-and-frontiers.md"
+require_literal "ProviderResolvedExtentDescriptor" "docs/v2/grill-notes/13-restarted-grill-2-lane-binding-checkpoint-publisher-and-frontiers.md"
+require_literal "LaneExtentResolvedThrough" "docs/v2/grill-notes/13-restarted-grill-2-lane-binding-checkpoint-publisher-and-frontiers.md"
+require_literal "Restarted Grill 2 round 12" "docs/v2/grill-notes/14-restarted-grill-2-checkpoint-payload-completion-ticket-and-active-tail.md"
+require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/14-restarted-grill-2-checkpoint-payload-completion-ticket-and-active-tail.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -300,6 +310,7 @@ for resolved_gate in \
     V2-OPEN-BK-12 \
     V2-OPEN-OBJ-18 \
     V2-OPEN-PUL-OBJ-08 \
+    V2-OPEN-OBJ-01 \
     V2-OPEN-PUL-OBJ-10; do
     if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$resolved_gate remains in the active gate table"
@@ -307,14 +318,16 @@ for resolved_gate in \
 done
 
 for active_gate in \
-    V2-OPEN-OBJ-01 \
     V2-OPEN-BK-11 \
     V2-OPEN-BK-13 \
     V2-OPEN-OBJ-17 \
     V2-OPEN-OBJ-19 \
-    V2-OPEN-PUL-OBJ-09; do
+    V2-OPEN-PUL-OBJ-09 \
+    V2-OPEN-OBJ-20 \
+    V2-OPEN-OBJ-21 \
+    V2-OPEN-READ-01; do
     require_literal "\`$active_gate\`" "docs/v2/open-questions.md"
-    require_literal "\`$active_gate\`" "docs/v2/grill-notes/13-restarted-grill-2-lane-binding-checkpoint-publisher-and-frontiers.md"
+    require_literal "\`$active_gate\`" "docs/v2/grill-notes/14-restarted-grill-2-checkpoint-payload-completion-ticket-and-active-tail.md"
     if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$active_gate is missing from the active gate table"
     fi
@@ -379,6 +392,9 @@ active_contracts=(
     "$repo_root/docs/decisions/0059-v2-object-wal-leaf-prefix-hint.md"
     "$repo_root/docs/decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md"
     "$repo_root/docs/decisions/0061-v2-pulsar-range-grant-owner-takeover.md"
+    "$repo_root/docs/decisions/0062-v2-object-wal-packing-catalog-and-leaf-sequence.md"
+    "$repo_root/docs/decisions/0063-v2-provider-resolved-checkpoint-publisher.md"
+    "$repo_root/docs/decisions/0064-v2-object-wal-physical-and-binding-frontiers.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )
@@ -534,6 +550,7 @@ required_scenarios = {
     "V2-OBJ-001", "V2-OBJ-002", "V2-OBJ-003", "V2-OBJ-004", "V2-OBJ-005", "V2-OBJ-006",
     "V2-OBJ-007", "V2-OBJ-008", "V2-OBJ-009", "V2-OBJ-010", "V2-OBJ-011", "V2-OBJ-012",
     "V2-OBJ-013", "V2-OBJ-014", "V2-OBJ-015", "V2-OBJ-016", "V2-OBJ-017", "V2-OBJ-018",
+    "V2-OBJ-019", "V2-OBJ-020", "V2-OBJ-021",
     "V2-BK-001", "V2-BK-002", "V2-BK-003", "V2-BK-004", "V2-BK-005", "V2-BK-006",
     "V2-BK-007", "V2-BK-008", "V2-BK-009", "V2-BK-010", "V2-BK-011", "V2-BK-012", "V2-BK-013",
     "V2-READ-001", "V2-READ-002", "V2-META-001", "V2-HO-001",
@@ -657,6 +674,9 @@ link_docs=(
     "$repo_root/docs/decisions/0059-v2-object-wal-leaf-prefix-hint.md"
     "$repo_root/docs/decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md"
     "$repo_root/docs/decisions/0061-v2-pulsar-range-grant-owner-takeover.md"
+    "$repo_root/docs/decisions/0062-v2-object-wal-packing-catalog-and-leaf-sequence.md"
+    "$repo_root/docs/decisions/0063-v2-provider-resolved-checkpoint-publisher.md"
+    "$repo_root/docs/decisions/0064-v2-object-wal-physical-and-binding-frontiers.md"
 )
 
 while IFS=: read -r source match; do

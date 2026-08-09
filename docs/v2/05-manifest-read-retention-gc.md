@@ -80,8 +80,10 @@ repeating the complete Object key.
 
 For an open Object-WAL run, the canonical lane/sequence/prefix-end/length/SHA leaf plus verified group header
 reconstructs that descriptor; the pre-open WalRun Root supplies its exact scope/prefix and aggregate recovery budgets.
-Asynchronous descriptor pages or sealed manifests may become preferred indexes, but cannot hide an ACKed lane tail
-that remains discoverable by bounded provider LIST.
+Asynchronous checkpoint pages inventory provider-resolved extents even when one member still waits for its binding
+frontier. They do not prove member ACK/readability and cannot hide a provider-resolved lane tail that remains
+discoverable by bounded provider LIST. Runtime binding trackers and gaps are reconstructed rather than persisted as a
+second manifest authority.
 
 ## Timestamp and protocol-position indexes
 
@@ -136,5 +138,5 @@ the source was safely retired and the preferred generation is corrupt, the resul
 system does not synthesize records or silently skip the requested Protocol Coverage.
 
 Relevant tradeoffs: `T-MANIFEST-01`, `T-POSITION-01`, `T-PROJECTION-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required
-scenarios: `V2-READ-001`, `V2-READ-002`, `V2-BK-007..008`, `V2-BK-011`, `V2-PROJECTION-001`, `V2-POLICY-001`, and
-`V2-FABRIC-003`.
+scenarios: `V2-READ-001`, `V2-READ-002`, `V2-OBJ-002/020/021`, `V2-BK-007..008`, `V2-BK-011`,
+`V2-PROJECTION-001`, `V2-POLICY-001`, and `V2-FABRIC-003`.

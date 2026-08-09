@@ -27,6 +27,11 @@ replace the exact context, compare positions across bindings, or advance a front
 then the complete context table, then every frame/context reference before reconstructing any binding's Durable
 Frontier.
 
+ADR 0064 makes the runtime tracker owner-local without putting Owner Epoch into durable frontier identity. Every
+completion still validates its cached context/owner fence in O(1); stale-owner work cannot advance the new instance,
+and no completion adds a remote metadata read. Once the shared Object/header/directory is valid, context/frame failure
+is isolated to that binding's complete append unit where the failing layer permits it.
+
 Cross-binding grouping remains limited to compatible bindings in one Protocol Cell. An epoch or incarnation mismatch
 rejects only by the fail-closed append/recovery contract; a group-level shard/run epoch never substitutes for a topic
 Owner or Storage Epoch.
@@ -41,5 +46,5 @@ Owner or Storage Epoch.
 - M3 must prove multi-binding/multi-epoch rejection, context/frame substitution, stale Owner Epoch, independent
   frontiers, and absence of any singular topic epoch in run-root authority.
 
-This decision refines ADRs 0014, 0030, and 0031 and is tracked by `T-OBJECT-01`, `T-FABRIC-01`, `V2-OBJ-002`, and
-`V2-OBJ-005..007`.
+This decision is refined by ADR 0064, refines ADRs 0014, 0030, and 0031 and is tracked by `T-OBJECT-01`, `T-FABRIC-01`,
+`V2-OBJ-002`, `V2-OBJ-005..007`, and `V2-OBJ-021`.

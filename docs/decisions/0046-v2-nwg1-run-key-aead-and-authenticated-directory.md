@@ -18,7 +18,9 @@ uniqueness difficult to prove across recovery.
 Each WalRun creates one random 256-bit data key. It is wrapped once under the immutable Cell KMS key identity and
 version recorded by the WalRun Root. Every ObjectExtent derives a unique object key from the run key and canonical,
 domain-separated shard identity, run epoch, lane ID, and lane-local sequence inputs through HKDF-SHA-256. Shard run
-epochs and `{laneId, laneSequence}` pairs are never reused.
+epochs and `{laneId, laneSequence}` pairs are never reused. ADR 0062 therefore allocates sequence after immutable
+group-plan admission but before HKDF/encryption/final-body seal; “body sealed before allocation” never means final
+ciphertext body.
 
 Within one ObjectExtent, fixed 96-bit nonces encode a domain and ordinal. One nonce domain is reserved for the combined
 encrypted/authenticated `BindingContextTable + AppendUnitDirectory`; a disjoint domain is reserved for frame ordinals.
@@ -50,5 +52,5 @@ used by the 0.2 cost-first Object WAL hot path.
 - M3 must prove key/nonce uniqueness, AAD substitution rejection, directory/frame domain separation, rotation only at
   rollover, no plaintext leakage, and KMS/cache lifecycle isolation between Protocol Cells.
 
-This decision is refined by ADRs 0058..0060, refines ADRs 0021, 0030, 0037, and 0040, and is tracked by `T-OBJECT-01`,
-`T-FABRIC-01`, and `V2-OBJ-006/007/012/013/016..018`.
+This decision is refined by ADRs 0058 through 0062 and ADR 0064, refines ADRs 0021, 0030, 0037, and 0040, and is tracked by
+`T-OBJECT-01`, `T-FABRIC-01`, and `V2-OBJ-006/007/012/013/016..019/021`.

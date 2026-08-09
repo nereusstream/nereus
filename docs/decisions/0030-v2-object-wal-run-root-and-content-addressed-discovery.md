@@ -19,20 +19,21 @@ identity and initial lane-sequence contract, Object/frame format families, compr
 and total page/object/byte/time recovery budgets. Because one run may group multiple bindings, the exact division
 between run-level fencing fields and per-frame binding epochs remains a downstream schema gate.
 
-Each Object group first seals its exact final canonical provider request body after Nereus compression and client-side
-encryption. ADRs 0059/0060 refine its scoped conditional-create leaf key to carry lane-local identity, the exclusive
-directory-prefix end, exact body length, and the full lowercase SHA-256/v1 digest:
+Each Object group first seals and admits its immutable membership and encoding plan. ADR 0062 then allocates the next lane
+sequence, which is required for HKDF/nonce/header identity, before final compression/encryption and canonical provider
+request-body seal. The scoped conditional-create leaf key carries lane-local identity, the exclusive directory-prefix
+end, exact body length, and the full lowercase SHA-256/v1 digest:
 
 ```text
-<wal-run-prefix>/<laneId>/<laneSequence19>/
+<wal-run-prefix>/<laneId:[0-2]>/<laneSequence19>/
   <directoryPrefixEnd19>-<bodyLength19>-sha256-v1-<64-lowercase-hex>.nwg
 ```
 
-The three numeric suffix components are zero-padded 19-digit non-negative signed-long values; the exact textual lane-ID
-token remains a downstream wire gate. `{bodyLength, SHA-256}` remains exact content identity, while the complete scoped
-key is physical immutable identity. The key, expected length/digest, and a verified group header jointly reconstruct
-the Object Extent descriptor; there is no synchronous per-group metadata-service row. The final key or digest is not
-placed inside the body it hashes.
+The lane token is exactly one ASCII digit for ADR-0062 class `0/1/2`; the other three numeric components are
+zero-padded 19-digit non-negative signed-long values. `{bodyLength, SHA-256}` remains exact content identity, while the
+complete scoped key is physical immutable identity. The key, expected length/digest, and a verified group header
+jointly reconstruct the Object Extent descriptor; there is no synchronous per-group metadata-service row. The final
+key or digest is not placed inside the body it hashes.
 
 Recovery reads the durable run root, performs same-prefix LIST with bounded continuation pages, object count, bytes,
 and elapsed time, parses only canonical leaf keys, and then verifies object proof/body, group header, frame checksums,
@@ -53,7 +54,8 @@ authority for an ACKed open-run tail.
 - Recovery pays bounded LIST/verification cost, and providers without qualifying LIST consistency are excluded.
 - Binding-epoch placement, provider-absent crash behavior, bounded lifecycle/root discovery, run-key AEAD, and
   immutable Root/Seal publication are refined by ADRs 0037 through 0039 and 0046/0047. Checkpoint bounds and open-tail
-  recovery are refined by ADR 0053, directory-prefix capacity by ADR 0058, and prefix/lane identity by ADRs 0059/0060;
+  recovery are refined by ADR 0053, directory-prefix capacity by ADR 0058, and prefix/lane identity and allocation by
+  ADRs 0059/0060/0062;
   exact remaining wire, GC handoff, and crash vectors remain downstream gates.
 - M3 must prove run-before-append, exact key grammar, list-after-PUT and pagination capabilities, open-tail discovery,
   gap/conflict/budget rejection, response-loss retry, and independent per-binding frontier reconstruction.
@@ -66,5 +68,6 @@ This decision is refined by [ADRs 0037](0037-v2-object-wal-binding-context-epoch
 [ADRs 0053](0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md) and
 [0058](0058-v2-nwg1-directory-prefix-capacity-and-evidence.md),
 [0059](0059-v2-object-wal-leaf-prefix-hint.md), and
-[0060](0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md); it refines ADRs 0018/0025 and is tracked by
-`T-OBJECT-01`, `V2-OBJ-001/003/005/007..011/013..018`.
+[0060](0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md), plus
+[0062](0062-v2-object-wal-packing-catalog-and-leaf-sequence.md); it refines ADRs 0018/0025 and is tracked by
+`T-OBJECT-01`, `V2-OBJ-001/003/005/007..011/013..019`.

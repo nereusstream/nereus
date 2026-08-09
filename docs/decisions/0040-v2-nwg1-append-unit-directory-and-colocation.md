@@ -40,6 +40,13 @@ then independently authenticated and checksummed. External hints can only plan t
 a frame offset. Readers never infer Kafka coverage from record count, split a Pulsar entry, or treat physical group
 order as protocol order.
 
+After Object/header/directory validation, each complete append unit is independently dispatchable to its binding's
+runtime completion tracker. A frame/commit-set AEAD, CRC, native-checksum, or typed-coverage failure blocks that complete
+unit but does not automatically block independently verified units from other bindings. Failure of Object digest, KMS
+envelope, fixed header, or directory authentication still blocks every member of the shared Object. Checkpoint
+publication inventories the provider-resolved Object and does not assert that every member has advanced its typed
+frontier.
+
 ## Consequences
 
 - `V2-OPEN-OBJ-14` is resolved.
@@ -51,5 +58,5 @@ order as protocol order.
 - M3 must prove commit-set co-location, oversize rejection before allocation, directory substitution/bounds failures,
   independent frame decode, no cross-frame compression/AEAD, and range reads that do not decode unrelated frames.
 
-This decision is refined by ADRs 0046/0058, refines ADRs 0026/0031/0037, and is tracked by `T-PROTOCOL-01`,
-`T-OBJECT-01`, and `V2-OBJ-004/006/007/012/013/016..018`.
+This decision is refined by ADRs 0046/0058/0063/0064, refines ADRs 0026/0031/0037, and is tracked by
+`T-PROTOCOL-01`, `T-OBJECT-01`, and `V2-OBJ-002/004/006/007/012/013/016..021`.

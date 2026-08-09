@@ -31,8 +31,10 @@ rollover, throttle, or fail-closed backpressure. Actual exhaustion never authori
 frontier, publishing incomplete coverage, or executing GC.
 
 ADR 0053 makes checkpoint pages asynchronous accelerators with finite uncovered-tail extent/byte/age bounds. ADR 0060
-uses one run-wide vector page chain over up to three lane-local sequences. Open-run recovery always LISTs each uncovered
-tail, and the Seal binds one mandatory final gap-free vector chain.
+uses one run-wide vector page chain over up to three lane-local sequences, and ADR 0063 counts only provider-resolved
+descriptors awaiting physical inventory. A binding's typed predecessor wait consumes tracker bounds, not the uncovered
+extent tail. Open-run recovery always LISTs each uncovered tail, and the Seal binds one mandatory final gap-free vector
+chain.
 
 Each shard has one low-frequency CAS-published
 `CurrentWalRunPointer {walRunRootKey, walRunRootSha256, shardRunEpoch}`. Owner-open, rollover, and handoff read or update
@@ -43,8 +45,9 @@ header binds the root SHA.
 
 The one Root fixes format/encryption and hard recovery envelopes; it does not become one Topic-specific soft
 target/linger identity. 0.2 does not multiply current pointers or run lineages by packing class. ADR 0060 fixes at most
-three lazily instantiated lanes, lane-local sequences/ACK barriers, aggregate budgets, and one vector checkpoint/Seal
-inventory. Exact class values and canonical lane binding/encoding remain an open policy/wire gate.
+three lazily instantiated lanes, lane-local extent-resolution barriers, aggregate budgets, and one vector
+checkpoint/Seal inventory. ADR 0062 fixes class/lane IDs and key encoding. Exact target/linger/quantized values and
+numeric budgets remain evidence gates.
 
 After an uncertain pointer CAS, reread accepts only exact candidate equality or the already committed winner; local
 merge is forbidden. Missing root, hash/epoch mismatch, lineage cycle/fork, predecessor-depth excess, or a pointer that
@@ -57,10 +60,10 @@ cannot reach the retirement frontier fails closed.
   eventually unscannable prefix.
 - Provider slowdown can create correctness-driven availability backpressure before capacity is exhausted.
 - Root/Seal/successor publication is refined by ADR 0047, checkpoint/open-tail authority by ADR 0053, and directory
-  capacity by ADR 0058 and lazy-lane/vector inventory by ADR 0060. Exact remaining wire, retirement authority, and
-  evidence-derived numeric values remain downstream gates.
+  capacity by ADR 0058, lazy-lane/vector inventory by ADR 0060, and publisher/frontier separation by ADRs 0063/0064.
+  Exact remaining wire, retirement authority, and evidence-derived numeric values remain downstream gates.
 - M3 must prove every cap and cumulative counter, no counter reset on fallback, pre-limit rollover, uncertain CAS,
   lineage fork/cycle/depth rejection, pointer/root substitution, and zero normal-append metadata I/O.
 
-This decision is refined by ADRs 0047/0053/0058/0060, refines ADR 0030, and is tracked by `T-APPEND-01`,
-`T-OBJECT-01`, `T-HANDOFF-01`, and `V2-OBJ-005/009..011/014..018`.
+This decision is refined by ADRs 0047/0053/0058/0060/0062..0064, refines ADR 0030, and is tracked by `T-APPEND-01`,
+`T-OBJECT-01`, `T-HANDOFF-01`, and `V2-OBJ-005/009..011/014..021`.

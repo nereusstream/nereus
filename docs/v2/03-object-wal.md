@@ -16,8 +16,9 @@ Cell Provider Scope, provider endpoint, region, format, encryption, Object-exten
 family, and compatible group policy. Protocol Cell is a mandatory shard boundary; tenant or topic policy may split it
 further when retention coupling, noisy-neighbor risk, or compliance requires it. Topic-specific soft target/linger is
 not a singular WalRun Root identity. One Root/pointer supports at most three lazily instantiated packing lanes with
-lane-local sequence/ACK order and shared aggregate recovery/resource limits. Exact class values and canonical lane-ID
-encoding remain `V2-OPEN-OBJ-19`.
+lane-local extent-resolution order and shared aggregate recovery/resource limits. Permanent class/lane IDs are
+`0=OBJECT_LATENCY`, `1=OBJECT_BALANCED`, and `2=OBJECT_COST`; exact target/linger/quantized values remain
+evidence-blocked under `V2-OPEN-OBJ-19`.
 
 Group close is triggered by bounded bytes, frame count, linger, deadline, memory pressure, or owner handoff. Every
 limit is configured and observable; no open group may grow or wait indefinitely.
@@ -25,9 +26,11 @@ limit is configured and observable; no open group may grow or wait indefinitely.
 ## Object and frame identity
 
 A group uses the new major body format `NWG1`. Its fixed header identifies the format, shard, node session,
-shard-run epoch, lane ID/sequence, resolved packing class and actual close facts, codec, Object-extent digest family,
-encryption metadata, and frame count. After the final canonical body is sealed, its scoped conditional-create leaf key
-encodes lane identity, fixed-width lane sequence, exclusive directory-prefix end, body length, and complete SHA-256/v1.
+shard-run epoch, lane ID/sequence, permanent class ID, `packingPolicyVersion`, resolved quantized policy and actual
+close facts, codec, Object-extent digest family, encryption metadata, and frame count. One group mixes only bindings
+with the same class/version/resolved policy. After immutable group-plan seal/admission, the lane allocates sequence;
+HKDF/encryption then produces the final canonical body and its scoped conditional-create leaf key encodes lane
+identity, fixed-width lane sequence, exclusive directory-prefix end, body length, and complete SHA-256/v1.
 `{bodyLength,SHA-256}` is exact content identity; the complete key is physical immutable identity. That key plus the
 verified header reconstructs the Object Extent descriptor outside the body; the key/digest is never embedded in the
 exact bytes it hashes.
@@ -84,14 +87,25 @@ positions.
 
 ## ACK and head-of-line isolation
 
-Provider completion validates the immutable group object, then advances each included binding's typed contiguous
-Durable Frontier independently. Each lane enforces its own sequence ACK barrier, so `n+1` cannot ACK while `n` remains
-unresolved or could become a provider-absent gap. There is no global sequence ACK barrier between lanes or unrelated
-bindings.
+Provider completion first advances only physical `LaneExtentResolvedThrough` after exact Object/header/directory
+verification. The lane barrier prevents `n+1` from becoming provider-resolved while `n` is unknown or could be absent;
+it does not wait for every member's protocol frontier.
 
-A frame waits for missing predecessor coverage in its own Position Domain. It does not wait for an unrelated topic
-because both frames share a group object. M3 must demonstrate this under one stalled/corrupted binding and one healthy
-binding before the layout is frozen.
+Each validated Kafka commit set or Pulsar entry is then dispatched independently to a lazy owner-local tracker keyed
+by Protocol Cell, binding, incarnation, Storage Epoch, and Position Domain ID/version. That tracker advances only its
+binding's typed `BindingDurableFrontier`. Owner Epoch is checked from the cached owner fence on every completion, not by
+a remote metadata read and not as durable frontier identity. A frame waits for missing predecessor coverage only in
+its Position Domain. Thus a provider-resolved shared Object may enter checkpoint and release B while A still waits.
+
+Normal completion uses a bounded ring/window; recovery or sparse completion may use a bounded Position-Domain-aware
+ordered map. Trackers are lazy and reclaimable. Durable Object resolution releases payload/ciphertext/compression
+buffers; a gap retains only coverage, idempotency identity, descriptor reference, and an owner-local future. Per-binding
+and shard aggregate bounds isolate A before new position allocation without rolling the run for an ordinary typed gap.
+
+Failure of Object digest, KMS envelope, fixed header, or directory AEAD blocks every member. After those layers
+validate, a frame/commit-set AEAD, CRC, native-checksum, or typed-coverage failure blocks only that binding's complete
+commit set; other independently validated bindings may advance. M3 must prove both shared and binding-local failure
+cuts.
 
 ## PUT-response loss
 
@@ -118,10 +132,10 @@ payload. A planning hint cannot substitute for either local authentication layer
 While the producing process still retains the exact sealed body, a missing object may be retried only under the same
 identity with conditional-create semantics. After process loss, a provider-present object is fully verified and
 reconciled. A conclusively absent, never-ACKed lane candidate stops admission for the old run, terminates that lane
-before the gap, preserves all verified ACKed extents in other lanes, and seals/retries only through a successor run and
-protocol idempotency. Unknown presence remains fail-closed. 0.2 does not claim a broker-local ciphertext journal or
-deterministic-nonce-only replay. A mismatched existing object is quarantined and never overwritten. Exhausting the
-verification budget does not produce an ACK.
+before the gap, preserves all provider-resolved extents and independently advanced binding frontiers in other lanes,
+and seals/retries only through a successor run and protocol idempotency. Unknown presence remains fail-closed. 0.2
+does not claim a broker-local ciphertext journal or deterministic-nonce-only replay. A mismatched existing object is
+quarantined and never overwritten. Exhausting the verification budget does not produce an ACK.
 
 ## WalRun and bounded recovery
 
@@ -132,10 +146,15 @@ format/codec/encryption/digest families, wrapped run-key identity, and aggregate
 metadata record, not a provider Object, and `putIfAbsent` response loss requires exact reread equality. It does not
 carry one binding's Owner/Storage Epoch or one Topic-specific soft packing identity. One current Root/pointer remains
 authoritative for all lanes. Each group leaf has the structural form
-`<laneId>/<laneSequence19>/<directoryPrefixEnd19>-<bodyLength19>-sha256-v1-<64hex>.nwg` below the Root prefix; the
-three numeric suffix fields are zero-padded 19-digit non-negative values. The exact lane token is frozen with final
-lane-class binding. Checkpoint/manifest rows store its structured fields rather than the full key. No per-group
-metadata-service row is required for ACK.
+`<laneId:[0-2]>/<laneSequence19>/<directoryPrefixEnd19>-<bodyLength19>-sha256-v1-<64hex>.nwg` below the Root prefix;
+the lane is one ASCII digit and the three remaining numeric fields are zero-padded 19-digit non-negative values.
+Checkpoint/manifest rows store its structured fields rather than the full key. No per-group metadata-service row is
+required for ACK.
+
+Builder creation, pre-plan cancellation, resource/admission failure, and early-close decisions allocate no sequence.
+Once the immutable group plan is admitted, sequence allocation occurs before HKDF/encryption/final-body seal. No later
+sequence proceeds until the candidate retries the same body/identity to convergence, becomes provider-resolved, or
+causes the old run to stop after proven absence/unrecoverable pre-PUT failure.
 
 Recovery gets the prefix from the root, performs same-prefix LIST with total continuation-page, object, byte, and time
 budgets, validates leaf identity, provider/body proof, header, frames, commit sets, typed coverage, and idempotency, then
@@ -143,13 +162,21 @@ reconstructs independent per-binding frontiers through each Position Domain. LIS
 pagination are required provider capabilities; a provider without them is rejected for `OBJECT_WAL`. A handoff hint or
 asynchronous checkpoint page may narrow scanning but cannot omit this durable open-tail fallback.
 
-Each immutable checkpoint page covers at most 256 descriptors and 64 KiB canonical bytes in aggregate and publishes
-only after ACK. One run-wide predecessor chain and checkpoint-head CAS carry a `coveredThrough` vector; a page may
-advance any subset of lanes, but every changed component is contiguous. Policy is Protocol Cell x shard scoped and
-persisted in the next Root. Proactive cadence may be disabled, but aggregate uncovered extent/byte bounds and per-lane
-age are finite. Open recovery/handoff always strong-LIST uncovered lane tails; invalid pages fall back to full bounded
-run LIST. The Seal binds one terminal sequence vector and one final checkpoint-head SHA. Three lane-local chains are
-not used.
+Each immutable checkpoint page covers at most 256 provider-resolved descriptors and 64 KiB canonical bytes in
+aggregate. One shard/WalRun-publisher-epoch-fenced combiner, one run-wide predecessor chain, and one checkpoint-head CAS
+carry a `coveredThrough` vector of `LaneExtentResolvedThrough` values. A page may advance any subset of lanes, but every
+changed component is contiguous. Member protocol ACKs are not checkpoint eligibility: A's typed gap cannot consume the
+uncovered physical-tail limits after its Object resolves.
+
+The combiner admits one page candidate at a time. Candidate identity derives from Root, ordinal, predecessor SHA, and
+page-body SHA. Takeover CASes only publisher epoch while preserving the committed head/vector; unknown responses accept
+only exact candidate equality, definitive conflicts adopt only a same-Root component-wise non-regressing head, and no
+publisher locally merges predecessors. Each failed publisher epoch can leave at most one bounded unreachable page.
+
+Policy is Protocol Cell x shard scoped and persisted in the next Root. Proactive cadence may be disabled, but aggregate
+uncovered provider-resolved extent/byte bounds and per-lane age are finite. Open recovery/handoff always strong-LIST
+uncovered lane tails; invalid pages fall back to full bounded run LIST. The Seal binds one provider-resolved terminal
+sequence vector and one final checkpoint-head SHA. Three lane-local chains are not used.
 
 Every run root fixes hard aggregate extent-count, canonical-byte, age, and recoverable-predecessor limits. All lane
 builders, plaintext/compressed/ciphertext/request/retry copies and in-flight work charge shared Cell/host ceilings;
@@ -160,8 +187,9 @@ work, decoded units, memory/concurrency/retries, and wall time. Fallback cannot 
 causes rollover/backpressure; actual exhaustion never skips coverage, advances a frontier, or permits GC.
 
 Sealing never mutates the Root. After admission stops and every lane tail is reconciled, one immutable
-`WalRunSealRecord` binds the Root key/SHA, terminal lane-sequence vector, final checkpoint-head SHA, and exact typed
-terminal coverage. A successor Root references both
+`WalRunSealRecord` binds the Root key/SHA, terminal lane-sequence vector, final checkpoint-head SHA, and exact
+provider-resolved inventory. Any per-binding frontier snapshot is a derived recovery hint rather than terminal
+authority. A successor Root references both
 predecessor Root and Seal identities. Each shard then CASes `CurrentWalRunPointer` from the exact predecessor tuple to
 the successor tuple. A crash that leaves the pointer on a sealed Root finishes/adopts the matching successor and never
 reopens that run. Recovery walks the bounded lineage to the retirement frontier, and every group header binds its Root
@@ -178,11 +206,16 @@ materialization lag. When limits are exhausted, the writer rejects or waits befo
 possible.
 The implementation must not create unbounded futures or retain payloads after completion/cancellation.
 
+Per-binding tracker pressure separately stops only that binding before new position allocation and removes it from new
+shared groups. It does not fence the binding or roll the WalRun merely because a typed predecessor gap reached an
+ordinary local capacity threshold. Owner/invariant failure, provider-unknown/absent lane state, or aggregate recovery
+pressure retains its stronger fail-closed behavior.
+
 Each Cell Provider Session owns its admission, retry/circuit-breaker state, open groups, in-flight accounting, drain,
 and close lifecycle. A compatible lower-level transport may be pooled, but a cell-local throttle, credential failure, or
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
-Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..018`,
+Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..021`,
 `V2-POLICY-001`, and `V2-FABRIC-002`. See
 [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md),
 [ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md),
@@ -200,4 +233,7 @@ Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required sc
 [ADR 0053](../decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md), plus
 [ADR 0058](../decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md),
 [ADR 0059](../decisions/0059-v2-object-wal-leaf-prefix-hint.md), and
-[ADR 0060](../decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md).
+[ADR 0060](../decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md), plus
+[ADR 0062](../decisions/0062-v2-object-wal-packing-catalog-and-leaf-sequence.md),
+[ADR 0063](../decisions/0063-v2-provider-resolved-checkpoint-publisher.md), and
+[ADR 0064](../decisions/0064-v2-object-wal-physical-and-binding-frontiers.md).

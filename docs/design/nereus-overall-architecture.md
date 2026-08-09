@@ -160,17 +160,29 @@ frontiers advance independently per binding, so one unrelated binding does not i
 One pre-open WalRun Root fixes physical scope, prefix, run/session identity, binding-context epoch-validation rules,
 format families, aggregate hard run bounds, and cumulative recovery envelope. A low-frequency hashed CAS pointer
 anchors the current root and bounded predecessor lineage. Up to three builders instantiate lazily under that one Root;
-each owns lane-local sequence/ACK order while shared recovery/memory budgets remain aggregate. Each leaf carries lane,
-sequence, exclusive directory-prefix end, body length, and complete SHA-256; structured checkpoints rebuild the key
-from the Root prefix. Restart discovers the ACKed open tail through bounded strong LIST without a per-group metadata
-commit. One async run-wide checkpoint predecessor chain carries a per-lane coverage vector, and the Seal binds one
-terminal sequence vector/final head. Three lane-specific chains, Roots, or pointers are not used.
+each owns lane-local physical outcome order while shared recovery/memory budgets remain aggregate. Product class/lane
+IDs are permanently `0=OBJECT_LATENCY`, `1=OBJECT_BALANCED`, and `2=OBJECT_COST`; target/linger values remain versioned
+evidence outputs. Each leaf carries that one-digit lane, sequence, exclusive directory-prefix end, body length, and
+complete SHA-256. Sequence allocates only after immutable group-plan admission and before HKDF/encryption/final-body
+seal. Restart discovers the provider-resolved open tail through bounded strong LIST without a per-group metadata
+commit.
+
+One publisher-epoch-fenced async combiner inventories `ProviderResolvedExtentDescriptor` values through one run-wide
+checkpoint predecessor chain and a per-lane `LaneExtentResolvedThrough` vector. It does not wait for every member's
+protocol ACK. The Seal binds one provider-resolved terminal vector/final head; three lane-specific chains, Roots, or
+pointers are not used.
 
 NWG1 stores an authoritative in-body Binding Context Table and Append Unit Directory. Exact binding/Storage/Owner Epoch
 authority is object-local rather than singular in a multi-binding root. One Kafka commit set stays inside one extent and
 each frame block is independently compressed, authenticated, and decoded. AES-256-GCM/HKDF-SHA-256 v1 wraps one
 run-scoped data key, derives one key per ObjectExtent, and separates authenticated directory and frame nonce domains;
 KMS rotation happens only at run rollover.
+
+Physical `LaneExtentResolvedThrough` and logical `BindingDurableFrontier` are separate. After shared Object/header/
+directory validation, owner-local lazy ring/window trackers release each binding's complete append units contiguously
+through its Position Domain. A's typed gap cannot block B or physical checkpoint progress; provider-unknown lane state
+still blocks later physical resolution. Trackers are reconstructible, perform cached O(1) owner-fence checks, retain no
+payload in gaps, and add no per-binding remote metadata authority.
 
 Routine random reads authenticate the Root-bound in-body header/directory and selected frame without first requiring a
 new full-Object provider proof. The leaf's exclusive bounded prefix end normally gives prefix plus frame GET; without
@@ -193,8 +205,9 @@ commit set. One Pulsar ManagedLedger entry is one frame/commit set. Object group
 After PUT-response loss, HEAD is sufficient only when a typed Provider Object Proof matches immutable version, exact
 length, SHA-256, and `FULL_OBJECT` scope; otherwise recovery performs a bounded full GET. ETag, application user
 metadata, and composite checksum scope are insufficient, and an unverifiable provider is rejected for Object WAL.
-After process loss, a present group is verified; a proven-absent never-ACKed gap fences the old run and retries only in a
-fresh run. Unknown presence remains fail-closed; 0.2 has no local ciphertext journal claim.
+After process loss, a present group is verified; a proven-absent never-ACKed gap fences the old run while preserving
+other lanes' provider-resolved extents and advanced binding frontiers, then retries only in a fresh run. Unknown
+presence remains fail-closed; 0.2 has no local ciphertext journal claim.
 
 Detailed contract: [Object WAL](../v2/03-object-wal.md).
 

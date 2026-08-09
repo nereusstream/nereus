@@ -254,7 +254,7 @@
     {
       "id": "V2-OBJ-002",
       "milestone": "M3",
-      "contract": "one stalled binding cannot block an unrelated binding's typed Durable Frontier",
+      "contract": "provider resolved physical lane progress checkpoint is independent from each binding typed frontier so one predecessor gap cannot block another binding",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -278,7 +278,7 @@
     {
       "id": "V2-OBJ-005",
       "milestone": "M3",
-      "contract": "one pre open WalRun root plus lane sequence directory prefix end length SHA leaf keys and bounded strong LIST discovers every ACKed open run group without per group metadata",
+      "contract": "one pre open WalRun root plus one digit class lane post plan sequence directory prefix end length SHA leaf keys and bounded strong LIST discovers every provider resolved open run group without per group metadata",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -302,7 +302,7 @@
     {
       "id": "V2-OBJ-008",
       "milestone": "M3",
-      "contract": "process loss recovery verifies provider present groups stops and seals the run on a proven absent never ACKed lane gap preserves other lanes ACKed extents and never claims local journal or deterministic nonce replay",
+      "contract": "process loss recovery verifies provider present groups stops and seals the run on a proven absent never ACKed lane gap preserves other lanes provider resolved extents and advanced binding frontiers and never claims local journal or deterministic nonce replay",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -342,7 +342,7 @@
     {
       "id": "V2-OBJ-013",
       "milestone": "M3",
-      "contract": "NWG1 uses one KMS wrapped WalRun key laneId laneSequence bound unique HKDF derived Object keys and disjoint authenticated directory and frame nonce domains",
+      "contract": "NWG1 uses one KMS wrapped WalRun key post plan laneId laneSequence bound unique HKDF derived Object keys and disjoint authenticated directory and frame nonce domains",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -350,7 +350,7 @@
     {
       "id": "V2-OBJ-014",
       "milestone": "M3/M7",
-      "contract": "immutable Root and vector terminal Seal records plus one exact pointer CAS publish each WalRun successor without reopening a sealed run",
+      "contract": "immutable Root and provider resolved vector terminal Seal records plus one exact pointer CAS publish each successor without making binding frontier snapshots authority",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -358,7 +358,7 @@
     {
       "id": "V2-OBJ-015",
       "milestone": "M3/M7",
-      "contract": "asynchronous checkpoint pages form one Cell shard run wide vector chain with aggregate uncovered tail bounds per lane age limits open tail LIST and a sealed final gap free inventory",
+      "contract": "one publisher epoch fenced asynchronous checkpoint chain inventories provider resolved extents under aggregate uncovered tail bounds and a sealed final gap free vector",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -382,7 +382,31 @@
     {
       "id": "V2-OBJ-018",
       "milestone": "M3/M7",
-      "contract": "one Root pointer owns at most three lazy lane local sequences and one run wide vector checkpoint Seal chain under aggregate hard budgets",
+      "contract": "one Root pointer owns three permanently typed lazy lanes with lane local physical resolution and one run wide vector checkpoint Seal chain under aggregate hard budgets",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-019",
+      "milestone": "M3",
+      "contract": "class lane IDs 0 1 2 permanently mean OBJECT_LATENCY OBJECT_BALANCED OBJECT_COST and final leaf sequence allocates only after immutable group plan admission before HKDF final body seal",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-020",
+      "milestone": "M3/M7",
+      "contract": "a single shard WalRun publisher checkpoints only ProviderResolvedExtentDescriptors using one candidate exact head CAS component wise non regression and bounded failed epoch residue",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-021",
+      "milestone": "M3",
+      "contract": "LaneExtentResolvedThrough is physical while owner local lazy binding trackers advance Position Domain Durable Frontiers without persisted gaps payload retention or remote completion metadata",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null

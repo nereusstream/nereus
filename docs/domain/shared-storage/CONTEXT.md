@@ -125,9 +125,29 @@ prefix scan
 
 **WalRun Scheduling Lane**:
 One of at most three lazily instantiated packing-class lanes under a single WalRun Root/pointer. It owns a stable
-lane ID, lane-local sequence/ACK barrier, bounded builder, and in-flight limit; all run/recovery budgets remain
-aggregate and checkpoint publication uses one vector chain.
-_Avoid_: Eager target-sized buffers, lane-specific Root/pointer, cross-lane ACK barrier, lane-local checkpoint chain
+one-digit class/lane ID, lane-local extent-resolution barrier, bounded builder, and in-flight limit; all run/recovery
+budgets remain aggregate and checkpoint publication uses one vector chain. IDs are permanently
+`0=OBJECT_LATENCY`, `1=OBJECT_BALANCED`, and `2=OBJECT_COST`; sequence allocates after immutable group-plan admission
+and before HKDF/encryption/final-body seal.
+_Avoid_: Eager target-sized buffers, lane-specific Root/pointer, protocol ACK as physical barrier, lane-local checkpoint
+chain
+
+**Provider Resolved Extent**:
+An immutable Object whose conditional PUT outcome, exact identity/body proof, Root-bound header/directory, and lane
+sequence have converged so it can no longer become provider-absent. It is eligible for physical checkpoint regardless
+of whether every member has advanced its binding frontier.
+_Avoid_: All-members-ACK prerequisite, checkpoint as protocol ACK fact, payload retention after resolution
+
+**Lane Extent Resolved Through**:
+The per-WalRun/lane greatest contiguous provider-resolved sequence. It drives physical checkpoint/Seal/recovery and is
+never compared with Kafka Offset or Pulsar Position.
+_Avoid_: Binding Durable Frontier alias, Object order as protocol order, typed gap consuming uncovered-tail budget
+
+**Binding Completion Tracker**:
+An owner-local lazy reconstructible ring/window, with a bounded ordered fallback for recovery/sparse completions, that
+advances one binding's Position-Domain Durable Frontier. It is not persisted and retains no payload in gap entries.
+_Avoid_: Per-topic permanent TreeMap, remote completion metadata read, persisted runtime gap map, Owner Epoch in logical
+frontier identity
 
 **Current WalRun Pointer**:
 The one low-frequency per-shard CAS authority binding the current WalRun Root key/SHA and shard run epoch. It anchors a
@@ -136,14 +156,15 @@ _Avoid_: Root-prefix LIST, per-group pointer update, locally merged lineage
 
 **WalRun Seal**:
 The immutable Cell control-metadata record that binds one Root to its terminal lane-sequence vector, one final
-checkpoint-head SHA, and exact typed coverage. A successor Root references both predecessor Root and Seal before the
-current pointer advances.
+checkpoint-head SHA, and exact provider-resolved inventory. A binding-frontier snapshot is at most a derived hint. A
+successor Root references both predecessor Root and Seal before the current pointer advances.
 _Avoid_: Mutating the Root to seal, reopening a sealed run, pointer advance before successor publication
 
 **WalRun Checkpoint Page**:
 An asynchronous immutable page in the one run-wide predecessor chain, with at most 256 aggregate descriptors/64 KiB
-and a per-lane `coveredThrough` vector. It may advance any subset of lanes contiguously; open uncovered tails still
-require LIST and the Seal requires one final gap-free vector chain.
+and a per-lane provider-resolved `coveredThrough` vector. One publisher-epoch-fenced combiner admits one candidate at a
+time. It may advance any subset of lanes contiguously; open uncovered tails still require LIST and the Seal requires one
+final gap-free vector chain.
 _Avoid_: Per-topic checkpoint switch, ACK dependency, one chain/head per lane, checkpoint overriding provider bytes
 
 **Directory Prefix Hint**:
