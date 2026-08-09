@@ -233,20 +233,31 @@ source protection/read-pin safety.
 
 `BindingReadViewSnapshot` is a logical per-read-batch capture, not an immutable object created for each ACK/read. Append
 continues to install locators hidden and release-publish frontiers. Low-frequency source-selection generations are
-pinned through bounded allocation-free RCU/epoch/hazard or event-loop reader slots; ordinary reads perform no metadata
-I/O, heap-pin allocation, or process-global refcount contention by default. One partition fetch/range or ManagedLedger
-`readEntries` call is a pin unit, not each record/message/frame or an unbounded session.
+pinned through a bounded sharded slot pool reused across Bindings; ordinary reads perform no metadata I/O, heap-pin
+allocation, or process-global refcount contention. Each unfinished partition fetch/range or ManagedLedger
+`readEntries` batch owns one exclusive slot, not each record/message/frame or an unbounded session.
+
+Capture follows standard hazard ordering: acquire G; publish exact `{Binding,G}`; establish StoreLoad; acquire G again;
+then capture a stable generation-tagged `{sourceGenerationId, ReadableFrontier, activeTailViewVersion}` by one reference
+or seqlock. Only an exact G/stable-cell match may dereference G-owned state. A pointer switch after validation waits on
+the slot. Clear occurs only after provider I/O/retry/fallback/decode and source-backed-buffer use finish. Multi-Binding
+requests reserve all required slots or release every partial reservation before failing/splitting.
 
 The captured logical scope binds Binding/incarnation, Storage Epoch/Position Domain version, owner fence, Readable
 Frontier, active-tail view version, manifest view identity/generation, and source-protection generation. One snapshot
 may read disjoint manifest and active-tail ranges; one Kafka commit set/Pulsar entry and every separately declared
 whole-range fallback remain source-pure.
 
-Reclamation is two-stage. First publish preferred+protected-fallback, drain older-view pins, and retire only obsolete
-index structures. Protection remains while any successor names fallback. Then publish a view without fallback, drain
-all fallback-bearing pins, and only afterward release protection/admit GC. Retired-view/pin count, bytes, age, and
-deadline are hard-bounded; leaks may block handoff/retirement or new read admission, never delete early. Exact coherent
-capture and the durable no-fallback/protection-release cut remain open.
+Reclamation is two-stage. First durably publish `PREFERRED_WITH_FALLBACK`, drain older-view pins, and retire only
+obsolete index structures. Then exact manifest-root CAS selects bounded `PREFERRED_ONLY`. Protection release requires
+all current fallback-bearing slots drained plus durable proof for every older read-admitting Owner Epoch. Planned drain
+uses `OwnerReadQuiescenceProof`; unplanned expiry qualifies only when the backend limits read admission and proves
+authority time, complete source-access lifetime, pause/recovery rechecks, skew, and grace. Otherwise protection remains.
+Only an exact idempotent protection-generation release admits GC.
+
+Retired-view/pin and retained-protection count, bytes, age, and deadline are hard-bounded; leaks may block handoff,
+retirement, or new admission, never delete early. Exact slot-reuse state, bounded multi-owner proof, backend capability
+record, and numeric limits remain open/evidence work.
 
 ## Backpressure
 
@@ -269,7 +280,7 @@ and close lifecycle. A compatible lower-level transport may be pooled, but a cel
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
 Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..024`,
-`V2-READ-003/004`, `V2-POLICY-001`, and `V2-FABRIC-002`. See
+`V2-READ-003..006`, `V2-POLICY-001`, and `V2-FABRIC-002`. See
 [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md),
 [ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md),
 [ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md),
@@ -294,4 +305,6 @@ Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required sc
 [ADR 0066](../decisions/0066-v2-pre-position-reservation-and-completion-ticket.md), and
 [ADR 0067](../decisions/0067-v2-active-tail-readable-publication-and-index-boundary.md), plus
 [ADR 0068](../decisions/0068-v2-checkpoint-provider-proof-mode-and-row-encoding.md) and
-[ADR 0069](../decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md).
+[ADR 0069](../decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md), plus
+[ADR 0070](../decisions/0070-v2-generation-tagged-read-publication-and-hazard-slots.md) and
+[ADR 0071](../decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md).

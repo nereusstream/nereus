@@ -15,18 +15,18 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-Round 13 kept partial recovery omission open/evidence-gated, accepted `NONE`-default compact checkpoint provider proof
-in ADR 0068, and accepted the logical allocation-free Binding read-view/pin boundary in ADR 0069. It deliberately does
-not add `FullyManifestCoveredThrough`, per-ACK snapshots, per-read heap pins, or a global refcount. The next independent
-frontier is:
+Round 14 accepted standard generation-tagged hazard capture in ADR 0070 and capability-tiered durable source retirement
+in ADR 0071. It does not freeze Java layout/numeric values or add per-read allocation, remote metadata, distributed
+refcount, unsafe timeout clear, or unqualified owner lease. The next independent frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-READ-03` | freeze allocation-free coherent capture across a low-frequency source generation and high-frequency frontier | consider a Binding-local generation pointer plus preallocated reader slots with capture-before-final-reload validation and generation-specific drain |
-| `V2-OPEN-READ-04` | freeze durable no-fallback publication, old-owner quiescence, and the source-protection release crash cut | consider separate immutable `PREFERRED_WITH_FALLBACK`/`PREFERRED_ONLY` generations plus planned drain or authority-backed expiry; otherwise retain protection |
+| `V2-OPEN-READ-05` | freeze async slot reuse/cancellation/late-callback ABA without timeout force-clear | consider a full 64-bit slot ticket and exact owner-local lifecycle that clears only after terminal source use |
+| `V2-OPEN-READ-06` | freeze bounded gap-free quiescence across repeated read-admitting owners and one bounded fallback set | consider a retirement-batch aggregate over a monotonic ReadAdmissionEpoch rather than native-epoch assumptions or owner x source rows |
+| `V2-OPEN-READ-07` | freeze the closed Protocol Cell/backend capability that may prove unplanned old-reader expiry | consider DURABLE_DRAIN_ONLY_V1 as default and one fully bound AUTHORITY_EXPIRY_V1 capability |
 
 The complete questions and recommendations are in
-[round 14](grill-notes/16-restarted-grill-2-allocation-free-read-capture-and-durable-handoff.md). None of its
+[round 15](grill-notes/17-restarted-grill-2-read-slot-lifecycle-and-quiescence-accumulator.md). None of its
 recommendations is accepted yet. `V2-OPEN-OBJ-22/24`, `V2-OPEN-BK-11/13`, remaining `V2-OPEN-OBJ-17/19`, and
 `V2-OPEN-PUL-OBJ-09` are evidence-blocked rather than questions in this round.
 
@@ -284,16 +284,35 @@ use two bounded drain stages; pressure never deletes early.
 
 ### `V2-OPEN-READ-03`: allocation-free coherent capture
 
-This remains open. ADR 0069 fixes the logical capture and pin unit but not the acquire/retire race protocol. Round 14
-asks whether a Binding-local generation pointer plus preallocated reader slots should publish G, coherently capture
-the frontier/view, and only then reload/validate G before reading.
+Resolved by [ADR 0070](../decisions/0070-v2-generation-tagged-read-publication-and-hazard-slots.md). Each unfinished
+Binding-scoped batch owns one bounded cross-Binding slot; standard hazard order publishes `{Binding,G}`, establishes
+StoreLoad, revalidates G, and only then captures a stable generation-tagged frontier/view cell before dereference. The
+slot lasts through all source use, and multi-Binding admission is all-or-release.
 
 ### `V2-OPEN-READ-04`: durable fallback-removal cut
 
-This remains open. ADR 0069 requires a later no-fallback view and a second pin drain but does not establish the durable
-crash/restart or cross-owner quiescence authority. Round 14 asks whether separate immutable
-`PREFERRED_WITH_FALLBACK` and `PREFERRED_ONLY` manifest generations plus planned old-owner drain or an
-authority-backed expiry/grace proof must precede exact source-protection release; absent either, protection stays.
+Resolved by [ADR 0071](../decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md). Fenced
+`PREFERRED_ONLY`, current slot drain, durable proof for every old read-admitting owner, and exact protection-generation
+release are separate prerequisites. Only an authoritative planned drain or a complete read-admission expiry capability
+qualifies; otherwise protection and its Cell capacity charge remain.
+
+### `V2-OPEN-READ-05`: async slot reuse and cancellation
+
+This remains open. ADR 0070 fixes slot ownership and full source lifetime but not the reuse ABA/state machine. Round 15
+asks whether a full 64-bit pool-local ticket plus exact terminal-drain transitions must prevent a cancelled batch's late
+callback from clearing a reused slot.
+
+### `V2-OPEN-READ-06`: bounded multi-owner quiescence accumulator
+
+This remains open. ADR 0071 requires bounded proof across every relevant owner without assuming native Owner Epoch
+order. Round 15 asks whether one retirement-batch/fallback-set aggregate over a Binding-local monotonic
+`ReadAdmissionEpoch` should advance contiguously and fail closed on every gap/regression.
+
+### `V2-OPEN-READ-07`: backend quiescence capability record
+
+This remains open. ADR 0071 freezes the capability-tiered behavior but not its closed persisted variants. Round 15 asks
+whether `DURABLE_DRAIN_ONLY_V1` should be the safe default and one fully bound `AUTHORITY_EXPIRY_V1` the only unplanned-
+takeover extension.
 
 ## Storage Epoch transitions
 
@@ -548,6 +567,23 @@ input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
 
+### Restarted Grill 2 round 14 adjusted decisions: resolved by ADRs 0070/0071
+
+Resolved on 2026-08-10 after explicit adjusted confirmation:
+
+- Q1 standard hazard ordering with explicit StoreLoad, pointer revalidation before dereference, stable generation-
+  tagged frontier/view capture, one exclusive slot per unfinished Binding read batch, bounded sharded cross-Binding
+  pool, complete async source lifetime, and all-or-release multi-Binding reservation ->
+  [ADR 0070](../decisions/0070-v2-generation-tagged-read-publication-and-hazard-slots.md);
+- Q2 fenced `PREFERRED_WITH_FALLBACK -> PREFERRED_ONLY`, current slot drain, durable all-old-owner quiescence,
+  capability-qualified unplanned expiry, exact protection release, bounded retirement batches, and retained-source Cell
+  admission -> [ADR 0071](../decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md).
+
+No Java layout, numeric pool/time limit, per-read allocation, remote per-read metadata, distributed refcount, generic
+lease flag, or unsafe timeout clear was accepted. Slot-reuse lifecycle and bounded proof/capability wire remain open.
+The complete response is preserved in
+[the round 14 record](grill-notes/16-restarted-grill-2-allocation-free-read-capture-and-durable-handoff.md).
+
 ### Restarted Grill 2 round 13 adjusted decisions: Q2/Q3 resolved by ADRs 0068/0069; Q1 remains open
 
 Resolved on 2026-08-09 after explicit adjusted confirmation:
@@ -561,8 +597,9 @@ Resolved on 2026-08-09 after explicit adjusted confirmation:
   boundary, two-stage locator/protection reclamation, hard backlog bounds, and independent takeover ->
   [ADR 0069](../decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md).
 
-Exact Provider/token values, allocation-free coherent capture, durable fallback-removal cut, and all numeric pin/view
-budgets remain open or evidence-blocked. The complete response is preserved in
+That round left exact Provider/token values, coherent capture, durable fallback removal, and numeric pin/view budgets
+open; Round 14 later resolved the two read-path contracts through ADRs 0070/0071. The complete Round 13 response is
+preserved in
 [the round 13 record](grill-notes/15-restarted-grill-2-recovery-skip-proof-provider-proof-wire-and-read-snapshot.md).
 
 ### Restarted Grill 2 round 12 adjusted decisions: resolved by ADRs 0065 through 0067

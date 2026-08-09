@@ -114,6 +114,8 @@ Current accepted decisions:
 - [ADR 0067: active-tail readable publication and index boundary](../decisions/0067-v2-active-tail-readable-publication-and-index-boundary.md)
 - [ADR 0068: checkpoint provider-proof mode and row encoding](../decisions/0068-v2-checkpoint-provider-proof-mode-and-row-encoding.md)
 - [ADR 0069: Binding read-view generation and pin boundary](../decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md)
+- [ADR 0070: generation-tagged read publication and hazard slots](../decisions/0070-v2-generation-tagged-read-publication-and-hazard-slots.md)
+- [ADR 0071: durable owner-read quiescence and protection release](../decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md)
 
 ## V2 document map
 

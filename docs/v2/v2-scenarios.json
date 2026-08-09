@@ -572,6 +572,22 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-READ-005",
+      "milestone": "M4",
+      "contract": "each unfinished Binding read batch owns one bounded cross Binding hazard slot StoreLoad and pointer revalidation precede generation tagged coherent publication capture and pin lifetime covers every async source use",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-006",
+      "milestone": "M4/M5",
+      "contract": "fenced preferred with fallback to preferred only current slot drain durable all old owner read quiescence and exact protection generation release precede Object WAL GC",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-META-001",
       "milestone": "M2",
       "contract": "KRaft and MetadataStore backends satisfy fencing and monotonic-root conformance",

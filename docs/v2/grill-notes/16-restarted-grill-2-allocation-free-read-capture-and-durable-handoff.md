@@ -126,7 +126,111 @@ from guessing whether another process still has an admitted read.
   `V2-OPEN-OBJ-19`, and `V2-OPEN-PUL-OBJ-09` remain evidence-blocked.
 - KoP remains documented and deferred outside the 0.2 runtime.
 
-## Awaiting explicit confirmation
+## Original confirmation boundary
 
-No Round 14 recommendation above is normative. Confirmed conclusions must move to ADRs/contracts; adjustments and all
-evidence-blocked values/modes remain in the open log.
+At proposal time, no Round 14 recommendation above was normative. The adjusted response below is the explicit
+confirmation boundary and supersedes the proposed acquire order and unqualified old-owner grace language above.
+
+## Adjusted response preserved verbatim
+
+````text
+Round 14 两项均调整后确认，不按原文直接确认。
+
+Q1 — 确认 allocation-free coherent capture 目标，但调整 acquire 协议和 slot 作用域。
+
+原方案在 publish slot 后、最终 generation 复核前执行 capture。如果 capture 会解引用 G 或访问 G 选择的 locator/index，就存在经典 pin-after-retire 竞态：publisher 可能在 slot 发布前已扫描并退休 G。
+
+建议采用 generation-tagged publication cell 加标准 hazard 顺序：
+
+1. acquire-load current generation/reference G；
+2. 将 {Binding identity, G} 发布到当前 read batch 独占的 slot；
+3. slot publication 与下一次 pointer load 之间必须具有 Store→Load ordering；不能仅假定 VarHandle setRelease + getAcquire 自动满足。实现可以选择 volatile/seq-cst store 或显式 StoreLoad/full fence；
+4. acquire-load current generation；不再是 G 则清 slot 并重试；
+5. coherent capture 一个带 generation tag 的 publication cell：
+   {sourceGenerationId, ReadableFrontier, activeTailViewVersion}
+   并通过单引用或 seqlock 证明没有 torn read；
+6. 只有 sourceGenerationId == G 且 seqlock 稳定才能使用 G 的 locator/source；否则清 slot 重试；
+7. 在最后一次可能访问 source 的异步 I/O、fallback、decode 或 source-backed buffer 使用完成后清 slot。
+
+pointer 在第 4 步之后切换并不要求 reader 重试：G 已被 slot pin 住，publisher 必须等待。generation tag 防止 G pin 搭配 G+1 frontier，因此不再需要“先 capture、再做唯一一次最终复核”这一危险顺序。
+
+slot 不能按 Binding × event-loop 固定预分配：
+
+- 一个 event loop 可以同时挂起大量异步 GET/read；
+- 每个并发未完成的 binding-scoped read batch 必须独占一个 slot；
+- 物理上使用按 shard/read-executor/event-loop 分片、跨 Binding 复用的 bounded slot pool；
+- 逻辑隔离仍按 Binding/generation 校验；
+- slot exhaustion 在 provider I/O 前 backpressure；
+- 跨多个 Binding 的 Fetch 要么一次预留全部所需 slots，要么失败后全部释放/拆分，不能持有部分 pin 等待剩余 slots。
+
+publisher swap 使用 release/volatile publication，reclaimer 以 acquire/volatile 读取 slots；clear 至少使用 release。具体数组布局、padding、VarHandle 和 RCU 实现继续由证据选择。
+
+性能判断：
+
+- 正常每个 read batch 增加一次 slot publish/clear、两次 generation load 和少量 seqlock load；
+- Object 冷读下相对 GET 成本很小；
+- cache hit/内存热读下可能可见，主要风险是 false sharing、slot pool 竞争、generation swap 扫描和切换期 retry storm；
+- 禁止 per-read heap allocation、全局 refcount和远端 metadata I/O。
+
+Q2 — 确认 PREFERRED_WITH_FALLBACK → PREFERRED_ONLY 两阶段 durable cut，但把 old-owner quiescence 定义为 capability-tiered 合同。
+
+PREFERRED_ONLY 是停止新 fallback pin 的必要条件，但不能独立授权 protection release。释放还必须满足：
+
+1. PREFERRED_ONLY 已通过 fenced manifest-root CAS 持久化，响应丢失按精确 generation/root reread 收敛；
+2. 当前 owner 上所有 fallback-bearing slots 已 drain；
+3. 所有可能持有旧 fallback pin 的 Owner Epoch 已有 durable quiescence proof；
+4. exact source-protection generation 通过幂等 CAS/release 后，才允许 GC。
+
+planned handoff 不能只依赖现有非权威 handoff hint。需要低频、精确的 durable OwnerReadQuiescenceProof，至少绑定：
+
+- Binding/incarnation；
+- fallback manifest/protection generation；
+- old Owner Epoch；
+- read-admission-stopped fence；
+- drained-through read-view generation；
+- 最大已接纳 source-access deadline。
+
+连续多次 takeover 应使用可验证的 quiescedThroughOwnerEpoch 或等价有界证明，不能只证明最后一个 owner。
+
+unplanned takeover 中，lease/expiry 只有同时满足以下条件才合格：
+
+- ownership lease 同时授权并限制 read admission，而不只是 writer admission；
+- authority 提供可验证的 notAfter/expiry 时间语义；
+- 每个 read batch 有硬性的 maxSourceAccessLifetime，覆盖 provider I/O、retry、fallback、decode 和 source-backed buffer 使用；
+- 旧 owner 在 lease 不确定/到期后不能接纳新读；
+- GC pause、进程暂停或网络恢复后，在任何新的 source I/O、fallback/retry以及响应发布前都重新检查 owner fence和deadline；
+- 新 owner 的等待基于 authority time/expiry proof，加 maxSourceAccessLifetime、声明的 clock-skew 和 propagation grace，不能只是本机 sleep。
+
+普通 Owner Epoch、没有时间上限的 session-loss、单纯 KRaft/Pulsar ownership fence或 host-local timer都不足以证明旧 reader 已消失。Backend 不具备上述能力时，0.2 必须保留 protection、延迟 GC；不能用分布式 per-read refcount补救，也不能允许 Topic关闭该保护。
+
+PREFERRED_ONLY 可以对一组有界 fallback sources/ranges 批量发布，避免每个 extent 单独一次 manifest CAS。
+
+性能判断：
+
+- 普通读取仍是零远端 metadata I/O，Q2 不增加读热路径成本；
+- 每次有界 source-retirement batch 增加一次低频 manifest generation/CAS；
+- 真实代价是无法证明 quiescence 时延长 source retention，因此必须把 retained source bytes/age 纳入 Cell 容量准入和告警；
+- 安全边界不能配置关闭，quiescence capability 属于 Protocol Cell/backend 准入能力，不是 Topic 性能开关。
+
+M4 应量化：
+- read allocations/op 必须为 0；
+- slot publish/clear 与 cache-line contention；
+- capture retry rate和generation swap drain p99；
+- slot-pool occupancy/scan time；
+- PREFERRED_ONLY CAS 频率；
+- retained protection bytes/age；
+- takeover 到 GC eligibility 的 p99。
+````
+
+## Authoritative synchronization
+
+- Q1 is frozen by
+  [ADR 0070](../../decisions/0070-v2-generation-tagged-read-publication-and-hazard-slots.md): standard hazard order,
+  explicit StoreLoad, generation-tagged coherent publication, exclusive bounded cross-Binding slots, complete async
+  source lifetime, and all-or-release multi-Binding reservation.
+- Q2 is frozen by
+  [ADR 0071](../../decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md): fenced
+  `PREFERRED_WITH_FALLBACK -> PREFERRED_ONLY`, current/old-owner durable quiescence, qualified authority expiry,
+  exact protection release, retained-source admission, and no remote per-read refcount.
+- Exact slot-reuse/cancellation states, bounded multi-owner proof wire, backend capability encoding, all numeric bounds,
+  and evidence-selected memory layout remain open or evidence-blocked.

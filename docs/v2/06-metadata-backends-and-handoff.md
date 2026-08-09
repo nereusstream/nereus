@@ -154,9 +154,14 @@ old tickets, reconstructs physical inventory first, then publishes Binding activ
 unrelated typed gap cannot block B.
 
 The logical Binding read snapshot and its allocation-free read-batch pins also remain owner-local. Append does not
-publish a new source generation per ACK. Manifest handoff publishes low-frequency source-selection generations and
-uses two pin drains: one before retiring old index structures, another after a later no-fallback view before releasing
-source protection. The exact durable second-view/protection-release cut remains open.
+publish a new source generation per ACK. A bounded sharded cross-Binding slot pool uses StoreLoad-ordered hazard
+publication, pointer revalidation, and a coherent generation-tagged frontier/view cell. Manifest handoff publishes
+low-frequency `PREFERRED_WITH_FALLBACK -> PREFERRED_ONLY` generations and uses two pin drains.
+
+The optional planned-handoff hint below is never `OwnerReadQuiescenceProof`. Protection release separately requires
+durable planned drain or a Protocol Cell/backend capability whose authority expiry limits read admission and bounds the
+complete source-access lifetime. Ordinary KRaft/Pulsar ownership fencing, session loss, or local time is insufficient;
+missing capability retains protection.
 
 ## Planned fast handoff
 
@@ -181,5 +186,5 @@ topic-open, rollover publication, trim, and background lifecycle work are separa
 hide in an aggregate append metric.
 
 Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios:
-`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015/020..024`, `V2-READ-003/004`, `V2-HO-001`, `V2-FABRIC-001`,
+`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015/020..024`, `V2-READ-003..006`, `V2-HO-001`, `V2-FABRIC-001`,
 `V2-POLICY-001`, and `V2-POSITION-002..011`.

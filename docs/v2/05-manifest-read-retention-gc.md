@@ -108,14 +108,17 @@ The replacement view is installed before removal. Active-tail readability and ha
 binding/tenant soft shares, Cell/shard recovery concurrency, host ceilings, and materialization pressure are tunable.
 
 `BindingReadViewSnapshot` is logical. Append does not create a snapshot generation: hidden locators precede a release-
-published frontier and ACK. Low-frequency source-selection generations are pinned allocation-free for one
-Binding-scoped protocol read batch. One snapshot may select disjoint manifest and active-tail ranges, while one atomic
-append unit and every declared whole-range fallback remain source-pure.
+published frontier and ACK. One unfinished Binding-scoped protocol read batch reserves one exclusive slot from a
+bounded sharded cross-Binding pool. It publishes `{Binding,G}`, establishes StoreLoad, revalidates G, then captures one
+stable generation-tagged frontier/view cell before dereferencing G. The slot persists through every source access and
+buffer use. One snapshot may select disjoint manifest and active-tail ranges, while one atomic append unit and every
+declared whole-range fallback remain source-pure.
 
-Reclamation publishes preferred+protected-fallback first and drains older pins before retiring obsolete index state.
-Protection remains until a later view removes fallback and every fallback-bearing pin drains. Retired-view/pin count,
-bytes, age, and deadline are hard-bounded; capacity pressure may block handoff/retirement or new read admission but
-never removes a locator/protection early. Exact local coherent capture and the durable no-fallback cut remain open.
+Reclamation durably publishes `PREFERRED_WITH_FALLBACK` first and drains older pins before retiring obsolete index
+state. A later fenced root CAS selects bounded `PREFERRED_ONLY`. Protection remains until current fallback-bearing
+slots drain, every older read-admitting Owner Epoch has durable planned-drain or fully qualified authority-expiry
+quiescence, and the exact protection generation releases. Existing handoff hints and ordinary ownership fences are
+insufficient. Missing capability retains protection and consumes Cell count/bytes/age admission.
 
 ## Timestamp and protocol-position indexes
 
@@ -140,6 +143,7 @@ Logical trim advances a binding-scoped typed Trim Frontier independently from ph
 - all protocol cursor/group/transaction retention floors pass the complete source;
 - no reader pin, recovery root, task protection, source-protection record, Access Projection, Projection Map, or
   Migration Link still requires the source;
+- Object-WAL retirement has durable `PREFERRED_ONLY`, current-slot drain, and complete older read-owner quiescence;
 - Protocol Cell, Cell Provider Scope, physical-delete capability, Owner Epoch, worker epoch, and Storage Epoch are
   revalidated;
 - response-loss state has converged and grace has elapsed;
@@ -170,5 +174,5 @@ the source was safely retired and the preferred generation is corrupt, the resul
 system does not synthesize records or silently skip the requested Protocol Coverage.
 
 Relevant tradeoffs: `T-MANIFEST-01`, `T-POSITION-01`, `T-PROJECTION-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required
-scenarios: `V2-READ-001..004`, `V2-OBJ-002/020..024`, `V2-BK-007..008`, `V2-BK-011`,
+scenarios: `V2-READ-001..006`, `V2-OBJ-002/020..024`, `V2-BK-007..008`, `V2-BK-011`,
 `V2-PROJECTION-001`, `V2-POLICY-001`, and `V2-FABRIC-003`.

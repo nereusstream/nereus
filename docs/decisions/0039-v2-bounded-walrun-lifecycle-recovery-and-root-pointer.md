@@ -67,10 +67,11 @@ cannot reach the retirement frontier fails closed.
 - Provider slowdown can create correctness-driven availability backpressure before capacity is exhausted.
 - Root/Seal/successor publication is refined by ADR 0047, checkpoint/open-tail authority by ADRs 0053/0065, directory
   capacity by ADR 0058, lazy-lane/vector inventory by ADR 0060, publisher/frontier separation by ADRs 0063/0064, and
-  pre-position/readable-tail publication by ADRs 0066/0067, and provider-proof/read-view boundaries by ADRs 0068/0069.
-  Exact remaining wire, retirement authority, and evidence-derived numeric values remain downstream gates.
+  pre-position/readable-tail publication by ADRs 0066/0067, provider-proof/read-view boundaries by ADRs 0068/0069,
+  and generation-tagged read/quiescent protection release by ADRs 0070/0071. Exact remaining wire, retirement
+  authority, and evidence-derived numeric values remain downstream gates.
 - M3 must prove every cap and cumulative counter, no counter reset on fallback, pre-limit rollover, uncertain CAS,
   lineage fork/cycle/depth rejection, pointer/root substitution, and zero normal-append metadata I/O.
 
-This decision is refined by ADRs 0047/0053/0058/0060/0062..0069, refines ADR 0030, and is tracked by `T-APPEND-01`,
-`T-OBJECT-01`, `T-HANDOFF-01`, `V2-OBJ-005/009..011/014..024`, and `V2-READ-003/004`.
+This decision is refined by ADRs 0047/0053/0058/0060/0062..0071, refines ADR 0030, and is tracked by `T-APPEND-01`,
+`T-OBJECT-01`, `T-HANDOFF-01`, `V2-OBJ-005/009..011/014..024`, and `V2-READ-003..006`.

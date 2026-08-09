@@ -120,10 +120,18 @@ Storage Epoch/Position Domain version, owner fence, Readable Frontier, active-ta
 source-protection generation for one Binding-scoped protocol read batch. Allocation-free local pins are bounded; one
 record/message/frame, a whole connection, and an unbounded stream are not pin units.
 
+Each concurrently unfinished batch exclusively reserves one slot from a bounded sharded cross-Binding pool before
+source I/O. It publishes `{Binding,G}`, establishes StoreLoad ordering, revalidates G, and only then captures a stable
+generation-tagged `{sourceGenerationId, ReadableFrontier, activeTailViewVersion}`. A mismatched/torn cell retries
+without dereference. The slot remains until every possible provider I/O, retry, fallback, decode, and source-backed
+buffer use completes.
+
 The same snapshot may serve disjoint manifest and active-tail ranges, but one atomic append unit and every explicitly
 declared whole-range fallback stay source-pure. Locator retirement follows old-view pin drain. Source protection remains
-until a later view no longer names fallback and every fallback-bearing pin drains. Pin/backlog pressure may block
-handoff or new reads but never authorizes early reclaim, frontier advance, or GC.
+until fenced `PREFERRED_ONLY`, every current fallback-bearing pin drains, every older read-admitting Owner Epoch has
+durable quiescence proof, and the exact protection generation releases. A non-authoritative hint, ordinary owner fence,
+session loss, or host timer is insufficient. Pin/backlog/retained-source pressure may block handoff or new reads but
+never authorizes early reclaim, frontier advance, or GC.
 
 ## Uncertain append
 
@@ -159,4 +167,4 @@ the envelope. This correctness-driven availability cost is explicit and does not
 
 Relevant tradeoffs: `T-APPEND-01` and `T-POSITION-01`. Required scenarios: `V2-APP-001`, `V2-APP-002`,
 `V2-APP-003`, `V2-POSITION-001..007`, `V2-META-002..004`, `V2-KAF-META-001`,
-`V2-OBJ-002/004..012/020..024`, and `V2-READ-003/004`.
+`V2-OBJ-002/004..012/020..024`, and `V2-READ-003..006`.

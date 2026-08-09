@@ -4,8 +4,9 @@
 
 Accepted for the 0.2 `OBJECT_WAL` logical read snapshot, append-versus-handoff publication split, read-pin granularity,
 source-mixing boundary, two-stage reclamation, backlog safety, and takeover behavior. Exact allocation-free capture
-algorithm, durable fallback-removal cut, and numeric bounds remain downstream M4 work; implementation has not started
-at M0.
+ordering and durable fallback-removal cut are refined by ADRs 0070/0071. Exact implementation layout, bounded
+quiescence wire/capability encoding, and numeric limits remain downstream M4/M5 work; implementation has not started at
+M0.
 
 ## Context
 
@@ -43,9 +44,9 @@ The logical captured scope binds at least:
 - manifest view identity/generation; and
 - source-protection generation.
 
-`BindingReadState` and shared immutable references may supply these facts; each capture need not copy them. The exact
-allocation-free coherent-capture algorithm remains open, but a reader may never combine fields from incompatible
-generations.
+`BindingReadState` and shared immutable references may supply these facts; each capture need not copy them. ADR 0070
+fixes hazard publication, StoreLoad ordering, pointer revalidation, and generation-tagged coherent capture before a
+reader may dereference generation-owned state.
 
 Source purity is required for one atomic append unit and for any read path whose existing contract declares
 whole-range fallback. It is not a one-source-per-request rule. Under one valid logical snapshot, a Kafka Fetch or
@@ -61,8 +62,10 @@ Locator and source-protection reclamation has two distinct stages:
    fallback, wait for every pin on fallback-bearing views to drain, and only then release protection or admit physical
    GC.
 
-Publishing the replacement view always precedes retirement. A cache hit, materialization intent, or local absence of a
-reader is not proof. The exact durable crash/restart cut between the second view and protection release remains open.
+Publishing the replacement view always precedes retirement. A cache hit, materialization intent, local absence of a
+reader, ordinary owner fence, or non-authoritative handoff hint is not proof. ADR 0071 fixes
+`PREFERRED_WITH_FALLBACK -> PREFERRED_ONLY`, durable current/old-owner quiescence, and exact protection release as
+separate prerequisites.
 
 Retired-view and pin backlog have finite count, byte, age, and deadline hard bounds. A leak or timeout may block
 handoff/retirement and may backpressure new read admission, but it can never reclaim a locator/protection early,
@@ -84,7 +87,9 @@ remain zero-remote-metadata operations.
 - M3/M4 must measure hypothetical recovery-GET savings, read allocations/op, reader-slot atomic contention,
   retired-view count/bytes/age, pin-drain p99, and takeover recovery, and prove every publication, mixing, timeout,
   two-stage reclamation, and owner-fence cut. Skip-rate measurement does not itself admit a recovery-omission authority.
-- Exact allocation-free coherent capture and durable fallback-removal state remain the next design frontier.
+- Exact slot-reuse/cancellation state, bounded owner-quiescence accumulator, and backend capability record remain the
+  next design frontier.
 
-This decision refines ADRs 0049, 0059, 0064, 0066, and 0067 and is tracked by `T-APPEND-01`, `T-MANIFEST-01`,
-`T-OBJECT-01`, `V2-READ-001/003/004`, and `V2-OPEN-READ-03/04`.
+This decision is refined by ADRs 0070/0071, refines ADRs 0049, 0059, 0064, 0066, and 0067 and is tracked by
+`T-APPEND-01`, `T-MANIFEST-01`, `T-OBJECT-01`, `V2-READ-001/003..006`, and
+`V2-OPEN-READ-05/06/07`.

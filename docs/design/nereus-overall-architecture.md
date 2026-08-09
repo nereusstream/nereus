@@ -198,12 +198,17 @@ progress, and the ACK path adds no provider/KMS/metadata I/O or repeated directo
 `BindingReadViewSnapshot` is a logical capture, not one object per ACK/read. Append only installs hidden locators,
 release-publishes Readable/Durable frontiers, and ACKs. Low-frequency manifest handoff publishes source-selection
 generations that readers pin for one Binding-scoped protocol read batch through allocation-free local RCU/epoch/hazard
-or reader-slot state. A request may read disjoint manifest and active-tail ranges, but one append unit and any declared
-whole-range fallback remain source-pure.
+or reader-slot state. Each unfinished batch owns one slot from a bounded cross-Binding sharded pool. Standard hazard
+ordering publishes `{Binding,G}`, establishes StoreLoad, revalidates G, then captures a coherent generation-tagged
+`{sourceGenerationId, ReadableFrontier, activeTailViewVersion}` before dereference. A request may read disjoint manifest
+and active-tail ranges, but one append unit and any declared whole-range fallback remain source-pure.
 
 Locator and source-protection retirement are two stages: publish preferred+protected-fallback, drain older-view pins,
-then publish a view without fallback and drain all fallback-bearing pins before protection release/GC. Retired-view and
-pin count/bytes/age/deadline are hard-bounded; pressure may block handoff or new reads but never delete early.
+then durably CAS `PREFERRED_ONLY`. Protection release additionally requires current slots drained and every older
+read-admitting Owner Epoch covered by a durable planned-drain proof or a fully qualified authority-expiry capability.
+Ordinary owner fences, handoff hints, session loss, and host timers are insufficient. Missing capability retains
+protection. Retired-view/pin and retained-source count/bytes/age/deadline are hard-bounded; pressure may block handoff or
+new reads but never delete early.
 
 Routine random reads authenticate the Root-bound in-body header/directory and selected frame without first requiring a
 new full-Object provider proof. The leaf's exclusive bounded prefix end normally gives prefix plus frame GET; without

@@ -81,7 +81,8 @@ binding's Position Domain comparison/adjacency to rebuild contiguous coverage an
 comparator. Runtime gaps, waiting futures, tickets, and owner-local completion order are not persisted and add no
 per-binding remote metadata operation. ADR 0067 installs compact active-tail locator coverage before publishing
 Readable/Durable frontiers and ACK. ADR 0069 separates that high-frequency publication from low-frequency pinned
-source-selection generations without changing the physical-versus-binding frontier split.
+source-selection generations without changing the physical-versus-binding frontier split. ADR 0070 fixes the hazard
+ordering and generation-tagged frontier/view capture for readers of that publication.
 
 ## Consequences
 
@@ -95,6 +96,6 @@ source-selection generations without changing the physical-versus-binding fronti
   every per-binding/aggregate bound, early buffer release, A/B isolation, shared-versus-frame corruption, Kafka
   commit-set atomicity, Pulsar entry atomicity, and zero append-path metadata I/O.
 
-This decision is refined by ADRs 0066/0067/0069, refines ADRs 0007, 0008, 0031, 0037, 0038, 0040, 0047, 0053, 0060, and
-0063 and is tracked by `T-APPEND-01`, `T-PROTOCOL-01`, `T-OBJECT-01`, `V2-APP-001..003`,
-`V2-OBJ-001/002/006/007/012/018/020..024`, and `V2-READ-003/004`.
+This decision is refined by ADRs 0066/0067/0069/0070, refines ADRs 0007, 0008, 0031, 0037, 0038, 0040, 0047, 0053,
+0060, and 0063 and is tracked by `T-APPEND-01`, `T-PROTOCOL-01`, `T-OBJECT-01`, `V2-APP-001..003`,
+`V2-OBJ-001/002/006/007/012/018/020..024`, and `V2-READ-003..005`.

@@ -180,10 +180,21 @@ _Avoid_: Snapshot object per ACK/read, record/message/frame pin, connection-life
 process-global refcount
 
 **Read View Pin**:
-An allocation-free bounded owner-local RCU/epoch/hazard or reader-slot claim on one source-selection generation for one
-complete protocol read batch. Retired-view count/bytes/age/deadline are hard-bounded; pressure may stop handoff or new
-read admission but never release referenced locators/protection early.
-_Avoid_: Unbounded streaming pin, early deletion to recover capacity, pin as durable authority
+An allocation-free claim by one unfinished Binding-scoped protocol read batch on one exact source-selection generation.
+It lasts through every source I/O, retry, fallback, decode, and source-backed-buffer use; capacity pressure never
+authorizes early clear or protection release.
+_Avoid_: Binding x event-loop fixed slot, shared concurrent-read slot, connection pin, timeout-based force clear
+
+**Generation-Tagged Read Publication**:
+The coherent owner-local tuple binding one source-generation identity to the Readable Frontier and active-tail view
+version captured by a pinned read batch. A mismatched or torn tuple is unusable.
+_Avoid_: Generation-only pin, independently sampled frontier, per-ACK snapshot object
+
+**Owner Read Quiescence Proof**:
+Durable evidence that one bounded set of older Owner Epochs can no longer access the exact protected fallback source
+generation. It derives from an authoritative planned drain or a qualified read-admission expiry capability, never an
+ordinary owner fence, handoff hint, session-loss observation, or host timer.
+_Avoid_: Writer-only lease, latest-owner-only proof, distributed per-read refcount, configurable safety switch
 
 **Current WalRun Pointer**:
 The one low-frequency per-shard CAS authority binding the current WalRun Root key/SHA and shard run epoch. It anchors a

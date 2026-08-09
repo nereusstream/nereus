@@ -28,6 +28,9 @@ Normal admitted append/read checks that local fence and the current owner/metada
 per operation. A watch change, cache miss, stale version, ownership change, or restart removes admission until the
 control path revalidates exact authority.
 
+ADR 0071 does not treat that cached fence, ownership change, or session-loss observation as proof that old read pins
+have drained. Object-WAL source-protection release requires its separate durable owner-read quiescence contract.
+
 The state machine and validation cannot be disabled. Cache size, refresh scheduling, watch concurrency, and host memory
 are performance policy at Cell/host scope and cannot manufacture or extend authority.
 
@@ -40,5 +43,5 @@ are performance policy at Cell/host scope and cannot manufacture or extend autho
 - M1/M5 must prove every crash cut, lost response, conflicting creator, stale watch/cache, ownership transfer,
   recreation, overflow, no per-access Oxia calls, and fail-closed invalidation.
 
-This decision refines ADRs 0019, 0028, 0043, and 0049 and is tracked by `T-META-01`, `T-POLICY-01`,
-`V2-META-005/006`.
+This decision is refined by ADR 0071, refines ADRs 0019, 0028, 0043, and 0049 and is tracked by `T-META-01`,
+`T-POLICY-01`, `V2-META-005/006`.

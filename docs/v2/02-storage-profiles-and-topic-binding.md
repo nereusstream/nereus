@@ -149,6 +149,10 @@ version-bound proof mode plus Provider adapter/canonicalizer version and token h
 future Root is required for a mode/cap change. Read-view pin and retired-generation hard bounds cannot be disabled or
 enlarged by Topic policy; exact evidence-selected ceilings remain Cell/host admission inputs.
 
+Read hazard ordering and complete source-access lifetime are correctness, not policy. Slot-pool/retained-source hard
+ceilings belong to Cell/host capacity. Whether unplanned takeover can prove old-reader expiry is a versioned Protocol
+Cell/backend admission capability; a Topic cannot enable it, weaken it, or choose deletion despite missing proof.
+
 A policy change that affects a primary WAL profile, format, Object-extent digest family, Frame-payload checksum family,
 or encryption family requires a new Storage Epoch at an exact Protocol Frontier. A materialization-only format or index
 policy may create a new immutable generation without changing the append epoch. Neither operation rewrites the Topic
