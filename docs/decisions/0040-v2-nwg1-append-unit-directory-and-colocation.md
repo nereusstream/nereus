@@ -52,4 +52,4 @@ order as protocol order.
   independent frame decode, no cross-frame compression/AEAD, and range reads that do not decode unrelated frames.
 
 This decision is refined by ADRs 0046/0058, refines ADRs 0026/0031/0037, and is tracked by `T-PROTOCOL-01`,
-`T-OBJECT-01`, and `V2-OBJ-004/006/007/012/013/016`.
+`T-OBJECT-01`, and `V2-OBJ-004/006/007/012/013/016..018`.

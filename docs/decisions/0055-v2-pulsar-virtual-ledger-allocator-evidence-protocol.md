@@ -51,12 +51,13 @@ select a different mode or weaken the persisted recovery protocol.
 
 - `V2-OPEN-PUL-OBJ-10`'s evidence-protocol decision is resolved; its scenario remains PLANNED and cannot be cited as a
   performance pass.
-- `V2-OPEN-PUL-OBJ-09` remains open. Both allocator modes remain unselected, and RANGE_LEASED must still freeze grant
-  lifetime, owner-epoch takeover, stale-candidate versus range-tail burn, response loss, allocator clear, bounded
-  orphan accounting, and pending-head discovery semantics.
+- `V2-OPEN-PUL-OBJ-09` remains open and both modes remain unselected. ADR 0061 fixes the correctness constraints for an
+  incarnation-owned RANGE grant, RESERVED takeover, owner-only head fencing, one stale-candidate burn, background
+  clear, and bounded permanent-orphan accounting. Exact wire/range size, allocator reservation concurrency, and mode
+  selection remain open.
 - A simple absolute queue threshold or active-ledger-count-only test cannot admit STRICT_SERIALIZED.
 - M1/M3 must execute this protocol against the pinned source and publish a source-qualified receipt before selecting an
   allocator mode.
 
-This decision refines ADRs 0022, 0027, 0032, 0041, 0048, 0049, and 0054 and is tracked by `T-POSITION-01`,
-`T-POLICY-01`, `V2-POSITION-010`, and `V2-OPEN-PUL-OBJ-09`.
+This decision is refined by ADR 0061, refines ADRs 0022, 0027, 0032, 0041, 0048, 0049, and 0054 and is tracked by
+`T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-010/011`, and `V2-OPEN-PUL-OBJ-09`.

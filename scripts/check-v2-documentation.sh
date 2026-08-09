@@ -111,6 +111,9 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md"
     "$repo_root/docs/decisions/0057-v2-npd1-policy-default-authority-and-evidence.md"
     "$repo_root/docs/decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md"
+    "$repo_root/docs/decisions/0059-v2-object-wal-leaf-prefix-hint.md"
+    "$repo_root/docs/decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md"
+    "$repo_root/docs/decisions/0061-v2-pulsar-range-grant-owner-takeover.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -147,7 +150,7 @@ require_literal "exact protocol-native bytes after the outer Nereus Object envel
 require_literal '`[2^62, 2^63 - 2]`' "docs/decisions/0027-v2-pulsar-virtual-ledger-numeric-compatibility.md"
 require_literal 'discriminated `TopicIncarnationIdentity`' "docs/decisions/0028-v2-topic-incarnation-keys-and-deterministic-ids.md"
 require_literal "pulsar-offload/v1/ledger-<ledgerId>/attempt-<uuid>/root" "docs/decisions/0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md"
-require_literal "<wal-run-prefix>/<sequence19>/<body-length19>-sha256-v1-<64-lowercase-hex>.nwg" "docs/decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md"
+require_literal "<directoryPrefixEnd19>-<bodyLength19>-sha256-v1-<64-lowercase-hex>.nwg" "docs/decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md"
 require_literal '`KafkaAppendCommitSet`' "docs/decisions/0031-v2-protocol-frame-and-append-commit-set.md"
 require_literal '`PulsarVirtualLedgerNamespaceRegistryRecord`' "docs/decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md"
 require_literal '`aggregateSchemaVersion=1`' "docs/decisions/0033-v2-topic-binding-aggregate-logical-schema-v1.md"
@@ -176,6 +179,9 @@ require_literal 'The phrase “serialized p99 capacity” is not' "docs/decision
 require_literal 'directoryPlaintextBytes = entryCount * 16' "docs/decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md"
 require_literal 'Product/Deployment supplies one validated base default' "docs/decisions/0057-v2-npd1-policy-default-authority-and-evidence.md"
 require_literal 'NWG1 v1 freezes `maxHeaderAndDirectoryPrefixBytes` before it freezes `maxFrames`' "docs/decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md"
+require_literal 'fixedHeaderBytes <= directoryPrefixEnd <= bodyLength' "docs/decisions/0059-v2-object-wal-leaf-prefix-hint.md"
+require_literal 'one run-wide predecessor chain and one checkpoint-head CAS' "docs/decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md"
+require_literal 'response unknown: exact reread accepts candidate/head/grant equality' "docs/decisions/0061-v2-pulsar-range-grant-owner-takeover.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -204,7 +210,10 @@ require_literal "Restarted Grill 2 round 9" "docs/v2/grill-notes/11-restarted-gr
 require_literal "Round 9 不全部按推荐确认" "docs/v2/grill-notes/11-restarted-grill-2-read-amplification-and-range-allocation.md"
 require_literal "Q3 / \`V2-OPEN-OBJ-17\`, Q5 / \`V2-OPEN-OBJ-19\`, Q6 / \`V2-OPEN-PUL-OBJ-09\`" "docs/v2/grill-notes/11-restarted-grill-2-read-amplification-and-range-allocation.md"
 require_literal "Restarted Grill 2 round 10" "docs/v2/grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md"
-require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md"
+require_literal "Round 10 不全部按原推荐确认" "docs/v2/grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md"
+require_literal "不确认每个 lane 一条独立 checkpoint chain" "docs/v2/grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md"
+require_literal "Restarted Grill 2 round 11" "docs/v2/grill-notes/13-restarted-grill-2-lane-binding-checkpoint-publisher-and-frontiers.md"
+require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/13-restarted-grill-2-lane-binding-checkpoint-publisher-and-frontiers.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -298,13 +307,14 @@ for resolved_gate in \
 done
 
 for active_gate in \
+    V2-OPEN-OBJ-01 \
     V2-OPEN-BK-11 \
     V2-OPEN-BK-13 \
     V2-OPEN-OBJ-17 \
     V2-OPEN-OBJ-19 \
     V2-OPEN-PUL-OBJ-09; do
     require_literal "\`$active_gate\`" "docs/v2/open-questions.md"
-    require_literal "\`$active_gate\`" "docs/v2/grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md"
+    require_literal "\`$active_gate\`" "docs/v2/grill-notes/13-restarted-grill-2-lane-binding-checkpoint-publisher-and-frontiers.md"
     if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$active_gate is missing from the active gate table"
     fi
@@ -366,6 +376,9 @@ active_contracts=(
     "$repo_root/docs/decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md"
     "$repo_root/docs/decisions/0057-v2-npd1-policy-default-authority-and-evidence.md"
     "$repo_root/docs/decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md"
+    "$repo_root/docs/decisions/0059-v2-object-wal-leaf-prefix-hint.md"
+    "$repo_root/docs/decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md"
+    "$repo_root/docs/decisions/0061-v2-pulsar-range-grant-owner-takeover.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )
@@ -513,14 +526,14 @@ required_scenarios = {
     "V2-APP-001", "V2-APP-002", "V2-APP-003", "V2-PROFILE-001", "V2-POLICY-001",
     "V2-POSITION-001", "V2-MULTIPROTOCOL-001",
     "V2-POSITION-002", "V2-POSITION-003", "V2-POSITION-004", "V2-POSITION-005", "V2-POSITION-006",
-    "V2-POSITION-007", "V2-POSITION-008", "V2-POSITION-009", "V2-POSITION-010",
+    "V2-POSITION-007", "V2-POSITION-008", "V2-POSITION-009", "V2-POSITION-010", "V2-POSITION-011",
     "V2-META-002", "V2-META-003", "V2-META-004", "V2-META-005", "V2-META-006",
     "V2-KAF-META-001", "V2-KAF-META-002", "V2-KAF-META-003",
     "V2-FABRIC-001", "V2-FABRIC-002", "V2-FABRIC-003", "V2-MIGRATION-001",
     "V2-PROJECTION-001",
     "V2-OBJ-001", "V2-OBJ-002", "V2-OBJ-003", "V2-OBJ-004", "V2-OBJ-005", "V2-OBJ-006",
     "V2-OBJ-007", "V2-OBJ-008", "V2-OBJ-009", "V2-OBJ-010", "V2-OBJ-011", "V2-OBJ-012",
-    "V2-OBJ-013", "V2-OBJ-014", "V2-OBJ-015", "V2-OBJ-016",
+    "V2-OBJ-013", "V2-OBJ-014", "V2-OBJ-015", "V2-OBJ-016", "V2-OBJ-017", "V2-OBJ-018",
     "V2-BK-001", "V2-BK-002", "V2-BK-003", "V2-BK-004", "V2-BK-005", "V2-BK-006",
     "V2-BK-007", "V2-BK-008", "V2-BK-009", "V2-BK-010", "V2-BK-011", "V2-BK-012", "V2-BK-013",
     "V2-READ-001", "V2-READ-002", "V2-META-001", "V2-HO-001",
@@ -641,6 +654,9 @@ link_docs=(
     "$repo_root/docs/decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md"
     "$repo_root/docs/decisions/0057-v2-npd1-policy-default-authority-and-evidence.md"
     "$repo_root/docs/decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md"
+    "$repo_root/docs/decisions/0059-v2-object-wal-leaf-prefix-hint.md"
+    "$repo_root/docs/decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md"
+    "$repo_root/docs/decisions/0061-v2-pulsar-range-grant-owner-takeover.md"
 )
 
 while IFS=: read -r source match; do

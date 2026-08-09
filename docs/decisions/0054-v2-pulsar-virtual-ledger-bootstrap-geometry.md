@@ -44,4 +44,4 @@ new domain fails closed. Existing Cells still cannot resize, acquire a second sl
 
 Allocator-mode evidence is refined by
 [ADR 0055](0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md). This decision refines ADRs 0027, 0032, 0041,
-0048, and 0049 and is tracked by `T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-008..010`.
+0048, and 0049 and is tracked by `T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-008..011`.

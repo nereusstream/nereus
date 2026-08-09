@@ -134,7 +134,8 @@ Namespace may inherit/override, Topic may explicitly override, Cell admits/caps,
 batching requires compatible resolved classes rather than arbitrary per-topic flag combinations. One policy identity
 cannot combine Storage-Epoch encoding, Object-group packing, sealed-ledger offload-attempt policy, and host capacity
 because those values activate and change at different lifecycle boundaries. Topic-specific soft packing is not one
-WalRun Root identity; its bounded lane/group wire remains open.
+WalRun Root identity. At most three lazily instantiated lanes share one Root/pointer and aggregate budgets; a binding
+moves lane only after its prior lane work converges, while exact class values/canonical lane encoding remain open.
 
 A policy change that affects a primary WAL profile, format, Object-extent digest family, Frame-payload checksum family,
 or encryption family requires a new Storage Epoch at an exact Protocol Frontier. A materialization-only format or index
@@ -183,4 +184,5 @@ Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-POLICY-01`, `T-OBJECT-0
 [ADR 0049](../decisions/0049-v2-configuration-scopes-and-persisted-semantics.md),
 [ADR 0050](../decisions/0050-v2-kafka-aggregate-wire-and-publication-validation.md), and
 [ADR 0051](../decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md), with NPD1 policy authority refined
-by [ADR 0057](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md).
+by [ADR 0057](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md) and Object-WAL lanes by
+[ADR 0060](../decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md).

@@ -45,8 +45,9 @@ at the next contract-defined epoch, run, Object group, or offload attempt, never
 A configurable identity is scoped to exactly one activation lifecycle. One enum or versioned class cannot combine a
 Storage-Epoch encoding choice, an Object-group packing/linger choice, a sealed-ledger offload-attempt choice, and host
 capacity. Related policies may be validated for compatibility, but each value is persisted and changed only at its own
-boundary. Topic-specific soft packing is not a singular WalRun Root recovery identity; the bounded scheduling-lane and
-group-recording contract remains an open Object-WAL gate.
+boundary. Topic-specific soft packing is not a singular WalRun Root recovery identity. ADR 0060 maps admitted classes
+onto at most three lazy lanes, persists group facts, and keeps every Root/recovery budget aggregate; exact class values
+and canonical lane binding remain open.
 
 Policy compatibility is part of batching admission. Cross-topic batching uses the resolved typed policy class and
 quantized fields; V2 does not expose an unbounded map of per-topic boolean flags.
@@ -61,5 +62,5 @@ quantized fields; V2 does not expose an unbounded map of per-topic boolean flags
   seal/backpressure under resource pressure, incompatible batching rejection, and that every correctness gate remains
   non-disableable.
 
-This decision is refined by ADRs 0056 through 0058, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and is tracked
-by `T-POLICY-01`, `V2-POLICY-001`, `V2-BK-012/013`, and `V2-OBJ-016`.
+This decision is refined by ADRs 0056 through 0061, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and is tracked
+by `T-POLICY-01`, `V2-POLICY-001`, `V2-BK-012/013`, `V2-OBJ-016..018`, and `V2-POSITION-011`.

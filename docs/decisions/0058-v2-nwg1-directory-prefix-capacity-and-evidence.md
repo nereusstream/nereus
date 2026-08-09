@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted as a partial 0.2 NWG1 capacity/evidence refinement. Exact row fields, prefix/directory numeric maxima, and the
-two-GET hint contract remain open; implementation and runtime evidence have not started at M0.
+Accepted as a partial 0.2 NWG1 capacity/evidence refinement. Exact row fields and prefix/directory numeric maxima remain
+open; ADR 0059 fixes the two-GET hint contract. Implementation and runtime evidence have not started at M0.
 
 ## Context
 
@@ -39,18 +39,19 @@ prefix bytes, GET latency/cost, authentication CPU, memory, early-seal frequency
 not add a paginated directory or second index authority merely to reach that count. A 64-MiB group remains a soft
 candidate and is never promised for every message distribution.
 
-This ADR does not select the exact prefix value or the two-GET hint source. Without a hint, the correctness fallback
-remains header GET, exact directory GET, then frame GET.
+This ADR does not select the exact prefix value. ADR 0059 places the exclusive directory-prefix end in every immutable
+leaf and fixes incremental short/long range reuse. Without a leaf hint, the correctness fallback remains header GET,
+exact directory GET, then frame GET.
 
 ## Consequences
 
-- `V2-OPEN-OBJ-17` remains open for exact prefix/directory/row values and range-hint assembly; the capacity derivation,
-  evidence priority, and no-pagination constraint are no longer open.
+- `V2-OPEN-OBJ-17` remains open for exact prefix/directory/row values and final lane-token wire; capacity derivation,
+  hint assembly, evidence priority, and no-pagination are no longer open.
 - Request-count optimization cannot hide multi-megabyte control-byte amplification.
 - Cost profiles may realize smaller Objects for small messages rather than weaken parser bounds or add another
   authority.
 - M3 must prove every derived-cap boundary, actual-count allocation, 4,096/16,384 evidence, early seal, prefix
   amplification, and rejection of pagination/secondary authority.
 
-This decision refines ADRs 0030, 0039, 0040, 0046, and 0049 and is tracked by `T-OBJECT-01`, `T-POLICY-01`,
-`V2-OBJ-012/016`, and `V2-OPEN-OBJ-17`.
+This decision is refined by ADR 0059, refines ADRs 0030, 0039, 0040, 0046, and 0049 and is tracked by `T-OBJECT-01`,
+`T-POLICY-01`, `V2-OBJ-012/016/017`, and `V2-OPEN-OBJ-17`.

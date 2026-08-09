@@ -62,7 +62,8 @@ and may cause backpressure or early seal. Effective budgets use the minimum acro
 affects bytes or recovery is persisted at its Storage Epoch, hard-recovery WalRun Root, Object-group, or offload-attempt
 boundary. Product/Deployment owns the base semantic default; Namespace/Topic may inherit or explicitly override, Cell
 admits/caps, and host only ceilings. One configurable identity never spans those lifecycles or lets failover silently
-reinterpret state. Topic-specific soft packing is not a singular WalRun Root identity.
+reinterpret state. Topic-specific soft packing is not a singular WalRun Root identity: at most three lazy lanes share
+one Root/pointer, vector checkpoint chain, and aggregate hard budgets.
 
 ADR 0016 retains Access Projection/Migration Link identities and rejects a second Native Write Authority, while
 excluding cross-protocol serving and authority-transfer runtime from 0.2. For Pulsar
@@ -76,13 +77,16 @@ and same-key retired tombstone. Pulsar async data uses independently verifiable 
 derived-entry row/streaming envelope and Deployment->Namespace->Topic policy resolution, plus a ManagedLedger-owned
 dual-source handle whose BK pins drain before persisted BK_DELETE_INTENT/DONE; Topic/Namespace policy selects RETAIN_BK
 or DELETE_AFTER_VERIFIED. Pulsar Object WAL positions use fixed aligned `2^40`, permanent-lifecycle Cell slices from one
-64-KiB/256-assignment registry and fail closed rather than expand a slice. NWG1 uses
+64-KiB/256-assignment registry and fail closed rather than expand a slice. Any RANGE candidate preserves an installed
+ManagedLedger-incarnation grant across owner takeover, burns at most one stale candidate, and leaves allocator mode
+unselected. NWG1 uses
 object-local binding epochs, in-body append-unit authority, co-located Kafka commit sets, a KMS-wrapped run key with
 per-Object AEAD, content-addressed strong-LIST discovery, explicit provider-absent crash cuts, and immutable
-Root/Seal/successor pointer lineage. Asynchronous checkpoint pages have mandatory uncovered-tail bounds; open tails
-still require LIST and sealed runs require a final gap-free page inventory. Routine frame ranges authenticate the
-Root-bound directory/frame rather than requiring a new whole-Object provider proof; prefix bytes, not frame count alone,
-bound cold-read amplification.
+Root/Seal/successor pointer lineage. Every known leaf carries its bounded exclusive directory-prefix end. Up to three
+lane-local sequences build lazily, while asynchronous checkpoints use one run-wide predecessor/vector chain with
+aggregate bounds; open tails still require LIST and sealed runs require one final vector inventory. Routine frame
+ranges authenticate the Root-bound directory/frame rather than requiring a new whole-Object provider proof or HEAD;
+prefix bytes, not frame count alone, bound cold-read amplification.
 
 Provider sharing is physical, not authoritative. Multiple cells may use the same external Object Storage or BookKeeper
 infrastructure, while each cell owns its Cell Provider Scope/session, namespace, credential/KMS and operator scope,
@@ -159,6 +163,9 @@ Accepted decisions:
 - [ADR 0056: NPD1 checked envelope and derived entry row](../decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md)
 - [ADR 0057: NPD1 policy default authority and evidence](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md)
 - [ADR 0058: NWG1 directory-prefix capacity and evidence](../decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md)
+- [ADR 0059: Object WAL leaf directory-prefix hint](../decisions/0059-v2-object-wal-leaf-prefix-hint.md)
+- [ADR 0060: WalRun lazy lanes and vector checkpoint](../decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md)
+- [ADR 0061: Pulsar range-grant owner takeover](../decisions/0061-v2-pulsar-range-grant-owner-takeover.md)
 
 ## Open design gates
 
@@ -173,17 +180,18 @@ Accepted decisions:
 `V2-OPEN-PUL-OBJ-07`; ADRs 0049 through 0054 resolve `V2-OPEN-KAF-META-03`, `V2-OPEN-PUL-META-02`,
 `V2-OPEN-BK-12`, `V2-OPEN-OBJ-18`, and `V2-OPEN-PUL-OBJ-08`; ADR 0055 resolves the
 `V2-OPEN-PUL-OBJ-10` evidence-protocol decision without selecting a mode or producing a PASS. ADRs 0056 through 0058
-partially resolve the NPD1 checked wire/policy evidence and NWG1 prefix-capacity rules without selecting their remaining
-numeric values, read hint, packing lanes, or allocator mode. The rows below are the remaining active 0.2 decisions or
-evidence gates.
+partially resolve NPD1 wire/policy evidence and NWG1 prefix capacity. ADRs 0059 through 0061 additionally fix the leaf
+hint, lazy-lane/vector-checkpoint structure, and RANGE takeover constraints without selecting remaining numeric/class
+values, canonical lane encoding, final RANGE wire/size, or an allocator mode. The rows below are the remaining active
+0.2 decisions or evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
 | `V2-OPEN-BK-11` | select exact NPD1 block/Object/adapter numeric maxima, lower admission, and provider evidence after ADR 0056's checked wire/streaming contract | M2 Object format freeze |
 | `V2-OPEN-BK-13` | execute ADR 0057's 1/4/8/16-MiB native-relative evidence, then select at most three classes and the Deployment base default | M2 offload policy freeze |
-| `V2-OPEN-OBJ-17` | freeze exact NWG1 prefix/directory/row values plus the bounded `directoryEnd` hint source and short/long-hint range assembly | M3 Object WAL format freeze |
-| `V2-OPEN-OBJ-19` | freeze per-group packing class, bounded concurrent lanes, lane sequence/checkpoint/Seal inventory, and evidence-selected soft values under one Root/pointer | M3 Object WAL policy freeze |
-| `V2-OPEN-PUL-OBJ-09` | choose a persisted allocator only after ADR 0055 evidence and complete STRICT/RANGE grant/head/takeover/stale-node/clear/orphan contracts | M1/M3 virtual-ledger allocator freeze |
+| `V2-OPEN-OBJ-17` | freeze exact NWG1 prefix/directory/row numeric wire plus canonical lane token after ADR 0059's leaf-hint contract | M3 Object WAL format freeze |
+| `V2-OPEN-OBJ-19` | freeze canonical lane-to-class binding/encoding and evidence-selected packing values after ADR 0060's lazy-lane/vector-chain contract | M3 Object WAL policy freeze |
+| `V2-OPEN-PUL-OBJ-09` | choose an allocator only after evidence plus exact reservation/head/node wire, range size, Cell reservation concurrency, and ADR 0061 conformance | M1/M3 virtual-ledger allocator freeze |
 | `V2-OPEN-OBJ-01` | prove per-binding typed durable frontiers inside a multi-binding Object group without shard-wide HOL | M3 layout freeze |
 | `V2-OPEN-BK-02` | validate one-active-ledger-per-Kafka-partition at 10k and 100k partitions | M2 Kafka BK layout freeze |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |

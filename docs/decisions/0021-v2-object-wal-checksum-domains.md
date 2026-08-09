@@ -59,4 +59,4 @@ This decision is refined by
 [ADR 0031](0031-v2-protocol-frame-and-append-commit-set.md). NWG1 placement is refined by
 [ADR 0040](0040-v2-nwg1-append-unit-directory-and-colocation.md), with bounded prefix capacity in
 [ADR 0058](0058-v2-nwg1-directory-prefix-capacity-and-evidence.md). This decision refines ADR 0018 and is tracked by
-`T-OBJECT-01`, `V2-OBJ-001`, `V2-OBJ-003..007`, and `V2-OBJ-012/016`.
+`T-OBJECT-01`, `V2-OBJ-001`, `V2-OBJ-003..007`, and `V2-OBJ-012/016/017`.

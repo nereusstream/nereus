@@ -64,16 +64,20 @@ include retired Cells. Bootstrap fixes `k=40`, 65,536 canonical registry bytes, 
 192-byte maximum assignment row. 0.2 forbids resize, relocation, in-place extension, and a second slice. Exhaustion
 fails closed before another ID is allocated; more capacity requires a new Protocol Cell and does not migrate existing
 topics or ledgers. After 256 lifetime Cells, only a bootstrap-proven disjoint reservation-domain namespace or
-independent deployment/cluster may allocate again; a new logical label cannot reuse the interval. Allocator
-mode/epochs, rollover, and recovery mechanics remain open.
+independent deployment/cluster may allocate again; a new logical label cannot reuse the interval. Allocator mode,
+exact RANGE wire/size, rollover, and later Ledger Chain mechanics remain open.
 
 ADR 0055 freezes the evidence protocol but selects neither allocator mode. It measures maximum sustainable rollover
 RPS while all predeclared queue/latency/error/recovery SLOs hold, covers real rollover distributions/jitter/storms and
 all crash cuts, including broker-wide takeover of 10,000/100,000 ManagedLedgers, and compares native Pulsar
 rollover/append-stall behavior. STRICT and RANGE correctness work proceed in parallel. Allocator identity may persist
 only mode, protocol version, and recovery/fencing identity; performance budgets remain versioned Cell policy/evidence
-and host capacity remains a runtime ceiling. The RANGE grant/head/node contract remains open; owner-change whole-tail
-burn is rejected because serialized reacquisition would recreate a Cell-wide failover stall.
+and host capacity remains a runtime ceiling. ADR 0061 constrains any RANGE candidate without selecting it: a grant
+belongs to the ManagedLedger incarnation, takeover changes only head owner epoch, a new owner may finish an unchanged
+RESERVED grant, and at most one stale candidate ID burns instead of the range tail. Installed-range use begins after
+head install; allocator clear is a high-priority background reconciliation that still blocks the next Cell grant.
+Unknown responses reread exact equality, while only definitive conflicts fence. Permanent orphan candidates are
+bounded metadata evidence rather than a new 0.2 GC protocol.
 
 Online Pulsar BookKeeper/Object evolution is not implied by this model. New-incarnation migration versus a future hybrid
 ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.
@@ -179,7 +183,7 @@ throttle, or stop new admission before BookKeeper capacity is exhausted. It neve
 into a synchronous Object write.
 
 Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, and `T-POLICY-01`. Required scenarios:
-`V2-BK-001..013`, `V2-POSITION-001..010`, and `V2-POLICY-001`. See
+`V2-BK-001..013`, `V2-POSITION-001..011`, and `V2-POLICY-001`. See
 [ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md),
 [ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md),
 [ADR 0022](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md),
@@ -198,4 +202,5 @@ Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, 
 [ADR 0054](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md), and
 [ADR 0055](../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md), plus
 [ADR 0056](../decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md) and
-[ADR 0057](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md).
+[ADR 0057](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md), with RANGE takeover constrained by
+[ADR 0061](../decisions/0061-v2-pulsar-range-grant-owner-takeover.md).

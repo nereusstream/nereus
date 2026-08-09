@@ -73,14 +73,15 @@ verification but cannot replace the expected descriptor, and protocol-native Kaf
 cache and materialization boundaries unless a new format explicitly defines a rewrite.
 
 Whole-Object proof establishes PUT durability and resolves uncertain recovery; it is not repeated before each routine
-NWG1 frame range. Normal random read authenticates the Root-bound header/directory and selected frame locally. A
-bounded external `directoryEnd` hint may plan a prefix request but never authorizes offsets; its exact source and
-short/long-hint assembly remain `V2-OPEN-OBJ-17`.
+NWG1 frame range. Normal random read uses the leaf's bounded exclusive `directoryPrefixEnd19`, then authenticates the
+Root-bound header/directory and selected frame locally. Short/long hints reuse already read bytes and never authorize
+offsets. A checkpoint/manifest stores structured leaf fields and reconstructs the key from the Root prefix rather than
+repeating the complete Object key.
 
-For an open Object-WAL run, the canonical sequence/length/SHA leaf key plus verified group header reconstructs that
-descriptor; the pre-open WalRun Root supplies its exact scope/prefix and recovery budgets. Asynchronous descriptor pages
-or sealed manifests may become preferred indexes, but cannot hide an ACKed tail that remains discoverable by bounded
-provider LIST.
+For an open Object-WAL run, the canonical lane/sequence/prefix-end/length/SHA leaf plus verified group header
+reconstructs that descriptor; the pre-open WalRun Root supplies its exact scope/prefix and aggregate recovery budgets.
+Asynchronous descriptor pages or sealed manifests may become preferred indexes, but cannot hide an ACKed lane tail
+that remains discoverable by bounded provider LIST.
 
 ## Timestamp and protocol-position indexes
 

@@ -36,7 +36,8 @@ replication, and transaction recovery remain downstream gates.
 ADRs 0027, 0032, and 0041 refine allocation to one deployment-wide bounded reservation registry. Each immutable Pulsar
 Protocol Cell identity owns one aligned equal `2^k` slice and follows `ACTIVE -> RETIRING -> RETIRED`; retired bounds
 remain permanent never-reuse evidence. ADR 0048 forbids every expansion path in 0.2; allocator/chain epochs and
-retirement proof remain downstream gates.
+retirement proof remain downstream gates. ADR 0061 fixes takeover constraints for a RANGE candidate without selecting
+that mode.
 
 ## Consequences
 
@@ -51,6 +52,7 @@ Numeric compatibility and reservation enforcement are refined by
 [ADR 0032](0032-v2-pulsar-virtual-ledger-reservation-registry.md),
 [ADR 0041](0041-v2-pulsar-virtual-ledger-slice-contract.md), and
 [ADR 0048](0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md); exact bootstrap geometry and cross-domain
-non-overlap are refined by [ADR 0054](0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md), and allocator-mode evidence
-by [ADR 0055](0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md). This decision refines ADR 0011 and is
-tracked by `T-POSITION-01`, `V2-POSITION-001..010`.
+non-overlap are refined by [ADR 0054](0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md), allocator-mode evidence by
+[ADR 0055](0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md), and RANGE owner takeover by
+[ADR 0061](0061-v2-pulsar-range-grant-owner-takeover.md). This decision refines ADR 0011 and is tracked by
+`T-POSITION-01`, `V2-POSITION-001..011`.

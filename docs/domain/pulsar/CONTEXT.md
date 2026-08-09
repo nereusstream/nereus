@@ -51,6 +51,12 @@ rollover/append-stall baseline. It selects neither STRICT_SERIALIZED nor RANGE_L
 _Avoid_: Active-ledger-count-only benchmark, serialized-p99-capacity metric, owner-change range reacquisition storm,
 host-selected allocator mode
 
+**ManagedLedger Range Grant**:
+A RANGE-candidate reservation permanently bound to one ManagedLedger incarnation and grant ID rather than a broker
+owner. Takeover changes only head owner epoch, may finish the same RESERVED grant when allocation state is unchanged,
+and burns at most one stale-owner candidate ID; it does not select RANGE_LEASED as the 0.2 allocator.
+_Avoid_: Owner-scoped range, takeover tail burn, unknown-response fence, installed-range use blocked by allocator clear
+
 **Pulsar Topic Generation Selector**:
 The permanent name-scoped monotonic generation authority using exact
 RESERVED→ACTIVE→DELETING→DELETED CAS transitions to fence create/delete/recreate. ACTIVE plus aggregate identity is

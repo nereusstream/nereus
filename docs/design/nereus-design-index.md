@@ -103,6 +103,9 @@ Current accepted decisions:
 - [ADR 0056: NPD1 checked envelope and derived entry row](../decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md)
 - [ADR 0057: NPD1 policy default authority and evidence](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md)
 - [ADR 0058: NWG1 directory-prefix capacity and evidence](../decisions/0058-v2-nwg1-directory-prefix-capacity-and-evidence.md)
+- [ADR 0059: Object WAL leaf directory-prefix hint](../decisions/0059-v2-object-wal-leaf-prefix-hint.md)
+- [ADR 0060: WalRun lazy lanes and vector checkpoint](../decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md)
+- [ADR 0061: Pulsar range-grant owner takeover](../decisions/0061-v2-pulsar-range-grant-owner-takeover.md)
 
 ## V2 document map
 

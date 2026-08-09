@@ -17,8 +17,8 @@ uniqueness difficult to prove across recovery.
 
 Each WalRun creates one random 256-bit data key. It is wrapped once under the immutable Cell KMS key identity and
 version recorded by the WalRun Root. Every ObjectExtent derives a unique object key from the run key and canonical,
-domain-separated shard identity, run epoch, and extent sequence inputs through HKDF-SHA-256. Shard run epochs and
-extent sequences are never reused.
+domain-separated shard identity, run epoch, lane ID, and lane-local sequence inputs through HKDF-SHA-256. Shard run
+epochs and `{laneId, laneSequence}` pairs are never reused.
 
 Within one ObjectExtent, fixed 96-bit nonces encode a domain and ordinal. One nonce domain is reserved for the combined
 encrypted/authenticated `BindingContextTable + AppendUnitDirectory`; a disjoint domain is reserved for frame ordinals.
@@ -31,8 +31,8 @@ not replace AEAD authentication.
 
 For routine random reads, successful Root-bound header/directory AEAD is the local authority for the selected frame
 range; provider whole-Object proof remains a separate durability/recovery domain. ADR 0058 bounds the maximum bytes a
-reader may fetch before authenticating that directory. A hint may plan those bytes but cannot replace in-body parsing
-or AEAD.
+reader may fetch before authenticating that directory, and ADR 0059 puts its exclusive end in the leaf. The hint plans
+bytes but cannot replace in-body parsing or AEAD.
 
 KMS unwrap and plaintext run-key caching are run-scoped and bounded by the owning Cell Provider Session. KMS key
 rotation takes effect only by sealing the current run and creating a successor Root. Per-Object KMS wrapping is not
@@ -50,5 +50,5 @@ used by the 0.2 cost-first Object WAL hot path.
 - M3 must prove key/nonce uniqueness, AAD substitution rejection, directory/frame domain separation, rotation only at
   rollover, no plaintext leakage, and KMS/cache lifecycle isolation between Protocol Cells.
 
-This decision is refined by ADR 0058, refines ADRs 0021, 0030, 0037, and 0040, and is tracked by `T-OBJECT-01`,
-`T-FABRIC-01`, and `V2-OBJ-006/007/012/013/016`.
+This decision is refined by ADRs 0058..0060, refines ADRs 0021, 0030, 0037, and 0040, and is tracked by `T-OBJECT-01`,
+`T-FABRIC-01`, and `V2-OBJ-006/007/012/013/016..018`.

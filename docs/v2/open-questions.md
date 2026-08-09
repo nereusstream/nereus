@@ -15,22 +15,21 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-Round 9 partially accepted the NPD1 checked envelope/policy evidence and NWG1 prefix-capacity derivation in ADRs
-0056..0058. It rejected ProviderObjectProof as a routine-read prerequisite, a singular WalRun-Root packing identity,
-and owner-change range-tail burn. Exact numeric values and all three replacement protocols remain open. The next
-independent frontier is:
+Round 10 accepted the leaf prefix hint, at most three lazy lane-local sequences with one vector checkpoint chain, and
+the owner-takeover correctness constraints for any RANGE candidate in ADRs 0059..0061. It explicitly rejected three
+lane-local checkpoint chains and still selected neither allocator mode. Evidence-blocked numeric/class/mode decisions
+wait; the next independent design frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-OBJ-17` | choose the durable/discardable source and exact recovery behavior of the bounded `directoryEnd` planning hint | consider encoding the bounded hint in the immutable leaf key so known extents can use prefix+frame without remote metadata or ProviderObjectProof |
-| `V2-OPEN-OBJ-19` | preserve one current WalRun while defining bounded concurrent packing lanes, sequence allocation, checkpoint pages, and Seal inventory | consider at most three lane IDs with lane-local sequences/page chains under one Root/pointer; Root carries hard lane bounds, not a Topic class |
-| `V2-OPEN-PUL-OBJ-09` | freeze ManagedLedger-incarnation range grants, owner-only takeover, one stale-candidate burn, background allocator clear, and finite churn accounting | preserve the installed range across takeover and separate visible chain head from its allocation cursor; do not select RANGE_LEASED yet |
-| `V2-OPEN-BK-11` | select exact NPD1 block/Object/adapter numeric maxima after implementation/provider evidence | retain 4 GiB/1,024 parts only as candidates and publish streaming/provider-capability receipts first |
-| `V2-OPEN-BK-13` | execute the accepted native-relative evidence and select at most three classes/default value | use ADR 0057's Deployment -> Namespace -> Topic authority and keep Cell/host as ceilings |
+| `V2-OPEN-OBJ-17`, `V2-OPEN-OBJ-19` | choose canonical lane binding/encoding and freeze the complete leaf grammar without a first-use map or Root-level soft-class identity | consider stable product-catalog packing IDs `0..2` as one-digit lane tokens with zero-based lane-local sequences |
+| `V2-OPEN-OBJ-19` | freeze one checkpoint combiner/head response-loss and takeover protocol for the accepted vector chain | consider one shard-owner-fenced async combiner; exact reread equality, successor-only retry, and bounded unreferenced-page residue |
+| `V2-OPEN-OBJ-01` | make independent per-binding contiguous ACK/frontier progress executable inside valid multi-binding Objects | consider bounded binding-scoped commit trackers/gap maps with aggregate resource ceilings and no physical-order sorting |
 
 The complete questions and recommendations are in
-[round 10](grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md). None of its recommendations is accepted
-yet.
+[round 11](grill-notes/13-restarted-grill-2-lane-binding-checkpoint-publisher-and-frontiers.md). None of its
+recommendations is accepted yet. `V2-OPEN-BK-11/13` and remaining `V2-OPEN-PUL-OBJ-09` wire/size/mode work are blocked
+on their accepted evidence protocols rather than questions in this round.
 
 ## Configuration scope
 
@@ -99,6 +98,14 @@ Resolved by [ADR 0051](../decisions/0051-v2-pulsar-selector-state-machine-and-ca
 validates ACTIVE plus aggregate identity and installs a local versioned fence, so normal append/read has no Oxia call.
 
 ## Object WAL durability verification
+
+### `V2-OPEN-OBJ-01`: per-binding frontier and cross-binding head-of-line isolation
+
+This remains open. One valid group PUT may contain commit sets from several bindings, but physical lane/Object order
+cannot become a shared protocol frontier. The remaining gate must freeze bounded per-binding contiguous completion,
+gap storage/backpressure, recovery ordering, and aggregate resource accounting so one binding's predecessor gap does
+not block another binding from the same verified Object. Failure of the shared Object/directory still affects every
+member. Round 11 asks the current recommendation.
 
 ### `V2-OPEN-OBJ-02`: resolved PUT-response-loss proof
 
@@ -197,13 +204,12 @@ A sealed run is never reopened.
 
 ### `V2-OPEN-OBJ-17`: exact NWG1 cryptographic framing
 
-The user retained AES-256-GCM/HKDF-SHA-256, fixed header/nonce/AAD/authenticated-directory direction and confirmed the
-three-GET no-hint fallback. ADR 0058 makes `maxHeaderAndDirectoryPrefixBytes` primary, derives frame capacity after row
-widths, benchmarks 4,096/16,384 first, and rejects pagination/secondary authority. ProviderObjectProof/full GET is only
-whole-Object durability/recovery proof; routine random reads use Root-bound directory/frame AEAD. The remaining gate
-must freeze exact prefix/directory/row values and the source/wire/recovery behavior of a bounded `directoryEnd` hint.
-The hint may plan prefix bytes but never authorize a frame offset; short/long hints should reuse safe bytes rather than
-blindly restart. Exact key/version/Root/AEAD mismatch still fails or uses bounded fallback.
+ADR 0058 makes `maxHeaderAndDirectoryPrefixBytes` primary, derives frame capacity after row widths, benchmarks
+4,096/16,384 first, and rejects pagination/secondary authority. ADR 0059 places an exclusive bounded
+`directoryPrefixEnd19` in every leaf, keeps it outside content digest identity, uses structured descriptors instead of
+full-key repetition, and fixes short/long incremental range reuse. Routine reads need neither ProviderObjectProof nor
+HEAD. The remaining gate must freeze exact prefix/directory/row numeric wire plus the canonical lane token/complete key
+grammar; exact key/Root/version/AEAD mismatch still fails or uses bounded fallback.
 
 ### `V2-OPEN-OBJ-18`: resolved WalRun checkpoint pages and open-tail handoff
 
@@ -213,12 +219,11 @@ is disabled, open uncovered tails always use bounded strong LIST, and the sealed
 
 ### `V2-OPEN-OBJ-19`: NWG1 typed operational policy classes
 
-Encoding and packing are separate, but the earlier singular WalRun-Root packing identity is rejected: ADR 0039 permits
-only one current Root/pointer per shard. `FrameEncodingPolicy` remains a Storage-Epoch concern; soft target/linger is a
-per-group scheduling concern and cannot create extra run lineages or require rollover on change. The remaining gate
-must freeze bounded concurrent lanes, lane/group compatibility, unique sequence/nonce allocation, checkpoint-page and
-Seal inventory, fairness/memory ceilings, and group audit fields. At most three lanes is a proposal, not yet a contract;
-former 4/16/64-MiB and 5/20/50-ms values remain evidence candidates only.
+Encoding and packing remain separate. ADR 0060 fixes one Root/pointer with at most three lazily instantiated lanes,
+lane-local sequence/ACK barriers, binding-move drain, lane-aware key/HKDF/nonce/header identity, aggregate hard budgets,
+and one run-wide checkpoint/Seal vector chain. Three lane-local chains and eager target-sized allocation are rejected.
+The remaining gate must freeze canonical lane-to-class binding/encoding, one checkpoint combiner/head conflict protocol,
+and evidence-selected class values. Former 4/16/64-MiB and 5/20/50-ms values remain candidates only.
 
 ## Storage Epoch transitions
 
@@ -398,14 +403,13 @@ domain must prove a disjoint ledger-ID namespace or use an independent deploymen
 
 ### `V2-OPEN-PUL-OBJ-09`: virtual-ledger allocator reservation and head publication
 
-This remains open. The original STRICT_SERIALIZED proposal has four successful writes, not three: allocator reserve
-CAS, immutable node put, ManagedLedger head CAS, and allocator clear CAS. STRICT_SERIALIZED and RANGE_LEASED are
-different persisted fencing/recovery protocols, not host feature flags; one Cell cannot mix them. STRICT requires ADR
-0055 evidence. The rejected RANGE proposal bound a grant to owner epoch and burned its whole tail on takeover, which
-would serialize mass range reacquisition: 10,000 ledgers x three allocator writes x 10 ms has an idealized 300-second
-lower bound. The remaining RANGE gate keeps a grant with the ManagedLedger incarnation across owner takeover, permits
-at most exact stale-candidate burn, moves allocator clear off range-use critical path, and still must freeze exact
-head/node/grant wire, every lost-response cut, orphan admission, and finite churn/rate/horizon accounting.
+This remains open. STRICT_SERIALIZED has four successful writes and still requires ADR 0055 evidence. ADR 0061 now
+constrains any RANGE candidate: the grant belongs to ManagedLedger incarnation, takeover changes only owner epoch, the
+new owner may finish the same RESERVED grant when exact allocation state is unchanged, an unknown response converges by
+exact reread, and at most one stale candidate burns. Installed-range use does not wait for allocator clear, but the
+next Cell grant does and therefore requires a high-priority reconciler. Permanent orphan evidence is bounded/admitted.
+The remaining gate must freeze exact reservation/head/node wire and range size, prove Cell grant concurrency and every
+failure cut, execute the evidence protocol, and then select at most one persisted mode.
 
 ### `V2-OPEN-PUL-OBJ-10`: allocator target-scale evidence protocol
 
@@ -473,6 +477,22 @@ For example, one Pulsar entry with batch indexes `0..2` might map to one Kafka O
 input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
+
+### Restarted Grill 2 round 10 adjusted decisions: partially resolved by ADRs 0059 through 0061
+
+Resolved on 2026-08-09 after explicit partial/adjusted confirmation:
+
+- Q1 exclusive leaf prefix hint, structured descriptors, incremental reuse, and leakage tradeoff ->
+  [ADR 0059](../decisions/0059-v2-object-wal-leaf-prefix-hint.md);
+- Q2 at most three lazy lanes, lane-local sequences/ACK barriers, aggregate budgets, and one vector chain ->
+  [ADR 0060](../decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md);
+- Q3 incarnation-owned RANGE grant, owner-only takeover, RESERVED continuation, one-candidate burn, background clear,
+  and permanent-orphan accounting ->
+  [ADR 0061](../decisions/0061-v2-pulsar-range-grant-owner-takeover.md).
+
+Three lane-local checkpoint chains are rejected. Exact numeric/class values, canonical lane/key wire, final RANGE wire /
+size/evidence, and both allocator modes remain open. The complete response is preserved in
+[the round 10 record](grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md).
 
 ### Restarted Grill 2 round 9 adjusted decisions: partially resolved by ADRs 0056 through 0058
 

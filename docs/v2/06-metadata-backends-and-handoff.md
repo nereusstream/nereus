@@ -104,20 +104,26 @@ Allocator mode remains open. ADR 0055 requires a source-qualified native-relativ
 before selection and starts RANGE_LEASED correctness design in parallel with STRICT evidence, including mass broker
 takeover. A future allocator record may persist only mode, protocol version, and recovery/fencing identities; observed
 rate/queue/latency/recovery budgets belong to versioned Cell policy/evidence and never to host-selected durable
-identity. RANGE grant ownership, head/cursor split, stale-candidate burn, background clear, and orphan/churn accounting
-remain open; a broker owner change cannot be assumed to require serialized reacquisition of every range.
+identity. ADR 0061 requires any RANGE grant to bind ManagedLedger incarnation rather than owner. Owner-only head CAS
+preserves an installed range; a new owner may finish the same unchanged RESERVED grant, and exact response-unknown
+reread differs from definitive conflict fencing. At most one stale candidate burns. Allocator clear runs through a
+high-priority reconciler and blocks the next grant, not current installed-range use. Exact wire/size/mode remain open.
 
 ## Object WalRun control records
 
 Each Object-WAL shard stores a bounded immutable `WalRunRootRecord` in its Protocol Cell control-metadata backend. A
-separate immutable `WalRunSealRecord` records terminal sequence and typed coverage; sealing never mutates the Root. A
+separate immutable `WalRunSealRecord` records the terminal lane-sequence vector, final checkpoint head, and typed
+coverage; sealing never mutates the Root. A
 successor Root binds predecessor Root+Seal identities, and one exact-version CAS advances `CurrentWalRunPointer` only
 after the successor exists. Lost create/CAS responses converge by exact reread equality. These are rollover/recovery
 cuts; normal admitted append performs no metadata read or mutation.
 
-Asynchronous checkpoint pages cover at most 256 contiguous extents/64 KiB each. Their cadence is Cell x shard policy,
-but finite uncovered extent/byte/age limits always force progress, backpressure, or rollover. Open recovery/handoff LISTs
-the uncovered tail, and the Seal binds the final mandatory gap-free page chain. Policy changes begin with the next Root.
+Up to three packing lanes instantiate lazily beneath that one Root/pointer and share aggregate hard budgets. One
+run-wide asynchronous checkpoint predecessor chain covers at most 256 descriptors/64 KiB per page and carries a
+per-lane `coveredThrough` vector. Cadence is Cell x shard policy; aggregate uncovered extent/byte and per-lane age limits
+force progress. Open recovery/handoff LISTs every uncovered lane tail, and the Seal binds one mandatory final vector
+chain. Three lane-local chains are rejected. Checkpoint cadence and hard-envelope policy changes begin with the next
+Root; Topic packing changes follow the group-boundary rule in ADR 0060 and do not roll the run merely to change linger.
 
 ## Ownership token
 
@@ -152,4 +158,4 @@ hide in an aggregate append metric.
 
 Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios:
 `V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015`, `V2-HO-001`, `V2-FABRIC-001`,
-`V2-POLICY-001`, and `V2-POSITION-002..010`.
+`V2-POLICY-001`, and `V2-POSITION-002..011`.

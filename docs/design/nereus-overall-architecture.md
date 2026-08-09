@@ -158,13 +158,13 @@ Extent; every frame carries its own binding, incarnation, Storage Epoch, Owner E
 frontiers advance independently per binding, so one unrelated binding does not impose a shard-wide correctness barrier.
 
 One pre-open WalRun Root fixes physical scope, prefix, run/session identity, binding-context epoch-validation rules,
-format families, hard run bounds, and cumulative recovery envelope. A low-frequency hashed CAS pointer anchors the
-current root and bounded predecessor lineage. Each conditional group key includes fixed-width sequence/body length plus
-the complete SHA-256; restart discovers the ACKed open tail through bounded strong same-prefix LIST, without adding a
-per-group metadata commit. Async checkpoint pages are Cell x shard accelerators with mandatory uncovered-tail
-extent/byte/age bounds. Open-tail recovery still LISTs uncovered state, and the Seal binds a final gap-free page chain.
-The Root does not carry one Topic-specific soft packing class and the shard still has one current pointer; bounded
-multi-class lane sequence/inventory remains open.
+format families, aggregate hard run bounds, and cumulative recovery envelope. A low-frequency hashed CAS pointer
+anchors the current root and bounded predecessor lineage. Up to three builders instantiate lazily under that one Root;
+each owns lane-local sequence/ACK order while shared recovery/memory budgets remain aggregate. Each leaf carries lane,
+sequence, exclusive directory-prefix end, body length, and complete SHA-256; structured checkpoints rebuild the key
+from the Root prefix. Restart discovers the ACKed open tail through bounded strong LIST without a per-group metadata
+commit. One async run-wide checkpoint predecessor chain carries a per-lane coverage vector, and the Seal binds one
+terminal sequence vector/final head. Three lane-specific chains, Roots, or pointers are not used.
 
 NWG1 stores an authoritative in-body Binding Context Table and Append Unit Directory. Exact binding/Storage/Owner Epoch
 authority is object-local rather than singular in a multi-binding root. One Kafka commit set stays inside one extent and
@@ -173,9 +173,10 @@ run-scoped data key, derives one key per ObjectExtent, and separates authenticat
 KMS rotation happens only at run rollover.
 
 Routine random reads authenticate the Root-bound in-body header/directory and selected frame without first requiring a
-new full-Object provider proof. Without a hint they use header, directory, and frame GETs. ADR 0058 makes prefix bytes
-the primary cap, derives frame capacity from the directory budget, and prioritizes 4,096/16,384-frame evidence without
-adding a paginated or second-authority directory.
+new full-Object provider proof. The leaf's exclusive bounded prefix end normally gives prefix plus frame GET; without
+it, recovery uses header, directory, and frame GETs. Short/long hints reuse already read bytes, and the hint cannot
+authorize an offset. ADR 0058 makes prefix bytes the primary cap and prioritizes 4,096/16,384-frame evidence without a
+paginated or second-authority directory. The exposed approximate directory size is an accepted key-metadata tradeoff.
 
 WalRun Root and Seal are separate immutable Cell control-metadata records. A successor binds both predecessor
 identities, then one exact CAS advances the current-run pointer. A pointer left on a sealed run is recovered forward and
@@ -216,9 +217,10 @@ deferred beyond 0.2.
 
 STRICT_SERIALIZED and RANGE_LEASED remain open allocator protocols. ADR 0055 requires maximum sustainable rollover RPS
 under every predeclared SLO, actual rollover distribution/jitter/storm/failure cuts, and native Pulsar
-rollover/append-stall comparison, including mass broker takeover. RANGE correctness is designed in parallel rather than
-hidden behind a host switch; owner-change whole-tail burn and serialized reacquisition are rejected inputs, not an
-accepted allocator.
+rollover/append-stall comparison, including mass broker takeover. Any RANGE candidate keeps its grant with the
+ManagedLedger incarnation across owner-only head fencing, lets a new owner finish the same RESERVED grant, and burns at
+most one stale candidate. Installed-range use does not wait for allocator clear, but a high-priority reconciler must
+unblock the next Cell grant. These constraints do not select RANGE_LEASED.
 
 For Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole attempt, completion,
 read/fallback, and deletion-eligibility authority. Nereus provides a `LedgerOffloader`; its manifest is derived and cannot

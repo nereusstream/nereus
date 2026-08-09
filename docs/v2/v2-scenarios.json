@@ -188,6 +188,14 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-POSITION-011",
+      "milestone": "M1/M3",
+      "contract": "any RANGE candidate keeps grants with ManagedLedger incarnation across owner only takeover can finish the same unchanged RESERVED grant burns at most one stale candidate and leaves allocator clear off installed range use",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-MULTIPROTOCOL-001",
       "milestone": "M1",
       "contract": "one Storage Fabric hosts independent Kafka and Pulsar Protocol Cells without shared position or write authority",
@@ -270,7 +278,7 @@
     {
       "id": "V2-OBJ-005",
       "milestone": "M3",
-      "contract": "one pre open WalRun root plus sequence length SHA leaf keys and bounded strong LIST discovers every ACKed open run group without per group metadata",
+      "contract": "one pre open WalRun root plus lane sequence directory prefix end length SHA leaf keys and bounded strong LIST discovers every ACKed open run group without per group metadata",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -294,7 +302,7 @@
     {
       "id": "V2-OBJ-008",
       "milestone": "M3",
-      "contract": "process loss recovery verifies provider present groups fences a proven absent never ACKed gap and never claims local journal or deterministic nonce replay",
+      "contract": "process loss recovery verifies provider present groups stops and seals the run on a proven absent never ACKed lane gap preserves other lanes ACKed extents and never claims local journal or deterministic nonce replay",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -334,7 +342,7 @@
     {
       "id": "V2-OBJ-013",
       "milestone": "M3",
-      "contract": "NWG1 uses one KMS wrapped WalRun key unique HKDF derived Object keys and disjoint authenticated directory and frame nonce domains",
+      "contract": "NWG1 uses one KMS wrapped WalRun key laneId laneSequence bound unique HKDF derived Object keys and disjoint authenticated directory and frame nonce domains",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -342,7 +350,7 @@
     {
       "id": "V2-OBJ-014",
       "milestone": "M3/M7",
-      "contract": "immutable control metadata Root and Seal records plus one exact pointer CAS publish each WalRun successor without reopening a sealed run",
+      "contract": "immutable Root and vector terminal Seal records plus one exact pointer CAS publish each WalRun successor without reopening a sealed run",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -350,7 +358,7 @@
     {
       "id": "V2-OBJ-015",
       "milestone": "M3/M7",
-      "contract": "asynchronous checkpoint pages are Cell shard scoped with mandatory uncovered tail limits open tail LIST and a sealed final gap free canonical chain",
+      "contract": "asynchronous checkpoint pages form one Cell shard run wide vector chain with aggregate uncovered tail bounds per lane age limits open tail LIST and a sealed final gap free inventory",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -359,6 +367,22 @@
       "id": "V2-OBJ-016",
       "milestone": "M3",
       "contract": "NWG1 hard caps header directory prefix before deriving frame capacity and routine Root bound directory frame AEAD range reads do not require ProviderObjectProof full GET",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-017",
+      "milestone": "M3",
+      "contract": "every NWG1 leaf carries a bounded exclusive directory prefix end while structured descriptors reconstruct its Root scoped key and the hint never authenticates offsets",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-018",
+      "milestone": "M3/M7",
+      "contract": "one Root pointer owns at most three lazy lane local sequences and one run wide vector checkpoint Seal chain under aggregate hard budgets",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null

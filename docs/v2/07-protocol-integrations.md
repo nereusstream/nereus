@@ -89,8 +89,9 @@ latency tradeoff. Every path keeps
 `PulsarPosition(ledgerId, entryId)`, MessageId, and the ledger chain as protocol truth; Object/BookKeeper coordinates
 remain Physical Extents. STRICT_SERIALIZED and RANGE_LEASED remain unselected; ADR 0055 requires actual rollover
 distribution/storm/crash evidence and native Pulsar rollover/append-stall comparison while RANGE fencing/recovery is
-designed in parallel. Broker-wide takeover is an explicit scale cut, and the rejected owner-scoped range design cannot
-reacquire every ManagedLedger range through one serialized allocator.
+designed in parallel. Broker-wide takeover is an explicit scale cut. Any RANGE candidate preserves an installed
+ManagedLedger-incarnation grant across owner-only head fencing, permits takeover completion of the same RESERVED grant,
+and burns at most one stale candidate; this correctness structure still does not select that mode.
 
 Object frames retain exact assigned Kafka RecordBatch bytes or exact Pulsar ManagedLedger entry bytes after only the
 outer Object envelope is decoded. Kafka makes all frames from one partition storage append an all-or-none commit set;
@@ -98,9 +99,10 @@ Pulsar makes one entry one frame/commit set. CRC32C/v1 protects each protocol-na
 checksum remains independently validated. NWG1 stores its authoritative binding contexts and append-unit directory in
 the Object body; one Kafka commit set never spans ObjectExtents and every frame block is independently decoded. NWG1
 uses one KMS-wrapped run key, domain-separated per-Object keys, and disjoint authenticated directory/frame nonce
-domains. Immutable Root and Seal records live in Cell control metadata; one exact CAS advances the current-run pointer.
-Checkpoint pages are Cell x shard scoped async accelerators; uncovered open tails always require bounded strong LIST,
-and the sealed final gap-free inventory cannot be disabled.
+domains. Every known leaf carries the bounded exclusive directory-prefix end, so routine reads need no provider proof
+or extra HEAD before prefix+frame GET. Up to three lazy packing lanes bind keys/HKDF/nonces to lane-local sequences
+under one Root/pointer. Checkpoint pages remain Cell x shard async accelerators but use one run-wide predecessor/vector
+chain, not one chain per lane; uncovered tails still require LIST and the sealed final vector inventory is mandatory.
 
 The parity matrix covers at least:
 
@@ -135,5 +137,5 @@ against V2 bindings, protocol-native Kafka work, and the then-current KoP source
 
 Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `T-POLICY-01`, `T-PROJECTION-01`,
 `T-BENCH-01`, and `T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`,
-`V2-PROJECTION-001`, `V2-POSITION-002..010`, `V2-OBJ-004..016`, `V2-BK-005..013`,
+`V2-PROJECTION-001`, `V2-POSITION-002..011`, `V2-OBJ-004..018`, `V2-BK-005..013`,
 `V2-KAF-META-001..003`, `V2-POLICY-001`, `V2-KAF-001`, `V2-PUL-001`, and `V2-KOP-001`.

@@ -117,11 +117,17 @@ _Avoid_: ETag proof, user-metadata checksum echo, composite checksum, full GET b
 
 **WalRun Root**:
 The immutable Cell control-metadata authority for one Object-WAL shard run. It fixes scope, prefix, run/session
-identity, epoch-validation rules, format families, wrapped run-key identity, initial sequence, and bounded LIST recovery
-budgets; per-group descriptors are reconstructed from content-addressed leaf keys and verified headers. It does not
-carry one Topic-specific soft packing class.
+identity, epoch-validation rules, format families, wrapped run-key identity, lane-sequence contract, and aggregate
+bounded LIST/recovery budgets; per-group descriptors are reconstructed from leaf keys and verified headers. It does
+not carry one Topic-specific soft packing class or a per-lane copy of the recovery budget.
 _Avoid_: Per-group metadata commit, Root-level packing class, pointer per class, sealed-run-only discovery, unbounded
 prefix scan
+
+**WalRun Scheduling Lane**:
+One of at most three lazily instantiated packing-class lanes under a single WalRun Root/pointer. It owns a stable
+lane ID, lane-local sequence/ACK barrier, bounded builder, and in-flight limit; all run/recovery budgets remain
+aggregate and checkpoint publication uses one vector chain.
+_Avoid_: Eager target-sized buffers, lane-specific Root/pointer, cross-lane ACK barrier, lane-local checkpoint chain
 
 **Current WalRun Pointer**:
 The one low-frequency per-shard CAS authority binding the current WalRun Root key/SHA and shard run epoch. It anchors a
@@ -129,14 +135,22 @@ bounded predecessor lineage; normal admitted group append does not mutate it.
 _Avoid_: Root-prefix LIST, per-group pointer update, locally merged lineage
 
 **WalRun Seal**:
-The immutable Cell control-metadata record that binds one Root to its terminal sequence and exact typed coverage. A
-successor Root references both predecessor Root and Seal before the current pointer advances.
+The immutable Cell control-metadata record that binds one Root to its terminal lane-sequence vector, one final
+checkpoint-head SHA, and exact typed coverage. A successor Root references both predecessor Root and Seal before the
+current pointer advances.
 _Avoid_: Mutating the Root to seal, reopening a sealed run, pointer advance before successor publication
 
 **WalRun Checkpoint Page**:
-An asynchronous immutable page of at most 256 contiguous extents and 64 KiB canonical bytes. It accelerates recovery,
-but an open uncovered tail still requires bounded strong LIST and a sealed run requires a final gap-free page chain.
-_Avoid_: Per-topic checkpoint switch, ACK dependency, checkpoint overriding provider bytes
+An asynchronous immutable page in the one run-wide predecessor chain, with at most 256 aggregate descriptors/64 KiB
+and a per-lane `coveredThrough` vector. It may advance any subset of lanes contiguously; open uncovered tails still
+require LIST and the Seal requires one final gap-free vector chain.
+_Avoid_: Per-topic checkpoint switch, ACK dependency, one chain/head per lane, checkpoint overriding provider bytes
+
+**Directory Prefix Hint**:
+The exclusive `directoryPrefixEnd19` embedded in every NWG1 leaf key. It plans a bounded prefix GET under the exact
+Root/key identity but does not enter the body digest, prove durability, authenticate the directory, or authorize frame
+offsets. Structured descriptors reconstruct the key from the Root prefix rather than repeat it.
+_Avoid_: Provider proof prerequisite, manifest-only hint, full key per checkpoint row, authenticated offset authority
 
 **Binding Context Table**:
 The bounded NWG1 table that binds frames to exact Topic Incarnation, binding, Storage Epoch, and Owner Epoch authority
@@ -152,8 +166,8 @@ commit set spanning ObjectExtents, record-count-derived coverage
 
 **NWG1 Run Key**:
 The random 256-bit WalRun data key wrapped once under the immutable Cell KMS key/version. HKDF derives per-Object keys;
-directory and frame AEAD use disjoint fixed nonce domains.
-_Avoid_: Per-PUT KMS wrap, topic-wide key, reused run epoch/sequence/nonce
+directory and frame AEAD use disjoint fixed nonce domains, and derivation binds lane ID plus lane-local sequence.
+_Avoid_: Per-PUT KMS wrap, topic-wide key, reused run epoch/lane/sequence/nonce
 
 **Recovery Envelope**:
 The cumulative worst-case bound over all work required to recover admitted Object-WAL state. Normal ACK/admission must
