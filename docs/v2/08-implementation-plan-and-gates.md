@@ -14,12 +14,12 @@ sourceTuple: v2-m0
 | Milestone | Scope | Status at M0 | Required aggregate |
 | --- | --- | --- | --- |
 | M0 | V1 archive references, Context Map/glossaries, V2 ADRs/contracts, open-question/session logs, source/scenario manifests, tradeoff register, documentation gate | DocumentationGated | `v2M0Check` |
-| M1 | typed protocol-native incarnations and deterministic aggregate IDs; one physical aggregate; deployment-wide virtual-ledger registry/chain model; capability-split metadata SPI; remove superseded V1 API | Planned | `v2M1Check` |
-| M2 | Owner Epoch lane, typed frontier contract, BookKeeper foundation, Pulsar deterministic data/root keys and bounded root/read/delete lifecycle, Kafka ledger-layout scale spike | Planned | `v2M2Check` |
-| M3 | one-cell Object WAL groups; pre-open WalRun roots and bounded strong-LIST discovery; SHA-256 extents; CRC32C protocol frames and Kafka commit sets; provider proof/session lifecycle; per-binding frontier; Pulsar virtual-ledger Object path | Planned | `v2M3Check` |
+| M1 | typed protocol-native incarnations and deterministic IDs; closed aggregate logical schema v1 and Kafka level-2 bootstrap contract; deployment registry plus immutable slice identity/lifecycle/geometry; capability-split metadata SPI; remove superseded V1 API | Planned | `v2M1Check` |
+| M2 | Owner Epoch lane, typed frontier contract, BookKeeper foundation, Pulsar deterministic pair plus bounded NPO1/read-fallback/final-delete revalidation lifecycle, Kafka ledger-layout scale spike | Planned | `v2M2Check` |
+| M3 | one-cell NWG1 Object WAL groups; binding-context epoch authority and commit-set co-location; content-addressed strong-LIST discovery; provider-absent crash cuts; bounded run/recovery envelope/current-root lineage; provider proof/session lifecycle; per-binding frontier; Pulsar virtual-ledger Object path | Planned | `v2M3Check` |
 | M4 | manifest, protocol-position/timestamp indexes, Storage Epoch resolver, readable active tail | Planned | `v2M4Check` |
 | M5 | materialization, compaction, retention, source protection, per-cell cache/task isolation, physical GC | Planned | `v2M5Check` |
-| M6 | Kafka KRaft integration and protocol compatibility | Planned | `v2M6Check` |
+| M6 | Kafka KRaft level-2 record/image/snapshot integration and protocol compatibility | Planned | `v2M6Check` |
 | M7 | fencing, planned handoff, bounded recovery, cell-local drain/close isolation, mixed-profile operations | Planned | `v2M7Check` |
 | M8 | scale, shared-infrastructure/noisy-neighbor chaos, exact-source AutoMQ comparison, Pulsar native parity, release evidence | Planned | `v2M8Check` and `v2FinalCheck` |
 

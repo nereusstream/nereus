@@ -43,5 +43,7 @@ attempt-inventory and partial-delete contract.
   whole-ledger `ReadHandle` equivalence, idempotent two-key deletion, and UUID isolation.
 
 The deterministic keys, root contract, and lifecycle order are refined by
-[ADR 0029](0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md). This decision refines ADRs 0017 and 0020 and is tracked
-by `T-BK-01`, `V2-BK-002`, `V2-BK-004`, and `V2-BK-005`.
+[ADR 0029](0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md); NPO1 and native dual-source safety are refined by
+[ADRs 0035](0035-v2-pulsar-npo1-sealed-ledger-root-format.md) and
+[0036](0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md). This decision refines ADRs 0017 and 0020 and is
+tracked by `T-BK-01`, `V2-BK-002`, and `V2-BK-004..008`.

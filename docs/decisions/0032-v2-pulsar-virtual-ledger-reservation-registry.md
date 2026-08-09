@@ -37,9 +37,10 @@ constructing a merged table locally.
 - `V2-OPEN-PUL-OBJ-03` is resolved.
 - Allocation updates serialize on one bounded record and cannot scale beyond its explicit capacity.
 - The design proves global non-overlap without relying on an unavailable multi-key transaction.
-- Slice identity/lifecycle/sizing, exhaustion, registry/slice/allocator epochs, allocation response loss, and Ledger
-  Chain publication remain downstream gates.
+- Slice identity/lifecycle/geometry are refined by ADR 0041. Exact `k`, resize, registry/slice/allocator epochs,
+  allocation response loss, and Ledger Chain publication remain downstream gates.
 - M1 must prove concurrent assignment, response loss, canonical ordering, overlap/range/reuse rejection, derived-index
   loss/rebuild, stale watch rejection, capacity exhaustion, and native-exclusion evidence drift.
 
-This decision refines ADR 0027 and is tracked by `T-POSITION-01`, `V2-POSITION-003`, and `V2-POSITION-004`.
+This decision is refined by [ADR 0041](0041-v2-pulsar-virtual-ledger-slice-contract.md), refines ADR 0027, and is tracked
+by `T-POSITION-01`, `V2-POSITION-003..007`.

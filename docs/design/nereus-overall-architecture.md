@@ -69,7 +69,9 @@ Binding plus initial epoch are one immutable `TopicBindingAggregateRecord`. Kafk
 result; MetadataStore/Oxia creates one key and resolves a lost response by exact reread equality. Binding and epoch APIs
 are typed projections, not separately writable authorities. Kafka native topic UUID or Pulsar persistence-name plus
 generation is the typed incarnation/ABA fence; aggregate and binding/initial-epoch IDs are retry-stable deterministic
-derivations. Partial or conflicting state never admits I/O.
+derivations. One closed logical aggregate schema v1 maps to Oxia and Kafka physical records. Kafka activates it only at
+fresh-bootstrap `nereus.storage.version=2`; V1 and runtime transitions are rejected. Partial or conflicting state never
+admits I/O.
 
 Ownership grants an exclusive Owner Epoch inside that binding. Kafka uses KRaft; Pulsar uses MetadataStore/Oxia plus
 native broker/ManagedLedger authority. Owner Epoch and Storage Epoch are distinct.
@@ -140,10 +142,15 @@ Object WAL uses bounded group commit to control request cost. A group-level node
 Extent; every frame carries its own binding, incarnation, Storage Epoch, Owner Epoch, and typed Protocol Coverage. ACK
 frontiers advance independently per binding, so one unrelated binding does not impose a shard-wide correctness barrier.
 
-One pre-open WalRun Root fixes scope, prefix, run/session identity, epoch-validation rules, format families, and bounded
-recovery budgets. Each conditional group key includes fixed-width sequence/body length plus the complete SHA-256;
-restart discovers the ACKed open tail through bounded strong same-prefix LIST, without adding a per-group metadata
-commit. Async checkpoint pages only accelerate it.
+One pre-open WalRun Root fixes physical scope, prefix, run/session identity, binding-context epoch-validation rules,
+format families, hard run bounds, and cumulative recovery envelope. A low-frequency hashed CAS pointer anchors the
+current root and bounded predecessor lineage. Each conditional group key includes fixed-width sequence/body length plus
+the complete SHA-256; restart discovers the ACKed open tail through bounded strong same-prefix LIST, without adding a
+per-group metadata commit. Async checkpoint pages only accelerate it.
+
+NWG1 stores an authoritative in-body Binding Context Table and Append Unit Directory. Exact binding/Storage/Owner Epoch
+authority is object-local rather than singular in a multi-binding root. One Kafka commit set stays inside one extent and
+each frame block is independently compressed, authenticated, and decoded.
 
 The WAL object is already the durable Object copy. SHA-256/v1 protects the exact canonical provider request body;
 CRC32C/v1 independently protects exact assigned Kafka batch bytes or exact Pulsar ManagedLedger entry bytes after the
@@ -156,6 +163,8 @@ commit set. One Pulsar ManagedLedger entry is one frame/commit set. Object group
 After PUT-response loss, HEAD is sufficient only when a typed Provider Object Proof matches immutable version, exact
 length, SHA-256, and `FULL_OBJECT` scope; otherwise recovery performs a bounded full GET. ETag, application user
 metadata, and composite checksum scope are insufficient, and an unverifiable provider is rejected for Object WAL.
+After process loss, a present group is verified; a proven-absent never-ACKed gap fences the old run and retries only in a
+fresh run. Unknown presence remains fail-closed; 0.2 has no local ciphertext journal claim.
 
 Detailed contract: [Object WAL](../v2/03-object-wal.md).
 
@@ -169,15 +178,18 @@ ordering, and lifecycle. Cross-ledger Pulsar Coverage is a ledger-keyed range co
 The exact Kafka ledger layout remains an M2 evidence gate. Pulsar async Object offload processes sealed non-current
 ledgers only; one native attempt publishes one bounded data Object followed by one deterministic sparse-index/root
 Object. It does not stream the current append ledger in 0.2. Pulsar Object WAL allocates increasing virtual ledger IDs
-from a native-excluded cell slice assigned by one bounded deployment-wide CAS registry. Explicit MetadataStore/Oxia
-links remain Ledger Chain authority, while Object groups remain Physical Extents. BookKeeper/Object profile-transition
-mechanics are deferred beyond 0.2.
+from one fixed aligned, never-reused Cell slice assigned by a bounded lifetime CAS registry. Slice ownership survives
+broker/provider change and retirement leaves a permanent tombstone. Explicit MetadataStore/Oxia links remain Ledger
+Chain authority, while Object groups remain Physical Extents. BookKeeper/Object profile-transition mechanics are
+deferred beyond 0.2.
 
 For Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole attempt, completion,
 read/fallback, and deletion-eligibility authority. Nereus provides a `LedgerOffloader`; its manifest is derived and cannot
 delete a ledger or overrule native lifecycle state. The offloader exposes the deterministic data/root pair as one
 ledger-equivalent `ReadHandle`; persisted attempt location/key derivation survives config drift, the bounded root binds
-sealed metadata and contiguous data coverage, and cleanup proves root absent before data deletion.
+sealed metadata and contiguous data coverage using NPO1 hard parser limits. While both sources are eligible, native
+reads allow one whole-range fallback; exact Object revalidation precedes `bookkeeperDeleted=true`. Cleanup proves root
+absent before data deletion.
 
 Detailed contract: [BookKeeper and Pulsar](../v2/04-bookkeeper-and-pulsar.md).
 
@@ -198,8 +210,8 @@ Ownership tokens bind Protocol Cell, Topic Protocol Binding, Topic Incarnation, 
 version. Stale owners cannot admit new positions or publish an in-flight completion.
 
 Planned handoff may provide a short-lived hint containing typed durable/readable frontiers, active Physical Extent, and
-manifest root. The target validates the hint and otherwise performs bounded durable recovery. The hint is never the only
-correctness path.
+manifest root. The target validates the hint and otherwise starts from the authoritative current-WalRun pointer and
+performs bounded durable recovery. The hint is never the only correctness path.
 
 Detailed contract: [Metadata backends and handoff](../v2/06-metadata-backends-and-handoff.md).
 

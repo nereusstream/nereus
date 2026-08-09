@@ -35,6 +35,10 @@ plus generation. Its value repeats the complete discriminated identity, and bind
 domain-separated SHA-256 derivations. Name-only keys, random IDs, time, log offsets, and backend versions cannot define
 durable aggregate identity.
 
+Logical `TopicBindingAggregateV1` has one whole-record schema version and a closed immutable binding plus ordinal-zero
+epoch payload. Backend envelopes/records map through one validator: Oxia uses schema/min-reader 1, while Kafka uses
+controller-record wire v0 for the same logical v1. Mutable lifecycle/owner/time/attempt/backend fields are excluded.
+
 ADR 0016 excludes Access Projection and Migration Link runtime from 0.2. The M1 model rejects a second Native Write
 Authority but does not expose `ProjectionMapStore`. A future accepted runtime must keep its map and authority-transfer
 contracts as separate capabilities and may not create a per-append cross-protocol metadata dependency.
@@ -44,6 +48,11 @@ contracts as separate capabilities and may not create a per-append cross-protoco
 Kafka uses KRaft as the durable authority for Topic Protocol Binding, Storage Epoch roots, partition ownership
 projection, low-frequency manifest roots, and typed logical trim required by the Kafka runtime. Controller records must
 be versioned and replay-deterministic.
+
+Kafka activates V2 only when a fresh storage format/bootstrap finalizes `nereus.storage.version=2`. A V2 node supports
+only `[2,2]`; level 1 remains V1 and is rejected. Generic runtime 0/1-to-2 updates and 2-to-0/1 downgrades are forbidden.
+At level 2, a successful native CreateTopics item publishes the aggregate in the same atomic result; validate-only and
+native failed items publish nothing.
 
 High-churn materialization heartbeats, cache state, and per-append data do not belong in the KRaft log. Background work
 uses deterministic assignment from durable roots or a separately bounded coordinator whose loss only delays work.
@@ -64,6 +73,11 @@ canonical complete assignment table uses one-key CAS and a monotonic registry ep
 derived. The cell's allocator operates only inside its current slice; missing, overlapping, drifted, revoked, or
 capacity-exhausted registry state blocks allocation. Reservation checks are low-frequency control-plane work, not
 normal append metadata I/O.
+
+Every assignment is owned by an immutable Pulsar Protocol Cell tuple and follows
+`ACTIVE -> RETIRING -> RETIRED`; retired rows and bounds remain forever. Each Cell has one immutable aligned `2^k`
+slice, while numeric and encoded/lifetime registry limits jointly bound capacity. Broker/session/provider changes do not
+change ownership or consume another assignment.
 
 ## Ownership token
 
@@ -96,5 +110,5 @@ For admitted normal append, both remote metadata read and mutation counters must
 topic-open, rollover publication, trim, and background lifecycle work are separately labeled and budgeted so they cannot
 hide in an aggregate append metric.
 
-Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, and `T-FABRIC-01`. Required scenarios: `V2-META-001..003`,
-`V2-HO-001`, `V2-FABRIC-001`, and `V2-POSITION-002..004`.
+Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, and `T-FABRIC-01`. Required scenarios: `V2-META-001..004`,
+`V2-KAF-META-001`, `V2-HO-001`, `V2-FABRIC-001`, and `V2-POSITION-002..007`.

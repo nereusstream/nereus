@@ -12,8 +12,8 @@ sourceTuple: v2-m0
 Date: 2026-08-09
 
 ADRs 0028 through 0032 resolved the previous frontier. This record preserves the next independent questions and
-recommendations presented to the user. None of the recommendations below is an accepted runtime contract until the
-user explicitly confirms it.
+recommendations presented to the user. The user subsequently confirmed all fourteen recommendations. The accepted
+contracts are ADRs 0033 through 0041; this session record is not runtime evidence.
 
 ## Source facts used for recommendations
 
@@ -205,8 +205,36 @@ bounded registry proof。是否允许 resize/第二 slice 必须在这个几何�
 - `V2-OPEN-OBJ-01`, `V2-OPEN-BK-02`, and `V2-OPEN-BENCH-01` remain executable evidence gates rather than prose
   questions.
 
-## Awaiting explicit confirmation
+## Confirmed answer and authoritative synchronization
 
-No recommendation in this round has been promoted into an ADR or normative contract. The user may confirm all fourteen,
-confirm a subset by question number, or revise any recommendation. Confirmed answers will be synchronized immediately;
-unconfirmed alternatives remain only in this session record and the open-question log.
+The user answered: “全部按推荐确认”. The decisions were synchronized as follows:
+
+- Q1 / `V2-OPEN-META-04` →
+  [ADR 0033](../../decisions/0033-v2-topic-binding-aggregate-logical-schema-v1.md): one closed whole-record logical
+  schema v1 and shared backend-independent validator;
+- Q2 / `V2-OPEN-KAF-META-01` →
+  [ADR 0034](../../decisions/0034-v2-kafka-feature-level-2-bootstrap-activation.md): feature level 2 is fresh-bootstrap
+  only, while V1 replay and every runtime upgrade/downgrade are rejected;
+- Q3 / `V2-OPEN-BK-06` →
+  [ADR 0035](../../decisions/0035-v2-pulsar-npo1-sealed-ledger-root-format.md): bounded big-endian NPO1 root structure,
+  canonical rules, and hard parser limits;
+- Q4–Q5 / `V2-OPEN-BK-07..08` →
+  [ADR 0036](../../decisions/0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md): final Object
+  revalidation before source deletion and one-shot whole-range native fallback;
+- Q6 / `V2-OPEN-OBJ-09` →
+  [ADR 0037](../../decisions/0037-v2-object-wal-binding-context-epoch-authority.md): run roots remain physical while
+  object-local binding contexts carry exact incarnation and epochs;
+- Q7 / `V2-OPEN-OBJ-10` →
+  [ADR 0038](../../decisions/0038-v2-object-wal-provider-absent-crash-contract.md): no local ciphertext journal in 0.2;
+  a proven-absent never-ACKed gap fences the old run and retries only in a fresh run;
+- Q8–Q10 / `V2-OPEN-OBJ-11..13` →
+  [ADR 0039](../../decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md): hard run bounds,
+  recovery-envelope admission, and one CAS current-root pointer with bounded lineage;
+- Q11 / `V2-OPEN-OBJ-14` →
+  [ADR 0040](../../decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md): authoritative in-body NWG1 directory,
+  independent frame blocks, and commit-set co-location;
+- Q12–Q14 / `V2-OPEN-PUL-OBJ-04..06` →
+  [ADR 0041](../../decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md): durable Cell owner identity,
+  irreversible slice lifecycle, fixed aligned geometry, and lifetime capacity bounds.
+
+Implementation and executable evidence remain NotStarted.

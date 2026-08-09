@@ -52,6 +52,22 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-META-004",
+      "milestone": "M1",
+      "contract": "one closed aggregate logical schema v1 contains the immutable binding plus ordinal zero epoch and excludes mutable or retry dependent state",
+      "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-META-001",
+      "milestone": "M1/M6",
+      "contract": "Kafka V2 activates only at fresh bootstrap nereus storage version 2 and rejects V1 plus every runtime upgrade or downgrade",
+      "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-POSITION-001",
       "milestone": "M1",
       "contract": "Kafka Offset and Pulsar Position remain binding and incarnation scoped typed domains without a universal logical offset",
@@ -79,6 +95,30 @@
       "id": "V2-POSITION-004",
       "milestone": "M1",
       "contract": "one bounded deployment registry is virtual ledger slice allocation authority and per cell lookups are derived",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-005",
+      "milestone": "M1",
+      "contract": "virtual ledger slice owner identity is the durable deployment reservation domain and Pulsar Protocol Cell tuple independent of broker and provider state",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-006",
+      "milestone": "M1/M3",
+      "contract": "slice lifecycle is irreversible ACTIVE RETIRING RETIRED and retired assignments remain permanent never reuse tombstones",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-007",
+      "milestone": "M1",
+      "contract": "every Cell has one immutable aligned power of two slice and deployment capacity is bounded by numeric and lifetime encoded registry limits",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -180,6 +220,54 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-OBJ-007",
+      "milestone": "M3",
+      "contract": "a multi binding WalRun Root remains physical while bounded NWG1 binding contexts carry each frame exact incarnation and Storage and Owner Epochs",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-008",
+      "milestone": "M3",
+      "contract": "process loss recovery verifies provider present groups fences a proven absent never ACKed gap and never claims local journal or deterministic nonce replay",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-009",
+      "milestone": "M3",
+      "contract": "every WalRun has immutable count byte age and predecessor bounds and rolls over before any bound is crossed",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-010",
+      "milestone": "M3",
+      "contract": "normal ACK and admission preserve one cumulative worst case recovery envelope and fallback never resets counters",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-011",
+      "milestone": "M3/M7",
+      "contract": "one per shard CAS pointer binds the exact current WalRun Root and a bounded predecessor lineage",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-OBJ-012",
+      "milestone": "M3",
+      "contract": "NWG1 keeps one authoritative in body context directory co locates every Kafka commit set and independently decodes frame blocks",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-BK-001",
       "milestone": "M2",
       "contract": "both BookKeeper profiles ACK at quorum without synchronous Object dependency",
@@ -215,6 +303,30 @@
       "id": "V2-BK-005",
       "milestone": "M2",
       "contract": "persisted attempt scope derives deterministic data root keys and a bounded canonical root verifies publication and root first cleanup",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-006",
+      "milestone": "M2",
+      "contract": "NPO1 uses one bounded canonical big endian four section root with hard parser limits and self digest before index trust",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-007",
+      "milestone": "M2",
+      "contract": "native BookKeeper source deletion performs final exact Object pair and read path revalidation then rechecks the same eligible attempt under CAS",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-008",
+      "milestone": "M2",
+      "contract": "native dual source reads allow at most one whole range single source fallback while both sources remain eligible",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null

@@ -33,6 +33,11 @@ Each Pulsar Protocol Cell owns a `PulsarVirtualLedgerStore` in its MetadataStore
 The exact rollover/seal state machine, uncertain publication recovery, and interactions with cursor trim, compaction,
 replication, and transaction recovery remain downstream gates.
 
+ADRs 0027, 0032, and 0041 refine allocation to one deployment-wide bounded reservation registry. Each immutable Pulsar
+Protocol Cell identity owns one aligned equal `2^k` slice and follows `ACTIVE -> RETIRING -> RETIRED`; retired bounds
+remain permanent never-reuse evidence. Exact expansion policy, allocator/chain epochs, and retirement proof remain
+downstream gates.
+
 ## Consequences
 
 - `V2-OPEN-PUL-OBJ-01` is resolved.
@@ -43,5 +48,6 @@ replication, and transaction recovery remain downstream gates.
 
 Numeric compatibility and reservation enforcement are refined by
 [ADR 0027](0027-v2-pulsar-virtual-ledger-numeric-compatibility.md), and registry authority by
-[ADR 0032](0032-v2-pulsar-virtual-ledger-reservation-registry.md). This decision refines ADR 0011 and is tracked by
-`T-POSITION-01`, `V2-POSITION-001..004`.
+[ADR 0032](0032-v2-pulsar-virtual-ledger-reservation-registry.md) plus
+[ADR 0041](0041-v2-pulsar-virtual-ledger-slice-contract.md). This decision refines ADR 0011 and is tracked by
+`T-POSITION-01`, `V2-POSITION-001..007`.

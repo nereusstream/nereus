@@ -40,9 +40,11 @@ cannot participate in aggregate visibility or override the incarnation-scoped au
 - `V2-OPEN-META-03` is resolved.
 - Kafka delete/recreate ABA is fenced by its native topic UUID; Pulsar pays for an explicit generation selector and
   retained non-reuse evidence.
-- Aggregate schema fields/versioning, Kafka feature activation, deletion/retirement GC, and snapshot/replay vectors
-  remain downstream gates.
+- Logical schema/versioning and Kafka feature activation are refined by ADRs 0033 and 0034. Deletion/retirement GC and
+  snapshot/replay vectors remain downstream gates.
 - M1 must prove deterministic retry bytes, Kafka same-name/new-topic-ID isolation, Pulsar generation non-reuse,
   key/value collision checks, protocol discriminator checks, and rejection of retry-dependent IDs.
 
-This decision refines ADR 0023 and is tracked by `T-META-01`, `V2-META-002`, and `V2-META-003`.
+This decision is refined by [ADRs 0033](0033-v2-topic-binding-aggregate-logical-schema-v1.md) and
+[0034](0034-v2-kafka-feature-level-2-bootstrap-activation.md), refines ADR 0023, and is tracked by `T-META-01`,
+`V2-META-002..004`, and `V2-KAF-META-001`.

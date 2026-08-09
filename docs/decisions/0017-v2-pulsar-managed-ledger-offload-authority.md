@@ -46,5 +46,7 @@ does not bypass cursor/read pins, deletion lag, response-loss reconciliation, or
 
 Execution timing is refined by [ADR 0020](0020-v2-pulsar-sealed-ledger-async-offload.md), the Object pair by
 [ADR 0024](0024-v2-pulsar-sealed-ledger-object-layout.md), and its root/lifecycle by
-[ADR 0029](0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md). This decision is tracked by `T-BK-01`, `V2-BK-001`,
-`V2-BK-002`, `V2-BK-004`, and `V2-BK-005`.
+[ADR 0029](0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md). Root wire and native dual-source safety are refined by
+[ADRs 0035](0035-v2-pulsar-npo1-sealed-ledger-root-format.md) and
+[0036](0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md). This decision is tracked by `T-BK-01`,
+`V2-BK-001..002`, and `V2-BK-004..008`.

@@ -66,4 +66,7 @@ signature, or other external trusted binding requires a separate threat-model de
 - M2 must prove canonical-root bounds, corruption and identity rejection, real `ReadHandle` equivalence, every
   publication cut, root-before-data deletion, configuration drift, response loss, and multipart residue cleanup.
 
-This decision refines ADR 0024 and is tracked by `T-BK-01`, `V2-BK-004`, and `V2-BK-005`.
+NPO1 wire/bounds and native dual-source safety are refined by
+[ADRs 0035](0035-v2-pulsar-npo1-sealed-ledger-root-format.md) and
+[0036](0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md). This decision refines ADR 0024 and is tracked by
+`T-BK-01`, `V2-BK-004..008`.

@@ -52,10 +52,18 @@ repeat the identity and are validated against the key. `bindingId` and the ordin
 domain-separated SHA-256 derivations from canonical framed Cell/incarnation facts; random attempts, time, log offsets,
 and backend versions cannot influence them.
 
+The one logical compatibility axis is `aggregateSchemaVersion=1`. Its closed payload contains the complete binding and
+ordinal-zero epoch, including typed profile/origin and WAL/payload/checksum/compression/encryption discriminators. An
+inapplicable discriminator is explicit `NONE`; unknown/illegal combinations fail closed. `ACTIVE` is derived only after
+complete publication/validation and is not stored. The v1 aggregate excludes `CREATING`, delete/lifecycle/owner state,
+timestamps, attempts, controller offsets, backend versions, and untyped attributes. Oxia envelope schema 1 and Kafka
+controller-record wire v0 map through one logical validator and shared semantic golden vectors.
+
 A lost create response rereads the same record and requires exact equality. Missing, mismatched, unknown, or conflicting
 aggregate state fails closed and never selects a default epoch. The generic `CREATING` fallback in ADR 0019 is not used
 by this 0.2 single-record representation. Normal admitted append does not read or mutate the aggregate remotely. ADRs
-0019, 0023, and 0028 are authoritative.
+0019, 0023, 0028, 0033, and 0034 are authoritative. Kafka activates this schema only at fresh-bootstrap finalized
+`nereus.storage.version=2`; level-1 replay and runtime upgrade/downgrade are rejected.
 
 ## Append-only Storage Epoch chain
 
@@ -134,7 +142,9 @@ default without validation. A protocol adapter may restrict the allowed initial 
 transaction authority cannot satisfy the contract. No adapter exposes an online transition set in 0.2.
 
 Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-OBJECT-01`, and `T-BK-01`. Required scenarios:
-`V2-PROFILE-001`, `V2-MIGRATION-001`, and `V2-META-002..003`. See
-[ADR 0019](../decisions/0019-v2-initial-binding-epoch-atomic-visibility.md) and
-[ADR 0023](../decisions/0023-v2-topic-binding-aggregate-record.md) and
-[ADR 0028](../decisions/0028-v2-topic-incarnation-keys-and-deterministic-ids.md).
+`V2-PROFILE-001`, `V2-MIGRATION-001`, `V2-META-002..004`, and `V2-KAF-META-001`. See
+[ADR 0019](../decisions/0019-v2-initial-binding-epoch-atomic-visibility.md),
+[ADR 0023](../decisions/0023-v2-topic-binding-aggregate-record.md),
+[ADR 0028](../decisions/0028-v2-topic-incarnation-keys-and-deterministic-ids.md),
+[ADR 0033](../decisions/0033-v2-topic-binding-aggregate-logical-schema-v1.md), and
+[ADR 0034](../decisions/0034-v2-kafka-feature-level-2-bootstrap-activation.md).

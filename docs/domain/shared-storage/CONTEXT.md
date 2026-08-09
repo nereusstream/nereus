@@ -87,8 +87,8 @@ Topic Incarnation and no online transition runtime exists; the exact future tran
 _Avoid_: Mutable profile, storage mode flag
 
 **Topic Binding Aggregate**:
-The atomically visible create/open unit whose one immutable identity contains a Topic Protocol Binding and its one
-initial Storage Epoch. Neither component has an independently writable authority.
+The atomically visible create/open unit whose one immutable logical schema v1 contains a Topic Protocol Binding and its
+ordinal-zero initial Storage Epoch. Neither component has an independently writable authority; ACTIVE is derived.
 _Avoid_: Default epoch, partially visible topic, separately mutable binding/epoch
 
 **Object Extent Digest**:
@@ -111,6 +111,26 @@ The immutable pre-append authority for one Object-WAL shard run. It fixes scope,
 epoch-validation rules, format families, initial sequence, and bounded LIST recovery budgets; per-group descriptors are
 reconstructed from content-addressed leaf keys and verified headers.
 _Avoid_: Per-group metadata commit, sealed-run-only discovery, unbounded prefix scan
+
+**Current WalRun Pointer**:
+The one low-frequency per-shard CAS authority binding the current WalRun Root key/SHA and shard run epoch. It anchors a
+bounded predecessor lineage; normal admitted group append does not mutate it.
+_Avoid_: Root-prefix LIST, per-group pointer update, locally merged lineage
+
+**Binding Context Table**:
+The bounded NWG1 table that binds frames to exact Topic Incarnation, binding, Storage Epoch, and Owner Epoch authority
+inside a multi-binding ObjectExtent. The WalRun Root does not carry one singular topic epoch.
+_Avoid_: Group shard epoch as topic authority, untyped binding summary
+
+**Append Unit Directory**:
+The authoritative bounded NWG1 in-body directory for frame ranges, context references, Kafka commit-set membership,
+and Pulsar entry units. Sidecars, manifests, and checkpoints are accelerators only.
+_Avoid_: Footer-only authority, commit set spanning ObjectExtents, record-count-derived coverage
+
+**Recovery Envelope**:
+The cumulative worst-case bound over all work required to recover admitted Object-WAL state. Normal ACK/admission must
+preserve it; fallback cannot reset it.
+_Avoid_: Takeover timeout only, per-run counter reset, partial recovery success
 
 ## Projection and migration
 

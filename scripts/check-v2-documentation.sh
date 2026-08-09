@@ -85,6 +85,15 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md"
     "$repo_root/docs/decisions/0031-v2-protocol-frame-and-append-commit-set.md"
     "$repo_root/docs/decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md"
+    "$repo_root/docs/decisions/0033-v2-topic-binding-aggregate-logical-schema-v1.md"
+    "$repo_root/docs/decisions/0034-v2-kafka-feature-level-2-bootstrap-activation.md"
+    "$repo_root/docs/decisions/0035-v2-pulsar-npo1-sealed-ledger-root-format.md"
+    "$repo_root/docs/decisions/0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md"
+    "$repo_root/docs/decisions/0037-v2-object-wal-binding-context-epoch-authority.md"
+    "$repo_root/docs/decisions/0038-v2-object-wal-provider-absent-crash-contract.md"
+    "$repo_root/docs/decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md"
+    "$repo_root/docs/decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md"
+    "$repo_root/docs/decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -124,6 +133,15 @@ require_literal "pulsar-offload/v1/ledger-<ledgerId>/attempt-<uuid>/root" "docs/
 require_literal "<wal-run-prefix>/<sequence19>/<body-length19>-sha256-v1-<64-lowercase-hex>.nwg" "docs/decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md"
 require_literal '`KafkaAppendCommitSet`' "docs/decisions/0031-v2-protocol-frame-and-append-commit-set.md"
 require_literal '`PulsarVirtualLedgerNamespaceRegistryRecord`' "docs/decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md"
+require_literal '`aggregateSchemaVersion=1`' "docs/decisions/0033-v2-topic-binding-aggregate-logical-schema-v1.md"
+require_literal '`nereus.storage.version=2`' "docs/decisions/0034-v2-kafka-feature-level-2-bootstrap-activation.md"
+require_literal "Exactly four sections" "docs/decisions/0035-v2-pulsar-npo1-sealed-ledger-root-format.md"
+require_literal "revalidateOffloadedForSourceDeletion" "docs/decisions/0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md"
+require_literal '`BindingContextTable`' "docs/decisions/0037-v2-object-wal-binding-context-epoch-authority.md"
+require_literal "broker-local exact-ciphertext recovery journal" "docs/decisions/0038-v2-object-wal-provider-absent-crash-contract.md"
+require_literal "CurrentWalRunPointer" "docs/decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md"
+require_literal '`BindingContextTable + AppendUnitDirectory`' "docs/decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md"
+require_literal '`ACTIVE -> RETIRING -> RETIRED`' "docs/decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -139,7 +157,9 @@ require_literal "The user answered: “全部按推荐确认”" "docs/v2/grill-
 require_literal "Restarted Grill 2 round 4" "docs/v2/grill-notes/06-restarted-grill-2-schema-discovery-and-registry.md"
 require_literal "The user answered: “全部按推荐确认”" "docs/v2/grill-notes/06-restarted-grill-2-schema-discovery-and-registry.md"
 require_literal "Restarted Grill 2 round 5" "docs/v2/grill-notes/07-restarted-grill-2-wire-recovery-and-slice-contracts.md"
-require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/07-restarted-grill-2-wire-recovery-and-slice-contracts.md"
+require_literal "The user answered: “全部按推荐确认”" "docs/v2/grill-notes/07-restarted-grill-2-wire-recovery-and-slice-contracts.md"
+require_literal "Restarted Grill 2 round 6" "docs/v2/grill-notes/08-restarted-grill-2-runtime-ownership-and-crypto.md"
+require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/08-restarted-grill-2-runtime-ownership-and-crypto.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -157,6 +177,20 @@ require_literal '`V2-OPEN-BK-05`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-07`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-08`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PUL-OBJ-03`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-META-04`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-KAF-META-01`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-BK-06`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-BK-07`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-BK-08`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-OBJ-09`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-OBJ-10`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-OBJ-11`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-OBJ-12`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-OBJ-13`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-OBJ-14`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-PUL-OBJ-04`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-PUL-OBJ-05`' "docs/v2/open-questions.md"
+require_literal '`V2-OPEN-PUL-OBJ-06`' "docs/v2/open-questions.md"
 require_literal "resolved by ADR 0014" "docs/v2/open-questions.md"
 
 for resolved_gate in \
@@ -178,13 +212,7 @@ for resolved_gate in \
     V2-OPEN-BK-05 \
     V2-OPEN-OBJ-07 \
     V2-OPEN-OBJ-08 \
-    V2-OPEN-PUL-OBJ-03; do
-    if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
-        fail "$resolved_gate remains in the active gate table"
-    fi
-done
-
-for active_gate in \
+    V2-OPEN-PUL-OBJ-03 \
     V2-OPEN-META-04 \
     V2-OPEN-KAF-META-01 \
     V2-OPEN-BK-06 \
@@ -199,7 +227,21 @@ for active_gate in \
     V2-OPEN-PUL-OBJ-04 \
     V2-OPEN-PUL-OBJ-05 \
     V2-OPEN-PUL-OBJ-06; do
+    if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
+        fail "$resolved_gate remains in the active gate table"
+    fi
+done
+
+for active_gate in \
+    V2-OPEN-KAF-META-02 \
+    V2-OPEN-PUL-META-01 \
+    V2-OPEN-BK-09 \
+    V2-OPEN-BK-10 \
+    V2-OPEN-OBJ-15 \
+    V2-OPEN-OBJ-16 \
+    V2-OPEN-PUL-OBJ-07; do
     require_literal "\`$active_gate\`" "docs/v2/open-questions.md"
+    require_literal "\`$active_gate\`" "docs/v2/grill-notes/08-restarted-grill-2-runtime-ownership-and-crypto.md"
     if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$active_gate is missing from the active gate table"
     fi
@@ -235,6 +277,15 @@ active_contracts=(
     "$repo_root/docs/decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md"
     "$repo_root/docs/decisions/0031-v2-protocol-frame-and-append-commit-set.md"
     "$repo_root/docs/decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md"
+    "$repo_root/docs/decisions/0033-v2-topic-binding-aggregate-logical-schema-v1.md"
+    "$repo_root/docs/decisions/0034-v2-kafka-feature-level-2-bootstrap-activation.md"
+    "$repo_root/docs/decisions/0035-v2-pulsar-npo1-sealed-ledger-root-format.md"
+    "$repo_root/docs/decisions/0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md"
+    "$repo_root/docs/decisions/0037-v2-object-wal-binding-context-epoch-authority.md"
+    "$repo_root/docs/decisions/0038-v2-object-wal-provider-absent-crash-contract.md"
+    "$repo_root/docs/decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md"
+    "$repo_root/docs/decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md"
+    "$repo_root/docs/decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )
@@ -360,7 +411,7 @@ allowed_statuses = {
 scenario_ids = []
 for item in scenarios.get("scenarios", []):
     scenario_id = item.get("id", "")
-    if not re.fullmatch(r"V2-[A-Z]+-[0-9]{3}", scenario_id):
+    if not re.fullmatch(r"V2-(?:[A-Z]+-)+[0-9]{3}", scenario_id):
         fail(f"invalid scenario ID {scenario_id!r}")
     scenario_ids.append(scenario_id)
     if item.get("status") not in allowed_statuses:
@@ -381,11 +432,14 @@ if len(scenario_ids) != len(set(scenario_ids)):
 required_scenarios = {
     "V2-APP-001", "V2-APP-002", "V2-APP-003", "V2-PROFILE-001",
     "V2-POSITION-001", "V2-MULTIPROTOCOL-001",
-    "V2-POSITION-002", "V2-POSITION-003", "V2-POSITION-004", "V2-META-002", "V2-META-003",
+    "V2-POSITION-002", "V2-POSITION-003", "V2-POSITION-004", "V2-POSITION-005", "V2-POSITION-006",
+    "V2-POSITION-007", "V2-META-002", "V2-META-003", "V2-META-004", "V2-KAF-META-001",
     "V2-FABRIC-001", "V2-FABRIC-002", "V2-FABRIC-003", "V2-MIGRATION-001",
     "V2-PROJECTION-001",
     "V2-OBJ-001", "V2-OBJ-002", "V2-OBJ-003", "V2-OBJ-004", "V2-OBJ-005", "V2-OBJ-006",
-    "V2-BK-001", "V2-BK-002", "V2-BK-003", "V2-BK-004", "V2-BK-005",
+    "V2-OBJ-007", "V2-OBJ-008", "V2-OBJ-009", "V2-OBJ-010", "V2-OBJ-011", "V2-OBJ-012",
+    "V2-BK-001", "V2-BK-002", "V2-BK-003", "V2-BK-004", "V2-BK-005", "V2-BK-006",
+    "V2-BK-007", "V2-BK-008",
     "V2-READ-001", "V2-READ-002", "V2-META-001", "V2-HO-001",
     "V2-KAF-001", "V2-PUL-001", "V2-KOP-001",
 }
@@ -393,7 +447,7 @@ missing_scenarios = required_scenarios - set(scenario_ids)
 if missing_scenarios:
     fail(f"required M0 scenarios were removed: {sorted(missing_scenarios)}")
 
-matrix_ids = set(re.findall(r"V2-[A-Z]+-[0-9]{3}", matrix_path.read_text()))
+matrix_ids = set(re.findall(r"V2-(?:[A-Z]+-)+[0-9]{3}", matrix_path.read_text()))
 if matrix_ids != set(scenario_ids):
     fail("Markdown and JSON scenario ID sets differ")
 
@@ -420,6 +474,8 @@ contract_paths += list((root / "docs/decisions").glob("0019-*.md"))
 contract_paths += list((root / "docs/decisions").glob("002[0-7]-*.md"))
 contract_paths += list((root / "docs/decisions").glob("002[8-9]-*.md"))
 contract_paths += list((root / "docs/decisions").glob("003[0-2]-*.md"))
+contract_paths += list((root / "docs/decisions").glob("003[3-9]-*.md"))
+contract_paths += list((root / "docs/decisions").glob("004[0-1]-*.md"))
 contract_text = "\n".join(
     path.read_text() for path in contract_paths if path != tradeoff_path
 )
@@ -476,6 +532,15 @@ link_docs=(
     "$repo_root/docs/decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md"
     "$repo_root/docs/decisions/0031-v2-protocol-frame-and-append-commit-set.md"
     "$repo_root/docs/decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md"
+    "$repo_root/docs/decisions/0033-v2-topic-binding-aggregate-logical-schema-v1.md"
+    "$repo_root/docs/decisions/0034-v2-kafka-feature-level-2-bootstrap-activation.md"
+    "$repo_root/docs/decisions/0035-v2-pulsar-npo1-sealed-ledger-root-format.md"
+    "$repo_root/docs/decisions/0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md"
+    "$repo_root/docs/decisions/0037-v2-object-wal-binding-context-epoch-authority.md"
+    "$repo_root/docs/decisions/0038-v2-object-wal-provider-absent-crash-contract.md"
+    "$repo_root/docs/decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md"
+    "$repo_root/docs/decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md"
+    "$repo_root/docs/decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md"
 )
 
 while IFS=: read -r source match; do

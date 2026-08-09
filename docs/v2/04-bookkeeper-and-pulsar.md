@@ -53,7 +53,14 @@ non-overlapping, never-reused slice. One bounded deployment registry is allocati
 assignment table advances through single-key CAS, while per-cell lookups/watches are derived only. The cell allocator
 issues increasing IDs with permitted gaps. Numeric monotonicity keeps stock MessageId comparison compatible, but
 explicit predecessor/head metadata remains chain authority. Object identity, bytes, and group/run sequence never become
-MessageId truth. Exact slice lifecycle, allocator, rollover, and recovery mechanics remain open.
+MessageId truth.
+
+Each slice owner is the durable deployment/reservation-domain/Pulsar Protocol Cell tuple, independent of broker,
+session, alias, and provider configuration. Lifecycle is irreversible `ACTIVE -> RETIRING -> RETIRED`; only ACTIVE
+allocates, and RETIRED assignments/bounds remain permanent never-reuse tombstones. Exhaustion is derived, not a
+lifecycle state. Each Cell has one immutable equal-size aligned `2^k` slice. Numeric capacity is
+`floor((2^62 - 1) / 2^k)`, the top `2^k - 1` IDs remain unused, and separate registry-byte/lifetime-assignment limits
+include retired Cells. Exact `k`, resize, allocator epochs, rollover, and recovery mechanics remain open.
 
 Online Pulsar BookKeeper/Object evolution is not implied by this model. New-incarnation migration versus a future hybrid
 ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.
@@ -88,6 +95,19 @@ sparse rows, and a separate root self-digest. Publication verifies data, root, t
 success. Cleanup proves root absent before data absent and covers attempt-scoped multipart residue. ADR 0029 is
 authoritative.
 
+The root uses the independent big-endian `NPO1` major format: a fixed 32-byte header, exactly four ordered typed
+sections (`ATTEMPT`, `SEALED_LEDGER`, `DATA_EXTENT`, `SPARSE_INDEX`), and a trailing SHA-256 over all preceding canonical
+bytes. Strict UTF-8, canonical map ordering, duplicate/trailing/overflow rejection, and hard limits bound the complete
+root to 8 MiB, sparse rows to 65,536, metadata/strings/ensemble dimensions to their ADR 0035 caps, and entry count to
+`1..2^31-1`. HEAD enforces root size before a bounded full GET/self-digest; empty ledgers are not offload attempts.
+
+Native read source eligibility is fixed by ManagedLedger metadata. Before completion it is BookKeeper-only; after
+`complete && !bookkeeperDeleted` both sources may participate in one bounded whole-range fallback; after
+`bookkeeperDeleted=true` reads are Object-only even if physical BookKeeper residue exists. Object-first integrity or
+availability failure may retry the complete range once from BookKeeper. BookKeeper-first may use Object only after
+native missing-ledger resolution. Partial entries are released, sources are never mixed within a range, fallback never
+loops, and Object corruption remains quarantined/deletion-vetoed even when fallback succeeds.
+
 A BookKeeper source becomes physically deletable only after all of these are durable and revalidated:
 
 - the exact sealed Kafka Offset Range or ledger-keyed Pulsar Coverage and checksum were materialized;
@@ -100,6 +120,11 @@ A BookKeeper source becomes physically deletable only after all of these are dur
 Offloader completion creates deletion eligibility; it does not itself bypass the remaining native retention, cursor,
 read-pin, deletion-lag, or Nereus source-protection checks.
 
+Immediately before native `bookkeeperDeleted=true`, ManagedLedger revalidates the exact persisted attempt, complete
+NPO1/self-digest, data immutable version/length/SHA, closed-ledger facts, and production-reader first/last/sparse
+boundaries without holding the metadata mutex across Object I/O. The final native CAS rechecks the same attempt UUID and
+eligible state. Timeout, missing, or mismatch retains BookKeeper; permanent corruption quarantines the attempt.
+
 ## Lag policy
 
 Async offload exposes pending ledgers/bytes/age and the oldest unmaterialized typed Protocol Frontier. Policy may alert,
@@ -107,11 +132,14 @@ throttle, or stop new admission before BookKeeper capacity is exhausted. It neve
 into a synchronous Object write.
 
 Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, and `T-POSITION-01`. Required scenarios:
-`V2-BK-001..005` and `V2-POSITION-001..004`. See
+`V2-BK-001..008` and `V2-POSITION-001..007`. See
 [ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md),
 [ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md),
 [ADR 0022](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md),
 [ADR 0024](../decisions/0024-v2-pulsar-sealed-ledger-object-layout.md),
 [ADR 0027](../decisions/0027-v2-pulsar-virtual-ledger-numeric-compatibility.md),
-[ADR 0029](../decisions/0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md), and
-[ADR 0032](../decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md).
+[ADR 0029](../decisions/0029-v2-pulsar-sealed-ledger-root-and-lifecycle.md),
+[ADR 0032](../decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md),
+[ADR 0035](../decisions/0035-v2-pulsar-npo1-sealed-ledger-root-format.md),
+[ADR 0036](../decisions/0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md), and
+[ADR 0041](../decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md).

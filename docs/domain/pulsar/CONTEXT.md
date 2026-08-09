@@ -37,6 +37,11 @@ The one bounded deployment-wide CAS record that canonically owns every virtual-l
 global non-overlap/non-reuse. Per-cell lookup and watches are derived only.
 _Avoid_: Independent authoritative slice key, watch authority, locally merged assignment table
 
+**Virtual Ledger Slice Assignment**:
+One immutable aligned `2^k` interval owned by a durable Pulsar Protocol Cell identity. Lifecycle is
+ACTIVE→RETIRING→RETIRED; retired assignments and bounds remain permanent never-reuse evidence.
+_Avoid_: Broker-owned slice, provider-owned slice, deleted tombstone, resized bounds
+
 **Pulsar Position Domain**:
 The Position Domain whose ordering and adjacency rules are proven by the Ledger Chain and Pulsar Position semantics.
 _Avoid_: Universal position domain
@@ -57,9 +62,14 @@ attempt. Both identities are deterministic and attempt-scoped.
 _Avoid_: Independent child extents, manifest-authorized offload completion
 
 **Sealed-Ledger Root**:
-The bounded canonical root that binds one offload attempt to sanitized closed-ledger metadata, data length/SHA-256,
-outer format, contiguous sparse index, and its own integrity domain.
+The bounded canonical NPO1 root that binds one offload attempt to sanitized closed-ledger metadata, data length/SHA-256,
+outer format, contiguous sparse index, and its own integrity domain under fixed parser limits.
 _Avoid_: Stock index assumed sufficient, current-config key derivation, unbounded offsets
+
+**Native Dual-Source Read**:
+The ManagedLedger-owned whole-range selection/fallback between an eligible Object attempt and BookKeeper source. One
+range uses one source, fallback occurs at most once, and `bookkeeperDeleted=true` is Object-only.
+_Avoid_: Mixed-source range, fallback loop, reading physical BookKeeper residue after native deletion
 
 **Pulsar Frame**:
 The exact bytes of one ManagedLedger entry and one `(ledgerId, entryId)`. Client batching, compression, encryption, and

@@ -47,6 +47,11 @@ group WAL, immutable objects, asynchronous materialization, bounded handoff hint
 inflight limits. The exact research commits are recorded in [source locks](source-locks.json); research is not executable
 acceptance evidence.
 
+V2 Kafka metadata is enabled only by fresh-bootstrap finalized `nereus.storage.version=2`; the V2 build supports only
+`[2,2]`, rejects level-1 V1 state, and forbids runtime upgrade or downgrade. A successful native CreateTopics item
+atomically publishes logical aggregate schema v1 with the topic records. Validate-only and native errors publish no
+aggregate.
+
 ### Kafka product target
 
 “Stronger than AutoMQ” is evaluated per profile:
@@ -66,16 +71,20 @@ The acceptance source is an exact clean AutoMQ commit and receipt, never the mov
 advantages are counted. `BOOKKEEPER_WAL_ASYNC_OBJECT` uses ManagedLedger ledger/offload metadata as sole lifecycle
 authority and offloads sealed non-current ledgers as one deterministic data/root Object pair through a Nereus
 `LedgerOffloader`; persisted attempt metadata pins key derivation and a bounded root is verified through the real read
-path before success. `OBJECT_WAL` uses an explicit ObjectManagedLedger path plus a reserved-slice Pulsar-cell
-MetadataStore/Oxia virtual-ledger authority. One bounded deployment CAS registry proves all slices non-overlapping and
-never reused. The profile accepts its cost-first latency tradeoff. Every path keeps
+path before success. The root is bounded NPO1; native dual-source reads use at most one whole-range fallback, and exact
+Object revalidation precedes BookKeeper-source deletion. `OBJECT_WAL` uses an explicit ObjectManagedLedger path plus a
+reserved-slice Pulsar-cell MetadataStore/Oxia virtual-ledger authority. One bounded deployment CAS registry proves all
+slices non-overlapping and never reused. Slice owner identity is the immutable Pulsar Protocol Cell, retirement is
+permanent, and fixed aligned geometry has explicit numeric/encoded lifetime caps. The profile accepts its cost-first
+latency tradeoff. Every path keeps
 `PulsarPosition(ledgerId, entryId)`, MessageId, and the ledger chain as protocol truth; Object/BookKeeper coordinates
 remain Physical Extents.
 
 Object frames retain exact assigned Kafka RecordBatch bytes or exact Pulsar ManagedLedger entry bytes after only the
 outer Object envelope is decoded. Kafka makes all frames from one partition storage append an all-or-none commit set;
 Pulsar makes one entry one frame/commit set. CRC32C/v1 protects each protocol-native frame blob while the native protocol
-checksum remains independently validated.
+checksum remains independently validated. NWG1 stores its authoritative binding contexts and append-unit directory in
+the Object body; one Kafka commit set never spans ObjectExtents and every frame block is independently decoded.
 
 The parity matrix covers at least:
 
@@ -110,5 +119,5 @@ against V2 bindings, protocol-native Kafka work, and the then-current KoP source
 
 Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `T-PROJECTION-01`, `T-BENCH-01`,
 and `T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`,
-`V2-PROJECTION-001`, `V2-POSITION-002..004`, `V2-OBJ-004..006`, `V2-BK-005`, `V2-KAF-001`, `V2-PUL-001`, and
-`V2-KOP-001`.
+`V2-PROJECTION-001`, `V2-POSITION-002..007`, `V2-OBJ-004..012`, `V2-BK-005..008`, `V2-KAF-META-001`,
+`V2-KAF-001`, `V2-PUL-001`, and `V2-KOP-001`.

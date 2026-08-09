@@ -70,8 +70,8 @@ cross-ledger ordering comes from the authoritative Ledger Chain; V2 does not der
 
 ## Uncertain append
 
-A timeout, connection reset, or lost provider response yields an uncertain result. Resolution uses the original
-deterministic identity and verifies:
+A timeout, connection reset, or lost provider response yields an uncertain result. Resolution preserves the original
+protocol idempotency identity and verifies:
 
 - Topic Protocol Binding, Topic Incarnation, Storage Epoch, and Owner Epoch;
 - typed Protocol Coverage and frame/entry count;
@@ -81,7 +81,9 @@ deterministic identity and verifies:
 - contiguous predecessor coverage.
 
 A retry may return the original success or fail closed. It may not allocate different successful protocol positions for
-the same idempotency identity.
+the same idempotency identity. For Object WAL after process loss, a provider-present group is verified and reconciled;
+a conclusively absent never-ACKed group fences the old run at its proven frontier and may be rebuilt only in a fresh run.
+Unknown presence remains fail-closed. V2 does not pretend a deterministic nonce recreates lost ciphertext.
 
 ## Hot-path contract
 
@@ -94,5 +96,9 @@ The complete active Topic Binding Aggregate and ownership are cached only after 
 Cache misses stop admission and reload before allocating positions; they do not insert metadata access into the admitted
 append path.
 
+Object-WAL admission also proves every still-recoverable run remains within the cumulative worst-case recovery
+envelope. Approaching a run or recovery bound triggers rollover/backpressure before another ACK; fallback never resets
+the envelope. This correctness-driven availability cost is explicit and does not permit a per-group metadata mutation.
+
 Relevant tradeoffs: `T-APPEND-01` and `T-POSITION-01`. Required scenarios: `V2-APP-001`, `V2-APP-002`,
-`V2-APP-003`, `V2-POSITION-001..004`, `V2-META-002..003`, and `V2-OBJ-004..006`.
+`V2-APP-003`, `V2-POSITION-001..007`, `V2-META-002..004`, `V2-KAF-META-001`, and `V2-OBJ-004..012`.

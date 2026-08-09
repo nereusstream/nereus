@@ -75,6 +75,15 @@ Current accepted decisions:
 - [ADR 0030: Object WAL run root and content-addressed discovery](../decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md)
 - [ADR 0031: protocol frame and append commit set](../decisions/0031-v2-protocol-frame-and-append-commit-set.md)
 - [ADR 0032: Pulsar virtual-ledger reservation registry](../decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md)
+- [ADR 0033: Topic Binding Aggregate logical schema v1](../decisions/0033-v2-topic-binding-aggregate-logical-schema-v1.md)
+- [ADR 0034: Kafka feature level 2 bootstrap activation](../decisions/0034-v2-kafka-feature-level-2-bootstrap-activation.md)
+- [ADR 0035: Pulsar NPO1 sealed-ledger root format](../decisions/0035-v2-pulsar-npo1-sealed-ledger-root-format.md)
+- [ADR 0036: Pulsar native dual-source read and deletion safety](../decisions/0036-v2-pulsar-native-dual-source-read-and-deletion-safety.md)
+- [ADR 0037: Object WAL binding-context epoch authority](../decisions/0037-v2-object-wal-binding-context-epoch-authority.md)
+- [ADR 0038: Object WAL provider-absent crash contract](../decisions/0038-v2-object-wal-provider-absent-crash-contract.md)
+- [ADR 0039: bounded WalRun lifecycle, recovery, and root pointer](../decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md)
+- [ADR 0040: NWG1 append-unit directory and co-location](../decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md)
+- [ADR 0041: Pulsar virtual-ledger slice contract](../decisions/0041-v2-pulsar-virtual-ledger-slice-contract.md)
 
 ## V2 document map
 
@@ -115,7 +124,8 @@ A Topic Protocol Binding fixes protocol identity, Position Domain, payload mappi
 Topic Incarnation. Its append-only Storage Epoch chain selects profiles over protocol-native frontier intervals. A
 profile is immutable within an epoch. In 0.2 the runtime creates exactly one initial epoch per incarnation and exposes no
 online profile transition. Binding plus initial epoch are one immutable physical aggregate record keyed by a typed
-protocol-native incarnation with deterministic binding/epoch IDs; the chain model is retained for future evolution.
+protocol-native incarnation with deterministic binding/epoch IDs and one closed logical schema v1. Kafka activates it
+only through fresh-bootstrap feature level 2; the chain model is retained for future evolution.
 
 ## Implementation and evidence status
 

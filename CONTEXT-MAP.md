@@ -15,12 +15,14 @@ KoP is outside the current V2 Kafka/Pulsar design session. Its existing design r
 
 - **Kafka → Shared Storage**: a Kafka Topic Protocol Binding selects the Kafka Position Domain; Kafka publishes
   binding-scoped Kafka Offset Range coverage over physical extents. Object WAL preserves assigned RecordBatch Frames
-  and makes one partition storage append visible as an all-or-none Kafka Append Commit Set.
+  and makes one partition storage append visible as an all-or-none Kafka Append Commit Set co-located in one NWG1
+  ObjectExtent. KRaft activates aggregate schema v1 only at fresh-bootstrap feature level 2.
 - **Pulsar → Shared Storage**: a Pulsar Topic Protocol Binding selects the Pulsar Position Domain; Pulsar publishes
   binding-scoped Pulsar Coverage over physical extents. In Object WAL mode, a Pulsar-cell virtual-ledger authority owns
-  ledger IDs and explicit Ledger Chain order under one deployment-wide reservation registry; Object identity remains
-  physical only. One ManagedLedger entry remains one Pulsar Frame. In async-offload mode, one native sealed-ledger
-  attempt maps to one deterministic Sealed-Ledger Object Pair with a bounded root.
+  ledger IDs and explicit Ledger Chain order under one deployment-wide reservation registry with permanent fixed-slice
+  assignments; Object identity remains physical only. One ManagedLedger entry remains one Pulsar Frame. In async-offload
+  mode, one native sealed-ledger attempt maps to one deterministic data/NPO1 pair with native whole-range fallback and
+  final Object revalidation before BookKeeper-source deletion.
 - **Kafka ↔ Pulsar**: neither context compares or allocates the other's positions. Shared access uses an Access
   Projection with one Native Write Authority; an authority transfer uses a separate Migration Link. ADR 0016 retains
   these boundaries but excludes their runtime from 0.2.

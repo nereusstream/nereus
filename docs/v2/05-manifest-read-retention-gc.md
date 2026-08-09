@@ -58,6 +58,11 @@ For Pulsar Object WAL, ledger/entry lookup first resolves the explicit virtual L
 maps ledger-keyed Pulsar Coverage to Object Extents. It never derives Ledger Chain order from a manifest, Object key, or
 numeric ledger-ID order.
 
+For Pulsar sealed-ledger async offload, native ManagedLedger metadata alone selects eligible sources. While Object and
+BookKeeper are both authorized, one inclusive range may perform at most one whole-range fallback and must return every
+entry from one source. Object integrity failure remains degraded/quarantined even if BookKeeper succeeds. Once native
+metadata says `bookkeeperDeleted=true`, Object is the only legal source; physical BookKeeper residue is not a fallback.
+
 Cache is never authority. Cache keys and accounting include Protocol Cell and Cell Provider Scope; each cell has an
 independent capacity share. A cache hit is validated against the selected descriptor generation and both declared
 checksum domains/families.
@@ -106,6 +111,11 @@ Pulsar sealed-ledger offload cleanup is root-first: deterministic persisted atte
 is proven before data deletion, and completion requires both objects plus covered multipart residue absent. This pair
 rule does not grant a Nereus manifest native ManagedLedger deletion authority.
 
+Before ManagedLedger commits `bookkeeperDeleted=true`, it performs bounded final NPO1/data/read-path revalidation, then
+rechecks the same attempt and eligible state in the native metadata CAS. Object I/O does not hold the metadata mutex.
+Failure retains BookKeeper; permanent mismatch quarantines the Object attempt. Reader pins and physical-delete
+intent/fact recovery remain required descendants of this final eligibility cut.
+
 A GC executor may be shared only as a capacity pool. Every request enters through a cell-scoped task root and delete
 capability, and foreign provider keys, ledgers, scopes, or credentials fail closed before provider I/O.
 
@@ -116,4 +126,4 @@ the source was safely retired and the preferred generation is corrupt, the resul
 system does not synthesize records or silently skip the requested Protocol Coverage.
 
 Relevant tradeoffs: `T-MANIFEST-01`, `T-POSITION-01`, `T-PROJECTION-01`, and `T-FABRIC-01`. Required scenarios:
-`V2-READ-001`, `V2-READ-002`, `V2-PROJECTION-001`, and `V2-FABRIC-003`.
+`V2-READ-001`, `V2-READ-002`, `V2-BK-007..008`, `V2-PROJECTION-001`, and `V2-FABRIC-003`.

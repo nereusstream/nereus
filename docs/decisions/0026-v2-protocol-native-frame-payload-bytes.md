@@ -38,5 +38,6 @@ format gate and cannot change the canonical byte identity above.
 - M3 must prove exact byte round-trip, outer compression/encryption decode, native-checksum independence, corrupted
   boundary/length rejection, Kafka multi-batch handling, and Pulsar batched/encrypted entry handling.
 
-This decision is refined by [ADR 0031](0031-v2-protocol-frame-and-append-commit-set.md), refines ADR 0021, and is tracked
-by `T-OBJECT-01`, `T-PROTOCOL-01`, `V2-OBJ-004`, and `V2-OBJ-006`.
+This decision is refined by [ADRs 0031](0031-v2-protocol-frame-and-append-commit-set.md) and
+[0040](0040-v2-nwg1-append-unit-directory-and-colocation.md), refines ADR 0021, and is tracked by `T-OBJECT-01`,
+`T-PROTOCOL-01`, `V2-OBJ-004/006/012`.

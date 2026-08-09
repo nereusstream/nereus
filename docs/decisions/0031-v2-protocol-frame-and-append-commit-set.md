@@ -41,8 +41,11 @@ validation remain independent of the V2 frame checksum.
 - Kafka pays for per-batch frame descriptors plus a small all-or-none commit-set envelope, preserving native random
   reads, producer/transaction headers, empty batches, and non-count-derived offset spans.
 - Pulsar retains one-entry MessageId, batching, partial-batch-ack, compression, and encryption semantics.
-- Exact frame/commit-set binary encoding, index layout, read assembly, and compaction vectors remain downstream gates.
+- NWG1 in-body directory authority and commit-set co-location are refined by ADR 0040. Exact field IDs/layout, read
+  assembly, and compaction vectors remain downstream gates.
 - M3 must prove Kafka multi-batch all-or-none cuts and corrupted membership rejection, Pulsar entry identity, empty
   Kafka batch coverage, native-checksum independence, and Object-group boundaries that do not leak into append truth.
 
-This decision refines ADR 0026 and is tracked by `T-PROTOCOL-01`, `T-OBJECT-01`, `V2-OBJ-004`, and `V2-OBJ-006`.
+This decision is refined by [ADRs 0037](0037-v2-object-wal-binding-context-epoch-authority.md) and
+[0040](0040-v2-nwg1-append-unit-directory-and-colocation.md), refines ADR 0026, and is tracked by `T-PROTOCOL-01`,
+`T-OBJECT-01`, `V2-OBJ-004/006/007/012`.

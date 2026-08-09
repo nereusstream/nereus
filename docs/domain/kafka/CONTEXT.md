@@ -25,6 +25,11 @@ _Avoid_: Universal position domain
 The Kafka partition leadership and protocol state permitted to allocate Kafka Offsets for a bound Topic Incarnation.
 _Avoid_: BookKeeper writer, Pulsar broker authority
 
+**Kafka Nereus Feature Level**:
+The KRaft finalized `nereus.storage.version=2` established only during fresh storage bootstrap. V2 rejects V1 level 1
+and every runtime upgrade/downgrade.
+_Avoid_: Online V1 migration, unsafe feature downgrade, absent feature as V2 activation
+
 **Kafka Frame**:
 One complete raw Kafka RecordBatch after broker offset and leader-epoch assignment. Its exact batch header defines
 coverage; record count does not derive the offset span.

@@ -21,8 +21,9 @@ limit is configured and observable; no open group may grow or wait indefinitely.
 
 ## Object and frame identity
 
-A group object header identifies the object format, shard, node session, shard-run epoch, sequence, codec,
-Object-extent digest family, encryption metadata, and frame count. After the final canonical body is sealed, its scoped
+A group uses the new major body format `NWG1`. Its fixed header identifies the format, shard, node session,
+shard-run epoch, sequence, codec, Object-extent digest family, encryption metadata, and frame count. After the final
+canonical body is sealed, its scoped
 conditional-create leaf key encodes fixed-width sequence, body length, and complete SHA-256/v1. That leaf key plus the
 verified header reconstructs the immutable Object Extent descriptor outside the body; the key/digest is never embedded
 in the exact bytes it hashes.
@@ -42,6 +43,19 @@ append form one `KafkaAppendCommitSet`: membership, every frame, and all coverag
 member is visible or acknowledged. One Pulsar frame/commit set is one exact ManagedLedger entry and one
 `(ledgerId, entryId)`. Object groups, network requests, transactions, and individual Pulsar batched messages do not
 redefine these boundaries.
+
+Immediately after the fixed header, NWG1 carries one authoritative bounded
+`BindingContextTable + AppendUnitDirectory`. Each context binds one exact binding incarnation, Storage Epoch, and Owner
+Epoch; every frame references one context. The WalRun Root is physical/run authority and never carries a singular topic
+epoch for a multi-binding run. Directory summaries accelerate bounded lookup but cannot replace frame/context
+validation or advance a frontier.
+
+One Kafka Append Commit Set is complete and contiguous inside one ObjectExtent; it never crosses group objects. A group
+seals before accepting a set that would exceed its limit, and a single oversize set is rejected before position
+allocation. Every frame block has independent compression, AEAD, and CRC validation. Compression never spans frames and
+NWG1 has no whole-group AEAD stream. An internal header/directory CRC32C/v1 protects canonical stored descriptor bounds
+and membership without substituting for either semantic checksum domain; frame CRC32C protects decoded native payload,
+and Object SHA-256 protects the final body. No extra commit-set CRC is added.
 
 One group may contain multiple compatible bindings from exactly one Protocol Cell. Object groups never cross Protocol
 Cells in 0.2. A group-level shard epoch cannot authorize every frame and its physical ordering cannot compare protocol
@@ -75,16 +89,18 @@ PUT response, `HEAD` proves success only for the same immutable version, exact l
 scope. Otherwise recovery performs a bounded full GET and recomputes SHA-256. ETag, Nereus user metadata, and
 `COMPOSITE` checksums are never accepted as that proof.
 
-A missing object may be retried only under the same deterministic identity with conditional-create semantics. A
-mismatched existing object is quarantined and fails closed; it is never overwritten. Exhausting the verification budget
-does not produce an ACK: the operation remains uncertain for bounded reconciliation while admission prevents unbounded
-retention. ADR 0018 is the authoritative proof contract.
+While the producing process still retains the exact sealed body, a missing object may be retried only under the same
+identity with conditional-create semantics. After process loss, a provider-present object is fully verified and
+reconciled. A conclusively absent, never-ACKed group permanently fences the old run at its proven contiguous frontier,
+burns the old run/sequence, and may be rebuilt only by protocol idempotency in a fresh run. Unknown presence remains
+fail-closed. 0.2 does not claim a broker-local ciphertext journal or deterministic-nonce-only replay. A mismatched
+existing object is quarantined and never overwritten. Exhausting the verification budget does not produce an ACK.
 
 ## WalRun and bounded recovery
 
 Before append opens, one immutable `WalRunRoot` binds Cell/provider scope, Protocol Cell, shard/run/session,
-the required Owner/Storage-Epoch validation contract, exact prefix, initial sequence, format/codec/encryption/digest
-families, and total recovery budgets. Exact run-level versus per-binding epoch placement remains an open format gate.
+the binding-context epoch-validation contract, exact prefix, initial sequence, format/codec/encryption/digest families,
+and total recovery budgets. It does not carry one binding's Owner/Storage Epoch.
 Each group leaf under that prefix has the canonical form
 `<sequence19>/<body-length19>-sha256-v1-<64-lowercase-hex>.nwg`; both decimal components are zero-padded 19-digit
 non-negative values. No per-group metadata-service row is required for ACK.
@@ -94,6 +110,17 @@ budgets, validates leaf identity, provider/body proof, header, frames, commit se
 reconstructs independent per-binding frontiers through each Position Domain. LIST-after-PUT visibility and bounded
 pagination are required provider capabilities; a provider without them is rejected for `OBJECT_WAL`. A handoff hint or
 asynchronous checkpoint/sealed manifest may narrow scanning but cannot omit this durable open-tail fallback.
+
+Every run root fixes hard extent-count, canonical-byte, age, and recoverable-predecessor limits. Before any limit can be
+crossed, the owner stops admission, drains/reconciles, seals, and publishes a successor; run IDs and epochs are never
+reused. ACK/admission preserves one cumulative worst-case envelope over roots/runs, LIST pages/keys/bytes, HEAD/GET
+work, decoded units, memory/concurrency/retries, and wall time. Fallback cannot reset counters. Predicted exhaustion
+causes rollover/backpressure; actual exhaustion never skips coverage, advances a frontier, or permits GC.
+
+Each shard has one low-frequency CAS `CurrentWalRunPointer` binding the exact root key/SHA and shard run epoch.
+Successors link exact predecessor key/SHA, recovery walks a bounded lineage to the retirement frontier, and every group
+header binds its root SHA. Missing/hash-mismatched/cyclic/forked/over-depth lineage fails closed. Owner-open, rollover,
+and handoff use the pointer; normal admitted group append performs no metadata-service I/O.
 
 Acknowledged group objects remain directly readable. Materialization creates a preferred read generation but is not
 required to make ACKed data durable or readable.
@@ -109,10 +136,14 @@ Each Cell Provider Session owns its admission, retry/circuit-breaker state, open
 and close lifecycle. A compatible lower-level transport may be pooled, but a cell-local throttle, credential failure, or
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
-Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..006` and `V2-FABRIC-002`. See
+Relevant tradeoffs: `T-OBJECT-01` and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..012` and `V2-FABRIC-002`. See
 [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md),
 [ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md),
 [ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md),
 [ADR 0026](../decisions/0026-v2-protocol-native-frame-payload-bytes.md),
-[ADR 0030](../decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md), and
-[ADR 0031](../decisions/0031-v2-protocol-frame-and-append-commit-set.md).
+[ADR 0030](../decisions/0030-v2-object-wal-run-root-and-content-addressed-discovery.md),
+[ADR 0031](../decisions/0031-v2-protocol-frame-and-append-commit-set.md),
+[ADR 0037](../decisions/0037-v2-object-wal-binding-context-epoch-authority.md),
+[ADR 0038](../decisions/0038-v2-object-wal-provider-absent-crash-contract.md),
+[ADR 0039](../decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md), and
+[ADR 0040](../decisions/0040-v2-nwg1-append-unit-directory-and-colocation.md).

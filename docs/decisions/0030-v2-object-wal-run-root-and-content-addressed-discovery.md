@@ -46,10 +46,13 @@ authority for an ACKed open-run tail.
 - `V2-OPEN-OBJ-07` is resolved.
 - Normal group ACK retains one conditional data PUT and no per-group metadata-service commit.
 - Recovery pays bounded LIST/verification cost, and providers without qualifying LIST consistency are excluded.
-- Exact WalRun/header binary fields, crash-stable encryption or local retry journal, checkpoint cadence, sealing, GC
-  handoff, and crash-cut vectors remain downstream gates.
+- Binding-epoch placement, provider-absent crash behavior, and bounded lifecycle/root discovery are refined by
+  ADRs 0037 through 0039. Exact wire, encryption envelope, checkpoint/seal/GC handoff, and crash vectors remain
+  downstream gates.
 - M3 must prove run-before-append, exact key grammar, list-after-PUT and pagination capabilities, open-tail discovery,
   gap/conflict/budget rejection, response-loss retry, and independent per-binding frontier reconstruction.
 
-This decision refines ADRs 0018 and 0025 and is tracked by `T-OBJECT-01`, `V2-OBJ-001`, `V2-OBJ-003`, and
-`V2-OBJ-005`.
+This decision is refined by [ADRs 0037](0037-v2-object-wal-binding-context-epoch-authority.md),
+[0038](0038-v2-object-wal-provider-absent-crash-contract.md), and
+[0039](0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md); it refines ADRs 0018 and 0025 and is tracked by
+`T-OBJECT-01`, `V2-OBJ-001/003/005/007..011`.
