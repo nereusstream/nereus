@@ -70,6 +70,11 @@ batch, unquiesced-epoch, and retained-protection limits are hard ceilings; reach
 changing proof semantics. Topic policy can neither enable a capability, reinterpret historical evidence, nor turn
 protection retention off.
 
+The Binding read selector's comparison tuple, fallback-conditional proof liability, irreversible epoch terminal cut,
+fenced proof publisher, and closed verifier are also fixed correctness. Cell/Binding policy may cap admission and tune
+reconciler cadence; Topic policy cannot replace the selector, reopen an epoch, demand proof for no-fallback epochs, or
+disable proof for a fallback-capable interval.
+
 ## Consequences
 
 - Performance tuning remains possible without making correctness or durable compatibility host-dependent.

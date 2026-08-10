@@ -30,10 +30,10 @@ its canonical record. The record stores only the receipt identity/digest, not th
 `maxSourceAccessLifetime`, maximum clock skew, propagation grace, and the pause/recovery owner-fence/deadline recheck
 contract. An ordinary lease, session-loss notice, or writer-only owner fence does not satisfy this envelope.
 
-Every owner grant, `ReadAdmissionEpoch`, quiescence proof, proof-window fold, `SourceRetirementBatch`, and
-source-protection release CAS binds the exact capability admission generation and evidence digest. Historical facts
-are never reinterpreted by loading a “current capability”. A later adapter/config/verifier/receipt change creates a new
-admission generation and cannot retroactively qualify older reads.
+Every owner grant, `ReadAdmissionEpoch`, Binding read-selector state, epoch terminal cut, quiescence proof, proof-window
+fold, `SourceRetirementBatch`, and source-protection release CAS binds the exact capability admission generation and
+evidence digest. Historical facts are never reinterpreted by loading a “current capability”. A later
+adapter/config/verifier/receipt change creates a new admission generation and cannot retroactively qualify older reads.
 
 `DURABLE_DRAIN_ONLY_V1` proves only that the verifier may validate a planned drain; each Owner Epoch still needs exact
 drain evidence. `AUTHORITY_EXPIRY_V1` proves only that the verifier may validate qualified expiry; each Owner Epoch
@@ -54,5 +54,5 @@ historical evidence.
   revocation/missing-verifier retention, planned versus expiry evidence, pause/recovery rechecks, zero normal-read
   metadata I/O, proofs/owner, retained bytes/age, and takeover-to-release p99.
 
-This decision refines ADRs 0049, 0069, 0071, and 0073 and is tracked by `T-POLICY-01`, `T-MANIFEST-01`,
-`T-HANDOFF-01`, `V2-READ-006/009`, and `V2-OPEN-READ-09`.
+This decision is refined by ADRs 0075/0076, refines ADRs 0049, 0069, 0071, and 0073 and is tracked by `T-POLICY-01`,
+`T-MANIFEST-01`, `T-HANDOFF-01`, `V2-READ-006/009..011`, and `V2-OPEN-READ-09/12/13`.

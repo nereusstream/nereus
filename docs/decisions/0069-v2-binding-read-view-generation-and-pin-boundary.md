@@ -6,7 +6,8 @@ Accepted for the 0.2 `OBJECT_WAL` logical read snapshot, append-versus-handoff p
 source-mixing boundary, two-stage reclamation, backlog safety, and takeover behavior. Exact allocation-free capture
 ordering and durable fallback-removal cut are refined by ADRs 0070/0071. Exact implementation layout, bounded
 slot lifecycle, owner-quiescence order, and capability binding are further refined by ADRs 0072..0074. Exact physical
-encodings and numeric limits remain downstream M4/M5 work; implementation has not started at M0.
+selector/terminal-proof cuts are further refined by ADRs 0075/0076. Exact physical encodings and numeric limits remain
+downstream M4/M5 work; implementation has not started at M0.
 
 ## Context
 
@@ -87,8 +88,9 @@ remain zero-remote-metadata operations.
 - M3/M4 must measure hypothetical recovery-GET savings, read allocations/op, reader-slot atomic contention,
   retired-view count/bytes/age, pin-drain p99, and takeover recovery, and prove every publication, mixing, timeout,
   two-stage reclamation, and owner-fence cut. Skip-rate measurement does not itself admit a recovery-omission authority.
-- ADRs 0072..0074 resolve slot reuse/cancellation, the source-independent bounded owner-quiescence proof model, and
-  immutable capability evidence without adding a per-batch accumulator or normal-read metadata I/O.
+- ADRs 0072..0076 resolve slot reuse/cancellation, the source-independent bounded owner-quiescence proof model,
+  immutable capability evidence, single-selector interval linearization, and terminal/on-demand proof behavior without
+  adding a per-batch accumulator or normal-read metadata I/O.
 
-This decision is refined by ADRs 0070..0074, refines ADRs 0049, 0059, 0064, 0066, and 0067 and is tracked by
-`T-APPEND-01`, `T-MANIFEST-01`, `T-OBJECT-01`, and `V2-READ-001/003..009`.
+This decision is refined by ADRs 0070..0076, refines ADRs 0049, 0059, 0064, 0066, and 0067 and is tracked by
+`T-APPEND-01`, `T-MANIFEST-01`, `T-OBJECT-01`, and `V2-READ-001/003..011`.

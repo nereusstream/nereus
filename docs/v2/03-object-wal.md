@@ -252,17 +252,22 @@ may read disjoint manifest and active-tail ranges; one Kafka commit set/Pulsar e
 whole-range fallback remain source-pure.
 
 Reclamation is two-stage. First durably publish `PREFERRED_WITH_FALLBACK`, drain older-view pins, and retire only
-obsolete index structures. Then exact manifest-root CAS selects bounded `PREFERRED_ONLY`. Protection release requires
-all current fallback-bearing slots drained plus contiguous source-independent proof for every Read Admission Epoch in
-the immutable retirement batch's closed interval. One proof is reusable across batches; a gap blocks only intersecting
-batches, and no mutable owner x batch accumulator exists. Planned drain and qualified unplanned expiry each require
-exact immutable capability-evidence binding for the historical admission generation. Otherwise protection remains.
-Only an exact idempotent protection-generation release admits GC.
+obsolete index structures. Then the same Binding/incarnation selector CAS used by takeover/read grant selects bounded
+`PREFERRED_ONLY`, comparing exact `{selectedViewSha, OwnerEpoch, ReadAdmissionEpoch, readAdmissionState}`. An
+application-side cross-key reread is forbidden. The winning takeover or no-fallback transition fences the loser.
+
+Protection release requires all current fallback-bearing slots drained plus contiguous source-independent proof for
+every Read Admission Epoch in the immutable retirement batch's closed interval. A source inherits its first fallback
+epoch across fallback-bearing views; a mixed-first batch uses the earliest first. Proof liability exists only while
+fallback is current or introduced. Each needed proof is one deterministic create-only record produced on demand after
+one irreversible `ReadAdmissionEpochTerminalCut`; planned drain and qualified expiry bind the same terminal SHA and
+exact historical capability evidence. A valid proof is reusable across batches; no mutable owner x batch accumulator
+exists. Otherwise protection remains. Only an exact idempotent protection-generation release admits GC.
 
 Retired-view/pin, proof-window, active-retirement-batch, unquiesced-epoch, and retained-protection count, bytes, age,
-and deadline are hard-bounded; leaks may block handoff, retirement, or new admission, never delete early. Exact proof
-publication/interval derivation, physical proof-window/fold layout, receipt/token encoding, and numeric limits remain
-open/evidence work.
+and deadline are hard-bounded; leaks may block handoff, retirement, or new admission, never delete early. Exact
+selector/terminal publication states, physical proof-window/fold layout, receipt/token encoding, and numeric limits
+remain open/evidence work.
 
 ## Backpressure
 
@@ -315,4 +320,6 @@ Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required sc
 [ADR 0071](../decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md), plus
 [ADR 0072](../decisions/0072-v2-slot-lease-word-and-terminal-source-drain.md),
 [ADR 0073](../decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md), and
-[ADR 0074](../decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md).
+[ADR 0074](../decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md),
+[ADR 0075](../decisions/0075-v2-binding-read-selector-and-fallback-interval-linearization.md) and
+[ADR 0076](../decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md).

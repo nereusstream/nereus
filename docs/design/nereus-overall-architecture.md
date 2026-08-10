@@ -206,13 +206,17 @@ atomic `FREE/PINNED(generation)` lease word; callbacks equality-check it, cancel
 complete terminal source drain clears it. Nonresponsive calls consume bounded quarantine rather than being force-cleared.
 
 Locator and source-protection retirement are two stages: publish preferred+protected-fallback, drain older-view pins,
-then durably CAS `PREFERRED_ONLY`. Protection release additionally requires current slots drained and every older
-read-admitting epoch in the immutable batch's closed Read Admission Epoch interval covered contiguously by a reusable,
-source-independent planned-drain or qualified-expiry proof. Every proof/fold/batch/release binds immutable capability
-evidence for the historical admission generation. Ordinary owner fences, handoff hints, current backend configuration,
-session loss, and host timers are insufficient. Missing/revoked evidence retains protection. Retired-view/pin,
-proof-window, and retained-source count/bytes/age/deadline are hard-bounded; pressure may block handoff or new reads but
-never delete early.
+then select `PREFERRED_ONLY` through the same Binding selector CAS used by takeover/read grant. The selector compares
+exact view SHA, Owner Epoch, Read Admission Epoch, and admission state; cross-key reread cannot freeze an interval.
+Fallback identities inherit their original first epoch and mixed-first batches use the earliest, while no-fallback
+epochs carry no proof liability.
+
+Protection release additionally requires current slots drained and every epoch in the immutable batch interval covered
+contiguously by a reusable, source-independent planned-drain or qualified-expiry proof. Each needed proof is one
+deterministic create-only record after an irreversible terminal cut; both proof paths bind the same terminal SHA and
+immutable historical capability evidence. Invalid occupants and missing/revoked evidence retain protection. Retired-
+view/pin, proof-window, and retained-source count/bytes/age/deadline are hard-bounded; pressure may block handoff or new
+reads but never delete early. Normal reads still perform no metadata I/O.
 
 Routine random reads authenticate the Root-bound in-body header/directory and selected frame without first requiring a
 new full-Object provider proof. The leaf's exclusive bounded prefix end normally gives prefix plus frame GET; without

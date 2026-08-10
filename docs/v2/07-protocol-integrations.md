@@ -120,8 +120,9 @@ partial reservation before protocol-legal split/failure. One ABA-safe lease word
 drain; cancellation and late callbacks cannot force-clear it. One pinned snapshot may span disjoint manifest and
 active-tail ranges while each Kafka commit set/Pulsar entry remains source-pure. Pulsar sealed-ledger async-offload
 keeps its separate whole-range source-pure fallback. Object-WAL locator/protection retirement requires fenced no-
-fallback plus contiguous source-independent Read Admission Epoch proofs bound to immutable capability evidence;
-ordinary reads perform zero remote metadata I/O.
+fallback selected by the same Binding selector CAS as takeover, plus contiguous source-independent Read Admission
+Epoch proofs bound to irreversible terminal cuts and immutable capability evidence. Proofs are generated only for
+fallback-capable intervals; ordinary reads perform zero remote metadata I/O.
 
 The parity matrix covers at least:
 

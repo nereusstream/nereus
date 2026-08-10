@@ -4,8 +4,9 @@
 
 Accepted for the 0.2 `OBJECT_WAL` Binding-scoped read-admission order, immutable source-retirement batch identity,
 one source-independent durable proof per read-admitting epoch, contiguous release test, proof reuse, and fail-closed
-bounds. The exact proof-window/head/fold physical encoding, compaction representation, and numeric limits remain M4
-evidence work; implementation has not started at M0.
+bounds. Selector/interval linearization and terminal/on-demand proof publication are refined by ADRs 0075/0076. The
+exact proof-window/head/fold physical encoding, compaction representation, and numeric limits remain M4 evidence work;
+implementation has not started at M0.
 
 ## Context
 
@@ -19,6 +20,8 @@ Binding-local durable order without conformance evidence.
 Each Binding incarnation owns one monotonic, never-reused `ReadAdmissionEpoch`. Read-admission authority and its epoch
 become atomically visible together; an owner cannot admit a read before that durable/authoritative transition. A native
 Owner Epoch may be used directly only after its backend proves the same strict publication and ordering contract.
+ADR 0075 requires takeover and fallback removal to compete through one Binding/incarnation selector CAS or a proven
+equivalent transaction; cross-key reread is not sufficient.
 
 Each immutable `SourceRetirementBatch` contains exactly the bounded source-handoff identity needed for coverage:
 
@@ -28,10 +31,17 @@ Each immutable `SourceRetirementBatch` contains exactly the bounded source-hando
 - `firstFallbackCapableReadAdmissionEpoch`; and
 - `lastFallbackCapableReadAdmissionEpoch`.
 
+The first epoch belongs to the fallback/source-protection identity and is inherited across later fallback-bearing view
+generations. A mixed-first batch conservatively uses the earliest first. Only epochs whose current/new selector carries
+fallback consume proof-window liability; no-fallback epochs require no prewritten proof.
+
 Each `ReadAdmissionEpoch` produces at most one source-independent durable quiescence proof. It binds Binding and
 incarnation, exact `ReadAdmissionEpoch` and Owner Epoch identity, `drainedThroughReadViewGeneration`,
 `safeAfterAuthorityTime`, exact proof/capability digest, and the authoritative planned-drain or qualified-expiry proof
-identity. One proof may satisfy every retirement batch whose required epoch interval and read-view cut it covers.
+identity. ADR 0076 additionally requires an irreversible terminal-cut SHA before proof creation, deterministic create-
+only bytes, a fenced authorized publisher, closed pre-create verification, and on-demand creation only for an
+intersecting fallback interval. One proof may satisfy every retirement batch whose required epoch interval and read-
+view cut it covers.
 
 The Binding maintains a bounded quiescence proof window/head. Protection release for one batch requires continuous
 coverage of every read-admitting epoch in its closed
@@ -51,11 +61,12 @@ turns an interval into a latest-owner check, or releases storage to recover capa
 
 - `V2-OPEN-READ-06` is resolved at the logical proof-authority level with O(owner + batch), rather than
   O(owner x batch), durable work.
-- Exact proof publication, interval derivation, physical folding, wire IDs, and evidence-selected numeric caps remain
-  downstream gates; no per-batch accumulator is implied by the word “window”.
+- ADRs 0075/0076 resolve interval derivation and logical proof publication. Physical folding/wire IDs, terminal
+  publication details, backend encoding, and evidence-selected numeric caps remain downstream gates; no per-batch
+  accumulator is implied by the word “window”.
 - M4/M5 must measure proof records/owner, metadata writes/takeover, proof-window bytes/age, fold cost, active batches,
   retained protection bytes/age, and protection-release p99, while testing response loss, repeated takeover gaps,
   proof reuse, mixed batch intervals, and hard-cap backpressure.
 
-This decision refines ADRs 0069 and 0071 and is tracked by `T-MANIFEST-01`, `T-HANDOFF-01`,
-`V2-READ-006/008`, and `V2-OPEN-READ-08`.
+This decision is refined by ADRs 0075/0076, refines ADRs 0069 and 0071, and is tracked by `T-MANIFEST-01`,
+`T-HANDOFF-01`, `V2-READ-006/008/010/011`, and `V2-OPEN-READ-08/12/13`.

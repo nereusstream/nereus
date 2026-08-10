@@ -32,6 +32,9 @@ ADRs 0071/0073/0074 do not treat that cached fence, ownership change, current ba
 observation as proof that old read pins have drained. Object-WAL source-protection release requires its separate
 contiguous Read Admission Epoch proof and immutable historical capability-evidence contract.
 
+ADR 0075's Binding-incarnation `BindingReadSelector` is a separate Object-WAL read-admission/source-view authority; it
+does not reuse the Pulsar topic-generation selector, its cached ACTIVE fence, or a cross-key application reread.
+
 The state machine and validation cannot be disabled. Cache size, refresh scheduling, watch concurrency, and host memory
 are performance policy at Cell/host scope and cannot manufacture or extend authority.
 
@@ -44,5 +47,5 @@ are performance policy at Cell/host scope and cannot manufacture or extend autho
 - M1/M5 must prove every crash cut, lost response, conflicting creator, stale watch/cache, ownership transfer,
   recreation, overflow, no per-access Oxia calls, and fail-closed invalidation.
 
-This decision is refined by ADRs 0071/0073/0074, refines ADRs 0019, 0028, 0043, and 0049 and is tracked by `T-META-01`,
+This decision is refined by ADRs 0071/0073..0076, refines ADRs 0019, 0028, 0043, and 0049 and is tracked by `T-META-01`,
 `T-POLICY-01`, `V2-META-005/006`.

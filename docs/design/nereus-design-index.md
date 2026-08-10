@@ -119,6 +119,8 @@ Current accepted decisions:
 - [ADR 0072: slot lease word and terminal source drain](../decisions/0072-v2-slot-lease-word-and-terminal-source-drain.md)
 - [ADR 0073: Read Admission Epoch and source-independent quiescence window](../decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md)
 - [ADR 0074: quiescence capability evidence and historical binding](../decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md)
+- [ADR 0075: Binding read selector and fallback-interval linearization](../decisions/0075-v2-binding-read-selector-and-fallback-interval-linearization.md)
+- [ADR 0076: Read Admission Epoch terminal cut and on-demand proof](../decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md)
 
 ## V2 document map
 

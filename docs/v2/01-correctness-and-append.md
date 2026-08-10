@@ -131,10 +131,13 @@ a hard capacity bound rather than force-cleared.
 The same snapshot may serve disjoint manifest and active-tail ranges, but one atomic append unit and every explicitly
 declared whole-range fallback stay source-pure. Locator retirement follows old-view pin drain. Source protection remains
 until fenced `PREFERRED_ONLY`, every current fallback-bearing pin drains, and the batch's closed Read Admission Epoch
-interval has contiguous source-independent quiescence proof before exact protection-generation release. Each proof,
-fold, batch, and release binds immutable Protocol Cell/backend capability evidence for its historical admission
-generation. A non-authoritative hint, ordinary owner fence, current backend configuration, session loss, or host timer
-is insufficient. Pin/proof/retained-source pressure may block handoff or new reads but never authorizes early reclaim,
+interval has contiguous source-independent quiescence proof before exact protection-generation release. Takeover/read
+grant and no-fallback publication compete on one Binding/incarnation selector CAS over exact
+`{selectedViewSha, OwnerEpoch, ReadAdmissionEpoch, readAdmissionState}`; cross-key reread is not atomicity. A source
+inherits its first fallback epoch across views and mixed-first batches use the earliest first. Proof liability and
+on-demand proof creation apply only to fallback-capable intervals. Each proof binds one irreversible epoch terminal-cut
+SHA and immutable capability evidence. A non-authoritative hint, ordinary owner fence, current backend configuration,
+session loss, or host timer is insufficient. Pressure may block handoff or new reads but never authorizes early reclaim,
 frontier advance, or GC.
 
 ## Uncertain append

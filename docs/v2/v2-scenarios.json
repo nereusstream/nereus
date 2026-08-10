@@ -612,6 +612,22 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-READ-010",
+      "milestone": "M4/M5",
+      "contract": "one exact BindingReadSelector CAS or proven equivalent transaction linearizes takeover read grant against fallback removal inherits each protection identity first epoch uses the earliest mixed first and reserves proof liability only for fallback bearing epochs",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-011",
+      "milestone": "M4/M5",
+      "contract": "every fallback relevant epoch proof follows one irreversible terminal cut and uses a fenced closed verified deterministic create only first valid publication while no fallback epochs remain proof free",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-META-001",
       "milestone": "M2",
       "contract": "KRaft and MetadataStore backends satisfy fencing and monotonic-root conformance",

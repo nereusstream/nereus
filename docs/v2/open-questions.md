@@ -15,19 +15,20 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-Round 15 accepted one minimal ABA-safe slot lease in ADR 0072, a source-independent Read Admission Epoch proof model in
-ADR 0073, and immutable historical capability-evidence binding in ADR 0074. It explicitly rejects callback lifecycle
-state in the slot, force clear, a mutable owner x retirement-batch accumulator, current-capability reinterpretation,
-per-read metadata, and a distributed refcount. The next independent frontier is:
+Round 16 accepted one Binding selector linearization point in ADR 0075 and an irreversible terminal/on-demand epoch-
+proof contract in ADR 0076. It preserves whole-epoch conservative coverage, inherited first epochs, fallback-only
+proof liability, deterministic create-only proof publication, zero ordinary-read metadata I/O, and the earlier
+rejection of sub-epochs, owner x source updates, mutable owner x batch accumulators, and proof replacement. The next
+independent frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-READ-10` | freeze exact fallback-capable Read Admission Epoch interval derivation and the takeover/no-fallback linearization cut | derive first/last from immutable fallback/no-fallback views and fence the final CAS by exact owner/read epoch |
-| `V2-OPEN-READ-11` | freeze one reusable source-independent proof publication per epoch and response-loss convergence | use one deterministic epoch key, immutable first-valid value, exact reread, and bounded proof-window admission |
+| `V2-OPEN-READ-12` | freeze selector admission/terminal behavior across same-owner rollover, takeover, later advancement, and asynchronous drain | use one E-to-E+1 selector CAS as E's durable closure fence, retain a bounded verifiable closure anchor, and create the terminal cut only after drain/qualified expiry |
+| `V2-OPEN-READ-13` | freeze immutable retirement-batch construction, selector activation, response-loss convergence, and per-source completion boundary | select one deterministic bounded eligibility envelope, keep completion derived from exact protection states, and reject mutable batch progress |
 
 The complete questions and recommendations are in
-[round 16](grill-notes/18-restarted-grill-2-read-admission-interval-and-proof-publication.md). None of its
-recommendations is accepted yet. `V2-OPEN-READ-08/09`, `V2-OPEN-OBJ-22/24`, `V2-OPEN-BK-11/13`, remaining
+[round 17](grill-notes/19-restarted-grill-2-selector-terminal-and-retirement-batch.md). None of its recommendations is
+accepted yet. `V2-OPEN-READ-08/09`, `V2-OPEN-OBJ-22/24`, `V2-OPEN-BK-11/13`, remaining
 `V2-OPEN-OBJ-17/19`, and `V2-OPEN-PUL-OBJ-09` are evidence-blocked rather than questions in this round.
 
 ## Configuration scope
@@ -331,16 +332,31 @@ This is evidence-blocked. M4/M5 must freeze canonical binary encodings and hard 
 cuts, conformance receipt identities, and actual Kafka/Pulsar backend admission generations. Until then missing
 evidence remains `RETAIN` and no backend is promoted by prose alone.
 
-### `V2-OPEN-READ-10`: fallback-capable epoch interval
+### `V2-OPEN-READ-10`: resolved fallback-capable epoch interval
 
-This remains open. Round 16 asks how immutable fallback/no-fallback view cuts derive exact first/last Read Admission
-Epochs and how the final manifest CAS linearizes against a concurrent owner takeover without per-owner/source writes.
+Resolved by [ADR 0075](../decisions/0075-v2-binding-read-selector-and-fallback-interval-linearization.md). Takeover/read
+grant and fallback removal compete on one Binding/incarnation selector CAS or proven equivalent transaction comparing
+the exact selected-view/owner/read-epoch/admission-state tuple. Source identities inherit first epoch, mixed-first
+batches use the earliest, and no-fallback epochs create no proof liability.
 
-### `V2-OPEN-READ-11`: source-independent epoch proof publication
+### `V2-OPEN-READ-11`: resolved source-independent epoch proof publication
 
-This remains open. Round 16 asks how one immutable proof per Read Admission Epoch converges planned-drain versus
-qualified-expiry races and unknown responses, enters the bounded proof window, and remains reusable across retirement
-batches.
+Resolved by [ADR 0076](../decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md). An irreversible
+terminal cut precedes each relevant deterministic create-only proof; only a fenced publisher may create a closed-
+verified canonical candidate, exact reread resolves unknown response, invalid occupants quarantine, and no-fallback
+epochs are not prewritten.
+
+### `V2-OPEN-READ-12`: selector terminal-state publication
+
+This remains open. Round 17 asks how the selector's E-to-E+1 transition remains a durable, verifiable admission-closure
+fence through asynchronous drain and later takeovers, how `PWF -> PO` under the same E eventually terminalizes E, and
+how bounded unresolved closure liability avoids another synchronous takeover write.
+
+### `V2-OPEN-READ-13`: retirement-batch construction and completion
+
+This remains open. Round 17 asks how one deterministic bounded batch becomes active at the selector CAS, how inline or
+precreated immutable mappings recover response loss, and how exact per-source protection release proceeds without a
+mutable batch bitmap/count/completion authority.
 
 ## Storage Epoch transitions
 
@@ -594,6 +610,24 @@ For example, one Pulsar entry with batch indexes `0..2` might map to one Kafka O
 input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
+
+### Restarted Grill 2 round 16 adjusted decisions: resolved by ADRs 0075/0076
+
+Resolved on 2026-08-10 after explicit adjusted confirmation:
+
+- Q1 one Binding/incarnation selector CAS or proven equivalent transaction for takeover/read grant versus no-fallback
+  publication, exact comparison tuple, whole-epoch conservative interval, inherited source first epoch, mixed-first
+  earliest interval, and fallback-only proof liability ->
+  [ADR 0075](../decisions/0075-v2-binding-read-selector-and-fallback-interval-linearization.md);
+- Q2 one irreversible Read Admission Epoch terminal cut, deterministic create-only and first-valid proof, fenced
+  publisher plus closed verifier, exact-reread response-loss convergence, invalid-occupant quarantine, and on-demand
+  generation only for an intersecting fallback interval ->
+  [ADR 0076](../decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md).
+
+Selector linearization, terminal closure, and on-demand proof eligibility are non-disableable correctness contracts.
+Exact terminal-state publication and retirement-batch construction remain `V2-OPEN-READ-12/13`; proof-window/fold and
+capability encodings remain evidence gates `V2-OPEN-READ-08/09`. The complete response is preserved in
+[the round 16 record](grill-notes/18-restarted-grill-2-read-admission-interval-and-proof-publication.md).
 
 ### Restarted Grill 2 round 15 adjusted decisions: resolved by ADRs 0072/0073/0074
 

@@ -205,9 +205,20 @@ The monotonic, never-reused Binding-incarnation order in which an owner becomes 
 atomically visible with that authority and is distinct from an unqualified backend Owner Epoch.
 _Avoid_: Host session counter, source generation, inferred takeover order, reusable owner number
 
+**Binding Read Selector**:
+The single Binding-incarnation authority that atomically selects source view, Owner Epoch, Read Admission Epoch, and
+read-admission state, so takeover and fallback removal cannot both commit from the same predecessor.
+_Avoid_: Manifest-only pointer, topic-generation selector, cross-key reread, cached owner fence
+
+**Read Admission Epoch Terminal Cut**:
+The immutable proof identity that one exact Read Admission Epoch can never admit another read and binds its last
+admitted/drained read-view cut to planned closure or qualified authority expiry.
+_Avoid_: Proof key existence, mutable closed flag, local timeout, reopenable owner state
+
 **Source Retirement Batch**:
 One immutable bounded fallback set and the closed Read Admission Epoch interval whose complete quiescence permits its
-exact source-protection generation to be released.
+exact source-protection generation to be released. A source identity inherits its first epoch across fallback-bearing
+views, and a mixed-first batch conservatively uses the earliest first.
 _Avoid_: Mutable per-owner accumulator, per-extent delete flag, latest-owner watermark
 
 **Quiescence Proof Window**:

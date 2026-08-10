@@ -117,12 +117,18 @@ disjoint manifest and active-tail ranges, while one atomic append unit and every
 source-pure.
 
 Reclamation durably publishes `PREFERRED_WITH_FALLBACK` first and drains older pins before retiring obsolete index
-state. A later fenced root CAS selects bounded `PREFERRED_ONLY`. Protection remains until current fallback-bearing
-slots drain and every Read Admission Epoch in the immutable retirement batch's exact closed interval has contiguous,
-source-independent planned-drain or qualified authority-expiry proof. Proofs are reusable across batches; no mutable
-owner x batch accumulator is admitted. Every epoch/proof/fold/batch/release binds immutable capability evidence for its
-historical admission generation. Existing handoff hints, ordinary ownership fences, or current backend configuration
-are insufficient. Missing/revoked evidence retains protection and consumes Cell count/bytes/age admission.
+state. A later Binding/incarnation selector CAS competes atomically with takeover/read grant and selects bounded
+`PREFERRED_ONLY`; it compares exact view SHA, Owner Epoch, Read Admission Epoch, and admission state. Cross-key reread
+cannot substitute. The fallback/protection identity inherits its original first epoch across views; mixed-first batches
+use the earliest first.
+
+Protection remains until current fallback-bearing slots drain and every Read Admission Epoch in the immutable batch's
+exact closed interval has contiguous, source-independent planned-drain or qualified authority-expiry proof. Each proof
+is generated on demand only for a fallback-capable interval, after an irreversible epoch terminal cut, by a fenced
+publisher and closed verifier. First-valid create-only proof wins; an invalid occupying value is quarantined, never
+overwritten. Every terminal/proof/fold/batch/release binds immutable historical capability evidence. Existing handoff
+hints, ordinary ownership fences, or current backend configuration are insufficient. Missing/revoked evidence retains
+protection and consumes Cell count/bytes/age admission.
 
 ## Timestamp and protocol-position indexes
 
@@ -148,7 +154,7 @@ Logical trim advances a binding-scoped typed Trim Frontier independently from ph
 - no reader pin, recovery root, task protection, source-protection record, Access Projection, Projection Map, or
   Migration Link still requires the source;
 - Object-WAL retirement has durable `PREFERRED_ONLY`, current-slot terminal drain, contiguous required Read Admission
-  Epoch proof coverage, and exact historical capability-evidence binding;
+  Epoch proof coverage, irreversible terminal cuts, and exact historical capability-evidence binding;
 - Protocol Cell, Cell Provider Scope, physical-delete capability, Owner Epoch, worker epoch, and Storage Epoch are
   revalidated;
 - response-loss state has converged and grace has elapsed;

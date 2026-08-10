@@ -159,11 +159,18 @@ publication, pointer revalidation, a coherent generation-tagged frontier/view ce
 per unfinished batch. Cancellation stops new source use; only complete terminal drain clears the slot. Manifest handoff
 publishes low-frequency `PREFERRED_WITH_FALLBACK -> PREFERRED_ONLY` generations and uses two pin drains.
 
+Takeover/read grant and `PREFERRED_ONLY` compete through one Binding/incarnation `BindingReadSelector` CAS or a backend
+transaction with proven equivalent conditional atomicity. The exact comparison tuple is selected view SHA, Owner Epoch,
+Read Admission Epoch, and read-admission state; a cross-key reread/watch/cache is not authority. Fallback identities
+inherit first epoch across fallback-bearing views, while completely no-fallback epochs carry no proof liability.
+
 The optional planned-handoff hint below is never `OwnerReadQuiescenceProof`. Protection release separately requires
 contiguous source-independent proof across the retirement batch's exact Read Admission Epoch interval. Planned drain
 or qualified authority expiry must bind the exact immutable Protocol Cell/backend capability evidence used by each
-historical owner/read epoch; a current capability cannot reinterpret it. Ordinary KRaft/Pulsar ownership fencing,
-session loss, or local time is insufficient; missing/revoked evidence retains protection.
+historical owner/read epoch and the same irreversible epoch terminal-cut SHA. Proof creation is deterministic, create-
+only, fenced, closed-verifier-checked, and on demand for intersecting fallback intervals. A current capability cannot
+reinterpret it. Ordinary KRaft/Pulsar ownership fencing, session loss, or local time is insufficient; missing/revoked
+evidence retains protection.
 
 ## Planned fast handoff
 
