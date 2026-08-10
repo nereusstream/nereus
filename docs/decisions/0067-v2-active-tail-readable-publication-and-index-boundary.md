@@ -57,7 +57,8 @@ protection/read pins make removal safe. ADR 0069 separates high-frequency fronti
 source-selection generations and requires two-stage locator/protection retirement. The replacement view must be
 installed before locator retirement; cache or local materialization intent is never sufficient. ADR 0070 fixes the
 bounded generation-tagged hazard acquisition order, while ADR 0071 requires durable no-fallback publication plus
-current/old-owner quiescence before exact protection release.
+current/old-owner quiescence before exact protection release. ADRs 0072..0074 refine slot terminal drain,
+source-independent epoch coverage, and immutable capability-evidence binding.
 
 Correctness/publication order and hard caps cannot be configured off. Configuration is limited to:
 
@@ -77,10 +78,10 @@ No Topic may disable active-tail readability or enlarge a hard cap.
 - M3/M4 must quantify ACK p99 increment, allocation bytes per commit unit, active-tail bytes per unit/range, GC/allocation
   pressure, materialization-trigger behavior, and takeover GET/bytes/time, and must prove gap invisibility, A/B recovery
   independence, exact publication order, and pin-safe retirement.
-- ADRs 0069/0070/0071 resolve logical snapshot scope, pin granularity, generation-tagged capture, source mixing, and
-  capability-tiered protection-release cuts without requiring a per-ACK snapshot, per-read allocation, or remote
-  per-read refcount. Exact slot-reuse and bounded quiescence-record formats remain open.
+- ADRs 0069..0074 resolve logical snapshot scope, pin granularity, generation-tagged capture, source mixing, minimal
+  slot reuse, source-independent owner coverage, and capability-tiered protection release without requiring a per-ACK
+  snapshot, per-read allocation, per-batch owner accumulator, or remote per-read refcount.
 
-This decision is refined by ADRs 0069/0070/0071, refines ADRs 0007, 0008, 0031, 0040, 0049, 0053, 0064, and 0066 and is
+This decision is refined by ADRs 0069..0074, refines ADRs 0007, 0008, 0031, 0040, 0049, 0053, 0064, and 0066 and is
 tracked by `T-APPEND-01`, `T-MANIFEST-01`, `T-OBJECT-01`, `V2-APP-001..003`,
-`V2-OBJ-002/006/021/023`, `V2-READ-001/003..006`, and `V2-OPEN-READ-05/06/07`.
+`V2-OBJ-002/006/021/023`, and `V2-READ-001/003..009`.

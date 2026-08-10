@@ -155,13 +155,15 @@ unrelated typed gap cannot block B.
 
 The logical Binding read snapshot and its allocation-free read-batch pins also remain owner-local. Append does not
 publish a new source generation per ACK. A bounded sharded cross-Binding slot pool uses StoreLoad-ordered hazard
-publication, pointer revalidation, and a coherent generation-tagged frontier/view cell. Manifest handoff publishes
-low-frequency `PREFERRED_WITH_FALLBACK -> PREFERRED_ONLY` generations and uses two pin drains.
+publication, pointer revalidation, a coherent generation-tagged frontier/view cell, and one ABA-safe `SlotLeaseWord`
+per unfinished batch. Cancellation stops new source use; only complete terminal drain clears the slot. Manifest handoff
+publishes low-frequency `PREFERRED_WITH_FALLBACK -> PREFERRED_ONLY` generations and uses two pin drains.
 
 The optional planned-handoff hint below is never `OwnerReadQuiescenceProof`. Protection release separately requires
-durable planned drain or a Protocol Cell/backend capability whose authority expiry limits read admission and bounds the
-complete source-access lifetime. Ordinary KRaft/Pulsar ownership fencing, session loss, or local time is insufficient;
-missing capability retains protection.
+contiguous source-independent proof across the retirement batch's exact Read Admission Epoch interval. Planned drain
+or qualified authority expiry must bind the exact immutable Protocol Cell/backend capability evidence used by each
+historical owner/read epoch; a current capability cannot reinterpret it. Ordinary KRaft/Pulsar ownership fencing,
+session loss, or local time is insufficient; missing/revoked evidence retains protection.
 
 ## Planned fast handoff
 

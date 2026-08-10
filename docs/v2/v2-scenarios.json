@@ -582,7 +582,31 @@
     {
       "id": "V2-READ-006",
       "milestone": "M4/M5",
-      "contract": "fenced preferred with fallback to preferred only current slot drain durable all old owner read quiescence and exact protection generation release precede Object WAL GC",
+      "contract": "fenced preferred with fallback to preferred only current slot drain contiguous fallback capable Read Admission Epoch proof exact historical capability evidence and protection release precede Object WAL GC",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-007",
+      "milestone": "M4",
+      "contract": "one atomic free pinned SlotLeaseWord fences reuse callbacks equality check cancellation stops new source use and only complete terminal source drain clears it",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-008",
+      "milestone": "M4/M5",
+      "contract": "one monotonic Binding Read Admission Epoch and source independent reusable proof window continuously cover each immutable retirement batch interval without a mutable owner batch accumulator",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-009",
+      "milestone": "M4/M5",
+      "contract": "every historical owner grant read epoch proof fold retirement batch and protection release binds one immutable closed capability evidence generation digest",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null

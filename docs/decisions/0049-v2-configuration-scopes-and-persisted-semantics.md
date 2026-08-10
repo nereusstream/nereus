@@ -65,8 +65,10 @@ authorize early reclamation.
 
 Generation-tagged read capture, StoreLoad ordering, complete source-access pin lifetime, and old-owner quiescence are
 also non-configurable correctness. Slot-pool and retained-protection ceilings are Cell/host capacity, while qualifying
-read-authority expiry is a versioned Protocol Cell/backend admission capability. Topic policy can neither enable that
-capability nor turn protection retention off.
+read-authority expiry is a versioned Protocol Cell/backend admission capability. Slot quarantine, proof-window, active-
+batch, unquiesced-epoch, and retained-protection limits are hard ceilings; reaching them backpressures instead of
+changing proof semantics. Topic policy can neither enable a capability, reinterpret historical evidence, nor turn
+protection retention off.
 
 ## Consequences
 

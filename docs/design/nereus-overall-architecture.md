@@ -201,14 +201,18 @@ generations that readers pin for one Binding-scoped protocol read batch through 
 or reader-slot state. Each unfinished batch owns one slot from a bounded cross-Binding sharded pool. Standard hazard
 ordering publishes `{Binding,G}`, establishes StoreLoad, revalidates G, then captures a coherent generation-tagged
 `{sourceGenerationId, ReadableFrontier, activeTailViewVersion}` before dereference. A request may read disjoint manifest
-and active-tail ranges, but one append unit and any declared whole-range fallback remain source-pure.
+and active-tail ranges, but one append unit and any declared whole-range fallback remain source-pure. The slot has one
+atomic `FREE/PINNED(generation)` lease word; callbacks equality-check it, cancellation stops new source use, and only
+complete terminal source drain clears it. Nonresponsive calls consume bounded quarantine rather than being force-cleared.
 
 Locator and source-protection retirement are two stages: publish preferred+protected-fallback, drain older-view pins,
 then durably CAS `PREFERRED_ONLY`. Protection release additionally requires current slots drained and every older
-read-admitting Owner Epoch covered by a durable planned-drain proof or a fully qualified authority-expiry capability.
-Ordinary owner fences, handoff hints, session loss, and host timers are insufficient. Missing capability retains
-protection. Retired-view/pin and retained-source count/bytes/age/deadline are hard-bounded; pressure may block handoff or
-new reads but never delete early.
+read-admitting epoch in the immutable batch's closed Read Admission Epoch interval covered contiguously by a reusable,
+source-independent planned-drain or qualified-expiry proof. Every proof/fold/batch/release binds immutable capability
+evidence for the historical admission generation. Ordinary owner fences, handoff hints, current backend configuration,
+session loss, and host timers are insufficient. Missing/revoked evidence retains protection. Retired-view/pin,
+proof-window, and retained-source count/bytes/age/deadline are hard-bounded; pressure may block handoff or new reads but
+never delete early.
 
 Routine random reads authenticate the Root-bound in-body header/directory and selected frame without first requiring a
 new full-Object provider proof. The leaf's exclusive bounded prefix end normally gives prefix plus frame GET; without

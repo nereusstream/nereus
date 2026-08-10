@@ -110,15 +110,19 @@ binding/tenant soft shares, Cell/shard recovery concurrency, host ceilings, and 
 `BindingReadViewSnapshot` is logical. Append does not create a snapshot generation: hidden locators precede a release-
 published frontier and ACK. One unfinished Binding-scoped protocol read batch reserves one exclusive slot from a
 bounded sharded cross-Binding pool. It publishes `{Binding,G}`, establishes StoreLoad, revalidates G, then captures one
-stable generation-tagged frontier/view cell before dereferencing G. The slot persists through every source access and
-buffer use. One snapshot may select disjoint manifest and active-tail ranges, while one atomic append unit and every
-declared whole-range fallback remain source-pure.
+stable generation-tagged frontier/view cell before dereferencing G. Its one atomic `SlotLeaseWord` remains pinned
+through every source access and buffer use; cancellation forbids new use but only complete terminal drain clears it.
+Late mismatched callbacks are no-ops and nonresponsive work consumes bounded quarantine. One snapshot may select
+disjoint manifest and active-tail ranges, while one atomic append unit and every declared whole-range fallback remain
+source-pure.
 
 Reclamation durably publishes `PREFERRED_WITH_FALLBACK` first and drains older pins before retiring obsolete index
 state. A later fenced root CAS selects bounded `PREFERRED_ONLY`. Protection remains until current fallback-bearing
-slots drain, every older read-admitting Owner Epoch has durable planned-drain or fully qualified authority-expiry
-quiescence, and the exact protection generation releases. Existing handoff hints and ordinary ownership fences are
-insufficient. Missing capability retains protection and consumes Cell count/bytes/age admission.
+slots drain and every Read Admission Epoch in the immutable retirement batch's exact closed interval has contiguous,
+source-independent planned-drain or qualified authority-expiry proof. Proofs are reusable across batches; no mutable
+owner x batch accumulator is admitted. Every epoch/proof/fold/batch/release binds immutable capability evidence for its
+historical admission generation. Existing handoff hints, ordinary ownership fences, or current backend configuration
+are insufficient. Missing/revoked evidence retains protection and consumes Cell count/bytes/age admission.
 
 ## Timestamp and protocol-position indexes
 
@@ -143,7 +147,8 @@ Logical trim advances a binding-scoped typed Trim Frontier independently from ph
 - all protocol cursor/group/transaction retention floors pass the complete source;
 - no reader pin, recovery root, task protection, source-protection record, Access Projection, Projection Map, or
   Migration Link still requires the source;
-- Object-WAL retirement has durable `PREFERRED_ONLY`, current-slot drain, and complete older read-owner quiescence;
+- Object-WAL retirement has durable `PREFERRED_ONLY`, current-slot terminal drain, contiguous required Read Admission
+  Epoch proof coverage, and exact historical capability-evidence binding;
 - Protocol Cell, Cell Provider Scope, physical-delete capability, Owner Epoch, worker epoch, and Storage Epoch are
   revalidated;
 - response-loss state has converged and grace has elapsed;

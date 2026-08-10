@@ -124,6 +124,9 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md"
     "$repo_root/docs/decisions/0070-v2-generation-tagged-read-publication-and-hazard-slots.md"
     "$repo_root/docs/decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md"
+    "$repo_root/docs/decisions/0072-v2-slot-lease-word-and-terminal-source-drain.md"
+    "$repo_root/docs/decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md"
+    "$repo_root/docs/decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -205,6 +208,13 @@ require_literal '`FullyManifestCoveredThrough` is not admitted in 0.2' "docs/dec
 require_literal 'establish Store-to-Load ordering' "docs/decisions/0070-v2-generation-tagged-read-publication-and-hazard-slots.md"
 require_literal '`OwnerReadQuiescenceProof`' "docs/decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md"
 require_literal '`PREFERRED_WITH_FALLBACK`' "docs/decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md"
+require_literal '`SlotLeaseWord`' "docs/decisions/0072-v2-slot-lease-word-and-terminal-source-drain.md"
+require_literal 'Only two slot ownership cuts' "docs/decisions/0072-v2-slot-lease-word-and-terminal-source-drain.md"
+require_literal '`ReadAdmissionEpoch`' "docs/decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md"
+require_literal 'does not admit `OwnerReadQuiescenceAggregateV1`' "docs/decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md"
+require_literal '`DURABLE_DRAIN_ONLY_V1`' "docs/decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md"
+require_literal '`AUTHORITY_EXPIRY_V1`' "docs/decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md"
+require_literal 'are never reinterpreted by loading' "docs/decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -250,7 +260,10 @@ require_literal "Restarted Grill 2 round 14" "docs/v2/grill-notes/16-restarted-g
 require_literal "Round 14 两项均调整后确认，不按原文直接确认" "docs/v2/grill-notes/16-restarted-grill-2-allocation-free-read-capture-and-durable-handoff.md"
 require_literal "slot publication 与下一次 pointer load 之间必须具有 Store→Load ordering" "docs/v2/grill-notes/16-restarted-grill-2-allocation-free-read-capture-and-durable-handoff.md"
 require_literal "Restarted Grill 2 round 15" "docs/v2/grill-notes/17-restarted-grill-2-read-slot-lifecycle-and-quiescence-accumulator.md"
-require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/17-restarted-grill-2-read-slot-lifecycle-and-quiescence-accumulator.md"
+require_literal "Round 15 不按原文全部确认" "docs/v2/grill-notes/17-restarted-grill-2-read-slot-lifecycle-and-quiescence-accumulator.md"
+require_literal "不确认 per-batch mutable accumulator" "docs/v2/grill-notes/17-restarted-grill-2-read-slot-lifecycle-and-quiescence-accumulator.md"
+require_literal "Restarted Grill 2 round 16" "docs/v2/grill-notes/18-restarted-grill-2-read-admission-interval-and-proof-publication.md"
+require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/18-restarted-grill-2-read-admission-interval-and-proof-publication.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -345,6 +358,9 @@ for resolved_gate in \
     V2-OPEN-READ-02 \
     V2-OPEN-READ-03 \
     V2-OPEN-READ-04 \
+    V2-OPEN-READ-05 \
+    V2-OPEN-READ-06 \
+    V2-OPEN-READ-07 \
     V2-OPEN-PUL-OBJ-10; do
     if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$resolved_gate remains in the active gate table"
@@ -359,14 +375,18 @@ for active_gate in \
     V2-OPEN-PUL-OBJ-09 \
     V2-OPEN-OBJ-22 \
     V2-OPEN-OBJ-24 \
-    V2-OPEN-READ-05 \
-    V2-OPEN-READ-06 \
-    V2-OPEN-READ-07; do
+    V2-OPEN-READ-08 \
+    V2-OPEN-READ-09 \
+    V2-OPEN-READ-10 \
+    V2-OPEN-READ-11; do
     require_literal "\`$active_gate\`" "docs/v2/open-questions.md"
-    require_literal "\`$active_gate\`" "docs/v2/grill-notes/17-restarted-grill-2-read-slot-lifecycle-and-quiescence-accumulator.md"
     if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$active_gate is missing from the active gate table"
     fi
+done
+
+for frontier_gate in V2-OPEN-READ-10 V2-OPEN-READ-11; do
+    require_literal "\`$frontier_gate\`" "docs/v2/grill-notes/18-restarted-grill-2-read-admission-interval-and-proof-publication.md"
 done
 
 active_contracts=(
@@ -438,6 +458,9 @@ active_contracts=(
     "$repo_root/docs/decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md"
     "$repo_root/docs/decisions/0070-v2-generation-tagged-read-publication-and-hazard-slots.md"
     "$repo_root/docs/decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md"
+    "$repo_root/docs/decisions/0072-v2-slot-lease-word-and-terminal-source-drain.md"
+    "$repo_root/docs/decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md"
+    "$repo_root/docs/decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )
@@ -459,12 +482,7 @@ fi
 for unconfirmed_design_symbol in \
     ActiveTailRetiredThrough \
     RecoverySkipCertificate \
-    ReadBatchSlotTicket \
-    OwnerReadQuiescenceAggregateV1 \
-    ReadAdmissionEpoch \
-    SourceRetirementBatchId \
-    DURABLE_DRAIN_ONLY_V1 \
-    AUTHORITY_EXPIRY_V1; do
+    ReadBatchSlotTicket; do
     if rg -Fn \
         --glob '!**/open-questions.md' \
         --glob '!**/grill-notes/**' \
@@ -478,6 +496,20 @@ for unconfirmed_design_symbol in \
         fail "unconfirmed Grill proposal leaked into active V2 contracts: $unconfirmed_design_symbol"
     fi
 done
+
+if rg -Fn \
+    --glob '!**/open-questions.md' \
+    --glob '!**/grill-notes/**' \
+    --glob '!**/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md' \
+    -- 'OwnerReadQuiescenceAggregateV1' \
+    "$repo_root/docs/v2" \
+    "$repo_root/docs/design/nereus-design-index.md" \
+    "$repo_root/docs/design/nereus-overall-architecture.md" \
+    "$repo_root/docs/decisions" \
+    "$repo_root/CONTEXT-MAP.md" \
+    "$repo_root/docs/domain"; then
+    fail "rejected per-batch OwnerReadQuiescenceAggregateV1 leaked into active V2 contracts"
+fi
 
 python3 - "$repo_root" <<'PY'
 import json
@@ -620,6 +652,7 @@ required_scenarios = {
     "V2-BK-001", "V2-BK-002", "V2-BK-003", "V2-BK-004", "V2-BK-005", "V2-BK-006",
     "V2-BK-007", "V2-BK-008", "V2-BK-009", "V2-BK-010", "V2-BK-011", "V2-BK-012", "V2-BK-013",
     "V2-READ-001", "V2-READ-002", "V2-READ-003", "V2-READ-004", "V2-READ-005", "V2-READ-006",
+    "V2-READ-007", "V2-READ-008", "V2-READ-009",
     "V2-META-001", "V2-HO-001",
     "V2-KAF-001", "V2-PUL-001", "V2-KOP-001",
 }
@@ -751,6 +784,9 @@ link_docs=(
     "$repo_root/docs/decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md"
     "$repo_root/docs/decisions/0070-v2-generation-tagged-read-publication-and-hazard-slots.md"
     "$repo_root/docs/decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md"
+    "$repo_root/docs/decisions/0072-v2-slot-lease-word-and-terminal-source-drain.md"
+    "$repo_root/docs/decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md"
+    "$repo_root/docs/decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md"
 )
 
 while IFS=: read -r source match; do

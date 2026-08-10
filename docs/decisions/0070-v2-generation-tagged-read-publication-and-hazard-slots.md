@@ -5,7 +5,7 @@
 Accepted for the 0.2 `OBJECT_WAL` allocation-free coherent-capture ordering, generation-tagged publication cell,
 bounded cross-Binding slot-pool scope, asynchronous pin lifetime, and memory-order contract. Exact array layout,
 padding, single-reference-versus-seqlock representation, VarHandle operations, and numeric pool limits remain M4
-evidence work; implementation has not started at M0.
+evidence work. Slot reuse and terminal source drain are refined by ADR 0072; implementation has not started at M0.
 
 ## Context
 
@@ -58,7 +58,8 @@ pool hard cap. There is no per-read heap pin/snapshot allocation, process-global
   cross-Binding pool isolation, multi-Binding all-or-release behavior, source-buffer lifetime, zero allocations/op,
   slot publish/clear cost, cache-line contention, slot occupancy/scan time, capture retry rate, and generation-swap
   drain p99.
-- Exact slot-reuse ABA and cancellation/late-callback state transitions remain the next design frontier.
+- ADR 0072 resolves slot-reuse ABA and cancellation/late-callback terminal drain without adding callback CAS traffic or
+  duplicating the read-batch lifecycle in the slot.
 
-This decision refines ADRs 0049, 0067, and 0069 and is tracked by `T-MANIFEST-01`, `T-POLICY-01`,
-`V2-READ-001/003..005`, and `V2-OPEN-READ-05`.
+This decision is refined by ADR 0072, refines ADRs 0049, 0067, and 0069, and is tracked by `T-MANIFEST-01`,
+`T-POLICY-01`, and `V2-READ-001/003..005/007`.

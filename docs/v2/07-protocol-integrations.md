@@ -116,10 +116,12 @@ remains isolated to that complete binding unit.
 Append does not publish a read snapshot per ACK. Low-frequency source-selection generations are pinned allocation-free
 for one Binding-scoped Kafka fetch/range or Pulsar Object-WAL `readEntries` batch through a bounded cross-Binding slot
 pool and generation-tagged hazard capture. A multi-Binding Kafka Fetch reserves all needed slots or releases every
-partial reservation before protocol-legal split/failure. One pinned snapshot may span disjoint manifest and active-tail
-ranges while each Kafka commit set/Pulsar entry remains source-pure. Pulsar sealed-ledger async-offload keeps its
-separate whole-range source-pure fallback. Object-WAL locator/protection retirement requires fenced no-fallback plus
-current/old-owner quiescence; ordinary reads perform zero remote metadata I/O.
+partial reservation before protocol-legal split/failure. One ABA-safe lease word remains pinned through terminal source
+drain; cancellation and late callbacks cannot force-clear it. One pinned snapshot may span disjoint manifest and
+active-tail ranges while each Kafka commit set/Pulsar entry remains source-pure. Pulsar sealed-ledger async-offload
+keeps its separate whole-range source-pure fallback. Object-WAL locator/protection retirement requires fenced no-
+fallback plus contiguous source-independent Read Admission Epoch proofs bound to immutable capability evidence;
+ordinary reads perform zero remote metadata I/O.
 
 The parity matrix covers at least:
 

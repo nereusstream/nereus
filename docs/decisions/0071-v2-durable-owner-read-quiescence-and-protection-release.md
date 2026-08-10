@@ -3,9 +3,10 @@
 ## Status
 
 Accepted for the 0.2 `OBJECT_WAL` two-generation durable source-handoff cut, capability-tiered old-owner quiescence,
-protection-release prerequisites, retained-source safety, and configuration scope. Exact quiescence accumulator/wire,
-backend capability encoding, batch-size limits, and numeric time/capacity bounds remain M4/M5 work; implementation has
-not started at M0.
+protection-release prerequisites, retained-source safety, and configuration scope. Read-admission ordering and the
+source-independent proof window are refined by ADR 0073; immutable capability evidence is refined by ADR 0074. Exact
+physical encodings, batch-size limits, and numeric time/capacity bounds remain M4/M5 work; implementation has not
+started at M0.
 
 ## Context
 
@@ -28,15 +29,20 @@ Object-WAL source handoff uses two immutable, fenced manifest-generation states:
 
 1. the exact `PREFERRED_ONLY` generation is durably selected;
 2. every current-owner slot that can name a fallback-bearing view has drained;
-3. every older Owner Epoch capable of admitting such a read is covered by durable owner-read quiescence evidence; and
+3. every Read Admission Epoch in the immutable retirement batch's exact fallback-capable interval is covered
+   contiguously by durable source-independent owner-read quiescence evidence; and
 4. the exact source-protection generation is released by idempotent CAS before physical GC.
 
 Planned handoff publishes a low-frequency durable `OwnerReadQuiescenceProof`; the optional handoff hint is not that
-proof. The proof binds at least Binding/incarnation, fallback manifest/protection generation, old Owner Epoch, a durable
-read-admission-stopped fence, drained-through read-view generation, and maximum admitted source-access deadline.
-Repeated takeovers require a bounded, verifiable coverage statement such as `quiescedThroughOwnerEpoch`; this name is
-valid only if the backend proves a Binding-local ordered Owner-Epoch contract. Otherwise an equivalent bounded lineage
-proof is required. A proof of only the latest owner cannot cover earlier gaps.
+proof. The source-independent proof binds at least Binding/incarnation, exact Read Admission Epoch and Owner Epoch, a
+durable read-admission-stopped fence, drained-through read-view generation, safe-after authority time, exact
+proof/capability digest, and planned-drain or qualified-expiry proof identity. A proof of only the latest owner cannot
+cover earlier gaps.
+
+ADR 0073 replaces a per-retirement-batch mutable accumulator with one Binding-scoped `ReadAdmissionEpoch` order, one
+source-independent proof per epoch, and one reusable bounded proof window/head. Each immutable retirement batch carries
+the exact fallback set and closed epoch interval it needs; every interval epoch must be covered contiguously. A native
+Owner Epoch may substitute for that order only after proving the same Binding-local publication/ordering contract.
 
 Unplanned takeover may synthesize qualifying quiescence only when the Protocol Cell/backend capability proves all of:
 
@@ -52,7 +58,9 @@ Unplanned takeover may synthesize qualifying quiescence only when the Protocol C
 
 Without either an exact planned-drain proof or that complete authority-expiry capability, 0.2 retains protection and
 defers GC. It does not add a distributed per-read refcount, and Topic policy cannot weaken this rule. Capability is a
-versioned Protocol Cell/backend admission fact, not a Topic performance switch.
+versioned Protocol Cell/backend admission fact, not a Topic performance switch. ADR 0074 fixes the two closed
+capability discriminators and requires every historical owner, proof, fold, batch, and release CAS to bind the exact
+immutable admission-evidence digest rather than reinterpret a current backend configuration.
 
 One `PREFERRED_ONLY` generation may cover an evidence-bounded set of fallback sources/ranges, avoiding one manifest
 CAS per extent. Retained protection count, bytes, age, and oldest deadline consume Cell admission and alerting budgets.
@@ -70,7 +78,9 @@ owned by ADRs 0036, 0045, and 0052 and its native metadata state machine.
   planned proof versus non-authoritative hint, every expiry-capability clause, exact protection CAS, batch substitution,
   retained bytes/age admission, and zero read-path metadata I/O.
 - M4 measures `PREFERRED_ONLY` CAS frequency, retained protection bytes/age, and takeover-to-GC-eligibility p99.
-- Exact bounded owner-coverage accumulator and capability record are the next design frontier.
+- Exact proof publication, retirement interval derivation, physical proof-window/fold encoding, and evidence-derived
+  capability token/receipt limits remain downstream gates.
 
-This decision refines ADRs 0049, 0051, 0067, and 0069 and is tracked by `T-MANIFEST-01`, `T-HANDOFF-01`,
-`T-POLICY-01`, `V2-READ-001/003/004/006`, and `V2-OPEN-READ-06/07`.
+This decision is refined by ADRs 0073/0074, refines ADRs 0049, 0051, 0067, and 0069, and is tracked by
+`T-MANIFEST-01`, `T-HANDOFF-01`, `T-POLICY-01`, `V2-READ-001/003/004/006/008/009`, and
+`V2-OPEN-READ-08/09`.

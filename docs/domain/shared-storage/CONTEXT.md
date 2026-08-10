@@ -185,16 +185,40 @@ It lasts through every source I/O, retry, fallback, decode, and source-backed-bu
 authorizes early clear or protection release.
 _Avoid_: Binding x event-loop fixed slot, shared concurrent-read slot, connection pin, timeout-based force clear
 
+**Slot Lease Word**:
+The single owner-local atomic identity proving that one read batch, and no earlier reuse of the same slot, owns a Read
+View Pin until complete source drain.
+_Avoid_: Async lifecycle state machine, split ticket/state atomics, timeout-clear token, durable quiescence proof
+
 **Generation-Tagged Read Publication**:
 The coherent owner-local tuple binding one source-generation identity to the Readable Frontier and active-tail view
 version captured by a pinned read batch. A mismatched or torn tuple is unusable.
 _Avoid_: Generation-only pin, independently sampled frontier, per-ACK snapshot object
 
 **Owner Read Quiescence Proof**:
-Durable evidence that one bounded set of older Owner Epochs can no longer access the exact protected fallback source
-generation. It derives from an authoritative planned drain or a qualified read-admission expiry capability, never an
-ordinary owner fence, handoff hint, session-loss observation, or host timer.
-_Avoid_: Writer-only lease, latest-owner-only proof, distributed per-read refcount, configurable safety switch
+Source-independent durable evidence that one exact Read Admission Epoch can no longer access fallback-bearing read
+views through a stated generation. It derives from authoritative planned drain or qualified read-admission expiry.
+_Avoid_: Source-specific owner row, latest-owner-only proof, ordinary owner fence, distributed per-read refcount
+
+**Read Admission Epoch**:
+The monotonic, never-reused Binding-incarnation order in which an owner becomes authorized to admit reads. It becomes
+atomically visible with that authority and is distinct from an unqualified backend Owner Epoch.
+_Avoid_: Host session counter, source generation, inferred takeover order, reusable owner number
+
+**Source Retirement Batch**:
+One immutable bounded fallback set and the closed Read Admission Epoch interval whose complete quiescence permits its
+exact source-protection generation to be released.
+_Avoid_: Mutable per-owner accumulator, per-extent delete flag, latest-owner watermark
+
+**Quiescence Proof Window**:
+The bounded Binding authority that proves contiguous Owner Read Quiescence Proof coverage for reusable epoch intervals;
+a gap affects only retirement batches whose interval contains it.
+_Avoid_: Owner x source matrix, per-batch CAS accumulator, gap-skipping frontier
+
+**Quiescence Capability Evidence**:
+The immutable Protocol Cell/backend admission-generation evidence that defines which planned-drain or authority-expiry
+proof verifier may interpret historical Read Admission Epochs.
+_Avoid_: Current backend configuration, generic lease flag, Topic capability switch, copied conformance report
 
 **Current WalRun Pointer**:
 The one low-frequency per-shard CAS authority binding the current WalRun Root key/SHA and shard run epoch. It anchors a

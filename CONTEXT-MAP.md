@@ -45,5 +45,7 @@ KoP is outside the current V2 Kafka/Pulsar design session. Its existing design r
   caps cannot be disabled by Topic policy. Provider-proof mode/canonicalizer/token cap belong to the WalRun Root and
   default to `NONE`. A logical Binding read snapshot separates allocation-free high-frequency frontier publication
   from low-frequency source-selection generations and bounded read pins. Generation-tagged hazard publication prevents
-  pin-after-retire/torn-frontier reads; durable no-fallback selection plus capability-qualified current/old-owner
-  quiescence precedes exact protection release. Neither becomes a Topic switch or remote per-read refcount.
+  pin-after-retire/torn-frontier reads; one atomic slot lease remains pinned until complete source drain. Durable
+  no-fallback selection plus a contiguous, source-independent Read Admission Epoch proof window and immutable
+  capability evidence precede exact protection release. Neither becomes a per-batch owner accumulator, Topic switch,
+  or remote per-read refcount.

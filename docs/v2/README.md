@@ -104,12 +104,14 @@ Append does not allocate a read snapshot per ACK. A logical `BindingReadViewSnap
 frontiers with low-frequency source-selection generations pinned allocation-free for one Binding-scoped protocol read
 batch. Each unfinished batch owns one bounded cross-Binding pool slot; StoreLoad-ordered hazard publication and a
 generation-tagged coherent cell prevent pin-after-retire and torn frontier reads. Disjoint manifest/active-tail ranges
-may share one snapshot, while an atomic append unit or declared whole-range fallback stays source-pure.
+may share one snapshot, while an atomic append unit or declared whole-range fallback stays source-pure. The slot owns
+one ABA-safe `SlotLeaseWord`; cancellation stops new source use and only complete terminal drain clears it.
 
 Object-WAL protection retirement durably advances `PREFERRED_WITH_FALLBACK -> PREFERRED_ONLY`, drains current slots,
-and proves every older read-admitting Owner Epoch quiescent before exact protection release. Planned proof is durable;
-an unplanned expiry qualifies only when the backend bounds read admission and the complete source-access lifetime.
-Otherwise protection remains and consumes Cell capacity. Normal reads still perform zero remote metadata I/O.
+and proves every Read Admission Epoch in the batch's exact closed interval quiescent before exact protection release.
+Proofs are source-independent and reusable across batches. Planned drain or qualified expiry binds immutable capability
+evidence for each historical admission generation; current configuration cannot reinterpret it. Otherwise protection
+remains and consumes Cell capacity. Normal reads still perform zero remote metadata I/O.
 
 Provider sharing is physical, not authoritative. Multiple cells may use the same external Object Storage or BookKeeper
 infrastructure, while each cell owns its Cell Provider Scope/session, namespace, credential/KMS and operator scope,
@@ -199,6 +201,9 @@ Accepted decisions:
 - [ADR 0069: Binding read-view generation and pin boundary](../decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md)
 - [ADR 0070: generation-tagged read publication and hazard slots](../decisions/0070-v2-generation-tagged-read-publication-and-hazard-slots.md)
 - [ADR 0071: durable owner-read quiescence and protection release](../decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md)
+- [ADR 0072: slot lease word and terminal source drain](../decisions/0072-v2-slot-lease-word-and-terminal-source-drain.md)
+- [ADR 0073: Read Admission Epoch and source-independent quiescence window](../decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md)
+- [ADR 0074: quiescence capability evidence and historical binding](../decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md)
 
 ## Open design gates
 
@@ -218,10 +223,12 @@ lazy-lane/vector-checkpoint structure, and RANGE takeover constraints. ADRs 0062
 class/lane grammar, provider-resolved checkpoint publisher, and physical-versus-binding frontier split without
 selecting remaining numeric values, final RANGE wire/size, or an allocator mode. ADRs 0065 through 0067 resolve
 physical-only checkpoint/Seal rows, pre-position reservation/local ticket semantics, and non-disableable active-tail
-publication. ADRs 0068 through 0071 resolve compact provider-proof semantics, logical read-view scope,
-generation-tagged hazard capture, and capability-tiered durable fallback removal. Partial recovery omission remains
-evidence-blocked; slot-reuse/cancellation, bounded owner-proof accumulation, and backend capability records are the next
-design frontier. The rows below are the remaining active 0.2 decisions or evidence gates.
+publication. ADRs 0068 through 0074 resolve compact provider-proof semantics, logical read-view scope,
+generation-tagged hazard capture, minimal slot reuse/terminal drain, source-independent owner-proof coverage, and
+historically bound capability evidence. Partial recovery omission remains evidence-blocked; exact read-admission/source
+interval publication and source-independent proof publication are the next design frontier, while physical proof-fold
+and capability encodings remain evidence gates. The rows below are the remaining active 0.2 decisions or evidence
+gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
@@ -232,9 +239,10 @@ design frontier. The rows below are the remaining active 0.2 decisions or eviden
 | `V2-OPEN-PUL-OBJ-09` | choose an allocator only after evidence plus exact reservation/head/node wire, range size, Cell reservation concurrency, and ADR 0061 conformance | M1/M3 virtual-ledger allocator freeze |
 | `V2-OPEN-OBJ-22` | execute bounded recovery and skip-hit evidence; only an SLO miss may reopen a whole-WalRun-first, Root/Seal-bound recovery omission certificate | M3/M7 recovery optimization decision |
 | `V2-OPEN-OBJ-24` | admit a Provider version token only after canonical-binary cap, immutable-version, FULL_OBJECT SHA-256, rows/page, and range-benefit evidence; otherwise retain Root mode NONE | M3 checkpoint provider-proof admission |
-| `V2-OPEN-READ-05` | freeze slot-reuse ABA, cancellation, late callback, and terminal async source-access cleanup without force-clear | M4 read-slot lifecycle freeze |
-| `V2-OPEN-READ-06` | freeze a bounded gap-free owner/read-view quiescence accumulator without assuming backend Owner Epoch ordering | M4 durable proof wire freeze |
-| `V2-OPEN-READ-07` | freeze the Protocol Cell/backend quiescence capability record and exact admission modes | M4/M5 takeover and GC capability freeze |
+| `V2-OPEN-READ-08` | execute M4 evidence and freeze the bounded proof-window/head/fold physical representation and numeric caps without a per-batch accumulator | M4 durable proof wire freeze |
+| `V2-OPEN-READ-09` | execute M4/M5 evidence and freeze canonical capability/receipt encodings, verifier availability/revocation behavior, and admitted backend generations | M4/M5 takeover and GC capability freeze |
+| `V2-OPEN-READ-10` | freeze owner-fenced Read Admission Epoch publication and exact fallback-capable interval derivation across concurrent takeover/handoff | M4 read-admission/handoff freeze |
+| `V2-OPEN-READ-11` | freeze source-independent per-epoch proof publication, response-loss convergence, and proof-window admission without owner x batch writes | M4 durable proof publication freeze |
 | `V2-OPEN-BK-02` | validate one-active-ledger-per-Kafka-partition at 10k and 100k partitions | M2 Kafka BK layout freeze |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |
 

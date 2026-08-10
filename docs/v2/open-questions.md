@@ -15,20 +15,20 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-Round 14 accepted standard generation-tagged hazard capture in ADR 0070 and capability-tiered durable source retirement
-in ADR 0071. It does not freeze Java layout/numeric values or add per-read allocation, remote metadata, distributed
-refcount, unsafe timeout clear, or unqualified owner lease. The next independent frontier is:
+Round 15 accepted one minimal ABA-safe slot lease in ADR 0072, a source-independent Read Admission Epoch proof model in
+ADR 0073, and immutable historical capability-evidence binding in ADR 0074. It explicitly rejects callback lifecycle
+state in the slot, force clear, a mutable owner x retirement-batch accumulator, current-capability reinterpretation,
+per-read metadata, and a distributed refcount. The next independent frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-READ-05` | freeze async slot reuse/cancellation/late-callback ABA without timeout force-clear | consider a full 64-bit slot ticket and exact owner-local lifecycle that clears only after terminal source use |
-| `V2-OPEN-READ-06` | freeze bounded gap-free quiescence across repeated read-admitting owners and one bounded fallback set | consider a retirement-batch aggregate over a monotonic ReadAdmissionEpoch rather than native-epoch assumptions or owner x source rows |
-| `V2-OPEN-READ-07` | freeze the closed Protocol Cell/backend capability that may prove unplanned old-reader expiry | consider DURABLE_DRAIN_ONLY_V1 as default and one fully bound AUTHORITY_EXPIRY_V1 capability |
+| `V2-OPEN-READ-10` | freeze exact fallback-capable Read Admission Epoch interval derivation and the takeover/no-fallback linearization cut | derive first/last from immutable fallback/no-fallback views and fence the final CAS by exact owner/read epoch |
+| `V2-OPEN-READ-11` | freeze one reusable source-independent proof publication per epoch and response-loss convergence | use one deterministic epoch key, immutable first-valid value, exact reread, and bounded proof-window admission |
 
 The complete questions and recommendations are in
-[round 15](grill-notes/17-restarted-grill-2-read-slot-lifecycle-and-quiescence-accumulator.md). None of its
-recommendations is accepted yet. `V2-OPEN-OBJ-22/24`, `V2-OPEN-BK-11/13`, remaining `V2-OPEN-OBJ-17/19`, and
-`V2-OPEN-PUL-OBJ-09` are evidence-blocked rather than questions in this round.
+[round 16](grill-notes/18-restarted-grill-2-read-admission-interval-and-proof-publication.md). None of its
+recommendations is accepted yet. `V2-OPEN-READ-08/09`, `V2-OPEN-OBJ-22/24`, `V2-OPEN-BK-11/13`, remaining
+`V2-OPEN-OBJ-17/19`, and `V2-OPEN-PUL-OBJ-09` are evidence-blocked rather than questions in this round.
 
 ## Configuration scope
 
@@ -298,21 +298,49 @@ qualifies; otherwise protection and its Cell capacity charge remain.
 
 ### `V2-OPEN-READ-05`: async slot reuse and cancellation
 
-This remains open. ADR 0070 fixes slot ownership and full source lifetime but not the reuse ABA/state machine. Round 15
-asks whether a full 64-bit pool-local ticket plus exact terminal-drain transitions must prevent a cancelled batch's late
-callback from clearing a reused slot.
+Resolved by [ADR 0072](../decisions/0072-v2-slot-lease-word-and-terminal-source-drain.md). One 64-bit atomic
+`SlotLeaseWord` is `FREE` or `PINNED(generation)`; callbacks equality-check it and only complete terminal source drain
+CAS-clears it. Cancellation only stops new use, nonresponsive work stays in bounded quarantine, wrap retires the slot,
+and no shared per-read ticket increment or force clear is admitted.
 
 ### `V2-OPEN-READ-06`: bounded multi-owner quiescence accumulator
 
-This remains open. ADR 0071 requires bounded proof across every relevant owner without assuming native Owner Epoch
-order. Round 15 asks whether one retirement-batch/fallback-set aggregate over a Binding-local monotonic
-`ReadAdmissionEpoch` should advance contiguously and fail closed on every gap/regression.
+Resolved at the logical proof-authority level by
+[ADR 0073](../decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md). One monotonic
+Binding Read Admission Epoch order, immutable retirement interval, and at most one reusable source-independent proof
+per epoch replace the rejected mutable per-batch accumulator. Continuous interval coverage is mandatory; exact
+physical proof-window/head/fold representation remains evidence gate `V2-OPEN-READ-08`.
 
 ### `V2-OPEN-READ-07`: backend quiescence capability record
 
-This remains open. ADR 0071 freezes the capability-tiered behavior but not its closed persisted variants. Round 15 asks
-whether `DURABLE_DRAIN_ONLY_V1` should be the safe default and one fully bound `AUTHORITY_EXPIRY_V1` the only unplanned-
-takeover extension.
+Resolved by [ADR 0074](../decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md).
+`DURABLE_DRAIN_ONLY_V1` and `AUTHORITY_EXPIRY_V1` are closed discriminators whose authorization comes only from one
+immutable admission-generation evidence digest. Every historical grant/epoch/proof/fold/batch/release binds it;
+missing/revoked evidence retains protection. Exact encoding/admitted backends remain evidence gate
+`V2-OPEN-READ-09`.
+
+### `V2-OPEN-READ-08`: proof-window/head/fold physical evidence
+
+This is evidence-blocked. M4 must compare bounded physical representations and numeric limits for the ADR-0073 logical
+window without introducing a mutable record per retirement batch. It must preserve contiguous per-epoch coverage,
+capability binding, bounded bytes/count/age, response-loss recovery, and proof reuse.
+
+### `V2-OPEN-READ-09`: capability/receipt encoding and backend admission evidence
+
+This is evidence-blocked. M4/M5 must freeze canonical binary encodings and hard caps, verifier availability/revocation
+cuts, conformance receipt identities, and actual Kafka/Pulsar backend admission generations. Until then missing
+evidence remains `RETAIN` and no backend is promoted by prose alone.
+
+### `V2-OPEN-READ-10`: fallback-capable epoch interval
+
+This remains open. Round 16 asks how immutable fallback/no-fallback view cuts derive exact first/last Read Admission
+Epochs and how the final manifest CAS linearizes against a concurrent owner takeover without per-owner/source writes.
+
+### `V2-OPEN-READ-11`: source-independent epoch proof publication
+
+This remains open. Round 16 asks how one immutable proof per Read Admission Epoch converges planned-drain versus
+qualified-expiry races and unknown responses, enters the bounded proof window, and remains reusable across retirement
+batches.
 
 ## Storage Epoch transitions
 
@@ -567,6 +595,24 @@ input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
 
+### Restarted Grill 2 round 15 adjusted decisions: resolved by ADRs 0072/0073/0074
+
+Resolved on 2026-08-10 after explicit adjusted confirmation:
+
+- Q1 one atomic `FREE/PINNED(generation)` lease word, equality-only callbacks, cancellation as no-new-source-use,
+  complete terminal drain, bounded quarantine, fail-closed wrap, and no shared per-read ticket hotspot ->
+  [ADR 0072](../decisions/0072-v2-slot-lease-word-and-terminal-source-drain.md);
+- Q2 one monotonic Binding Read Admission Epoch, immutable retirement interval, source-independent reusable proof per
+  epoch, continuous coverage, hard bounds, and explicit rejection of a mutable per-batch accumulator ->
+  [ADR 0073](../decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md);
+- Q3 two closed discriminators authorized only by immutable capability-evidence digest, historical generation binding,
+  exact per-owner evidence, fail-safe revocation/missing verifier, and zero normal-read metadata I/O ->
+  [ADR 0074](../decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md).
+
+Exact bit/layout/counter choices and proof-window/capability encodings remain M4/M5 evidence-selected. The original
+per-batch `OwnerReadQuiescenceAggregateV1` recommendation was rejected. The complete response is preserved in
+[the round 15 record](grill-notes/17-restarted-grill-2-read-slot-lifecycle-and-quiescence-accumulator.md).
+
 ### Restarted Grill 2 round 14 adjusted decisions: resolved by ADRs 0070/0071
 
 Resolved on 2026-08-10 after explicit adjusted confirmation:
@@ -580,7 +626,8 @@ Resolved on 2026-08-10 after explicit adjusted confirmation:
   admission -> [ADR 0071](../decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md).
 
 No Java layout, numeric pool/time limit, per-read allocation, remote per-read metadata, distributed refcount, generic
-lease flag, or unsafe timeout clear was accepted. Slot-reuse lifecycle and bounded proof/capability wire remain open.
+lease flag, or unsafe timeout clear was accepted. Round 15 later refined slot reuse, logical proof coverage, and
+capability evidence while leaving physical encodings evidence-selected.
 The complete response is preserved in
 [the round 14 record](grill-notes/16-restarted-grill-2-allocation-free-read-capture-and-durable-handoff.md).
 

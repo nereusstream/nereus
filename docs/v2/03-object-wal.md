@@ -240,8 +240,11 @@ allocation, or process-global refcount contention. Each unfinished partition fet
 Capture follows standard hazard ordering: acquire G; publish exact `{Binding,G}`; establish StoreLoad; acquire G again;
 then capture a stable generation-tagged `{sourceGenerationId, ReadableFrontier, activeTailViewVersion}` by one reference
 or seqlock. Only an exact G/stable-cell match may dereference G-owned state. A pointer switch after validation waits on
-the slot. Clear occurs only after provider I/O/retry/fallback/decode and source-backed-buffer use finish. Multi-Binding
-requests reserve all required slots or release every partial reservation before failing/splitting.
+the slot. Its one atomic `SlotLeaseWord` is `FREE` or `PINNED(generation)`; callbacks only equality-check it and only the
+unique terminal source drain CAS clears it. Cancellation stops new source use but cannot clear before provider
+completion/real cancel acknowledgement, fallback/decode end, and final source-backed-buffer release. Nonresponsive
+work consumes bounded quarantine. Multi-Binding requests reserve all required slots or release every partial
+reservation before failing/splitting.
 
 The captured logical scope binds Binding/incarnation, Storage Epoch/Position Domain version, owner fence, Readable
 Frontier, active-tail view version, manifest view identity/generation, and source-protection generation. One snapshot
@@ -250,14 +253,16 @@ whole-range fallback remain source-pure.
 
 Reclamation is two-stage. First durably publish `PREFERRED_WITH_FALLBACK`, drain older-view pins, and retire only
 obsolete index structures. Then exact manifest-root CAS selects bounded `PREFERRED_ONLY`. Protection release requires
-all current fallback-bearing slots drained plus durable proof for every older read-admitting Owner Epoch. Planned drain
-uses `OwnerReadQuiescenceProof`; unplanned expiry qualifies only when the backend limits read admission and proves
-authority time, complete source-access lifetime, pause/recovery rechecks, skew, and grace. Otherwise protection remains.
+all current fallback-bearing slots drained plus contiguous source-independent proof for every Read Admission Epoch in
+the immutable retirement batch's closed interval. One proof is reusable across batches; a gap blocks only intersecting
+batches, and no mutable owner x batch accumulator exists. Planned drain and qualified unplanned expiry each require
+exact immutable capability-evidence binding for the historical admission generation. Otherwise protection remains.
 Only an exact idempotent protection-generation release admits GC.
 
-Retired-view/pin and retained-protection count, bytes, age, and deadline are hard-bounded; leaks may block handoff,
-retirement, or new admission, never delete early. Exact slot-reuse state, bounded multi-owner proof, backend capability
-record, and numeric limits remain open/evidence work.
+Retired-view/pin, proof-window, active-retirement-batch, unquiesced-epoch, and retained-protection count, bytes, age,
+and deadline are hard-bounded; leaks may block handoff, retirement, or new admission, never delete early. Exact proof
+publication/interval derivation, physical proof-window/fold layout, receipt/token encoding, and numeric limits remain
+open/evidence work.
 
 ## Backpressure
 
@@ -307,4 +312,7 @@ Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required sc
 [ADR 0068](../decisions/0068-v2-checkpoint-provider-proof-mode-and-row-encoding.md) and
 [ADR 0069](../decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md), plus
 [ADR 0070](../decisions/0070-v2-generation-tagged-read-publication-and-hazard-slots.md) and
-[ADR 0071](../decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md).
+[ADR 0071](../decisions/0071-v2-durable-owner-read-quiescence-and-protection-release.md), plus
+[ADR 0072](../decisions/0072-v2-slot-lease-word-and-terminal-source-drain.md),
+[ADR 0073](../decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md), and
+[ADR 0074](../decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md).

@@ -123,15 +123,19 @@ record/message/frame, a whole connection, and an unbounded stream are not pin un
 Each concurrently unfinished batch exclusively reserves one slot from a bounded sharded cross-Binding pool before
 source I/O. It publishes `{Binding,G}`, establishes StoreLoad ordering, revalidates G, and only then captures a stable
 generation-tagged `{sourceGenerationId, ReadableFrontier, activeTailViewVersion}`. A mismatched/torn cell retries
-without dereference. The slot remains until every possible provider I/O, retry, fallback, decode, and source-backed
-buffer use completes.
+without dereference. One atomic `SlotLeaseWord` is `FREE` or `PINNED(generation)`; ordinary callbacks equality-check it
+and only the unique terminal drain CAS may clear it. Cancellation stops new source use but the slot remains until every
+provider I/O, retry, fallback, decode, and source-backed-buffer use completes. Nonresponsive work is quarantined under
+a hard capacity bound rather than force-cleared.
 
 The same snapshot may serve disjoint manifest and active-tail ranges, but one atomic append unit and every explicitly
 declared whole-range fallback stay source-pure. Locator retirement follows old-view pin drain. Source protection remains
-until fenced `PREFERRED_ONLY`, every current fallback-bearing pin drains, every older read-admitting Owner Epoch has
-durable quiescence proof, and the exact protection generation releases. A non-authoritative hint, ordinary owner fence,
-session loss, or host timer is insufficient. Pin/backlog/retained-source pressure may block handoff or new reads but
-never authorizes early reclaim, frontier advance, or GC.
+until fenced `PREFERRED_ONLY`, every current fallback-bearing pin drains, and the batch's closed Read Admission Epoch
+interval has contiguous source-independent quiescence proof before exact protection-generation release. Each proof,
+fold, batch, and release binds immutable Protocol Cell/backend capability evidence for its historical admission
+generation. A non-authoritative hint, ordinary owner fence, current backend configuration, session loss, or host timer
+is insufficient. Pin/proof/retained-source pressure may block handoff or new reads but never authorizes early reclaim,
+frontier advance, or GC.
 
 ## Uncertain append
 
