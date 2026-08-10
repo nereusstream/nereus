@@ -46,6 +46,33 @@ they cannot depend on Oxia/Kafka physical wire, Java serialization, runtime conf
 derivation may contain random attempt IDs, wall-clock time, controller offsets, backend versions, or another retry-
 dependent fact. Exact retries reproduce the same IDs, and derivation runs only on create/replay rather than append/read.
 
+ADR 0083 fixes their version-1 layout:
+
+```text
+Kafka cellBytes:
+NPC1 || u16be(KAFKA) || deploymentId[16] || kafkaCellId[16]
+
+Pulsar cellBytes:
+NPC1 || u16be(PULSAR) || deploymentId[16] || reservationDomainId[16] || pulsarCellId[16]
+
+Kafka incarnationBytes:
+NTI1 || u16be(KAFKA) || topicId[16]
+     || u32be(canonicalTopicNameLength) || canonicalTopicNameAscii
+
+Pulsar incarnationBytes:
+NTI1 || u16be(PULSAR)
+     || u32be(canonicalPersistenceNameLength) || canonicalPersistenceNameUtf8
+     || u32be(canonicalTopicNameLength) || canonicalTopicNameUtf8
+     || u64be(bindingGeneration)
+```
+
+Protocol code zero is invalid and NTA1/NPC1/NTI1 discriminators must agree. Exact non-zero protocol code assignments
+remain part of the not-yet-frozen discriminator table. Kafka names use the pinned 249-ASCII-byte limit and topic IDs
+reject both pinned reserved values `ZERO_UUID` and `ONE_UUID`/`METADATA_TOPIC_ID`. Pulsar generation is
+`1..Long.MAX_VALUE`; zero and `Math.addExact` overflow fail closed. Its per-name and total UTF-8 caps remain V2 format
+decisions that must be frozen before codec implementation. Compatibility namespace, provider scope, broker/session,
+and display alias do not enter these bytes.
+
 The aggregate remains immutable. Enumeration indexes may be added only as repairable hints; a name index or second key
 cannot participate in aggregate visibility or override the incarnation-scoped authority.
 
@@ -67,5 +94,6 @@ This decision is refined by [ADRs 0033](0033-v2-topic-binding-aggregate-logical-
 [0043](0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md),
 [0050](0050-v2-kafka-aggregate-wire-and-publication-validation.md), and
 [0051](0051-v2-pulsar-selector-state-machine-and-cached-fence.md), and
-[0082](0082-v2-m1-domain-and-control-authority-contracts.md), refines ADR 0023, and is tracked by `T-META-01`,
+[0082](0082-v2-m1-domain-and-control-authority-contracts.md) and
+[0083](0083-v2-m1-wire-control-and-evidence-bounds.md), refines ADR 0023, and is tracked by `T-META-01`,
 `V2-META-002..007`, and `V2-KAF-META-001..005`.

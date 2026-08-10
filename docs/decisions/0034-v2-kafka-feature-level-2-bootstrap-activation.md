@@ -23,7 +23,8 @@ rejected. Recovery or rollback therefore requires rebuilding a cluster rather th
 
 At finalized level 2:
 
-- every successful native `CreateTopics` item, including an internal topic, includes its complete
+- every successful creation path that enters a topic into `TopicImage`, including native `CreateTopics` and built-in
+  internal-topic creation, includes its complete
   `TopicBindingAggregateV1` in the same atomic controller result as the topic records; no topic-name exemption exists;
 - `validateOnly` executes the same pure resolution, validation, and size admission but emits no records;
 - native errors such as `TOPIC_ALREADY_EXISTS` retain their Kafka meaning and do not publish an aggregate;
@@ -50,5 +51,5 @@ It does not prove provider credentials, profile capacity, or per-topic admission
   level-1 replay refusal, atomic CreateTopics behavior, validate-only zero writes, and native error preservation. M6
   separately proves the complete broker/controller process and restart boundary.
 
-This decision is refined by ADRs 0042/0050/0082, refines ADRs 0023/0033, and is tracked by `T-META-01`, `T-COMPAT-01`,
+This decision is refined by ADRs 0042/0050/0082/0083, refines ADRs 0023/0033, and is tracked by `T-META-01`, `T-COMPAT-01`,
 `V2-META-004`, and `V2-KAF-META-001..005`.

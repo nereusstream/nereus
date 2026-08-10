@@ -34,6 +34,11 @@ either:
 0.2 defines no online multi-domain allocator. Without accepted non-overlap/native-exclusion evidence, provisioning the
 new domain fails closed. Existing Cells still cannot resize, acquire a second slice, or migrate automatically.
 
+ADR 0083 further limits 0.2 activation to a genuinely fresh BookKeeper ledger root that is authoritatively absent
+immediately before init, either never created or after a qualified non-force nuke bound to the expected old identity.
+Replacing or recreating INSTANCEID through format is not proof that old ledgers or id-generator state disappeared and
+cannot create additional capacity. Existing-root migration and force/direct nuke shortcuts remain outside 0.2.
+
 ## Consequences
 
 - `V2-OPEN-PUL-OBJ-08` is resolved.
@@ -47,4 +52,4 @@ new domain fails closed. Existing Cells still cannot resize, acquire a second sl
 
 Allocator-mode evidence is refined by
 [ADR 0055](0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md). This decision refines ADRs 0027, 0032, 0041,
-0048, 0049, and 0082 and is tracked by `T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-008/009/015/016`.
+0048, 0049, 0082, and 0083 and is tracked by `T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-008/009/015/016`.

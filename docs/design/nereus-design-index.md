@@ -14,8 +14,9 @@ sourceTuple: v2-m0
 `main` is the Nereus V2 development line and uses version `0.2.0-SNAPSHOT`. M0 establishes the V2 documentation
 baseline; it does not claim that the current Java implementation already satisfies V2.
 
-M1 readiness ADRs 0081/0082 freeze the implementation/promotion boundary and outer domain/control authorities only.
-M1 code, gates, exact inner byte tables, backend adapters, and executable receipts remain NotStarted/OPEN.
+M1 readiness ADRs 0081/0082/0083 freeze the implementation/promotion boundary, outer domain/control authorities, and
+Round-3 structural wire/control/evidence cuts. M1 code, gates, exact remaining field/code/cap tables, qualified provider
+hooks, and executable receipts remain NotStarted/OPEN.
 
 The V1 product line is preserved at
 `v0.1@a14d925da5763f36208f8ddca7bef31f3eb90b0b`. Existing Phase/Future documents and their historical receipts describe
@@ -130,6 +131,7 @@ Current accepted decisions:
 - [ADR 0080: irreversible Source Retirement Batch tombstone](../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md)
 - [ADR 0081: M1 pure active graph and promotion boundary](../decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md)
 - [ADR 0082: M1 domain and control-authority contracts](../decisions/0082-v2-m1-domain-and-control-authority-contracts.md)
+- [ADR 0083: M1 wire, control-plane, and evidence bounds](../decisions/0083-v2-m1-wire-control-and-evidence-bounds.md)
 
 ## V2 document map
 

@@ -26,9 +26,21 @@ Oxia on every append or read would avoid a local cache problem by putting remote
 
 Topic open and ownership acquisition use a backend-native opaque witness. A 128-bit CSPRNG `acquisitionId` is generated
 before the first conditional acquire; all-zero and a process-observed duplicate are rejected. The same response-unknown
-acquire retry and lease renewal inherit it. Reacquire after loss, transfer, forced takeover, or missing-record recreate
-generate a fresh value. The guarantee is collision resistance, not mathematical never-reuse; a qualified backend
-creation/session revision is also bound when available. A stable endpoint or resettable state counter is insufficient.
+acquire retry and lease renewal inherit it. A qualified brief reconnect in the same process/backend session may inherit
+only when the admitted provider lifecycle hook proves session continuity. `SessionLost` or process restart creates a
+new broker incarnation. Every real service-unit reacquisition after either event, plus transfer target, forced takeover,
+missing/tombstone recreation, and split-child acquisition, creates a fresh acquisition ID bound to the target broker's
+current incarnation. Restart cannot inherit through authoritative reread alone. The guarantee is collision resistance,
+not mathematical never-reuse; a qualified backend creation/session revision is also bound when available. A stable
+endpoint or resettable state counter is insufficient.
+
+The first M1 adapter candidate is limited to the Oxia 0.9.0-backed MetadataStore ELM. The pinned source verifies direct
+GET, Stat, and versioned-CAS primitives only; it does not already provide a qualifying adapter. M1 adds acquisition
+fields and exact transitions, dedicated authoritative reads, a provider-qualified lifecycle/gap hook, and one closed
+transition kernel used by every ownership writer. The existing eventual TableView, force path, unconditional syncer
+write, and conflict-swallowing wrapper do not qualify and cannot create a sidecar authority. Initial admission requires
+MetadataStore ELM, syncer disabled, and every ownership writer upgraded. The pinned source currently lacks a qualified
+provider session/gap callback, so V2 remains fail-closed until M1 adds and proves that hook.
 
 The control path performs authoritative witness A, exact ACTIVE/aggregate read, then authoritative witness B. An ELM
 eventual TableView is not an authoritative A/B read. Exact `A == B` while still locally owned is necessary, but the
@@ -36,8 +48,10 @@ installer must also compare-and-set the expected ownership and selector invalida
 that arrived before installation therefore cannot be overwritten by a stale installer. A backend unable to provide
 this capability fails V2 admission; unsupported third-party backends need not implement it.
 
-The watch/loss capability is armed before the exact read and must invalidate the same fence sequence on callback,
-reconnect/session gap, and close. A generic best-effort watch without a registration barrier or gap invalidation is not
+The watch/loss capability is armed before the exact read. Ownership, selector, and aggregate sources must all
+invalidate the same fence sequence on callback, connection gap, and close. Even a qualified same-session reconnect
+preserves at most the identity; it does not preserve VALID and must repeat witness A/read/B before reinstall. A generic
+best-effort watch without a registration barrier or gap invalidation is not
 sufficient. If selector mutation and ownership transfer cannot be ordered with local invalidation, or a notification
 gap cannot force global invalidation, the backend fails V2 admission rather than trusting a possibly valid old word.
 
@@ -72,5 +86,5 @@ are performance policy at Cell/host scope and cannot manufacture or extend autho
   ownership transfer/recreation, overflow, unsupported-backend refusal, local-only per-access checks, and fail-closed
   invalidation. M5 separately proves exact reference-free full-aggregate-to-tombstone replacement.
 
-This decision is refined by ADRs 0071/0073..0080 and 0082, refines ADRs 0019, 0028, 0043, and 0049, and is tracked by
+This decision is refined by ADRs 0071/0073..0080, 0082, and 0083, refines ADRs 0019, 0028, 0043, and 0049, and is tracked by
 `T-META-01`, `T-POLICY-01`, `V2-META-005..007`.

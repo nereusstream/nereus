@@ -23,18 +23,27 @@ interlock and distinct Registry/harness receipts. The complete adjusted answers 
 [round 1](grill-notes/22-m1-readiness-round-1-pure-graph-and-promotion.md) and
 [round 2](grill-notes/23-m1-readiness-round-2-domain-control-authorities.md).
 
-Those accepted outer contracts do not select an allocator or invent unconfirmed byte tables. The next
+Round 3 accepted ADR 0083's NPC1/NTI1 layouts, flat/no-tail NTA1 direction, one Kafka profile pseudo-config plus
+classifier-v1 and residue-free linear admission, the Oxia-backed MetadataStore ELM adapter-candidate boundary with restart-new
+acquisition, INSTANCEID-derived fresh-only Registry identity with inline writer membership, and one canonical virtual-
+ledger receipt envelope. Its complete adjusted answer is preserved in
+[round 3](grill-notes/24-m1-readiness-round-3-wire-control-and-evidence.md).
+
+Those accepted structural contracts do not select an allocator or invent unconfirmed byte/cap tables. The next
 implementation-readiness descendants remain OPEN until explicitly confirmed:
 
-- exact `cellBytes` and protocol-discriminated `incarnationBytes` field order, codes, lengths, and key/golden vectors;
-- the complete NTA1 v1 field/enum/presence table and numeric parser-cap derivation from pinned Kafka/Pulsar boundaries;
-- Kafka pseudo-config keys/value grammar, validation/error precedence, built-in-internal classification, exact
-  cumulative-batch overflow selection/error, record order, and DescribeConfigs projection surface;
-- each Pulsar native ownership transition's acquisition-ID inheritance/new-ID rule, authoritative witness encoding,
-  watch-registration barrier/reconnect-gap contract, and adapter-specific sequence hook;
-- exact `ledgerIdCompatibilityNamespaceId` encoding plus inline-versus-referenced writer-set representation and its
-  backend-specific ACL/credential/deployment interlock;
-- exact `REGISTRY_CONFORMANCE` and `HARNESS_CONFORMANCE_ONLY` receipt payload schemas and immutable artifact layout.
+- exact non-zero protocol numeric codes and aggregate authority-key/golden bytes for the already-fixed raw reserved UUID
+  rejection set;
+- the complete NTA1 v1 ordered field/width/enum/`NONE`/variant table, Pulsar per-name UTF-8 caps, total parser cap, and
+  checked cap derivation;
+- the first Oxia-backed ELM adapter's bounded witness bytes, qualified provider session/gap hook, direct-CAS transition
+  integration, and fail-closed current-source conformance;
+- exact INSTANCEID hash separator/framing/validation grammar and goldens, qualified fresh-root evidence encoding,
+  writer-count/row-byte caps, and independently revocable principal/interlock evidence encoding;
+- exact JCS envelope/payload field table, integer/count accounting, source/attachment path and redaction grammar,
+  numeric attachment caps, and Final-index binding to non-virtual-ledger M1 evidence;
+- Kafka duplicate pseudo-config semantics, invalid-input error precedence and `CreateTopicPolicy` visibility, plus the M6
+  stock tiered-storage disable/compatible-settings proof.
 
 These descendants remain non-normative until a later explicit grill confirmation.
 

@@ -135,6 +135,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
     "$repo_root/docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
     "$repo_root/docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
+    "$repo_root/docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -256,6 +257,15 @@ require_literal 'PulsarVirtualLedgerNamespaceRegistryStore' "docs/decisions/0082
 require_literal 'CREATED | EXISTING_EXACT | DEFINITIVE_CONFLICT | INDETERMINATE' "docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
 require_literal 'APPLIED_EXACT | PREDECESSOR_UNCHANGED | DEFINITIVE_CONFLICT | INDETERMINATE' "docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
 require_literal '`REGISTRY_CONFORMANCE` from `HARNESS_CONFORMANCE_ONLY`' "docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
+require_literal 'NPC1 || u16be(KAFKA)' "docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
+require_literal 'NTI1 || u16be(PULSAR)' "docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
+require_literal 'native configuration-derived records*' "docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
+require_literal 'does **not** already implement a qualifying witness adapter' "docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
+require_literal 'genuinely fresh ledger root' "docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
+require_literal 'RFC 8785/JCS' "docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
+require_literal 'request-order greedy residue-free linear admission sizes the exact cumulative record list' "docs/v2/v2-scenarios.json"
+require_literal 'INSTANCEID-derived compatibility-namespace Registry' "docs/v2/v2-scenarios.json"
+require_literal 'Oxia-0.9.0/MetadataStore-ELM authoritative witness adapter' "docs/v2/v2-scenarios.json"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -318,6 +328,9 @@ require_literal "M1 Readiness Grill round 1" "docs/v2/grill-notes/22-m1-readines
 require_literal "M1 Readiness Round 1：Q1–Q6 调整后确认" "docs/v2/grill-notes/22-m1-readiness-round-1-pure-graph-and-promotion.md"
 require_literal "M1 Readiness Grill round 2" "docs/v2/grill-notes/23-m1-readiness-round-2-domain-control-authorities.md"
 require_literal "Q1–Q6 都建议“调整后确认”" "docs/v2/grill-notes/23-m1-readiness-round-2-domain-control-authorities.md"
+require_literal "M1 Readiness Grill round 3" "docs/v2/grill-notes/24-m1-readiness-round-3-wire-control-and-evidence.md"
+require_literal "没有明显的数据热路径型过度设计" "docs/v2/grill-notes/24-m1-readiness-round-3-wire-control-and-evidence.md"
+require_literal "exact JCS envelope/payload field table" "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -523,6 +536,7 @@ active_contracts=(
     "$repo_root/docs/decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md"
     "$repo_root/docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
     "$repo_root/docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
+    "$repo_root/docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )
@@ -875,6 +889,7 @@ link_docs=(
     "$repo_root/docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
     "$repo_root/docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
     "$repo_root/docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
+    "$repo_root/docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
 )
 
 while IFS=: read -r source match; do

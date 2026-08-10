@@ -23,10 +23,12 @@ The product does not force all objectives through one WAL or one universal posit
 Protocol Cells, Position Domains, Native Write Authorities, and Cell Provider Sessions while sharing correctness,
 immutable physical descriptors, lifecycle contracts, and optional external provider infrastructure.
 
-M1 readiness freezes the pure V2 module/promotion boundary plus NTB1/NSE1/NTA1 outer contracts, four production
-metadata capabilities, Kafka topic-create authority, Pulsar ownership-fence capability, and compatibility-namespace
-Registry governance. This is still documentation-only: exact descendant byte tables/adapters and all implementation
-receipts remain open.
+M1 readiness freezes the pure V2 module/promotion boundary plus NTB1/NSE1 outer identities, NPC1/NTI1 layouts and flat
+NTA1 direction, four production metadata capabilities, Kafka's one profile input and linear topic-create admission,
+the Oxia-backed ELM ownership-fence candidate boundary, and INSTANCEID-derived fresh-only Registry governance with
+inline writers. Current pinned source proves witness primitives rather than a complete adapter. This is still
+documentation-only: exact remaining byte/code/cap tables, qualified provider hooks, receipt inner schema, and all
+implementation evidence remain open.
 
 ## 2. Architecture
 
@@ -81,13 +83,15 @@ Binding plus initial epoch are one immutable `TopicBindingAggregateRecord`. Kafk
 result; MetadataStore/Oxia creates one key and resolves a lost response through a closed exact result. One
 `VersionedAggregateSnapshot` supplies Binding/initial-Epoch projections, not separately writable authorities. Bootstrap
 IDs are create-only 16-byte identities; `bindingId`/`storageEpochId` are the exact 32-byte NTB1/NSE1 derivations.
-Canonical NTA1 is Oxia's wrapped payload while Kafka maps generated fields directly into the domain validator. Kafka
+Canonical NTA1 is flat/no-tail with only absent initial sealed end; its complete field/code/cap table remains OPEN.
+Oxia wraps that payload while Kafka maps generated fields directly into the domain validator. Kafka
 activates it only at fresh-bootstrap `nereus.storage.version=2`; V1 and runtime transitions are rejected. Partial or
 conflicting state never admits I/O.
 
 Kafka's generated non-flexible wire-v0 record uses API key 32000 and is owned by `TopicImage`; snapshots place it
-between the topic and partitions, and `RemoveTopicRecord` removes it with the topic. Input-only Nereus create settings
-never become ConfigRecord authority; exact cumulative batch sizing precedes Raft append. MetadataLoader validates
+between the topic and partitions, and `RemoveTopicRecord` removes it with the topic. The sole input-only
+`nereus.storage.profile` setting never becomes ConfigRecord authority; request-order, residue-free, one-pass cumulative
+batch sizing precedes Raft append. MetadataLoader validates
 touched topics at ordinary image publication and scans all topics only for snapshot/bootstrap. Pulsar instead uses
 exact `RESERVED -> ACTIVE -> DELETING -> DELETED` selector CAS state plus authoritative ownership-witness A/B and a
 gap-safe sequence CAS into one atomic ACTIVE fence word. Unsupported ownership backends fail V2 admission. These native

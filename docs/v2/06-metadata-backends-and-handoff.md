@@ -63,11 +63,15 @@ only `[2,2]`; level 1 remains V1 and is rejected. Generic runtime 0/1-to-2 updat
 At level 2, a successful native CreateTopics item publishes the aggregate in the same atomic result; validate-only and
 native failed items publish nothing.
 
-Nereus CreateTopics pseudo-config is input-only. Resolution removes it before native `ConfigRecord` validation/emission
-and persists only resolved value, origin, and catalog/policy version in the aggregate. DescribeConfigs may synthesize a
-read-only aggregate projection; both AlterConfigs APIs reject every change/delete operation for those keys. Internal
-topics use an explicit versioned Deployment policy, and every successful TopicImage topic has one aggregate; the KRaft
-metadata log is outside that set.
+The sole Nereus CreateTopics pseudo-config is input-only, exact case-sensitive/no-trim
+`nereus.storage.profile = OBJECT_WAL | BOOKKEEPER_WAL_ONLY | BOOKKEEPER_WAL_ASYNC_OBJECT`. Resolution removes it before
+native `ConfigRecord` validation/emission and persists only resolved value, origin, and catalog/policy version in the
+aggregate. Unknown `nereus.*` keys remain stock-validator inputs. DescribeConfigs may synthesize a read-only aggregate
+projection; both AlterConfigs APIs reject every operation for the exact key. Classifier v1 gives only
+`__consumer_offsets`, `__transaction_state`, and `__share_group_state` an explicit internal Deployment policy;
+Streams/Connect/MM2/`__remote_log_metadata` remain ordinary user-path topics, and the KRaft metadata log is outside
+TopicImage. Every successful TopicImage topic has one aggregate. M6 disables stock tiered-storage bootstrap or proves
+replication/minISR settings compatible with ordinary V2 topic admission.
 
 Kafka reserves metadata extension keys `32000..32767`; API key 32000 is the generated non-flexible wire-v0
 `TopicBindingAggregateRecord` owned directly by `TopicImage`. Completed snapshots write
@@ -79,11 +83,14 @@ validation cannot be disabled.
 
 Initial replay/CreateTopics performs full semantic validation. Ordinary publication validates only touched-topic
 incremental invariants and neither scans all topics nor recomputes canonical aggregate SHA values. Bootstrap, complete
-snapshot, and equivalent full catch-up scan all live topics. CreateTopics/validateOnly pre-admit the exact final
-cumulative `Topic + Aggregate + native Config* + Partition* + record/batch framing` count/encoded size before producing
-an atomic result; a failed topic contributes no residue, native per-topic partial success remains, and an invalid
-candidate image is never published. These record/image authorities are M1; M6 owns process-level protocol and restart
-evidence.
+snapshot, and equivalent full catch-up scan all live topics. CreateTopics/validateOnly apply the stock request-wide
+partition guard, then request-order greedy pre-admission for the exact cumulative
+`Topic + Aggregate + native configuration-derived records* + Partition* + record/batch framing` count/encoded size.
+Configuration-derived records currently include `ConfigRecord` and applicable `ClearElrRecord`. One rejected candidate
+leaves no quota/topic-ID/record residue and does not prevent a later smaller candidate; native per-topic partial success
+remains. An exact incremental Raft sizer performs linear work and the accumulator rechecks a fresh-batch, reset-offset-
+delta encoding before any final too-large rejection. An invalid candidate image is never published. These record/image
+authorities are M1; M6 owns process-level protocol and restart evidence.
 
 High-churn materialization heartbeats, cache state, and per-append data do not belong in the KRaft log. Background work
 uses deterministic assignment from durable roots or a separately bounded coordinator whose loss only delays work.
@@ -109,25 +116,40 @@ ACTIVE plus exact aggregate identity and install a local versioned fence. Watch/
 path but normal append/read performs no Oxia call; stale state blocks admission until revalidation.
 
 The ownership side of that fence is an opaque backend-native witness with a collision-resistant 128-bit acquisition ID
-whose create/retry/reacquire transitions follow ADR 0082. Install first arms gap-safe ownership and selector
-invalidation, captures authoritative witness A, reads/validates selector and aggregate, captures authoritative B, and
+whose create/retry/reacquire transitions follow ADRs 0082/0083. The first candidate is limited to the Oxia 0.9.0-backed
+MetadataStore ELM, but current source proves only direct GET/Stat/versioned-CAS primitives. M1 must add acquisition
+fields/transitions, a provider-qualified lifecycle/gap hook, and one closed kernel used by every writer; initial
+admission requires MetadataStore ELM, syncer disabled, and all writers upgraded. Install first arms gap-safe ownership
+and selector invalidation, captures authoritative witness A, reads/validates selector and aggregate, captures
+authoritative B, and
 CASes the exact invalidation sequence into one VALID atomic fence word. Resettable state versions, endpoints, boolean
 ownership, eventual TableView, and generic best-effort watches are insufficient. Callback, reconnect/session gap,
 close, or ownership loss advances the same INVALID sequence before transfer/unload, so a stale installer cannot restore
 validity. Admission captures the full word and success completion/ACK rechecks equality. Ordinary access performs no
 token/SHA parsing or remote I/O. A backend without authoritative A/B, acquisition transition, ordered loss hook, and
-gap-safe invalidation fails V2 topic/Cell admission closed.
+gap-safe invalidation fails V2 topic/Cell admission closed. `ConnectionLost` immediately invalidates; even a qualified
+same-session reconnect must repeat A/read/B. `SessionLost` or process restart rotates broker incarnation, and every real
+service-unit reacquisition creates a new acquisition ID bound to the current broker incarnation.
 
-The immutable `ledgerIdCompatibilityNamespaceId` names the numeric space shared by all ledger-ID writers. Before V2
-admission its Registry may be absent; while V2 allocation is admitted exactly one bounded Registry owns non-overlapping,
-never-reused cell slices from `[2^62, 2^63 - 2]`. It contains the complete canonical writer set or a typed exact
-key/version/length/SHA reference to an immutable content-addressed snapshot, plus an ACL/credential/deployment interlock
-that excludes omitted writers. New writers are committed before start; removal follows fence/drain; rolling upgrade
-may commit old and new identities together. The complete assignment table uses one-key CAS and `registryEpoch + 1`.
+The immutable 32-byte `ledgerIdCompatibilityNamespaceId` names the numeric space shared by all ledger-ID writers and is
+domain-separated SHA-256 over the exact native BookKeeper `INSTANCEID`; its exact preimage grammar remains OPEN. M1
+admits only a ledger root authoritatively absent immediately before init, either never created or after a qualified
+expected-ID non-force nuke with all writers/admins fenced and an absent-root postcondition. Format, force/direct nuke,
+missing/recreated identity, or an ID change does not prove freshness. Before V2 admission its Registry may be absent;
+while V2 allocation is admitted exactly one bounded Registry owns non-overlapping, never-reused cell slices from
+`[2^62, 2^63 - 2]`. It contains one bounded inline canonical writer set plus an ACL/credential/deployment interlock that
+excludes omitted writers; 0.2 has no referenced membership mode. Source/artifact SHA belongs in evidence, not writer
+identity. New writers are committed before start; removal follows fence/drain/revocation; rolling upgrade may commit
+independently revocable old and new identities together. The complete assignment table uses one-key CAS and
+`registryEpoch + 1`.
 Allocators use a versioned derived slice view instead of rereading/copying the 64-KiB Registry per rollover. Missing,
 overlapping, drifted, revoked, incomplete, or capacity-exhausted authority blocks allocation. Registry conformance and
 allocator-harness receipts are distinct. Reservation checks are low-frequency control-plane work, not normal append
 metadata I/O.
+
+After Registry activation, format/nuke/INSTANCEID/root mutation is forbidden; missing or changed identity invalidates
+the Registry and every namespace-bound derived slice view. A changed INSTANCEID does not prove cleanup or fence old
+clients.
 
 Every assignment is owned by an immutable Pulsar Protocol Cell tuple and follows
 `ACTIVE -> RETIRING -> RETIRED`; retired rows and bounds remain forever. Each Cell has one immutable aligned `2^40`

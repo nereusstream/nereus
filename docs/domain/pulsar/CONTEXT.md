@@ -34,11 +34,14 @@ _Avoid_: High-bit convention, reusable cell range, allocator-local assumption
 
 **Virtual Ledger Namespace Registry**:
 The exactly one bounded CAS authority selected while V2 allocation is admitted in an immutable
-`ledgerIdCompatibilityNamespaceId`. It binds the complete writer commitment and admission interlock, canonically owns
-every slice assignment, and proves global non-overlap/non-reuse. It uses `k=40`, at most 65,536 canonical bytes, 256
-lifetime assignments, and 192 bytes per assignment row. Per-cell allocator state is a versioned derived view.
+`ledgerIdCompatibilityNamespaceId` derived from the exact native BookKeeper `INSTANCEID`. M1 admits only a root proven
+absent immediately before init; format or an ID change is not freshness proof. The Registry binds one bounded inline
+writer commitment and admission interlock, canonically owns every slice assignment, and proves global non-overlap/non-
+reuse. It uses `k=40`, at most 65,536 canonical bytes, 256 lifetime assignments, and 192 bytes per assignment row. Per-
+cell allocator state is a namespace-bound versioned derived view.
 _Avoid_: Deployment-name namespace, omitted-writer digest, second Registry, independent authoritative slice key,
-watch authority, locally merged assignment table, per-rollover Registry read
+external writer-set snapshot, source-SHA writer identity, format-as-cleanup, watch authority, locally merged assignment
+table, per-rollover Registry read
 
 **Virtual Ledger Slice Assignment**:
 One immutable aligned `2^k` interval owned by a durable Pulsar Protocol Cell identity. Lifecycle is
@@ -62,10 +65,12 @@ _Avoid_: Owner-scoped range, takeover tail burn, unknown-response fence, install
 **Pulsar Topic Generation Selector**:
 The permanent name-scoped monotonic generation authority using exact
 RESERVED→ACTIVE→DELETING→DELETED CAS transitions to fence create/delete/recreate. ACTIVE plus aggregate identity is
-cached only after authoritative ownership witness A/B and stale-install-safe sequence CAS. Normal data access captures
-and rechecks one atomic local fence word.
+cached only after authoritative ownership witness A/B and stale-install-safe sequence CAS. The first M1 witness
+candidate is limited to Oxia 0.9.0-backed MetadataStore ELM, but pinned source supplies only direct GET/Stat/CAS
+primitives; M1 still adds and proves acquisition transitions, an all-writer closed kernel, and the provider lifecycle/
+gap hook. Normal data access captures and rechecks one atomic local fence word.
 _Avoid_: Name-only aggregate key, selector deletion, generation rollback, endpoint/bool/TableView witness, best-effort
-watch as authority, tearable generation plus valid bits
+watch as authority, current-primitives-as-complete-adapter, tearable generation plus valid bits
 
 **Retired Topic Incarnation Tombstone**:
 The compact permanent same-key replacement for an exactly reference-free full aggregate, binding its incarnation,

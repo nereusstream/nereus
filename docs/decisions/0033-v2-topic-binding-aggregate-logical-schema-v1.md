@@ -43,14 +43,19 @@ random attempts, controller offsets, backend versions, or an untyped attributes 
 fields directly to the logical object and validator; it neither embeds nor constructs temporary NTA1 bytes. Identity
 preimages use their own stable canonical sub-encodings and depend on neither physical representation.
 
-NTA1 freezes field order, enum codes, presence bytes, `u32be` lengths/counts, and fixed-array widths. Strict UTF-8
-encoding/decoding rejects malformed or unmappable input without NFC, lowercasing, or replacement. Decoders reject
-unknown discriminators, illegal presence, overflow, non-canonical values, and trailing bytes. Version 1 has no unknown
-optional-field extension path; evolution requires NTA2/logical schema v2 and a new Kafka wire version. Parser caps are
-derived once from pinned protocol limits, then frozen as v1 format constants. Deployment may lower only new-write or
-admission ceilings; reading persisted NTA1 always uses the full fixed v1 parser cap. Runtime cannot enlarge, recompute,
-or silently lower that decoder contract. A read followed by canonical logical re-encode preserves exact aggregate
-equality.
+NTA1 is flat, sequential, and canonical. It has no TLV, map, self-digest, reserved/extension tail, unknown-field bag,
+or unknown-field skipping. Embedded `cellBytes` and `incarnationBytes` are explicitly `u32be` length-framed. The v1
+initial-sealed-end presence byte is exactly `0x00`; `0x01` is illegal rather than a hidden future value. Version 1 has
+no unknown optional-field extension path; evolution requires NTA2/logical schema v2 and a new Kafka wire version.
+
+The complete ordered field/width table, numeric enum codes, legal `NONE` combinations, variant payloads, Pulsar
+per-name UTF-8 caps, and total NTA1 cap are not yet frozen. They must be assigned together before codec implementation;
+until then the format must not be called exact NTA1. That final table uses fixed presence bytes, `u32be`
+lengths/counts, fixed-array widths, strict UTF-8 without NFC/lowercasing/replacement, checked arithmetic, and rejection
+of unknown discriminators, illegal presence, overflow, non-canonical values, and trailing bytes. Deployment may lower
+only new-write/admission ceilings; reading persisted NTA1 always uses the complete future fixed-v1 parser cap. Runtime
+cannot enlarge, recompute, or silently lower that decoder contract. A read followed by canonical logical re-encode
+preserves exact aggregate equality.
 
 ## Consequences
 
@@ -63,7 +68,7 @@ equality.
 - M1 must prove NTA1 byte/golden vectors, strict UTF-8, every length/count/overflow/trailing-byte boundary, closed-
   discriminator rejection, required/`NONE` combinations, ordinal/back-reference validation, backend-to-logical
   equality without Kafka temporary NTA1 allocation, deterministic re-encode, fixed parser caps, and exclusion of every
-  mutable/retry-dependent field.
+  mutable/retry-dependent field. Codec work cannot begin until the remaining table and caps are accepted.
 
-This decision is refined by ADRs 0042/0043, 0050/0051, and 0082, refines ADRs 0023/0028, and is tracked by `T-META-01`,
+This decision is refined by ADRs 0042/0043, 0050/0051, 0082, and 0083, refines ADRs 0023/0028, and is tracked by `T-META-01`,
 `V2-META-002..007`, and `V2-KAF-META-002..005`.

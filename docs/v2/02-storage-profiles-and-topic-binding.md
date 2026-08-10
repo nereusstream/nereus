@@ -52,15 +52,18 @@ UUID, while Pulsar keys use a domain-separated canonical-persistence-name digest
 repeat the identity and are validated against the key. Bootstrap deployment/reservation-domain/Cell IDs and Kafka
 topic UUIDs are create-only, non-zero 16-byte values; `bindingId` and ordinal-zero `storageEpochId` are 32-byte SHA-256
 values. They use ADR 0082's exact `NTB1 || u32be(cellLength) || cellBytes || u32be(incarnationLength) ||
-incarnationBytes` and `NSE1 || bindingId[32] || u64be(epochOrdinal)` preimages. Kafka UUID is raw 16 bytes, M1 accepts
-only ordinal zero, and random attempts, names/configuration, time, log offsets, and backend versions cannot influence
-these IDs.
+incarnationBytes` and `NSE1 || bindingId[32] || u64be(epochOrdinal)` preimages. ADR 0083 fixes NPC1/NTI1 variant layouts:
+Pulsar Cell bytes include reservation-domain identity, while compatibility namespace/provider/broker facts do not.
+Kafka UUID is raw 16 bytes and rejects ZERO/ONE; Kafka name is at most 249 ASCII bytes; Pulsar generation is positive
+signed-long with overflow rejection. M1 accepts only ordinal zero, and random attempts, runtime configuration, time,
+log offsets, and backend versions cannot influence IDs. Numeric protocol codes and Pulsar/total caps remain OPEN.
 
 The one logical compatibility axis is `aggregateSchemaVersion=1`. Canonical `NTA1` contains the complete binding and
 ordinal-zero epoch, including typed profile/origin, source-qualified policy/catalog version, and
-WAL/payload/checksum/compression/encryption discriminators. Its
-field order, enum codes, presence bytes, `u32be` lengths/counts, fixed arrays, strict UTF-8, rejection rules, and fixed
-v1 parser caps follow ADR 0082. Deployment may lower only new-write/admission ceilings, never persisted-v1 decoding.
+WAL/payload/checksum/compression/encryption discriminators. It is flat/sequential with no TLV/map/self-digest/tail,
+explicitly length-frames Cell/incarnation bytes, and permits only `0x00` for the initial sealed-end presence. The
+complete ordered field/width/enum/`NONE`/variant table and Pulsar/total parser caps remain OPEN before codec work.
+Deployment may lower only new-write/admission ceilings, never persisted-v1 decoding.
 An inapplicable discriminator is explicit `NONE`; unknown/illegal combinations fail closed. `ACTIVE` is derived only
 after complete publication/validation and is not stored. The v1 aggregate excludes `CREATING`, delete/lifecycle/owner
 state, timestamps, attempts, controller offsets, backend versions, and untyped attributes. Oxia envelope schema 1 wraps
@@ -190,11 +193,15 @@ derived and cannot independently delete a native ledger. See [BookKeeper and Pul
 
 ## System topics
 
-Kafka internal topics and Pulsar system topics use explicit initial-epoch profile policy; they never inherit a tenant
-default without validation. Kafka Nereus CreateTopics pseudo-config is input-only: it is removed from native
-`ConfigRecord` changes, the resolved value/origin/catalog-policy version lives only in the aggregate, DescribeConfigs
-may synthesize a read-only projection, and AlterConfigs mutation is rejected. Every successful TopicImage topic,
-including internal topics, owns an aggregate; the KRaft metadata log is not such a topic. A protocol adapter may
+Kafka classifier-v1 built-ins and Pulsar system topics use explicit initial-epoch profile policy; they never inherit a
+tenant default without validation. Kafka exposes only exact, case-sensitive, no-trim `nereus.storage.profile` with the
+three profile names. It is removed from native `ConfigRecord` changes, the resolved value/origin/catalog-policy version
+lives only in the aggregate, DescribeConfigs synthesizes a read-only/no-synonym projection, and every AlterConfigs
+operation is rejected. The three pinned built-ins reject explicit input; Streams/Connect/MM2,
+`__remote_log_metadata`, and other topics use the Deployment user-topic default/explicit-input path without name-
+inferred Namespace. Classifier membership does not bypass native replication/minISR checks, so M6 disables stock
+tiered-storage bootstrap or proves compatible explicit settings. Every successful TopicImage topic owns an aggregate;
+the KRaft metadata log is not such a topic. A protocol adapter may
 restrict the allowed initial profile set when its recovery or transaction authority cannot satisfy the contract. No
 adapter exposes an online transition set in 0.2.
 
@@ -214,4 +221,5 @@ Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-POLICY-01`, `T-OBJECT-0
 by [ADR 0057](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md) and Object-WAL lanes by
 [ADRs 0060](../decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md) and
 [0062](../decisions/0062-v2-object-wal-packing-catalog-and-leaf-sequence.md), and M1 exact domain/control boundaries by
-[ADR 0082](../decisions/0082-v2-m1-domain-and-control-authority-contracts.md).
+[ADRs 0082](../decisions/0082-v2-m1-domain-and-control-authority-contracts.md) and
+[0083](../decisions/0083-v2-m1-wire-control-and-evidence-bounds.md).

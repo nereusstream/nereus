@@ -49,12 +49,15 @@ acceptance evidence.
 
 V2 Kafka metadata is enabled only by fresh-bootstrap finalized `nereus.storage.version=2`; the V2 build supports only
 `[2,2]`, rejects level-1 V1 state, and forbids runtime upgrade or downgrade. A successful native CreateTopics item
-atomically publishes logical aggregate schema v1 with the topic records. Input-only Nereus pseudo-config is resolved
-and removed before native ConfigRecord emission; Aggregate is sole persisted authority, DescribeConfigs may synthesize
-a read-only projection, and AlterConfigs mutation is rejected. Every successful TopicImage topic, including internal
-topics under an explicit Deployment policy, has one aggregate. Validate-only performs the same resolution/validation/
+atomically publishes logical aggregate schema v1 with the topic records. The sole exact, case-sensitive/no-trim input-
+only pseudo-config `nereus.storage.profile` is resolved and removed before native `ConfigRecord` emission; Aggregate is
+sole persisted authority, DescribeConfigs may synthesize a read-only projection, and AlterConfigs mutation is rejected.
+Classifier v1 contains only the three pinned Kafka built-ins; Streams/Connect/MM2/`__remote_log_metadata` use the user-
+topic path. Every successful TopicImage topic has one aggregate. Validate-only performs the same resolution/validation/
 exact cumulative-batch admission and emits no records; native failed items leave no residue while per-topic partial
-success remains. One generated non-flexible typed record at API key 32000 is owned by `TopicImage`; completed snapshot
+success remains. Admission counts the actual native configuration-derived records, including applicable
+`ClearElrRecord`, and uses request-order greedy linear exact sizing. One generated non-flexible typed record at API key
+32000 is owned by `TopicImage`; completed snapshot
 order places it between `TopicRecord` and that topic's partitions, and topic removal cascades without a second delete
 authority. Ordinary MetadataLoader publication validates only touched topics; snapshot/bootstrap validates every live
 topic.
@@ -85,7 +88,9 @@ gap-free NPD1 multi-entry blocks, and one ManagedLedger-owned composite handle o
 only DONE proves physical absence.
 `OBJECT_WAL` uses an explicit ObjectManagedLedger path plus a reserved-slice Pulsar-cell MetadataStore/Oxia virtual-
 ledger authority. While admitted, one bounded Registry for the immutable ledger-ID compatibility namespace proves all
-slices non-overlapping/never-reused and binds a complete writer commitment plus exclusion interlock. Slice owner
+slice ranges non-overlapping/never-reused and binds a bounded inline writer commitment plus exclusion interlock. The
+namespace derives from exact BookKeeper `INSTANCEID`, and 0.2 admits only a root authoritatively absent immediately
+before init; changed identity/format is not cleanup proof. Slice owner
 identity is the immutable Pulsar Protocol Cell, retirement is
 permanent, `k=40` plus 64 KiB/256-lifetime/192-byte-row bootstrap caps bound the registry, and 0.2 forbids every
 resize/second-slice
@@ -99,10 +104,15 @@ ManagedLedger-incarnation grant across owner-only head fencing, permits takeover
 and burns at most one stale candidate; this correctness structure still does not select that mode.
 
 Pulsar V2 ownership admission requires a collision-resistant acquisition identity and authoritative witness A/B around
-the exact selector/aggregate read. A gap-safe invalidation sequence and CAS install one atomic ACTIVE fence word;
+the exact selector/aggregate read. The first candidate is the Oxia 0.9.0-backed MetadataStore ELM, but M1 must build and
+prove the adapter: current source supplies direct GET/Stat/CAS primitives, not the acquisition transitions or qualified
+session/gap hook. MetadataStore ELM with syncer disabled and all ownership writers upgraded is the initial capability
+gate. A gap-safe invalidation sequence and CAS install one atomic ACTIVE fence word;
 position admission captures it and every success completion/ACK rechecks equality. Endpoint, boolean ownership,
 resettable version, eventual TableView, or best-effort watch is insufficient. Unsupported ownership backends fail V2
-topic/Cell admission without disabling stock non-V2 Pulsar paths.
+topic/Cell admission without disabling stock non-V2 Pulsar paths. Same-session reconnect preserves at most identity and
+must repeat A/read/B; SessionLost/process restart rotates broker incarnation, and any real service-unit reacquisition
+uses a new acquisition ID.
 
 Object frames retain exact assigned Kafka RecordBatch bytes or exact Pulsar ManagedLedger entry bytes after only the
 outer Object envelope is decoded. Kafka makes all frames from one partition storage append an all-or-none commit set;

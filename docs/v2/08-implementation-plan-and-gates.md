@@ -63,19 +63,28 @@ projection, TopicImage/Delta/replay/snapshot/remove, and publication validation 
 generated record may land dormant but cannot be advertised, formatted, or emitted alone. M6 owns complete
 broker/controller process and Produce/Fetch/Admin/restart evidence only. Ordinary delta validation is touched-topic-
 only without canonical SHA recomputation; full scans are bootstrap/snapshot/full-catch-up only; CreateTopics and
-validateOnly pre-admit the exact final cumulative record count and serialized Raft-batch bytes while preserving native
-per-topic partial-success behavior.
+validateOnly apply the stock request-wide partition guard and then request-order greedy pre-admission of the exact final
+cumulative record count and serialized Raft-batch bytes while preserving native per-topic partial-success behavior.
+The candidate list includes actual native configuration-derived records, including applicable `ClearElrRecord`; the
+linear sizer shares effective Raft limits, and a current-batch miss is re-estimated with fresh-batch offset deltas before
+the final append may reject it. M6 must disable stock tiered-storage bootstrap or prove compatible replication/minISR
+settings for its ordinary `__remote_log_metadata` topic.
 
-Pulsar M1 arms gap-safe invalidation, captures authoritative ABA-safe native ownership witness A/B around exact
-selector/aggregate validation, and installs only by CAS from the same invalidation sequence. Legacy/ELM/third-party
-backends missing acquisition identity, authoritative read, ordered loss hook, or reconnect-gap invalidation fail V2
-admission closed. Ordinary access captures/rechecks one atomic fence word with zero remote metadata I/O. Full
+Pulsar M1 builds the first witness candidate only for Oxia 0.9.0-backed MetadataStore ELM: pinned source proves direct
+GET/Stat/versioned-CAS primitives, not a complete adapter. M1 adds acquisition fields/transitions, a qualified provider
+lifecycle/gap hook, and one closed writer kernel, with syncer disabled and all ownership writers upgraded. It arms gap-
+safe invalidation, captures authoritative ABA-safe native ownership witness A/B around exact selector/aggregate
+validation, and installs only by CAS from the same invalidation sequence. Legacy/TableView/mixed/third-party backends
+missing acquisition identity, authoritative read, ordered loss hook, or reconnect-gap invalidation fail V2 admission
+closed. Ordinary access captures/rechecks one atomic fence word with zero remote metadata I/O. Full
 aggregate-to-retired-tombstone replacement remains M5; complete process integration remains M6.
 
-M1 implements the mode-independent virtual-ledger Registry bound to the immutable ledger-ID compatibility namespace.
-V2 admission requires exactly one selected Registry, a complete inline or exact referenced writer commitment, and an
-ACL/credential/deployment interlock; allocators use a versioned derived slice view. Its real-Oxia receipt is
-`REGISTRY_CONFORMANCE`. STRICT/RANGE candidate SPI and cut injection remain evidence-only and emit a distinct
+M1 implements the mode-independent virtual-ledger Registry bound to the immutable 32-byte ledger-ID compatibility
+namespace derived from exact BookKeeper `INSTANCEID`. Only a root authoritatively absent immediately before init is
+admitted; format/changed identity is not cleanup proof. V2 admission requires exactly one selected Registry, one bounded
+inline canonical writer commitment, and an ACL/credential/deployment interlock with independently revocable writers;
+there is no external membership reference. Allocators use a namespace-bound versioned derived slice view. Its real-
+Oxia receipt is `REGISTRY_CONFORMANCE`. STRICT/RANGE candidate SPI and cut injection remain evidence-only and emit a distinct
 `HARNESS_CONFORMANCE_ONLY` receipt with `selectionEligible=false`; M1 runs deterministic/small smoke only and neither
 persists nor activates a mode. M3 owns 10k/100k multi-broker capacity evidence and selection.
 
@@ -89,10 +98,15 @@ binds it. M1 gates are:
 
 Zero tests, skipped mandatory tests, failure, dirtied/changed source, or digest mismatch fails. PR CI runs the fast gate;
 trusted promotion runs Exact/Final. Promotion uses N1 foundation, P1/K1 fork commits, N2 source-tuple/final execution,
-then receipt-only N3. Each receipt binds N2/P1/K1, source-lock digest, domain JAR/POM SHAs, Oxia identity, closed receipt
-kind, scenario IDs, test/failure/skip counts, and aggregate result. A Registry scenario requires
+then evidence-only N3. Virtual-ledger conformance payloads use one strict RFC-8785/JCS envelope with the closed kinds
+`REGISTRY_CONFORMANCE | HARNESS_CONFORMANCE_ONLY`; this is not the universe of all M1 evidence kinds. Each receipt binds
+N2/P1/K1, source-lock digest, domain JAR/POM SHAs, Oxia server image plus client/test identities, closed receipt kind,
+scenario IDs, normalized `discovered/executed/passed/failed/skipped/aborted` counts, and aggregate result. Attachments
+are referenced by canonical relative path, length, and SHA-256 rather than embedded. A Registry scenario requires
 `REGISTRY_CONFORMANCE`; allocator cut scenarios require `HARNESS_CONFORMANCE_ONLY` and `selectionEligible=false`.
-Cross-M1 scenario rows are split before promotion so future evidence cannot be borrowed.
+Cross-M1 scenario rows are split before promotion so future evidence cannot be borrowed. N3 may change only receipts,
+attachments, and their exactly covered scenario status/index; it may not modify code, gates, workflows, ADRs, or source
+locks. Exact receipt/accounting/path/cap tables remain implementation-readiness blockers.
 
 ## Status model
 

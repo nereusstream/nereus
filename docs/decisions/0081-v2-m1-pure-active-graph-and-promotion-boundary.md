@@ -72,8 +72,9 @@ M1 owns the Pulsar selector, an ABA-safe backend-native opaque ownership witness
 installation/invalidation, and focused tests. Full aggregate-to-retired-tombstone replacement remains M5, and complete
 Pulsar process integration remains M6. Normal append/read captures and rechecks one atomic local fence word.
 
-M1 owns the mode-independent virtual-ledger Registry SPI, real-Oxia conformance, compatibility-namespace identity,
-complete writer commitment/admission interlock, and versioned derived slice view. Registry correctness emits a distinct
+M1 owns the mode-independent virtual-ledger Registry SPI, real-Oxia conformance, INSTANCEID-derived compatibility-
+namespace identity for a genuinely fresh ledger root, inline complete writer commitment/admission interlock, and
+versioned derived slice view. Registry correctness emits a distinct
 `REGISTRY_CONFORMANCE` receipt. STRICT/RANGE candidate SPI, fault cuts, and receipts are test/evidence-only; production
 metadata SPI cannot expose them. Harness evidence remains `HARNESS_CONFORMANCE_ONLY` with `selectionEligible=false`,
 runs only deterministic and small smoke workloads, persists no allocator mode, and cannot promote Registry scenarios.
@@ -104,10 +105,19 @@ Cross-repository promotion uses four stages and at least five commits:
 3. N2 locks P1/K1, records candidate gate state, runs Final, and produces a receipt binding N2/P1/K1;
 4. N3 commits only the receipt/evidence and promotes only its exactly covered scenarios.
 
-Receipts record tested product/fork commits, source-lock digest, domain JAR/POM SHAs, Oxia identity, receipt kind,
-scenario IDs, test counts, failure/skip counts, and the aggregate result. Registry and harness receipts cannot substitute
-for one another. A scenario whose M1 portion passes cannot thereby claim an M3, M5, or M6 result; cross-M1 scenario rows
-are split before implementation promotion.
+Virtual-ledger conformance receipts share one RFC-8785/JCS canonical JSON envelope with the closed payload kinds
+`REGISTRY_CONFORMANCE` and `HARNESS_CONFORMANCE_ONLY`. They record tested product/fork commits, source-lock digest,
+domain JAR/POM SHAs, Oxia server-image/client/test-artifact identities, scenario IDs, and suite/scenario-bound
+`discovered/executed/passed/failed/skipped/aborted` counts plus the aggregate result. Harness non-selection is a schema
+constant. Registry bytes, writer membership, ACL/interlock snapshots, and logs are content-addressed attachments whose
+root references contain relative path, length, and SHA-256. Registry and harness receipts cannot substitute for one
+another; exact inner receipt fields, count equations, and numeric attachment caps remain open.
+
+N3 may commit only receipts/evidence attachments and the scenario status/index exactly covered by them. It cannot
+change code, gates, workflows, ADRs, or source locks; such a change returns to N2 and reruns promotion. Content hashes
+bind bytes but do not prove provenance, which comes from the trusted workflow and protected N3 commit. A scenario whose
+M1 portion passes cannot thereby claim an M3, M5, or M6 result; cross-M1 scenario rows are split before implementation
+promotion.
 
 ## Consequences
 
@@ -120,5 +130,5 @@ are split before implementation promotion.
 - M1 can verify registry and harness conformance without making an unevidenced allocator selection or borrowing M3/M5/
   M6 PASS status.
 
-This decision is refined by ADR 0082, refines ADRs 0006, 0009, 0032, 0034, 0042, 0043, 0050, 0051, 0054, and 0055 and
+This decision is refined by ADRs 0082/0083, refines ADRs 0006, 0009, 0032, 0034, 0042, 0043, 0050, 0051, 0054, and 0055 and
 is tracked by the M1 implementation plan and its milestone-specific scenario rows.

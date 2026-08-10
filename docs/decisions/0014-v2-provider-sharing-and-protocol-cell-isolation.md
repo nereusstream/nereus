@@ -61,5 +61,5 @@ isolation survives an outage of intentionally shared physical infrastructure.
 - Protocol Cell is the minimum logical failure-attribution and provider-authorization boundary. Tenant policies may
   further subdivide a cell and are not replaced by this decision.
 
-This decision is refined by ADR 0082, refines ADRs 0009/0011, and is tracked by `T-FABRIC-01`, `V2-FABRIC-001`,
+This decision is refined by ADRs 0082/0083, refines ADRs 0009/0011, and is tracked by `T-FABRIC-01`, `V2-FABRIC-001`,
 `V2-FABRIC-002`, and `V2-FABRIC-003`.

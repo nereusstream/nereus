@@ -34,8 +34,11 @@ _Avoid_: Online V1 migration, unsafe feature downgrade, absent feature as V2 act
 The generated typed KRaft non-flexible wire-v0 record at API key 32000, owned by one `TopicImage`. MetadataLoader
 validates touched topics at ordinary publication and all live topics only at snapshot/bootstrap. Completed snapshots
 place it after `TopicRecord` and before partitions; `RemoveTopicRecord` removes it with the topic. Nereus CreateTopics
-pseudo-config is removed before native ConfigRecord emission, persists only as resolved aggregate facts, and is exposed
-only as an optional read-only projection.
+pseudo-config is exactly case-sensitive/no-trim `nereus.storage.profile`, is removed before native `ConfigRecord`
+emission, persists only as resolved aggregate facts, and is exposed only as an optional read-only projection. Its
+classifier v1 contains the three pinned Kafka built-ins only; other application/Admin-created topics use the user path.
+Create admission sizes the actual final configuration-derived/aggregate/partition record list once in request-order
+greedy linear time and leaves no rejected-candidate residue.
 _Avoid_: Opaque attachment, parallel aggregate image, independent aggregate delete record, duplicate ConfigRecord
 authority, mutable AlterConfigs pseudo-key
 

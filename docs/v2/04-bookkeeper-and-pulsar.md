@@ -50,8 +50,11 @@ durable bytes use `ObjectExtent`. A Pulsar-cell `PulsarVirtualLedgerStore` in Me
 virtual ledger IDs and publishes explicit append-only Ledger Chain order. Entry IDs are allocated serially in the active
 virtual ledger. The deployment excludes `[2^62, 2^63 - 2]` from native allocation and assigns each cell one
 non-overlapping, never-reused slice. The immutable `ledgerIdCompatibilityNamespaceId` names the actual shared numeric
-space. Before admission it may have no Registry; while V2 allocation is admitted exactly one bounded Registry is
-selected. Its canonical complete assignment table advances through single-key CAS, while allocators consume a
+space. Its 32-byte identity derives with domain-separated SHA-256 from the exact native BookKeeper `INSTANCEID`; M1
+admits only a ledger root proven absent immediately before init, either never created or after a qualified expected-ID,
+non-force nuke. Format, missing/recreated INSTANCEID, force/direct nuke, or a changed ID does not prove freshness.
+Before admission it may have no Registry; while V2 allocation is admitted exactly one bounded Registry is selected.
+Its canonical complete assignment table advances through single-key CAS, while allocators consume a namespace-bound
 versioned derived slice view and never reread/copy the 64-KiB Registry per rollover. The cell allocator issues
 increasing IDs with permitted gaps. Numeric monotonicity keeps stock MessageId comparison compatible, but explicit
 predecessor/head metadata remains chain authority. Object identity, bytes, and group/run sequence never become
@@ -82,14 +85,17 @@ head install; allocator clear is a high-priority background reconciliation that 
 Unknown responses reread exact equality, while only definitive conflicts fence. Permanent orphan candidates are
 bounded metadata evidence rather than a new 0.2 GC protocol.
 
-M1 implements the complete mode-independent Registry and real-Oxia conformance. Registry authority contains either a
-bounded canonical writer set or a typed exact key/version/length/SHA reference to an immutable content-addressed
-snapshot. ACL/credential/deployment interlock excludes every omitted native/BookKeeper/custom writer. A new writer is
-committed before start; removal follows fence and drain; rolling upgrade may commit old and new identities together.
+M1 implements the complete mode-independent Registry and real-Oxia conformance. Registry authority contains one bounded
+inline canonical writer set; there is no external snapshot/reference in 0.2. Rows bind stable writer, exclusion-contract,
+independently revocable principal, interlock-policy, and typed evidence identities; source/artifact SHA remains in the
+receipt. Exclusive admin/ACL interlock, fresh-root proof/init, writer upgrade, legacy-principal revoke plus negative-
+allocation proof precede the final Registry activation. A new writer is committed before start; removal follows fence,
+drain, and independent revoke; rolling upgrade may commit old and new entries together. Shared credentials are invalid.
+After activation, root/INSTANCEID format/nuke/mutation fences the Registry and all derived views.
 Patching one Pulsar generator alone is not a completeness proof. The Registry emits `REGISTRY_CONFORMANCE`; the former
 V1 allocator is removed or isolated rather than renamed. STRICT/RANGE candidate SPI and cut injection exist only in
-test/evidence code and emit `HARNESS_CONFORMANCE_ONLY` with `selectionEligible=false`; they persist no mode and install
-no production allocator. M3 owns 10k/100k multi-broker capacity evidence and any eventual selection.
+test/evidence code and emit `HARNESS_CONFORMANCE_ONLY` with schema-fixed `selectionEligible=false`; they persist no mode
+and install no production allocator. M3 owns 10k/100k multi-broker capacity evidence and any eventual selection.
 
 Online Pulsar BookKeeper/Object evolution is not implied by this model. New-incarnation migration versus a future hybrid
 ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.
@@ -215,4 +221,6 @@ Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, 
 [ADR 0055](../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md), plus
 [ADR 0056](../decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md) and
 [ADR 0057](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md), with RANGE takeover constrained by
-[ADR 0061](../decisions/0061-v2-pulsar-range-grant-owner-takeover.md).
+[ADR 0061](../decisions/0061-v2-pulsar-range-grant-owner-takeover.md) and M1 Registry/witness/evidence bounds refined by
+[ADRs 0082](../decisions/0082-v2-m1-domain-and-control-authority-contracts.md) and
+[0083](../decisions/0083-v2-m1-wire-control-and-evidence-bounds.md).

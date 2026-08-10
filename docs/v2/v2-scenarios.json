@@ -62,7 +62,7 @@
     {
       "id": "V2-META-003",
       "milestone": "M1",
-      "contract": "create-only nonzero 16-byte bootstrap/topic identities and raw Kafka UUID feed exact NTB1/NSE1 preimages that yield 32-byte binding and initial-epoch IDs",
+      "contract": "create-only nonzero 16-byte bootstrap/topic identities plus fixed NPC1/NTI1 variants feed exact NTB1/NSE1 preimages that yield 32-byte binding and initial-epoch IDs",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -70,7 +70,7 @@
     {
       "id": "V2-META-004",
       "milestone": "M1",
-      "contract": "canonical NTA1 is one closed aggregate logical schema v1; Oxia wraps it while Kafka maps generated fields directly without temporary NTA1 bytes",
+      "contract": "canonical NTA1 is one flat/no-tail aggregate logical schema v1 with only absent initial sealed end; Oxia wraps it while Kafka maps generated fields directly without temporary NTA1 bytes",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -94,7 +94,7 @@
     {
       "id": "V2-META-006",
       "milestone": "M1",
-      "contract": "Pulsar selector uses closed exact RESERVED to ACTIVE to DELETING to DELETED recovery and a capability-gated authoritative ownership witness to CAS one stale-install-safe atomic ACTIVE fence word",
+      "contract": "Pulsar selector uses closed exact RESERVED to ACTIVE to DELETING to DELETED recovery and a capability-gated Oxia-0.9.0/MetadataStore-ELM authoritative witness adapter to CAS one stale-install-safe atomic ACTIVE fence word",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -118,7 +118,7 @@
     {
       "id": "V2-KAF-META-003",
       "milestone": "M1",
-      "contract": "Kafka reserves API key 32000 strict non-flexible v0; direct generated-record mapping validates fully, ordinary publication validates only touched invariants without SHA recomputation, complete boundaries scan all topics, and exact final cumulative batch admission precedes Raft append",
+      "contract": "Kafka reserves API key 32000 strict non-flexible v0; direct generated-record mapping validates fully, ordinary publication is touched-only, and request-order greedy residue-free linear admission sizes the exact cumulative record list before Raft append",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -158,7 +158,7 @@
     {
       "id": "V2-POSITION-003",
       "milestone": "M1",
-      "contract": "exactly one admitted compatibility-namespace Registry assigns non-overlapping never-reused Cell slices only after a complete selected writer commitment and allocation interlock prove exclusion",
+      "contract": "exactly one admitted INSTANCEID-derived compatibility-namespace Registry assigns non-overlapping never-reused Cell slices only after fresh-root proof, a bounded inline writer commitment, and allocation interlock prove exclusion",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "requiredReceiptKind": "REGISTRY_CONFORMANCE",
       "status": "PLANNED",
@@ -167,7 +167,7 @@
     {
       "id": "V2-POSITION-004",
       "milestone": "M1",
-      "contract": "one bounded compatibility-namespace Registry Store is slice-allocation authority; key/value identity and registryEpoch plus one are exact while allocators use versioned derived slice views",
+      "contract": "one bounded compatibility-namespace Registry Store is slice-allocation authority; key/value namespace identity and registryEpoch plus one are exact while allocators use namespace-bound versioned derived slice views",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "requiredReceiptKind": "REGISTRY_CONFORMANCE",
       "status": "PLANNED",
@@ -221,7 +221,7 @@
     {
       "id": "V2-POSITION-010",
       "milestone": "M1",
-      "contract": "the allocator harness deterministically exercises candidate cuts and emits only HARNESS_CONFORMANCE_ONLY with selectionEligible false",
+      "contract": "the allocator harness deterministically exercises candidate cuts and emits only RFC-8785/JCS HARNESS_CONFORMANCE_ONLY with schema-fixed selectionEligible false",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "requiredReceiptKind": "HARNESS_CONFORMANCE_ONLY",
       "status": "PLANNED",
