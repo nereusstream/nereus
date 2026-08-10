@@ -14,9 +14,10 @@ sourceTuple: v2-m0
 `main` is the Nereus V2 development line and uses version `0.2.0-SNAPSHOT`. M0 establishes the V2 documentation
 baseline; it does not claim that the current Java implementation already satisfies V2.
 
-M1 readiness ADRs 0081..0084 freeze the implementation/promotion boundary, outer domain/control authorities, and
-Round-3 structural wire/control/evidence cuts. M1 code, gates, exact remaining field/code/cap tables, qualified provider
-hooks, and executable receipts remain NotStarted/OPEN.
+M1 readiness ADRs 0081..0085 freeze the implementation/promotion boundary, outer domain/control authorities, structural
+wire/control/evidence cuts, and the explicitly partial M1.1a start boundary. M1.1a module/identity/ID/SPI and client-
+continuity scaffolding may start; complete NTA1 policy/caps, Registry writer count, receipt numeric caps, final provider
+artifacts, gates, and executable receipts remain NotStarted/OPEN.
 
 The V1 product line is preserved at
 `v0.1@a14d925da5763f36208f8ddca7bef31f3eb90b0b`. Existing Phase/Future documents and their historical receipts describe
@@ -133,6 +134,7 @@ Current accepted decisions:
 - [ADR 0082: M1 domain and control-authority contracts](../decisions/0082-v2-m1-domain-and-control-authority-contracts.md)
 - [ADR 0083: M1 wire, control-plane, and evidence bounds](../decisions/0083-v2-m1-wire-control-and-evidence-bounds.md)
 - [ADR 0084: M1 leaf, witness, Registry, and receipt contracts](../decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md)
+- [ADR 0085: M1 foundation start and deferred codec bounds](../decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md)
 
 ## V2 document map
 

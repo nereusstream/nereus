@@ -27,10 +27,11 @@ M1 readiness freezes the pure V2 module/promotion boundary plus NTB1/NSE1 outer 
 NTA1 direction, four production metadata capabilities, Kafka's one profile input and linear topic-create admission,
 the Oxia-backed ELM ownership-fence candidate boundary, and INSTANCEID-derived fresh-only Registry governance with
 inline writers. Round 4 adds exact protocol/Pulsar leaves, Kafka last-wins and remote-log admission, a minimal local
-store-wide continuity contract, canonical UUID/NLI1 namespace identity, and one receipt hierarchy. Current pinned
-source proves witness primitives rather than a complete adapter. This is still documentation-only: complete NTA1/name
-caps, concrete provider hook/source evidence, writer caps, receipt numeric caps, and all implementation evidence remain
-open.
+store-wide continuity contract, canonical UUID/NLI1 namespace identity, and one receipt hierarchy. Round 5 permits the
+M1.1a foundation slice after removing derived NTA1 authorities, reusing the Oxia dummy barrier client-side, fixing a
+120-byte writer row, and removing receipt run/result duplication. This is still documentation-only: complete NTA1
+FrameEncodingPolicy/name/total caps, writer count, receipt caps, final provider artifacts, and all executable evidence
+remain open.
 
 ## 2. Architecture
 
@@ -85,7 +86,9 @@ Binding plus initial epoch are one immutable `TopicBindingAggregateRecord`. Kafk
 result; MetadataStore/Oxia creates one key and resolves a lost response through a closed exact result. One
 `VersionedAggregateSnapshot` supplies Binding/initial-Epoch projections, not separately writable authorities. Bootstrap
 IDs are create-only 16-byte identities; `bindingId`/`storageEpochId` are the exact 32-byte NTB1/NSE1 derivations.
-Canonical NTA1 is flat/no-tail with only absent initial sealed end; its complete field/code/cap table remains OPEN.
+Canonical NTA1 is flat/no-tail with only absent initial sealed end and persists only independent semantics; derived
+protocol/profile facts and the binding back-reference are not repeated. Its FrameEncodingPolicy/legality/cap table
+remains OPEN.
 Oxia wraps that payload while Kafka maps generated fields directly into the domain validator. Kafka
 activates it only at fresh-bootstrap `nereus.storage.version=2`; V1 and runtime transitions are rejected. Partial or
 conflicting state never admits I/O.

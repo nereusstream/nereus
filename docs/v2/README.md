@@ -32,6 +32,11 @@ performance-first BookKeeper WAL.
   policy and remote-log admission, a local store-wide watch-continuity contract, canonical UUID/NLI1 namespace bytes,
   and one receipt result hierarchy plus safe attachment grammar in ADR 0084. Complete NTA1/name caps, concrete Oxia
   hook/source tuple, writer caps, and receipt numeric caps remain OPEN.
+- M1 implementation-readiness Round 5 freezes minimal independent NTA1 semantics without claiming its complete codec,
+  the Oxia client-only dummy ready barrier and source/artifact/image separation, two writer kinds plus a 120-byte row
+  and immutable admission evidence, and one content-identified receipt/Final hierarchy in ADR 0085. M1.1a module,
+  identity, deterministic-ID, SPI, dependency, and continuity scaffolding may start; full NTA1 policy/caps, writer count,
+  receipt numeric caps, and executable promotion evidence remain OPEN.
 - Existing Java modules and Phase/Future evidence on `main` are V1 residue until replaced by a V2 milestone.
 - The ordinary CI Pulsar API checkout remains a legacy V1-residue build baseline until the V2 Pulsar slice replaces
   that code; it is recorded separately and is not the V2 fork-development or parity baseline.
@@ -237,6 +242,7 @@ Accepted decisions:
 - [ADR 0082: M1 domain and control-authority contracts](../decisions/0082-v2-m1-domain-and-control-authority-contracts.md)
 - [ADR 0083: M1 wire, control-plane, and evidence bounds](../decisions/0083-v2-m1-wire-control-and-evidence-bounds.md)
 - [ADR 0084: M1 leaf, witness, Registry, and receipt contracts](../decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md)
+- [ADR 0085: M1 foundation start and deferred codec bounds](../decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md)
 
 ## Open design gates
 
@@ -264,9 +270,10 @@ publication, and permanent same-key compact batch tombstones. The pure-document 
 exhausted. ADR 0081 freezes the M1 execution/promotion boundary; ADR 0082 freezes the outer M1 domain/control authority;
 ADR 0083 fixes the next structural wire/control/evidence cuts. ADR 0084 closes protocol/authority leaves, Kafka
 precedence and remote-log interlock, minimal store-wide continuity semantics, canonical UUID/NLI1 namespace identity,
-and receipt accounting/path safety. It deliberately retains the complete NTA1/name caps, concrete ownership hook and
-source evidence, exact Registry writer schema/caps, remaining receipt payload fields, and numeric attachment caps as
-OPEN implementation-readiness descendants. Partial recovery omission, numeric caps,
+and receipt accounting/path safety. ADR 0085 closes the M1.1a start boundary, minimal independent aggregate semantics,
+client-only continuity direction, exact 120-byte writer row/evidence shape, and content-identified receipt/Final
+hierarchy. It deliberately retains the complete NTA1 FrameEncodingPolicy/legality/name/total caps, Registry writer
+count, receipt numeric caps, and executable promotion evidence as OPEN descendants. Partial recovery omission, numeric caps,
 physical proof-fold/capability encodings, and any tombstone-deletion authority remain evidence gates. The rows below
 are the remaining active 0.2 evidence gates.
 

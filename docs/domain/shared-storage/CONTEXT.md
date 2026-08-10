@@ -96,8 +96,10 @@ format, configurable correctness
 
 **Topic Binding Aggregate**:
 The atomically visible create/open unit whose one immutable logical schema v1 contains a Topic Protocol Binding and its
-ordinal-zero initial Storage Epoch. Neither component has an independently writable authority; ACTIVE is derived.
-_Avoid_: Default epoch, partially visible topic, separately mutable binding/epoch
+ordinal-zero initial Storage Epoch. Canonical bytes persist only independent semantics: protocol/profile-derived
+position, payload, authority, WAL, checksum, and crypto views plus the logical binding back-reference are not repeated
+as separately selectable fields. Neither component has an independently writable authority; ACTIVE is derived.
+_Avoid_: Default epoch, partially visible topic, separately mutable binding/epoch, duplicate derived wire authority
 
 **Object Extent Digest**:
 Integrity over the exact canonical Object-provider request body after Nereus compression and client-side encryption.

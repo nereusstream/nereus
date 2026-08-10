@@ -39,9 +39,11 @@ The exactly one bounded CAS authority selected while V2 allocation is admitted i
 absent immediately before init; format or an ID change is not freshness proof. The Registry binds one bounded inline
 writer commitment and admission interlock, canonically owns every slice assignment, and proves global non-overlap/non-
 reuse. It uses `k=40`, at most 65,536 canonical bytes, 256 lifetime assignments, and 192 bytes per assignment row. Per-
-cell allocator state is a namespace-bound versioned derived view.
-Writer count/row budgets remain evidence-derived OPEN caps. Ownership-watch continuity is one local store-wide epoch;
-provider connection/session/shard identities are never persisted.
+cell allocator state is a namespace-bound versioned derived view. Two closed writer kinds use one canonical 120-byte
+row per independently revocable cohort and immutable proof-only admission evidence; there is no random row ID or
+generic writer kind. Writer count remains an evidence-derived OPEN cap. Ownership-watch continuity is one local store-
+wide epoch; the client reuses Oxia v0.9's no-offset dummy notification as its ready barrier and persists no provider
+connection/session/shard identity.
 _Avoid_: Deployment-name namespace, omitted-writer digest, second Registry, independent authoritative slice key,
 external writer-set snapshot, source-SHA writer identity, format-as-cleanup, watch authority, locally merged assignment
 table, per-rollover Registry read

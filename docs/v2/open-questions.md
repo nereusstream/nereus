@@ -35,17 +35,28 @@ compatibility identity, and one receipt result hierarchy with safe attachment gr
 answer is preserved in
 [round 4](grill-notes/25-m1-readiness-round-4-leaf-witness-registry-and-receipt.md).
 
-Those accepted structural contracts do not select an allocator or invent unconfirmed byte/cap tables. The next
-implementation-readiness descendants remain OPEN until explicitly confirmed:
+Round 5 accepted ADR 0085's M1.1a start boundary: NTA1 persists only independent semantics; Oxia continuity reuses the
+existing v0.9 dummy notification barrier through a client-only hook; Registry writers use two closed kinds, a fixed
+120-byte row, and immutable proof-only admission evidence; receipts use canonical content identity, five attachment
+kinds, and one non-authoritative Final manifest. It explicitly did not accept complete NTA1, `maxWriterCount=8`, or any
+proposed receipt numeric cap. The dedicated design-review answer is preserved in
+[round 5](grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md).
 
-- the complete NTA1 v1 ordered field/width/enum/`NONE`/variant table, Pulsar per-name UTF-8 caps, total parser cap, and
-  checked cap derivation;
-- the first Oxia-backed ELM adapter's concrete ready/gap API, bounded witness bytes, exact source/artifact tuple,
-  direct-CAS integration, and fail-closed current-source conformance;
-- qualified fresh-root evidence encoding plus the Registry writer row/header/evidence table, source-qualified writer
-  inventory, and evidence-derived count/byte caps; `16/256/4096` remain candidates only;
-- exact remaining JCS envelope/payload fields, allowlisted attachment kinds, evidence-derived numeric attachment caps,
-  and Final-index binding to non-virtual-ledger M1 evidence.
+M1.1a module/identity/deterministic-ID/SPI/dependency/continuity scaffolding may now start. It cannot claim complete
+NTA1, Registry codec/capacity, receipt validator, M1 Final, or executable evidence. The remaining descendants are:
+
+- **M1.1b codec OPEN:** exact `FrameEncodingPolicy` kind/version/payload, complete protocol/profile/`NONE` legality and
+  goldens, Pulsar persistence/topic UTF-8 caps, `maxCellBytes`, `maxIncarnationBytes`, `maxNta1Bytes`, checked formula,
+  and canonical topic-name/persistence-name consistency. The 16-KiB/64-KiB values are candidates only.
+- **Registry capacity OPEN:** `maxWriterCount=8` is a candidate until steady, concurrent binary/credential rollout,
+  rollback, fenced residue, and bootstrap/admin cohorts plus the complete Registry size formula bound it. The fixed
+  row is 120 bytes and there is no separate writer-set-byte cap.
+- **Receipt-cap OPEN:** root/count/path/file/total/log parser and verification caps wait for representative all-pass,
+  maximum-failure, fault-cut, Registry/interlock, and multi-scenario outputs. The root fields, attachment kinds,
+  content identity, and Final reference hierarchy are already closed.
+- **Promotion evidence pending:** final Oxia client fork, JAR/POM, server image, focused-test identities, executable
+  continuity/Registry conformance, and trusted N3 receipt are implementation/promotion evidence rather than another
+  prose-design decision.
 
 These descendants remain non-normative until a later explicit grill confirmation.
 

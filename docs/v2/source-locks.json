@@ -44,6 +44,24 @@
       "evidenceStatus": "DEVELOPMENT_BASE_ONLY"
     }
   ],
+  "dependencyImplementationBases": [
+    {
+      "id": "oxia-client-v2-implementation-base",
+      "repository": "https://github.com/nereusstream/oxia-client-java.git",
+      "tag": "v0.9.0",
+      "commit": "ce8143e06bcb089a2916c8ce4bf64b40c1d4d5bc",
+      "role": "CLIENT_FORK_BASE",
+      "evidenceStatus": "IMPLEMENTATION_BASE_ONLY"
+    },
+    {
+      "id": "oxia-server-v2-conformance-base",
+      "repository": "https://github.com/nereusstream/oxia.git",
+      "tag": "v0.9.0",
+      "commit": "1934d55f0f619971d83f43fbc56865ce9221ca92",
+      "role": "SERVER_SOURCE_BASE",
+      "evidenceStatus": "IMPLEMENTATION_BASE_ONLY"
+    }
+  ],
   "researchBaselines": [
     {
       "id": "automq-architecture-review",

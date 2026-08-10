@@ -94,8 +94,12 @@ receipt. Exclusive admin/ACL interlock, fresh-root proof/init, writer upgrade, l
 allocation proof precede the final Registry activation. A new writer is committed before start; removal follows fence,
 drain, and independent revoke; rolling upgrade may commit old and new entries together. Shared credentials are invalid.
 After activation, root/INSTANCEID format/nuke/mutation fences the Registry and all derived views.
-Writer count/row/total budgets remain OPEN until exact row/header/evidence bytes and the source-qualified rollout
-inventory derive them; `16/256/4096` are candidates only.
+Writer kinds close to native BookKeeper ID allocation and Nereus virtual-ledger ID allocation. Each independently
+revocable cohort uses one exact 120-byte row containing kind/contract, positive principal/interlock generations and
+non-zero SHA-256 values, plus typed evidence kind/version/SHA; there is no random writer-entry ID or generic external
+kind. Immutable `RegistryAdmissionEvidenceV1` proves the complete activation cut but is not allocation authority and is
+not read per rollover. `maxWriterCount=8` remains a candidate until bounded rollout/rollback/credential/residue/admin
+inventory and the complete Registry size formula derive it; there is no separate writer-set-byte cap.
 Patching one Pulsar generator alone is not a completeness proof. The Registry emits `REGISTRY_CONFORMANCE`; the former
 V1 allocator is removed or isolated rather than renamed. STRICT/RANGE candidate SPI and cut injection exist only in
 test/evidence code and emit `HARNESS_CONFORMANCE_ONLY` with schema-fixed `selectionEligible=false`; they persist no mode

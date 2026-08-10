@@ -48,6 +48,12 @@ separate mechanical commits. Architecture, gate rewiring, and the large deletion
 deprecated or retained as a compatibility shim; protected `v0.1`/`v0.1.0` history preserves the old product line. KoP
 runtime leaves the active graph while its design documents remain.
 
+M1 may now start with the explicitly partial M1.1a foundation: Java-17/JDK-only modules, bootstrap identities,
+ProtocolKind/NPC1/NTI1/NTB1/NSE1 and authority-leaf codecs, minimal independent aggregate domain types, the four closed
+metadata capabilities, dependency/source-lock boundaries, and the client-only Oxia continuity hook. M1.1a neither
+implements nor activates complete NTA1. M1.1b owns its strict codec/goldens after FrameEncodingPolicy, legality matrix,
+Pulsar/name/Cell/incarnation/total caps, and checked maximum formula close.
+
 ## M1 implementation and promotion contract
 
 The M1 module dependency is `nereus-domain <- nereus-metadata-spi <- nereus-metadata-oxia`. Domain is Java-17/JDK-only
@@ -81,7 +87,9 @@ closed. Ordinary access captures/rechecks one atomic fence word with zero remote
 aggregate-to-retired-tombstone replacement remains M5; complete process integration remains M6.
 The provider hook exports only a local store-wide `WatchContinuityEpoch` plus ready barrier; provider internal
 connection/session/shard identities are not persisted. A gap invalidates all store fences and triggers bounded,
-coalesced A/read/B recovery. Exact hook API/source lock/conformance remains an implementation blocker.
+coalesced A/read/B recovery. The client fork uses Oxia v0.9's existing no-start-offset dummy notification batch as the
+ready barrier and adds no server wire/RPC; a gap discards the old offset and obtains a new barrier. Final fork/artifact/
+server-image identities and conformance remain promotion evidence rather than an unresolved protocol design.
 
 M1 implements the mode-independent virtual-ledger Registry bound to the immutable 32-byte ledger-ID compatibility
 namespace `SHA-256(NLI1 || u32be(36) || canonicalInstanceIdAscii[36])`. Only an exact lowercase canonical non-zero
@@ -92,6 +100,11 @@ there is no external membership reference. Allocators use a namespace-bound vers
 Oxia receipt is `REGISTRY_CONFORMANCE`. STRICT/RANGE candidate SPI and cut injection remain evidence-only and emit a distinct
 `HARNESS_CONFORMANCE_ONLY` receipt with `selectionEligible=false`; M1 runs deterministic/small smoke only and neither
 persists nor activates a mode. M3 owns 10k/100k multi-broker capacity evidence and selection.
+
+The Registry closes writer kinds to native BookKeeper and Nereus virtual-ledger ID allocation. Each cohort uses a
+120-byte canonical row; `RegistryAdmissionEvidenceV1` is bounded immutable activation proof, not allocation authority.
+`maxWriterCount=8` remains only a candidate pending the full bounded cohort/rollout/rollback/residue inventory and
+Registry size formula. The writer-count choice blocks the Registry codec/capacity gate, not M1.1a domain/SPI work.
 
 `docs/v2/source-locks.json` is the sole expected-SHA authority for external Kafka/Pulsar/Oxia sources. Checkout paths
 may be overridden; expected SHAs may not. The manifest cannot self-lock the current Nereus commit; a promotion receipt
@@ -109,12 +122,16 @@ N2/P1/K1, source-lock digest, domain JAR/POM SHAs, Oxia server image plus client
 one `scenarios[] -> suites[]` result hierarchy and normalized `discovered/executed/passed/failed/skipped/aborted`
 counts. Derived summaries cannot become another authority. Internal retries/dynamic tests are forbidden and mandatory
 PASS has non-zero execution with no failure/skip/abort. Attachments are allowlisted regular files referenced by kind,
-safe sorted POSIX-relative path, length, and SHA-256 rather than embedded. A Registry scenario requires
+safe sorted POSIX-relative path, length, and SHA-256 rather than embedded. The canonical root contains exactly
+`schema/kind/sourceTuple/scenarios/attachments`; canonical bytes supply content identity, with no `runIdentity`, leaf
+IDs, or separately authoritative aggregate result. Attachment kinds are `TEST_REPORT`, `REGISTRY_BYTES`,
+`REGISTRY_ADMISSION_EVIDENCE`, `WRITER_INTERLOCK_SNAPSHOT`, and `SANITIZED_LOG_EXCERPT`. A Registry scenario requires
 `REGISTRY_CONFORMANCE`; allocator cut scenarios require `HARNESS_CONFORMANCE_ONLY` and `selectionEligible=false`.
 Cross-M1 scenario rows are split before promotion so future evidence cannot be borrowed. N3 may change only receipts,
 attachments, and their exactly covered scenario status/index; it may not modify code, gates, workflows, ADRs, or source
-locks. Exact remaining payload fields and evidence-derived numeric attachment caps remain implementation-readiness
-blockers.
+locks. The Final index is a typed path/length/SHA promotion manifest, not another result authority. Evidence-derived
+root/count/path/file/total/log caps remain OPEN until representative early-M1 outputs establish them; they block the
+receipt validator/N3 promotion, not M1.1a.
 
 ## Status model
 

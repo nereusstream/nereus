@@ -54,13 +54,44 @@ admission but cannot allocate a range or overrule the exact registry value/versi
 64-KiB Registry. An uncertain CAS rereads the one Registry key and converges only through ADR 0082's closed exact result;
 the client never constructs a merged table locally.
 
-Native exclusion is deployment admission evidence for every writer that shares the compatibility namespace. Each row
-contains only writer kind/entry identity, allocator/exclusion contract version, independently revocable principal
-generation/digest, interlock-policy generation/digest, and a typed conformance-evidence reference. Source commit and
-artifact SHA remain receipt facts rather than long-lived Registry identity. Writer count and row bytes have independent
-hard caps in addition to the total 64-KiB value cap; their numbers remain OPEN until the complete row/header/evidence
-schema, source-qualified writer inventory, rollout overlap, and safety residue derive them. `16/256/4096` remain
-candidates only, and a third writer-set cap is added only if it supplies an independent bound. The namespace hash
+Native exclusion is deployment admission evidence for every writer that shares the compatibility namespace. The
+closed writer kinds are `NATIVE_BOOKKEEPER_LEDGER_ID=1` and `NEREUS_VIRTUAL_LEDGER_ID=2`; there is no generic third
+kind. A native row denotes one source-qualified writer cohort under one independently revocable principal generation,
+not one process. External/custom writers, shared unrestricted credentials, or writers outside the admitted generator
+fail admission.
+
+There is no random `writerEntryId`. A row is identified by
+`{writerKind, exclusionContractVersion, principalGeneration, principalSha256}` and has exactly 120 bytes:
+
+```text
+u16 writerKind
+u16 exclusionContractVersion
+u64 principalGeneration
+principalSha256[32]
+u64 interlockGeneration
+interlockSha256[32]
+u16 evidenceKind
+u16 evidenceVersion
+admissionEvidenceSha256[32]
+```
+
+Generations are positive, digests are non-zero, codes are closed, and rows sort by writer kind, principal generation,
+then principal digest. Duplicate identities or one principal reused across writer kinds are illegal. A derived
+`SHA-256(NWR1 || canonicalWriterRowBytes)` may identify a row in evidence but is not persisted back into it. Lifecycle
+remains a Registry-predecessor/evidence fact rather than a mutable row field. Source commit and artifact SHA remain
+receipt facts rather than long-lived Registry identity.
+
+`RegistryAdmissionEvidenceV1` is a bounded create-only immutable content-addressed proof record, not allocation
+authority. It binds the exact INSTANCEID/namespace, candidate predecessor/epoch and writer set, fresh-root proof,
+ACL/principal/interlock generations, negative-allocation proof, and source-qualified writer evidence. The Registry
+binds only its closed kind/version/SHA; a row reference must resolve its exact cohort section even if the whole Registry
+and all rows share one evidence bundle. Allocators and normal rollover never read the bundle. The Registry conformance
+receipt binds both final Registry and evidence bytes without writing itself back into either record.
+
+`writerRowBytes=120` is fixed. `maxWriterCount=8` remains a candidate, not a contract, until steady, rolling, rollback,
+credential/binary overlap, fenced residue, and bootstrap/admin cohorts produce a bounded inventory and complete
+Registry maximum-size formula. There is no separate writer-set-byte cap: final writer count, fixed row length,
+`maxRegistryBytes=65,536`, and the exact header/evidence/assignment formula provide the bound. The namespace hash
 excludes root URI/path, deployment/reservation-domain identity, and source/artifact SHA; copying an INSTANCEID is
 therefore conservatively the same compatibility namespace.
 
@@ -98,5 +129,6 @@ This decision is refined by [ADR 0041](0041-v2-pulsar-virtual-ledger-slice-contr
 by [ADR 0061](0061-v2-pulsar-range-grant-owner-takeover.md) and M1 control authority by
 [ADRs 0082](0082-v2-m1-domain-and-control-authority-contracts.md) and
 [0083](0083-v2-m1-wire-control-and-evidence-bounds.md), and
-[0084](0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md); it refines ADR 0027 and is tracked by `T-POSITION-01`,
+[0084](0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md), and
+[0085](0085-v2-m1-foundation-start-and-deferred-codec-bounds.md); it refines ADR 0027 and is tracked by `T-POSITION-01`,
 `V2-POSITION-003..018`.

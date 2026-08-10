@@ -43,10 +43,14 @@ MetadataStore ELM, syncer disabled, and every ownership writer upgraded. The pin
 provider session/gap callback, so V2 remains fail-closed until M1 adds and proves that hook.
 
 The hook exposes one process-local, store-level opaque `WatchContinuityEpoch`, not Oxia connection/session/shard/
-channel identities in persisted wire. Registration has an explicit ready barrier. A connection gap, session loss,
-client close/recreation, or continuity-unknown reconnect first advances the epoch and invalidates all local V2 fences
-for that store. VALID cannot install before the barrier, and callback recovery never restores it without A/read/B. The
-installer CAS compares exact `INVALID(seq, continuityEpoch)` before publishing its ownership-bound VALID word.
+channel identities in persisted wire. Registration has an explicit ready barrier. Oxia v0.9 already emits a dummy
+`NotificationBatch` at the current commit offset for a no-start-offset notification request, and its client completes
+the stream barrier on first `onNext`; M1 exposes this existing semantic through the client fork and adds neither server
+wire nor RPC. A connection gap, receiver error/close, shard reassignment, session loss, client close/recreation, or
+continuity-unknown reconnect first advances the epoch and invalidates all local V2 fences for that store. The old
+offset is discarded and a fresh no-offset stream/dummy barrier precedes bounded/coalesced A/read/B. VALID cannot
+install before the barrier, and callback recovery never restores it without A/read/B. The installer CAS compares exact
+`INVALID(seq, continuityEpoch)` before publishing its ownership-bound VALID word.
 
 The control path performs authoritative witness A, exact ACTIVE/aggregate read, then authoritative witness B. An ELM
 eventual TableView is not an authoritative A/B read. Exact `A == B` while still locally owned is necessary, but the
@@ -94,8 +98,11 @@ are performance policy at Cell/host scope and cannot manufacture or extend autho
   ownership transfer/recreation, overflow, unsupported-backend refusal, local-only per-access checks, and fail-closed
   invalidation. M5 separately proves exact reference-free full-aggregate-to-tombstone replacement.
 
-The exact Java callback/barrier API, witness record fields, admitted Oxia source/artifact tuple, and fault-injection
-conformance remain OPEN.
+The ownership value persists only `brokerIncarnationId[16]` and `acquisitionId[16]`; Stat version, canonical bytes/hash,
+parsed owner, and captured continuity epoch are local A/B comparison facts. The concrete Java API, final client-fork
+commit, artifact/image digests, and fault-injection conformance are implementation/promotion evidence, not another
+protocol-design branch. Oxia v0.9 client base `ce8143e06bcb089a2916c8ce4bf64b40c1d4d5bc` and server base
+`1934d55f0f619971d83f43fbc56865ce9221ca92` are implementation bases only.
 
-This decision is refined by ADRs 0071/0073..0080 and 0082..0084, refines ADRs 0019, 0028, 0043, and 0049, and is tracked by
+This decision is refined by ADRs 0071/0073..0080 and 0082..0085, refines ADRs 0019, 0028, 0043, and 0049, and is tracked by
 `T-META-01`, `T-POLICY-01`, `V2-META-005..007`.

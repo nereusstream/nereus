@@ -118,7 +118,7 @@ ACTIVE plus exact aggregate identity and install a local versioned fence. Watch/
 path but normal append/read performs no Oxia call; stale state blocks admission until revalidation.
 
 The ownership side of that fence is an opaque backend-native witness with a collision-resistant 128-bit acquisition ID
-whose create/retry/reacquire transitions follow ADRs 0082..0084. The first candidate is limited to the Oxia 0.9.0-backed
+whose create/retry/reacquire transitions follow ADRs 0082..0085. The first candidate is limited to the Oxia 0.9.0-backed
 MetadataStore ELM, but current source proves only direct GET/Stat/versioned-CAS primitives. M1 must add acquisition
 fields/transitions, a provider-qualified lifecycle/gap hook, and one closed kernel used by every writer; initial
 admission requires MetadataStore ELM, syncer disabled, and all writers upgraded. Install first arms gap-safe ownership
@@ -134,9 +134,11 @@ same-session reconnect must repeat A/read/B. `SessionLost` or process restart ro
 service-unit reacquisition creates a new acquisition ID bound to the current broker incarnation.
 
 The hook supplies a process-local, store-level opaque `WatchContinuityEpoch` with a ready barrier; provider connection,
-session, shard, and channel identities do not enter persisted wire. Any continuity-unknown gap advances that epoch and
-invalidates every local V2 fence for the store before revalidation. Recovery is bounded/coalesced rather than serial on
-the callback thread. Concrete Oxia APIs, source tuple, and conformance remain OPEN.
+session, shard, and channel identities do not enter persisted wire. M1 reuses Oxia v0.9's existing no-start-offset
+dummy notification batch as that barrier through a client-only hook, with no server protocol/RPC change. Any continuity-
+unknown gap advances the epoch, invalidates every local V2 fence, discards the old offset, and obtains a new dummy
+barrier before bounded/coalesced A/read/B. Oxia client/server v0.9 commits in source locks are implementation bases;
+the final fork, client artifact, server image, and conformance are promotion evidence.
 
 The immutable 32-byte `ledgerIdCompatibilityNamespaceId` names the numeric space shared by all ledger-ID writers and is
 `SHA-256(NLI1 || u32be(36) || canonicalInstanceIdAscii[36])`. The input is exact lowercase canonical, non-zero,
@@ -150,7 +152,12 @@ excludes omitted writers; 0.2 has no referenced membership mode. Source/artifact
 identity. New writers are committed before start; removal follows fence/drain/revocation; rolling upgrade may commit
 independently revocable old and new identities together. The complete assignment table uses one-key CAS and
 `registryEpoch + 1`.
-Writer cap candidates remain OPEN until the exact row/header/evidence schema and writer inventory derive them.
+Writer kinds are `NATIVE_BOOKKEEPER_LEDGER_ID=1` and `NEREUS_VIRTUAL_LEDGER_ID=2`. One independently revocable cohort
+uses one canonical 120-byte row with kind/contract, positive principal/interlock generations and non-zero digests, plus
+typed evidence kind/version/SHA; there is no random writer-entry ID or generic third kind. The bounded immutable
+`RegistryAdmissionEvidenceV1` proves the exact activation cut but is not allocation authority and is never read during
+rollover. `maxWriterCount=8` remains only a sizing candidate; the exact count waits for a bounded cohort/rollout/
+rollback/residue inventory and total Registry formula, with no independent writer-set-byte cap.
 Allocators use a versioned derived slice view instead of rereading/copying the 64-KiB Registry per rollover. Missing,
 overlapping, drifted, revoked, incomplete, or capacity-exhausted authority blocks allocation. Registry conformance and
 allocator-harness receipts are distinct. Reservation checks are low-frequency control-plane work, not normal append

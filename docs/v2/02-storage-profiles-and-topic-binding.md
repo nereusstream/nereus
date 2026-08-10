@@ -60,16 +60,24 @@ Pulsar uses ADR 0084's single NPN1 persistence-name digest under distinct select
 19-digit generation. M1 accepts only ordinal zero, and random attempts, runtime configuration, time, log offsets, and
 backend versions cannot influence IDs. Pulsar/total caps remain OPEN.
 
-The one logical compatibility axis is `aggregateSchemaVersion=1`. Canonical `NTA1` contains the complete binding and
-ordinal-zero epoch, including typed profile/origin, source-qualified policy/catalog version, and
-WAL/payload/checksum/compression/encryption discriminators. It is flat/sequential with no TLV/map/self-digest/tail,
-explicitly length-frames Cell/incarnation bytes, and permits only `0x00` for the initial sealed-end presence. The
-complete ordered field/width/enum/`NONE`/variant table and Pulsar/total parser caps remain OPEN before codec work.
-Deployment may lower only new-write/admission ceilings, never persisted-v1 decoding.
-An inapplicable discriminator is explicit `NONE`; unknown/illegal combinations fail closed. `ACTIVE` is derived only
+The one logical compatibility axis is `aggregateSchemaVersion=1`. Canonical `NTA1` persists only independent
+semantics: protocol, one binding ID, length-framed Cell/incarnation, one ordinal-zero Storage Epoch ID, resolved
+profile/origin/catalog SHA, one `FrameEncodingPolicy` pair, and absent sealed end. Position/payload/native authority are
+derived from protocol; primary WAL/digest/checksum/encryption are derived from profile plus fixed format contracts; the
+binding back-reference is the Aggregate's one binding ID. They are domain views, not repeated wire authorities.
+NTA1 is flat/sequential with no TLV/map/self-digest/tail and permits only `0x00` for initial sealed-end presence. Pure
+closed enums use one `u16`; only independently evolving typed payloads use kind/version with `NONE={0,0}`. The exact
+FrameEncodingPolicy table/payload, complete profile/protocol/NONE matrix and goldens, Pulsar name caps,
+`maxCellBytes/maxIncarnationBytes/maxNta1Bytes`, and checked maximum formula remain OPEN before complete codec work;
+16-KiB name and 64-KiB total values are candidates only. Deployment may lower only new-write/admission ceilings, never
+persisted-v1 decoding. Unknown/illegal combinations fail closed. `ACTIVE` is derived only
 after complete publication/validation and is not stored. The v1 aggregate excludes `CREATING`, delete/lifecycle/owner
 state, timestamps, attempts, controller offsets, backend versions, and untyped attributes. Oxia envelope schema 1 wraps
 NTA1; Kafka wire v0 maps generated fields directly to the domain validator without constructing temporary NTA1 bytes.
+
+M1 starts as M1.1a with modules, identity/ID codecs, minimal independent domain types, four closed metadata
+capabilities, and continuity/source-lock scaffolding. Complete NTA1 encoding/decoding and goldens are M1.1b and cannot
+be claimed by the foundation slice.
 
 At Kafka feature level 2, that physical record is one generated, typed, non-flexible
 `TopicBindingAggregateRecord(apiKey=32000, wireVersion=0)` owned by `TopicImage`, not an opaque attachment or parallel

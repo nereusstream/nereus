@@ -2,11 +2,13 @@
 
 ## Status
 
-Accepted for the 0.2 M1 implementation. The complete NTA1 field/code/variant table, Pulsar UTF-8 and total-payload
-caps, writer count/row-byte caps, receipt/attachment numeric caps, and
+Accepted for the 0.2 M1 implementation. The complete NTA1 FrameEncodingPolicy/legality/cap table, Pulsar UTF-8 and
+total-payload caps, writer count, receipt/attachment numeric caps, and
 executable current-source evidence remain implementation-readiness descendants. ADR 0084 closes the protocol/leaf,
 Kafka precedence, minimal continuity, native hash, and receipt-accounting descendants while keeping the complete NTA1
-table, provider API/source tuple, Registry writer caps, and receipt numeric caps OPEN. Implementation has not started.
+table, provider API/source tuple, Registry writer caps, and receipt numeric caps OPEN. ADR 0085 closes the client-only
+continuity direction and exact 120-byte writer row, removes receipt run identity, and permits M1.1a foundation work
+without claiming the deferred codecs or validators.
 
 ## Context
 
@@ -248,9 +250,10 @@ ledger union and other gate outputs; it cannot reinterpret one kind as another.
   all clients; the fresh-root admission proof supplies that safety without a second random identity.
 - Rebuild SHAs remain evidence facts rather than Registry migrations; completeness still depends on independently
   revocable principals, writer membership, and the allocation interlock.
-- Q2's complete NTA1 table and all explicitly listed numeric caps remain OPEN and must not be inferred from this ADR.
+- Complete NTA1 policy/legality/caps, Registry writer count, and receipt numeric caps remain OPEN and must not be
+  inferred from this ADR.
 
-This decision is refined by ADR 0084 and refines ADRs 0028, 0032, 0033, 0034, 0041, 0042, 0050, 0051, 0054, 0081, and 0082. It is tracked by
+This decision is refined by ADRs 0084 and 0085 and refines ADRs 0028, 0032, 0033, 0034, 0041, 0042, 0050, 0051, 0054, 0081, and 0082. It is tracked by
 `V2-META-003..006`, `V2-KAF-META-001..004`, `V2-POSITION-003..010`, and the M1 gates.
 The complete confirmed answer is preserved in
 [M1 Readiness Grill round 3](../v2/grill-notes/24-m1-readiness-round-3-wire-control-and-evidence.md).

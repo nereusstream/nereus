@@ -100,5 +100,5 @@ tooling all handle the record explicitly.
   transactions, touched-topic tracking, removal, snapshot/bootstrap scans, feature ordering, every invalid record class,
   non-disableability, and no ordinary full-image scan or SHA recomputation. M6 proves complete-process behavior.
 
-This decision is refined by ADRs 0082..0084, refines ADRs 0033, 0034, and 0042 and is tracked by `T-META-01`, `T-POLICY-01`,
+This decision is refined by ADRs 0082..0085, refines ADRs 0033, 0034, and 0042 and is tracked by `T-META-01`, `T-POLICY-01`,
 `V2-KAF-META-002..005`.

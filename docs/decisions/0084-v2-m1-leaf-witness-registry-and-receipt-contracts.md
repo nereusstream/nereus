@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted for the 0.2 M1 implementation. Exact NTA1 fields and Pulsar name caps, the concrete Oxia continuity-hook API
-and source tuple, Registry writer-row schema and numeric caps, and receipt attachment numeric caps remain OPEN.
-Implementation and executable evidence have not started.
+Accepted for the 0.2 M1 implementation and refined by ADR 0085. Complete NTA1 FrameEncodingPolicy/legality/caps,
+Registry writer-count capacity, and receipt attachment numeric caps remain OPEN. The client-only Oxia continuity shape
+and 120-byte writer row are closed; concrete fork/artifact/image identities and executable evidence have not started.
 
 ## Context
 
@@ -116,9 +116,10 @@ One store gap conservatively invalidates all that store's V2 fences. Recovery us
 service-unit coalescing, and admission backpressure rather than serial re-open on a callback thread. Ordinary
 append/read still performs only local atomic capture and completion-time equality checking.
 
-The Java hook, callback/threading and barrier API, exact witness record fields, admitted Oxia commits/artifacts/images,
-and current-source conformance remain OPEN and require an exact source lock plus fault-injection evidence before M1
-promotion.
+ADR 0085 fixes a client-only implementation direction: the existing Oxia v0.9 no-offset notification stream's first
+dummy batch is the ready barrier, so M1 adds no server protocol or RPC. Discontinuity discards the old offset and obtains
+a new dummy barrier before A/read/B. The Java surface and final fork/artifact/image identities are implementation and
+promotion evidence; the v0.9 source bases are recorded separately and do not themselves qualify the adapter.
 
 ### Native INSTANCEID grammar and namespace hash
 
@@ -141,11 +142,13 @@ ledgerIdCompatibilityNamespaceId =
 The Registry retains the exact INSTANCEID bytes and binds the derived 32-byte ID; key/value rederivation mismatch
 fails closed. Root URI/path, deployment/reservation-domain IDs, and source SHA remain excluded.
 
-The candidate values `maxWriterCount=16`, `maxWriterRowBytes=256`, and `maxWriterSetBytes=4096` are not contracts.
-Before the Registry codec starts, M1 must derive `maxWriterCount`, `maxWriterRowBytes`, and the writer total budget from
-the exact row/header/evidence schema, 64-KiB Registry cap, 49,152-byte maximum assignment table, safety residue,
-source-qualified writer inventory, and required old/new rollout overlap. An independent writer-set cap is required only
-if that derivation gives it independent value. Deployment may lower admission but cannot enlarge format caps.
+ADR 0085 closes two writer kinds (`NATIVE_BOOKKEEPER_LEDGER_ID=1`, `NEREUS_VIRTUAL_LEDGER_ID=2`) and one canonical
+120-byte row containing closed kind/contract, positive principal/interlock generations and non-zero 32-byte digests,
+plus closed evidence kind/version/SHA. It has no random writer-entry ID; exact tuple equality and Registry reread resolve
+response uncertainty. `RegistryAdmissionEvidenceV1` is immutable content-addressed admission proof, not allocation
+authority, and a row reference must resolve the exact cohort section. `maxWriterCount=8` remains only a candidate until
+the complete bounded cohort/rollout/rollback/residue inventory and Registry maximum-size formula derive it. No separate
+writer-set-byte cap is added. Deployment may lower admission but cannot enlarge format caps.
 
 ### Receipt accounting and attachment safety
 
@@ -163,7 +166,8 @@ executed   = passed + failed + aborted
 
 Containers do not count as leaves. Parameterized invocations count as executed leaves. M1 conformance suites do not
 use runtime-generated dynamic tests and do not persist a permanent canonical ID per leaf. Internal retries are
-forbidden; a workflow rerun creates a new run identity and complete receipt. Fail-then-pass cannot be collapsed.
+forbidden; a workflow rerun creates a complete new receipt whose canonical-byte SHA-256 is its content identity. There
+is no receipt-specific run-ID/attempt-ordinal allocator. Fail-then-pass cannot be collapsed.
 Mandatory PASS requires non-zero discovered/executed, zero failed/skipped/aborted, and every required suite present.
 
 There is one authoritative nesting:
@@ -186,16 +190,21 @@ scenarios[] {
 Scenario totals and the overall result are derived. Any persisted summary is recomputed and must match exactly; it
 cannot override the hierarchy.
 
-Attachment kinds are closed and allowlisted. A row binds `attachmentKind + path + length + SHA-256`. Paths are sorted,
+Attachment kinds are closed to `TEST_REPORT`, `REGISTRY_BYTES`, `REGISTRY_ADMISSION_EVIDENCE`,
+`WRITER_INTERLOCK_SNAPSHOT`, and `SANITIZED_LOG_EXCERPT`. A row binds
+`attachmentKind + path + length + SHA-256`. Paths are sorted,
 unique, canonical POSIX-relative safe-ASCII paths under the receipt directory and reject absolute paths, empty
 segments, `.`, `..`, backslash, NUL, and control characters. Resolution must remain inside the receipt root. The target
 must be a regular file, never a symlink, device, FIFO, or directory; the validator rereads length and digest. A hash
 does not prove redaction, so trusted promotion collects only allowlisted sanitized artifacts and the schema does not
 claim `redacted=true`.
 
-The candidate path/count/per-file/total attachment limits remain OPEN until representative success, failure, and
-fault-cut evidence gives p50/p99/max sizes. Operational upload limits cannot masquerade as persisted format caps.
-PASS-critical bounded artifacts must be attached; an external URL alone is insufficient.
+The root contains exactly `schema`, `kind`, `sourceTuple`, `scenarios[]`, and `attachments[]`; it stores no leaf IDs or
+independent aggregate result. The Final index is only `schema + sourceTupleSha + requiredGateRefs[] + receiptRefs[]`,
+with typed path/length/SHA references whose validator recomputes final status. The candidate root/count/path/per-file/
+total/log limits remain OPEN until representative success, maximum-failure, fault-cut, Registry/interlock, and multi-
+scenario evidence gives p99/max sizes plus margin. Operational upload limits cannot masquerade as persisted format
+caps. PASS-critical bounded artifacts must be attached; an external URL alone is insufficient.
 
 ## Consequences
 
@@ -206,7 +215,7 @@ PASS-critical bounded artifacts must be attached; an external URL alone is insuf
 - Registry and receipt numeric caps remain evidence-derived implementation blockers, not guessed contracts.
 - One canonical receipt hierarchy eliminates competing result authorities and per-leaf identity machinery.
 
-This decision refines ADRs 0028, 0032, 0033, 0050, 0051, 0081, 0082, and 0083. It is tracked by
+This decision is refined by ADR 0085 and refines ADRs 0028, 0032, 0033, 0050, 0051, 0081, 0082, and 0083. It is tracked by
 `V2-META-003..006`, `V2-KAF-META-001`, `V2-POSITION-003..004/010`, and the M1 exact-source/promotion gates. The complete
 review answer is preserved in
 [M1 Readiness Grill round 4](../v2/grill-notes/25-m1-readiness-round-4-leaf-witness-registry-and-receipt.md).

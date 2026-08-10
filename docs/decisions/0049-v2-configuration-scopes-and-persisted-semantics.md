@@ -49,6 +49,13 @@ Every resolved value that affects persisted bytes or recovery semantics is recor
 facts. A failover reads that persisted value and does not recompute it from the target host. Changes take effect only
 at the next contract-defined epoch, run, Object group, or offload attempt, never halfway through one.
 
+For the initial aggregate, only an independently meaningful `FrameEncodingPolicy` is a Storage-Epoch encoding value.
+`OBJECT_WAL` requires a closed non-NONE policy for compression eligibility and codec family/version, while an actual
+frame may still encode NONE when compression is ineligible or not beneficial. `BOOKKEEPER_WAL_ONLY` and
+`BOOKKEEPER_WAL_ASYNC_OBJECT` persist NONE in the initial epoch: NPD1 block target, compression result, wrapped key,
+and attempt parameters activate at the offload attempt. A policy-catalog SHA qualifies the resolution source but never
+replaces the directly persisted resolved policy or requires an online catalog lookup during replay.
+
 A configurable identity is scoped to exactly one activation lifecycle. One enum or versioned class cannot combine a
 Storage-Epoch encoding choice, an Object-group packing/linger choice, a sealed-ledger offload-attempt choice, and host
 capacity. Related policies may be validated for compatibility, but each value is persisted and changed only at its own
@@ -104,6 +111,6 @@ replace the immutable terminal candidate with a role-name owner check.
   seal/backpressure under resource pressure, incompatible batching rejection, and that every correctness gate remains
   non-disableable.
 
-This decision is refined by ADRs 0056 through 0080, 0082, and 0083, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and
+This decision is refined by ADRs 0056 through 0080 and 0082..0085, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and
 is tracked by `T-POLICY-01`, `V2-POLICY-001..002`, `V2-BK-012/013`, `V2-OBJ-016..024`,
 `V2-READ-003..006/014/015`, and `V2-POSITION-011/018`.

@@ -111,9 +111,17 @@ domain JAR/POM SHAs, Oxia server-image/client/test-artifact identities, and one 
 `scenarios[] -> suites[]` hierarchy. Each suite has `discovered/executed/passed/failed/skipped/aborted`; scenario and
 overall results are deterministic derived summaries, never independent authorities. Harness non-selection is a schema
 constant. Accounting, retry prohibition, safe attachment grammar, and PASS semantics are fixed by ADR 0084. Registry
-bytes, writer membership, ACL/interlock snapshots, and logs are content-addressed allowlisted attachments whose root
-references contain kind, safe relative path, length, and SHA-256. Registry and harness receipts cannot substitute for
-one another; exact remaining payload fields and evidence-derived numeric attachment caps remain OPEN.
+bytes, admission evidence, writer interlock snapshots, test reports, and sanitized log excerpts are content-addressed
+allowlisted attachments whose root references contain kind, safe relative path, length, and SHA-256. The canonical root
+contains only `schema`, `kind`, `sourceTuple`, `scenarios[]`, and `attachments[]`. It has no leaf IDs, independent
+aggregate result, or allocated/random/time-based `runIdentity`; canonical receipt SHA-256 is its content identity.
+Registry and harness receipts cannot substitute for one another.
+
+The Final index is only a promotion manifest containing `schema`, `sourceTupleSha`, `requiredGateRefs[]`, and
+`receiptRefs[]`. Each typed reference binds safe relative path, length, and SHA-256. The validator reads those objects
+and computes final status; a persisted display status, if any, is exact-rechecked and never overrides them. Exact root,
+count, path, attachment, and log numeric caps remain OPEN until representative early-M1 all-pass, maximum-failure,
+fault-cut, Registry/interlock, and multi-scenario evidence derives them with margin.
 
 N3 may commit only receipts/evidence attachments and the scenario status/index exactly covered by them. It cannot
 change code, gates, workflows, ADRs, or source locks; such a change returns to N2 and reruns promotion. Content hashes
@@ -132,5 +140,5 @@ promotion.
 - M1 can verify registry and harness conformance without making an unevidenced allocator selection or borrowing M3/M5/
   M6 PASS status.
 
-This decision is refined by ADRs 0082..0084, refines ADRs 0006, 0009, 0032, 0034, 0042, 0043, 0050, 0051, 0054, and 0055 and
+This decision is refined by ADRs 0082..0085, refines ADRs 0006, 0009, 0032, 0034, 0042, 0043, 0050, 0051, 0054, and 0055 and
 is tracked by the M1 implementation plan and its milestone-specific scenario rows.

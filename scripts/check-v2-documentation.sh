@@ -137,6 +137,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
     "$repo_root/docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
     "$repo_root/docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
+    "$repo_root/docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -269,6 +270,12 @@ require_literal 'NPN1' "docs/decisions/0084-v2-m1-leaf-witness-registry-and-rece
 require_literal '`WatchContinuityEpoch`' "docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
 require_literal 'SHA-256(' "docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
 require_literal 'discovered = executed + skipped' "docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
+require_literal '`writerRowBytes=120`' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
+require_literal 'M1.1a may now implement' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
+require_literal 'Complete NTA1 codec/goldens remain OPEN' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
+require_literal '`RegistryAdmissionEvidenceV1`' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
+require_literal 'ce8143e06bcb089a2916c8ce4bf64b40c1d4d5bc' "docs/v2/source-locks.json"
+require_literal '1934d55f0f619971d83f43fbc56865ce9221ca92' "docs/v2/source-locks.json"
 require_literal 'request-order greedy residue-free linear admission sizes the exact cumulative record list' "docs/v2/v2-scenarios.json"
 require_literal 'canonical-UUID/NLI1-derived compatibility-namespace Registry' "docs/v2/v2-scenarios.json"
 require_literal 'local store-wide continuity epoch' "docs/v2/v2-scenarios.json"
@@ -338,7 +345,10 @@ require_literal "M1 Readiness Grill round 3" "docs/v2/grill-notes/24-m1-readines
 require_literal "没有明显的数据热路径型过度设计" "docs/v2/grill-notes/24-m1-readiness-round-3-wire-control-and-evidence.md"
 require_literal "M1 Readiness Grill round 4" "docs/v2/grill-notes/25-m1-readiness-round-4-leaf-witness-registry-and-receipt.md"
 require_literal "不要同时维护 suite/scenario/aggregate 三套独立结果" "docs/v2/grill-notes/25-m1-readiness-round-4-leaf-witness-registry-and-receipt.md"
-require_literal "concrete ready/gap API" "docs/v2/open-questions.md"
+require_literal "M1 Readiness Grill round 5" "docs/v2/grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md"
+require_literal "结论：Round 5 不能全部确认" "docs/v2/grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md"
+require_literal "M1.1a module/identity/deterministic-ID/SPI/dependency/continuity scaffolding may now start" "docs/v2/open-questions.md"
+require_literal '`maxWriterCount=8` is a candidate' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -899,6 +909,7 @@ link_docs=(
     "$repo_root/docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
     "$repo_root/docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
     "$repo_root/docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
+    "$repo_root/docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
 )
 
 while IFS=: read -r source match; do

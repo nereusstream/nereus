@@ -8,7 +8,8 @@ and the receipt-envelope direction. Exact aggregate field/variant tables, remain
 lifecycle hooks/source tuple, Registry writer schema, and remaining receipt payload fields remain implementation-readiness descendants. ADR 0084
 fixes the protocol codes and authority leaves, Kafka precedence/interlock, minimal local continuity semantics, native
 INSTANCEID hash, and receipt accounting/path safety while retaining evidence-derived caps and concrete provider hooks.
-Implementation and executable evidence have not started.
+ADR 0085 then permits M1.1a foundation work, closes the client-only continuity shape and 120-byte writer row, and
+retains the complete NTA1 policy/cap table, writer count, receipt caps, and executable evidence as explicit descendants.
 
 ## Context
 
@@ -219,10 +220,9 @@ numeric caps remain open.
   local atomic fence comparison.
 - Registry updates remain rare, but writer admission now requires real namespace governance rather than a descriptive
   digest. Missing completeness or interlock evidence fails closed.
-- Exact discriminator/aggregate tables and numeric caps, compatibility hash bytes, qualified provider session/gap
-  hooks, and receipt inner-schema/accounting/path rules remain the next implementation-readiness frontier and cannot be
-  inferred by code.
+- Complete NTA1 FrameEncodingPolicy/legality/caps, Registry writer count, receipt numeric caps, and promotion evidence
+  remain later readiness frontiers and cannot be inferred by code; they do not block the M1.1a identity/SPI slice.
 
-This decision is refined by ADRs 0083 and 0084 and refines ADRs 0023, 0028, 0032, 0033, 0034, 0041, 0042, 0050, 0051, 0054,
+This decision is refined by ADRs 0083..0085 and refines ADRs 0023, 0028, 0032, 0033, 0034, 0041, 0042, 0050, 0051, 0054,
 0055, and 0081. It is tracked by
 `V2-META-002..006`, `V2-KAF-META-001..003`, `V2-POSITION-003..011`, and the M1 implementation/promotion gates.
