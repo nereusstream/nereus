@@ -13,7 +13,27 @@ This file records proposals that have not been accepted as runtime contracts and
 traceability. An answer moves into a normative document or ADR only after explicit confirmation; editing this file
 alone cannot close a gate.
 
-## Restarted Grill 2: current frontier
+## M1 implementation-readiness grill: current frontier
+
+Round 1 accepted ADR 0081's pure V2 active graph, Java-17/JDK-only domain and capability-specific metadata SPI,
+complete M1 Kafka metadata authority, Pulsar backend-native ownership witness plus local ACTIVE fence, mode-independent
+virtual-ledger registry, and three-stage gate/four-stage cross-repository promotion boundary. It split every M1/M3,
+M1/M5, and M1/M6 scenario so a focused M1 receipt cannot promote future milestone evidence. The complete adjusted
+answer is preserved in [M1 readiness round 1](grill-notes/22-m1-readiness-round-1-pure-graph-and-promotion.md).
+
+Round 1 did not freeze implementation bytes or select an allocator. The next implementation-readiness descendants
+remain OPEN until explicitly confirmed:
+
+- exact `ProtocolCellIdentity` fields plus deterministic binding/epoch ID v1 preimage bytes and golden vectors;
+- the closed aggregate logical wire, discriminator/field IDs, parser caps, Oxia key grammar, and Kafka physical mapping;
+- Kafka CreateTopics profile/policy input, error precedence, internal-topic behavior, and atomic-batch admission formula;
+- Pulsar selector/aggregate key and wire plus the backend-native opaque ownership-witness acquisition/validation hook;
+- virtual-ledger registry key/wire/row encoding and the deployment-wide all-writer native-exclusion evidence envelope;
+- M1 candidate-harness and promotion-receipt schemas, source-qualified artifact layout, and zero-test/skip failure rules.
+
+No value in that list is normative merely because it is a Round 2 candidate.
+
+## Restarted Grill 2: evidence frontier
 
 Round 18 accepted the small bounded inline selector-owned anchor set, dedicated emergency STOPPED envelope, immutable-
 candidate closed-verifier terminal safety, and asynchronous batched prune in ADR 0079. It also accepted ADR 0080's

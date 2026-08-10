@@ -55,4 +55,4 @@ must preserve exact aggregate equality.
   backend-to-logical equality, deterministic re-encode, and exclusion of every mutable/retry-dependent field.
 
 This decision is refined by ADRs 0042/0043 and 0050/0051, refines ADRs 0023/0028, and is tracked by `T-META-01`,
-`V2-META-002..006`, and `V2-KAF-META-002..003`.
+`V2-META-002..007`, and `V2-KAF-META-002..005`.

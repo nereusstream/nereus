@@ -79,6 +79,13 @@ head install; allocator clear is a high-priority background reconciliation that 
 Unknown responses reread exact equality, while only definitive conflicts fence. Permanent orphan candidates are
 bounded metadata evidence rather than a new 0.2 GC protocol.
 
+M1 implements the complete mode-independent registry and real-Oxia conformance. Native-range exclusion is admitted only
+with evidence covering every writer sharing the ledger-ID namespace; patching one Pulsar generator alone is not a
+complete exclusion proof. The former V1 global allocator is removed or isolated rather than renamed into the registry.
+STRICT/RANGE candidate SPI, cut injection, and receipt schema exist only in test/evidence code. M1 runs deterministic
+and small smoke evidence and emits `HARNESS_CONFORMANCE_ONLY` with `selectionEligible=false`; it persists no mode and
+installs no production allocator. M3 owns 10k/100k multi-broker capacity evidence and any eventual selection.
+
 Online Pulsar BookKeeper/Object evolution is not implied by this model. New-incarnation migration versus a future hybrid
 ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.
 
@@ -183,7 +190,7 @@ throttle, or stop new admission before BookKeeper capacity is exhausted. It neve
 into a synchronous Object write.
 
 Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, and `T-POLICY-01`. Required scenarios:
-`V2-BK-001..013`, `V2-POSITION-001..011`, and `V2-POLICY-001`. See
+`V2-BK-001..013`, `V2-POSITION-001..018`, and `V2-POLICY-001..002`. See
 [ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md),
 [ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md),
 [ADR 0022](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md),

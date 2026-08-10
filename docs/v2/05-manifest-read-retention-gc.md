@@ -192,4 +192,4 @@ system does not synthesize records or silently skip the requested Protocol Cover
 
 Relevant tradeoffs: `T-MANIFEST-01`, `T-POSITION-01`, `T-PROJECTION-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required
 scenarios: `V2-READ-001..015`, `V2-OBJ-002/020..024`, `V2-BK-007..008`, `V2-BK-011`,
-`V2-PROJECTION-001`, `V2-POLICY-001`, and `V2-FABRIC-003`.
+`V2-PROJECTION-001`, `V2-POLICY-001..002`, and `V2-FABRIC-003`.

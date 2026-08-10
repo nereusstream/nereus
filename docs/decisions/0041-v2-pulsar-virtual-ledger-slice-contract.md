@@ -48,4 +48,4 @@ RETIRING-to-RETIRED proof and allocator/chain epoch protocols remain downstream 
   permanent tombstones, alignment/math, numeric/encoded capacity, and provider-configuration independence.
 
 This decision is refined by ADRs 0048/0054/0055/0061, refines ADRs 0027/0032, and is tracked by `T-POSITION-01`,
-`V2-POSITION-003..011`.
+`V2-POSITION-003..018`.

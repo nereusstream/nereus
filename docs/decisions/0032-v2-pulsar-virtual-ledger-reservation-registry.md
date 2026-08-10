@@ -33,6 +33,11 @@ allocate a range or overrule the exact registry value/version. An uncertain CAS 
 only exact candidate equality; a mismatch follows the committed winner or fails the administrative operation without
 constructing a merged table locally.
 
+Native exclusion is deployment admission evidence for every writer that shares the ledger-ID compatibility namespace.
+Making one `PulsarLedgerIdGenerator` fail before `[2^62, 2^63 - 2]` is necessary but is not sufficient when another
+BookKeeper/native/custom writer can allocate in that namespace. Missing or drifted all-writer evidence blocks registry
+activation. The old V1 global allocator is removed or isolated and cannot be renamed into this authority.
+
 ## Consequences
 
 - `V2-OPEN-PUL-OBJ-03` is resolved.
@@ -41,11 +46,12 @@ constructing a merged table locally.
 - Slice identity/lifecycle/geometry and fail-closed no-expansion behavior are refined by ADRs 0041/0048/0054.
   Registry/slice/allocator epochs, allocation response loss, and Ledger Chain publication remain downstream gates.
 - M1 must prove concurrent assignment, response loss, canonical ordering, overlap/range/reuse rejection, derived-index
-  loss/rebuild, stale watch rejection, capacity exhaustion, and native-exclusion evidence drift.
+  loss/rebuild, stale watch rejection, capacity exhaustion, all-writer native-exclusion evidence drift, and absence of
+  the V1 allocator authority.
 
 This decision is refined by [ADR 0041](0041-v2-pulsar-virtual-ledger-slice-contract.md),
 [ADR 0048](0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md), and
 [ADR 0054](0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md), with allocator-mode evidence refined by
 [ADR 0055](0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md), with RANGE reservation takeover constrained
 by [ADR 0061](0061-v2-pulsar-range-grant-owner-takeover.md); it refines ADR 0027 and is tracked by `T-POSITION-01`,
-`V2-POSITION-003..011`.
+`V2-POSITION-003..018`.

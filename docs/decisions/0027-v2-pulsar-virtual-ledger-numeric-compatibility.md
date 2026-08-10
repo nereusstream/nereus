@@ -45,4 +45,4 @@ The deployment registry's physical authority is refined by
 non-overlap are refined by [ADR 0054](0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md), allocator-mode evidence by
 [ADR 0055](0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md), and RANGE owner takeover by
 [ADR 0061](0061-v2-pulsar-range-grant-owner-takeover.md). This decision refines ADR 0022 and is tracked by
-`T-POSITION-01`, `V2-POSITION-002..011`.
+`T-POSITION-01`, `V2-POSITION-002..018`.

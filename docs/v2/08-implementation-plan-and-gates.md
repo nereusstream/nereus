@@ -14,12 +14,12 @@ sourceTuple: v2-m0
 | Milestone | Scope | Status at M0 | Required aggregate |
 | --- | --- | --- | --- |
 | M0 | V1 archive references, Context Map/glossaries, V2 ADRs/contracts, open-question/session logs, source/scenario manifests, tradeoff register, documentation gate | DocumentationGated | `v2M0Check` |
-| M1 | typed protocol-native incarnations and deterministic IDs; closed aggregate logical schema v1; Kafka API-key-32000 TopicImage record with publication-boundary incremental/full validation; Pulsar selector CAS state machine, cached ACTIVE fence, and retired tombstone; `k=40`/64-KiB/256-assignment registry bootstrap contract plus ADR-0055 native-relative allocator evidence harness and parallel RANGE contract; typed policy-scope resolver; capability-split metadata SPI; remove superseded V1 API | Planned | `v2M1Check` |
+| M1 | pure V2 active graph; Java-17/JDK-only domain and capability-split metadata SPI; typed protocol-native incarnations and deterministic IDs; closed aggregate logical schema v1; complete Kafka API-key-32000 KRaft record/image/CreateTopics/publication authority; Pulsar selector CAS plus ABA-safe ownership witness and local ACTIVE fence; mode-independent `k=40`/64-KiB/256-assignment registry plus all-writer native exclusion; allocator harness conformance only with no mode selection; remove every active V1 runtime/gate | Planned | `v2M1FinalCheck` |
 | M2 | Owner Epoch lane, typed frontier contract, BookKeeper foundation, Pulsar deterministic NPD1-data/NPO1-root pair with checked 16-byte-row/streaming envelope and provider admission plus native-relative block-policy evidence, ManagedLedger-owned dual-source handle/read pins/final-delete revalidation and persisted BK_DELETE state/retention policy, Kafka ledger-layout scale spike | Planned | `v2M2Check` |
 | M3 | one-cell NWG1 Object WAL groups; binding-context epoch authority and commit-set co-location; run-key/per-Object AEAD; final class/lane leaf grammar and post-plan sequence allocation; up to three lazy lanes under one Root/pointer; provider-resolved physical frontier plus owner-local per-binding typed frontier; physical-only de-duplicated checkpoint rows/Seal; one publisher-epoch-fenced vector chain; pre-position tracker/locator reservation and local tickets; shared-verified range-aggregated active-tail publication before ACK; Root-fixed NONE/optional bounded provider-proof mode; provider-absent cuts; conservative bounded prefix/LIST recovery with no partial skip vector; provider/session evidence; fixed-slice Pulsar virtual-ledger path with RANGE evidence | Planned | `v2M3Check` |
 | M4 | manifest, protocol-position/timestamp indexes, Storage Epoch resolver, logical Binding read snapshot, bounded sharded generation-tagged hazard slots, ABA-safe lease word and terminal source drain, `ADMITTING/STOPPED` Binding selector with fused fallback-removal/E+1 cut, small inline closure-anchor set plus emergency STOPPED envelope, closed-verifier terminal publication and async batched prune, per-source first/shared-last intervals, deterministic on-demand proofs/window, exact inline/reference activation, explicit bounded O(N) reconciliation, and two-stage retirement | Planned | `v2M4Check` |
 | M5 | materialization, compaction, retention, immutable capability-evidence verification, exact per-source protection release, irreversible same-key `FULL_V1 -> RETIRED_V1` batch compaction with permanent compact tombstone, retained-source/batch/tombstone admission and alerting, per-cell cache/task isolation, physical GC | Planned | `v2M5Check` |
-| M6 | Kafka KRaft level-2 record/image/snapshot integration and protocol compatibility | Planned | `v2M6Check` |
+| M6 | Kafka/Pulsar broker/controller process integration; Produce/Fetch/Admin, restart/catch-up/snapshot, and protocol compatibility evidence over the M1 metadata authorities | Planned | `v2M6Check` |
 | M7 | fencing, planned handoff, bounded recovery, cell-local drain/close isolation, mixed-profile operations | Planned | `v2M7Check` |
 | M8 | scale, shared-infrastructure/noisy-neighbor chaos, exact-source AutoMQ comparison, Pulsar native parity, release evidence | Planned | `v2M8Check` and `v2FinalCheck` |
 
@@ -42,8 +42,48 @@ Every implementation milestone must land one coherent set:
 6. ordinary deterministic gate;
 7. exact-source receipt for any `Verified` or performance/parity claim.
 
-Superseded V1 Java, tests, Phase/Future prose, and literal checks are deleted with the V2 slice that replaces them. They
-are not marked deprecated and are not kept as compatibility shims; branch `v0.1` preserves the old product line.
+M1 finishes with no compilable, publishable, or runnable V1 graph. The transition first lands domain/SPI and dependency
+checks, then cuts old settings/BOM/publication/CI edges, then removes the V1 runtime and Phase/F9 tasks/scripts in
+separate mechanical commits. Architecture, gate rewiring, and the large deletion are not one review. Nothing is marked
+deprecated or retained as a compatibility shim; protected `v0.1`/`v0.1.0` history preserves the old product line. KoP
+runtime leaves the active graph while its design documents remain.
+
+## M1 implementation and promotion contract
+
+The M1 module dependency is `nereus-domain <- nereus-metadata-spi <- nereus-metadata-oxia`. Domain is Java-17/JDK-only
+and contains canonical values, deterministic IDs, and validators. SPI contains only capability-specific atomic
+semantics. Kafka `:metadata` consumes the exact immutable domain JAR/POM without transitively importing SPI/Oxia; its
+generated physical record remains Kafka-owned. Published domain artifacts are source-qualified by JAR/POM SHA and may
+not be overwriteable SNAPSHOT/changing/composite inputs.
+
+Kafka feature 2, API-32000, atomic CreateTopics aggregate, TopicImage/Delta/replay/snapshot/remove, and publication
+validation form one activatable M1 source tuple. A generated record may land dormant but cannot be advertised, formatted,
+or emitted alone. M6 owns complete broker/controller process and Produce/Fetch/Admin/restart evidence only. Ordinary
+delta validation is touched-topic-only without canonical SHA recomputation; full scans are bootstrap/snapshot/full-
+catch-up only; CreateTopics pre-admits the complete atomic batch.
+
+Pulsar M1 captures an ABA-safe native ownership witness before and after exact selector/aggregate validation and installs
+the cache only on equality while still locally owned. Ordinary access reads only a primitive local valid/generation
+state. Full aggregate-to-retired-tombstone replacement remains M5; complete process integration remains M6.
+
+M1 implements the mode-independent virtual-ledger registry and all-writer native-exclusion admission. STRICT/RANGE
+candidate SPI and cut injection are evidence-only. Its receipt is `HARNESS_CONFORMANCE_ONLY`,
+`selectionEligible=false`; M1 runs deterministic/small smoke only and neither persists nor activates a mode. M3 owns
+10k/100k multi-broker capacity evidence and selection.
+
+`docs/v2/source-locks.json` is the sole expected-SHA authority for external Kafka/Pulsar/Oxia sources. Checkout paths
+may be overridden; expected SHAs may not. The manifest cannot self-lock the current Nereus commit; a promotion receipt
+binds it. M1 gates are:
+
+- `v2M1Check`: no Docker/fork/composite; local domain/schema/SPI/codec/harness, active-graph, and V1-absence checks;
+- `v2M1ExactSourceCheck`: clean exact forks before/after, isolated immutable artifacts, real Oxia, and focused fork tests;
+- `v2M1FinalCheck`: aggregate previous outcomes and receipt schema without rerunning their suites.
+
+Zero tests, skipped mandatory tests, failure, dirtied/changed source, or digest mismatch fails. PR CI runs the fast gate;
+trusted promotion runs Exact/Final. Promotion uses N1 foundation, P1/K1 fork commits, N2 source-tuple/final execution,
+then receipt-only N3. The receipt binds N2/P1/K1, source-lock digest, domain JAR/POM SHAs, Oxia identity, scenario IDs,
+test/failure/skip counts, and aggregate result. Cross-M1 scenario rows are split before promotion so future evidence
+cannot be borrowed.
 
 ## Status model
 

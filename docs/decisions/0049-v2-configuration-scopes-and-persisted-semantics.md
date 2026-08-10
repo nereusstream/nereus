@@ -98,5 +98,5 @@ replace the immutable terminal candidate with a role-name owner check.
   non-disableable.
 
 This decision is refined by ADRs 0056 through 0080, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and is tracked
-by `T-POLICY-01`, `V2-POLICY-001`, `V2-BK-012/013`, `V2-OBJ-016..024`, `V2-READ-003..006/014/015`, and
+by `T-POLICY-01`, `V2-POLICY-001..002`, `V2-BK-012/013`, `V2-OBJ-016..024`, `V2-READ-003..006/014/015`, and
 `V2-POSITION-011`.

@@ -50,4 +50,4 @@ This decision is refined by [ADRs 0028](0028-v2-topic-incarnation-keys-and-deter
 [0043](0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md),
 [0050](0050-v2-kafka-aggregate-wire-and-publication-validation.md), and
 [0051](0051-v2-pulsar-selector-state-machine-and-cached-fence.md); it refines ADR 0019 and is tracked by `T-META-01`,
-`V2-PROFILE-001`, `V2-META-002..006`, and `V2-KAF-META-001..003`.
+`V2-PROFILE-001`, `V2-META-002..007`, and `V2-KAF-META-001..005`.

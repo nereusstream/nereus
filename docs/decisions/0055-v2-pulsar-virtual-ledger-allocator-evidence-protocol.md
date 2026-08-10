@@ -24,6 +24,12 @@ that work without reducing correctness risk.
 0.2 selects neither `STRICT_SERIALIZED` nor `RANGE_LEASED` until current-source evidence and the complete candidate
 correctness contract exist. RANGE_LEASED fencing/recovery design proceeds in parallel with STRICT evidence.
 
+M1 implements candidate SPI, deterministic fault cuts, telemetry, and receipt production only in the test/evidence
+layer; none enters the production metadata SPI or persists a mode. Its receipt is explicitly
+`HARNESS_CONFORMANCE_ONLY` with `selectionEligible=false`. M1 runs deterministic and small exact-source smoke workloads
+to prove the harness itself. M3 owns the 10,000/100,000 multi-broker capacity run and the only receipt that may make a
+candidate eligible for selection.
+
 The allocator evidence protocol covers:
 
 - 10,000 and 100,000 active ManagedLedgers per Protocol Cell;
@@ -56,8 +62,8 @@ select a different mode or weaken the persisted recovery protocol.
   clear, and bounded permanent-orphan accounting. Exact wire/range size, allocator reservation concurrency, and mode
   selection remain open.
 - A simple absolute queue threshold or active-ledger-count-only test cannot admit STRICT_SERIALIZED.
-- M1/M3 must execute this protocol against the pinned source and publish a source-qualified receipt before selecting an
-  allocator mode.
+- M1 must publish source-qualified harness-conformance evidence without claiming performance or selection eligibility.
+  M3 must execute the complete scale protocol against its pinned source before selecting an allocator mode.
 
 This decision is refined by ADR 0061, refines ADRs 0022, 0027, 0032, 0041, 0048, 0049, and 0054 and is tracked by
-`T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-010/011`, and `V2-OPEN-PUL-OBJ-09`.
+`T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-010/011/017/018`, and `V2-OPEN-PUL-OBJ-09`.

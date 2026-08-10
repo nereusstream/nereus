@@ -44,4 +44,4 @@ publication to validate only touched topics and reserves full live-topic scans f
   and that no completed image exposes a live Nereus topic without exactly one aggregate.
 
 This decision is refined by ADR 0050, refines ADRs 0023, 0033, and 0034, and is tracked by `T-META-01`,
-`V2-META-002..004`, and `V2-KAF-META-001..003`.
+`V2-META-002..004`, and `V2-KAF-META-001..005`.

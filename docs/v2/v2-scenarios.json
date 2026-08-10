@@ -37,8 +37,16 @@
     },
     {
       "id": "V2-POLICY-001",
-      "milestone": "M1/M2/M3",
-      "contract": "correctness and parser caps are never configurable Product Deployment owns base semantic defaults Cell and host only cap resources and one policy identity never spans epoch run group offload attempt and host lifecycles",
+      "milestone": "M1",
+      "contract": "the typed resolver makes correctness/parser caps non-configurable, Product/Deployment owns base defaults, Namespace/Topic may narrow intent, Cell/host only cap, and one policy type cannot span activation lifecycles",
+      "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POLICY-002",
+      "milestone": "M2/M3",
+      "contract": "resolved policy persists at its exact epoch/run/group/offload-attempt boundary and failover, early seal/backpressure, or batching cannot reinterpret it",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -69,8 +77,16 @@
     },
     {
       "id": "V2-META-005",
-      "milestone": "M1/M5",
-      "contract": "Pulsar keeps a permanent monotonic topic generation selector and replaces a reference free full aggregate only with a same key permanent retired tombstone",
+      "milestone": "M1",
+      "contract": "Pulsar keeps a permanent monotonic topic-generation selector and defines a same-key permanent retired-tombstone wire without executing reference-free replacement",
+      "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-META-007",
+      "milestone": "M5",
+      "contract": "an exact reference-free proof is the only authority for full aggregate to same-key permanent retired-tombstone replacement",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -85,8 +101,8 @@
     },
     {
       "id": "V2-KAF-META-001",
-      "milestone": "M1/M6",
-      "contract": "Kafka V2 activates only at fresh bootstrap nereus storage version 2 and rejects V1 plus every runtime upgrade or downgrade",
+      "milestone": "M1",
+      "contract": "Kafka metadata authority activates only as one complete fresh-bootstrap feature-2/API-32000/CreateTopics/image/publication tuple and rejects every upgrade/downgrade",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -101,8 +117,24 @@
     },
     {
       "id": "V2-KAF-META-003",
-      "milestone": "M1/M6",
-      "contract": "Kafka reserves API key 32000 strict non flexible wire v0 and ordinary publication validates only touched topics while snapshot and bootstrap scan all live topics",
+      "milestone": "M1",
+      "contract": "Kafka reserves API key 32000 strict non-flexible v0; initial mapping validates fully, ordinary publication validates only touched invariants without SHA recomputation, and complete boundaries scan all topics",
+      "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-META-004",
+      "milestone": "M6",
+      "contract": "the complete Kafka broker/controller process formats and restarts only with the exact M1 feature-2 metadata authority",
+      "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-META-005",
+      "milestone": "M6",
+      "contract": "Produce/Fetch/Admin and full snapshot/catch-up remain compatible while using the M1 record/image authority",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -117,16 +149,16 @@
     },
     {
       "id": "V2-POSITION-002",
-      "milestone": "M1/M3",
-      "contract": "Pulsar Object WAL uses explicit virtual Ledger Chain authority while Object identity never becomes a position",
+      "milestone": "M1",
+      "contract": "typed domain and evidence candidate APIs require explicit virtual Ledger Chain authority and never accept Object identity as a Pulsar position",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
     {
       "id": "V2-POSITION-003",
-      "milestone": "M1/M3",
-      "contract": "virtual ledger IDs increase inside non overlapping never reused cell slices excluded from native allocation",
+      "milestone": "M1",
+      "contract": "the registry assigns non-overlapping never-reused Cell slices only after all writers sharing the namespace prove native exclusion",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -149,8 +181,8 @@
     },
     {
       "id": "V2-POSITION-006",
-      "milestone": "M1/M3",
-      "contract": "slice lifecycle is irreversible ACTIVE RETIRING RETIRED and retired assignments remain permanent never reuse tombstones",
+      "milestone": "M1",
+      "contract": "registry wire and validator make ACTIVE→RETIRING→RETIRED irreversible and retain retired assignments permanently",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -165,32 +197,88 @@
     },
     {
       "id": "V2-POSITION-008",
-      "milestone": "M1/M3",
-      "contract": "0.2 never resizes relocates extends or attaches another virtual ledger slice and exhaustion fails before allocation",
+      "milestone": "M1",
+      "contract": "registry admission rejects resize, relocation, extension, second-slice attachment, wrap, borrow, and reuse before allocation",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
     {
       "id": "V2-POSITION-009",
-      "milestone": "M1/M3",
-      "contract": "virtual ledger bootstrap fixes k 40 64 KiB registry bytes 256 lifetime assignments and 192 byte rows and any replacement domain proves a disjoint ledger ID namespace",
+      "milestone": "M1",
+      "contract": "registry bootstrap fixes k=40, 64 KiB, 256 lifetime assignments, and 192-byte rows and rejects a replacement logical domain without disjoint-namespace proof",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
     {
       "id": "V2-POSITION-010",
-      "milestone": "M1/M3",
-      "contract": "allocator selection requires maximum sustainable rollover RPS with all predeclared SLOs actual rollover storm crash mass takeover cuts and native Pulsar comparison while performance budgets remain outside allocator identity",
+      "milestone": "M1",
+      "contract": "the allocator harness deterministically exercises candidate cuts and emits only HARNESS_CONFORMANCE_ONLY with selectionEligible false",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
     {
       "id": "V2-POSITION-011",
-      "milestone": "M1/M3",
-      "contract": "any RANGE candidate keeps grants with ManagedLedger incarnation across owner only takeover can finish the same unchanged RESERVED grant burns at most one stale candidate and leaves allocator clear off installed range use",
+      "milestone": "M1",
+      "contract": "the evidence-only RANGE candidate preserves incarnation-owned grants across owner takeover and deterministically converges response-loss cuts without production activation",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-012",
+      "milestone": "M3",
+      "contract": "production Pulsar Object WAL publishes explicit virtual Ledger Chain authority while Object identity never becomes a position",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-013",
+      "milestone": "M3",
+      "contract": "a production allocator issues increasing IDs only inside the admitted non-overlapping native-excluded Cell slice",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-014",
+      "milestone": "M3",
+      "contract": "slice retirement preserves existing-ledger readability and proves RETIRING→RETIRED without permitting later allocation or reuse",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-015",
+      "milestone": "M3",
+      "contract": "production slice exhaustion fails before allocation and never resizes, borrows, wraps, or migrates a topic automatically",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-016",
+      "milestone": "M3",
+      "contract": "production provisioning accepts additional capacity only from a proven disjoint reservation namespace or independent cluster",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-017",
+      "milestone": "M3",
+      "contract": "allocator selection requires maximum sustainable rollover RPS with every frozen SLO, realistic storm/crash/mass-takeover cut, and native Pulsar comparison",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-POSITION-018",
+      "milestone": "M3",
+      "contract": "any production-admitted RANGE candidate preserves grants across owner takeover, burns at most one stale candidate, and keeps clear off installed-range use",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null

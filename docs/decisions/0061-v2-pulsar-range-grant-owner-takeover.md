@@ -79,4 +79,4 @@ Topic/host configuration cannot enlarge it.
   progress, and mass-takeover behavior.
 
 This decision refines ADRs 0022, 0027, 0032, 0041, 0048, 0049, 0054, and 0055 and is tracked by `T-POSITION-01`,
-`T-POLICY-01`, `V2-POSITION-010/011`, and `V2-OPEN-PUL-OBJ-09`.
+`T-POLICY-01`, `V2-POSITION-010/011/017/018`, and `V2-OPEN-PUL-OBJ-09`.

@@ -22,11 +22,17 @@ Oxia on every append or read would avoid a local cache problem by putting remote
 - Every uncertain response rereads the exact key/value and resumes only the one legal successor step. RESERVED is a
   selector recovery state, not an externally usable aggregate `CREATING` state.
 
-Topic open, ownership acquisition, and any observed selector/aggregate metadata-version change validate ACTIVE plus the
-exact generation, incarnation, aggregate key, and aggregate SHA. The result is cached as a local versioned fence.
-Normal admitted append/read checks that local fence and the current owner/metadata version; it performs no Oxia access
-per operation. A watch change, cache miss, stale version, ownership change, or restart removes admission until the
-control path revalidates exact authority.
+Topic open and ownership acquisition use a backend-native opaque ownership witness containing a non-reusable ownership-
+acquisition identity; a stable broker endpoint or a state counter that may reset after deletion/recreation is not
+sufficient. The control path captures witness A, reads and validates ACTIVE plus the exact generation, incarnation,
+aggregate key/SHA and metadata versions, then captures witness B. Only exact `A == B` while still locally owned installs
+the cache. A backend unable to provide that ABA-safe witness fails V2 admission.
+
+The cached fence stores primitive ownership/cache generation and valid state plus the validated selector/aggregate
+identity. Normal append/read performs only local primitive/volatile checks; it performs no Oxia access, token/SHA string
+parsing, or remote validation. Watch notifications can invalidate but never grant admission. Ownership loss invalidates
+the fence before unload begins. A watch change, cache miss, stale version, ownership change, unknown acquisition, or
+restart removes admission until the control path repeats the witness/read/witness validation.
 
 ADRs 0071/0073/0074 do not treat that cached fence, ownership change, current backend capability, or session-loss
 observation as proof that old read pins have drained. Object-WAL source-protection release requires its separate
@@ -47,8 +53,9 @@ are performance policy at Cell/host scope and cannot manufacture or extend autho
 - Creation/deletion pays several low-frequency single-key operations and recovery states, while normal data access keeps
   zero remote metadata I/O.
 - A watch/cache accelerator never becomes topic-incarnation or ABA authority.
-- M1/M5 must prove every crash cut, lost response, conflicting creator, stale watch/cache, ownership transfer,
-  recreation, overflow, no per-access Oxia calls, and fail-closed invalidation.
+- M1 proves selector creation/deletion, ownership-witness capture, cache install/invalidate, every response-loss cut,
+  conflicting creator, stale watch/cache, ownership transfer, recreation, overflow, local-only per-access checks, and
+  fail-closed invalidation. M5 separately proves exact reference-free full-aggregate-to-tombstone replacement.
 
 This decision is refined by ADRs 0071/0073..0080, refines ADRs 0019, 0028, 0043, and 0049 and is tracked by `T-META-01`,
-`T-POLICY-01`, `V2-META-005/006`.
+`T-POLICY-01`, `V2-META-005..007`.

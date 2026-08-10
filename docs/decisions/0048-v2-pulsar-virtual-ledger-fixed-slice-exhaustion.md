@@ -36,4 +36,4 @@ migration contract and is not implied by creating either one.
   absence of automatic topic/ledger migration.
 
 This decision is refined by ADRs 0054/0055, refines ADRs 0022, 0027, 0032, and 0041, and is tracked by
-`T-POSITION-01`, `V2-POSITION-003..011`.
+`T-POSITION-01`, `V2-POSITION-003..018`.

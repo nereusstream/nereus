@@ -18,6 +18,8 @@ performance-first BookKeeper WAL.
 
 - `main` develops `0.2.0-SNAPSHOT` from source tuple `v2-m0`.
 - M0 freezes the V2 documentation contract only; V2 Java implementation and runtime evidence have not started.
+- M1 implementation-readiness Round 1 freezes the pure-active-graph, module, milestone, source-lock, gate, and
+  cross-repository promotion boundaries in ADR 0081; it does not claim that an M1 module or gate exists yet.
 - Existing Java modules and Phase/Future evidence on `main` are V1 residue until replaced by a V2 milestone.
 - The ordinary CI Pulsar API checkout remains a legacy V1-residue build baseline until the V2 Pulsar slice replaces
   that code; it is recorded separately and is not the V2 fork-development or parity baseline.
@@ -219,6 +221,7 @@ Accepted decisions:
 - [ADR 0078: per-source retirement interval and batch retirement](../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md)
 - [ADR 0079: bounded inline closure anchors and terminal publication](../decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md)
 - [ADR 0080: irreversible Source Retirement Batch tombstone](../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md)
+- [ADR 0081: M1 pure active graph and promotion boundary](../decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md)
 
 ## Open design gates
 
@@ -242,9 +245,11 @@ publication. ADRs 0068 through 0080 resolve compact provider-proof semantics, lo
 generation-tagged hazard capture, minimal slot reuse/terminal drain, source-independent owner-proof coverage,
 historically bound capability evidence, fused selector closure, terminal/on-demand proof behavior, per-source release
 intervals, explicit O(N) work, small bounded inline anchors with emergency STOPPED capacity, closed-verifier terminal
-publication, and permanent same-key compact batch tombstones. The pure-document M0 decision frontier is exhausted.
-Partial recovery omission, numeric caps, physical proof-fold/capability encodings, and any tombstone-deletion authority
-remain evidence gates. The rows below are the remaining active 0.2 evidence gates.
+publication, and permanent same-key compact batch tombstones. The pure-document M0 runtime-design frontier is
+exhausted. ADR 0081 separately freezes the M1 execution and promotion boundary while leaving exact M1 wire, key,
+ownership-witness, registry-codec, and receipt-schema descendants open to implementation-readiness grilling. Partial
+recovery omission, numeric caps, physical proof-fold/capability encodings, and any tombstone-deletion authority remain
+evidence gates. The rows below are the remaining active 0.2 evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |

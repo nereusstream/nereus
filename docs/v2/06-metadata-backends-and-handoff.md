@@ -22,6 +22,12 @@ Shared contracts are separated into:
 - `TypedLogicalTrimStore`;
 - `BackgroundWorkCoordinator`.
 
+The executable dependency boundary is `nereus-domain <- nereus-metadata-spi <- nereus-metadata-oxia`.
+`nereus-domain` is Java-17/JDK-only and owns canonical logical values, deterministic identities, and validators;
+`nereus-metadata-spi` depends only on it and exposes the atomic semantics above. It has no generic key/value operations
+or umbrella store. Kafka `:metadata` consumes only an immutable, source-qualified `nereus-domain` JAR/POM, maps its
+generated physical record to a domain value, and invokes the validator directly without encode/decode round trips.
+
 Conformance suites verify fencing, monotonic roots, idempotency, response-loss recovery, and bounded enumeration. They
 do not require both backends to implement the same ephemeral lease primitive.
 
@@ -62,6 +68,12 @@ touched/created/removed topics in the resulting image; snapshot/bootstrap scans 
 `finishSnapshot`. No raw multi-batch transaction fragment is published or forced through a full scan, and correctness
 validation cannot be disabled.
 
+Initial replay/CreateTopics performs full semantic validation. Ordinary publication validates only touched-topic
+incremental invariants and neither scans all topics nor recomputes canonical aggregate SHA values. Bootstrap, complete
+snapshot, and equivalent full catch-up scan all live topics. CreateTopics pre-admits the complete Topic+Aggregate+
+Partition record count/encoded size before producing its atomic result, and an invalid candidate image is never
+published. These record/image authorities are M1; M6 owns process-level protocol and restart evidence.
+
 High-churn materialization heartbeats, cache state, and per-append data do not belong in the KRaft log. Background work
 uses deterministic assignment from durable roots or a separately bounded coordinator whose loss only delays work.
 When a coordinator or executor serves multiple Protocol Cells, assignment roots, queues, quotas, fencing, and task
@@ -84,6 +96,13 @@ Selector creation/deletion uses exact `RESERVED -> ACTIVE -> DELETING -> DELETED
 immutable aggregate creation/native deletion. Topic open, ownership acquisition, and metadata-version change validate
 ACTIVE plus exact aggregate identity and install a local versioned fence. Watch/cache state may accelerate this control
 path but normal append/read performs no Oxia call; stale state blocks admission until revalidation.
+
+The ownership side of that fence is an opaque backend-native witness with a non-reusable acquisition identity. Install
+captures witness A, reads/validates selector and aggregate, captures witness B, and succeeds only when A equals B and
+the broker still owns the service unit. Resettable state versions and stable broker endpoints are insufficient. Watch
+or ownership-loss events only invalidate, with invalidation preceding unload. Ordinary access reads a primitive local
+generation/valid bit and performs no token/SHA parsing or remote I/O. A backend without a qualifying witness fails
+closed.
 
 A single bounded deployment-level Virtual Ledger Namespace Registry is allocation authority for non-overlapping,
 never-reused cell slices from `[2^62, 2^63 - 2]` and records native-exclusion evidence for the entire interval. Its
@@ -209,5 +228,5 @@ topic-open, rollover publication, trim, and background lifecycle work are separa
 hide in an aggregate append metric.
 
 Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios:
-`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015/020..024`, `V2-READ-003..015`, `V2-HO-001`, `V2-FABRIC-001`,
-`V2-POLICY-001`, and `V2-POSITION-002..011`.
+`V2-META-001..007`, `V2-KAF-META-001..005`, `V2-OBJ-015/020..024`, `V2-READ-003..015`, `V2-HO-001`, `V2-FABRIC-001`,
+`V2-POLICY-001..002`, and `V2-POSITION-002..018`.

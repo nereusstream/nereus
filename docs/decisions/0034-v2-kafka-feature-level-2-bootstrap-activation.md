@@ -29,6 +29,11 @@ At finalized level 2:
 - native errors such as `TOPIC_ALREADY_EXISTS` retain their Kafka meaning and do not publish an aggregate;
 - replay rejects a live Nereus topic with a missing, duplicate, unknown, or invalid aggregate.
 
+Feature 2, API-key-32000 decoding, aggregate-producing CreateTopics, TopicImage/Delta ownership, snapshot/remove, and
+publication validation are one activatable source tuple. The generated record may exist dormant before that tuple, but
+the fork cannot advertise, format, or emit level-2 metadata until the whole tuple is present. M1 owns that metadata
+authority. M6 adds process integration and end-to-end protocol/restart evidence without redefining it.
+
 The feature level proves only that every controller/broker participating in V2 can decode and replay logical schema v1.
 It does not prove provider credentials, profile capacity, or per-topic admission; those remain explicit runtime checks.
 
@@ -41,8 +46,9 @@ It does not prove provider credentials, profile capacity, or per-topic admission
 - Image ownership and snapshot ordering are refined by ADR 0042. The physical controller record band/API/wire and
   publication-boundary validation are refined by ADR 0050; generated-wire vectors and fresh-format executable evidence
   remain downstream gates.
-- M1/M6 must prove bootstrap-only activation, rejection of every runtime transition, level-1 replay refusal, atomic
-  CreateTopics behavior, validate-only zero writes, and native error preservation.
+- M1 must prove the metadata-authority portion of bootstrap-only activation, every runtime-transition rejection,
+  level-1 replay refusal, atomic CreateTopics behavior, validate-only zero writes, and native error preservation. M6
+  separately proves the complete broker/controller process and restart boundary.
 
 This decision is refined by ADRs 0042/0050, refines ADRs 0023/0033, and is tracked by `T-META-01`, `T-COMPAT-01`,
-`V2-META-004`, and `V2-KAF-META-001..003`.
+`V2-META-004`, and `V2-KAF-META-001..005`.

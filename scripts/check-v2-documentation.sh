@@ -133,6 +133,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
     "$repo_root/docs/decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md"
     "$repo_root/docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
+    "$repo_root/docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -244,6 +245,9 @@ require_literal '`FULL_V1`' "docs/decisions/0080-v2-irreversible-source-retireme
 require_literal '`RETIRED_V1`' "docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
 require_literal '0.2 retains every valid compact tombstone' "docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
 require_literal 'does not set a source protection' "docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
+require_literal 'nereus-domain <- nereus-metadata-spi <- nereus-metadata-oxia' "docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
+require_literal '`HARNESS_CONFORMANCE_ONLY` with `selectionEligible=false`' "docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
+require_literal '`v2M1FinalCheck` aggregates those outcomes' "docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -302,6 +306,8 @@ require_literal "Round 18 不按原文全部确认" "docs/v2/grill-notes/20-rest
 require_literal "暂不确认 BatchMetadataRetiredThroughEpoch 及 tombstone 删除" "docs/v2/grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md"
 require_literal "Restarted Grill 2 round 19" "docs/v2/grill-notes/21-restarted-grill-2-round-19-evidence-frontier.md"
 require_literal "There is no user-decision question" "docs/v2/grill-notes/21-restarted-grill-2-round-19-evidence-frontier.md"
+require_literal "M1 Readiness Grill round 1" "docs/v2/grill-notes/22-m1-readiness-round-1-pure-graph-and-promotion.md"
+require_literal "M1 Readiness Round 1：Q1–Q6 调整后确认" "docs/v2/grill-notes/22-m1-readiness-round-1-pure-graph-and-promotion.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -686,12 +692,14 @@ if len(scenario_ids) != len(set(scenario_ids)):
     fail("scenario IDs must be unique")
 
 required_scenarios = {
-    "V2-APP-001", "V2-APP-002", "V2-APP-003", "V2-PROFILE-001", "V2-POLICY-001",
+    "V2-APP-001", "V2-APP-002", "V2-APP-003", "V2-PROFILE-001", "V2-POLICY-001", "V2-POLICY-002",
     "V2-POSITION-001", "V2-MULTIPROTOCOL-001",
     "V2-POSITION-002", "V2-POSITION-003", "V2-POSITION-004", "V2-POSITION-005", "V2-POSITION-006",
     "V2-POSITION-007", "V2-POSITION-008", "V2-POSITION-009", "V2-POSITION-010", "V2-POSITION-011",
-    "V2-META-002", "V2-META-003", "V2-META-004", "V2-META-005", "V2-META-006",
-    "V2-KAF-META-001", "V2-KAF-META-002", "V2-KAF-META-003",
+    "V2-POSITION-012", "V2-POSITION-013", "V2-POSITION-014", "V2-POSITION-015", "V2-POSITION-016",
+    "V2-POSITION-017", "V2-POSITION-018",
+    "V2-META-002", "V2-META-003", "V2-META-004", "V2-META-005", "V2-META-006", "V2-META-007",
+    "V2-KAF-META-001", "V2-KAF-META-002", "V2-KAF-META-003", "V2-KAF-META-004", "V2-KAF-META-005",
     "V2-FABRIC-001", "V2-FABRIC-002", "V2-FABRIC-003", "V2-MIGRATION-001",
     "V2-PROJECTION-001",
     "V2-OBJ-001", "V2-OBJ-002", "V2-OBJ-003", "V2-OBJ-004", "V2-OBJ-005", "V2-OBJ-006",

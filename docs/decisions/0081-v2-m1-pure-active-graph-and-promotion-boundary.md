@@ -1,0 +1,118 @@
+# ADR 0081: V2 M1 pure active graph and promotion boundary
+
+## Status
+
+Accepted for the 0.2 M1 implementation and cross-repository promotion workflow. Implementation and executable evidence
+have not started.
+
+## Context
+
+M0 froze the V2 contracts while `main` still compiled and published a large V1 module graph. The root build also kept
+historical Phase/F9 gates and three different Pulsar source identities across CI, Gradle defaults, and the V2 source
+manifest. Building that graph cannot establish V2 M1 readiness, while deleting the graph in the same change as the new
+metadata architecture would make a roughly thousand-file mechanical removal inseparable from correctness review.
+
+M1 also needs one logical aggregate validator in Nereus, Kafka KRaft, and the Pulsar/Oxia path. Making Kafka metadata
+depend on the current broad `nereus-api` would pull V1 data-path types into KRaft; copying a second validator would make
+semantic drift a correctness risk. Cross-repository evidence has a separate circularity: a receipt cannot be committed
+at the product commit whose previously unknown commit ID it claims to test.
+
+## Decision
+
+### Pure V2 active graph
+
+M1 finishes with a pure V2 Gradle, BOM, publication, CI, and executable graph. No V1 runtime, deprecated compatibility
+shim, Phase/F9 task, or V1-only script remains compilable, publishable, or runnable from `main`. KoP runtime is outside
+the active graph while its design documents remain present. Protected `v0.1` and `v0.1.0` history is the only
+implementation reference for removed V1 code.
+
+The transition is deliberately reviewable:
+
+1. create the V2 domain/SPI foundation and dependency-boundary checks;
+2. cut old modules from settings, BOM, publication, and CI;
+3. remove V1 runtime sources and historical executable tasks/scripts in separate mechanical commits.
+
+Architecture replacement, gate rewiring, and the large mechanical deletion are not one commit. M1 Final nevertheless
+fails if any forbidden V1 graph remains.
+
+### Contract modules
+
+The dependency direction is:
+
+```text
+nereus-domain <- nereus-metadata-spi <- nereus-metadata-oxia
+```
+
+`nereus-domain` targets Java 17 and is JDK-only. It owns the logical canonical forms, deterministic identities, and
+closed validators. It has no Kafka, Pulsar, Oxia, asynchronous-framework, or backend-version dependency.
+
+`nereus-metadata-spi` depends only on `nereus-domain` and exposes capability-specific atomic semantics. It cannot
+expose a generic key/value `get/put/delete` facade or an umbrella `MetadataStore`. Physical Kafka API-key-32000 wire is
+still generated and owned by Kafka. Kafka `:metadata` depends only on the exact `nereus-domain` artifact, maps the
+physical record to a domain value, and invokes the domain validator directly without a canonical encode/decode round
+trip. It never transitively imports the SPI or Oxia.
+
+Every cross-repository domain artifact is immutable and source-qualified. Promotion records its JAR and POM SHA-256;
+Kafka/Pulsar cannot consume an overwriteable SNAPSHOT, a `changing=true` dependency, or an unconstrained whole-product
+composite.
+
+### Milestone boundaries
+
+M1 owns Kafka's complete KRaft metadata authority: feature-2 bootstrap activation, API-32000, atomic CreateTopics
+publication, TopicImage/Delta/replay/snapshot/remove ownership, and publication-boundary validation form one activatable
+source tuple. A generated record may land dormant, but no feature advertisement, format, or record emission may precede
+that complete tuple. M6 owns broker/controller process integration and end-to-end Produce/Fetch/Admin/restart evidence;
+it does not reimplement record/image authority.
+
+M1 owns the Pulsar selector, an ABA-safe backend-native opaque ownership witness, cached ACTIVE-fence installation and
+invalidation, and focused tests. Full aggregate-to-retired-tombstone replacement remains M5, and complete Pulsar process
+integration remains M6. Normal append/read observes only a local primitive generation/valid bit.
+
+M1 owns the mode-independent virtual-ledger registry, real-Oxia conformance, and shared-namespace native-exclusion
+admission. STRICT/RANGE candidate SPI, fault cuts, and receipts are test/evidence-only; production metadata SPI cannot
+expose them. M1 evidence is `HARNESS_CONFORMANCE_ONLY` with `selectionEligible=false`, runs only deterministic and small
+smoke workloads, persists no allocator mode, and activates no production allocator. M3 owns 10k/100k multi-broker
+capacity evidence and any mode selection.
+
+### Gates, source locks, and promotion
+
+`docs/v2/source-locks.json` is the only expected-SHA authority for external Kafka, Pulsar, Oxia, and other admitted
+sources. Checkout paths may be overridden; expected SHAs may not. Gradle, CI, and scripts parse the manifest directly
+and keep no V2-path SHA default. The current Nereus commit is not self-locked by that manifest; the final receipt binds
+the tested product commit.
+
+M1 has three non-duplicating gates:
+
+- `v2M1Check` uses no Docker, fork, or composite build and covers local domain/schema/SPI/codec/harness contracts, the
+  active module graph, and V1 absence;
+- `v2M1ExactSourceCheck` verifies clean exact Kafka/Pulsar checkouts before and after execution, uses an isolated
+  immutable artifact repository, runs real Oxia and focused fork suites, and rejects every source/artifact mismatch;
+- `v2M1FinalCheck` aggregates those outcomes and validates the receipt schema without rerunning their suites.
+
+Zero discovered tests, skipped mandatory tests, failures, dirty/source-changing checkouts, or digest mismatches cannot
+pass. Fast PR CI runs `v2M1Check`; exact/final gates run in a trusted promotion workflow.
+
+Cross-repository promotion uses four stages and at least five commits:
+
+1. N1 publishes the foundation/domain/SPI in `InProgress`;
+2. P1 and K1 consume the exact N1 artifact in Pulsar and Kafka;
+3. N2 locks P1/K1, records candidate gate state, runs Final, and produces a receipt binding N2/P1/K1;
+4. N3 commits only the receipt/evidence and promotes only its exactly covered scenarios.
+
+The receipt records tested product/fork commits, source-lock digest, domain JAR/POM SHAs, Oxia identity, scenario IDs,
+test counts, failure/skip counts, and the aggregate result. A scenario whose M1 portion passes cannot thereby claim an
+M3, M5, or M6 result; cross-M1 scenario rows are split before implementation promotion.
+
+## Consequences
+
+- M1 review separates architecture, build-boundary changes, and mechanical V1 deletion, while still enforcing a pure
+  V2 final graph.
+- Kafka accepts a small immutable domain dependency in exchange for one executable validator and no V1/Oxia leakage.
+- Normal Kafka/Pulsar data paths gain no remote I/O, canonical hashing, or string parsing from M1 metadata validation.
+- The main costs are low-frequency metadata CAS, takeover validation, immutable artifact construction, and trusted
+  cross-repository promotion.
+- M1 can verify registry and harness conformance without making an unevidenced allocator selection or borrowing M3/M5/
+  M6 PASS status.
+
+This decision refines ADRs 0006, 0009, 0032, 0034, 0042, 0043, 0050, 0051, 0054, and 0055 and is tracked by the M1
+implementation plan and its milestone-specific scenario rows.
