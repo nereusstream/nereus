@@ -622,7 +622,7 @@
     {
       "id": "V2-READ-011",
       "milestone": "M4/M5",
-      "contract": "every fallback relevant epoch proof follows one irreversible selector anchor bound terminal cut and uses a fenced closed verified deterministic create only first valid publication while no fallback epochs remain proof free",
+      "contract": "every fallback relevant epoch proof follows one irreversible selector anchor bound terminal cut and uses a closed verified deterministic create only first valid publication whose immutable candidate remains safety authority while no fallback epochs remain proof free",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -630,7 +630,7 @@
     {
       "id": "V2-READ-012",
       "milestone": "M4/M5",
-      "contract": "one fused selector CAS from preferred with fallback E to preferred only E plus one freezes shared last E closes E grants same owner no fallback E plus one and persists a durable closure anchor under closed ADMITTING STOPPED states",
+      "contract": "one fused selector CAS from preferred with fallback E to preferred only E plus one freezes shared last E closes E grants same owner no fallback E plus one and persists a durable closure anchor with complete emergency STOPPED envelope under closed ADMITTING STOPPED states",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -639,6 +639,22 @@
       "id": "V2-READ-013",
       "milestone": "M4/M5",
       "contract": "each retirement member releases against its own first_i sharedLast interval selector only immutable activation exposes inline reference and N O N costs progress remains derived and full batch metadata retires only after all source reference prerequisites",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-014",
+      "milestone": "M4/M5",
+      "contract": "one small selector owned inline canonical unresolved anchor set preserves a dedicated emergency STOPPED envelope while immutable closed verified terminal candidates converge and eligible anchors prune asynchronously in batches",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-015",
+      "milestone": "M4/M5",
+      "contract": "a completed Source Retirement Batch changes only by exact version same key irreversible FULL_V1 to RETIRED_V1 and the compact tombstone remains permanent in zero point two without protection release or source GC authority",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null

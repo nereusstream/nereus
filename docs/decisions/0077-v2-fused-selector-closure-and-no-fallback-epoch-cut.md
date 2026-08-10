@@ -4,8 +4,9 @@
 
 Accepted for the 0.2 `OBJECT_WAL` closed read-admission states, fused no-fallback/epoch transition, durable closure-
 anchor requirement, fallback-introduction epoch cut, STOPPED recovery, response-unknown fence, closure-versus-
-quiescence separation, and configuration boundary. Exact anchor wire/layout, bounded carry-forward representation,
-terminal publisher convergence, and numeric limits remain M4/M5 work; implementation has not started at M0.
+quiescence separation, and configuration boundary. ADR 0079 freezes the bounded inline carry-forward, emergency
+envelope, closed-verifier terminal safety, and asynchronous prune boundaries. Exact binary encoding and evidence-
+selected numeric limits remain M4/M5 work; implementation has not started at M0.
 
 ## Context
 
@@ -83,5 +84,5 @@ the validated cached selector fence and perform no metadata I/O.
   anchor persistence without backend history, response-unknown admission fencing, STOPPED emergency capacity and
   fresh-epoch recovery, terminal non-reopening, hard-cap backpressure, and zero ordinary-read metadata I/O.
 
-This decision refines ADRs 0069, 0071, 0073, 0075, and 0076 and is tracked by `T-MANIFEST-01`, `T-HANDOFF-01`,
-`V2-READ-006/008/010/012`, and `V2-OPEN-READ-14`.
+This decision is refined by ADR 0079, refines ADRs 0069, 0071, 0073, 0075, and 0076 and is tracked by
+`T-MANIFEST-01`, `T-HANDOFF-01`, and `V2-READ-006/008/010/012/014`.

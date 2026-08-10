@@ -15,20 +15,24 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-Round 17 accepted the fused no-fallback/E+1 closure cut in ADR 0077 and per-source retirement intervals/derived batch
-retirement in ADR 0078. It removes the extra same-owner rollover, keeps only `ADMITTING/STOPPED`, requires a durable
-selector closure anchor, assigns each source its own `first_i`, exposes N release CAS/bounded O(N) reconciliation, and
-rejects mutable batch progress or metadata compression as source-GC authority. The next independent frontier is:
+Round 18 accepted the small bounded inline selector-owned anchor set, dedicated emergency STOPPED envelope, immutable-
+candidate closed-verifier terminal safety, and asynchronous batched prune in ADR 0079. It also accepted ADR 0080's
+irreversible same-key `FULL_V1 -> RETIRED_V1` compaction and permanent 0.2 compact tombstone. It explicitly did not
+accept tombstone deletion or a retired-through/frontier authority.
 
-| Gate | Decision needed now | Current recommendation, not a decision |
+The pure-document M0 decision frontier for this branch is exhausted. The remaining descendants require evidence:
+
+| Gate | Evidence required before another design decision |
 | --- | --- | --- |
-| `V2-OPEN-READ-14` | freeze bounded unresolved-anchor carry-forward/pruning and the authorized asynchronous terminal publisher across repeated takeover/STOPPED cuts | use one bounded selector-owned pending-anchor set, create-only first-valid terminal cuts, an emergency STOPPED reserve, and exact prune CAS |
-| `V2-OPEN-READ-15` | freeze full-batch replacement and final compact-tombstone retirement without creating source-GC authority | use a same-key RETIRED tombstone followed by a monotonic metadata-only retired-through frontier on qualified backends |
+| `V2-OPEN-READ-08` | M4 proof-window/head/fold representation, terminal-row retirement, response-loss, capacity, and throughput receipt |
+| `V2-OPEN-READ-09` | M4/M5 capability/receipt encoding, verifier lifetime/revocation, and admitted backend-generation receipt |
+| `V2-OPEN-READ-15` | M4/M5 tombstone lifetime/capacity plus a concrete backend's gap-free activation history, monotonic conditional authority, lineage, stale-create, and recovery receipt before any deletion authority is reconsidered |
 
-The complete questions and recommendations are in
-[round 18](grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md). None of its recommendations is
-accepted yet. `V2-OPEN-READ-08/09`, `V2-OPEN-OBJ-22/24`, `V2-OPEN-BK-11/13`, remaining
-`V2-OPEN-OBJ-17/19`, and `V2-OPEN-PUL-OBJ-09` are evidence-blocked rather than questions in this round.
+The adjusted response is preserved in
+[round 18](grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md); the no-question evidence
+handoff is recorded in [round 19](grill-notes/21-restarted-grill-2-round-19-evidence-frontier.md). The grill must not
+invent another prose-only authority while these facts are absent. `V2-OPEN-OBJ-22/24`, `V2-OPEN-BK-11/13`, remaining
+`V2-OPEN-OBJ-17/19`, and `V2-OPEN-PUL-OBJ-09` are likewise evidence-blocked.
 
 ## Configuration scope
 
@@ -341,9 +345,9 @@ minimum is summary only under ADR 0078, and no-fallback epochs create no proof l
 ### `V2-OPEN-READ-11`: resolved source-independent epoch proof publication
 
 Resolved by [ADR 0076](../decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md). An irreversible
-terminal cut precedes each relevant deterministic create-only proof; only a fenced publisher may create a closed-
-verified canonical candidate, exact reread resolves unknown response, invalid occupants quarantine, and no-fallback
-epochs are not prewritten.
+terminal cut precedes each relevant deterministic create-only proof; publisher fencing governs authorization while the
+closed-verified canonical candidate remains safety authority on a non-transactional backend. Exact reread resolves
+unknown response, invalid occupants quarantine, and no-fallback epochs are not prewritten.
 
 ### `V2-OPEN-READ-12`: selector terminal-state publication
 
@@ -361,15 +365,23 @@ retires without becoming source-GC authority.
 
 ### `V2-OPEN-READ-14`: bounded anchor carry-forward and terminal publisher
 
-This remains open. Round 18 asks how repeated takeovers carry and prune unresolved fallback-relevant anchors under one
-selector hard cap, how emergency STOPPED capacity remains available, and how the currently fenced publisher converges
-planned-drain versus qualified-expiry terminal candidates without admitting stale-owner publication.
+Resolved by [ADR 0079](../decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md). The selector
+logically owns one small bounded inline canonical unresolved-anchor set and preserves a dedicated emergency STOPPED
+envelope. Terminal correctness comes from the exact immutable candidate and one closed verifier rather than a racy
+non-transactional owner check; eligible anchors prune asynchronously in batches. K and bytes remain evidence-selected.
 
 ### `V2-OPEN-READ-15`: compact batch metadata retirement
 
-This remains open. Round 18 asks what exact retired tombstone replaces a fully released batch and whether/how a
-monotonic Binding-incarnation metadata-only retired-through frontier may later delete tombstones without releasing
-source protection or authorizing physical GC.
+Partially resolved by [ADR 0080](../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md). 0.2 permits
+only exact-version same-key `FULL_V1 -> RETIRED_V1`; matching BatchId/fullBatchSha converges delayed create/unknown
+replacement, reverse transition is forbidden, and the tombstone grants no source-protection or physical-GC authority.
+The compact tombstone remains permanent under Binding/Cell lifetime budgets; exhaustion stops new fallback/handoff
+admission and never deletes by age.
+
+Tombstone deletion remains evidence-blocked. Only unacceptable M4/M5 lifetime capacity plus a concrete backend's gap-
+free ordered activation history, monotonic conditional authority, exact incarnation/selector-lineage binding, never-
+reactivation, stale-create, and recovery evidence may reopen a metadata-deletion authority. No retired-through/frontier
+symbol is an accepted 0.2 contract.
 
 ## Storage Epoch transitions
 
@@ -624,6 +636,25 @@ input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
 
+### Restarted Grill 2 round 18 adjusted decisions: resolved/partially resolved by ADRs 0079/0080
+
+Resolved on 2026-08-10 after explicit adjusted confirmation:
+
+- Q1 logical selector-owned bounded anchor set, small inline canonical 0.2 baseline, validated-byte copy, complete
+  emergency STOPPED envelope admission, immutable-candidate closed-verifier safety for non-transactional backends,
+  monotonic reconciler epoch, different-valid terminal convergence, asynchronous batched/piggyback prune, and terminal
+  retirement only through the evidenced proof/fold authority ->
+  [ADR 0079](../decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md);
+- Q2 exact-version same-key irreversible `FULL_V1 -> RETIRED_V1`, delayed-create/unknown-response convergence by
+  matching BatchId/fullBatchSha, strict non-GC meaning, permanent compact tombstone, lifetime budget and no age deletion
+  -> [ADR 0080](../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md).
+
+Tombstone deletion and any retired-through/frontier authority remain `V2-OPEN-READ-15`, evidence-blocked. Proof/fold
+and capability encodings remain `V2-OPEN-READ-08/09`. The complete response is preserved in
+[the round 18 record](grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md), and
+[round 19](grill-notes/21-restarted-grill-2-round-19-evidence-frontier.md) records that no decision-only M0 frontier
+remains.
+
 ### Restarted Grill 2 round 17 adjusted decisions: resolved by ADRs 0077/0078
 
 Resolved on 2026-08-10 after explicit adjusted confirmation:
@@ -638,9 +669,10 @@ Resolved on 2026-08-10 after explicit adjusted confirmation:
   release, quarantine budget impact, no mutable completion state, and mandatory derived full-batch retirement ->
   [ADR 0078](../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md).
 
-Selector/terminal/batch membership and per-source release remain non-disableable correctness contracts. Exact bounded
-anchor/terminal publication and compact batch-retirement representation remain `V2-OPEN-READ-14/15`; proof-window/fold
-and capability encodings remain evidence gates `V2-OPEN-READ-08/09`. The complete response is preserved in
+Selector/terminal/batch membership and per-source release remain non-disableable correctness contracts. Round 18 later
+resolved bounded anchor/terminal publication in ADR 0079 and selected permanent same-key compact tombstones in ADR
+0080; only tombstone deletion remains under `V2-OPEN-READ-15`. Proof-window/fold and capability encodings remain
+evidence gates `V2-OPEN-READ-08/09`. The complete Round 17 response is preserved in
 [the round 17 record](grill-notes/19-restarted-grill-2-selector-terminal-and-retirement-batch.md).
 
 ### Restarted Grill 2 round 16 adjusted decisions: resolved by ADRs 0075/0076
@@ -658,8 +690,8 @@ Resolved on 2026-08-10 after explicit adjusted confirmation:
 
 Selector linearization, terminal closure, and on-demand proof eligibility are non-disableable correctness contracts.
 Round 17 later replaced batch-min release with per-source intervals and resolved `V2-OPEN-READ-12/13` in ADRs 0077/0078;
-the current descendants are `V2-OPEN-READ-14/15`. Proof-window/fold and capability encodings remain evidence gates
-`V2-OPEN-READ-08/09`. The complete Round 16 response is preserved in
+Round 18 then resolved `V2-OPEN-READ-14` and retained only tombstone deletion under `V2-OPEN-READ-15`. Proof-window/fold
+and capability encodings remain evidence gates `V2-OPEN-READ-08/09`. The complete Round 16 response is preserved in
 [the round 16 record](grill-notes/18-restarted-grill-2-read-admission-interval-and-proof-publication.md).
 
 ### Restarted Grill 2 round 15 adjusted decisions: resolved by ADRs 0072/0073/0074

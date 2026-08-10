@@ -5,8 +5,9 @@
 Accepted for the 0.2 `OBJECT_WAL` Binding/incarnation read-selector authority, takeover-versus-no-fallback
 linearization, conservative whole-epoch fallback interval, first-epoch inheritance, conditional proof liability, and
 configuration boundary. Exact backend encoding, numeric limits, and equivalent-transaction conformance receipts remain
-M4 evidence work. ADR 0077 refines the no-fallback transition into one fused E-to-E+1 closure cut, while ADR 0078
-refines mixed-first release to each source's own interval; implementation has not started at M0.
+M4 evidence work. ADR 0077 refines the no-fallback transition into one fused E-to-E+1 closure cut, ADR 0078 refines
+mixed-first release to each source's own interval, and ADR 0079 freezes the bounded inline unresolved-anchor/emergency-
+STOPPED boundary; implementation has not started at M0.
 
 ## Context
 
@@ -53,6 +54,11 @@ the transition introduces fallback. A completely no-fallback epoch neither requi
 takeover merely because an older retirement batch still exists. The selector/epoch cut remains low-frequency Binding
 control metadata; ordinary reads use validated cached authority and perform no metadata I/O.
 
+The selector logically owns one small bounded inline canonical unresolved-anchor set. An `ADMITTING` successor is
+eligible only after checked admission preserves the complete dedicated emergency STOPPED envelope under the backend
+hard value/transaction cap. Membership-neutral transitions copy validated canonical bytes; they do not fetch or
+revalidate a remote anchor page, and 0.2 admits no page/index/chain.
+
 Selector linearization, interval inheritance, and conditional liability are non-disableable correctness contracts.
 Topic policy cannot replace the selector, weaken its comparison tuple, reset first, or make a no-fallback epoch proof-
 liable. Configuration is limited to Cell/Binding admission ceilings, reconciler scheduling, and evidence-derived
@@ -68,5 +74,5 @@ capacity values.
   source identities, per-source mixed-first intervals, fallback-conditional liability, fused no-fallback E+1 grant,
   no-fallback takeover progress, and zero ordinary-read metadata I/O.
 
-This decision is refined by ADRs 0077/0078, refines ADRs 0069, 0071, 0073, and 0074 and is tracked by
-`T-MANIFEST-01`, `T-HANDOFF-01`, and `V2-READ-006/008/010/012/013`.
+This decision is refined by ADRs 0077..0079, refines ADRs 0069, 0071, 0073, and 0074 and is tracked by
+`T-MANIFEST-01`, `T-HANDOFF-01`, and `V2-READ-006/008/010/012..014`.

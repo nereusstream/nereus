@@ -132,7 +132,8 @@ The same snapshot may serve disjoint manifest and active-tail ranges, but one at
 declared whole-range fallback stay source-pure. Locator retirement follows old-view pin drain. One selector CAS
 atomically selects `PREFERRED_ONLY`, closes E, grants same-owner no-fallback E+1, and persists E's closure anchor;
 takeover competes on the same exact predecessor tuple. Only `ADMITTING/STOPPED` exist, STOPPED recovery uses a fresh
-epoch, and response unknown forbids further E admission until exact reread.
+epoch, and response unknown forbids further E admission until exact reread. One small inline canonical unresolved-
+anchor set remains selector-owned, and every `ADMITTING` admission reserves the complete emergency STOPPED envelope.
 
 Source protection remains until current fallback-bearing pins drain and source i's `[first_i,sharedLast]` interval has
 contiguous source-independent proof before its exact release CAS. Batch minimum is summary only; N members retain up to
@@ -140,7 +141,11 @@ N release CAS operations and bounded O(N) reconciliation. One quarantined member
 capacity but not eligible sibling release. Each proof follows an asynchronous irreversible terminal cut binding the
 closure anchor and immutable capability evidence. A hint, ordinary owner fence, cross-key reread, current backend
 configuration, session loss, or host timer is insufficient. Pressure may STOP admission but never authorizes early
-reclaim, frontier advance, metadata compaction as source GC, or physical GC.
+reclaim, frontier advance, metadata compaction as source GC, or physical GC. Terminal correctness comes from one closed
+verifier over the exact immutable candidate; a non-transactional current-owner check is only ACL/rate/audit. Eligible
+anchors prune asynchronously in batches. A completed full batch may only perform the irreversible exact-version same-
+key `FULL_V1 -> RETIRED_V1` compaction; the compact tombstone remains permanent in 0.2 and authorizes no protection
+release or source deletion.
 
 ## Uncertain append
 
@@ -176,4 +181,4 @@ the envelope. This correctness-driven availability cost is explicit and does not
 
 Relevant tradeoffs: `T-APPEND-01` and `T-POSITION-01`. Required scenarios: `V2-APP-001`, `V2-APP-002`,
 `V2-APP-003`, `V2-POSITION-001..007`, `V2-META-002..004`, `V2-KAF-META-001`,
-`V2-OBJ-002/004..012/020..024`, and `V2-READ-003..013`.
+`V2-OBJ-002/004..012/020..024`, and `V2-READ-003..015`.

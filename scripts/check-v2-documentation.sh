@@ -131,6 +131,8 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md"
     "$repo_root/docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
     "$repo_root/docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
+    "$repo_root/docs/decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md"
+    "$repo_root/docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -234,6 +236,14 @@ require_literal '`[first_i, sharedLast]`' "docs/decisions/0078-v2-per-source-ret
 require_literal 'bounded O(N) authoritative protection-state scan' "docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
 require_literal 'pre-read followed by an independent CAS is not equivalent' "docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
 require_literal 'never gains a mutable released bitmap' "docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
+require_literal 'small inline canonical set' "docs/decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md"
+require_literal 'completeEmergencyStoppedEnvelopeBytes' "docs/decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md"
+require_literal 'is not the correctness proof' "docs/decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md"
+require_literal 'eligible anchors in one selector CAS' "docs/decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md"
+require_literal '`FULL_V1`' "docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
+require_literal '`RETIRED_V1`' "docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
+require_literal '0.2 retains every valid compact tombstone' "docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
+require_literal 'does not set a source protection' "docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -288,7 +298,10 @@ require_literal "Restarted Grill 2 round 17" "docs/v2/grill-notes/19-restarted-g
 require_literal "Round 17：Q1、Q2 均调整后确认" "docs/v2/grill-notes/19-restarted-grill-2-selector-terminal-and-retirement-batch.md"
 require_literal "不能让所有 source 共用 batch 最早 first" "docs/v2/grill-notes/19-restarted-grill-2-selector-terminal-and-retirement-batch.md"
 require_literal "Restarted Grill 2 round 18" "docs/v2/grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md"
-require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md"
+require_literal "Round 18 不按原文全部确认" "docs/v2/grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md"
+require_literal "暂不确认 BatchMetadataRetiredThroughEpoch 及 tombstone 删除" "docs/v2/grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md"
+require_literal "Restarted Grill 2 round 19" "docs/v2/grill-notes/21-restarted-grill-2-round-19-evidence-frontier.md"
+require_literal "There is no user-decision question" "docs/v2/grill-notes/21-restarted-grill-2-round-19-evidence-frontier.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -390,6 +403,7 @@ for resolved_gate in \
     V2-OPEN-READ-11 \
     V2-OPEN-READ-12 \
     V2-OPEN-READ-13 \
+    V2-OPEN-READ-14 \
     V2-OPEN-PUL-OBJ-10; do
     if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$resolved_gate remains in the active gate table"
@@ -406,7 +420,6 @@ for active_gate in \
     V2-OPEN-OBJ-24 \
     V2-OPEN-READ-08 \
     V2-OPEN-READ-09 \
-    V2-OPEN-READ-14 \
     V2-OPEN-READ-15; do
     require_literal "\`$active_gate\`" "docs/v2/open-questions.md"
     if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
@@ -414,8 +427,8 @@ for active_gate in \
     fi
 done
 
-for frontier_gate in V2-OPEN-READ-14 V2-OPEN-READ-15; do
-    require_literal "\`$frontier_gate\`" "docs/v2/grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md"
+for evidence_frontier_gate in V2-OPEN-READ-08 V2-OPEN-READ-09 V2-OPEN-READ-15; do
+    require_literal "\`$evidence_frontier_gate\`" "docs/v2/grill-notes/21-restarted-grill-2-round-19-evidence-frontier.md"
 done
 
 active_contracts=(
@@ -518,7 +531,7 @@ for unconfirmed_design_symbol in \
     ReadBatchSlotTicket \
     BatchMetadataRetiredThroughEpoch \
     pendingClosureAnchors \
-    RETIRED_V1; do
+    BatchMetadataRetirementAuthority; do
     if rg -Fn \
         --glob '!**/open-questions.md' \
         --glob '!**/grill-notes/**' \
@@ -689,7 +702,7 @@ required_scenarios = {
     "V2-BK-007", "V2-BK-008", "V2-BK-009", "V2-BK-010", "V2-BK-011", "V2-BK-012", "V2-BK-013",
     "V2-READ-001", "V2-READ-002", "V2-READ-003", "V2-READ-004", "V2-READ-005", "V2-READ-006",
     "V2-READ-007", "V2-READ-008", "V2-READ-009", "V2-READ-010", "V2-READ-011",
-    "V2-READ-012", "V2-READ-013",
+    "V2-READ-012", "V2-READ-013", "V2-READ-014", "V2-READ-015",
     "V2-META-001", "V2-HO-001",
     "V2-KAF-001", "V2-PUL-001", "V2-KOP-001",
 }
@@ -828,6 +841,8 @@ link_docs=(
     "$repo_root/docs/decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md"
     "$repo_root/docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
     "$repo_root/docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
+    "$repo_root/docs/decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md"
+    "$repo_root/docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
 )
 
 while IFS=: read -r source match; do

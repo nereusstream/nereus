@@ -81,6 +81,12 @@ retirement prerequisites are fixed correctness. Inline/reference backend mode is
 policy. Cell/Binding policy may bound anchor/batch/source rows and reconciliation work; it cannot substitute the batch
 minimum for `first_i`, skip a release CAS, reopen STOPPED E, or use metadata compression as source-GC authority.
 
+The small inline unresolved-anchor set, dedicated emergency STOPPED envelope, closed-verifier terminal safety,
+asynchronous batched prune, and irreversible same-key `FULL_V1 -> RETIRED_V1` batch compaction are also fixed
+correctness. Selector K and permanent compact-tombstone count/bytes are Cell/Binding hard caps derived from evidence;
+Topic policy cannot enlarge them, borrow the emergency reserve, choose an anchor layout, enable tombstone deletion, or
+replace the immutable terminal candidate with a role-name owner check.
+
 ## Consequences
 
 - Performance tuning remains possible without making correctness or durable compatibility host-dependent.
@@ -91,6 +97,6 @@ minimum for `first_i`, skip a release CAS, reopen STOPPED E, or use metadata com
   seal/backpressure under resource pressure, incompatible batching rejection, and that every correctness gate remains
   non-disableable.
 
-This decision is refined by ADRs 0056 through 0071, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and is tracked
-by `T-POLICY-01`, `V2-POLICY-001`, `V2-BK-012/013`, `V2-OBJ-016..024`, `V2-READ-003..006`, and
+This decision is refined by ADRs 0056 through 0080, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and is tracked
+by `T-POLICY-01`, `V2-POLICY-001`, `V2-BK-012/013`, `V2-OBJ-016..024`, `V2-READ-003..006/014/015`, and
 `V2-POSITION-011`.

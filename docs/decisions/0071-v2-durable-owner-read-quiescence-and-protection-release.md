@@ -6,7 +6,8 @@ Accepted for the 0.2 `OBJECT_WAL` two-generation durable source-handoff cut, cap
 protection-release prerequisites, retained-source safety, and configuration scope. Read-admission ordering and the
 source-independent proof window are refined by ADR 0073; immutable capability evidence is refined by ADR 0074. Exact
 selector/terminal-proof cuts are refined by ADRs 0075..0077, while per-source release and batch retirement are refined
-by ADR 0078. Exact physical encodings, batch-size limits, and numeric time/capacity bounds remain M4/M5 work;
+by ADR 0078. ADRs 0079/0080 freeze bounded inline anchor/terminal publication and permanent same-key compact batch
+tombstones. Exact physical encodings, batch-size limits, and numeric time/capacity bounds remain M4/M5 work;
 implementation has not started at M0.
 
 ## Context
@@ -72,6 +73,11 @@ reconciliation. A quarantined source does not block eligible sibling release but
 Retained protection/batch count, bytes, age, and oldest deadline consume Cell admission and alerting budgets. Pressure
 may block handoff, retirement, or new admission; it never manufactures quiescence or releases protection.
 
+ADR 0079 keeps unresolved anchors in one small selector-owned inline canonical set, preserves a dedicated emergency
+STOPPED envelope, and makes the immutable terminal candidate plus closed verifier—not a racy non-transactional owner
+check—the safety proof. ADR 0080 permits only exact-version same-key `FULL_V1 -> RETIRED_V1` metadata compaction after
+every member/reference retires. The permanent 0.2 tombstone grants no protection release or physical GC authority.
+
 This ADR applies to Object-WAL manifest/source handoff. Pulsar sealed-ledger BookKeeper eligibility/deletion remains
 owned by ADRs 0036, 0045, and 0052 and its native metadata state machine.
 
@@ -88,6 +94,6 @@ owned by ADRs 0036, 0045, and 0052 and its native metadata state machine.
 - Exact selector/terminal physical encoding, proof-window/fold encoding, and evidence-derived capability token/receipt
   limits remain downstream gates.
 
-This decision is refined by ADRs 0073..0078, refines ADRs 0049, 0051, 0067, and 0069, and is tracked by
-`T-MANIFEST-01`, `T-HANDOFF-01`, `T-POLICY-01`, `V2-READ-001/003/004/006/008..013`, and
-`V2-OPEN-READ-08/09/14/15`.
+This decision is refined by ADRs 0073..0080, refines ADRs 0049, 0051, 0067, and 0069, and is tracked by
+`T-MANIFEST-01`, `T-HANDOFF-01`, `T-POLICY-01`, `V2-READ-001/003/004/006/008..015`, and
+`V2-OPEN-READ-08/09/15`.

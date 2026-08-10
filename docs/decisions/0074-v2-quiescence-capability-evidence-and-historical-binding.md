@@ -36,6 +36,12 @@ the exact capability admission generation and evidence digest. Historical facts 
 “current capability”. A later adapter/config/verifier/receipt change creates a new admission generation and cannot
 retroactively qualify older reads.
 
+Planned-drain and qualified-expiry terminal candidates use the same closed verifier. On a non-transactional backend,
+current owner/reconciler fencing remains ACL/rate/audit rather than terminal truth; the exact anchor, closed epoch,
+Owner Epoch, drained/last-admitted view cut, capability evidence, and receipt/expiry variant provide safety. A Cell
+reconciler carries a monotonic reconciler epoch. A different existing terminal variant is usable only after the same
+verifier accepts it for the exact anchor.
+
 `DURABLE_DRAIN_ONLY_V1` proves only that the verifier may validate a planned drain; each Owner Epoch still needs exact
 drain evidence. `AUTHORITY_EXPIRY_V1` proves only that the verifier may validate qualified expiry; each Owner Epoch
 still needs exact authority-time evidence. Missing verifier, failed validation, evidence mismatch, or safety revocation
@@ -55,5 +61,5 @@ historical evidence.
   revocation/missing-verifier retention, planned versus expiry evidence, pause/recovery rechecks, zero normal-read
   metadata I/O, proofs/owner, retained bytes/age, and takeover-to-release p99.
 
-This decision is refined by ADRs 0075..0078, refines ADRs 0049, 0069, 0071, and 0073 and is tracked by `T-POLICY-01`,
-`T-MANIFEST-01`, `T-HANDOFF-01`, `V2-READ-006/009..013`, and `V2-OPEN-READ-09/14/15`.
+This decision is refined by ADRs 0075..0080, refines ADRs 0049, 0069, 0071, and 0073 and is tracked by `T-POLICY-01`,
+`T-MANIFEST-01`, `T-HANDOFF-01`, `V2-READ-006/009..015`, and `V2-OPEN-READ-09/15`.

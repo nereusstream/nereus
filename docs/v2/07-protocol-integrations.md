@@ -123,7 +123,10 @@ keeps its separate whole-range source-pure fallback. Object-WAL locator/protecti
 fallback E+1 granted by the same Binding selector CAS that closes E and carries its anchor. Each source releases against
 its own `[first_i,sharedLast]` proof interval through an exact CAS; N members retain bounded O(N) recovery work. Proofs
 bind irreversible terminal cuts and immutable capability evidence. Quarantine blocks batch retirement/capacity but not
-eligible siblings; batch compaction never authorizes source GC. Ordinary reads perform zero remote metadata I/O.
+eligible siblings. One small selector-owned inline anchor set preserves an emergency STOPPED envelope; terminal safety
+uses the immutable candidate/closed verifier and pruning remains asynchronous. Completed batch metadata only moves by
+irreversible same-key `FULL_V1 -> RETIRED_V1`; compact tombstones remain permanent in 0.2 and never authorize source
+GC. Ordinary reads perform zero remote metadata I/O.
 
 The parity matrix covers at least:
 
@@ -158,5 +161,5 @@ against V2 bindings, protocol-native Kafka work, and the then-current KoP source
 
 Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `T-POLICY-01`, `T-PROJECTION-01`,
 `T-BENCH-01`, and `T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`,
-`V2-PROJECTION-001`, `V2-POSITION-002..011`, `V2-OBJ-002/004..024`, `V2-READ-003..013`, `V2-BK-005..013`,
+`V2-PROJECTION-001`, `V2-POSITION-002..011`, `V2-OBJ-002/004..024`, `V2-READ-003..015`, `V2-BK-005..013`,
 `V2-KAF-META-001..003`, `V2-POLICY-001`, `V2-KAF-001`, `V2-PUL-001`, and `V2-KOP-001`.

@@ -213,21 +213,24 @@ _Avoid_: CLOSING/DRAINING reader state, manifest-only pointer, topic-generation 
 
 **Read Admission Closure Anchor**:
 The immutable predecessor/successor selector and transition digest that proves one Read Admission Epoch lost admission
-authority. It is carried by the successor selector value or persisted in the same selector transaction until the
-fallback-relevant epoch gains a terminal cut.
-_Avoid_: Backend history assumption, watch event, host-local CAS receipt, quiescence proof
+authority. The selector logically owns a small bounded inline canonical unresolved set and preserves a dedicated
+emergency STOPPED envelope until each fallback-relevant epoch gains a terminal cut. Membership-neutral transitions
+copy validated canonical bytes; 0.2 has no anchor page/index/chain.
+_Avoid_: Backend history assumption, remote anchor lookup, borrowed STOPPED reserve, watch event, host-local CAS receipt
 
 **Read Admission Epoch Terminal Cut**:
 The immutable asynchronous proof identity that one exact Read Admission Epoch can never admit another read and binds
 its selector-carried closure anchor plus last admitted/drained read-view cut to planned closure or qualified authority
-expiry.
-_Avoid_: Proof key existence, mutable closed flag, local timeout, reopenable owner state
+expiry. Planned and expiry variants use one closed verifier; immutable candidate facts remain the safety proof when a
+backend cannot atomically check current owner authority. Eligible anchors prune asynchronously in batches.
+_Avoid_: Role-name authority, proof key existence, mutable closed flag, per-terminal prune CAS, local timeout
 
 **Source Retirement Batch**:
 One transition-exact immutable bounded fallback set with a shared last epoch. Every source/protection row retains its
-own inherited first epoch and releases against `[first_i, sharedLast]`; the batch minimum is summary only. Full batch
-metadata becomes compactable only after every exact protection is released/retired and all references disappear.
-_Avoid_: Mutable per-owner accumulator, per-extent delete flag, latest-owner watermark
+own inherited first epoch and releases against `[first_i, sharedLast]`; the batch minimum is summary only. After every
+exact protection and reference retires, the same key may move irreversibly from `FULL_V1` to compact `RETIRED_V1`.
+The permanent 0.2 tombstone proves metadata compaction only.
+_Avoid_: Mutable per-owner accumulator, `RETIRED_V1 -> FULL_V1`, tombstone deletion, source-GC inference
 
 **Quiescence Proof Window**:
 The bounded Binding authority that proves contiguous Owner Read Quiescence Proof coverage for reusable epoch intervals;

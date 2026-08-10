@@ -47,7 +47,10 @@ KoP is outside the current V2 Kafka/Pulsar design session. Its existing design r
   from low-frequency source-selection generations and bounded read pins. Generation-tagged hazard publication prevents
   pin-after-retire/torn-frontier reads; one atomic slot lease remains pinned until complete source drain. Durable
   no-fallback selection and takeover compete on one Binding read selector; the winning fused cut closes E, grants E+1,
-  and carries a durable closure anchor. Every source row retains its own fallback-first epoch and releases against its
-  own interval using on-demand terminal-bound proof. Batch progress remains derived, with explicit N release CAS and
-  bounded O(N) reconciliation; no-fallback epochs carry no proof liability. None becomes a per-batch owner accumulator,
-  Topic switch, or remote per-read refcount.
+  and carries a durable closure anchor in one small bounded inline canonical set with a dedicated emergency STOPPED
+  envelope. Terminal safety comes from the closed-verifiable immutable candidate, not a racy non-transactional owner
+  check; pruning is asynchronous and batched. Every source row retains its own fallback-first epoch and releases against
+  its own interval using on-demand terminal-bound proof. Batch progress remains derived, with explicit N release CAS and
+  bounded O(N) reconciliation. The exact-version same-key `FULL_V1 -> RETIRED_V1` compaction is irreversible and its
+  compact tombstone remains permanent in 0.2; no-fallback epochs carry no proof liability. None becomes a per-batch owner
+  accumulator, Topic switch, remote per-read refcount, or metadata-absence deletion authority.

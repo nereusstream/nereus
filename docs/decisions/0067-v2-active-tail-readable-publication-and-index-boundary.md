@@ -57,9 +57,9 @@ protection/read pins make removal safe. ADR 0069 separates high-frequency fronti
 source-selection generations and requires two-stage locator/protection retirement. The replacement view must be
 installed before locator retirement; cache or local materialization intent is never sufficient. ADR 0070 fixes the
 bounded generation-tagged hazard acquisition order, while ADR 0071 requires durable no-fallback publication plus
-current/old-owner quiescence before exact protection release. ADRs 0072..0078 refine slot terminal drain,
-source-independent epoch coverage, immutable capability-evidence binding, fused selector/closure publication, per-
-source release intervals, and batch retirement.
+current/old-owner quiescence before exact protection release. ADRs 0072..0080 refine slot terminal drain,
+source-independent epoch coverage, immutable capability-evidence binding, fused selector/closure publication, bounded
+inline anchors/terminal verification, per-source release intervals, and permanent compact batch tombstones.
 
 Correctness/publication order and hard caps cannot be configured off. Configuration is limited to:
 
@@ -79,10 +79,10 @@ No Topic may disable active-tail readability or enlarge a hard cap.
 - M3/M4 must quantify ACK p99 increment, allocation bytes per commit unit, active-tail bytes per unit/range, GC/allocation
   pressure, materialization-trigger behavior, and takeover GET/bytes/time, and must prove gap invisibility, A/B recovery
   independence, exact publication order, and pin-safe retirement.
-- ADRs 0069..0078 resolve logical snapshot scope, pin granularity, generation-tagged capture, source mixing, minimal
+- ADRs 0069..0080 resolve logical snapshot scope, pin granularity, generation-tagged capture, source mixing, minimal
   slot reuse, source-independent owner coverage, and capability-tiered protection release without requiring a per-ACK
   snapshot, per-read allocation, per-batch owner accumulator, or remote per-read refcount.
 
-This decision is refined by ADRs 0069..0078, refines ADRs 0007, 0008, 0031, 0040, 0049, 0053, 0064, and 0066 and is
+This decision is refined by ADRs 0069..0080, refines ADRs 0007, 0008, 0031, 0040, 0049, 0053, 0064, and 0066 and is
 tracked by `T-APPEND-01`, `T-MANIFEST-01`, `T-OBJECT-01`, `V2-APP-001..003`,
-`V2-OBJ-002/006/021/023`, and `V2-READ-001/003..013`.
+`V2-OBJ-002/006/021/023`, and `V2-READ-001/003..015`.

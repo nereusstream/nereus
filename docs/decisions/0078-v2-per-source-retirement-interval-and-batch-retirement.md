@@ -5,8 +5,9 @@
 Accepted for the 0.2 `OBJECT_WAL` transition-exact immutable batch, per-source first epoch and release interval,
 deterministic batch identity, selector-only activation, backend inline/reference boundary, explicit O(N) control cost,
 independent protection release, rejection of mutable batch completion state, and mandatory derived batch retirement.
-Exact source-protection state wire, compact tombstone versus proved lineage-retirement representation, and numeric caps
-remain M4/M5 work; implementation has not started at M0.
+ADR 0080 selects the irreversible same-key `FULL_V1 -> RETIRED_V1` compact transition and permanent 0.2 tombstone;
+exact source-protection/tombstone wire and numeric caps remain M4/M5 work. Tombstone deletion remains evidence-blocked;
+implementation has not started at M0.
 
 ## Context
 
@@ -65,9 +66,10 @@ real batch-level capacity impact, not source-level correctness coupling.
 The batch never gains a mutable released bitmap, remaining count, progress row, or completion CAS. Completion is
 derived from authoritative source-protection states. Once every member is `RELEASED` or otherwise proven retired and
 no selector, lineage, recovery, or response-loss path references the full batch, the full record must become
-retirable: either it is replaced by a compact retired tombstone or it is reclaimed under a proved monotonic lineage-
-retirement protocol. That operation compresses metadata only. It cannot release source protection, authorize physical
-GC, repair a missing member release, or reinterpret a quarantined source.
+retirable through ADR 0080's exact-version same-key `FULL_V1 -> RETIRED_V1` CAS. 0.2 retains the compact tombstone and
+does not admit direct reclaim, a retired-through frontier, or age-based deletion. That operation compresses metadata
+only. It cannot release source protection, authorize physical GC, repair a missing member release, or reinterpret a
+quarantined source.
 
 Selected/unselected batch count, full bytes, compact-retired bytes, age, source rows, quarantine, and bounded O(N)
 scan work have Cell/Binding hard caps. Pressure may backpressure handoff/read admission and retain bytes; it cannot
@@ -88,5 +90,5 @@ evidence-derived capacity parameters.
   create/select/release outcomes, N-member partial progress, sibling independence, quarantine budget impact, exact
   derived-completion scan, every full-batch retirement prerequisite, and that batch compaction never grants source GC.
 
-This decision refines ADRs 0069, 0071, 0073, 0074, 0075, and 0077 and is tracked by `T-MANIFEST-01`, `T-HANDOFF-01`,
-`V2-READ-006/008/010/013`, and `V2-OPEN-READ-15`.
+This decision is refined by ADR 0080, refines ADRs 0069, 0071, 0073, 0074, 0075, and 0077 and is tracked by
+`T-MANIFEST-01`, `T-HANDOFF-01`, `V2-READ-006/008/010/013/015`, and `V2-OPEN-READ-15`.

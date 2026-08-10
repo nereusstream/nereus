@@ -123,6 +123,8 @@ Current accepted decisions:
 - [ADR 0076: Read Admission Epoch terminal cut and on-demand proof](../decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md)
 - [ADR 0077: fused selector closure and no-fallback epoch cut](../decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md)
 - [ADR 0078: per-source retirement interval and batch retirement](../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md)
+- [ADR 0079: bounded inline closure anchors and terminal publication](../decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md)
+- [ADR 0080: irreversible Source Retirement Batch tombstone](../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md)
 
 ## V2 document map
 

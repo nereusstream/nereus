@@ -209,7 +209,9 @@ Locator and source-protection retirement are two stages: publish preferred+prote
 then use one Binding selector CAS to atomically select `PREFERRED_ONLY`, close E, grant same-owner no-fallback E+1, and
 persist E's closure anchor. Takeover competes on the same exact predecessor. The selector exposes only
 `ADMITTING/STOPPED`; a response-unknown cut admits no further E read until exact reread, and STOPPED can recover only to
-a fresh epoch. Cross-key reread or backend history cannot supply the anchor.
+a fresh epoch. Cross-key reread or backend history cannot supply the anchor. The selector logically owns one small
+bounded inline canonical unresolved-anchor set and preserves a dedicated emergency STOPPED envelope. A membership-
+neutral transition copies validated canonical bytes; 0.2 adds no anchor page/index/chain.
 
 Every source/protection row inherits its own `first_i`; the selector transition shares `last=E`, and source i releases
 only after `[first_i,E]` has continuous source-independent planned-drain/qualified-expiry proof. Batch minimum is
@@ -218,10 +220,14 @@ plus the CAS; N sources still require up to N exact release CAS operations and b
 quarantined source does not block sibling release but blocks full-batch retirement and consumes capacity.
 
 Each needed proof is deterministic create-only after an asynchronous irreversible terminal cut binding the selector-
-carried closure anchor and immutable historical capability evidence. Full batch metadata becomes compactable only
-after every source is released/retired and selector/lineage/recovery/response-loss references disappear; compaction is
-never source-GC authority. Retired-view/pin, anchor/proof/batch/source count/bytes/age/deadline are hard-bounded;
-pressure may STOP admission but never delete early. Normal reads still perform no metadata I/O.
+carried closure anchor and immutable historical capability evidence. One closed verifier accepts planned-drain or
+qualified-expiry variants; on non-transactional backends the immutable candidate supplies safety while owner/reconciler
+fences supply ACL/rate/audit. Eligible anchors prune asynchronously in batches or piggyback a selector transition.
+Full batch metadata compacts only after every source is released/retired and selector/lineage/recovery/response-loss
+references disappear, using the irreversible same-key `FULL_V1 -> RETIRED_V1` exact-version CAS. The compact tombstone
+remains permanent in 0.2 and is never source-GC authority. Retired-view/pin, anchor/proof/batch/source/tombstone
+count/bytes/age/deadline are hard-bounded; pressure may STOP admission but never delete early. Normal reads still
+perform no metadata I/O.
 
 Routine random reads authenticate the Root-bound in-body header/directory and selected frame without first requiring a
 new full-Object provider proof. The leaf's exclusive bounded prefix end normally gives prefix plus frame GET; without

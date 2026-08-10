@@ -3,10 +3,11 @@
 ## Status
 
 Accepted for the 0.2 `OBJECT_WAL` irreversible epoch-terminal prerequisite, deterministic create-only epoch proof,
-fenced publisher/verifier contract, first-valid-wins convergence, invalid-occupant quarantine, on-demand generation,
+publisher ACL/fencing plus closed-verifier safety, first-valid-wins convergence, invalid-occupant quarantine, on-demand generation,
 and configuration boundary. ADR 0077 refines terminal closure to a fused selector-carried anchor followed by
 asynchronous terminal publication. Exact anchor/terminal publication representation, proof/window wire encoding, and
-numeric limits remain M4/M5 work; implementation has not started at M0.
+numeric limits remain M4/M5 work; ADR 0079 additionally freezes closed-verifier safety, different-valid convergence,
+bounded inline anchor carry-forward, and terminal-retirement delegation; implementation has not started at M0.
 
 ## Context
 
@@ -35,8 +36,10 @@ expiry proof candidates for E must bind and validate the same exact terminal-cut
 terminal evidence determine whether the closed verifier may accept that cut; a key name alone never proves closure.
 
 Each proof uses one deterministic Binding/incarnation/Read Admission Epoch key and an immutable canonical value.
-Creation is create-only and allowed only to a currently fenced publisher authorized for that terminal cut. Before
-creation, the closed verifier validates the candidate's exact Binding/incarnation, Read Admission Epoch, Owner Epoch,
+Creation is create-only. A transactional backend may additionally fence the current publisher in the create
+transaction; on a non-transactional backend publisher/reconciler fencing governs ACL, rate limiting, and audit while
+the immutable candidate plus closed verifier supplies safety. Before creation, the closed verifier validates the
+candidate's exact Binding/incarnation, Read Admission Epoch, Owner Epoch,
 drained read-view cut, applicable admission-closed or authority-time cut, terminal-cut SHA, capability
 generation/digest, and proof identity.
 
@@ -49,7 +52,9 @@ overwritten, normalized, or ignored.
 Proofs are generated on demand only for Read Admission Epochs intersecting at least one fallback-capable retirement
 interval. No-fallback epochs are not prewritten merely to make the global epoch sequence dense. One valid proof is
 source-independent and reusable by every intersecting batch. Exact proof-window/head/fold representation remains M4
-evidence work under `V2-OPEN-READ-08`.
+evidence work under `V2-OPEN-READ-08`. Terminal rows may retire only through that evidenced durable proof/fold
+authority after every active interval, recovery, and response-loss reference disappears; 0.2 adds no separate terminal
+progress state machine.
 
 Terminal closure, fenced publication, closed verification, and on-demand eligibility are non-disableable correctness
 contracts. Topic policy cannot create/skip a proof, reopen an epoch, or promote a publisher/verifier. Configuration is
@@ -65,5 +70,5 @@ limited to Cell/Binding admission ceilings, reconciler cadence, and evidence-der
   rejection, deterministic bytes, both conditional-put response outcomes, invalid occupant quarantine, on-demand/no-
   fallback omission, proof reuse, and no normal-read I/O.
 
-This decision is refined by ADR 0077, refines ADRs 0071, 0073, 0074, and 0075 and is tracked by `T-MANIFEST-01`,
-`T-HANDOFF-01`, and `V2-READ-006/008/009/011/012`.
+This decision is refined by ADRs 0077/0079, refines ADRs 0071, 0073, 0074, and 0075 and is tracked by
+`T-MANIFEST-01`, `T-HANDOFF-01`, and `V2-READ-006/008/009/011/012/014`.

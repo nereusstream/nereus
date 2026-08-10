@@ -120,15 +120,20 @@ Reclamation durably publishes `PREFERRED_WITH_FALLBACK` first and drains older p
 state. One later Binding/incarnation selector CAS competes atomically with takeover/read grant and performs the complete
 `PWF(O,E,ADMITTING) -> PO(O,E+1,ADMITTING,batch[last=E],anchor[E])` cut. It closes E, grants no-fallback E+1, and
 persists the closure anchor. Cross-key reread/backend history cannot substitute. `STOPPED` recovery uses only a fresh
-epoch; an unknown response forbids further E admission until exact reread.
+epoch; an unknown response forbids further E admission until exact reread. One small bounded inline canonical set owns
+unresolved anchors. Every `ADMITTING` cut reserves a complete emergency STOPPED envelope under the backend hard cap;
+normal work cannot borrow it.
 
 Each source/protection row inherits its own `first_i`; source i remains protected until current pins drain and every
 epoch in `[first_i,sharedLast]` has contiguous planned-drain/qualified-expiry proof. Batch minimum is summary only.
 Each proof is on demand after an asynchronous irreversible terminal cut, fenced, closed-verifier-checked, deterministic
-and create-only. N source rows retain up to N exact release CAS operations plus bounded O(N) recovery scan. One
-quarantined member blocks full-batch retirement/capacity but not sibling release. Full batch metadata compacts only
-after every member and reference retires; that compression cannot release source protection or authorize GC. Missing/
-revoked evidence retains protection and consumes Cell count/bytes/age admission.
+and create-only. Planned-drain and qualified-expiry variants use the same verifier; for a non-transactional backend the
+immutable candidate is the safety proof, while owner/reconciler fencing is ACL/rate/audit. Valid anchors prune
+asynchronously in batches. N source rows retain up to N exact release CAS operations plus bounded O(N) recovery scan.
+One quarantined member blocks full-batch retirement/capacity but not sibling release. After every member/reference
+retires, full metadata changes only by exact-version same-key `FULL_V1 -> RETIRED_V1`; the permanent 0.2 tombstone
+cannot release protection or authorize GC. Missing/revoked evidence retains protection and consumes Cell
+count/bytes/age admission.
 
 ## Timestamp and protocol-position indexes
 
@@ -186,5 +191,5 @@ the source was safely retired and the preferred generation is corrupt, the resul
 system does not synthesize records or silently skip the requested Protocol Coverage.
 
 Relevant tradeoffs: `T-MANIFEST-01`, `T-POSITION-01`, `T-PROJECTION-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required
-scenarios: `V2-READ-001..013`, `V2-OBJ-002/020..024`, `V2-BK-007..008`, `V2-BK-011`,
+scenarios: `V2-READ-001..015`, `V2-OBJ-002/020..024`, `V2-BK-007..008`, `V2-BK-011`,
 `V2-PROJECTION-001`, `V2-POLICY-001`, and `V2-FABRIC-003`.

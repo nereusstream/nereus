@@ -6,7 +6,8 @@ Accepted for the 0.2 `OBJECT_WAL` Binding-scoped read-admission order, immutable
 at most one source-independent durable proof per fallback-relevant read-admitting epoch, contiguous release test, proof
 reuse, and fail-closed bounds. Selector/interval linearization and terminal/on-demand proof publication are refined by
 ADRs 0075..0077, while per-source interval release and batch retirement are refined by ADR 0078. The exact proof-
-window/head/fold physical encoding, compaction representation, and numeric limits remain M4 evidence work;
+window/head/fold physical encoding, terminal-row retirement, and numeric limits remain M4 evidence work; ADR 0079
+forbids a separate terminal progress state machine and ADR 0080 makes batch tombstones permanent in 0.2;
 implementation has not started at M0.
 
 ## Context
@@ -42,8 +43,9 @@ Each `ReadAdmissionEpoch` produces at most one source-independent durable quiesc
 incarnation, exact `ReadAdmissionEpoch` and Owner Epoch identity, `drainedThroughReadViewGeneration`,
 `safeAfterAuthorityTime`, exact proof/capability digest, and the authoritative planned-drain or qualified-expiry proof
 identity. ADR 0076 additionally requires an irreversible terminal-cut SHA before proof creation, deterministic create-
-only bytes, a fenced authorized publisher, closed pre-create verification, and on-demand creation only for an
-intersecting fallback interval. One proof may satisfy every source interval whose required epoch and read-view cut it
+only bytes, operational publisher fencing, closed pre-create verification as the non-transactional safety authority,
+and on-demand creation only for an intersecting fallback interval. One proof may satisfy every source interval whose
+required epoch and read-view cut it
 covers, including intervals from different batches and with different `first_i` values.
 
 The Binding maintains a bounded quiescence proof window/head. Protection release for source i requires continuous
@@ -63,12 +65,13 @@ turns an interval into a latest-owner check, or releases storage to recover capa
 
 - `V2-OPEN-READ-06` is resolved at the logical proof-authority level without O(owner x batch) proof writes. ADR 0078
   makes the remaining N per-source release CAS operations and bounded O(N) recovery scan explicit.
-- ADRs 0075..0078 resolve interval derivation, logical proof publication, fused closure, and per-source release.
-  Physical folding/wire IDs, terminal/retirement compaction, backend encoding, and evidence-selected numeric caps
-  remain downstream gates; no per-batch accumulator is implied by the word “window”.
+- ADRs 0075..0080 resolve interval derivation, logical proof publication, fused closure, per-source release, bounded
+  inline anchors, and permanent compact batch tombstones. Physical folding/wire IDs, terminal-row retirement, optional
+  tombstone deletion, backend encoding, and evidence-selected numeric caps remain downstream evidence gates; no per-
+  batch accumulator is implied by the word “window”.
 - M4/M5 must measure proof records/owner, metadata writes/takeover, proof-window bytes/age, fold cost, active batches,
   retained protection bytes/age, and protection-release p99, while testing response loss, repeated takeover gaps,
   proof reuse, mixed per-source intervals, and hard-cap backpressure.
 
-This decision is refined by ADRs 0075..0078, refines ADRs 0069 and 0071, and is tracked by `T-MANIFEST-01`,
-`T-HANDOFF-01`, `V2-READ-006/008/010..013`, and `V2-OPEN-READ-08/14/15`.
+This decision is refined by ADRs 0075..0080, refines ADRs 0069 and 0071, and is tracked by `T-MANIFEST-01`,
+`T-HANDOFF-01`, `V2-READ-006/008/010..015`, and `V2-OPEN-READ-08/15`.

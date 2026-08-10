@@ -109,14 +109,18 @@ one ABA-safe `SlotLeaseWord`; cancellation stops new source use and only complet
 
 Object-WAL protection retirement uses one Binding selector CAS to atomically select `PREFERRED_ONLY`, close E, grant
 same-owner no-fallback E+1, and carry E's closure anchor; takeover competes on the same predecessor. Only
-`ADMITTING/STOPPED` are durable read-admission states, and an unresolved response forbids further E admission. Each
-source row inherits its own `first_i` and releases against `[first_i,sharedLast]`; batch minimum is summary only.
+`ADMITTING/STOPPED` are durable read-admission states, and an unresolved response forbids further E admission. One
+small inline canonical unresolved-anchor set preserves a dedicated emergency STOPPED envelope. Each source row
+inherits its own `first_i` and releases against `[first_i,sharedLast]`; batch minimum is summary only.
 
 Each fallback-relevant proof is deterministic create-only, source-independent, reusable, and follows one asynchronous
 irreversible terminal cut plus immutable historical capability evidence. Inline batch activation costs one selector
 CAS; reference mode requires an atomically validated immutable create plus that CAS; N sources retain up to N release
 CAS operations and bounded O(N) reconciliation. Quarantine blocks batch retirement/capacity but not eligible sibling
-release. No-fallback epochs create no proof liability. Normal reads still perform zero remote metadata I/O.
+release. Terminal safety uses the immutable candidate plus one closed verifier; valid anchors prune asynchronously in
+batches. Completed batch metadata moves only through irreversible same-key `FULL_V1 -> RETIRED_V1`, whose compact
+tombstone remains permanent in 0.2 and authorizes no source GC. No-fallback epochs create no proof liability. Normal
+reads still perform zero remote metadata I/O.
 
 Provider sharing is physical, not authoritative. Multiple cells may use the same external Object Storage or BookKeeper
 infrastructure, while each cell owns its Cell Provider Scope/session, namespace, credential/KMS and operator scope,
@@ -213,6 +217,8 @@ Accepted decisions:
 - [ADR 0076: Read Admission Epoch terminal cut and on-demand proof](../decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md)
 - [ADR 0077: fused selector closure and no-fallback epoch cut](../decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md)
 - [ADR 0078: per-source retirement interval and batch retirement](../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md)
+- [ADR 0079: bounded inline closure anchors and terminal publication](../decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md)
+- [ADR 0080: irreversible Source Retirement Batch tombstone](../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md)
 
 ## Open design gates
 
@@ -232,13 +238,13 @@ lazy-lane/vector-checkpoint structure, and RANGE takeover constraints. ADRs 0062
 class/lane grammar, provider-resolved checkpoint publisher, and physical-versus-binding frontier split without
 selecting remaining numeric values, final RANGE wire/size, or an allocator mode. ADRs 0065 through 0067 resolve
 physical-only checkpoint/Seal rows, pre-position reservation/local ticket semantics, and non-disableable active-tail
-publication. ADRs 0068 through 0078 resolve compact provider-proof semantics, logical read-view scope,
+publication. ADRs 0068 through 0080 resolve compact provider-proof semantics, logical read-view scope,
 generation-tagged hazard capture, minimal slot reuse/terminal drain, source-independent owner-proof coverage,
 historically bound capability evidence, fused selector closure, terminal/on-demand proof behavior, per-source release
-intervals, explicit O(N) work, and mandatory derived batch retirement. Partial recovery omission remains evidence-
-blocked; exact closure-anchor/terminal publication and compact batch-retirement representation are the next design
-frontier, while physical proof-fold and capability encodings remain evidence gates. The rows below are the remaining
-active 0.2 decisions or evidence gates.
+intervals, explicit O(N) work, small bounded inline anchors with emergency STOPPED capacity, closed-verifier terminal
+publication, and permanent same-key compact batch tombstones. The pure-document M0 decision frontier is exhausted.
+Partial recovery omission, numeric caps, physical proof-fold/capability encodings, and any tombstone-deletion authority
+remain evidence gates. The rows below are the remaining active 0.2 evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
@@ -251,8 +257,7 @@ active 0.2 decisions or evidence gates.
 | `V2-OPEN-OBJ-24` | admit a Provider version token only after canonical-binary cap, immutable-version, FULL_OBJECT SHA-256, rows/page, and range-benefit evidence; otherwise retain Root mode NONE | M3 checkpoint provider-proof admission |
 | `V2-OPEN-READ-08` | execute M4 evidence and freeze the bounded proof-window/head/fold physical representation and numeric caps without a per-batch accumulator | M4 durable proof wire freeze |
 | `V2-OPEN-READ-09` | execute M4/M5 evidence and freeze canonical capability/receipt encodings, verifier availability/revocation behavior, and admitted backend generations | M4/M5 takeover and GC capability freeze |
-| `V2-OPEN-READ-14` | freeze bounded closure-anchor carry-forward, asynchronous terminal-cut publisher/convergence, and STOPPED recovery under repeated takeover | M4 closure/terminal wire freeze |
-| `V2-OPEN-READ-15` | freeze compact retired-batch tombstone versus proved lineage-retirement representation without promoting metadata compaction to source-GC authority | M4/M5 batch-retirement freeze |
+| `V2-OPEN-READ-15` | execute M4/M5 tombstone lifetime/capacity and concrete-backend ordered-history/lineage/stale-create evidence before reconsidering a metadata-only tombstone-deletion authority; 0.2 otherwise retains `RETIRED_V1` permanently | M4/M5 optional metadata-retirement authority |
 | `V2-OPEN-BK-02` | validate one-active-ledger-per-Kafka-partition at 10k and 100k partitions | M2 Kafka BK layout freeze |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |
 

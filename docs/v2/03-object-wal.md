@@ -256,6 +256,11 @@ obsolete index structures. Then one Binding/incarnation selector CAS atomically 
 freezes `last=E`, closes E, grants same-owner no-fallback E+1, and persists E's closure anchor. Takeover competes on the
 same exact predecessor. An application-side cross-key reread or assumed backend history is forbidden.
 
+The selector logically owns one small bounded inline canonical unresolved-anchor set. Membership-neutral transitions
+copy already validated canonical bytes, and no 0.2 page/index/chain is admitted. Before a successor stays `ADMITTING`,
+checked admission includes the new anchor plus a dedicated complete emergency STOPPED envelope under the backend hard
+value/transaction cap. Normal capacity exhaustion closes E into STOPPED rather than borrowing that reserve.
+
 Protection release requires current fallback-bearing slots drained plus contiguous source-independent proof for source
 i's own `[first_i,sharedLast]` interval. Each source row inherits `first_i`; batch minimum is not release authority.
 Each needed proof is deterministic create-only and follows an asynchronous irreversible terminal cut binding the
@@ -263,12 +268,15 @@ closure anchor and exact historical capability evidence. A valid proof is reusab
 costs one selector CAS; atomically validated reference mode costs one immutable create plus the CAS; N members still
 require up to N idempotent release CAS operations and bounded O(N) scan. No mutable batch progress exists. One
 quarantined source blocks full-batch retirement/capacity but not eligible sibling release. Batch compaction after all
-release/reference prerequisites never admits source GC by itself.
+release/reference prerequisites is only the irreversible exact-version same-key `FULL_V1 -> RETIRED_V1` transition.
+The compact tombstone remains permanent in 0.2 and never admits protection release or source GC by itself. Terminal
+candidates use one closed verifier for planned-drain and qualified-expiry variants; eligible anchors prune
+asynchronously in batches and never enter read/append ACK cuts.
 
-Retired-view/pin, proof-window, active-retirement-batch, unquiesced-epoch, and retained-protection count, bytes, age,
-and deadline are hard-bounded; leaks may block handoff, retirement, or new admission, never delete early. Exact anchor/
-terminal publication, retired-batch compaction, physical proof-window/fold layout, receipt/token encoding, and numeric
-limits remain open/evidence work.
+Retired-view/pin, proof-window, active-retirement-batch, permanent compact-tombstone, unquiesced-epoch, and retained-
+protection count, bytes, age, and deadline are hard-bounded; leaks may block handoff, retirement, or new admission,
+never delete early. Exact proof-window/fold layout, terminal-row retirement, receipt/token encoding, selector K, and
+numeric limits remain evidence work. Tombstone deletion remains evidence-blocked and is not an accepted 0.2 authority.
 
 ## Backpressure
 
@@ -291,7 +299,7 @@ and close lifecycle. A compatible lower-level transport may be pooled, but a cel
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
 Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..024`,
-`V2-READ-003..013`, `V2-POLICY-001`, and `V2-FABRIC-002`. See
+`V2-READ-003..015`, `V2-POLICY-001`, and `V2-FABRIC-002`. See
 [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md),
 [ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md),
 [ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md),
@@ -325,4 +333,6 @@ Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required sc
 [ADR 0075](../decisions/0075-v2-binding-read-selector-and-fallback-interval-linearization.md) and
 [ADR 0076](../decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md), plus
 [ADR 0077](../decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md) and
-[ADR 0078](../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md).
+[ADR 0078](../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md),
+[ADR 0079](../decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md), and
+[ADR 0080](../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md).

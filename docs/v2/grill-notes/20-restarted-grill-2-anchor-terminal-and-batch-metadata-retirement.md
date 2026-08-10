@@ -114,7 +114,101 @@ completion record or changing source-GC correctness.
   `V2-OPEN-PUL-OBJ-09` remain evidence-blocked.
 - KoP remains documented and deferred outside the 0.2 runtime.
 
-## Awaiting explicit confirmation
+## Explicit adjusted confirmation
 
-No Round 18 recommendation above is normative. Confirmed conclusions must move to ADRs/contracts; adjustments and all
-evidence-selected values/representations remain in the open log.
+The following response is preserved verbatim. It confirms only the adjusted boundaries stated here; the original
+recommendations above remain a non-normative record where they differ.
+
+````text
+Round 18 不按原文全部确认：
+
+- Q1：调整后确认。
+- Q2：部分确认；确认 same-key compact tombstone，暂不确认 tombstone 删除和 retired-through frontier。
+
+Q1：确认 selector authority 拥有有界 unresolved closure-anchor 集合、保留 emergency STOPPED 容量、terminal deterministic create-only/first-valid-wins，以及异步批量 prune。
+
+但补充以下限制：
+
+1. “selector-owned”只冻结逻辑权威，不冻结为每次 CAS 都反序列化、逐项校验或远端读取全部 anchor。
+
+0.2 优先使用很小的 bounded inline canonical set；membership-neutral transition 只复制已经验证的 canonical bytes。暂不引入 anchor page/index/多级 chain。只有 benchmark 证明 inline cap 无法满足 takeover SLO 时再重开物理布局。
+
+2. Admission 必须预先证明：
+
+current pending bytes
++ 本次新 closure anchor
++ 完整 emergency STOPPED envelope
+<= backend hard value/transaction cap
+
+Emergency reserve 禁止被普通 ADMITTING transition、prune residue 或动态配置占用。正常容量耗尽时只能关闭 E 并进入 STOPPED，不能丢 anchor，也不能继续让 E 接纳读取。
+
+3. terminal publisher 的“当前 owner 身份”不能成为非事务 backend 的正确性前提。
+
+在 selector 检查与 terminal create 之间，publisher 可能已经失去 owner fence。正确性必须来自 terminal candidate 自身绑定的：
+
+{closureAnchorSha, closedEpoch, OwnerEpoch,
+ exact drained/last-admitted view cut,
+ capability evidence,
+ planned-drain receipt 或 qualified-expiry evidence}
+
+事务 backend 可以原子校验 selector fence；非事务 backend 中，owner/reconciler fence 只负责 ACL、限流和审计，closed verifier 才是安全依据。Cell reconciler 也必须拥有明确的单调 reconciler epoch，不能只依赖角色名称。
+
+4. planned-drain 和 qualified-expiry candidate 使用同一个 closed verifier。Unknown response reread到不同 bytes 时，只要该 existing terminal 对同一 anchor 是完整合法 variant，就作为共同 terminal SHA；不能只接受字节相等。
+
+5. prune 必须异步、可批量、可与其他 selector transition piggyback。CAS 冲突只能重新排队，不能进入 read/append ACK cut，也不要求每个 terminal 单独执行一次 prune CAS。
+
+6. terminal rows 不能永久无限增长。它们后续只能在已经进入 durable proof/fold、且没有 active interval/recovery 引用后按 V2-OPEN-READ-08 的证据协议退休；本轮不再新增一套 terminal progress 状态机。
+
+性能结论：普通读取仍然零 metadata I/O。成本集中在 takeover selector CAS 的 O(K) payload/copy、每个相关 epoch 一次 terminal create，以及低频 prune CAS。K 必须很小并由 takeover p99、selector bytes、STOPPED duration 和 prune-conflict benchmark 反推，不能由 Topic 放大。
+
+Q2：确认以下部分：
+
+FULL_V1
+  -- exact-version CAS -->
+RETIRED_V1
+
+full batch 在所有 member protection 均已 RELEASED/retired，且 selector、lineage、recovery、response-loss 引用全部消失后，可以替换为同 key compact tombstone。
+
+需要明确它是“immutable logical BatchId + irreversible storage lifecycle”，而不是宣称同一 key 的物理 bytes 永远不变。状态只允许 FULL_V1 → RETIRED_V1，禁止恢复为 FULL。
+
+响应丢失必须这样收敛：
+
+- delayed create/reread 看到 BatchId/fullBatchSha 匹配的 RETIRED_V1，解释为“该 full batch 曾成功提交且已经退休”；
+- 不得重建 full batch，也不得当成普通冲突；
+- BatchId 或 fullBatchSha 不匹配时 fail closed；
+- tombstone 只证明 batch metadata 已退休，绝不证明 source protection 已释放或物理对象可以删除。
+
+但 0.2 暂不确认 BatchMetadataRetiredThroughEpoch 及 tombstone 删除。
+
+原因是 tombstone 一旦允许被删除，retired-through frontier 就不再是普通 accelerator，而会成为 metadata absence、late recreate 和恢复解释的持久化权威。所有 batch create、selector replay、恢复和 residue cleanup 都必须查询或绑定它，还必须证明：
+
+- 每个 epoch 最多一次 batch activation；
+- ordered activation scan 无 gap、phantom 或被压缩掉的历史；
+- frontier 与 Binding incarnation/selector lineage 精确绑定；
+- 一个已关闭 epoch 永远不能重新激活 batch；
+- stale create 在 tombstone 缺失后仍只能成为 inert residue。
+
+这会引入新的 scan/index、frontier CAS、恢复分支和 prefix HOL；一个早期 quarantined batch 还可能阻止全部后续 tombstone 回收。当前没有 tombstone 容量证据证明值得在 0.2 支付这些复杂度。
+
+因此 0.2 先保留 compact tombstone，并以 Binding/Cell lifetime count/bytes budget 准入；达到上限时停止新的 fallback/handoff admission，不能按年龄删除。
+
+只有 M4/M5 证明 tombstone 生成率和长期容量确实无法接受，并且具体 backend 提供可信 ordered activation scan、monotonic CAS 与恢复证据后，才重新讨论 frontier。届时应明确命名为 BatchMetadataRetirementAuthority，并严格限制为 metadata 删除权限，永远不能参与 protection release 或 source GC。
+
+最终结论：
+
+- Q1：按上述约束调整后确认。
+- Q2：确认 FULL_V1 → RETIRED_V1；tombstone 删除和 retired-through frontier 保持 OPEN、等待容量及 backend capability 证据。
+````
+
+## Authoritative synchronization
+
+- Q1 resolves `V2-OPEN-READ-14` in
+  [ADR 0079](../../decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md): the selector owns one
+  small bounded inline canonical set, admission preserves a dedicated emergency STOPPED envelope, terminal correctness
+  comes from the immutable candidate plus one closed verifier, and prune remains asynchronous and batched.
+- Q2's accepted 0.2 cut is frozen by
+  [ADR 0080](../../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md): an exact-version same-key
+  `FULL_V1 -> RETIRED_V1` replacement is irreversible and lost-response recoverable, grants no source-GC authority,
+  and remains permanently retained under lifetime budgets.
+- `V2-OPEN-READ-15` remains evidence-blocked only for tombstone deletion. No retired-through/frontier authority is an
+  accepted 0.2 contract. Exact proof/fold and capability encodings remain evidence gates `V2-OPEN-READ-08/09`.

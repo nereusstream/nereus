@@ -165,6 +165,11 @@ E+1, selects the exact immutable batch, and carries E's predecessor/transition c
 `ADMITTING/STOPPED`; response unknown blocks E admission, and STOPPED can grant only a fresh epoch. A cross-key reread,
 watch/cache, or assumed backend version history is not authority.
 
+The selector logically owns one small bounded inline canonical unresolved-anchor set and admission reserves a complete
+emergency STOPPED envelope. Membership-neutral transitions copy validated canonical bytes; no anchor page/index/chain
+or remote anchor lookup is admitted for 0.2. Normal capacity exhaustion closes E into STOPPED and cannot borrow the
+reserve.
+
 Every source/protection row carries its own inherited `first_i`; the batch freezes shared last E and may summarize the
 minimum only. Inline activation is one CAS. Reference activation is one immutable create plus one CAS only when that
 selector transaction atomically proves exact key/SHA existence; otherwise the backend must inline. Release remains up
@@ -174,9 +179,12 @@ The optional planned-handoff hint below is never `OwnerReadQuiescenceProof`. Pro
 contiguous source-independent proof across each source's exact `[first_i,sharedLast]` interval. Planned drain or
 qualified authority expiry must bind the selector-carried closure anchor, exact immutable Protocol Cell/backend
 capability evidence, and the same irreversible epoch terminal-cut SHA. Proof creation is deterministic, create-only,
-fenced, closed-verifier-checked, and on demand. A current capability cannot reinterpret it. One quarantined source
-blocks full-batch retirement and budget but not sibling release. Batch compaction is derived metadata cleanup, never
-source-GC authority.
+fenced, closed-verifier-checked, and on demand. Planned-drain and qualified-expiry variants share that verifier. On a
+non-transactional backend the candidate's immutable facts provide safety; owner/reconciler fences provide ACL/rate/
+audit, and the reconciler carries a monotonic epoch. Eligible anchors prune asynchronously and in batches. A current
+capability cannot reinterpret a proof. One quarantined source blocks full-batch retirement and budget but not sibling
+release. Full batch compaction is only the irreversible same-key `FULL_V1 -> RETIRED_V1` exact-version CAS. Its compact
+tombstone remains permanent in 0.2; metadata compaction never becomes source-GC authority.
 
 ## Planned fast handoff
 
@@ -201,5 +209,5 @@ topic-open, rollover publication, trim, and background lifecycle work are separa
 hide in an aggregate append metric.
 
 Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios:
-`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015/020..024`, `V2-READ-003..013`, `V2-HO-001`, `V2-FABRIC-001`,
+`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015/020..024`, `V2-READ-003..015`, `V2-HO-001`, `V2-FABRIC-001`,
 `V2-POLICY-001`, and `V2-POSITION-002..011`.
