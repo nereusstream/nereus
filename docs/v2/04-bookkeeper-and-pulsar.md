@@ -49,10 +49,12 @@ For Pulsar `OBJECT_WAL`, the same Pulsar Position Domain and ledger-chain rules 
 durable bytes use `ObjectExtent`. A Pulsar-cell `PulsarVirtualLedgerStore` in MetadataStore/Oxia allocates reserved-domain
 virtual ledger IDs and publishes explicit append-only Ledger Chain order. Entry IDs are allocated serially in the active
 virtual ledger. The deployment excludes `[2^62, 2^63 - 2]` from native allocation and assigns each cell one
-non-overlapping, never-reused slice. One bounded deployment registry is allocation authority: its canonical complete
-assignment table advances through single-key CAS, while per-cell lookups/watches are derived only. The cell allocator
-issues increasing IDs with permitted gaps. Numeric monotonicity keeps stock MessageId comparison compatible, but
-explicit predecessor/head metadata remains chain authority. Object identity, bytes, and group/run sequence never become
+non-overlapping, never-reused slice. The immutable `ledgerIdCompatibilityNamespaceId` names the actual shared numeric
+space. Before admission it may have no Registry; while V2 allocation is admitted exactly one bounded Registry is
+selected. Its canonical complete assignment table advances through single-key CAS, while allocators consume a
+versioned derived slice view and never reread/copy the 64-KiB Registry per rollover. The cell allocator issues
+increasing IDs with permitted gaps. Numeric monotonicity keeps stock MessageId comparison compatible, but explicit
+predecessor/head metadata remains chain authority. Object identity, bytes, and group/run sequence never become
 MessageId truth.
 
 Each slice owner is the durable deployment/reservation-domain/Pulsar Protocol Cell tuple, independent of broker,
@@ -63,8 +65,9 @@ lifecycle state. Each Cell has one immutable equal-size aligned `2^k` slice. Num
 include retired Cells. Bootstrap fixes `k=40`, 65,536 canonical registry bytes, 256 lifetime assignments, and a
 192-byte maximum assignment row. 0.2 forbids resize, relocation, in-place extension, and a second slice. Exhaustion
 fails closed before another ID is allocated; more capacity requires a new Protocol Cell and does not migrate existing
-topics or ledgers. After 256 lifetime Cells, only a bootstrap-proven disjoint reservation-domain namespace or
-independent deployment/cluster may allocate again; a new logical label cannot reuse the interval. Allocator mode,
+topics or ledgers. After 256 lifetime Cells, only a new `ledgerIdCompatibilityNamespaceId` backed by a bootstrap-proven
+disjoint numeric namespace, or an independent deployment/cluster, may allocate again; a second logical reservation
+domain in the same namespace cannot reuse the interval. Allocator mode,
 exact RANGE wire/size, rollover, and later Ledger Chain mechanics remain open.
 
 ADR 0055 freezes the evidence protocol but selects neither allocator mode. It measures maximum sustainable rollover
@@ -79,12 +82,14 @@ head install; allocator clear is a high-priority background reconciliation that 
 Unknown responses reread exact equality, while only definitive conflicts fence. Permanent orphan candidates are
 bounded metadata evidence rather than a new 0.2 GC protocol.
 
-M1 implements the complete mode-independent registry and real-Oxia conformance. Native-range exclusion is admitted only
-with evidence covering every writer sharing the ledger-ID namespace; patching one Pulsar generator alone is not a
-complete exclusion proof. The former V1 global allocator is removed or isolated rather than renamed into the registry.
-STRICT/RANGE candidate SPI, cut injection, and receipt schema exist only in test/evidence code. M1 runs deterministic
-and small smoke evidence and emits `HARNESS_CONFORMANCE_ONLY` with `selectionEligible=false`; it persists no mode and
-installs no production allocator. M3 owns 10k/100k multi-broker capacity evidence and any eventual selection.
+M1 implements the complete mode-independent Registry and real-Oxia conformance. Registry authority contains either a
+bounded canonical writer set or a typed exact key/version/length/SHA reference to an immutable content-addressed
+snapshot. ACL/credential/deployment interlock excludes every omitted native/BookKeeper/custom writer. A new writer is
+committed before start; removal follows fence and drain; rolling upgrade may commit old and new identities together.
+Patching one Pulsar generator alone is not a completeness proof. The Registry emits `REGISTRY_CONFORMANCE`; the former
+V1 allocator is removed or isolated rather than renamed. STRICT/RANGE candidate SPI and cut injection exist only in
+test/evidence code and emit `HARNESS_CONFORMANCE_ONLY` with `selectionEligible=false`; they persist no mode and install
+no production allocator. M3 owns 10k/100k multi-broker capacity evidence and any eventual selection.
 
 Online Pulsar BookKeeper/Object evolution is not implied by this model. New-incarnation migration versus a future hybrid
 ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.

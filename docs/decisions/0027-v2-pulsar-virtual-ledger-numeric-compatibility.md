@@ -15,12 +15,14 @@ permit native/cross-cell collisions even when explicit chain metadata is correct
 
 The Pulsar deployment reserves the positive signed-long interval `[2^62, 2^63 - 2]` exclusively for virtual ledgers:
 
-- One deployment-level reservation registry assigns each Pulsar Protocol Cell a non-overlapping slice. A slice is never
-  reused, including after a cell is retired.
+- One Registry selected for the immutable `ledgerIdCompatibilityNamespaceId` assigns each Pulsar Protocol Cell a
+  non-overlapping slice. Before V2 admission it may be absent; while V2 allocation is admitted exactly one Registry
+  owns that namespace. A slice is never reused, including after a cell is retired.
 - The native ledger-ID generator is modified and conformance-tested never to allocate anywhere in the entire reserved
   interval. `2^63 - 1` remains outside the allocatable interval.
-- A cell admits Pulsar `OBJECT_WAL` only while its deployment and cell-slice reservations are present, non-overlapping,
-  and current. Missing, overlapping, drifted, or revoked reservation authority fences allocation and fails closed.
+- A cell admits Pulsar `OBJECT_WAL` only while its compatibility namespace, selected Registry, and cell-slice
+  reservations are present, non-overlapping, and current. Missing, overlapping, drifted, or revoked reservation
+  authority fences allocation and fails closed.
 - Inside its slice, the cell's single-key CAS allocator issues strictly increasing ledger IDs, permits gaps after
   races/response loss, and never reuses an ID.
 - Explicit predecessor/head metadata remains the Ledger Chain authority. Numeric monotonicity is a compatibility
@@ -33,16 +35,17 @@ This decision does not activate online BookKeeper/Object migration or a hybrid l
 
 - `V2-OPEN-PUL-OBJ-02` is resolved.
 - V2 gains stock numeric MessageId compatibility without granting numeric order authoritative recovery semantics.
-- The design adds a Pulsar-fork obligation, deployment-level registry, never-reused cell slices, and fail-closed
+- The design adds a Pulsar-fork obligation, compatibility-namespace Registry, never-reused cell slices, and fail-closed
   reservation admission.
-- M1 proves registry geometry, all-writer native-range exclusion evidence, cross-cell non-overlap, and evidence-candidate
-  response-loss cuts without production activation. M3 proves production monotonic allocation with gaps, no reuse,
-  reservation drift/revoke fencing, stock comparison compatibility, and explicit-chain-only recovery.
+- M1 proves Registry geometry, complete writer-set exclusion/interlock, cross-cell non-overlap, exact CAS response-loss,
+  and the separate allocator-harness cuts without activating a production allocator. M3 proves production monotonic
+  allocation with gaps, no reuse, reservation drift/revoke fencing, stock comparison compatibility, and explicit-chain-
+  only recovery.
 
-The deployment registry's physical authority is refined by
+The compatibility-namespace Registry's physical authority is refined by
 [ADR 0032](0032-v2-pulsar-virtual-ledger-reservation-registry.md), and the slice contract by
 [ADR 0041](0041-v2-pulsar-virtual-ledger-slice-contract.md) plus
-[ADR 0048](0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md). Exact 0.2 bootstrap geometry and cross-domain
+[ADR 0048](0048-v2-pulsar-virtual-ledger-fixed-slice-exhaustion.md). Exact 0.2 bootstrap geometry and cross-namespace
 non-overlap are refined by [ADR 0054](0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md), allocator-mode evidence by
 [ADR 0055](0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md), and RANGE owner takeover by
 [ADR 0061](0061-v2-pulsar-range-grant-owner-takeover.md). This decision refines ADR 0022 and is tracked by

@@ -28,15 +28,17 @@ append-only Ledger Chain order for Object WAL. Object keys and WalRun/group sequ
 _Avoid_: Object-derived ledger ID, numeric ledger-ID ordering
 
 **Virtual Ledger Reservation**:
-The deployment authority that excludes one high signed-long domain from native allocation and assigns non-overlapping,
-never-reused slices to Pulsar Protocol Cells.
+The compatibility-namespace authority that excludes one high signed-long domain from every admitted ledger-ID writer
+and assigns non-overlapping, never-reused slices to Pulsar Protocol Cells.
 _Avoid_: High-bit convention, reusable cell range, allocator-local assumption
 
 **Virtual Ledger Namespace Registry**:
-The one bounded deployment-wide CAS record that canonically owns every virtual-ledger slice assignment and proves
-global non-overlap/non-reuse. It uses `k=40`, at most 65,536 canonical bytes, 256 lifetime assignments, and 192 bytes
-per assignment row. Per-cell lookup and watches are derived only.
-_Avoid_: Independent authoritative slice key, watch authority, locally merged assignment table
+The exactly one bounded CAS authority selected while V2 allocation is admitted in an immutable
+`ledgerIdCompatibilityNamespaceId`. It binds the complete writer commitment and admission interlock, canonically owns
+every slice assignment, and proves global non-overlap/non-reuse. It uses `k=40`, at most 65,536 canonical bytes, 256
+lifetime assignments, and 192 bytes per assignment row. Per-cell allocator state is a versioned derived view.
+_Avoid_: Deployment-name namespace, omitted-writer digest, second Registry, independent authoritative slice key,
+watch authority, locally merged assignment table, per-rollover Registry read
 
 **Virtual Ledger Slice Assignment**:
 One immutable aligned `2^k` interval owned by a durable Pulsar Protocol Cell identity. Lifecycle is
@@ -60,8 +62,10 @@ _Avoid_: Owner-scoped range, takeover tail burn, unknown-response fence, install
 **Pulsar Topic Generation Selector**:
 The permanent name-scoped monotonic generation authority using exact
 RESERVED→ACTIVE→DELETING→DELETED CAS transitions to fence create/delete/recreate. ACTIVE plus aggregate identity is
-cached only after control-path validation; normal data access checks the local versioned fence.
-_Avoid_: Name-only aggregate key, selector deletion, generation rollback
+cached only after authoritative ownership witness A/B and stale-install-safe sequence CAS. Normal data access captures
+and rechecks one atomic local fence word.
+_Avoid_: Name-only aggregate key, selector deletion, generation rollback, endpoint/bool/TableView witness, best-effort
+watch as authority, tearable generation plus valid bits
 
 **Retired Topic Incarnation Tombstone**:
 The compact permanent same-key replacement for an exactly reference-free full aggregate, binding its incarnation,

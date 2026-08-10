@@ -49,9 +49,13 @@ acceptance evidence.
 
 V2 Kafka metadata is enabled only by fresh-bootstrap finalized `nereus.storage.version=2`; the V2 build supports only
 `[2,2]`, rejects level-1 V1 state, and forbids runtime upgrade or downgrade. A successful native CreateTopics item
-atomically publishes logical aggregate schema v1 with the topic records. Validate-only and native errors publish no
-aggregate. One generated non-flexible typed record at API key 32000 is owned by `TopicImage`; completed snapshot order
-places it between `TopicRecord` and that topic's partitions, and topic removal cascades without a second delete
+atomically publishes logical aggregate schema v1 with the topic records. Input-only Nereus pseudo-config is resolved
+and removed before native ConfigRecord emission; Aggregate is sole persisted authority, DescribeConfigs may synthesize
+a read-only projection, and AlterConfigs mutation is rejected. Every successful TopicImage topic, including internal
+topics under an explicit Deployment policy, has one aggregate. Validate-only performs the same resolution/validation/
+exact cumulative-batch admission and emits no records; native failed items leave no residue while per-topic partial
+success remains. One generated non-flexible typed record at API key 32000 is owned by `TopicImage`; completed snapshot
+order places it between `TopicRecord` and that topic's partitions, and topic removal cascades without a second delete
 authority. Ordinary MetadataLoader publication validates only touched topics; snapshot/bootstrap validates every live
 topic.
 
@@ -79,9 +83,10 @@ Object revalidation plus BK read-pin drain precedes BookKeeper-source deletion. 
 gap-free NPD1 multi-entry blocks, and one ManagedLedger-owned composite handle owns Object/BK children and fallback.
 `RETAIN_BK` keeps delete state NONE; `DELETE_AFTER_VERIFIED` irreversibly advances through BK_DELETE_INTENT/DONE, and
 only DONE proves physical absence.
-`OBJECT_WAL` uses an explicit ObjectManagedLedger path plus a
-reserved-slice Pulsar-cell MetadataStore/Oxia virtual-ledger authority. One bounded deployment CAS registry proves all
-slices non-overlapping and never reused. Slice owner identity is the immutable Pulsar Protocol Cell, retirement is
+`OBJECT_WAL` uses an explicit ObjectManagedLedger path plus a reserved-slice Pulsar-cell MetadataStore/Oxia virtual-
+ledger authority. While admitted, one bounded Registry for the immutable ledger-ID compatibility namespace proves all
+slices non-overlapping/never-reused and binds a complete writer commitment plus exclusion interlock. Slice owner
+identity is the immutable Pulsar Protocol Cell, retirement is
 permanent, `k=40` plus 64 KiB/256-lifetime/192-byte-row bootstrap caps bound the registry, and 0.2 forbids every
 resize/second-slice
 path and fails closed at exhaustion. The profile accepts its cost-first
@@ -92,6 +97,12 @@ distribution/storm/crash evidence and native Pulsar rollover/append-stall compar
 designed in parallel. Broker-wide takeover is an explicit scale cut. Any RANGE candidate preserves an installed
 ManagedLedger-incarnation grant across owner-only head fencing, permits takeover completion of the same RESERVED grant,
 and burns at most one stale candidate; this correctness structure still does not select that mode.
+
+Pulsar V2 ownership admission requires a collision-resistant acquisition identity and authoritative witness A/B around
+the exact selector/aggregate read. A gap-safe invalidation sequence and CAS install one atomic ACTIVE fence word;
+position admission captures it and every success completion/ACK rechecks equality. Endpoint, boolean ownership,
+resettable version, eventual TableView, or best-effort watch is insufficient. Unsupported ownership backends fail V2
+topic/Cell admission without disabling stock non-V2 Pulsar paths.
 
 Object frames retain exact assigned Kafka RecordBatch bytes or exact Pulsar ManagedLedger entry bytes after only the
 outer Object envelope is decoded. Kafka makes all frames from one partition storage append an all-or-none commit set;

@@ -46,11 +46,15 @@ nereus-domain <- nereus-metadata-spi <- nereus-metadata-oxia
 `nereus-domain` targets Java 17 and is JDK-only. It owns the logical canonical forms, deterministic identities, and
 closed validators. It has no Kafka, Pulsar, Oxia, asynchronous-framework, or backend-version dependency.
 
-`nereus-metadata-spi` depends only on `nereus-domain` and exposes capability-specific atomic semantics. It cannot
-expose a generic key/value `get/put/delete` facade or an umbrella `MetadataStore`. Physical Kafka API-key-32000 wire is
-still generated and owned by Kafka. Kafka `:metadata` depends only on the exact `nereus-domain` artifact, maps the
-physical record to a domain value, and invokes the domain validator directly without a canonical encode/decode round
-trip. It never transitively imports the SPI or Oxia.
+`nereus-metadata-spi` depends only on `nereus-domain` and exposes exactly the aggregate publisher/reader, Pulsar topic-
+generation selector, and Pulsar virtual-ledger namespace Registry capabilities. It cannot expose child binding/Epoch
+stores, a generic key/value `get/put/delete` facade, or an umbrella `MetadataStore`. One
+`VersionedAggregateSnapshot` supplies both domain projections. Create and CAS operations use the closed result sets in
+ADR 0082 and exactness includes key, schema, digest, and canonical stored bytes.
+
+Physical Kafka API-key-32000 wire is still generated and owned by Kafka. Kafka `:metadata` depends only on the exact
+`nereus-domain` artifact, maps the physical record directly to a domain value, and invokes the domain validator without
+a canonical encode/decode round trip. It never transitively imports the SPI or Oxia and implements none of those SPIs.
 
 Every cross-repository domain artifact is immutable and source-qualified. Promotion records its JAR and POM SHA-256;
 Kafka/Pulsar cannot consume an overwriteable SNAPSHOT, a `changing=true` dependency, or an unconstrained whole-product
@@ -64,15 +68,16 @@ source tuple. A generated record may land dormant, but no feature advertisement,
 that complete tuple. M6 owns broker/controller process integration and end-to-end Produce/Fetch/Admin/restart evidence;
 it does not reimplement record/image authority.
 
-M1 owns the Pulsar selector, an ABA-safe backend-native opaque ownership witness, cached ACTIVE-fence installation and
-invalidation, and focused tests. Full aggregate-to-retired-tombstone replacement remains M5, and complete Pulsar process
-integration remains M6. Normal append/read observes only a local primitive generation/valid bit.
+M1 owns the Pulsar selector, an ABA-safe backend-native opaque ownership witness, stale-install-safe ACTIVE-fence
+installation/invalidation, and focused tests. Full aggregate-to-retired-tombstone replacement remains M5, and complete
+Pulsar process integration remains M6. Normal append/read captures and rechecks one atomic local fence word.
 
-M1 owns the mode-independent virtual-ledger registry, real-Oxia conformance, and shared-namespace native-exclusion
-admission. STRICT/RANGE candidate SPI, fault cuts, and receipts are test/evidence-only; production metadata SPI cannot
-expose them. M1 evidence is `HARNESS_CONFORMANCE_ONLY` with `selectionEligible=false`, runs only deterministic and small
-smoke workloads, persists no allocator mode, and activates no production allocator. M3 owns 10k/100k multi-broker
-capacity evidence and any mode selection.
+M1 owns the mode-independent virtual-ledger Registry SPI, real-Oxia conformance, compatibility-namespace identity,
+complete writer commitment/admission interlock, and versioned derived slice view. Registry correctness emits a distinct
+`REGISTRY_CONFORMANCE` receipt. STRICT/RANGE candidate SPI, fault cuts, and receipts are test/evidence-only; production
+metadata SPI cannot expose them. Harness evidence remains `HARNESS_CONFORMANCE_ONLY` with `selectionEligible=false`,
+runs only deterministic and small smoke workloads, persists no allocator mode, and cannot promote Registry scenarios.
+M3 owns 10k/100k multi-broker capacity evidence and any mode selection.
 
 ### Gates, source locks, and promotion
 
@@ -99,9 +104,10 @@ Cross-repository promotion uses four stages and at least five commits:
 3. N2 locks P1/K1, records candidate gate state, runs Final, and produces a receipt binding N2/P1/K1;
 4. N3 commits only the receipt/evidence and promotes only its exactly covered scenarios.
 
-The receipt records tested product/fork commits, source-lock digest, domain JAR/POM SHAs, Oxia identity, scenario IDs,
-test counts, failure/skip counts, and the aggregate result. A scenario whose M1 portion passes cannot thereby claim an
-M3, M5, or M6 result; cross-M1 scenario rows are split before implementation promotion.
+Receipts record tested product/fork commits, source-lock digest, domain JAR/POM SHAs, Oxia identity, receipt kind,
+scenario IDs, test counts, failure/skip counts, and the aggregate result. Registry and harness receipts cannot substitute
+for one another. A scenario whose M1 portion passes cannot thereby claim an M3, M5, or M6 result; cross-M1 scenario rows
+are split before implementation promotion.
 
 ## Consequences
 
@@ -114,5 +120,5 @@ M3, M5, or M6 result; cross-M1 scenario rows are split before implementation pro
 - M1 can verify registry and harness conformance without making an unevidenced allocator selection or borrowing M3/M5/
   M6 PASS status.
 
-This decision refines ADRs 0006, 0009, 0032, 0034, 0042, 0043, 0050, 0051, 0054, and 0055 and is tracked by the M1
-implementation plan and its milestone-specific scenario rows.
+This decision is refined by ADR 0082, refines ADRs 0006, 0009, 0032, 0034, 0042, 0043, 0050, 0051, 0054, and 0055 and
+is tracked by the M1 implementation plan and its milestone-specific scenario rows.

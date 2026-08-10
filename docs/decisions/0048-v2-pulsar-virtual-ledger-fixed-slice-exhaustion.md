@@ -20,9 +20,10 @@ not wrap, search another interval, borrow from a retired Cell, or mutate registr
 
 Additional capacity inside the current reservation domain requires a new immutable Pulsar Protocol Cell ID and unused
 registry assignment. After that domain's bounded lifetime registry is exhausted, a new logical name is insufficient:
-ADR 0054 requires either a new reservation domain with bootstrap-proven non-overlapping ledger-ID namespace or an
-independent deployment/cluster. Moving an existing Topic Incarnation or ManagedLedger requires a future explicit
-migration contract and is not implied by creating either one.
+ADR 0054 requires a new immutable `ledgerIdCompatibilityNamespaceId` backed by a genuinely disjoint ledger-ID
+namespace, or an independent deployment/cluster. Creating another logical reservation domain inside the same shared
+numeric namespace cannot allocate a second Registry or reuse the interval. Moving an existing Topic Incarnation or
+ManagedLedger requires a future explicit migration contract and is not implied by creating either one.
 
 ## Consequences
 

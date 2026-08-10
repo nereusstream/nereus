@@ -14,7 +14,7 @@ sourceTuple: v2-m0
 | Milestone | Scope | Status at M0 | Required aggregate |
 | --- | --- | --- | --- |
 | M0 | V1 archive references, Context Map/glossaries, V2 ADRs/contracts, open-question/session logs, source/scenario manifests, tradeoff register, documentation gate | DocumentationGated | `v2M0Check` |
-| M1 | pure V2 active graph; Java-17/JDK-only domain and capability-split metadata SPI; typed protocol-native incarnations and deterministic IDs; closed aggregate logical schema v1; complete Kafka API-key-32000 KRaft record/image/CreateTopics/publication authority; Pulsar selector CAS plus ABA-safe ownership witness and local ACTIVE fence; mode-independent `k=40`/64-KiB/256-assignment registry plus all-writer native exclusion; allocator harness conformance only with no mode selection; remove every active V1 runtime/gate | Planned | `v2M1FinalCheck` |
+| M1 | pure V2 active graph; Java-17/JDK-only domain and exact four-capability metadata SPI; NTB1/NSE1 identities and strict NTA1 aggregate; complete Kafka API-key-32000 KRaft record/image/CreateTopics pseudo-config/resolution/sizing/projection/publication authority; Pulsar selector CAS plus authoritative ABA-safe ownership witness, gap-safe stale-install exclusion, and local atomic ACTIVE fence; compatibility-namespace Registry, complete writer-set/interlock, versioned derived slice view, and `REGISTRY_CONFORMANCE`; allocator `HARNESS_CONFORMANCE_ONLY` with no mode selection; remove every active V1 runtime/gate | Planned | `v2M1FinalCheck` |
 | M2 | Owner Epoch lane, typed frontier contract, BookKeeper foundation, Pulsar deterministic NPD1-data/NPO1-root pair with checked 16-byte-row/streaming envelope and provider admission plus native-relative block-policy evidence, ManagedLedger-owned dual-source handle/read pins/final-delete revalidation and persisted BK_DELETE state/retention policy, Kafka ledger-layout scale spike | Planned | `v2M2Check` |
 | M3 | one-cell NWG1 Object WAL groups; binding-context epoch authority and commit-set co-location; run-key/per-Object AEAD; final class/lane leaf grammar and post-plan sequence allocation; up to three lazy lanes under one Root/pointer; provider-resolved physical frontier plus owner-local per-binding typed frontier; physical-only de-duplicated checkpoint rows/Seal; one publisher-epoch-fenced vector chain; pre-position tracker/locator reservation and local tickets; shared-verified range-aggregated active-tail publication before ACK; Root-fixed NONE/optional bounded provider-proof mode; provider-absent cuts; conservative bounded prefix/LIST recovery with no partial skip vector; provider/session evidence; fixed-slice Pulsar virtual-ledger path with RANGE evidence | Planned | `v2M3Check` |
 | M4 | manifest, protocol-position/timestamp indexes, Storage Epoch resolver, logical Binding read snapshot, bounded sharded generation-tagged hazard slots, ABA-safe lease word and terminal source drain, `ADMITTING/STOPPED` Binding selector with fused fallback-removal/E+1 cut, small inline closure-anchor set plus emergency STOPPED envelope, closed-verifier terminal publication and async batched prune, per-source first/shared-last intervals, deterministic on-demand proofs/window, exact inline/reference activation, explicit bounded O(N) reconciliation, and two-stage retirement | Planned | `v2M4Check` |
@@ -51,25 +51,33 @@ runtime leaves the active graph while its design documents remain.
 ## M1 implementation and promotion contract
 
 The M1 module dependency is `nereus-domain <- nereus-metadata-spi <- nereus-metadata-oxia`. Domain is Java-17/JDK-only
-and contains canonical values, deterministic IDs, and validators. SPI contains only capability-specific atomic
-semantics. Kafka `:metadata` consumes the exact immutable domain JAR/POM without transitively importing SPI/Oxia; its
-generated physical record remains Kafka-owned. Published domain artifacts are source-qualified by JAR/POM SHA and may
-not be overwriteable SNAPSHOT/changing/composite inputs.
+and contains canonical values, deterministic IDs, and validators. SPI contains exactly aggregate Publisher/Reader,
+Pulsar generation Selector Store, and Pulsar virtual-ledger Registry Store, with ADR 0082's closed create/CAS outcomes.
+One `VersionedAggregateSnapshot` supplies Binding/initial-Epoch projections; child authorities and generic metadata
+facades are forbidden. Kafka `:metadata` consumes the exact immutable domain JAR/POM without transitively importing
+SPI/Oxia and implements none of these SPIs; its generated physical record remains Kafka-owned. Published domain
+artifacts are source-qualified by JAR/POM SHA and may not be overwriteable SNAPSHOT/changing/composite inputs.
 
-Kafka feature 2, API-32000, atomic CreateTopics aggregate, TopicImage/Delta/replay/snapshot/remove, and publication
-validation form one activatable M1 source tuple. A generated record may land dormant but cannot be advertised, formatted,
-or emitted alone. M6 owns complete broker/controller process and Produce/Fetch/Admin/restart evidence only. Ordinary
-delta validation is touched-topic-only without canonical SHA recomputation; full scans are bootstrap/snapshot/full-
-catch-up only; CreateTopics pre-admits the complete atomic batch.
+Kafka feature 2, API-32000, atomic CreateTopics aggregate, input-only pseudo-config resolution, read-only config
+projection, TopicImage/Delta/replay/snapshot/remove, and publication validation form one activatable M1 source tuple. A
+generated record may land dormant but cannot be advertised, formatted, or emitted alone. M6 owns complete
+broker/controller process and Produce/Fetch/Admin/restart evidence only. Ordinary delta validation is touched-topic-
+only without canonical SHA recomputation; full scans are bootstrap/snapshot/full-catch-up only; CreateTopics and
+validateOnly pre-admit the exact final cumulative record count and serialized Raft-batch bytes while preserving native
+per-topic partial-success behavior.
 
-Pulsar M1 captures an ABA-safe native ownership witness before and after exact selector/aggregate validation and installs
-the cache only on equality while still locally owned. Ordinary access reads only a primitive local valid/generation
-state. Full aggregate-to-retired-tombstone replacement remains M5; complete process integration remains M6.
+Pulsar M1 arms gap-safe invalidation, captures authoritative ABA-safe native ownership witness A/B around exact
+selector/aggregate validation, and installs only by CAS from the same invalidation sequence. Legacy/ELM/third-party
+backends missing acquisition identity, authoritative read, ordered loss hook, or reconnect-gap invalidation fail V2
+admission closed. Ordinary access captures/rechecks one atomic fence word with zero remote metadata I/O. Full
+aggregate-to-retired-tombstone replacement remains M5; complete process integration remains M6.
 
-M1 implements the mode-independent virtual-ledger registry and all-writer native-exclusion admission. STRICT/RANGE
-candidate SPI and cut injection are evidence-only. Its receipt is `HARNESS_CONFORMANCE_ONLY`,
-`selectionEligible=false`; M1 runs deterministic/small smoke only and neither persists nor activates a mode. M3 owns
-10k/100k multi-broker capacity evidence and selection.
+M1 implements the mode-independent virtual-ledger Registry bound to the immutable ledger-ID compatibility namespace.
+V2 admission requires exactly one selected Registry, a complete inline or exact referenced writer commitment, and an
+ACL/credential/deployment interlock; allocators use a versioned derived slice view. Its real-Oxia receipt is
+`REGISTRY_CONFORMANCE`. STRICT/RANGE candidate SPI and cut injection remain evidence-only and emit a distinct
+`HARNESS_CONFORMANCE_ONLY` receipt with `selectionEligible=false`; M1 runs deterministic/small smoke only and neither
+persists nor activates a mode. M3 owns 10k/100k multi-broker capacity evidence and selection.
 
 `docs/v2/source-locks.json` is the sole expected-SHA authority for external Kafka/Pulsar/Oxia sources. Checkout paths
 may be overridden; expected SHAs may not. The manifest cannot self-lock the current Nereus commit; a promotion receipt
@@ -81,9 +89,10 @@ binds it. M1 gates are:
 
 Zero tests, skipped mandatory tests, failure, dirtied/changed source, or digest mismatch fails. PR CI runs the fast gate;
 trusted promotion runs Exact/Final. Promotion uses N1 foundation, P1/K1 fork commits, N2 source-tuple/final execution,
-then receipt-only N3. The receipt binds N2/P1/K1, source-lock digest, domain JAR/POM SHAs, Oxia identity, scenario IDs,
-test/failure/skip counts, and aggregate result. Cross-M1 scenario rows are split before promotion so future evidence
-cannot be borrowed.
+then receipt-only N3. Each receipt binds N2/P1/K1, source-lock digest, domain JAR/POM SHAs, Oxia identity, closed receipt
+kind, scenario IDs, test/failure/skip counts, and aggregate result. A Registry scenario requires
+`REGISTRY_CONFORMANCE`; allocator cut scenarios require `HARNESS_CONFORMANCE_ONLY` and `selectionEligible=false`.
+Cross-M1 scenario rows are split before promotion so future evidence cannot be borrowed.
 
 ## Status model
 

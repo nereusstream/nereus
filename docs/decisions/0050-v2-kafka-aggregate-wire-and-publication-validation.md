@@ -19,6 +19,12 @@ fields explicitly encode the closed logical aggregate from ADR 0033, including t
 version, fixed binding/epoch IDs, Cell/protocol identity, closed format discriminators, profile/origin, ordinal zero,
 and nullable sealed end. It has no opaque aggregate blob, untyped attributes, mutable lifecycle, or retry fields.
 
+Nereus CreateTopics settings are input-only pseudo-configs. Resolution removes them from ordinary `ConfigRecord`
+changes; resolved values, origins, and policy/catalog versions live only in the aggregate. DescribeConfigs may synthesize
+a read-only projection from that aggregate, while AlterConfigs change/delete is rejected. Internal topics use an
+explicit versioned Kafka internal-topic Deployment policy rather than a tenant default. Thus Aggregate and ConfigRecord
+cannot become competing authorities.
+
 Exactly-one validation is mandatory and runs at the actual `MetadataLoader` image-publication boundary, after the
 finalized feature image for that publication is known:
 
@@ -30,9 +36,15 @@ finalized feature image for that publication is known:
 - snapshot load, fresh bootstrap, and an equivalent complete catch-up boundary call `finishSnapshot` and then scan every
   live topic exactly once before publishing the complete image.
 
-CreateTopics computes the complete `TopicRecord + TopicBindingAggregateRecord + PartitionRecord*` record count and
-encoded-size admission before returning an atomic result; it does not discover an atomic-batch limit only after append.
-No candidate image is available to publishers or readers before the applicable validation succeeds.
+CreateTopics and `validateOnly` compute the exact generated count and serialized size of the final cumulative atomic
+controller batch, including
+`TopicRecord + TopicBindingAggregateRecord + native ConfigRecord* + PartitionRecord* + record/batch overhead` before
+returning. An isolated per-topic estimate is insufficient. They do not discover an atomic-batch limit only after Raft
+append. Native per-topic partial-success behavior remains: a failed item emits nothing, while every record for each
+successful item belongs to the same atomic controller batch. Exact pseudo-key/value syntax, validation/error precedence,
+internal-topic classifier, overflow-selection/error behavior, and DescribeConfigs projection shape remain the next
+implementation-readiness descendants rather than being inferred here. No candidate image is available to publishers
+or readers before the applicable validation succeeds.
 
 No raw batch boundary is treated as a publication boundary when Kafka metadata transactions span batches. No ordinary
 delta performs a full live-topic scan. Validation failure is fatal/fail-closed and cannot be configured off. Generated
@@ -46,9 +58,10 @@ tooling all handle the record explicitly.
   upstream collision handling.
 - Normal publication work is proportional to touched topics; full `O(all topics)` validation is limited to
   snapshot/bootstrap.
-- M1 proves record/image authority, aggregate batch pre-admission, multi-batch transactions, touched-topic tracking,
-  removal, snapshot/bootstrap scans, feature ordering, every invalid record class, non-disableability, and no ordinary
-  full-image scan or SHA recomputation. M6 proves the corresponding complete-process restart/catch-up behavior.
+- M1 proves record/image authority, pseudo-config removal/read-only projection/AlterConfigs rejection, explicit internal-
+  topic policy, exact serialized batch pre-admission, validate-only equality, native partial success, multi-batch
+  transactions, touched-topic tracking, removal, snapshot/bootstrap scans, feature ordering, every invalid record class,
+  non-disableability, and no ordinary full-image scan or SHA recomputation. M6 proves complete-process behavior.
 
-This decision refines ADRs 0033, 0034, and 0042 and is tracked by `T-META-01`, `T-POLICY-01`,
+This decision is refined by ADR 0082, refines ADRs 0033, 0034, and 0042 and is tracked by `T-META-01`, `T-POLICY-01`,
 `V2-KAF-META-002..005`.

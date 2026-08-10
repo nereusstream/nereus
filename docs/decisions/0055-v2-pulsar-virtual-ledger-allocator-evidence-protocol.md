@@ -30,6 +30,10 @@ layer; none enters the production metadata SPI or persists a mode. Its receipt i
 to prove the harness itself. M3 owns the 10,000/100,000 multi-broker capacity run and the only receipt that may make a
 candidate eligible for selection.
 
+This harness receipt is distinct from `REGISTRY_CONFORMANCE`, which proves compatibility-namespace identity, complete
+writer commitment/admission interlock, Registry CAS, and versioned derived slice views. Harness conformance cannot
+promote or replace Registry evidence; Registry conformance does not select an allocator.
+
 The allocator evidence protocol covers:
 
 - 10,000 and 100,000 active ManagedLedgers per Protocol Cell;
@@ -65,5 +69,5 @@ select a different mode or weaken the persisted recovery protocol.
 - M1 must publish source-qualified harness-conformance evidence without claiming performance or selection eligibility.
   M3 must execute the complete scale protocol against its pinned source before selecting an allocator mode.
 
-This decision is refined by ADR 0061, refines ADRs 0022, 0027, 0032, 0041, 0048, 0049, and 0054 and is tracked by
+This decision is refined by ADRs 0061/0082, refines ADRs 0022, 0027, 0032, 0041, 0048, 0049, and 0054 and is tracked by
 `T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-010/011/017/018`, and `V2-OPEN-PUL-OBJ-09`.

@@ -134,6 +134,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md"
     "$repo_root/docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
     "$repo_root/docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
+    "$repo_root/docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -248,6 +249,13 @@ require_literal 'does not set a source protection' "docs/decisions/0080-v2-irrev
 require_literal 'nereus-domain <- nereus-metadata-spi <- nereus-metadata-oxia' "docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
 require_literal '`HARNESS_CONFORMANCE_ONLY` with `selectionEligible=false`' "docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
 require_literal '`v2M1FinalCheck` aggregates those outcomes' "docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
+require_literal 'NTB1 || u32be(cellLength) || cellBytes' "docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
+require_literal 'NSE1 || bindingId[32] || u64be(epochOrdinal)' "docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
+require_literal '`NTA1` is the canonical' "docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
+require_literal 'PulsarVirtualLedgerNamespaceRegistryStore' "docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
+require_literal 'CREATED | EXISTING_EXACT | DEFINITIVE_CONFLICT | INDETERMINATE' "docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
+require_literal 'APPLIED_EXACT | PREDECESSOR_UNCHANGED | DEFINITIVE_CONFLICT | INDETERMINATE' "docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
+require_literal '`REGISTRY_CONFORMANCE` from `HARNESS_CONFORMANCE_ONLY`' "docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -308,6 +316,8 @@ require_literal "Restarted Grill 2 round 19" "docs/v2/grill-notes/21-restarted-g
 require_literal "There is no user-decision question" "docs/v2/grill-notes/21-restarted-grill-2-round-19-evidence-frontier.md"
 require_literal "M1 Readiness Grill round 1" "docs/v2/grill-notes/22-m1-readiness-round-1-pure-graph-and-promotion.md"
 require_literal "M1 Readiness Round 1：Q1–Q6 调整后确认" "docs/v2/grill-notes/22-m1-readiness-round-1-pure-graph-and-promotion.md"
+require_literal "M1 Readiness Grill round 2" "docs/v2/grill-notes/23-m1-readiness-round-2-domain-control-authorities.md"
+require_literal "Q1–Q6 都建议“调整后确认”" "docs/v2/grill-notes/23-m1-readiness-round-2-domain-control-authorities.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -670,6 +680,12 @@ allowed_statuses = {
     "FAILED",
     "BLOCKED_ENVIRONMENT",
 }
+expected_receipt_kinds = {
+    **{f"V2-POSITION-{ordinal:03d}": "REGISTRY_CONFORMANCE" for ordinal in range(3, 10)},
+    "V2-POSITION-010": "HARNESS_CONFORMANCE_ONLY",
+    "V2-POSITION-011": "HARNESS_CONFORMANCE_ONLY",
+}
+allowed_receipt_kinds = {"REGISTRY_CONFORMANCE", "HARNESS_CONFORMANCE_ONLY"}
 scenario_ids = []
 for item in scenarios.get("scenarios", []):
     scenario_id = item.get("id", "")
@@ -678,6 +694,12 @@ for item in scenarios.get("scenarios", []):
     scenario_ids.append(scenario_id)
     if item.get("status") not in allowed_statuses:
         fail(f"{scenario_id} has an invalid status")
+    receipt_kind = item.get("requiredReceiptKind")
+    if receipt_kind is not None and receipt_kind not in allowed_receipt_kinds:
+        fail(f"{scenario_id} has an invalid requiredReceiptKind")
+    expected_receipt_kind = expected_receipt_kinds.get(scenario_id)
+    if expected_receipt_kind is not None and receipt_kind != expected_receipt_kind:
+        fail(f"{scenario_id} must require {expected_receipt_kind}")
     owner = root / str(item.get("ownerDoc", ""))
     if not owner.is_file():
         fail(f"{scenario_id} owner document does not exist")
@@ -851,6 +873,8 @@ link_docs=(
     "$repo_root/docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
     "$repo_root/docs/decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md"
     "$repo_root/docs/decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md"
+    "$repo_root/docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
+    "$repo_root/docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
 )
 
 while IFS=: read -r source match; do

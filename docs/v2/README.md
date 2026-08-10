@@ -20,6 +20,9 @@ performance-first BookKeeper WAL.
 - M0 freezes the V2 documentation contract only; V2 Java implementation and runtime evidence have not started.
 - M1 implementation-readiness Round 1 freezes the pure-active-graph, module, milestone, source-lock, gate, and
   cross-repository promotion boundaries in ADR 0081; it does not claim that an M1 module or gate exists yet.
+- M1 implementation-readiness Round 2 freezes the outer NTB1/NSE1/NTA1 domain contracts, exact M1 metadata
+  capabilities/results, Kafka topic-create authority, Pulsar ownership-fence capability, and compatibility-namespace
+  Registry/writer-set evidence boundary in ADR 0082; exact descendant byte tables/adapters remain OPEN.
 - Existing Java modules and Phase/Future evidence on `main` are V1 residue until replaced by a V2 milestone.
 - The ordinary CI Pulsar API checkout remains a legacy V1-residue build baseline until the V2 Pulsar slice replaces
   that code; it is recorded separately and is not the V2 fork-development or parity baseline.
@@ -222,6 +225,7 @@ Accepted decisions:
 - [ADR 0079: bounded inline closure anchors and terminal publication](../decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md)
 - [ADR 0080: irreversible Source Retirement Batch tombstone](../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md)
 - [ADR 0081: M1 pure active graph and promotion boundary](../decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md)
+- [ADR 0082: M1 domain and control-authority contracts](../decisions/0082-v2-m1-domain-and-control-authority-contracts.md)
 
 ## Open design gates
 
@@ -246,10 +250,11 @@ generation-tagged hazard capture, minimal slot reuse/terminal drain, source-inde
 historically bound capability evidence, fused selector closure, terminal/on-demand proof behavior, per-source release
 intervals, explicit O(N) work, small bounded inline anchors with emergency STOPPED capacity, closed-verifier terminal
 publication, and permanent same-key compact batch tombstones. The pure-document M0 runtime-design frontier is
-exhausted. ADR 0081 separately freezes the M1 execution and promotion boundary while leaving exact M1 wire, key,
-ownership-witness, registry-codec, and receipt-schema descendants open to implementation-readiness grilling. Partial
-recovery omission, numeric caps, physical proof-fold/capability encodings, and any tombstone-deletion authority remain
-evidence gates. The rows below are the remaining active 0.2 evidence gates.
+exhausted. ADR 0081 freezes the M1 execution/promotion boundary; ADR 0082 freezes the outer M1 domain/control authority
+while leaving exact inner field/code/cap tables, Kafka pseudo-config/error/projection details, Pulsar backend witness
+mapping, Registry namespace/writer-set encoding/interlock, and receipt payload schemas open to implementation-readiness
+grilling. Partial recovery omission, numeric caps, physical proof-fold/capability encodings, and any tombstone-deletion
+authority remain evidence gates. The rows below are the remaining active 0.2 evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |

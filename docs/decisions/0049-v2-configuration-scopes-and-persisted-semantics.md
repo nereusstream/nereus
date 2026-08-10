@@ -15,6 +15,12 @@ flag combinations would also fragment cross-topic Object batching and make compa
 Correctness invariants, recovery semantics, and durable compatibility contracts are never feature flags and cannot be
 disabled by topic, tenant, Cell, shard, host, or process configuration.
 
+Format parser caps are part of that durable contract. Deployment may lower only new-write or admission ceilings; it
+must not lower the decoder cap for already persisted v1 bytes. Kafka Nereus CreateTopics pseudo-config is input-only:
+resolution persists the value/origin/catalog-policy version in the aggregate, ordinary `ConfigRecord` never becomes a
+second authority, and later AlterConfigs mutation is rejected. Internal Kafka topics use an explicit versioned
+Deployment policy rather than a tenant default.
+
 Tunable policy has exactly three scopes:
 
 1. **Topic/Tenant-or-Namespace policy** expresses latency/cost intent through a small closed set of typed policy
@@ -97,6 +103,6 @@ replace the immutable terminal candidate with a role-name owner check.
   seal/backpressure under resource pressure, incompatible batching rejection, and that every correctness gate remains
   non-disableable.
 
-This decision is refined by ADRs 0056 through 0080, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and is tracked
-by `T-POLICY-01`, `V2-POLICY-001..002`, `V2-BK-012/013`, `V2-OBJ-016..024`, `V2-READ-003..006/014/015`, and
-`V2-POSITION-011/018`.
+This decision is refined by ADRs 0056 through 0080 and 0082, refines ADRs 0012, 0014, 0029, 0030, 0037, and 0047, and
+is tracked by `T-POLICY-01`, `V2-POLICY-001..002`, `V2-BK-012/013`, `V2-OBJ-016..024`,
+`V2-READ-003..006/014/015`, and `V2-POSITION-011/018`.

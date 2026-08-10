@@ -23,6 +23,11 @@ The product does not force all objectives through one WAL or one universal posit
 Protocol Cells, Position Domains, Native Write Authorities, and Cell Provider Sessions while sharing correctness,
 immutable physical descriptors, lifecycle contracts, and optional external provider infrastructure.
 
+M1 readiness freezes the pure V2 module/promotion boundary plus NTB1/NSE1/NTA1 outer contracts, four production
+metadata capabilities, Kafka topic-create authority, Pulsar ownership-fence capability, and compatibility-namespace
+Registry governance. This is still documentation-only: exact descendant byte tables/adapters and all implementation
+receipts remain open.
+
 ## 2. Architecture
 
 ```text
@@ -73,20 +78,20 @@ has exactly one initial epoch and no online profile-transition API/state machine
 future evolution, and at most one epoch may ever admit new positions at a time.
 
 Binding plus initial epoch are one immutable `TopicBindingAggregateRecord`. Kafka adds it to the atomic `CreateTopics`
-result; MetadataStore/Oxia creates one key and resolves a lost response by exact reread equality. Binding and epoch APIs
-are typed projections, not separately writable authorities. Kafka native topic UUID or Pulsar persistence-name plus
-generation is the typed incarnation/ABA fence; aggregate and binding/initial-epoch IDs are retry-stable deterministic
-derivations. One closed logical aggregate schema v1 maps to Oxia and Kafka physical records. Kafka activates it only at
-fresh-bootstrap `nereus.storage.version=2`; V1 and runtime transitions are rejected. Partial or conflicting state never
-admits I/O.
+result; MetadataStore/Oxia creates one key and resolves a lost response through a closed exact result. One
+`VersionedAggregateSnapshot` supplies Binding/initial-Epoch projections, not separately writable authorities. Bootstrap
+IDs are create-only 16-byte identities; `bindingId`/`storageEpochId` are the exact 32-byte NTB1/NSE1 derivations.
+Canonical NTA1 is Oxia's wrapped payload while Kafka maps generated fields directly into the domain validator. Kafka
+activates it only at fresh-bootstrap `nereus.storage.version=2`; V1 and runtime transitions are rejected. Partial or
+conflicting state never admits I/O.
 
 Kafka's generated non-flexible wire-v0 record uses API key 32000 and is owned by `TopicImage`; snapshots place it
-between the topic and partitions, and `RemoveTopicRecord` removes it with the topic. MetadataLoader validates touched
-topics at ordinary image publication and scans all topics only for snapshot/bootstrap. Pulsar instead uses exact
-`RESERVED -> ACTIVE -> DELETING -> DELETED` selector CAS state, caches an exact ACTIVE/aggregate fence at
-open/ownership/version changes, and may replace a fully retired incarnation aggregate at the same never-reused key
-with a compact permanent tombstone. These native lifecycle fences prevent partial Kafka images, per-access Oxia I/O,
-and same-name Pulsar recreation ABA.
+between the topic and partitions, and `RemoveTopicRecord` removes it with the topic. Input-only Nereus create settings
+never become ConfigRecord authority; exact cumulative batch sizing precedes Raft append. MetadataLoader validates
+touched topics at ordinary image publication and scans all topics only for snapshot/bootstrap. Pulsar instead uses
+exact `RESERVED -> ACTIVE -> DELETING -> DELETED` selector CAS state plus authoritative ownership-witness A/B and a
+gap-safe sequence CAS into one atomic ACTIVE fence word. Unsupported ownership backends fail V2 admission. These native
+lifecycle fences prevent partial Kafka images, per-access Oxia I/O, stale fence reinstall, and same-name Pulsar ABA.
 
 Ownership grants an exclusive Owner Epoch inside that binding. Kafka uses KRaft; Pulsar uses MetadataStore/Oxia plus
 native broker/ManagedLedger authority. Owner Epoch and Storage Epoch are distinct.
@@ -271,12 +276,13 @@ ordering, and lifecycle. Cross-ledger Pulsar Coverage is a ledger-keyed range co
 The exact Kafka ledger layout remains an M2 evidence gate. Pulsar async Object offload processes sealed non-current
 ledgers only; one native attempt publishes one bounded data Object followed by one deterministic sparse-index/root
 Object. It does not stream the current append ledger in 0.2. Pulsar Object WAL allocates increasing virtual ledger IDs
-from one fixed aligned `2^40`, never-reused Cell slice assigned by a 64-KiB/256-lifetime CAS registry. Slice ownership survives
-broker/provider change and retirement leaves a permanent tombstone. 0.2 never resizes, relocates, extends, or adds a
-second slice; exhaustion fails closed and new capacity uses a new Cell. After registry exhaustion a new logical domain
-is insufficient without a disjoint ledger-ID namespace or independent cluster. Explicit MetadataStore/Oxia links remain Ledger
-Chain authority, while Object groups remain Physical Extents. BookKeeper/Object profile-transition mechanics are
-deferred beyond 0.2.
+from one fixed aligned `2^40`, never-reused Cell slice assigned by the 64-KiB/256-lifetime Registry selected for its
+immutable ledger-ID compatibility namespace. The Registry binds a complete writer commitment and exclusion interlock.
+Slice ownership survives broker/provider change and retirement leaves a permanent tombstone. 0.2 never resizes,
+relocates, extends, or adds a second slice; exhaustion fails closed and new capacity uses a new Cell. After Registry
+exhaustion a new logical domain is insufficient: capacity requires a new compatibility namespace backed by a disjoint
+ledger-ID space, or an independent cluster. Explicit MetadataStore/Oxia links remain Ledger Chain authority, while
+Object groups remain Physical Extents. BookKeeper/Object profile-transition mechanics are deferred beyond 0.2.
 
 STRICT_SERIALIZED and RANGE_LEASED remain open allocator protocols. ADR 0055 requires maximum sustainable rollover RPS
 under every predeclared SLO, actual rollover distribution/jitter/storm/failure cuts, and native Pulsar

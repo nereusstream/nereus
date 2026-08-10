@@ -26,11 +26,12 @@ At finalized `nereus.storage.version=2`, Kafka uses one generated, explicitly ty
 `RemoveTopicRecord(topicId)` removes the complete active topic image, including the aggregate. 0.2 has no separate
 aggregate-delete record and no parallel aggregate image with independent lifecycle.
 
-At the actual MetadataLoader image-publication boundary, every live Nereus topic has exactly one aggregate whose topic
-ID and logical schema validate against its `TopicRecord`. Missing, duplicate, unknown-topic, unknown-version, or invalid
-aggregates fail closed. A transient replay state containing a `TopicRecord` without its aggregate may exist only inside
-unpublished delta/snapshot construction; it is never published as a usable metadata image. ADR 0050 refines ordinary
-publication to validate only touched topics and reserves full live-topic scans for snapshot/bootstrap.
+At the actual MetadataLoader image-publication boundary, every topic in `TopicImage`, including internal topics, has
+exactly one aggregate whose topic ID and logical schema validate against its `TopicRecord`. Topic names cannot exempt a
+topic; the KRaft metadata log itself is not a TopicImage topic. Missing, duplicate, unknown-topic, unknown-version, or
+invalid aggregates fail closed. A transient replay state containing a `TopicRecord` without its aggregate may exist
+only inside unpublished delta/snapshot construction; it is never published as a usable metadata image. ADR 0050 refines
+ordinary publication to validate only touched topics and reserves full live-topic scans for snapshot/bootstrap.
 
 ## Consequences
 
@@ -43,5 +44,5 @@ publication to validate only touched topics and reserves full live-topic scans f
 - M1 must prove atomic batch visibility, canonical snapshot order, topic-cascaded removal, duplicate/unknown rejection,
   and that no completed image exposes a live Nereus topic without exactly one aggregate.
 
-This decision is refined by ADR 0050, refines ADRs 0023, 0033, and 0034, and is tracked by `T-META-01`,
+This decision is refined by ADRs 0050/0082, refines ADRs 0023, 0033, and 0034, and is tracked by `T-META-01`,
 `V2-META-002..004`, and `V2-KAF-META-001..005`.

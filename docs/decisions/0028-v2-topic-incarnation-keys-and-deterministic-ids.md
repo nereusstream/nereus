@@ -27,10 +27,24 @@ as its leaf component. Pulsar uses a domain-separated digest of the canonical pe
 fixed-width generation component. The value repeats the complete typed incarnation; every read rederives the expected
 key and fails closed on key/value, protocol, name, topic-ID, or generation disagreement.
 
-`bindingId` is a domain-separated SHA-256 derivation over canonical length-framed Cell identity plus the complete typed
-incarnation. The initial `storageEpochId` is a separate domain-separated SHA-256 derivation over that binding ID plus
-epoch ordinal zero. Neither derivation may contain random attempt IDs, wall-clock time, controller offsets, backend
-versions, or another retry-dependent fact. Exact retries therefore reproduce the same aggregate bytes and IDs.
+Bootstrap `deploymentId`, `reservationDomainId`, protocol-specific `CellId`, and Kafka `topicId` are create-only,
+non-zero 16-byte identities. They are never derived from names/configuration; rebuilding a Cell creates a new Cell ID.
+`bindingId` and `storageEpochId` are fixed 32-byte SHA-256 outputs. Kafka topic UUIDs are encoded as raw 16 bytes and
+never as strings.
+
+The exact outer derivation preimages are:
+
+```text
+NTB1 || u32be(cellLength) || cellBytes
+     || u32be(incarnationLength) || incarnationBytes
+
+NSE1 || bindingId[32] || u64be(epochOrdinal)
+```
+
+M1 accepts only ordinal zero. `cellBytes` and `incarnationBytes` use independent stable canonical domain sub-encodings;
+they cannot depend on Oxia/Kafka physical wire, Java serialization, runtime configuration, or retry state. Neither
+derivation may contain random attempt IDs, wall-clock time, controller offsets, backend versions, or another retry-
+dependent fact. Exact retries reproduce the same IDs, and derivation runs only on create/replay rather than append/read.
 
 The aggregate remains immutable. Enumeration indexes may be added only as repairable hints; a name index or second key
 cannot participate in aggregate visibility or override the incarnation-scoped authority.
@@ -43,13 +57,15 @@ cannot participate in aggregate visibility or override the incarnation-scoped au
 - Logical schema/versioning and Kafka feature activation are refined by ADRs 0033 and 0034. Kafka image ownership and
   Pulsar deletion/retirement ABA are refined by ADRs 0042 and 0043. Kafka physical wire/publication validation and the
   Pulsar exact selector/cache state machine are refined by ADRs 0050 and 0051; executable vectors remain downstream.
-- M1 must prove deterministic retry bytes, Kafka same-name/new-topic-ID isolation, Pulsar generation non-reuse,
-  key/value collision checks, protocol discriminator checks, and rejection of retry-dependent IDs.
+- M1 must prove exact NTB1/NSE1 golden vectors and lengths, raw UUID encoding, deterministic retry bytes, bootstrap-ID
+  non-zero/create-only behavior, Kafka same-name/new-topic-ID isolation, Pulsar generation non-reuse, key/value
+  collision checks, protocol discriminator checks, and rejection of retry-dependent IDs.
 
 This decision is refined by [ADRs 0033](0033-v2-topic-binding-aggregate-logical-schema-v1.md),
 [0034](0034-v2-kafka-feature-level-2-bootstrap-activation.md),
 [0042](0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md), and
 [0043](0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md),
 [0050](0050-v2-kafka-aggregate-wire-and-publication-validation.md), and
-[0051](0051-v2-pulsar-selector-state-machine-and-cached-fence.md), refines ADR 0023, and is tracked by `T-META-01`,
+[0051](0051-v2-pulsar-selector-state-machine-and-cached-fence.md), and
+[0082](0082-v2-m1-domain-and-control-authority-contracts.md), refines ADR 0023, and is tracked by `T-META-01`,
 `V2-META-002..007`, and `V2-KAF-META-001..005`.

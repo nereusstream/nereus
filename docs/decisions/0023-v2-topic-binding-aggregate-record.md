@@ -19,10 +19,11 @@ and its one initial Storage Epoch:
 
 - Kafka appends that composite record inside the existing atomic `CreateTopics` controller result. The binding and
   epoch do not have separately authoritative controller records.
-- MetadataStore/Oxia creates one aggregate key with `putIfAbsent`. A lost create response is resolved by rereading the
-  same key and requiring exact aggregate equality; a mismatch is a conflict and fails closed.
-- `TopicProtocolBindingStore` and `StorageEpochStore` expose typed logical views projected from this one record. A
-  projected view cannot be independently created, replaced, or activated.
+- MetadataStore/Oxia uses `TopicBindingAggregatePublisher` and `TopicBindingAggregateReader` for that one key. A lost
+  create response is resolved by exact reread; `EXISTING_EXACT` requires matching authority key, schema, digest, and
+  canonical stored bytes, while a mismatch is a definitive conflict and an unresolved result stays indeterminate.
+- One read/decode produces one `VersionedAggregateSnapshot`. Binding and ordinal-zero initial Epoch are domain views of
+  that snapshot, not separate backend stores. A view has no child key/write/cache/watch/list or future-epoch mutation.
 - The record is immutable for one Topic Incarnation. Repeated create with the same identity and exact value converges;
   a different value cannot reuse the record identity.
 - The `CREATING` intent path from ADR 0019 is not used by the 0.2 composite representation. A future requirement to
@@ -40,8 +41,8 @@ ADR 0043. Kafka physical wire/publication validation and the Pulsar selector/cac
 - `V2-OPEN-META-02` is resolved.
 - Both metadata backends implement the same visible aggregate without requiring Oxia multi-key transactions.
 - Whole-record versioning and equality replace partial-record repair in 0.2.
-- M1 must prove atomic Kafka replay/snapshot publication, Oxia create-response-loss convergence, conflicting retry
-  rejection, typed-view equality, and absence of independently writable child records.
+- M1 must prove atomic Kafka replay/snapshot publication, every closed create result, Oxia response-loss convergence,
+  conflicting retry rejection, one-decode/multi-view equality, and absence of independent child authority.
 
 This decision is refined by [ADRs 0028](0028-v2-topic-incarnation-keys-and-deterministic-ids.md),
 [0033](0033-v2-topic-binding-aggregate-logical-schema-v1.md),
@@ -49,5 +50,6 @@ This decision is refined by [ADRs 0028](0028-v2-topic-incarnation-keys-and-deter
 [0042](0042-v2-kafka-topic-aggregate-kraft-record-and-image-ownership.md), and
 [0043](0043-v2-pulsar-topic-generation-selector-and-retired-tombstone.md),
 [0050](0050-v2-kafka-aggregate-wire-and-publication-validation.md), and
-[0051](0051-v2-pulsar-selector-state-machine-and-cached-fence.md); it refines ADR 0019 and is tracked by `T-META-01`,
+[0051](0051-v2-pulsar-selector-state-machine-and-cached-fence.md), and
+[0082](0082-v2-m1-domain-and-control-authority-contracts.md); it refines ADR 0019 and is tracked by `T-META-01`,
 `V2-PROFILE-001`, `V2-META-002..007`, and `V2-KAF-META-001..005`.

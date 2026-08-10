@@ -11,30 +11,33 @@ sourceTuple: v2-m0
 
 ## Capability boundaries
 
-V2 does not expose one broad metadata API whose operations must map identically to KRaft and MetadataStore/Oxia.
-Shared contracts are separated into:
+V2 does not expose one broad metadata API whose operations must map identically to KRaft and MetadataStore/Oxia. M1's
+production metadata SPI has exactly four capabilities:
 
-- `TopicProtocolBindingStore`;
-- `StorageEpochStore`;
 - `TopicBindingAggregatePublisher`;
-- `OwnershipAuthority`;
-- `ManifestPublisher`;
-- `TypedLogicalTrimStore`;
-- `BackgroundWorkCoordinator`.
+- `TopicBindingAggregateReader`;
+- `PulsarTopicGenerationSelectorStore`;
+- `PulsarVirtualLedgerNamespaceRegistryStore`.
+
+One aggregate read/decode returns a `VersionedAggregateSnapshot`; Binding and initial Epoch are domain projections, not
+child stores. No child key/write/cache/watch/list or future-Epoch mutation is permitted. Manifest, logical trim,
+background coordination, and other later-milestone capabilities remain separately scoped and are not added to the M1
+SPI prematurely.
 
 The executable dependency boundary is `nereus-domain <- nereus-metadata-spi <- nereus-metadata-oxia`.
 `nereus-domain` is Java-17/JDK-only and owns canonical logical values, deterministic identities, and validators;
 `nereus-metadata-spi` depends only on it and exposes the atomic semantics above. It has no generic key/value operations
-or umbrella store. Kafka `:metadata` consumes only an immutable, source-qualified `nereus-domain` JAR/POM, maps its
-generated physical record to a domain value, and invokes the validator directly without encode/decode round trips.
+or umbrella store. Create and CAS return only ADR 0082's closed results; `EXACT` binds key, schema, digest, and canonical
+stored bytes. Kafka `:metadata` consumes only an immutable, source-qualified `nereus-domain` JAR/POM, maps its generated
+physical record to a domain value, and invokes the validator directly without NTA1 encode/decode round trips. Kafka
+implements none of these MetadataStore SPIs.
 
 Conformance suites verify fencing, monotonic roots, idempotency, response-loss recovery, and bounded enumeration. They
 do not require both backends to implement the same ephemeral lease primitive.
 
-`TopicBindingAggregatePublisher` writes one immutable `TopicBindingAggregateRecord`. Kafka adds it to the atomic
-`CreateTopics` result; MetadataStore/Oxia creates one key and resolves response loss by exact reread equality. Binding
-and epoch stores are projections rather than independent authorities. This is create/open control-plane work, not
-normal append.
+`TopicBindingAggregatePublisher` writes one immutable `TopicBindingAggregateRecord` to MetadataStore/Oxia and resolves
+response loss by exact reread. Kafka instead maps the same domain value directly into its native atomic CreateTopics
+record/image authority. This is create/open control-plane work, not normal append.
 
 The aggregate key is protocol/incarnation-scoped: native Kafka topic UUID or Pulsar canonical persistence-name digest
 plus generation. Its value repeats the complete discriminated identity, and binding/initial-epoch IDs are deterministic
@@ -60,6 +63,12 @@ only `[2,2]`; level 1 remains V1 and is rejected. Generic runtime 0/1-to-2 updat
 At level 2, a successful native CreateTopics item publishes the aggregate in the same atomic result; validate-only and
 native failed items publish nothing.
 
+Nereus CreateTopics pseudo-config is input-only. Resolution removes it before native `ConfigRecord` validation/emission
+and persists only resolved value, origin, and catalog/policy version in the aggregate. DescribeConfigs may synthesize a
+read-only aggregate projection; both AlterConfigs APIs reject every change/delete operation for those keys. Internal
+topics use an explicit versioned Deployment policy, and every successful TopicImage topic has one aggregate; the KRaft
+metadata log is outside that set.
+
 Kafka reserves metadata extension keys `32000..32767`; API key 32000 is the generated non-flexible wire-v0
 `TopicBindingAggregateRecord` owned directly by `TopicImage`. Completed snapshots write
 `TopicRecord -> TopicBindingAggregateRecord -> PartitionRecord*` for each topic, and `RemoveTopicRecord` removes the
@@ -70,9 +79,11 @@ validation cannot be disabled.
 
 Initial replay/CreateTopics performs full semantic validation. Ordinary publication validates only touched-topic
 incremental invariants and neither scans all topics nor recomputes canonical aggregate SHA values. Bootstrap, complete
-snapshot, and equivalent full catch-up scan all live topics. CreateTopics pre-admits the complete Topic+Aggregate+
-Partition record count/encoded size before producing its atomic result, and an invalid candidate image is never
-published. These record/image authorities are M1; M6 owns process-level protocol and restart evidence.
+snapshot, and equivalent full catch-up scan all live topics. CreateTopics/validateOnly pre-admit the exact final
+cumulative `Topic + Aggregate + native Config* + Partition* + record/batch framing` count/encoded size before producing
+an atomic result; a failed topic contributes no residue, native per-topic partial success remains, and an invalid
+candidate image is never published. These record/image authorities are M1; M6 owns process-level protocol and restart
+evidence.
 
 High-churn materialization heartbeats, cache state, and per-append data do not belong in the KRaft log. Background work
 uses deterministic assignment from durable roots or a separately bounded coordinator whose loss only delays work.
@@ -97,19 +108,26 @@ immutable aggregate creation/native deletion. Topic open, ownership acquisition,
 ACTIVE plus exact aggregate identity and install a local versioned fence. Watch/cache state may accelerate this control
 path but normal append/read performs no Oxia call; stale state blocks admission until revalidation.
 
-The ownership side of that fence is an opaque backend-native witness with a non-reusable acquisition identity. Install
-captures witness A, reads/validates selector and aggregate, captures witness B, and succeeds only when A equals B and
-the broker still owns the service unit. Resettable state versions and stable broker endpoints are insufficient. Watch
-or ownership-loss events only invalidate, with invalidation preceding unload. Ordinary access reads a primitive local
-generation/valid bit and performs no token/SHA parsing or remote I/O. A backend without a qualifying witness fails
-closed.
+The ownership side of that fence is an opaque backend-native witness with a collision-resistant 128-bit acquisition ID
+whose create/retry/reacquire transitions follow ADR 0082. Install first arms gap-safe ownership and selector
+invalidation, captures authoritative witness A, reads/validates selector and aggregate, captures authoritative B, and
+CASes the exact invalidation sequence into one VALID atomic fence word. Resettable state versions, endpoints, boolean
+ownership, eventual TableView, and generic best-effort watches are insufficient. Callback, reconnect/session gap,
+close, or ownership loss advances the same INVALID sequence before transfer/unload, so a stale installer cannot restore
+validity. Admission captures the full word and success completion/ACK rechecks equality. Ordinary access performs no
+token/SHA parsing or remote I/O. A backend without authoritative A/B, acquisition transition, ordered loss hook, and
+gap-safe invalidation fails V2 topic/Cell admission closed.
 
-A single bounded deployment-level Virtual Ledger Namespace Registry is allocation authority for non-overlapping,
-never-reused cell slices from `[2^62, 2^63 - 2]` and records native-exclusion evidence for the entire interval. Its
-canonical complete assignment table uses one-key CAS and a monotonic registry epoch. Per-cell lookup/watch state is
-derived. The cell's allocator operates only inside its current slice; missing, overlapping, drifted, revoked, or
-capacity-exhausted registry state blocks allocation. Reservation checks are low-frequency control-plane work, not
-normal append metadata I/O.
+The immutable `ledgerIdCompatibilityNamespaceId` names the numeric space shared by all ledger-ID writers. Before V2
+admission its Registry may be absent; while V2 allocation is admitted exactly one bounded Registry owns non-overlapping,
+never-reused cell slices from `[2^62, 2^63 - 2]`. It contains the complete canonical writer set or a typed exact
+key/version/length/SHA reference to an immutable content-addressed snapshot, plus an ACL/credential/deployment interlock
+that excludes omitted writers. New writers are committed before start; removal follows fence/drain; rolling upgrade
+may commit old and new identities together. The complete assignment table uses one-key CAS and `registryEpoch + 1`.
+Allocators use a versioned derived slice view instead of rereading/copying the 64-KiB Registry per rollover. Missing,
+overlapping, drifted, revoked, incomplete, or capacity-exhausted authority blocks allocation. Registry conformance and
+allocator-harness receipts are distinct. Reservation checks are low-frequency control-plane work, not normal append
+metadata I/O.
 
 Every assignment is owned by an immutable Pulsar Protocol Cell tuple and follows
 `ACTIVE -> RETIRING -> RETIRED`; retired rows and bounds remain forever. Each Cell has one immutable aligned `2^40`

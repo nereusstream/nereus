@@ -38,7 +38,7 @@
     {
       "id": "V2-POLICY-001",
       "milestone": "M1",
-      "contract": "the typed resolver makes correctness/parser caps non-configurable, Product/Deployment owns base defaults, Namespace/Topic may narrow intent, Cell/host only cap, and one policy type cannot span activation lifecycles",
+      "contract": "the typed resolver makes correctness/parser caps non-configurable, Product/Deployment owns base defaults, Namespace/Topic may narrow new-write admission but never persisted-v1 decode, Cell/host only cap, and one policy type cannot span activation lifecycles",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -54,7 +54,7 @@
     {
       "id": "V2-META-002",
       "milestone": "M1",
-      "contract": "one immutable TopicBindingAggregateRecord physically owns the complete binding and initial epoch",
+      "contract": "one immutable TopicBindingAggregateRecord physically owns the complete binding and initial epoch; Publisher/Reader return one VersionedAggregateSnapshot and closed exact outcomes with no child authority",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -62,7 +62,7 @@
     {
       "id": "V2-META-003",
       "milestone": "M1",
-      "contract": "aggregate authority uses a typed Kafka UUID or Pulsar persistence name generation incarnation and deterministic binding and initial epoch IDs",
+      "contract": "create-only nonzero 16-byte bootstrap/topic identities and raw Kafka UUID feed exact NTB1/NSE1 preimages that yield 32-byte binding and initial-epoch IDs",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -70,7 +70,7 @@
     {
       "id": "V2-META-004",
       "milestone": "M1",
-      "contract": "one closed aggregate logical schema v1 contains the immutable binding plus ordinal zero epoch and excludes mutable or retry dependent state",
+      "contract": "canonical NTA1 is one closed aggregate logical schema v1; Oxia wraps it while Kafka maps generated fields directly without temporary NTA1 bytes",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -94,7 +94,7 @@
     {
       "id": "V2-META-006",
       "milestone": "M1",
-      "contract": "Pulsar selector uses exact reserved active deleting deleted CAS recovery and normal access checks a cached versioned active aggregate fence",
+      "contract": "Pulsar selector uses closed exact RESERVED to ACTIVE to DELETING to DELETED recovery and a capability-gated authoritative ownership witness to CAS one stale-install-safe atomic ACTIVE fence word",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -102,7 +102,7 @@
     {
       "id": "V2-KAF-META-001",
       "milestone": "M1",
-      "contract": "Kafka metadata authority activates only as one complete fresh-bootstrap feature-2/API-32000/CreateTopics/image/publication tuple and rejects every upgrade/downgrade",
+      "contract": "Kafka metadata authority activates only as one complete fresh-bootstrap feature-2/API-32000/CreateTopics pseudo-config/image/publication tuple and rejects every upgrade/downgrade",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -118,7 +118,7 @@
     {
       "id": "V2-KAF-META-003",
       "milestone": "M1",
-      "contract": "Kafka reserves API key 32000 strict non-flexible v0; initial mapping validates fully, ordinary publication validates only touched invariants without SHA recomputation, and complete boundaries scan all topics",
+      "contract": "Kafka reserves API key 32000 strict non-flexible v0; direct generated-record mapping validates fully, ordinary publication validates only touched invariants without SHA recomputation, complete boundaries scan all topics, and exact final cumulative batch admission precedes Raft append",
       "ownerDoc": "docs/v2/06-metadata-backends-and-handoff.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -158,24 +158,27 @@
     {
       "id": "V2-POSITION-003",
       "milestone": "M1",
-      "contract": "the registry assigns non-overlapping never-reused Cell slices only after all writers sharing the namespace prove native exclusion",
+      "contract": "exactly one admitted compatibility-namespace Registry assigns non-overlapping never-reused Cell slices only after a complete selected writer commitment and allocation interlock prove exclusion",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "requiredReceiptKind": "REGISTRY_CONFORMANCE",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
     {
       "id": "V2-POSITION-004",
       "milestone": "M1",
-      "contract": "one bounded deployment registry is virtual ledger slice allocation authority and per cell lookups are derived",
+      "contract": "one bounded compatibility-namespace Registry Store is slice-allocation authority; key/value identity and registryEpoch plus one are exact while allocators use versioned derived slice views",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "requiredReceiptKind": "REGISTRY_CONFORMANCE",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
     {
       "id": "V2-POSITION-005",
       "milestone": "M1",
-      "contract": "virtual ledger slice owner identity is the durable deployment reservation domain and Pulsar Protocol Cell tuple independent of broker and provider state",
+      "contract": "virtual ledger slice owner identity is the durable deployment reservation domain and Pulsar Protocol Cell tuple inside one immutable compatibility namespace independent of broker and provider state",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "requiredReceiptKind": "REGISTRY_CONFORMANCE",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
@@ -184,6 +187,7 @@
       "milestone": "M1",
       "contract": "registry wire and validator make ACTIVE→RETIRING→RETIRED irreversible and retain retired assignments permanently",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "requiredReceiptKind": "REGISTRY_CONFORMANCE",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
@@ -192,6 +196,7 @@
       "milestone": "M1",
       "contract": "every Cell has one immutable aligned power of two slice and deployment capacity is bounded by numeric and lifetime encoded registry limits",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "requiredReceiptKind": "REGISTRY_CONFORMANCE",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
@@ -200,14 +205,16 @@
       "milestone": "M1",
       "contract": "registry admission rejects resize, relocation, extension, second-slice attachment, wrap, borrow, and reuse before allocation",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "requiredReceiptKind": "REGISTRY_CONFORMANCE",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
     {
       "id": "V2-POSITION-009",
       "milestone": "M1",
-      "contract": "registry bootstrap fixes k=40, 64 KiB, 256 lifetime assignments, and 192-byte rows and rejects a replacement logical domain without disjoint-namespace proof",
+      "contract": "Registry bootstrap fixes k=40, 64 KiB, 256 lifetime assignments, and 192-byte rows and rejects a second logical domain in the same compatibility namespace",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "requiredReceiptKind": "REGISTRY_CONFORMANCE",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
@@ -216,6 +223,7 @@
       "milestone": "M1",
       "contract": "the allocator harness deterministically exercises candidate cuts and emits only HARNESS_CONFORMANCE_ONLY with selectionEligible false",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "requiredReceiptKind": "HARNESS_CONFORMANCE_ONLY",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
@@ -224,6 +232,7 @@
       "milestone": "M1",
       "contract": "the evidence-only RANGE candidate preserves incarnation-owned grants across owner takeover and deterministically converges response-loss cuts without production activation",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "requiredReceiptKind": "HARNESS_CONFORMANCE_ONLY",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
@@ -262,7 +271,7 @@
     {
       "id": "V2-POSITION-016",
       "milestone": "M3",
-      "contract": "production provisioning accepts additional capacity only from a proven disjoint reservation namespace or independent cluster",
+      "contract": "production provisioning accepts additional capacity only from a new immutable compatibility namespace with a proven disjoint ledger-ID space or an independent cluster",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null

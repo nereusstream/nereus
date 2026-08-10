@@ -15,23 +15,28 @@ alone cannot close a gate.
 
 ## M1 implementation-readiness grill: current frontier
 
-Round 1 accepted ADR 0081's pure V2 active graph, Java-17/JDK-only domain and capability-specific metadata SPI,
-complete M1 Kafka metadata authority, Pulsar backend-native ownership witness plus local ACTIVE fence, mode-independent
-virtual-ledger registry, and three-stage gate/four-stage cross-repository promotion boundary. It split every M1/M3,
-M1/M5, and M1/M6 scenario so a focused M1 receipt cannot promote future milestone evidence. The complete adjusted
-answer is preserved in [M1 readiness round 1](grill-notes/22-m1-readiness-round-1-pure-graph-and-promotion.md).
+Round 1 accepted ADR 0081's pure V2 active graph, module/gate, milestone, and cross-repository promotion boundaries.
+Round 2 accepted ADR 0082's 16/32-byte identity boundary and exact NTB1/NSE1 outer preimages, strict NTA1 direction,
+exact four-capability M1 SPI and closed mutation outcomes, Kafka input-only CreateTopics authority, Pulsar authoritative
+ownership witness plus stale-install-safe atomic fence, and compatibility-namespace Registry with complete writer-set
+interlock and distinct Registry/harness receipts. The complete adjusted answers are preserved in
+[round 1](grill-notes/22-m1-readiness-round-1-pure-graph-and-promotion.md) and
+[round 2](grill-notes/23-m1-readiness-round-2-domain-control-authorities.md).
 
-Round 1 did not freeze implementation bytes or select an allocator. The next implementation-readiness descendants
-remain OPEN until explicitly confirmed:
+Those accepted outer contracts do not select an allocator or invent unconfirmed byte tables. The next
+implementation-readiness descendants remain OPEN until explicitly confirmed:
 
-- exact `ProtocolCellIdentity` fields plus deterministic binding/epoch ID v1 preimage bytes and golden vectors;
-- the closed aggregate logical wire, discriminator/field IDs, parser caps, Oxia key grammar, and Kafka physical mapping;
-- Kafka CreateTopics profile/policy input, error precedence, internal-topic behavior, and atomic-batch admission formula;
-- Pulsar selector/aggregate key and wire plus the backend-native opaque ownership-witness acquisition/validation hook;
-- virtual-ledger registry key/wire/row encoding and the deployment-wide all-writer native-exclusion evidence envelope;
-- M1 candidate-harness and promotion-receipt schemas, source-qualified artifact layout, and zero-test/skip failure rules.
+- exact `cellBytes` and protocol-discriminated `incarnationBytes` field order, codes, lengths, and key/golden vectors;
+- the complete NTA1 v1 field/enum/presence table and numeric parser-cap derivation from pinned Kafka/Pulsar boundaries;
+- Kafka pseudo-config keys/value grammar, validation/error precedence, built-in-internal classification, exact
+  cumulative-batch overflow selection/error, record order, and DescribeConfigs projection surface;
+- each Pulsar native ownership transition's acquisition-ID inheritance/new-ID rule, authoritative witness encoding,
+  watch-registration barrier/reconnect-gap contract, and adapter-specific sequence hook;
+- exact `ledgerIdCompatibilityNamespaceId` encoding plus inline-versus-referenced writer-set representation and its
+  backend-specific ACL/credential/deployment interlock;
+- exact `REGISTRY_CONFORMANCE` and `HARNESS_CONFORMANCE_ONLY` receipt payload schemas and immutable artifact layout.
 
-No value in that list is normative merely because it is a Round 2 candidate.
+These descendants remain non-normative until a later explicit grill confirmation.
 
 ## Restarted Grill 2: evidence frontier
 
@@ -543,11 +548,13 @@ Resolved by [ADR 0027](../decisions/0027-v2-pulsar-virtual-ledger-numeric-compat
 increasing with gaps and no reuse. Numeric order preserves stock comparison only; explicit predecessor/head metadata
 remains Ledger Chain authority.
 
-### `V2-OPEN-PUL-OBJ-03`: resolved deployment reservation registry authority
+### `V2-OPEN-PUL-OBJ-03`: resolved compatibility-namespace reservation Registry authority
 
-Resolved by [ADR 0032](../decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md). One bounded deployment-wide
-registry is slice-allocation authority; its canonical assignment table advances through single-key CAS. Per-cell lookup
-and watches are derived. Exact capacity, slice lifecycle, allocator, and Ledger Chain protocols remain descendants.
+Resolved by [ADR 0032](../decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md). Before V2 admission an
+immutable ledger-ID compatibility namespace may have no Registry; while admitted it has exactly one bounded
+slice-allocation Registry. Its complete writer commitment/interlock and canonical assignment table advance through
+single-key CAS; per-cell allocator state is a versioned derived view. Exact physical key/writer-set encodings, allocator,
+and Ledger Chain protocols remain descendants.
 
 ### `V2-OPEN-PUL-OBJ-04`: resolved durable slice owner identity
 
@@ -576,8 +583,9 @@ a future explicit migration contract for existing topics or ledgers.
 ### `V2-OPEN-PUL-OBJ-08`: resolved virtual-ledger exponent and registry lifetime caps
 
 Resolved by [ADR 0054](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geometry.md). Bootstrap fixes `k=40`,
-64 KiB, 256 lifetime rows, and 192 bytes/row. A new logical reservation-domain label cannot reuse the interval; a new
-domain must prove a disjoint ledger-ID namespace or use an independent deployment/cluster.
+64 KiB, 256 lifetime rows, and 192 bytes/row. A new logical reservation-domain label cannot reuse the interval; further
+allocation requires a new immutable compatibility namespace backed by a disjoint ledger-ID space, or an independent
+deployment/cluster.
 
 ### `V2-OPEN-PUL-OBJ-09`: virtual-ledger allocator reservation and head publication
 

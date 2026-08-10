@@ -43,21 +43,28 @@ never authority keys.
 
 The Topic Protocol Binding and its one initial Storage Epoch are physically stored as one immutable
 `TopicBindingAggregateRecord`. Kafka appends it inside the existing atomic `CreateTopics` controller result;
-MetadataStore/Oxia creates one aggregate key with `putIfAbsent`. The logical binding and epoch stores are typed views of
-that record and cannot mutate one component independently.
+MetadataStore/Oxia creates one aggregate key with `putIfAbsent`. One decode yields one
+`VersionedAggregateSnapshot`; logical binding and ordinal-zero epoch are domain projections, not child stores, keys,
+writes, caches, watches, lists, or future-epoch mutation authorities.
 
 Aggregate authority keys include the protocol kind and complete typed incarnation: Kafka keys use the canonical topic
 UUID, while Pulsar keys use a domain-separated canonical-persistence-name digest plus fixed-width generation. Values
-repeat the identity and are validated against the key. `bindingId` and the ordinal-zero `storageEpochId` are separate
-domain-separated SHA-256 derivations from canonical framed Cell/incarnation facts; random attempts, time, log offsets,
-and backend versions cannot influence them.
+repeat the identity and are validated against the key. Bootstrap deployment/reservation-domain/Cell IDs and Kafka
+topic UUIDs are create-only, non-zero 16-byte values; `bindingId` and ordinal-zero `storageEpochId` are 32-byte SHA-256
+values. They use ADR 0082's exact `NTB1 || u32be(cellLength) || cellBytes || u32be(incarnationLength) ||
+incarnationBytes` and `NSE1 || bindingId[32] || u64be(epochOrdinal)` preimages. Kafka UUID is raw 16 bytes, M1 accepts
+only ordinal zero, and random attempts, names/configuration, time, log offsets, and backend versions cannot influence
+these IDs.
 
-The one logical compatibility axis is `aggregateSchemaVersion=1`. Its closed payload contains the complete binding and
-ordinal-zero epoch, including typed profile/origin and WAL/payload/checksum/compression/encryption discriminators. An
-inapplicable discriminator is explicit `NONE`; unknown/illegal combinations fail closed. `ACTIVE` is derived only after
-complete publication/validation and is not stored. The v1 aggregate excludes `CREATING`, delete/lifecycle/owner state,
-timestamps, attempts, controller offsets, backend versions, and untyped attributes. Oxia envelope schema 1 and Kafka
-controller-record wire v0 map through one logical validator and shared semantic golden vectors.
+The one logical compatibility axis is `aggregateSchemaVersion=1`. Canonical `NTA1` contains the complete binding and
+ordinal-zero epoch, including typed profile/origin, source-qualified policy/catalog version, and
+WAL/payload/checksum/compression/encryption discriminators. Its
+field order, enum codes, presence bytes, `u32be` lengths/counts, fixed arrays, strict UTF-8, rejection rules, and fixed
+v1 parser caps follow ADR 0082. Deployment may lower only new-write/admission ceilings, never persisted-v1 decoding.
+An inapplicable discriminator is explicit `NONE`; unknown/illegal combinations fail closed. `ACTIVE` is derived only
+after complete publication/validation and is not stored. The v1 aggregate excludes `CREATING`, delete/lifecycle/owner
+state, timestamps, attempts, controller offsets, backend versions, and untyped attributes. Oxia envelope schema 1 wraps
+NTA1; Kafka wire v0 maps generated fields directly to the domain validator without constructing temporary NTA1 bytes.
 
 At Kafka feature level 2, that physical record is one generated, typed, non-flexible
 `TopicBindingAggregateRecord(apiKey=32000, wireVersion=0)` owned by `TopicImage`, not an opaque attachment or parallel
@@ -184,8 +191,12 @@ derived and cannot independently delete a native ledger. See [BookKeeper and Pul
 ## System topics
 
 Kafka internal topics and Pulsar system topics use explicit initial-epoch profile policy; they never inherit a tenant
-default without validation. A protocol adapter may restrict the allowed initial profile set when its recovery or
-transaction authority cannot satisfy the contract. No adapter exposes an online transition set in 0.2.
+default without validation. Kafka Nereus CreateTopics pseudo-config is input-only: it is removed from native
+`ConfigRecord` changes, the resolved value/origin/catalog-policy version lives only in the aggregate, DescribeConfigs
+may synthesize a read-only projection, and AlterConfigs mutation is rejected. Every successful TopicImage topic,
+including internal topics, owns an aggregate; the KRaft metadata log is not such a topic. A protocol adapter may
+restrict the allowed initial profile set when its recovery or transaction authority cannot satisfy the contract. No
+adapter exposes an online transition set in 0.2.
 
 Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-POLICY-01`, `T-OBJECT-01`, and `T-BK-01`. Required scenarios:
 `V2-PROFILE-001`, `V2-POLICY-001..002`, `V2-MIGRATION-001`, `V2-META-002..007`, and
@@ -202,4 +213,5 @@ Relevant tradeoffs: `T-PROFILE-01`, `T-MIGRATION-01`, `T-POLICY-01`, `T-OBJECT-0
 [ADR 0051](../decisions/0051-v2-pulsar-selector-state-machine-and-cached-fence.md), with NPD1 policy authority refined
 by [ADR 0057](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md) and Object-WAL lanes by
 [ADRs 0060](../decisions/0060-v2-walrun-lazy-lanes-and-vector-checkpoint.md) and
-[0062](../decisions/0062-v2-object-wal-packing-catalog-and-leaf-sequence.md).
+[0062](../decisions/0062-v2-object-wal-packing-catalog-and-leaf-sequence.md), and M1 exact domain/control boundaries by
+[ADR 0082](../decisions/0082-v2-m1-domain-and-control-authority-contracts.md).

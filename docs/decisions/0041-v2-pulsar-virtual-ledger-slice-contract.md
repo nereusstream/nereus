@@ -6,10 +6,10 @@ Accepted for Pulsar `OBJECT_WAL` in 0.2. Implementation and runtime evidence are
 
 ## Context
 
-ADR 0032 selects one bounded deployment registry but leaves durable owner identity, retirement, and capacity geometry
-open. Binding a slice to a broker, session, display alias, or provider configuration would consume the finite reserved
-domain during ordinary operations. Deleting retired assignments or varying interval sizes would complicate the global
-never-overlap/never-reuse proof and bounded canonical encoding.
+ADR 0032 selects one bounded Registry for an admitted compatibility namespace but leaves durable owner identity,
+retirement, and capacity geometry open. Binding a slice to a broker, session, display alias, or provider configuration
+would consume the finite reserved domain during ordinary operations. Deleting retired assignments or varying interval
+sizes would complicate the global never-overlap/never-reuse proof and bounded canonical encoding.
 
 ## Decision
 
@@ -18,6 +18,10 @@ Each assignment owner is the stable tuple
 `sliceAssignmentId`; inclusive bounds are part of that assignment's identity. Broker/process/session, display alias,
 provider endpoint/credential, and Cell Provider Scope are runtime/admission attributes and never change slice ownership.
 Reusing a display name after retirement requires a new Protocol Cell ID and new assignment.
+
+That tuple exists inside exactly one Registry bound to the immutable `ledgerIdCompatibilityNamespaceId`; the Registry
+key/value supplies the namespace cross-check. A versioned derived slice view repeats the Registry epoch and assignment
+identity so the allocator need not read the complete Registry during rollover.
 
 Slice lifecycle is the irreversible sequence `ACTIVE -> RETIRING -> RETIRED`:
 
@@ -48,5 +52,5 @@ RETIRING-to-RETIRED proof and allocator/chain epoch protocols remain downstream 
   alignment/math, encoded capacity, and provider-configuration independence. M3 proves production allocation stop at
   RETIRING/exhaustion and retired-ledger readability.
 
-This decision is refined by ADRs 0048/0054/0055/0061, refines ADRs 0027/0032, and is tracked by `T-POSITION-01`,
+This decision is refined by ADRs 0048/0054/0055/0061/0082, refines ADRs 0027/0032, and is tracked by `T-POSITION-01`,
 `V2-POSITION-003..018`.

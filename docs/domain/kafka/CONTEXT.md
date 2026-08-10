@@ -33,8 +33,11 @@ _Avoid_: Online V1 migration, unsafe feature downgrade, absent feature as V2 act
 **Kafka Topic Binding Aggregate Record**:
 The generated typed KRaft non-flexible wire-v0 record at API key 32000, owned by one `TopicImage`. MetadataLoader
 validates touched topics at ordinary publication and all live topics only at snapshot/bootstrap. Completed snapshots
-place it after `TopicRecord` and before partitions; `RemoveTopicRecord` removes it with the topic.
-_Avoid_: Opaque attachment, parallel aggregate image, independent aggregate delete record
+place it after `TopicRecord` and before partitions; `RemoveTopicRecord` removes it with the topic. Nereus CreateTopics
+pseudo-config is removed before native ConfigRecord emission, persists only as resolved aggregate facts, and is exposed
+only as an optional read-only projection.
+_Avoid_: Opaque attachment, parallel aggregate image, independent aggregate delete record, duplicate ConfigRecord
+authority, mutable AlterConfigs pseudo-key
 
 **Kafka Frame**:
 One complete raw Kafka RecordBatch after broker offset and leader-epoch assignment. Its exact batch header defines

@@ -32,6 +32,11 @@ Sessions**:
 - a session may borrow a compatible lower-level SDK transport or client pool, but that pool owns no protocol position,
   manifest, task, cache, or GC authority and cannot erase the session boundary.
 
+The immutable protocol-specific Cell ID is a create-only, non-zero 16-byte bootstrap identity. It is never recomputed
+from a display name or configuration, and rebuilding a Cell creates a new ID. Registry identity additionally binds its
+enclosing `ledgerIdCompatibilityNamespaceId`, deployment, and reservation-domain facts; those Registry-scope facts do
+not become part of every Topic Binding's Cell identity.
+
 Object WAL groups never cross Protocol Cells in 0.2. A group may batch multiple compatible Topic Protocol Bindings only
 inside one Cell Provider Scope. Cross-cell batching is not required for Storage Fabric sharing.
 
@@ -56,5 +61,5 @@ isolation survives an outage of intentionally shared physical infrastructure.
 - Protocol Cell is the minimum logical failure-attribution and provider-authorization boundary. Tenant policies may
   further subdivide a cell and are not replaced by this decision.
 
-This decision refines ADR 0009 and ADR 0011 and is tracked by `T-FABRIC-01`, `V2-FABRIC-001`, `V2-FABRIC-002`, and
-`V2-FABRIC-003`.
+This decision is refined by ADR 0082, refines ADRs 0009/0011, and is tracked by `T-FABRIC-01`, `V2-FABRIC-001`,
+`V2-FABRIC-002`, and `V2-FABRIC-003`.

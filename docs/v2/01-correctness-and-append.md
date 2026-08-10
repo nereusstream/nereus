@@ -53,6 +53,11 @@ but its physical PUT boundary cannot weaken either protocol's append atomicity.
 The owner must not acknowledge coverage because a local future completed if its Owner Epoch or Storage Epoch authority
 was fenced before the durability completion was validated.
 
+On Pulsar, admitted work captures the complete local atomic ACTIVE-fence word before position allocation and rechecks
+exact equality before every success completion, duplicate/transaction fast-path response, or ACK. A changed/invalid
+word permits only a fenced or uncertain failure, never a success ACK, even when bytes became durable. The check is
+local; ordinary append performs no ownership or selector metadata read.
+
 ## Physical extent resolution versus binding durability
 
 For `OBJECT_WAL`, `LaneExtentResolvedThrough` and `BindingDurableFrontier` are distinct:
