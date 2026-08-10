@@ -46,7 +46,7 @@ field ordering/codes are frozen before their implementation slice is activated. 
 is never ordinary append/read work. ADR 0083 owns the NPC1/NTI1 variant layouts: Pulsar `cellBytes` retains
 `reservationDomainId`; compatibility namespace, provider scope, and broker alias remain excluded. Protocol code zero
 and Kafka `ZERO_UUID`/`ONE_UUID` are invalid, Kafka names are at most 249 ASCII bytes, and Pulsar generation is positive
-signed-long with overflow rejection. Numeric protocol codes plus Pulsar name/total caps remain open.
+signed-long with overflow rejection. ADR 0084 fixes `KAFKA=1` and `PULSAR=2`; Pulsar name/total caps remain OPEN.
 
 ### Logical aggregate and physical encodings
 
