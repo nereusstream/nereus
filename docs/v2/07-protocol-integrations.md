@@ -120,9 +120,10 @@ partial reservation before protocol-legal split/failure. One ABA-safe lease word
 drain; cancellation and late callbacks cannot force-clear it. One pinned snapshot may span disjoint manifest and
 active-tail ranges while each Kafka commit set/Pulsar entry remains source-pure. Pulsar sealed-ledger async-offload
 keeps its separate whole-range source-pure fallback. Object-WAL locator/protection retirement requires fenced no-
-fallback selected by the same Binding selector CAS as takeover, plus contiguous source-independent Read Admission
-Epoch proofs bound to irreversible terminal cuts and immutable capability evidence. Proofs are generated only for
-fallback-capable intervals; ordinary reads perform zero remote metadata I/O.
+fallback E+1 granted by the same Binding selector CAS that closes E and carries its anchor. Each source releases against
+its own `[first_i,sharedLast]` proof interval through an exact CAS; N members retain bounded O(N) recovery work. Proofs
+bind irreversible terminal cuts and immutable capability evidence. Quarantine blocks batch retirement/capacity but not
+eligible siblings; batch compaction never authorizes source GC. Ordinary reads perform zero remote metadata I/O.
 
 The parity matrix covers at least:
 
@@ -157,5 +158,5 @@ against V2 bindings, protocol-native Kafka work, and the then-current KoP source
 
 Relevant tradeoffs: `T-PROTOCOL-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `T-POLICY-01`, `T-PROJECTION-01`,
 `T-BENCH-01`, and `T-KOP-01`. Required scenarios: `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`,
-`V2-PROJECTION-001`, `V2-POSITION-002..011`, `V2-OBJ-002/004..024`, `V2-READ-003..006`, `V2-BK-005..013`,
+`V2-PROJECTION-001`, `V2-POSITION-002..011`, `V2-OBJ-002/004..024`, `V2-READ-003..013`, `V2-BK-005..013`,
 `V2-KAF-META-001..003`, `V2-POLICY-001`, `V2-KAF-001`, `V2-PUL-001`, and `V2-KOP-001`.

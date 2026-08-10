@@ -129,6 +129,8 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md"
     "$repo_root/docs/decisions/0075-v2-binding-read-selector-and-fallback-interval-linearization.md"
     "$repo_root/docs/decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md"
+    "$repo_root/docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
+    "$repo_root/docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -223,6 +225,15 @@ require_literal 'Cross-key application-side reread' "docs/decisions/0075-v2-bind
 require_literal '`ReadAdmissionEpochTerminalCut`' "docs/decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md"
 require_literal 'The first valid' "docs/decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md"
 require_literal 'generated on demand only' "docs/decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md"
+require_literal '**Read Admission Closure Anchor**' "docs/domain/shared-storage/CONTEXT.md"
+require_literal '`ADMITTING`' "docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
+require_literal '`STOPPED`' "docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
+require_literal 'grants the same owner no-fallback reads under E+1' "docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
+require_literal "A backend's old value" "docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
+require_literal '`[first_i, sharedLast]`' "docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
+require_literal 'bounded O(N) authoritative protection-state scan' "docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
+require_literal 'pre-read followed by an independent CAS is not equivalent' "docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
+require_literal 'never gains a mutable released bitmap' "docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -274,7 +285,10 @@ require_literal "Restarted Grill 2 round 16" "docs/v2/grill-notes/18-restarted-g
 require_literal "Round 16：Q1、Q2 均调整后确认" "docs/v2/grill-notes/18-restarted-grill-2-read-admission-interval-and-proof-publication.md"
 require_literal "selector linearization、terminal epoch 和 proof 按需生成属于不可关闭的正确性合同" "docs/v2/grill-notes/18-restarted-grill-2-read-admission-interval-and-proof-publication.md"
 require_literal "Restarted Grill 2 round 17" "docs/v2/grill-notes/19-restarted-grill-2-selector-terminal-and-retirement-batch.md"
-require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/19-restarted-grill-2-selector-terminal-and-retirement-batch.md"
+require_literal "Round 17：Q1、Q2 均调整后确认" "docs/v2/grill-notes/19-restarted-grill-2-selector-terminal-and-retirement-batch.md"
+require_literal "不能让所有 source 共用 batch 最早 first" "docs/v2/grill-notes/19-restarted-grill-2-selector-terminal-and-retirement-batch.md"
+require_literal "Restarted Grill 2 round 18" "docs/v2/grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md"
+require_literal "Awaiting explicit confirmation" "docs/v2/grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -374,6 +388,8 @@ for resolved_gate in \
     V2-OPEN-READ-07 \
     V2-OPEN-READ-10 \
     V2-OPEN-READ-11 \
+    V2-OPEN-READ-12 \
+    V2-OPEN-READ-13 \
     V2-OPEN-PUL-OBJ-10; do
     if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$resolved_gate remains in the active gate table"
@@ -390,16 +406,16 @@ for active_gate in \
     V2-OPEN-OBJ-24 \
     V2-OPEN-READ-08 \
     V2-OPEN-READ-09 \
-    V2-OPEN-READ-12 \
-    V2-OPEN-READ-13; do
+    V2-OPEN-READ-14 \
+    V2-OPEN-READ-15; do
     require_literal "\`$active_gate\`" "docs/v2/open-questions.md"
     if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$active_gate is missing from the active gate table"
     fi
 done
 
-for frontier_gate in V2-OPEN-READ-12 V2-OPEN-READ-13; do
-    require_literal "\`$frontier_gate\`" "docs/v2/grill-notes/19-restarted-grill-2-selector-terminal-and-retirement-batch.md"
+for frontier_gate in V2-OPEN-READ-14 V2-OPEN-READ-15; do
+    require_literal "\`$frontier_gate\`" "docs/v2/grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md"
 done
 
 active_contracts=(
@@ -476,6 +492,8 @@ active_contracts=(
     "$repo_root/docs/decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md"
     "$repo_root/docs/decisions/0075-v2-binding-read-selector-and-fallback-interval-linearization.md"
     "$repo_root/docs/decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md"
+    "$repo_root/docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
+    "$repo_root/docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
     "$repo_root/CONTEXT-MAP.md"
     "$repo_root/docs/domain"
 )
@@ -497,7 +515,10 @@ fi
 for unconfirmed_design_symbol in \
     ActiveTailRetiredThrough \
     RecoverySkipCertificate \
-    ReadBatchSlotTicket; do
+    ReadBatchSlotTicket \
+    BatchMetadataRetiredThroughEpoch \
+    pendingClosureAnchors \
+    RETIRED_V1; do
     if rg -Fn \
         --glob '!**/open-questions.md' \
         --glob '!**/grill-notes/**' \
@@ -668,6 +689,7 @@ required_scenarios = {
     "V2-BK-007", "V2-BK-008", "V2-BK-009", "V2-BK-010", "V2-BK-011", "V2-BK-012", "V2-BK-013",
     "V2-READ-001", "V2-READ-002", "V2-READ-003", "V2-READ-004", "V2-READ-005", "V2-READ-006",
     "V2-READ-007", "V2-READ-008", "V2-READ-009", "V2-READ-010", "V2-READ-011",
+    "V2-READ-012", "V2-READ-013",
     "V2-META-001", "V2-HO-001",
     "V2-KAF-001", "V2-PUL-001", "V2-KOP-001",
 }
@@ -804,6 +826,8 @@ link_docs=(
     "$repo_root/docs/decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md"
     "$repo_root/docs/decisions/0075-v2-binding-read-selector-and-fallback-interval-linearization.md"
     "$repo_root/docs/decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md"
+    "$repo_root/docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
+    "$repo_root/docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
 )
 
 while IFS=: read -r source match; do

@@ -4,8 +4,9 @@
 
 Accepted for the 0.2 `OBJECT_WAL` irreversible epoch-terminal prerequisite, deterministic create-only epoch proof,
 fenced publisher/verifier contract, first-valid-wins convergence, invalid-occupant quarantine, on-demand generation,
-and configuration boundary. Exact terminal publication state machine, proof/window wire encoding, and numeric limits
-remain M4/M5 work; implementation has not started at M0.
+and configuration boundary. ADR 0077 refines terminal closure to a fused selector-carried anchor followed by
+asynchronous terminal publication. Exact anchor/terminal publication representation, proof/window wire encoding, and
+numeric limits remain M4/M5 work; implementation has not started at M0.
 
 ## Context
 
@@ -28,10 +29,10 @@ capabilityEvidenceDigest
 admissionClosedFence OR qualifiedAuthorityNotAfter
 ```
 
-The terminal cut is irreversible. The same Read Admission Epoch can never reopen; every later admitted read belongs to
-E+1 or later. Planned-drain and qualified-expiry proof candidates for E must bind and validate the same exact terminal-
-cut SHA. The capability variant and exact terminal evidence determine whether the closed verifier may accept that cut;
-a key name alone never proves closure.
+The terminal cut is irreversible and is published asynchronously after the selector's durable closure anchor. The same
+Read Admission Epoch can never reopen; every later admitted read belongs to E+1 or later. Planned-drain and qualified-
+expiry proof candidates for E must bind and validate the same exact terminal-cut SHA. The capability variant and exact
+terminal evidence determine whether the closed verifier may accept that cut; a key name alone never proves closure.
 
 Each proof uses one deterministic Binding/incarnation/Read Admission Epoch key and an immutable canonical value.
 Creation is create-only and allowed only to a currently fenced publisher authorized for that terminal cut. Before
@@ -64,5 +65,5 @@ limited to Cell/Binding admission ceilings, reconciler cadence, and evidence-der
   rejection, deterministic bytes, both conditional-put response outcomes, invalid occupant quarantine, on-demand/no-
   fallback omission, proof reuse, and no normal-read I/O.
 
-This decision refines ADRs 0071, 0073, 0074, and 0075 and is tracked by `T-MANIFEST-01`, `T-HANDOFF-01`,
-`V2-READ-006/008/009/011`, and `V2-OPEN-READ-13`.
+This decision is refined by ADR 0077, refines ADRs 0071, 0073, 0074, and 0075 and is tracked by `T-MANIFEST-01`,
+`T-HANDOFF-01`, and `V2-READ-006/008/009/011/012`.

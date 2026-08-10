@@ -75,6 +75,12 @@ fenced proof publisher, and closed verifier are also fixed correctness. Cell/Bin
 reconciler cadence; Topic policy cannot replace the selector, reopen an epoch, demand proof for no-fallback epochs, or
 disable proof for a fallback-capable interval.
 
+The selector's `ADMITTING/STOPPED` vocabulary, fused fallback-removal/E+1 closure cut, durable anchor, per-source
+`first_i` release interval, immutable batch membership, selector-only activation, exact protection release, and batch-
+retirement prerequisites are fixed correctness. Inline/reference backend mode is capability-admitted, not Topic
+policy. Cell/Binding policy may bound anchor/batch/source rows and reconciliation work; it cannot substitute the batch
+minimum for `first_i`, skip a release CAS, reopen STOPPED E, or use metadata compression as source-GC authority.
+
 ## Consequences
 
 - Performance tuning remains possible without making correctness or durable compatibility host-dependent.

@@ -5,7 +5,8 @@
 Accepted for the 0.2 `OBJECT_WAL` Binding/incarnation read-selector authority, takeover-versus-no-fallback
 linearization, conservative whole-epoch fallback interval, first-epoch inheritance, conditional proof liability, and
 configuration boundary. Exact backend encoding, numeric limits, and equivalent-transaction conformance receipts remain
-M4 evidence work; implementation has not started at M0.
+M4 evidence work. ADR 0077 refines the no-fallback transition into one fused E-to-E+1 closure cut, while ADR 0078
+refines mixed-first release to each source's own interval; implementation has not started at M0.
 
 ## Context
 
@@ -30,20 +31,22 @@ equivalent transaction.
 For a fallback-bearing selector value `(PWF, O, E)`, the two competing transitions are:
 
 ```text
-takeover/read grant:  (PWF, O, E) -> (PWF, O2, E+1)
-no-fallback cut:      (PWF, O, E) -> (PO,  O,  E, SourceRetirementBatch[last=E])
+takeover/read grant:
+  (PWF, O, E, ADMITTING) -> (PWF, O2, E+1, ADMITTING, closureAnchor[E])
+no-fallback cut:
+  (PWF, O, E, ADMITTING) -> (PO, O, E+1, ADMITTING, SourceRetirementBatch[last=E], closureAnchor[E])
 ```
 
 Whichever transition commits first linearizes the result. The other receives a definitive conflict and must reread and
-recompute from the new exact selector. An unknown response converges only by exact selector/view/batch equality. If the
-no-fallback cut wins, E+1 may admit no-fallback reads only after its grant observes the selector already selecting
-`PREFERRED_ONLY`; if takeover wins, the stale no-fallback cut cannot freeze `last=E`.
+recompute from the new exact selector. An unknown response converges only by exact selector/view/batch equality and
+admits no further E read while unresolved. If the no-fallback cut wins, the same CAS closes E and immediately grants
+same-owner no-fallback E+1; if takeover wins, the stale no-fallback cut cannot freeze `last=E`.
 
 `firstFallbackCapableReadAdmissionEpoch` is assigned only when one new fallback/source-protection identity first
 appears. Later `PREFERRED_WITH_FALLBACK` generations carrying that same identity inherit the original first epoch; they
-never reset it to the current epoch. A retirement batch containing sources with different first epochs uses the
-earliest first, conservatively covering the whole resulting interval. Removing and later reintroducing bytes under a
-new protection identity starts a new interval even if the physical object key is the same.
+never reset it to the current epoch. Each source/protection row retains its own first epoch; a batch may summarize the
+earliest first, but source i releases only against `[first_i, sharedLast]`. Removing and later reintroducing bytes under
+a new protection identity starts a new interval and a fresh selector epoch even if the physical object key is the same.
 
 Proof-window liability is reserved for a new Read Admission Epoch only when the current selector contains fallback or
 the transition introduces fallback. A completely no-fallback epoch neither requires a quiescence proof nor blocks
@@ -62,8 +65,8 @@ capacity values.
   whole-epoch coverage can retain fallback bytes longer; the cost is control-plane/storage cost rather than read
   throughput.
 - M4/M5 must prove both CAS orders, unknown response, stale-owner fencing, selector substitution, inherited/renewed
-  source identities, mixed-first batch intervals, fallback-conditional liability, no-fallback takeover progress, and
-  zero ordinary-read metadata I/O.
+  source identities, per-source mixed-first intervals, fallback-conditional liability, fused no-fallback E+1 grant,
+  no-fallback takeover progress, and zero ordinary-read metadata I/O.
 
-This decision refines ADRs 0069, 0071, 0073, and 0074 and is tracked by `T-MANIFEST-01`, `T-HANDOFF-01`,
-`V2-READ-006/008/010`, and `V2-OPEN-READ-12`.
+This decision is refined by ADRs 0077/0078, refines ADRs 0069, 0071, 0073, and 0074 and is tracked by
+`T-MANIFEST-01`, `T-HANDOFF-01`, and `V2-READ-006/008/010/012/013`.

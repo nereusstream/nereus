@@ -582,7 +582,7 @@
     {
       "id": "V2-READ-006",
       "milestone": "M4/M5",
-      "contract": "fenced preferred with fallback to preferred only current slot drain contiguous fallback capable Read Admission Epoch proof exact historical capability evidence and protection release precede Object WAL GC",
+      "contract": "fused fenced preferred with fallback E to preferred only E plus one closure current slot drain contiguous proof for each source fallback capable interval exact historical capability evidence and protection release precede Object WAL GC",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -598,7 +598,7 @@
     {
       "id": "V2-READ-008",
       "milestone": "M4/M5",
-      "contract": "one monotonic Binding Read Admission Epoch and source independent reusable proof window continuously cover each immutable retirement batch interval without a mutable owner batch accumulator",
+      "contract": "one monotonic Binding Read Admission Epoch and source independent reusable proof window continuously cover each immutable source interval without a mutable owner batch accumulator",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -614,7 +614,7 @@
     {
       "id": "V2-READ-010",
       "milestone": "M4/M5",
-      "contract": "one exact BindingReadSelector CAS or proven equivalent transaction linearizes takeover read grant against fallback removal inherits each protection identity first epoch uses the earliest mixed first and reserves proof liability only for fallback bearing epochs",
+      "contract": "one exact BindingReadSelector CAS or proven equivalent transaction linearizes takeover read grant against fallback removal preserves each protection identity own first epoch and reserves proof liability only for fallback bearing epochs",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -622,7 +622,23 @@
     {
       "id": "V2-READ-011",
       "milestone": "M4/M5",
-      "contract": "every fallback relevant epoch proof follows one irreversible terminal cut and uses a fenced closed verified deterministic create only first valid publication while no fallback epochs remain proof free",
+      "contract": "every fallback relevant epoch proof follows one irreversible selector anchor bound terminal cut and uses a fenced closed verified deterministic create only first valid publication while no fallback epochs remain proof free",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-012",
+      "milestone": "M4/M5",
+      "contract": "one fused selector CAS from preferred with fallback E to preferred only E plus one freezes shared last E closes E grants same owner no fallback E plus one and persists a durable closure anchor under closed ADMITTING STOPPED states",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-READ-013",
+      "milestone": "M4/M5",
+      "contract": "each retirement member releases against its own first_i sharedLast interval selector only immutable activation exposes inline reference and N O N costs progress remains derived and full batch metadata retires only after all source reference prerequisites",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null

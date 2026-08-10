@@ -15,19 +15,18 @@ alone cannot close a gate.
 
 ## Restarted Grill 2: current frontier
 
-Round 16 accepted one Binding selector linearization point in ADR 0075 and an irreversible terminal/on-demand epoch-
-proof contract in ADR 0076. It preserves whole-epoch conservative coverage, inherited first epochs, fallback-only
-proof liability, deterministic create-only proof publication, zero ordinary-read metadata I/O, and the earlier
-rejection of sub-epochs, owner x source updates, mutable owner x batch accumulators, and proof replacement. The next
-independent frontier is:
+Round 17 accepted the fused no-fallback/E+1 closure cut in ADR 0077 and per-source retirement intervals/derived batch
+retirement in ADR 0078. It removes the extra same-owner rollover, keeps only `ADMITTING/STOPPED`, requires a durable
+selector closure anchor, assigns each source its own `first_i`, exposes N release CAS/bounded O(N) reconciliation, and
+rejects mutable batch progress or metadata compression as source-GC authority. The next independent frontier is:
 
 | Gate | Decision needed now | Current recommendation, not a decision |
 | --- | --- | --- |
-| `V2-OPEN-READ-12` | freeze selector admission/terminal behavior across same-owner rollover, takeover, later advancement, and asynchronous drain | use one E-to-E+1 selector CAS as E's durable closure fence, retain a bounded verifiable closure anchor, and create the terminal cut only after drain/qualified expiry |
-| `V2-OPEN-READ-13` | freeze immutable retirement-batch construction, selector activation, response-loss convergence, and per-source completion boundary | select one deterministic bounded eligibility envelope, keep completion derived from exact protection states, and reject mutable batch progress |
+| `V2-OPEN-READ-14` | freeze bounded unresolved-anchor carry-forward/pruning and the authorized asynchronous terminal publisher across repeated takeover/STOPPED cuts | use one bounded selector-owned pending-anchor set, create-only first-valid terminal cuts, an emergency STOPPED reserve, and exact prune CAS |
+| `V2-OPEN-READ-15` | freeze full-batch replacement and final compact-tombstone retirement without creating source-GC authority | use a same-key RETIRED tombstone followed by a monotonic metadata-only retired-through frontier on qualified backends |
 
 The complete questions and recommendations are in
-[round 17](grill-notes/19-restarted-grill-2-selector-terminal-and-retirement-batch.md). None of its recommendations is
+[round 18](grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md). None of its recommendations is
 accepted yet. `V2-OPEN-READ-08/09`, `V2-OPEN-OBJ-22/24`, `V2-OPEN-BK-11/13`, remaining
 `V2-OPEN-OBJ-17/19`, and `V2-OPEN-PUL-OBJ-09` are evidence-blocked rather than questions in this round.
 
@@ -336,8 +335,8 @@ evidence remains `RETAIN` and no backend is promoted by prose alone.
 
 Resolved by [ADR 0075](../decisions/0075-v2-binding-read-selector-and-fallback-interval-linearization.md). Takeover/read
 grant and fallback removal compete on one Binding/incarnation selector CAS or proven equivalent transaction comparing
-the exact selected-view/owner/read-epoch/admission-state tuple. Source identities inherit first epoch, mixed-first
-batches use the earliest, and no-fallback epochs create no proof liability.
+the exact selected-view/owner/read-epoch/admission-state tuple. Source identities inherit their own first epoch, a batch
+minimum is summary only under ADR 0078, and no-fallback epochs create no proof liability.
 
 ### `V2-OPEN-READ-11`: resolved source-independent epoch proof publication
 
@@ -348,15 +347,29 @@ epochs are not prewritten.
 
 ### `V2-OPEN-READ-12`: selector terminal-state publication
 
-This remains open. Round 17 asks how the selector's E-to-E+1 transition remains a durable, verifiable admission-closure
-fence through asynchronous drain and later takeovers, how `PWF -> PO` under the same E eventually terminalizes E, and
-how bounded unresolved closure liability avoids another synchronous takeover write.
+Resolved by [ADR 0077](../decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md). One selector CAS
+atomically freezes shared last E, closes E, grants same-owner no-fallback E+1, and persists E's closure anchor while
+takeover competes on the same predecessor. Only `ADMITTING/STOPPED` exist; response unknown fences E and STOPPED
+recovers only to a fresh epoch.
 
 ### `V2-OPEN-READ-13`: retirement-batch construction and completion
 
-This remains open. Round 17 asks how one deterministic bounded batch becomes active at the selector CAS, how inline or
-precreated immutable mappings recover response loss, and how exact per-source protection release proceeds without a
-mutable batch bitmap/count/completion authority.
+Resolved by [ADR 0078](../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md). Every source row
+owns `first_i`, release checks `[first_i,sharedLast]`, selector-only inline/reference activation and N/O(N) costs are
+explicit, progress remains derived, and full batch metadata must eventually compact after every source/reference
+retires without becoming source-GC authority.
+
+### `V2-OPEN-READ-14`: bounded anchor carry-forward and terminal publisher
+
+This remains open. Round 18 asks how repeated takeovers carry and prune unresolved fallback-relevant anchors under one
+selector hard cap, how emergency STOPPED capacity remains available, and how the currently fenced publisher converges
+planned-drain versus qualified-expiry terminal candidates without admitting stale-owner publication.
+
+### `V2-OPEN-READ-15`: compact batch metadata retirement
+
+This remains open. Round 18 asks what exact retired tombstone replaces a fully released batch and whether/how a
+monotonic Binding-incarnation metadata-only retired-through frontier may later delete tombstones without releasing
+source protection or authorizing physical GC.
 
 ## Storage Epoch transitions
 
@@ -611,6 +624,25 @@ input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
 
+### Restarted Grill 2 round 17 adjusted decisions: resolved by ADRs 0077/0078
+
+Resolved on 2026-08-10 after explicit adjusted confirmation:
+
+- Q1 closed `ADMITTING/STOPPED` selector states, closure/quiescence separation, one fused
+  `PWF(O,E) -> PO(O,E+1,batch[last=E],anchor[E])` CAS, same-predecessor takeover competition, successor-carried or
+  transaction-atomic anchor, fresh-epoch STOPPED recovery, hard-cap fencing, response-unknown E admission stop, and no
+  proof for never-fallback epochs ->
+  [ADR 0077](../decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md);
+- Q2 exact immutable membership, per-source `first_i`, `[first_i,sharedLast]` release, deterministic digest identity,
+  selector-only inline/reference activation, explicit N release CAS plus bounded O(N) scan, sibling-independent
+  release, quarantine budget impact, no mutable completion state, and mandatory derived full-batch retirement ->
+  [ADR 0078](../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md).
+
+Selector/terminal/batch membership and per-source release remain non-disableable correctness contracts. Exact bounded
+anchor/terminal publication and compact batch-retirement representation remain `V2-OPEN-READ-14/15`; proof-window/fold
+and capability encodings remain evidence gates `V2-OPEN-READ-08/09`. The complete response is preserved in
+[the round 17 record](grill-notes/19-restarted-grill-2-selector-terminal-and-retirement-batch.md).
+
 ### Restarted Grill 2 round 16 adjusted decisions: resolved by ADRs 0075/0076
 
 Resolved on 2026-08-10 after explicit adjusted confirmation:
@@ -625,8 +657,9 @@ Resolved on 2026-08-10 after explicit adjusted confirmation:
   [ADR 0076](../decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md).
 
 Selector linearization, terminal closure, and on-demand proof eligibility are non-disableable correctness contracts.
-Exact terminal-state publication and retirement-batch construction remain `V2-OPEN-READ-12/13`; proof-window/fold and
-capability encodings remain evidence gates `V2-OPEN-READ-08/09`. The complete response is preserved in
+Round 17 later replaced batch-min release with per-source intervals and resolved `V2-OPEN-READ-12/13` in ADRs 0077/0078;
+the current descendants are `V2-OPEN-READ-14/15`. Proof-window/fold and capability encodings remain evidence gates
+`V2-OPEN-READ-08/09`. The complete Round 16 response is preserved in
 [the round 16 record](grill-notes/18-restarted-grill-2-read-admission-interval-and-proof-publication.md).
 
 ### Restarted Grill 2 round 15 adjusted decisions: resolved by ADRs 0072/0073/0074

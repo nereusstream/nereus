@@ -160,17 +160,23 @@ per unfinished batch. Cancellation stops new source use; only complete terminal 
 publishes low-frequency `PREFERRED_WITH_FALLBACK -> PREFERRED_ONLY` generations and uses two pin drains.
 
 Takeover/read grant and `PREFERRED_ONLY` compete through one Binding/incarnation `BindingReadSelector` CAS or a backend
-transaction with proven equivalent conditional atomicity. The exact comparison tuple is selected view SHA, Owner Epoch,
-Read Admission Epoch, and read-admission state; a cross-key reread/watch/cache is not authority. Fallback identities
-inherit first epoch across fallback-bearing views, while completely no-fallback epochs carry no proof liability.
+transaction with proven equivalent conditional atomicity. The no-fallback winner atomically closes E, grants same-owner
+E+1, selects the exact immutable batch, and carries E's predecessor/transition closure digest. The selector has only
+`ADMITTING/STOPPED`; response unknown blocks E admission, and STOPPED can grant only a fresh epoch. A cross-key reread,
+watch/cache, or assumed backend version history is not authority.
+
+Every source/protection row carries its own inherited `first_i`; the batch freezes shared last E and may summarize the
+minimum only. Inline activation is one CAS. Reference activation is one immutable create plus one CAS only when that
+selector transaction atomically proves exact key/SHA existence; otherwise the backend must inline. Release remains up
+to N exact per-source CAS operations plus bounded O(N) reconciliation, not one batch completion write.
 
 The optional planned-handoff hint below is never `OwnerReadQuiescenceProof`. Protection release separately requires
-contiguous source-independent proof across the retirement batch's exact Read Admission Epoch interval. Planned drain
-or qualified authority expiry must bind the exact immutable Protocol Cell/backend capability evidence used by each
-historical owner/read epoch and the same irreversible epoch terminal-cut SHA. Proof creation is deterministic, create-
-only, fenced, closed-verifier-checked, and on demand for intersecting fallback intervals. A current capability cannot
-reinterpret it. Ordinary KRaft/Pulsar ownership fencing, session loss, or local time is insufficient; missing/revoked
-evidence retains protection.
+contiguous source-independent proof across each source's exact `[first_i,sharedLast]` interval. Planned drain or
+qualified authority expiry must bind the selector-carried closure anchor, exact immutable Protocol Cell/backend
+capability evidence, and the same irreversible epoch terminal-cut SHA. Proof creation is deterministic, create-only,
+fenced, closed-verifier-checked, and on demand. A current capability cannot reinterpret it. One quarantined source
+blocks full-batch retirement and budget but not sibling release. Batch compaction is derived metadata cleanup, never
+source-GC authority.
 
 ## Planned fast handoff
 
@@ -195,5 +201,5 @@ topic-open, rollover publication, trim, and background lifecycle work are separa
 hide in an aggregate append metric.
 
 Relevant tradeoffs: `T-META-01`, `T-HANDOFF-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios:
-`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015/020..024`, `V2-READ-003..006`, `V2-HO-001`, `V2-FABRIC-001`,
+`V2-META-001..006`, `V2-KAF-META-001..003`, `V2-OBJ-015/020..024`, `V2-READ-003..013`, `V2-HO-001`, `V2-FABRIC-001`,
 `V2-POLICY-001`, and `V2-POSITION-002..011`.

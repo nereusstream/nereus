@@ -129,16 +129,18 @@ provider I/O, retry, fallback, decode, and source-backed-buffer use completes. N
 a hard capacity bound rather than force-cleared.
 
 The same snapshot may serve disjoint manifest and active-tail ranges, but one atomic append unit and every explicitly
-declared whole-range fallback stay source-pure. Locator retirement follows old-view pin drain. Source protection remains
-until fenced `PREFERRED_ONLY`, every current fallback-bearing pin drains, and the batch's closed Read Admission Epoch
-interval has contiguous source-independent quiescence proof before exact protection-generation release. Takeover/read
-grant and no-fallback publication compete on one Binding/incarnation selector CAS over exact
-`{selectedViewSha, OwnerEpoch, ReadAdmissionEpoch, readAdmissionState}`; cross-key reread is not atomicity. A source
-inherits its first fallback epoch across views and mixed-first batches use the earliest first. Proof liability and
-on-demand proof creation apply only to fallback-capable intervals. Each proof binds one irreversible epoch terminal-cut
-SHA and immutable capability evidence. A non-authoritative hint, ordinary owner fence, current backend configuration,
-session loss, or host timer is insufficient. Pressure may block handoff or new reads but never authorizes early reclaim,
-frontier advance, or GC.
+declared whole-range fallback stay source-pure. Locator retirement follows old-view pin drain. One selector CAS
+atomically selects `PREFERRED_ONLY`, closes E, grants same-owner no-fallback E+1, and persists E's closure anchor;
+takeover competes on the same exact predecessor tuple. Only `ADMITTING/STOPPED` exist, STOPPED recovery uses a fresh
+epoch, and response unknown forbids further E admission until exact reread.
+
+Source protection remains until current fallback-bearing pins drain and source i's `[first_i,sharedLast]` interval has
+contiguous source-independent proof before its exact release CAS. Batch minimum is summary only; N members retain up to
+N release CAS operations and bounded O(N) reconciliation. One quarantined member blocks full-batch retirement and
+capacity but not eligible sibling release. Each proof follows an asynchronous irreversible terminal cut binding the
+closure anchor and immutable capability evidence. A hint, ordinary owner fence, cross-key reread, current backend
+configuration, session loss, or host timer is insufficient. Pressure may STOP admission but never authorizes early
+reclaim, frontier advance, metadata compaction as source GC, or physical GC.
 
 ## Uncertain append
 
@@ -174,4 +176,4 @@ the envelope. This correctness-driven availability cost is explicit and does not
 
 Relevant tradeoffs: `T-APPEND-01` and `T-POSITION-01`. Required scenarios: `V2-APP-001`, `V2-APP-002`,
 `V2-APP-003`, `V2-POSITION-001..007`, `V2-META-002..004`, `V2-KAF-META-001`,
-`V2-OBJ-002/004..012/020..024`, and `V2-READ-003..006`.
+`V2-OBJ-002/004..012/020..024`, and `V2-READ-003..013`.

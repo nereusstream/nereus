@@ -206,17 +206,22 @@ atomic `FREE/PINNED(generation)` lease word; callbacks equality-check it, cancel
 complete terminal source drain clears it. Nonresponsive calls consume bounded quarantine rather than being force-cleared.
 
 Locator and source-protection retirement are two stages: publish preferred+protected-fallback, drain older-view pins,
-then select `PREFERRED_ONLY` through the same Binding selector CAS used by takeover/read grant. The selector compares
-exact view SHA, Owner Epoch, Read Admission Epoch, and admission state; cross-key reread cannot freeze an interval.
-Fallback identities inherit their original first epoch and mixed-first batches use the earliest, while no-fallback
-epochs carry no proof liability.
+then use one Binding selector CAS to atomically select `PREFERRED_ONLY`, close E, grant same-owner no-fallback E+1, and
+persist E's closure anchor. Takeover competes on the same exact predecessor. The selector exposes only
+`ADMITTING/STOPPED`; a response-unknown cut admits no further E read until exact reread, and STOPPED can recover only to
+a fresh epoch. Cross-key reread or backend history cannot supply the anchor.
 
-Protection release additionally requires current slots drained and every epoch in the immutable batch interval covered
-contiguously by a reusable, source-independent planned-drain or qualified-expiry proof. Each needed proof is one
-deterministic create-only record after an irreversible terminal cut; both proof paths bind the same terminal SHA and
-immutable historical capability evidence. Invalid occupants and missing/revoked evidence retain protection. Retired-
-view/pin, proof-window, and retained-source count/bytes/age/deadline are hard-bounded; pressure may block handoff or new
-reads but never delete early. Normal reads still perform no metadata I/O.
+Every source/protection row inherits its own `first_i`; the selector transition shares `last=E`, and source i releases
+only after `[first_i,E]` has continuous source-independent planned-drain/qualified-expiry proof. Batch minimum is
+summary only. Inline activation costs one selector CAS; atomically validated reference mode costs one immutable create
+plus the CAS; N sources still require up to N exact release CAS operations and bounded O(N) reconciliation. A
+quarantined source does not block sibling release but blocks full-batch retirement and consumes capacity.
+
+Each needed proof is deterministic create-only after an asynchronous irreversible terminal cut binding the selector-
+carried closure anchor and immutable historical capability evidence. Full batch metadata becomes compactable only
+after every source is released/retired and selector/lineage/recovery/response-loss references disappear; compaction is
+never source-GC authority. Retired-view/pin, anchor/proof/batch/source count/bytes/age/deadline are hard-bounded;
+pressure may STOP admission but never delete early. Normal reads still perform no metadata I/O.
 
 Routine random reads authenticate the Root-bound in-body header/directory and selected frame without first requiring a
 new full-Object provider proof. The leaf's exclusive bounded prefix end normally gives prefix plus frame GET; without

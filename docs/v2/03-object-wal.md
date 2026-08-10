@@ -252,22 +252,23 @@ may read disjoint manifest and active-tail ranges; one Kafka commit set/Pulsar e
 whole-range fallback remain source-pure.
 
 Reclamation is two-stage. First durably publish `PREFERRED_WITH_FALLBACK`, drain older-view pins, and retire only
-obsolete index structures. Then the same Binding/incarnation selector CAS used by takeover/read grant selects bounded
-`PREFERRED_ONLY`, comparing exact `{selectedViewSha, OwnerEpoch, ReadAdmissionEpoch, readAdmissionState}`. An
-application-side cross-key reread is forbidden. The winning takeover or no-fallback transition fences the loser.
+obsolete index structures. Then one Binding/incarnation selector CAS atomically selects bounded `PREFERRED_ONLY`,
+freezes `last=E`, closes E, grants same-owner no-fallback E+1, and persists E's closure anchor. Takeover competes on the
+same exact predecessor. An application-side cross-key reread or assumed backend history is forbidden.
 
-Protection release requires all current fallback-bearing slots drained plus contiguous source-independent proof for
-every Read Admission Epoch in the immutable retirement batch's closed interval. A source inherits its first fallback
-epoch across fallback-bearing views; a mixed-first batch uses the earliest first. Proof liability exists only while
-fallback is current or introduced. Each needed proof is one deterministic create-only record produced on demand after
-one irreversible `ReadAdmissionEpochTerminalCut`; planned drain and qualified expiry bind the same terminal SHA and
-exact historical capability evidence. A valid proof is reusable across batches; no mutable owner x batch accumulator
-exists. Otherwise protection remains. Only an exact idempotent protection-generation release admits GC.
+Protection release requires current fallback-bearing slots drained plus contiguous source-independent proof for source
+i's own `[first_i,sharedLast]` interval. Each source row inherits `first_i`; batch minimum is not release authority.
+Each needed proof is deterministic create-only and follows an asynchronous irreversible terminal cut binding the
+closure anchor and exact historical capability evidence. A valid proof is reusable across batches. Inline activation
+costs one selector CAS; atomically validated reference mode costs one immutable create plus the CAS; N members still
+require up to N idempotent release CAS operations and bounded O(N) scan. No mutable batch progress exists. One
+quarantined source blocks full-batch retirement/capacity but not eligible sibling release. Batch compaction after all
+release/reference prerequisites never admits source GC by itself.
 
 Retired-view/pin, proof-window, active-retirement-batch, unquiesced-epoch, and retained-protection count, bytes, age,
-and deadline are hard-bounded; leaks may block handoff, retirement, or new admission, never delete early. Exact
-selector/terminal publication states, physical proof-window/fold layout, receipt/token encoding, and numeric limits
-remain open/evidence work.
+and deadline are hard-bounded; leaks may block handoff, retirement, or new admission, never delete early. Exact anchor/
+terminal publication, retired-batch compaction, physical proof-window/fold layout, receipt/token encoding, and numeric
+limits remain open/evidence work.
 
 ## Backpressure
 
@@ -290,7 +291,7 @@ and close lifecycle. A compatible lower-level transport may be pooled, but a cel
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
 Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..024`,
-`V2-READ-003..006`, `V2-POLICY-001`, and `V2-FABRIC-002`. See
+`V2-READ-003..013`, `V2-POLICY-001`, and `V2-FABRIC-002`. See
 [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md),
 [ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md),
 [ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md),
@@ -322,4 +323,6 @@ Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required sc
 [ADR 0073](../decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md), and
 [ADR 0074](../decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md),
 [ADR 0075](../decisions/0075-v2-binding-read-selector-and-fallback-interval-linearization.md) and
-[ADR 0076](../decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md).
+[ADR 0076](../decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md), plus
+[ADR 0077](../decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md) and
+[ADR 0078](../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md).

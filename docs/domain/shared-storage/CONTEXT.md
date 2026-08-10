@@ -207,23 +207,31 @@ _Avoid_: Host session counter, source generation, inferred takeover order, reusa
 
 **Binding Read Selector**:
 The single Binding-incarnation authority that atomically selects source view, Owner Epoch, Read Admission Epoch, and
-read-admission state, so takeover and fallback removal cannot both commit from the same predecessor.
-_Avoid_: Manifest-only pointer, topic-generation selector, cross-key reread, cached owner fence
+closed `ADMITTING/STOPPED` state, so takeover and fused fallback-removal/E+1 closure cannot both commit from the same
+predecessor.
+_Avoid_: CLOSING/DRAINING reader state, manifest-only pointer, topic-generation selector, cross-key reread
+
+**Read Admission Closure Anchor**:
+The immutable predecessor/successor selector and transition digest that proves one Read Admission Epoch lost admission
+authority. It is carried by the successor selector value or persisted in the same selector transaction until the
+fallback-relevant epoch gains a terminal cut.
+_Avoid_: Backend history assumption, watch event, host-local CAS receipt, quiescence proof
 
 **Read Admission Epoch Terminal Cut**:
-The immutable proof identity that one exact Read Admission Epoch can never admit another read and binds its last
-admitted/drained read-view cut to planned closure or qualified authority expiry.
+The immutable asynchronous proof identity that one exact Read Admission Epoch can never admit another read and binds
+its selector-carried closure anchor plus last admitted/drained read-view cut to planned closure or qualified authority
+expiry.
 _Avoid_: Proof key existence, mutable closed flag, local timeout, reopenable owner state
 
 **Source Retirement Batch**:
-One immutable bounded fallback set and the closed Read Admission Epoch interval whose complete quiescence permits its
-exact source-protection generation to be released. A source identity inherits its first epoch across fallback-bearing
-views, and a mixed-first batch conservatively uses the earliest first.
+One transition-exact immutable bounded fallback set with a shared last epoch. Every source/protection row retains its
+own inherited first epoch and releases against `[first_i, sharedLast]`; the batch minimum is summary only. Full batch
+metadata becomes compactable only after every exact protection is released/retired and all references disappear.
 _Avoid_: Mutable per-owner accumulator, per-extent delete flag, latest-owner watermark
 
 **Quiescence Proof Window**:
 The bounded Binding authority that proves contiguous Owner Read Quiescence Proof coverage for reusable epoch intervals;
-a gap affects only retirement batches whose interval contains it.
+a gap affects only source-retirement intervals `[first_i, sharedLast]` that contain it.
 _Avoid_: Owner x source matrix, per-batch CAS accumulator, gap-skipping frontier
 
 **Quiescence Capability Evidence**:

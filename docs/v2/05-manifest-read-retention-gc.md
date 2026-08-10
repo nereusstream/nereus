@@ -117,18 +117,18 @@ disjoint manifest and active-tail ranges, while one atomic append unit and every
 source-pure.
 
 Reclamation durably publishes `PREFERRED_WITH_FALLBACK` first and drains older pins before retiring obsolete index
-state. A later Binding/incarnation selector CAS competes atomically with takeover/read grant and selects bounded
-`PREFERRED_ONLY`; it compares exact view SHA, Owner Epoch, Read Admission Epoch, and admission state. Cross-key reread
-cannot substitute. The fallback/protection identity inherits its original first epoch across views; mixed-first batches
-use the earliest first.
+state. One later Binding/incarnation selector CAS competes atomically with takeover/read grant and performs the complete
+`PWF(O,E,ADMITTING) -> PO(O,E+1,ADMITTING,batch[last=E],anchor[E])` cut. It closes E, grants no-fallback E+1, and
+persists the closure anchor. Cross-key reread/backend history cannot substitute. `STOPPED` recovery uses only a fresh
+epoch; an unknown response forbids further E admission until exact reread.
 
-Protection remains until current fallback-bearing slots drain and every Read Admission Epoch in the immutable batch's
-exact closed interval has contiguous, source-independent planned-drain or qualified authority-expiry proof. Each proof
-is generated on demand only for a fallback-capable interval, after an irreversible epoch terminal cut, by a fenced
-publisher and closed verifier. First-valid create-only proof wins; an invalid occupying value is quarantined, never
-overwritten. Every terminal/proof/fold/batch/release binds immutable historical capability evidence. Existing handoff
-hints, ordinary ownership fences, or current backend configuration are insufficient. Missing/revoked evidence retains
-protection and consumes Cell count/bytes/age admission.
+Each source/protection row inherits its own `first_i`; source i remains protected until current pins drain and every
+epoch in `[first_i,sharedLast]` has contiguous planned-drain/qualified-expiry proof. Batch minimum is summary only.
+Each proof is on demand after an asynchronous irreversible terminal cut, fenced, closed-verifier-checked, deterministic
+and create-only. N source rows retain up to N exact release CAS operations plus bounded O(N) recovery scan. One
+quarantined member blocks full-batch retirement/capacity but not sibling release. Full batch metadata compacts only
+after every member and reference retires; that compression cannot release source protection or authorize GC. Missing/
+revoked evidence retains protection and consumes Cell count/bytes/age admission.
 
 ## Timestamp and protocol-position indexes
 
@@ -154,7 +154,8 @@ Logical trim advances a binding-scoped typed Trim Frontier independently from ph
 - no reader pin, recovery root, task protection, source-protection record, Access Projection, Projection Map, or
   Migration Link still requires the source;
 - Object-WAL retirement has durable `PREFERRED_ONLY`, current-slot terminal drain, contiguous required Read Admission
-  Epoch proof coverage, irreversible terminal cuts, and exact historical capability-evidence binding;
+  Epoch proof coverage per source interval, selector-carried closure anchors, irreversible terminal cuts, and exact
+  historical capability-evidence binding;
 - Protocol Cell, Cell Provider Scope, physical-delete capability, Owner Epoch, worker epoch, and Storage Epoch are
   revalidated;
 - response-loss state has converged and grace has elapsed;
@@ -185,5 +186,5 @@ the source was safely retired and the preferred generation is corrupt, the resul
 system does not synthesize records or silently skip the requested Protocol Coverage.
 
 Relevant tradeoffs: `T-MANIFEST-01`, `T-POSITION-01`, `T-PROJECTION-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required
-scenarios: `V2-READ-001..006`, `V2-OBJ-002/020..024`, `V2-BK-007..008`, `V2-BK-011`,
+scenarios: `V2-READ-001..013`, `V2-OBJ-002/020..024`, `V2-BK-007..008`, `V2-BK-011`,
 `V2-PROJECTION-001`, `V2-POLICY-001`, and `V2-FABRIC-003`.

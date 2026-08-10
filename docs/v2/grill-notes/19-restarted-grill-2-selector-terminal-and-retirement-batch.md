@@ -121,7 +121,90 @@ per-source release prevents a single retained source from amplifying storage cos
   `V2-OPEN-PUL-OBJ-09` remain evidence-blocked.
 - KoP remains documented and deferred outside the 0.2 runtime.
 
-## Awaiting explicit confirmation
+## Explicit adjusted confirmation
 
-No Round 17 recommendation above is normative. Confirmed conclusions must move to ADRs/contracts; adjustments and all
-evidence-selected values/representations remain in the open log.
+The following response is preserved verbatim. It confirms only the adjusted boundaries stated here; the original
+recommendations above remain a non-normative record where they differ.
+
+````text
+Round 17：Q1、Q2 均调整后确认。
+
+Q1：确认 selector 只保留 ADMITTING/STOPPED、closure 与 quiescence 分离、异步发布 terminal cut，不引入 CLOSING/DRAINING 读路径状态。
+
+但删除原方案第 5 点的额外 same-owner rollover，改为：
+
+PWF(O,E,ADMITTING)
+  -> PO(O,E+1,ADMITTING, retirementBatch[last=E])
+
+由同一次 selector CAS：
+
+1. 冻结 fallback interval 的 last=E；
+2. 不可逆地关闭 E；
+3. 授予同 owner 的 E+1 no-fallback read；
+4. 产生 E 的 durable closure anchor。
+
+这样不必先 PWF→PO 保留 E，再等待 reconciler 执行 PO(E)→PO(E+1)。原方案会平白增加一次 selector CAS、一个 unresolved anchor，并让已经 PREFERRED_ONLY 的 source 因 reconciler cadence 继续保留。
+
+takeover 仍与它竞争相同 expected tuple：
+
+PWF(O,E) -> PWF(O2,E+1)
+
+谁先成功，另一方必须冲突并重算。重新引入 fallback 时也使用新 protection identity，并建议在同一次 selector CAS 中进入新 epoch；fallback membership 未变化的普通 view 更新不必 rollover。
+
+补充合同：
+
+- closure anchor 必须由 successor selector value 携带 predecessor/transition digest，或与 selector CAS 在同一事务中持久化；不能假设 backend 的旧版本或 CAS history 永久可查询。
+- STOPPED 恢复只能进入新的 never-reused epoch，禁止重新开放原 E。
+- hard cap 耗尽时可以 fence 旧 E 并进入 STOPPED，阻止新的 ADMITTING grant；不能为了等待容量而让旧 E 继续获得读权限。
+- response unknown 时，在 exact reread 收敛前禁止继续以 E 接纳新读。
+- 与 fallback interval 从未相交的 epoch 不需要 terminal/proof。
+
+调整后 Q1 不增加正常读 metadata I/O。每个 fallback-relevant transition 仍需一次 selector CAS，以及后续异步 terminal/proof publication；主要风险是 anchor backlog、takeover 冲突和 source-retention 延迟，不是稳定态读吞吐。
+
+Q2：确认 transition-exact immutable batch、确定性 digest ID、selector 唯一激活点、完整 view 有界准入、per-source protection release，以及不增加 mutable released bitmap/count/completion authority。
+
+但需要四项调整：
+
+1. 每个 source/protection row 保存自己的：
+   firstFallbackCapableReadAdmissionEpoch
+
+   batch 可以保存 min(first_i) 作为摘要，但单个 source 的释放必须验证：
+   [first_i, sharedLast]
+
+   不能让所有 source 共用 batch 最早 first。否则早期 epoch 的 proof hole 会阻塞后来才加入、原本可以独立释放的 source，形成批级 HOL。
+
+2. 明确实际控制面成本：
+
+   - inline 模式：1 selector CAS；
+   - reference 模式：1 immutable batch create + 1 selector CAS；
+   - N 个 protection identity 最多需要 N 次独立 release CAS；
+   - crash recovery/final reconciliation 需要 bounded O(N) authoritative state scan。
+
+   该设计避免的是 mutable batch-progress/completion CAS，不是消除所有 per-source/per-extent CAS。
+
+3. 不支持原子引用验证的 backend 必须 inline batch。只有 backend 能在 selector transaction 中原子证明 immutable batch key/SHA 已存在时，才允许 precreate + reference；跨 key pre-read 再 CAS 不等价。
+
+4. 完整 batch 不能永久无限保留。所有 source protection 已 RELEASED/retired，且没有 selector、lineage、recovery 或 response-loss 引用后，应允许替换为紧凑 retired tombstone，或按受证明的 lineage-retirement 协议回收。该动作只是派生压缩，不成为新的 GC authority。
+
+单个 quarantined source 不阻塞 sibling 的 release，但仍会阻止完整 batch retirement并占用 batch count/bytes/age budget，这一点必须如实计入 backpressure，而不能宣称完全无批级影响。
+
+因此最终结论：
+
+- Q1：合并 PWF→PO 与 E→E+1 后确认。
+- Q2：加入 per-source first epoch、如实声明 O(N) 成本并补 batch retirement 后确认。
+- selector/terminal/batch membership 属于不可配置的正确性合同；可配置的仍只是 Cell/Binding hard caps、reconciler cadence 和 evidence-derived 容量参数。
+````
+
+## Authoritative synchronization
+
+- Q1 resolves `V2-OPEN-READ-12` in
+  [ADR 0077](../../decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md): one selector CAS freezes
+  `last=E`, closes E, grants same-owner no-fallback E+1, and durably anchors the transition; only
+  `ADMITTING/STOPPED` exist, response unknown fences E, and STOPPED recovers only to a fresh epoch.
+- Q2 resolves `V2-OPEN-READ-13` in
+  [ADR 0078](../../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md): every source row owns
+  `first_i`, release checks `[first_i,sharedLast]`, inline/reference atomicity and N/O(N) costs are explicit, progress
+  remains derived, and full batch metadata must eventually compact without becoming source-GC authority.
+- Exact bounded closure-anchor/terminal publication and compact retired-batch representation remain the independent
+  Round 18 frontier under `V2-OPEN-READ-14/15`; proof-window/fold and capability encodings remain evidence gates
+  `V2-OPEN-READ-08/09`.

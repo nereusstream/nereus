@@ -46,7 +46,8 @@ KoP is outside the current V2 Kafka/Pulsar design session. Its existing design r
   default to `NONE`. A logical Binding read snapshot separates allocation-free high-frequency frontier publication
   from low-frequency source-selection generations and bounded read pins. Generation-tagged hazard publication prevents
   pin-after-retire/torn-frontier reads; one atomic slot lease remains pinned until complete source drain. Durable
-  no-fallback selection and takeover compete on one Binding read selector. A contiguous, source-independent Read
-  Admission Epoch proof window accepts only on-demand proofs bound to an irreversible terminal cut and immutable
-  capability evidence before exact protection release. No-fallback epochs carry no proof liability. None becomes a
-  per-batch owner accumulator, Topic switch, or remote per-read refcount.
+  no-fallback selection and takeover compete on one Binding read selector; the winning fused cut closes E, grants E+1,
+  and carries a durable closure anchor. Every source row retains its own fallback-first epoch and releases against its
+  own interval using on-demand terminal-bound proof. Batch progress remains derived, with explicit N release CAS and
+  bounded O(N) reconciliation; no-fallback epochs carry no proof liability. None becomes a per-batch owner accumulator,
+  Topic switch, or remote per-read refcount.

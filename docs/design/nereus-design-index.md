@@ -121,6 +121,8 @@ Current accepted decisions:
 - [ADR 0074: quiescence capability evidence and historical binding](../decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md)
 - [ADR 0075: Binding read selector and fallback-interval linearization](../decisions/0075-v2-binding-read-selector-and-fallback-interval-linearization.md)
 - [ADR 0076: Read Admission Epoch terminal cut and on-demand proof](../decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md)
+- [ADR 0077: fused selector closure and no-fallback epoch cut](../decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md)
+- [ADR 0078: per-source retirement interval and batch retirement](../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md)
 
 ## V2 document map
 
