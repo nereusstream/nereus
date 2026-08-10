@@ -39,9 +39,10 @@ new domain fails closed. Existing Cells still cannot resize, acquire a second sl
 - The format intentionally wastes numeric space and limits one registry to 256 lifetime Cells in exchange for one small
   single-key CAS authority and auditable capacity.
 - A reservation-domain identifier alone is never a uniqueness fence.
-- M1/M3 must prove exact encoding limits, final-row admission, retired-row accounting, `k=40` alignment/math,
-  bootstrap immutability, cross-domain overlap/native-exclusion rejection, and independent-cluster behavior.
+- M1 proves exact registry encoding limits, final-row admission, retired-row accounting, `k=40` alignment/math,
+  bootstrap immutability, and cross-domain overlap/native-exclusion rejection. M3 proves production exhaustion,
+  additional-capacity admission, and independent-cluster behavior.
 
 Allocator-mode evidence is refined by
 [ADR 0055](0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md). This decision refines ADRs 0027, 0032, 0041,
-0048, and 0049 and is tracked by `T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-008..011`.
+0048, and 0049 and is tracked by `T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-008/009/015/016`.

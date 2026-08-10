@@ -42,8 +42,9 @@ then cached as a local versioned fence; normal append/read performs no per-acces
 - Topic-name recreation does not reuse generation, key, binding ID, or initial Storage Epoch ID.
 - Selector state/recovery and cached admission are refined by ADR 0051. Tombstone wire, retirement receipt, exhaustive
   reference domains, and audit grace remain downstream metadata gates.
-- M1/M5 must prove monotonic selection, durable deletion, overflow rejection, stale-create response loss, exact
-  replacement ordering, reference vetoes, tombstone capacity accounting, and same-name recreation isolation.
+- M1 proves monotonic selection, durable deletion, overflow rejection, stale-create response loss, tombstone wire/
+  capacity, same-name recreation isolation, and rejection of replacement without proof. M5 proves exact replacement
+  ordering, every reference veto, and irreversible full-to-tombstone CAS recovery.
 
 This decision is refined by ADR 0051, refines ADRs 0023, 0028, and 0033, and is tracked by `T-META-01`, `T-GC-01`,
-`V2-META-002/003/005/006`, and `V2-GC-003`.
+`V2-META-002/003/005..007`.

@@ -44,8 +44,9 @@ that mode.
 - `V2-OPEN-PUL-OBJ-01` is resolved.
 - Pulsar Object mode preserves native position shape without paying BookKeeper merely to allocate ledger IDs.
 - V2 owns a protocol-specific virtual-ledger allocator and chain store, including namespace reservation and recovery.
-- M1/M3 must prove identity uniqueness, explicit chain ordering, current-ledger fencing, zero normal-append metadata I/O,
-  rollover/restart recovery, and rejection of Object-derived or numerically sorted positions.
+- M1 proves typed identity/chain models and rejects Object-derived or numerically sorted positions from production
+  metadata SPI. M3 proves production explicit-chain ordering, current-ledger fencing, zero normal-append metadata I/O,
+  and rollover/restart recovery.
 
 Numeric compatibility and reservation enforcement are refined by
 [ADR 0027](0027-v2-pulsar-virtual-ledger-numeric-compatibility.md), and registry authority by

@@ -35,7 +35,8 @@ This decision does not activate online BookKeeper/Object migration or a hybrid l
 - V2 gains stock numeric MessageId compatibility without granting numeric order authoritative recovery semantics.
 - The design adds a Pulsar-fork obligation, deployment-level registry, never-reused cell slices, and fail-closed
   reservation admission.
-- M1/M3 must prove native-range exclusion, cross-cell slice isolation, monotonic allocation with gaps, no reuse,
+- M1 proves registry geometry, all-writer native-range exclusion evidence, cross-cell non-overlap, and evidence-candidate
+  response-loss cuts without production activation. M3 proves production monotonic allocation with gaps, no reuse,
   reservation drift/revoke fencing, stock comparison compatibility, and explicit-chain-only recovery.
 
 The deployment registry's physical authority is refined by

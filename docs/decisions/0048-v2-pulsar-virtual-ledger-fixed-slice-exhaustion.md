@@ -32,8 +32,8 @@ migration contract and is not implied by creating either one.
 - 0.2 has no hidden multi-slice chain ordering, recovery, or ownership-transfer semantics.
 - Exact geometry is refined by ADR 0054. Allocator wire/mode, allocation response-loss recovery, ledger-head
   publication, rollover, takeover, and `RETIRING -> RETIRED` proof remain downstream gates.
-- M1/M3 must prove rejection of every geometry mutation, fail-closed boundary allocation, new-Cell independence, and
-  absence of automatic topic/ledger migration.
+- M1 proves rejection of every registry geometry mutation and absence of an automatic migration API. M3 proves
+  fail-closed production boundary allocation and new-Cell independence.
 
 This decision is refined by ADRs 0054/0055, refines ADRs 0022, 0027, 0032, and 0041, and is tracked by
 `T-POSITION-01`, `V2-POSITION-003..018`.

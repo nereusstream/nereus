@@ -74,9 +74,9 @@ Topic/host configuration cannot enlarge it.
 - A stuck clear can block the next grant even though it cannot revoke the installed range, so reconciler priority and
   queue/age evidence are release gates.
 - Permanent orphan metadata is an accepted bounded capacity cost; 0.2 does not add orphan GC.
-- M1/M3 must prove takeover at every reserve/install/clear and node/head response-loss cut, exact-equality convergence,
-  definitive-conflict fencing, old-owner late writes, one-candidate bound, no tail burn on owner change, reconciler
-  progress, and mass-takeover behavior.
+- M1 proves every reserve/install/clear and node/head response-loss cut in the evidence-only harness, including exact-
+  equality convergence, same-RESERVED takeover, one-candidate burn, and production-SPI absence. M3 proves definitive-
+  conflict fencing, late-old-owner writes, tail preservation, clear reconciliation, and mass-takeover behavior.
 
 This decision refines ADRs 0022, 0027, 0032, 0041, 0048, 0049, 0054, and 0055 and is tracked by `T-POSITION-01`,
 `T-POLICY-01`, `V2-POSITION-010/011/017/018`, and `V2-OPEN-PUL-OBJ-09`.
