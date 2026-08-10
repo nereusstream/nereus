@@ -51,5 +51,5 @@ It does not prove provider credentials, profile capacity, or per-topic admission
   level-1 replay refusal, atomic CreateTopics behavior, validate-only zero writes, and native error preservation. M6
   separately proves the complete broker/controller process and restart boundary.
 
-This decision is refined by ADRs 0042/0050/0082/0083, refines ADRs 0023/0033, and is tracked by `T-META-01`, `T-COMPAT-01`,
+This decision is refined by ADRs 0042/0050/0082..0084, refines ADRs 0023/0033, and is tracked by `T-META-01`, `T-COMPAT-01`,
 `V2-META-004`, and `V2-KAF-META-001..005`.

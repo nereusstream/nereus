@@ -34,11 +34,14 @@ _Avoid_: High-bit convention, reusable cell range, allocator-local assumption
 
 **Virtual Ledger Namespace Registry**:
 The exactly one bounded CAS authority selected while V2 allocation is admitted in an immutable
-`ledgerIdCompatibilityNamespaceId` derived from the exact native BookKeeper `INSTANCEID`. M1 admits only a root proven
+`ledgerIdCompatibilityNamespaceId` derived as
+`SHA-256(NLI1 || u32be(36) || canonicalInstanceIdAscii[36])`. M1 admits only a root proven
 absent immediately before init; format or an ID change is not freshness proof. The Registry binds one bounded inline
 writer commitment and admission interlock, canonically owns every slice assignment, and proves global non-overlap/non-
 reuse. It uses `k=40`, at most 65,536 canonical bytes, 256 lifetime assignments, and 192 bytes per assignment row. Per-
 cell allocator state is a namespace-bound versioned derived view.
+Writer count/row budgets remain evidence-derived OPEN caps. Ownership-watch continuity is one local store-wide epoch;
+provider connection/session/shard identities are never persisted.
 _Avoid_: Deployment-name namespace, omitted-writer digest, second Registry, independent authoritative slice key,
 external writer-set snapshot, source-SHA writer identity, format-as-cleanup, watch authority, locally merged assignment
 table, per-rollover Registry read

@@ -24,6 +24,12 @@ inherit one versioned Deployment default when absent; topic names do not infer a
 that exact key from ordinary `ConfigRecord` changes. Key/value matching is case-sensitive with no trim; null, empty, or
 unknown value for the exact key is `INVALID_CONFIG`, while unknown `nereus.*` keys retain stock validation/error
 precedence.
+Repeated exact pseudo-keys retain pinned Kafka's insertion-order last-wins behavior. One linear config pass collapses
+duplicates and only the last value is parsed; earlier invalid values do not fail when the final value is legal. The
+ordering is the stock request-wide partition guard, topic name/collision/existing checks, last-wins collapse and pseudo
+validation, pseudo removal, production native config validation, then assignment, `CreateTopicPolicy`, quota, and
+record admission. The policy sees only native request configs and cannot interpret or rewrite the Nereus profile. Tests
+must use the production `ControllerConfigurationValidator`, not a default `NO_OP` fixture.
 Resolved value, origin, and policy/catalog version live only in the aggregate. DescribeConfigs may synthesize an
 aggregate projection that is `readOnly=true`, has no synonyms, reports explicit input as `DYNAMIC_TOPIC_CONFIG` and
 inherited input as `DEFAULT_CONFIG`, and preserves the creation-time default origin. Both
@@ -33,8 +39,9 @@ become competing authorities.
 Classifier v1 uses the pinned `Topic.isInternal` set: `__consumer_offsets`, `__transaction_state`, and
 `__share_group_state`. Those topics reject explicit profile input and use only the versioned internal Deployment
 policy. Streams, Connect, MM2, `__remote_log_metadata`, and other application/Admin-created topics follow the user-
-topic path; `__cluster_metadata` is not a TopicImage topic. This classification does not exempt stock tiered-storage
-bootstrap from replication/minISR admission; M6 must disable it or prove compatible explicit settings. Every live entry
+topic path; `__cluster_metadata` is not a TopicImage topic. V2 admission requires
+`remote.log.storage.system.enable=false` and fails closed rather than silently rewriting it. `__remote_log_metadata`
+gets no internal-profile exception. M1 proves this interlock; M6 proves a full process leaves RLMM inactive. Every live entry
 point capable of creating a TopicImage topic uses the same resolution and aggregate kernel; replay/snapshot validates
 persisted pairs rather than rerunning policy resolution.
 
@@ -63,8 +70,7 @@ controller batch.
 Each topic first becomes an externally side-effect-free `TopicCreateCandidate`. Candidate construction may generate
 the UUID required by the complete aggregate and exact sizing, but only admission commits or exposes it. Rejection leaves
 no quota, success-map, topic-ID, or record residue. `ConfigRecord` records sort by config name and `PartitionRecord`
-records by partition ID; companion configuration-derived records retain their required semantic order. Duplicate
-pseudo-config semantics remain an explicit pre-implementation descendant. A pure incremental sizer extracts Raft's
+records by partition ID; companion configuration-derived records retain their required semantic order. A pure incremental sizer extracts Raft's
 exact `BatchBuilder` record-size logic, uses `MetadataRecordSerde` plus one serialization cache, and consumes the same
 effective controller count/byte limits,
 including test injection. The existing fit-oriented builder API is not misused as a pure estimator. It sizes every
@@ -94,5 +100,5 @@ tooling all handle the record explicitly.
   transactions, touched-topic tracking, removal, snapshot/bootstrap scans, feature ordering, every invalid record class,
   non-disableability, and no ordinary full-image scan or SHA recomputation. M6 proves complete-process behavior.
 
-This decision is refined by ADRs 0082/0083, refines ADRs 0033, 0034, and 0042 and is tracked by `T-META-01`, `T-POLICY-01`,
+This decision is refined by ADRs 0082..0084, refines ADRs 0033, 0034, and 0042 and is tracked by `T-META-01`, `T-POLICY-01`,
 `V2-KAF-META-002..005`.

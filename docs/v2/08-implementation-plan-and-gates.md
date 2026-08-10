@@ -65,10 +65,11 @@ broker/controller process and Produce/Fetch/Admin/restart evidence only. Ordinar
 only without canonical SHA recomputation; full scans are bootstrap/snapshot/full-catch-up only; CreateTopics and
 validateOnly apply the stock request-wide partition guard and then request-order greedy pre-admission of the exact final
 cumulative record count and serialized Raft-batch bytes while preserving native per-topic partial-success behavior.
-The candidate list includes actual native configuration-derived records, including applicable `ClearElrRecord`; the
+Duplicate pseudo-configs are last-wins, the production native validator runs after pseudo removal, and
+`CreateTopicPolicy` sees only native configs. The candidate list includes actual native configuration-derived records, including applicable `ClearElrRecord`; the
 linear sizer shares effective Raft limits, and a current-batch miss is re-estimated with fresh-batch offset deltas before
-the final append may reject it. M6 must disable stock tiered-storage bootstrap or prove compatible replication/minISR
-settings for its ordinary `__remote_log_metadata` topic.
+the final append may reject it. V2 admission requires `remote.log.storage.system.enable=false`; M1 tests the interlock
+and M6 proves RLMM remains inactive.
 
 Pulsar M1 builds the first witness candidate only for Oxia 0.9.0-backed MetadataStore ELM: pinned source proves direct
 GET/Stat/versioned-CAS primitives, not a complete adapter. M1 adds acquisition fields/transitions, a qualified provider
@@ -78,9 +79,13 @@ validation, and installs only by CAS from the same invalidation sequence. Legacy
 missing acquisition identity, authoritative read, ordered loss hook, or reconnect-gap invalidation fail V2 admission
 closed. Ordinary access captures/rechecks one atomic fence word with zero remote metadata I/O. Full
 aggregate-to-retired-tombstone replacement remains M5; complete process integration remains M6.
+The provider hook exports only a local store-wide `WatchContinuityEpoch` plus ready barrier; provider internal
+connection/session/shard identities are not persisted. A gap invalidates all store fences and triggers bounded,
+coalesced A/read/B recovery. Exact hook API/source lock/conformance remains an implementation blocker.
 
 M1 implements the mode-independent virtual-ledger Registry bound to the immutable 32-byte ledger-ID compatibility
-namespace derived from exact BookKeeper `INSTANCEID`. Only a root authoritatively absent immediately before init is
+namespace `SHA-256(NLI1 || u32be(36) || canonicalInstanceIdAscii[36])`. Only an exact lowercase canonical non-zero
+36-byte UUID from a root authoritatively absent immediately before init is
 admitted; format/changed identity is not cleanup proof. V2 admission requires exactly one selected Registry, one bounded
 inline canonical writer commitment, and an ACL/credential/deployment interlock with independently revocable writers;
 there is no external membership reference. Allocators use a namespace-bound versioned derived slice view. Its real-
@@ -101,12 +106,15 @@ trusted promotion runs Exact/Final. Promotion uses N1 foundation, P1/K1 fork com
 then evidence-only N3. Virtual-ledger conformance payloads use one strict RFC-8785/JCS envelope with the closed kinds
 `REGISTRY_CONFORMANCE | HARNESS_CONFORMANCE_ONLY`; this is not the universe of all M1 evidence kinds. Each receipt binds
 N2/P1/K1, source-lock digest, domain JAR/POM SHAs, Oxia server image plus client/test identities, closed receipt kind,
-scenario IDs, normalized `discovered/executed/passed/failed/skipped/aborted` counts, and aggregate result. Attachments
-are referenced by canonical relative path, length, and SHA-256 rather than embedded. A Registry scenario requires
+one `scenarios[] -> suites[]` result hierarchy and normalized `discovered/executed/passed/failed/skipped/aborted`
+counts. Derived summaries cannot become another authority. Internal retries/dynamic tests are forbidden and mandatory
+PASS has non-zero execution with no failure/skip/abort. Attachments are allowlisted regular files referenced by kind,
+safe sorted POSIX-relative path, length, and SHA-256 rather than embedded. A Registry scenario requires
 `REGISTRY_CONFORMANCE`; allocator cut scenarios require `HARNESS_CONFORMANCE_ONLY` and `selectionEligible=false`.
 Cross-M1 scenario rows are split before promotion so future evidence cannot be borrowed. N3 may change only receipts,
 attachments, and their exactly covered scenario status/index; it may not modify code, gates, workflows, ADRs, or source
-locks. Exact receipt/accounting/path/cap tables remain implementation-readiness blockers.
+locks. Exact remaining payload fields and evidence-derived numeric attachment caps remain implementation-readiness
+blockers.
 
 ## Status model
 

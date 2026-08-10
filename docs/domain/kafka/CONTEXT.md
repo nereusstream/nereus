@@ -37,10 +37,12 @@ place it after `TopicRecord` and before partitions; `RemoveTopicRecord` removes 
 pseudo-config is exactly case-sensitive/no-trim `nereus.storage.profile`, is removed before native `ConfigRecord`
 emission, persists only as resolved aggregate facts, and is exposed only as an optional read-only projection. Its
 classifier v1 contains the three pinned Kafka built-ins only; other application/Admin-created topics use the user path.
+Duplicate exact pseudo-keys are last-wins, `CreateTopicPolicy` receives only native configs, and V2 admission requires
+the stock remote-log system disabled rather than silently rewriting its topic.
 Create admission sizes the actual final configuration-derived/aggregate/partition record list once in request-order
 greedy linear time and leaves no rejected-candidate residue.
 _Avoid_: Opaque attachment, parallel aggregate image, independent aggregate delete record, duplicate ConfigRecord
-authority, mutable AlterConfigs pseudo-key
+authority, mutable AlterConfigs pseudo-key, NO_OP validation evidence, automatic RLMM rewrite
 
 **Kafka Frame**:
 One complete raw Kafka RecordBatch after broker offset and leader-epoch assignment. Its exact batch header defines

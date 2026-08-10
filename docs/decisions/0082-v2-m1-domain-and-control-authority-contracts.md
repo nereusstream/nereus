@@ -4,8 +4,10 @@
 
 Accepted for the 0.2 M1 implementation. ADR 0083 fixes NPC1/NTI1 layout, flat NTA1 structure, Kafka pseudo-config and
 linear admission, the first Pulsar witness-adapter candidate boundary, INSTANCEID-derived Registry identity with inline writers,
-and the receipt-envelope direction. Exact discriminator/field/variant tables, remaining numeric caps, provider lifecycle
-hooks, compatibility hash preimage, and receipt inner schema remain implementation-readiness descendants.
+and the receipt-envelope direction. Exact aggregate field/variant tables, remaining numeric caps, concrete provider
+lifecycle hooks/source tuple, Registry writer schema, and remaining receipt payload fields remain implementation-readiness descendants. ADR 0084
+fixes the protocol codes and authority leaves, Kafka precedence/interlock, minimal local continuity semantics, native
+INSTANCEID hash, and receipt accounting/path safety while retaining evidence-derived caps and concrete provider hooks.
 Implementation and executable evidence have not started.
 
 ## Context
@@ -221,6 +223,6 @@ numeric caps remain open.
   hooks, and receipt inner-schema/accounting/path rules remain the next implementation-readiness frontier and cannot be
   inferred by code.
 
-This decision is refined by ADR 0083 and refines ADRs 0023, 0028, 0032, 0033, 0034, 0041, 0042, 0050, 0051, 0054,
+This decision is refined by ADRs 0083 and 0084 and refines ADRs 0023, 0028, 0032, 0033, 0034, 0041, 0042, 0050, 0051, 0054,
 0055, and 0081. It is tracked by
 `V2-META-002..006`, `V2-KAF-META-001..003`, `V2-POSITION-003..011`, and the M1 implementation/promotion gates.

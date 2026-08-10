@@ -50,7 +50,9 @@ durable bytes use `ObjectExtent`. A Pulsar-cell `PulsarVirtualLedgerStore` in Me
 virtual ledger IDs and publishes explicit append-only Ledger Chain order. Entry IDs are allocated serially in the active
 virtual ledger. The deployment excludes `[2^62, 2^63 - 2]` from native allocation and assigns each cell one
 non-overlapping, never-reused slice. The immutable `ledgerIdCompatibilityNamespaceId` names the actual shared numeric
-space. Its 32-byte identity derives with domain-separated SHA-256 from the exact native BookKeeper `INSTANCEID`; M1
+space. Its 32-byte identity is
+`SHA-256(NLI1 || u32be(36) || canonicalInstanceIdAscii[36])`; the admitted native `INSTANCEID` is an exact lowercase
+canonical, non-zero, 36-byte ASCII UUID. M1
 admits only a ledger root proven absent immediately before init, either never created or after a qualified expected-ID,
 non-force nuke. Format, missing/recreated INSTANCEID, force/direct nuke, or a changed ID does not prove freshness.
 Before admission it may have no Registry; while V2 allocation is admitted exactly one bounded Registry is selected.
@@ -92,6 +94,8 @@ receipt. Exclusive admin/ACL interlock, fresh-root proof/init, writer upgrade, l
 allocation proof precede the final Registry activation. A new writer is committed before start; removal follows fence,
 drain, and independent revoke; rolling upgrade may commit old and new entries together. Shared credentials are invalid.
 After activation, root/INSTANCEID format/nuke/mutation fences the Registry and all derived views.
+Writer count/row/total budgets remain OPEN until exact row/header/evidence bytes and the source-qualified rollout
+inventory derive them; `16/256/4096` are candidates only.
 Patching one Pulsar generator alone is not a completeness proof. The Registry emits `REGISTRY_CONFORMANCE`; the former
 V1 allocator is removed or isolated rather than renamed. STRICT/RANGE candidate SPI and cut injection exist only in
 test/evidence code and emit `HARNESS_CONFORMANCE_ONLY` with schema-fixed `selectionEligible=false`; they persist no mode

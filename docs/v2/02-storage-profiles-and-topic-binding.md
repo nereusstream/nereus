@@ -55,8 +55,10 @@ values. They use ADR 0082's exact `NTB1 || u32be(cellLength) || cellBytes || u32
 incarnationBytes` and `NSE1 || bindingId[32] || u64be(epochOrdinal)` preimages. ADR 0083 fixes NPC1/NTI1 variant layouts:
 Pulsar Cell bytes include reservation-domain identity, while compatibility namespace/provider/broker facts do not.
 Kafka UUID is raw 16 bytes and rejects ZERO/ONE; Kafka name is at most 249 ASCII bytes; Pulsar generation is positive
-signed-long with overflow rejection. M1 accepts only ordinal zero, and random attempts, runtime configuration, time,
-log offsets, and backend versions cannot influence IDs. Numeric protocol codes and Pulsar/total caps remain OPEN.
+signed-long with overflow rejection. Protocol codes are `KAFKA=1`, `PULSAR=2`; zero and all other v1 values fail.
+Pulsar uses ADR 0084's single NPN1 persistence-name digest under distinct selector/aggregate leaf prefixes and a
+19-digit generation. M1 accepts only ordinal zero, and random attempts, runtime configuration, time, log offsets, and
+backend versions cannot influence IDs. Pulsar/total caps remain OPEN.
 
 The one logical compatibility axis is `aggregateSchemaVersion=1`. Canonical `NTA1` contains the complete binding and
 ordinal-zero epoch, including typed profile/origin, source-qualified policy/catalog version, and
@@ -199,8 +201,9 @@ three profile names. It is removed from native `ConfigRecord` changes, the resol
 lives only in the aggregate, DescribeConfigs synthesizes a read-only/no-synonym projection, and every AlterConfigs
 operation is rejected. The three pinned built-ins reject explicit input; Streams/Connect/MM2,
 `__remote_log_metadata`, and other topics use the Deployment user-topic default/explicit-input path without name-
-inferred Namespace. Classifier membership does not bypass native replication/minISR checks, so M6 disables stock
-tiered-storage bootstrap or proves compatible explicit settings. Every successful TopicImage topic owns an aggregate;
+inferred Namespace. Duplicate exact pseudo-keys are last-wins and the native `CreateTopicPolicy` sees only the view
+after pseudo removal. V2 admission requires `remote.log.storage.system.enable=false`; M1 proves the fail-closed
+interlock and M6 proves RLMM remains inactive. Every successful TopicImage topic owns an aggregate;
 the KRaft metadata log is not such a topic. A protocol adapter may
 restrict the allowed initial profile set when its recovery or transaction authority cannot satisfy the contract. No
 adapter exposes an online transition set in 0.2.

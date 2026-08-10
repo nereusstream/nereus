@@ -66,12 +66,14 @@ native failed items publish nothing.
 The sole Nereus CreateTopics pseudo-config is input-only, exact case-sensitive/no-trim
 `nereus.storage.profile = OBJECT_WAL | BOOKKEEPER_WAL_ONLY | BOOKKEEPER_WAL_ASYNC_OBJECT`. Resolution removes it before
 native `ConfigRecord` validation/emission and persists only resolved value, origin, and catalog/policy version in the
-aggregate. Unknown `nereus.*` keys remain stock-validator inputs. DescribeConfigs may synthesize a read-only aggregate
+aggregate. Duplicate exact pseudo-keys are collapsed last-wins in one linear pass; earlier invalid values are ignored
+when the final value is legal. Unknown `nereus.*` keys remain stock-validator inputs. DescribeConfigs may synthesize a read-only aggregate
 projection; both AlterConfigs APIs reject every operation for the exact key. Classifier v1 gives only
 `__consumer_offsets`, `__transaction_state`, and `__share_group_state` an explicit internal Deployment policy;
 Streams/Connect/MM2/`__remote_log_metadata` remain ordinary user-path topics, and the KRaft metadata log is outside
-TopicImage. Every successful TopicImage topic has one aggregate. M6 disables stock tiered-storage bootstrap or proves
-replication/minISR settings compatible with ordinary V2 topic admission.
+TopicImage. Every successful TopicImage topic has one aggregate. `CreateTopicPolicy` sees only native configs after
+pseudo removal. V2 admission requires `remote.log.storage.system.enable=false`; M1 tests the interlock and M6 proves
+RLMM remains inactive.
 
 Kafka reserves metadata extension keys `32000..32767`; API key 32000 is the generated non-flexible wire-v0
 `TopicBindingAggregateRecord` owned directly by `TopicImage`. Completed snapshots write
@@ -116,7 +118,7 @@ ACTIVE plus exact aggregate identity and install a local versioned fence. Watch/
 path but normal append/read performs no Oxia call; stale state blocks admission until revalidation.
 
 The ownership side of that fence is an opaque backend-native witness with a collision-resistant 128-bit acquisition ID
-whose create/retry/reacquire transitions follow ADRs 0082/0083. The first candidate is limited to the Oxia 0.9.0-backed
+whose create/retry/reacquire transitions follow ADRs 0082..0084. The first candidate is limited to the Oxia 0.9.0-backed
 MetadataStore ELM, but current source proves only direct GET/Stat/versioned-CAS primitives. M1 must add acquisition
 fields/transitions, a provider-qualified lifecycle/gap hook, and one closed kernel used by every writer; initial
 admission requires MetadataStore ELM, syncer disabled, and all writers upgraded. Install first arms gap-safe ownership
@@ -131,8 +133,14 @@ gap-safe invalidation fails V2 topic/Cell admission closed. `ConnectionLost` imm
 same-session reconnect must repeat A/read/B. `SessionLost` or process restart rotates broker incarnation, and every real
 service-unit reacquisition creates a new acquisition ID bound to the current broker incarnation.
 
+The hook supplies a process-local, store-level opaque `WatchContinuityEpoch` with a ready barrier; provider connection,
+session, shard, and channel identities do not enter persisted wire. Any continuity-unknown gap advances that epoch and
+invalidates every local V2 fence for the store before revalidation. Recovery is bounded/coalesced rather than serial on
+the callback thread. Concrete Oxia APIs, source tuple, and conformance remain OPEN.
+
 The immutable 32-byte `ledgerIdCompatibilityNamespaceId` names the numeric space shared by all ledger-ID writers and is
-domain-separated SHA-256 over the exact native BookKeeper `INSTANCEID`; its exact preimage grammar remains OPEN. M1
+`SHA-256(NLI1 || u32be(36) || canonicalInstanceIdAscii[36])`. The input is exact lowercase canonical, non-zero,
+36-byte UUID ASCII. M1
 admits only a ledger root authoritatively absent immediately before init, either never created or after a qualified
 expected-ID non-force nuke with all writers/admins fenced and an absent-root postcondition. Format, force/direct nuke,
 missing/recreated identity, or an ID change does not prove freshness. Before V2 admission its Registry may be absent;
@@ -142,6 +150,7 @@ excludes omitted writers; 0.2 has no referenced membership mode. Source/artifact
 identity. New writers are committed before start; removal follows fence/drain/revocation; rolling upgrade may commit
 independently revocable old and new identities together. The complete assignment table uses one-key CAS and
 `registryEpoch + 1`.
+Writer cap candidates remain OPEN until the exact row/header/evidence schema and writer inventory derive them.
 Allocators use a versioned derived slice view instead of rereading/copying the 64-KiB Registry per rollover. Missing,
 overlapping, drifted, revoked, incomplete, or capacity-exhausted authority blocks allocation. Registry conformance and
 allocator-harness receipts are distinct. Reservation checks are low-frequency control-plane work, not normal append

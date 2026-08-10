@@ -3,8 +3,10 @@
 ## Status
 
 Accepted for the 0.2 M1 implementation. The complete NTA1 field/code/variant table, Pulsar UTF-8 and total-payload
-caps, exact compatibility-namespace hash preimage, writer count/row-byte caps, receipt/attachment numeric caps, and
-executable current-source evidence remain implementation-readiness descendants. Implementation has not started.
+caps, writer count/row-byte caps, receipt/attachment numeric caps, and
+executable current-source evidence remain implementation-readiness descendants. ADR 0084 closes the protocol/leaf,
+Kafka precedence, minimal continuity, native hash, and receipt-accounting descendants while keeping the complete NTA1
+table, provider API/source tuple, Registry writer caps, and receipt numeric caps OPEN. Implementation has not started.
 
 ## Context
 
@@ -122,8 +124,8 @@ side-effect-free `TopicCreateCandidate`; only an admitted candidate commits quot
 records. Candidate construction may generate the UUID needed by the complete aggregate and exact sizing, but rejection
 never publishes or retains that UUID. A rejected candidate leaves none of those residues. `ConfigRecord` records sort
 by config name and partition records by partition ID before sizing and publication; companion native configuration-
-derived records retain their required semantic order. The exact duplicate-pseudo-config rule remains a pre-
-implementation descendant rather than being accidentally chosen by a first-match parser.
+derived records retain their required semantic order. ADR 0084 refines duplicate pseudo-configs to one linear
+insertion-order last-wins collapse and forbids a first-match parser.
 
 The complete candidate contains:
 
@@ -248,7 +250,7 @@ ledger union and other gate outputs; it cannot reinterpret one kind as another.
   revocable principals, writer membership, and the allocation interlock.
 - Q2's complete NTA1 table and all explicitly listed numeric caps remain OPEN and must not be inferred from this ADR.
 
-This decision refines ADRs 0028, 0032, 0033, 0034, 0041, 0042, 0050, 0051, 0054, 0081, and 0082. It is tracked by
+This decision is refined by ADR 0084 and refines ADRs 0028, 0032, 0033, 0034, 0041, 0042, 0050, 0051, 0054, 0081, and 0082. It is tracked by
 `V2-META-003..006`, `V2-KAF-META-001..004`, `V2-POSITION-003..010`, and the M1 gates.
 The complete confirmed answer is preserved in
 [M1 Readiness Grill round 3](../v2/grill-notes/24-m1-readiness-round-3-wire-control-and-evidence.md).

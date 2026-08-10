@@ -15,8 +15,15 @@ concurrent administrators from assigning overlapping intervals.
 
 0.2 uses one bounded `PulsarVirtualLedgerNamespaceRegistryRecord` as the only slice-allocation authority for one
 immutable `ledgerIdCompatibilityNamespaceId`, the actual ledger-ID space shared by native, BookKeeper, and custom
-writers. In 0.2 that 32-byte identity is a domain-separated SHA-256 derivation of the exact BookKeeper ledger root's
-native `INSTANCEID`; the exact hash separator/framing remains a pre-implementation wire descendant. A format-created
+writers. In 0.2 that 32-byte identity is:
+
+```text
+SHA-256(NLI1 || u32be(36) || canonicalInstanceIdAscii[36])
+```
+
+The admitted fresh-only `INSTANCEID` is exactly 36 ASCII bytes, byte-for-byte equal to lowercase canonical UUID
+parse/render output, and non-zero. Whitespace, uppercase, alternative forms, NUL, and trailing bytes are rejected; UUID
+version 4 is not required. The Registry retains the exact bytes and derived ID and verifies both. A format-created
 new INSTANCEID changes the derived identity but does not prove an empty namespace. M1 admits only a genuinely fresh
 ledger root that is authoritatively absent immediately before initialization: either never created or removed by a
 qualified non-force nuke bound to the expected old identity, with every old writer/admin principal fenced and an exact
@@ -51,9 +58,11 @@ Native exclusion is deployment admission evidence for every writer that shares t
 contains only writer kind/entry identity, allocator/exclusion contract version, independently revocable principal
 generation/digest, interlock-policy generation/digest, and a typed conformance-evidence reference. Source commit and
 artifact SHA remain receipt facts rather than long-lived Registry identity. Writer count and row bytes have independent
-hard caps in addition to the total 64-KiB value cap; their numbers remain open before M1 implementation. The namespace
-hash excludes root URI/path, deployment/reservation-domain identity, and source/artifact SHA; copying an INSTANCEID is
-therefore conservatively the same compatibility namespace. Exact hash framing and INSTANCEID grammar remain open.
+hard caps in addition to the total 64-KiB value cap; their numbers remain OPEN until the complete row/header/evidence
+schema, source-qualified writer inventory, rollout overlap, and safety residue derive them. `16/256/4096` remain
+candidates only, and a third writer-set cap is added only if it supplies an independent bound. The namespace hash
+excludes root URI/path, deployment/reservation-domain identity, and source/artifact SHA; copying an INSTANCEID is
+therefore conservatively the same compatibility namespace.
 
 ACL, credential, or an equivalent admission interlock prevents every writer outside the selected commitment from
 allocating IDs. Shared credentials are insufficient. First activation establishes exclusive ACL/admin interlock,
@@ -88,5 +97,6 @@ This decision is refined by [ADR 0041](0041-v2-pulsar-virtual-ledger-slice-contr
 [ADR 0055](0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md), with RANGE reservation takeover constrained
 by [ADR 0061](0061-v2-pulsar-range-grant-owner-takeover.md) and M1 control authority by
 [ADRs 0082](0082-v2-m1-domain-and-control-authority-contracts.md) and
-[0083](0083-v2-m1-wire-control-and-evidence-bounds.md); it refines ADR 0027 and is tracked by `T-POSITION-01`,
+[0083](0083-v2-m1-wire-control-and-evidence-bounds.md), and
+[0084](0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md); it refines ADR 0027 and is tracked by `T-POSITION-01`,
 `V2-POSITION-003..018`.

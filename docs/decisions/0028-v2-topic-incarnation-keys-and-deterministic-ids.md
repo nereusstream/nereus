@@ -66,12 +66,30 @@ NTI1 || u16be(PULSAR)
      || u64be(bindingGeneration)
 ```
 
-Protocol code zero is invalid and NTA1/NPC1/NTI1 discriminators must agree. Exact non-zero protocol code assignments
-remain part of the not-yet-frozen discriminator table. Kafka names use the pinned 249-ASCII-byte limit and topic IDs
+Protocol code zero is invalid, `KAFKA=1`, `PULSAR=2`, and codes `3..65535` are unknown/rejected in v1.
+NTA1/NPC1/NTI1 discriminators must agree. Kafka names use the pinned 249-ASCII-byte limit and topic IDs
 reject both pinned reserved values `ZERO_UUID` and `ONE_UUID`/`METADATA_TOPIC_ID`. Pulsar generation is
 `1..Long.MAX_VALUE`; zero and `Math.addExact` overflow fail closed. Its per-name and total UTF-8 caps remain V2 format
 decisions that must be frozen before codec implementation. Compatibility namespace, provider scope, broker/session,
 and display alias do not enter these bytes.
+
+Pulsar selector and aggregate leaves share exactly one canonical persistence-name digest while remaining distinct
+authorities through separate versioned prefixes:
+
+```text
+pulsarNameDigest =
+  SHA-256(NPN1 || u32be(canonicalPersistenceNameUtf8.length) || canonicalPersistenceNameUtf8)
+
+selector leaf:
+  <selector-prefix>/<64 lowercase hex pulsarNameDigest>
+
+aggregate leaf:
+  <aggregate-prefix>/<64 lowercase hex pulsarNameDigest>/<generation19>
+```
+
+`generation19` is the 19-digit zero-padded decimal encoding of `1..Long.MAX_VALUE`. The backend root is outside the
+domain leaf grammar. Values repeat the exact canonical persistence name and generation and rederive the leaf; they do
+not redundantly store the digest. Collision or key/value/protocol disagreement fails closed.
 
 The aggregate remains immutable. Enumeration indexes may be added only as repairable hints; a name index or second key
 cannot participate in aggregate visibility or override the incarnation-scoped authority.
@@ -95,5 +113,6 @@ This decision is refined by [ADRs 0033](0033-v2-topic-binding-aggregate-logical-
 [0050](0050-v2-kafka-aggregate-wire-and-publication-validation.md), and
 [0051](0051-v2-pulsar-selector-state-machine-and-cached-fence.md), and
 [0082](0082-v2-m1-domain-and-control-authority-contracts.md) and
-[0083](0083-v2-m1-wire-control-and-evidence-bounds.md), refines ADR 0023, and is tracked by `T-META-01`,
+[0083](0083-v2-m1-wire-control-and-evidence-bounds.md), and
+[0084](0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md), refines ADR 0023, and is tracked by `T-META-01`,
 `V2-META-002..007`, and `V2-KAF-META-001..005`.

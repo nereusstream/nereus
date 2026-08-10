@@ -136,6 +136,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
     "$repo_root/docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
     "$repo_root/docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
+    "$repo_root/docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -263,9 +264,14 @@ require_literal 'native configuration-derived records*' "docs/decisions/0083-v2-
 require_literal 'does **not** already implement a qualifying witness adapter' "docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
 require_literal 'genuinely fresh ledger root' "docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
 require_literal 'RFC 8785/JCS' "docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
+require_literal '`KAFKA=1` and `PULSAR=2`' "docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
+require_literal 'NPN1' "docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
+require_literal '`WatchContinuityEpoch`' "docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
+require_literal 'SHA-256(' "docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
+require_literal 'discovered = executed + skipped' "docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
 require_literal 'request-order greedy residue-free linear admission sizes the exact cumulative record list' "docs/v2/v2-scenarios.json"
-require_literal 'INSTANCEID-derived compatibility-namespace Registry' "docs/v2/v2-scenarios.json"
-require_literal 'Oxia-0.9.0/MetadataStore-ELM authoritative witness adapter' "docs/v2/v2-scenarios.json"
+require_literal 'canonical-UUID/NLI1-derived compatibility-namespace Registry' "docs/v2/v2-scenarios.json"
+require_literal 'local store-wide continuity epoch' "docs/v2/v2-scenarios.json"
 require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
 require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
@@ -330,7 +336,9 @@ require_literal "M1 Readiness Grill round 2" "docs/v2/grill-notes/23-m1-readines
 require_literal "Q1–Q6 都建议“调整后确认”" "docs/v2/grill-notes/23-m1-readiness-round-2-domain-control-authorities.md"
 require_literal "M1 Readiness Grill round 3" "docs/v2/grill-notes/24-m1-readiness-round-3-wire-control-and-evidence.md"
 require_literal "没有明显的数据热路径型过度设计" "docs/v2/grill-notes/24-m1-readiness-round-3-wire-control-and-evidence.md"
-require_literal "exact JCS envelope/payload field table" "docs/v2/open-questions.md"
+require_literal "M1 Readiness Grill round 4" "docs/v2/grill-notes/25-m1-readiness-round-4-leaf-witness-registry-and-receipt.md"
+require_literal "不要同时维护 suite/scenario/aggregate 三套独立结果" "docs/v2/grill-notes/25-m1-readiness-round-4-leaf-witness-registry-and-receipt.md"
+require_literal "concrete ready/gap API" "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -890,6 +898,7 @@ link_docs=(
     "$repo_root/docs/decisions/0081-v2-m1-pure-active-graph-and-promotion-boundary.md"
     "$repo_root/docs/decisions/0082-v2-m1-domain-and-control-authority-contracts.md"
     "$repo_root/docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
+    "$repo_root/docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
 )
 
 while IFS=: read -r source match; do

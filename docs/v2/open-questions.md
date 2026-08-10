@@ -29,21 +29,23 @@ acquisition, INSTANCEID-derived fresh-only Registry identity with inline writer 
 ledger receipt envelope. Its complete adjusted answer is preserved in
 [round 3](grill-notes/24-m1-readiness-round-3-wire-control-and-evidence.md).
 
+Round 4 accepted ADR 0084's exact protocol codes and NPN1 Pulsar authority leaves, Kafka duplicate/validation/policy
+precedence plus remote-log fail-closed admission, one local store-wide watch-continuity epoch, canonical UUID/NLI1
+compatibility identity, and one receipt result hierarchy with safe attachment grammar. The dedicated design-review
+answer is preserved in
+[round 4](grill-notes/25-m1-readiness-round-4-leaf-witness-registry-and-receipt.md).
+
 Those accepted structural contracts do not select an allocator or invent unconfirmed byte/cap tables. The next
 implementation-readiness descendants remain OPEN until explicitly confirmed:
 
-- exact non-zero protocol numeric codes and aggregate authority-key/golden bytes for the already-fixed raw reserved UUID
-  rejection set;
 - the complete NTA1 v1 ordered field/width/enum/`NONE`/variant table, Pulsar per-name UTF-8 caps, total parser cap, and
   checked cap derivation;
-- the first Oxia-backed ELM adapter's bounded witness bytes, qualified provider session/gap hook, direct-CAS transition
-  integration, and fail-closed current-source conformance;
-- exact INSTANCEID hash separator/framing/validation grammar and goldens, qualified fresh-root evidence encoding,
-  writer-count/row-byte caps, and independently revocable principal/interlock evidence encoding;
-- exact JCS envelope/payload field table, integer/count accounting, source/attachment path and redaction grammar,
-  numeric attachment caps, and Final-index binding to non-virtual-ledger M1 evidence;
-- Kafka duplicate pseudo-config semantics, invalid-input error precedence and `CreateTopicPolicy` visibility, plus the M6
-  stock tiered-storage disable/compatible-settings proof.
+- the first Oxia-backed ELM adapter's concrete ready/gap API, bounded witness bytes, exact source/artifact tuple,
+  direct-CAS integration, and fail-closed current-source conformance;
+- qualified fresh-root evidence encoding plus the Registry writer row/header/evidence table, source-qualified writer
+  inventory, and evidence-derived count/byte caps; `16/256/4096` remain candidates only;
+- exact remaining JCS envelope/payload fields, allowlisted attachment kinds, evidence-derived numeric attachment caps,
+  and Final-index binding to non-virtual-ledger M1 evidence.
 
 These descendants remain non-normative until a later explicit grill confirmation.
 

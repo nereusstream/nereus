@@ -107,11 +107,13 @@ Cross-repository promotion uses four stages and at least five commits:
 
 Virtual-ledger conformance receipts share one RFC-8785/JCS canonical JSON envelope with the closed payload kinds
 `REGISTRY_CONFORMANCE` and `HARNESS_CONFORMANCE_ONLY`. They record tested product/fork commits, source-lock digest,
-domain JAR/POM SHAs, Oxia server-image/client/test-artifact identities, scenario IDs, and suite/scenario-bound
-`discovered/executed/passed/failed/skipped/aborted` counts plus the aggregate result. Harness non-selection is a schema
-constant. Registry bytes, writer membership, ACL/interlock snapshots, and logs are content-addressed attachments whose
-root references contain relative path, length, and SHA-256. Registry and harness receipts cannot substitute for one
-another; exact inner receipt fields, count equations, and numeric attachment caps remain open.
+domain JAR/POM SHAs, Oxia server-image/client/test-artifact identities, and one authoritative
+`scenarios[] -> suites[]` hierarchy. Each suite has `discovered/executed/passed/failed/skipped/aborted`; scenario and
+overall results are deterministic derived summaries, never independent authorities. Harness non-selection is a schema
+constant. Accounting, retry prohibition, safe attachment grammar, and PASS semantics are fixed by ADR 0084. Registry
+bytes, writer membership, ACL/interlock snapshots, and logs are content-addressed allowlisted attachments whose root
+references contain kind, safe relative path, length, and SHA-256. Registry and harness receipts cannot substitute for
+one another; exact remaining payload fields and evidence-derived numeric attachment caps remain OPEN.
 
 N3 may commit only receipts/evidence attachments and the scenario status/index exactly covered by them. It cannot
 change code, gates, workflows, ADRs, or source locks; such a change returns to N2 and reruns promotion. Content hashes
@@ -130,5 +132,5 @@ promotion.
 - M1 can verify registry and harness conformance without making an unevidenced allocator selection or borrowing M3/M5/
   M6 PASS status.
 
-This decision is refined by ADRs 0082/0083, refines ADRs 0006, 0009, 0032, 0034, 0042, 0043, 0050, 0051, 0054, and 0055 and
+This decision is refined by ADRs 0082..0084, refines ADRs 0006, 0009, 0032, 0034, 0042, 0043, 0050, 0051, 0054, and 0055 and
 is tracked by the M1 implementation plan and its milestone-specific scenario rows.

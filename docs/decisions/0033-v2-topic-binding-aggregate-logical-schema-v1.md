@@ -30,7 +30,8 @@ The initial epoch payload contains:
 - an absent sealed end;
 - closed kind/version discriminators for WAL, payload, checksum, compression, and encryption families.
 
-Every discriminator is a closed wire value. A semantically inapplicable value uses an explicit `NONE`; unknown values,
+The protocol discriminator table is `KAFKA=1`, `PULSAR=2`; zero and `3..65535` are rejected in v1. Every other
+discriminator is likewise a closed wire value. A semantically inapplicable value uses an explicit `NONE`; unknown values,
 unknown required versions, illegal combinations, missing required fields, non-zero initial ordinal, a present initial
 sealed end, or a binding/epoch back-reference mismatch fail closed.
 
@@ -70,5 +71,5 @@ preserves exact aggregate equality.
   equality without Kafka temporary NTA1 allocation, deterministic re-encode, fixed parser caps, and exclusion of every
   mutable/retry-dependent field. Codec work cannot begin until the remaining table and caps are accepted.
 
-This decision is refined by ADRs 0042/0043, 0050/0051, 0082, and 0083, refines ADRs 0023/0028, and is tracked by `T-META-01`,
+This decision is refined by ADRs 0042/0043, 0050/0051, and 0082..0084, refines ADRs 0023/0028, and is tracked by `T-META-01`,
 `V2-META-002..007`, and `V2-KAF-META-002..005`.

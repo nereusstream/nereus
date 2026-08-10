@@ -53,5 +53,5 @@ RETIRING-to-RETIRED proof and allocator/chain epoch protocols remain downstream 
   alignment/math, encoded capacity, and provider-configuration independence. M3 proves production allocation stop at
   RETIRING/exhaustion and retired-ledger readability.
 
-This decision is refined by ADRs 0048/0054/0055/0061/0082/0083, refines ADRs 0027/0032, and is tracked by `T-POSITION-01`,
+This decision is refined by ADRs 0048/0054/0055/0061/0082..0084, refines ADRs 0027/0032, and is tracked by `T-POSITION-01`,
 `V2-POSITION-003..018`.

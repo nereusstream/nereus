@@ -26,9 +26,11 @@ immutable physical descriptors, lifecycle contracts, and optional external provi
 M1 readiness freezes the pure V2 module/promotion boundary plus NTB1/NSE1 outer identities, NPC1/NTI1 layouts and flat
 NTA1 direction, four production metadata capabilities, Kafka's one profile input and linear topic-create admission,
 the Oxia-backed ELM ownership-fence candidate boundary, and INSTANCEID-derived fresh-only Registry governance with
-inline writers. Current pinned source proves witness primitives rather than a complete adapter. This is still
-documentation-only: exact remaining byte/code/cap tables, qualified provider hooks, receipt inner schema, and all
-implementation evidence remain open.
+inline writers. Round 4 adds exact protocol/Pulsar leaves, Kafka last-wins and remote-log admission, a minimal local
+store-wide continuity contract, canonical UUID/NLI1 namespace identity, and one receipt hierarchy. Current pinned
+source proves witness primitives rather than a complete adapter. This is still documentation-only: complete NTA1/name
+caps, concrete provider hook/source evidence, writer caps, receipt numeric caps, and all implementation evidence remain
+open.
 
 ## 2. Architecture
 
