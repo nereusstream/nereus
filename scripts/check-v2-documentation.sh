@@ -29,6 +29,8 @@ required_v2_docs=(
     07-protocol-integrations.md
     08-implementation-plan-and-gates.md
     09-scenario-evidence-matrix.md
+    detailed_design/m1/README.md
+    detailed_design/m1/m1.1a-domain-spi-foundation.md
     open-questions.md
     tradeoffs.md
 )
@@ -152,6 +154,10 @@ require_literal "v0.1@a14d925da5763f36208f8ddca7bef31f3eb90b0b" "docs/v2/README.
 require_literal "191fbbe5a0430cc4c88b9a2be61cb5a492ec3494" "docs/v2/source-locks.json"
 require_literal "v2DocumentationCheck" "build.gradle.kts"
 require_literal "v2M0Check" "build.gradle.kts"
+require_literal 'M1 execution index' "docs/v2/detailed_design/m1/README.md"
+require_literal 'M1.1a-A domain and metadata SPI foundation' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
+require_literal 'Complete NTA1 codec/goldens remain OPEN' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
+require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal "V2 documentation baseline" ".github/workflows/build.yml"
 require_literal "Superseded by ADR 0012." "docs/decisions/0010-v2-topic-profile-binding.md"
 require_literal "Kafka and Pulsar do not share a universal numeric position" "docs/decisions/0011-v2-position-domains-and-multi-protocol-fabric.md"

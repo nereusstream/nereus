@@ -37,6 +37,9 @@ performance-first BookKeeper WAL.
   and immutable admission evidence, and one content-identified receipt/Final hierarchy in ADR 0085. M1.1a module,
   identity, deterministic-ID, SPI, dependency, and continuity scaffolding may start; full NTA1 policy/caps, writer count,
   receipt numeric caps, and executable promotion evidence remain OPEN.
+- The accepted [M1 execution index](detailed_design/m1/README.md) and
+  [M1.1a-A code-level design](detailed_design/m1/m1.1a-domain-spi-foundation.md) split the first implementation into
+  module, identity/domain, SPI/gate, continuity-fork, and metadata-oxia targets. Their presence is not implementation.
 - Existing Java modules and Phase/Future evidence on `main` are V1 residue until replaced by a V2 milestone.
 - The ordinary CI Pulsar API checkout remains a legacy V1-residue build baseline until the V2 Pulsar slice replaces
   that code; it is recorded separately and is not the V2 fork-development or parity baseline.
@@ -158,10 +161,11 @@ pooling is optional and remains below the independently owned sessions.
 8. [Metadata backends and handoff](06-metadata-backends-and-handoff.md)
 9. [Protocol integrations and product gates](07-protocol-integrations.md)
 10. [Implementation plan and gates](08-implementation-plan-and-gates.md)
-11. [Scenario evidence matrix](09-scenario-evidence-matrix.md)
-12. [Architecture tradeoffs](tradeoffs.md)
-13. [Open questions](open-questions.md) and [grill session records](grill-notes/)
-14. [Structured source locks](source-locks.json) and [structured scenarios](v2-scenarios.json)
+11. [M1 execution index](detailed_design/m1/README.md) and component detailed designs
+12. [Scenario evidence matrix](09-scenario-evidence-matrix.md)
+13. [Architecture tradeoffs](tradeoffs.md)
+14. [Open questions](open-questions.md) and [grill session records](grill-notes/)
+15. [Structured source locks](source-locks.json) and [structured scenarios](v2-scenarios.json)
 
 Accepted decisions:
 
