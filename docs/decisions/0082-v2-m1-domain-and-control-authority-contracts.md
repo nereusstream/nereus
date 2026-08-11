@@ -11,6 +11,14 @@ INSTANCEID hash, and receipt accounting/path safety while retaining evidence-der
 ADR 0085 then permits M1.1a foundation work, closes the client-only continuity shape and 120-byte writer row, and
 retains the complete NTA1 policy/cap table, writer count, receipt caps, and executable evidence as explicit descendants.
 
+### Implementation refinement (2026-08-11)
+
+The Nereus-local foundation now implements the accepted 16/32-byte identities, NTB1/NSE1 derivations, independent
+aggregate object model, direct foundation validator, four capability interfaces, and closed create/CAS results. Exact
+stored outcomes carry versioned snapshots with canonical bytes and digest; no child or generic metadata authority was
+added. Kafka/Pulsar/Oxia physical authorities, complete NTA1, Registry conformance, and promotion evidence remain
+outside this refinement.
+
 ## Context
 
 ADR 0081 fixes M1's module, milestone, and promotion boundary but leaves several implementation choices capable of

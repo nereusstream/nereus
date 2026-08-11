@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: Normative
 sourceTuple: v2-m0
@@ -75,9 +75,10 @@ after complete publication/validation and is not stored. The v1 aggregate exclud
 state, timestamps, attempts, controller offsets, backend versions, and untyped attributes. Oxia envelope schema 1 wraps
 NTA1; Kafka wire v0 maps generated fields directly to the domain validator without constructing temporary NTA1 bytes.
 
-M1 starts as M1.1a with modules, identity/ID codecs, minimal independent domain types, four closed metadata
-capabilities, and continuity/source-lock scaffolding. Complete NTA1 encoding/decoding and goldens are M1.1b and cannot
-be claimed by the foundation slice.
+M1.1a-A now implements the additive modules, frozen identity/ID codecs, minimal independent domain values and direct
+foundation validator, and four closed metadata capabilities. Its executable gate owns the production classpath/API
+boundary and local goldens. The separate continuity/backend/runtime work has not started. Complete NTA1 encoding/
+decoding, final legality, caps, and goldens remain M1.1b and cannot be claimed by this foundation slice.
 
 At Kafka feature level 2, that physical record is one generated, typed, non-flexible
 `TopicBindingAggregateRecord(apiKey=32000, wireVersion=0)` owned by `TopicImage`, not an opaque attachment or parallel

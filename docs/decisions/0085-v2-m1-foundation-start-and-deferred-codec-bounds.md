@@ -2,9 +2,16 @@
 
 ## Status
 
-Accepted as the 0.2 M1 first-implementation boundary. M1.1a foundation implementation may start. Complete NTA1 codec,
-Registry capacity, and promotion-receipt validators remain blocked by the explicit descendants below. No implementation
-or executable evidence is claimed by this ADR.
+Accepted as the 0.2 M1 first-implementation boundary. The Nereus-local M1.1a-A domain/SPI foundation and intermediate
+gate are implemented. Complete NTA1 codec, Registry capacity, Oxia continuity/backend work, and promotion-receipt
+validators remain blocked or pending under the explicit descendants below. This ADR still claims no M1 PASS.
+
+### Implementation refinement (2026-08-11)
+
+The implementation uses an opaque structural `{kind,formatVersion,payload}` frame-policy value solely to validate the
+accepted zero/non-zero shape and profile-level NONE split. No non-NONE semantic code or payload contract is assigned.
+`v2M1FoundationCheck` verifies the domain/SPI classpaths, forbidden surfaces, module tests, documentation, and
+reproducible JAR/source-JAR/POM hashes without registering `v2M1FinalCheck`.
 
 ## Context
 

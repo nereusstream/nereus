@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: DocumentationOnly
 authority: ProductArchitecture
 sourceTuple: v2-m0
@@ -29,9 +29,9 @@ the Oxia-backed ELM ownership-fence candidate boundary, and INSTANCEID-derived f
 inline writers. Round 4 adds exact protocol/Pulsar leaves, Kafka last-wins and remote-log admission, a minimal local
 store-wide continuity contract, canonical UUID/NLI1 namespace identity, and one receipt hierarchy. Round 5 permits the
 M1.1a foundation slice after removing derived NTA1 authorities, reusing the Oxia dummy barrier client-side, fixing a
-120-byte writer row, and removing receipt run/result duplication. This is still documentation-only: complete NTA1
-FrameEncodingPolicy/name/total caps, writer count, receipt caps, final provider artifacts, and all executable evidence
-remain open.
+120-byte writer row, and removing receipt run/result duplication. The additive domain/SPI foundation and its local
+gate now exist, so V2 is `InProgress`; complete NTA1 FrameEncodingPolicy/name/total caps, writer count, Oxia/Kafka/
+Pulsar runtime adapters, receipt caps, final provider artifacts, and promotion evidence remain open or pending.
 
 ## 2. Architecture
 
@@ -366,7 +366,8 @@ epoch-scoped profiles, physical generation overlap, no synchronous BK/Object dou
 
 ## 11. Status and historical boundary
 
-M0 is documentation-only. V2 runtime implementation and evidence are NotStarted. Existing V1 implementation contracts,
+M0 remains the documentation/source-lock baseline. The M1.1a-A domain/SPI foundation is implemented and locally gated,
+but V2 runtime activation and current-source promotion evidence are not started. Existing V1 implementation contracts,
 including [BookKeeper primary WAL](../v1/phase-bk-bookkeeper-primary-wal/README.md), remain historical evidence until
 their
 code slices are replaced. Their exact archive is

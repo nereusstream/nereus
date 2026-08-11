@@ -10,6 +10,13 @@ table, provider API/source tuple, Registry writer caps, and receipt numeric caps
 continuity direction and exact 120-byte writer row, removes receipt run identity, and permits M1.1a foundation work
 without claiming the deferred codecs or validators.
 
+### Implementation refinement (2026-08-11)
+
+NPC1 and NTI1 are now strict Java-17/JDK-only codecs over already bounded byte arrays, with literal golden/negative
+vectors, unsigned declared-length checks before allocation, raw Kafka UUID handling, strict UTF-8, positive Pulsar
+generation, and strict EOF. This does not implement or name an NTA1 codec, freeze a Pulsar/name/total cap, or activate
+Kafka/Pulsar wire integration.
+
 ## Context
 
 ADR 0082 freezes the outer domain and control authorities but intentionally leaves several choices open. An exact

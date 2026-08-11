@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Proposed
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: NonNormativeQuestionLog
 sourceTuple: v2-m0
@@ -42,8 +42,9 @@ kinds, and one non-authoritative Final manifest. It explicitly did not accept co
 proposed receipt numeric cap. The dedicated design-review answer is preserved in
 [round 5](grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md).
 
-M1.1a module/identity/deterministic-ID/SPI/dependency/continuity scaffolding may now start. It cannot claim complete
-NTA1, Registry codec/capacity, receipt validator, M1 Final, or executable evidence. The remaining descendants are:
+The Nereus-local M1.1a-A module/identity/deterministic-ID/SPI/dependency foundation is now implemented and locally
+gated. The separate Oxia continuity and metadata-oxia scaffolds have not started. The foundation cannot claim complete
+NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidence. The remaining descendants are:
 
 - **M1.1b codec OPEN:** exact `FrameEncodingPolicy` kind/version/payload, complete protocol/profile/`NONE` legality and
   goldens, Pulsar persistence/topic UTF-8 caps, `maxCellBytes`, `maxIncarnationBytes`, `maxNta1Bytes`, checked formula,

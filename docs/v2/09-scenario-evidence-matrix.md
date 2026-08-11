@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: NormativeEvidencePlan
 sourceTuple: v2-m0
@@ -9,7 +9,7 @@ sourceTuple: v2-m0
 
 # V2 scenario evidence matrix
 
-The machine-readable owner is [v2-scenarios.json](v2-scenarios.json). At M0 every runtime scenario is `PLANNED`;
+The machine-readable owner is [v2-scenarios.json](v2-scenarios.json). M0 started with every runtime scenario `PLANNED`;
 the documentation gate proves synchronization only and does not promote runtime evidence.
 
 | ID | Milestone | Contract | Required evidence | Status |
@@ -21,7 +21,7 @@ the documentation gate proves synchronization only and does not promote runtime 
 | V2-POLICY-001 | M1 | the typed resolver makes correctness/parser caps non-configurable, Product/Deployment owns base defaults, Namespace/Topic may narrow new-write admission but never persisted-v1 decode, Cell/host only cap, and one policy type cannot span activation lifecycles | domain/resolver unit tests for precedence, minimum arithmetic, incompatible/missing values, admission-cap non-escalation, persisted decode at the full v1 cap, and lifecycle-type separation | PLANNED |
 | V2-POLICY-002 | M2/M3 | resolved policy persists at its exact epoch/run/group/offload-attempt boundary and failover, early seal/backpressure, or batching cannot reinterpret it | persisted-value failover drift, early seal/backpressure, incompatible batching, and Cell/host pressure integration tests | PLANNED |
 | V2-META-002 | M1 | one immutable TopicBindingAggregateRecord physically owns the complete binding and initial epoch; Publisher/Reader return one VersionedAggregateSnapshot and closed exact outcomes with no child authority | atomic Kafka CreateTopics replay/snapshot, Oxia create/CAS four-outcome and response-loss tests, key/schema/digest/canonical-byte exactness, one-decode typed-view equality, and child key/write/cache/watch/list rejection | PLANNED |
-| V2-META-003 | M1 | create-only nonzero 16-byte bootstrap/topic identities plus fixed KAFKA=1/PULSAR=2 NPC1/NTI1 variants and NPN1 Pulsar authority leaves feed exact NTB1/NSE1 preimages that yield 32-byte binding/initial-epoch IDs | protocol-code, NPN1 digest, selector/aggregate-prefix and generation19 golden bytes; raw Kafka UUID with ZERO/ONE rejection and 249-ASCII cap; Pulsar reservation-domain Cell bytes, UTF-8 names, positive generation/overflow; key/value/collision, same-name recreate, Cell rebuild, ordinal-zero, deterministic retry, protocol mismatch, and excluded-input tests; maximum-name vectors wait for the accepted cap | PLANNED |
+| V2-META-003 | M1 | create-only nonzero 16-byte bootstrap/topic identities plus fixed KAFKA=1/PULSAR=2 NPC1/NTI1 variants and NPN1 Pulsar authority leaves feed exact NTB1/NSE1 preimages that yield 32-byte binding/initial-epoch IDs | protocol-code, NPN1 digest, selector/aggregate-prefix and generation19 golden bytes; raw Kafka UUID with ZERO/ONE rejection and 249-ASCII cap; Pulsar reservation-domain Cell bytes, UTF-8 names, positive generation/overflow; key/value/collision, same-name recreate, Cell rebuild, ordinal-zero, deterministic retry, protocol mismatch, and excluded-input tests; maximum-name vectors wait for the accepted cap | IMPLEMENTED_NOT_RUN |
 | V2-META-004 | M1 | canonical NTA1 persists only independent semantics in one flat/no-tail aggregate logical schema v1 with only absent initial sealed end; Oxia wraps it while Kafka maps generated fields directly without temporary NTA1 bytes | minimal ordered fields and derived-view exclusion; exact FrameEncodingPolicy/profile/protocol/`NONE` legality; Pulsar/name/Cell/incarnation/total caps and checked formula; exact goldens; strict UTF-8/no normalization; length/presence/overflow/trailing/unknown rejection; persisted-v1 parser cap; Oxia/Kafka equality; NTA2 tests | PLANNED |
 | V2-META-005 | M1 | Pulsar keeps a permanent monotonic topic-generation selector and defines a same-key permanent retired-tombstone wire without executing reference-free replacement | generation/delete/recreate ABA, stale `putIfAbsent`, overflow, tombstone codec/key/capacity, selector response-loss, and replacement-before-proof rejection | PLANNED |
 | V2-META-007 | M5 | an exact reference-free proof is the only authority for full aggregate to same-key permanent retired-tombstone replacement | exact-version CAS, every reference veto, audit grace, lost response, stale create, and full-to-tombstone irreversibility tests | PLANNED |

@@ -2,8 +2,15 @@
 
 ## Status
 
-Accepted for the 0.2 M1 implementation and cross-repository promotion workflow. Implementation and executable evidence
-have not started.
+Accepted for the 0.2 M1 implementation and cross-repository promotion workflow. The additive `nereus-domain` and
+`nereus-metadata-spi` foundation plus its intermediate gate now exist. Pure-active-graph pruning, fork/runtime work,
+promotion receipts, and M1 Final remain unstarted or pending.
+
+### Implementation refinement (2026-08-11)
+
+`v2M1FoundationCheck` enforces the first two dependency nodes, exact capability inventory, forbidden API surface, local
+tests/goldens, and reproducible artifact hashing. It is deliberately not the ADR's `v2M1Check`/Exact/Final ladder and
+does not weaken the requirement to remove the active V1/KoP runtime graph before M1 completion.
 
 ## Context
 

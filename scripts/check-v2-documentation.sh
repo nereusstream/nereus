@@ -57,6 +57,23 @@ for name in "${required_v2_docs[@]}"; do
     fi
 done
 
+in_progress_docs=(
+    README.md
+    architecture.md
+    02-storage-profiles-and-topic-binding.md
+    06-metadata-backends-and-handoff.md
+    08-implementation-plan-and-gates.md
+    09-scenario-evidence-matrix.md
+    detailed_design/m1/README.md
+    detailed_design/m1/m1.1a-domain-spi-foundation.md
+    open-questions.md
+    tradeoffs.md
+)
+for name in "${in_progress_docs[@]}"; do
+    rg -q '^implementationStatus: InProgress$' "$v2_dir/$name" ||
+        fail "docs/v2/$name must report the partial M1 foundation as InProgress"
+done
+
 for path in "$repo_root/docs/v2/README.md" "$repo_root/docs/v2/architecture.md"; do
     rg -q "^sourceTuple: ${source_tuple}$" "$path" || fail "${path#"$repo_root/"} does not use source tuple $source_tuple"
 done
@@ -154,8 +171,14 @@ require_literal "v0.1@a14d925da5763f36208f8ddca7bef31f3eb90b0b" "docs/v2/README.
 require_literal "191fbbe5a0430cc4c88b9a2be61cb5a492ec3494" "docs/v2/source-locks.json"
 require_literal "v2DocumentationCheck" "build.gradle.kts"
 require_literal "v2M0Check" "build.gradle.kts"
+require_literal "v2M1FoundationDependencyCheck" "build.gradle.kts"
+require_literal "v2M1FoundationArtifactCheck" "build.gradle.kts"
+require_literal "v2M1FoundationCheck" "build.gradle.kts"
+require_literal "partial M1.1a-A domain and metadata SPI foundation" "build.gradle.kts"
+require_literal "no M1 PASS" "scripts/check-v2-m1-foundation.sh"
 require_literal 'M1 execution index' "docs/v2/detailed_design/m1/README.md"
 require_literal 'M1.1a-A domain and metadata SPI foundation' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
+require_literal '## Implementation record' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal 'Complete NTA1 codec/goldens remain OPEN' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
 require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal "V2 documentation baseline" ".github/workflows/build.yml"
@@ -354,7 +377,7 @@ require_literal "M1 Readiness Grill round 4" "docs/v2/grill-notes/25-m1-readines
 require_literal "不要同时维护 suite/scenario/aggregate 三套独立结果" "docs/v2/grill-notes/25-m1-readiness-round-4-leaf-witness-registry-and-receipt.md"
 require_literal "M1 Readiness Grill round 5" "docs/v2/grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md"
 require_literal "结论：Round 5 不能全部确认" "docs/v2/grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md"
-require_literal "M1.1a module/identity/deterministic-ID/SPI/dependency/continuity scaffolding may now start" "docs/v2/open-questions.md"
+require_literal "Nereus-local M1.1a-A module/identity/deterministic-ID/SPI/dependency foundation is now implemented" "docs/v2/open-questions.md"
 require_literal '`maxWriterCount=8` is a candidate' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
@@ -782,6 +805,21 @@ if missing_scenarios:
 matrix_ids = set(re.findall(r"V2-(?:[A-Z]+-)+[0-9]{3}", matrix_path.read_text()))
 if matrix_ids != set(scenario_ids):
     fail("Markdown and JSON scenario ID sets differ")
+
+matrix_statuses = dict(re.findall(
+    r"^\| (V2-(?:[A-Z]+-)+[0-9]{3}) \|.*\| "
+    r"(PLANNED|IMPLEMENTED_NOT_RUN|PASSED_CURRENT_SOURCE|FAILED|BLOCKED_ENVIRONMENT) \|$",
+    matrix_path.read_text(),
+    re.M,
+))
+json_statuses = {item["id"]: item["status"] for item in scenarios["scenarios"]}
+if matrix_statuses != json_statuses:
+    fail("Markdown and JSON scenario statuses differ")
+implemented_not_run = {key for key, value in json_statuses.items() if value == "IMPLEMENTED_NOT_RUN"}
+if implemented_not_run != {"V2-META-003"}:
+    fail(f"partial M1 foundation must promote only V2-META-003, found {sorted(implemented_not_run)}")
+if any(value == "PASSED_CURRENT_SOURCE" for value in json_statuses.values()):
+    fail("partial M1 foundation must not report a current-source scenario PASS")
 
 tradeoff_text = tradeoff_path.read_text()
 tradeoff_rows = re.findall(r"^\| (T-[A-Z]+-[0-9]{2}) \| (Accepted|Provisional) \|", tradeoff_text, re.M)

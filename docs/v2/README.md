@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: DocumentationOnly
 authority: NormativeIndex
 sourceTuple: v2-m0
@@ -17,9 +17,10 @@ performance-first BookKeeper WAL.
 ## Current status
 
 - `main` develops `0.2.0-SNAPSHOT` from source tuple `v2-m0`.
-- M0 freezes the V2 documentation contract only; V2 Java implementation and runtime evidence have not started.
+- M0 remains the accepted documentation/source-lock baseline. M1 is now `InProgress` through the additive M1.1a-A
+  foundation only; no V2 runtime is activated and no current-source promotion receipt exists.
 - M1 implementation-readiness Round 1 freezes the pure-active-graph, module, milestone, source-lock, gate, and
-  cross-repository promotion boundaries in ADR 0081; it does not claim that an M1 module or gate exists yet.
+  cross-repository promotion boundaries in ADR 0081; that readiness decision alone did not claim an implementation.
 - M1 implementation-readiness Round 2 freezes the outer NTB1/NSE1/NTA1 domain contracts, exact M1 metadata
   capabilities/results, Kafka topic-create authority, Pulsar ownership-fence capability, and compatibility-namespace
   Registry/writer-set evidence boundary in ADR 0082; exact descendant byte tables/adapters remain OPEN.
@@ -39,7 +40,13 @@ performance-first BookKeeper WAL.
   receipt numeric caps, and executable promotion evidence remain OPEN.
 - The accepted [M1 execution index](detailed_design/m1/README.md) and
   [M1.1a-A code-level design](detailed_design/m1/m1.1a-domain-spi-foundation.md) split the first implementation into
-  module, identity/domain, SPI/gate, continuity-fork, and metadata-oxia targets. Their presence is not implementation.
+  module, identity/domain, SPI/gate, continuity-fork, and metadata-oxia targets. The first three are now implemented by
+  `nereus-domain`, `nereus-metadata-spi`, and `v2M1FoundationCheck`; the Oxia fork and metadata-oxia targets remain
+  separate and unstarted.
+- The foundation supplies Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct aggregate
+  foundation validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
+  guards, and reproducible JAR/source-JAR/POM hashes. It deliberately supplies no NTA1 codec, Registry capacity,
+  backend adapter, Kafka/Pulsar activation, or M1 Final/PASS claim.
 - Existing Java modules and Phase/Future evidence on `main` are V1 residue until replaced by a V2 milestone.
 - The ordinary CI Pulsar API checkout remains a legacy V1-residue build baseline until the V2 Pulsar slice replaces
   that code; it is recorded separately and is not the V2 fork-development or parity baseline.

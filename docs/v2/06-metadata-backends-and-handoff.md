@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: Normative
 sourceTuple: v2-m0
@@ -34,6 +34,11 @@ implements none of these MetadataStore SPIs.
 
 Conformance suites verify fencing, monotonic roots, idempotency, response-loss recovery, and bounded enumeration. They
 do not require both backends to implement the same ephemeral lease primitive.
+
+The M1.1a-A foundation now provides these four interfaces, their closed outcomes and exact snapshot value types, plus
+deterministic in-test response-loss/CAS cuts. `v2M1FoundationCheck` proves the SPI production classpath contains only
+`nereus-domain` and scans for forbidden generic/backend APIs. This is capability scaffolding only: no Oxia adapter,
+selector transition kernel, Registry codec/capacity, watch continuity, or backend conformance is implemented.
 
 `TopicBindingAggregatePublisher` writes one immutable `TopicBindingAggregateRecord` to MetadataStore/Oxia and resolves
 response loss by exact reread. Kafka instead maps the same domain value directly into its native atomic CreateTopics

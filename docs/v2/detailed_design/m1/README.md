@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: DocumentationOnly
 authority: ExecutionIndex
 sourceTuple: v2-m0
@@ -35,9 +35,9 @@ The authoring baseline is the clean M0 split commit
 `c8c1d0030ece7ce0ee4014544ce7f612e95fd394`. It is a repository milestone anchor, not a replacement for
 `docs/v2/source-locks.json` or a promotion receipt.
 
-M1 starts from these facts:
+M1 started from these facts; the first bullet is now superseded by the implementation record below:
 
-- V2 implementation remains `NotStarted` and only M0 documentation gates exist;
+- the M0 baseline had V2 implementation `NotStarted` and only documentation gates;
 - the active Gradle/BOM/CI graph is still V1 residue, including KoP runtime;
 - M1.1a alone is implementation-ready;
 - complete NTA1, Registry writer capacity, receipt numeric caps, and final promotion evidence remain OPEN or pending.
@@ -83,11 +83,11 @@ Each target owns one row below and must preserve unrelated worktree state.
 
 | Slice | Deliverable | Prerequisite | Exit gate | Current state |
 | --- | --- | --- | --- | --- |
-| `M1.1a-A` | add `nereus-domain` and `nereus-metadata-spi`; enforce Java 17/JDK-only dependency direction | this index and accepted [M1.1a design](m1.1a-domain-spi-foundation.md) | module compile plus dependency-surface checks | implementation authorized |
-| `M1.1a-B` | bootstrap IDs, `ProtocolKindV1`, NPC1/NTI1/NPN1 leaves, NTB1/NSE1 IDs, strict names and goldens | `M1.1a-A` | domain unit/golden tests | design review required |
-| `M1.1a-C` | minimal independent aggregate values and foundation-only validator | `M1.1a-B` | semantic/negative API tests; no NTA1 activation | design review required |
-| `M1.1a-D` | exactly four production capabilities, closed outcomes, snapshots, deterministic test fakes | `M1.1a-C` | SPI contract tests | design review required |
-| `M1.1a-E` | `v2M1FoundationCheck`, immutable JAR/POM hashing, M1 `InProgress` handoff | `M1.1a-A..D` | foundation gate; never M1 PASS | planned |
+| `M1.1a-A` | add `nereus-domain` and `nereus-metadata-spi`; enforce Java 17/JDK-only dependency direction | this index and accepted [M1.1a design](m1.1a-domain-spi-foundation.md) | module compile plus dependency-surface checks | implemented and foundation-gated |
+| `M1.1a-B` | bootstrap IDs, `ProtocolKindV1`, NPC1/NTI1/NPN1 leaves, NTB1/NSE1 IDs, strict names and goldens | `M1.1a-A` | domain unit/golden tests | implemented and foundation-gated |
+| `M1.1a-C` | minimal independent aggregate values and foundation-only validator | `M1.1a-B` | semantic/negative API tests; no NTA1 activation | implemented and foundation-gated |
+| `M1.1a-D` | exactly four production capabilities, closed outcomes, snapshots, deterministic test fakes | `M1.1a-C` | SPI contract tests | implemented and foundation-gated |
+| `M1.1a-E` | `v2M1FoundationCheck`, reproducible JAR/source-JAR/POM hashing, M1 `InProgress` handoff | `M1.1a-A..D` | foundation gate; never M1 PASS | local gate implemented; N1 promotion pending |
 | `M1.1a-O1` | expose ready/loss lifecycle from the Oxia v0.9 client dummy barrier; no server wire/RPC | exact client base in source locks | fork focused tests and clean fork state | separate design/target required |
 | `M1.1a-O2` | V2 aggregate/selector/Registry adapter scaffolding and store-wide continuity capability | `M1.1a-D`, `M1.1a-O1` | local fake tests; exact-source conformance remains pending | separate design/target required |
 | `M1.1b` | freeze and implement complete NTA1 encoder/parser, legality table, caps, formula, and goldens | four accepted codec decisions plus evidence | exact codec gate | **OPEN; do not implement** |
@@ -128,13 +128,13 @@ Use one target per item below. A target must not silently absorb the next item b
    runtime activation fail-closed until exact-source conformance exists. Existing V1 best-effort watches do not satisfy
    this target.
 
-The first implementation target is item 1. The first three targets are described by
-[M1.1a domain/SPI detailed design](m1.1a-domain-spi-foundation.md). Items 4 and 5 require their own accepted component design before
-code changes.
+Items 1 through 3 are implemented and locally gated as the M1.1a-A foundation described by
+[M1.1a domain/SPI detailed design](m1.1a-domain-spi-foundation.md). Items 4 and 5 require their own accepted component
+design before code changes.
 
 ## Scenario ownership during M1.1a
 
-M1.1a contributes test evidence to a scenario but does not promote a scenario by itself.
+M1.1a contributes executable local evidence but does not create a current-source PASS by itself.
 
 | Scenario | M1.1a contribution | Still required after M1.1a |
 | --- | --- | --- |
@@ -144,8 +144,9 @@ M1.1a contributes test evidence to a scenario but does not promote a scenario by
 | `V2-PROFILE-001` | immutable selected profile/origin/catalog semantic values | complete creation authorities and runtime open/replay tests |
 | `V2-MIGRATION-001` | ordinal-zero and second-epoch API absence in the domain/SPI | Kafka/Pulsar authority and process evidence |
 
-Scenario JSON remains `PLANNED` until the implementation change has enough code and executed evidence to justify a
-different allowed status. A focused local unit test never justifies `PASSED_CURRENT_SOURCE`.
+`V2-META-003` is `IMPLEMENTED_NOT_RUN` because it now has a production owner and executable foundation gate, while its
+full cross-repository/cap evidence has not run. All broader rows above remain `PLANNED`. A focused local unit test never
+justifies `PASSED_CURRENT_SOURCE`.
 
 ## Commit and review order
 
@@ -173,7 +174,7 @@ must not start merely because the replacement modules compile.
 | Gate | When it exists | What it proves | What it cannot prove |
 | --- | --- | --- | --- |
 | `v2DocumentationCheck` / `v2M0Check` | now | accepted documentation/source/scenario consistency | any M1 implementation |
-| `v2M1FoundationCheck` | M1.1a-E | domain/SPI tests, dependency boundaries, forbidden API absence, JAR/POM hashes | complete NTA1, backend conformance, pure final graph, M1 PASS |
+| `v2M1FoundationCheck` | now | domain/SPI tests, dependency boundaries, forbidden API absence, reproducible JAR/source-JAR/POM hashes | complete NTA1, backend conformance, pure final graph, M1 PASS |
 | `v2M1Check` | after K1/P1/R1 and graph cut | ordinary deterministic M1 fast suite and V1 absence | exact external source/artifact/runtime identity |
 | `v2M1ExactSourceCheck` | N2 | clean exact forks, immutable artifacts, real Oxia, focused fork tests | evidence provenance without trusted workflow/N3 |
 | `v2M1FinalCheck` | N2/N3 | referenced gate/receipt schema and aggregate result | work not explicitly referenced by the receipts |

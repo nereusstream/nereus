@@ -4,7 +4,15 @@
 
 Accepted for the 0.2 M1 implementation and refined by ADR 0085. Complete NTA1 FrameEncodingPolicy/legality/caps,
 Registry writer-count capacity, and receipt attachment numeric caps remain OPEN. The client-only Oxia continuity shape
-and 120-byte writer row are closed; concrete fork/artifact/image identities and executable evidence have not started.
+and 120-byte writer row are closed. Local protocol/leaf code and tests now exist; concrete fork/server-image identities,
+continuity/Registry conformance, and promotion evidence have not started.
+
+### Implementation refinement (2026-08-11)
+
+`ProtocolKindV1`, NPN1 digest, lowercase selector leaf, `<digest>/<generation19>` aggregate leaf, and key/value mismatch
+guards are implemented in `nereus-domain`. The Registry SPI value remains intentionally opaque beyond typed key
+identity/epoch and exact candidate bytes: it freezes no writer count, assignment parser, backend codec, or capacity
+validator.
 
 ## Context
 

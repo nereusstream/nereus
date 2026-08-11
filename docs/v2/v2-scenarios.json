@@ -64,7 +64,7 @@
       "milestone": "M1",
       "contract": "create-only nonzero 16-byte bootstrap/topic identities plus fixed KAFKA=1/PULSAR=2 NPC1/NTI1 variants and NPN1 Pulsar authority leaves feed exact NTB1/NSE1 preimages that yield 32-byte binding and initial-epoch IDs",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
-      "status": "PLANNED",
+      "status": "IMPLEMENTED_NOT_RUN",
       "evidenceReceipt": null
     },
     {
