@@ -91,6 +91,83 @@ abstract class V2FoundationDependencyVerificationTask : DefaultTask() {
     }
 }
 
+abstract class V2FoundationArtifactVerificationTask : DefaultTask() {
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.NONE)
+    abstract val domainJar: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.NONE)
+    abstract val domainSourcesJar: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.NONE)
+    abstract val domainPom: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.NONE)
+    abstract val metadataSpiJar: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.NONE)
+    abstract val metadataSpiSourcesJar: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.NONE)
+    abstract val metadataSpiPom: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.OutputFile
+    abstract val hashReport: org.gradle.api.file.RegularFileProperty
+
+    @TaskAction
+    fun verifyArtifacts() {
+        val artifacts = linkedMapOf(
+            "nereus-domain.jar" to domainJar.get().asFile,
+            "nereus-domain.sources.jar" to domainSourcesJar.get().asFile,
+            "nereus-domain.pom" to domainPom.get().asFile,
+            "nereus-metadata-spi.jar" to metadataSpiJar.get().asFile,
+            "nereus-metadata-spi.sources.jar" to metadataSpiSourcesJar.get().asFile,
+            "nereus-metadata-spi.pom" to metadataSpiPom.get().asFile,
+        )
+        artifacts.forEach { (label, file) ->
+            check(file.isFile && file.length() > 0) { "$label is missing or empty: $file" }
+        }
+
+        val domainPomText = domainPom.get().asFile.readText()
+        check("<dependency>" !in domainPomText) {
+            "nereus-domain POM must publish no production dependencies"
+        }
+        val metadataSpiPomText = metadataSpiPom.get().asFile.readText()
+        check(Regex("<dependency>").findAll(metadataSpiPomText).count() == 1) {
+            "nereus-metadata-spi POM must publish exactly one dependency"
+        }
+        check("<artifactId>nereus-domain</artifactId>" in metadataSpiPomText) {
+            "nereus-metadata-spi POM does not depend on nereus-domain"
+        }
+
+        fun sha256(file: File): String {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) {
+                        break
+                    }
+                    digest.update(buffer, 0, read)
+                }
+            }
+            return java.util.HexFormat.of().formatHex(digest.digest())
+        }
+
+        val report = hashReport.get().asFile
+        report.parentFile.mkdirs()
+        report.writeText(artifacts.entries.joinToString(separator = "\n", postfix = "\n") { (label, file) ->
+            "${sha256(file)}  $label"
+        })
+    }
+}
+
 plugins {
     `base`
     `maven-publish`
@@ -757,6 +834,9 @@ val v2DomainMainOutput = project(":nereus-domain")
     .get()
     .output
 val v2DomainJar = project(":nereus-domain").tasks.named<Jar>("jar").flatMap { it.archiveFile }
+val v2DomainSourcesJar = project(":nereus-domain").tasks.named<Jar>("sourcesJar").flatMap { it.archiveFile }
+val v2MetadataSpiJar = project(":nereus-metadata-spi").tasks.named<Jar>("jar").flatMap { it.archiveFile }
+val v2MetadataSpiSourcesJar = project(":nereus-metadata-spi").tasks.named<Jar>("sourcesJar").flatMap { it.archiveFile }
 
 tasks.register<V2FoundationDependencyVerificationTask>("v2M1FoundationDependencyCheck") {
     group = "verification"
@@ -775,6 +855,26 @@ tasks.register<Exec>("v2M1FoundationApiCheck") {
     commandLine("bash", "scripts/check-v2-m1-foundation.sh")
 }
 
+tasks.register<V2FoundationArtifactVerificationTask>("v2M1FoundationArtifactCheck") {
+    group = "verification"
+    description = "Build and SHA-256 qualify the M1.1a-A JAR, source JAR, and Maven POM artifacts."
+    dependsOn(":nereus-domain:jar")
+    dependsOn(":nereus-domain:sourcesJar")
+    dependsOn(":nereus-domain:generatePomFileForMavenJavaPublication")
+    dependsOn(":nereus-metadata-spi:jar")
+    dependsOn(":nereus-metadata-spi:sourcesJar")
+    dependsOn(":nereus-metadata-spi:generatePomFileForMavenJavaPublication")
+    domainJar.set(v2DomainJar)
+    domainSourcesJar.set(v2DomainSourcesJar)
+    domainPom.set(project(":nereus-domain").layout.buildDirectory.file("publications/mavenJava/pom-default.xml"))
+    metadataSpiJar.set(v2MetadataSpiJar)
+    metadataSpiSourcesJar.set(v2MetadataSpiSourcesJar)
+    metadataSpiPom.set(
+        project(":nereus-metadata-spi").layout.buildDirectory.file("publications/mavenJava/pom-default.xml"),
+    )
+    hashReport.set(layout.buildDirectory.file("v2-m1-foundation/artifacts.sha256"))
+}
+
 tasks.register("v2M1FoundationCheck") {
     group = "verification"
     description = "Verify only the partial M1.1a-A domain and metadata SPI foundation; this is not M1 PASS."
@@ -782,6 +882,7 @@ tasks.register("v2M1FoundationCheck") {
     dependsOn(":nereus-metadata-spi:check")
     dependsOn("v2M1FoundationDependencyCheck")
     dependsOn("v2M1FoundationApiCheck")
+    dependsOn("v2M1FoundationArtifactCheck")
     dependsOn("v2DocumentationCheck")
 }
 

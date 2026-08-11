@@ -64,7 +64,9 @@ public final class Sha256Digest {
 
     @Override
     public boolean equals(Object other) {
-        return this == other || other instanceof Sha256Digest that && bytes.equals(that.bytes);
+        return this == other
+                || other instanceof Sha256Digest that
+                        && MessageDigest.isEqual(bytes.toByteArray(), that.bytes.toByteArray());
     }
 
     @Override

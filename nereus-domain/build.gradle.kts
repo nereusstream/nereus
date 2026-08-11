@@ -17,3 +17,8 @@ dependencies {
     testImplementation(libs.assertj)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
+
+tasks.withType<Jar>().configureEach {
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
