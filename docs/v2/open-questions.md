@@ -43,9 +43,18 @@ proposed receipt numeric cap. The dedicated design-review answer is preserved in
 [round 5](grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md).
 
 The Nereus-local M1.1a-A module/identity/deterministic-ID/SPI/dependency foundation is now implemented and locally
-gated. The separate Oxia continuity and metadata-oxia scaffolds have not started. The foundation cannot claim complete
+gated. The separate Oxia continuity slice is in progress; metadata-oxia scaffolding has not started. The foundation
+cannot claim complete
 NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidence. The remaining descendants are:
 
+- **Oxia O1 implementation in progress:** the confirmed 2026-08-12 source audit uses Java client
+  `24b730d1d66a1da701f4c99957361f6b3c5d748c` plus server
+  `37a17bef17202d5fd6e23282da5fd26d94865484` after an exact dummy/payload compatibility probe. The
+  [accepted O1 design](detailed_design/m1/m1.1a-oxia-client-continuity.md) selects a public immutable snapshot,
+  per-generation ready stage, listener, and registration handle. Its source-seam review also requires internal
+  assignment-stream loss/restoration publication and one cancelable notification attempt so no opaque retry can
+  precede loss. Schema-v2 source locks now record the confirmed implementation/conformance bases and distinct pending
+  final-fork/artifact/runtime evidence; those pending fields do not claim focused evidence or promotion.
 - **M1.1b codec OPEN:** exact `FrameEncodingPolicy` kind/version/payload, complete protocol/profile/`NONE` legality and
   goldens, Pulsar persistence/topic UTF-8 caps, `maxCellBytes`, `maxIncarnationBytes`, `maxNta1Bytes`, checked formula,
   and canonical topic-name/persistence-name consistency. The 16-KiB/64-KiB values are candidates only.
@@ -59,7 +68,9 @@ NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidenc
   continuity/Registry conformance, and trusted N3 receipt are implementation/promotion evidence rather than another
   prose-design decision.
 
-These descendants remain non-normative until a later explicit grill confirmation.
+O1 is now governed by its accepted implementation design. The remaining codec, Registry-capacity, receipt-cap, O2,
+P1, and promotion descendants remain OPEN, pending, or non-normative until their own required implementation/evidence
+gate or explicit design confirmation.
 
 ## Restarted Grill 2: evidence frontier
 

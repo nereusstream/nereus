@@ -89,9 +89,10 @@ closed. Ordinary access captures/rechecks one atomic fence word with zero remote
 aggregate-to-retired-tombstone replacement remains M5; complete process integration remains M6.
 The provider hook exports only a local store-wide `WatchContinuityEpoch` plus ready barrier; provider internal
 connection/session/shard identities are not persisted. A gap invalidates all store fences and triggers bounded,
-coalesced A/read/B recovery. The client fork uses Oxia v0.9's existing no-start-offset dummy notification batch as the
-ready barrier and adds no server wire/RPC; a gap discards the old offset and obtains a new barrier. Final fork/artifact/
-server-image identities and conformance remain promotion evidence rather than an unresolved protocol design.
+coalesced A/read/B recovery. The accepted O1 client fork uses the confirmed server base's existing no-start-offset dummy
+notification batch as the ready barrier and adds no server wire/RPC; a gap discards the old offset and obtains a new
+barrier. Source-lock schema v2 owns the confirmed implementation/conformance bases while final fork/artifact/server-
+image identities and conformance remain distinct pending promotion evidence.
 
 M1 implements the mode-independent virtual-ledger Registry bound to the immutable 32-byte ledger-ID compatibility
 namespace `SHA-256(NLI1 || u32be(36) || canonicalInstanceIdAscii[36])`. Only an exact lowercase canonical non-zero

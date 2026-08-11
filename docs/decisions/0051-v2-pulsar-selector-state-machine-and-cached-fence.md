@@ -104,5 +104,10 @@ commit, artifact/image digests, and fault-injection conformance are implementati
 protocol-design branch. Oxia v0.9 client base `ce8143e06bcb089a2916c8ce4bf64b40c1d4d5bc` and server base
 `1934d55f0f619971d83f43fbc56865ce9221ca92` are implementation bases only.
 
+The accepted 2026-08-12 M1.1a-O1 implementation design and schema-v2 source lock supersede those historical bases with
+client `24b730d1d66a1da701f4c99957361f6b3c5d748c` and server
+`37a17bef17202d5fd6e23282da5fd26d94865484`. This changes implementation/conformance identity only; it does not change
+this ADR's provider-neutral authority, wire, or fail-closed continuity semantics.
+
 This decision is refined by ADRs 0071/0073..0080 and 0082..0085, refines ADRs 0019, 0028, 0043, and 0049, and is tracked by
 `T-META-01`, `T-POLICY-01`, `V2-META-005..007`.

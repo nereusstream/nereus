@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sourceTupleId": "v2-m0",
   "productLine": "V2",
   "developmentVersion": "0.2.0-SNAPSHOT",
@@ -48,20 +48,79 @@
     {
       "id": "oxia-client-v2-implementation-base",
       "repository": "https://github.com/nereusstream/oxia-client-java.git",
-      "tag": "v0.9.0",
-      "commit": "ce8143e06bcb089a2916c8ce4bf64b40c1d4d5bc",
+      "branch": "main",
+      "version": "0.9.4",
+      "commit": "24b730d1d66a1da701f4c99957361f6b3c5d748c",
       "role": "CLIENT_FORK_BASE",
       "evidenceStatus": "IMPLEMENTATION_BASE_ONLY"
     },
     {
       "id": "oxia-server-v2-conformance-base",
       "repository": "https://github.com/nereusstream/oxia.git",
-      "tag": "v0.9.0",
-      "commit": "1934d55f0f619971d83f43fbc56865ce9221ca92",
+      "branch": "main",
+      "nearestTag": "v0.16.3",
+      "commit": "37a17bef17202d5fd6e23282da5fd26d94865484",
       "role": "SERVER_SOURCE_BASE",
       "evidenceStatus": "IMPLEMENTATION_BASE_ONLY"
     }
   ],
+  "dependencyForkOutputs": [
+    {
+      "id": "oxia-client-notification-continuity",
+      "repository": "https://github.com/nereusstream/oxia-client-java.git",
+      "implementationBaseId": "oxia-client-v2-implementation-base",
+      "implementationBaseCommit": "24b730d1d66a1da701f4c99957361f6b3c5d748c",
+      "branch": "nereus/v2-m1.1a-o1-notification-continuity",
+      "finalForkCommit": null,
+      "evidenceStatus": "PENDING"
+    }
+  ],
+  "dependencyEvidenceBindings": {
+    "oxiaClientArtifacts": {
+      "forkOutputId": "oxia-client-notification-continuity",
+      "requiredArtifacts": [
+        "JAR",
+        "SOURCE_JAR",
+        "POM"
+      ],
+      "artifacts": {
+        "jar": {
+          "fileName": null,
+          "sha256": null
+        },
+        "sourceJar": {
+          "fileName": null,
+          "sha256": null
+        },
+        "pom": {
+          "fileName": null,
+          "sha256": null
+        }
+      },
+      "receipt": null,
+      "evidenceStatus": "PENDING"
+    },
+    "oxiaServerRuntime": {
+      "implementationBaseId": "oxia-server-v2-conformance-base",
+      "sourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
+      "imageReference": null,
+      "imageDigest": null,
+      "receipt": null,
+      "evidenceStatus": "PENDING"
+    },
+    "oxiaFocusedCompatibility": {
+      "clientForkOutputId": "oxia-client-notification-continuity",
+      "clientFinalForkCommit": null,
+      "serverSourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
+      "serverImageDigest": null,
+      "testArtifact": {
+        "fileName": null,
+        "sha256": null
+      },
+      "receipt": null,
+      "evidenceStatus": "PENDING"
+    }
+  },
   "researchBaselines": [
     {
       "id": "automq-architecture-review",

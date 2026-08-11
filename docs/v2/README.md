@@ -17,8 +17,9 @@ performance-first BookKeeper WAL.
 ## Current status
 
 - `main` develops `0.2.0-SNAPSHOT` from source tuple `v2-m0`.
-- M0 remains the accepted documentation/source-lock baseline. M1 is now `InProgress` through the additive M1.1a-A
-  foundation only; no V2 runtime is activated and no current-source promotion receipt exists.
+- M0 remains the source-tuple label while M1 is `InProgress`: the additive M1.1a-A foundation is implemented, and the
+  accepted M1.1a-O1 Oxia client continuity slice has entered stage C. No V2 runtime is activated and no current-source
+  promotion receipt exists.
 - M1 implementation-readiness Round 1 freezes the pure-active-graph, module, milestone, source-lock, gate, and
   cross-repository promotion boundaries in ADR 0081; that readiness decision alone did not claim an implementation.
 - M1 implementation-readiness Round 2 freezes the outer NTB1/NSE1/NTA1 domain contracts, exact M1 metadata
@@ -31,8 +32,9 @@ performance-first BookKeeper WAL.
   schema remain OPEN.
 - M1 implementation-readiness Round 4 freezes `KAFKA=1/PULSAR=2`, NPN1 Pulsar authority leaves, Kafka last-wins/error/
   policy and remote-log admission, a local store-wide watch-continuity contract, canonical UUID/NLI1 namespace bytes,
-  and one receipt result hierarchy plus safe attachment grammar in ADR 0084. Complete NTA1/name caps, concrete Oxia
-  hook/source tuple, writer caps, and receipt numeric caps remain OPEN.
+  and one receipt result hierarchy plus safe attachment grammar in ADR 0084. Complete NTA1/name caps, writer caps, and
+  receipt numeric caps remain OPEN; O1 now owns the confirmed Oxia client API and exact client/server bases while its
+  implementation and evidence remain pending.
 - M1 implementation-readiness Round 5 freezes minimal independent NTA1 semantics without claiming its complete codec,
   the Oxia client-only dummy ready barrier and source/artifact/image separation, two writer kinds plus a 120-byte row
   and immutable admission evidence, and one content-identified receipt/Final hierarchy in ADR 0085. M1.1a module,
@@ -41,8 +43,8 @@ performance-first BookKeeper WAL.
 - The accepted [M1 execution index](detailed_design/m1/README.md) and
   [M1.1a-A code-level design](detailed_design/m1/m1.1a-domain-spi-foundation.md) split the first implementation into
   module, identity/domain, SPI/gate, continuity-fork, and metadata-oxia targets. The first three are now implemented by
-  `nereus-domain`, `nereus-metadata-spi`, and `v2M1FoundationCheck`; the Oxia fork and metadata-oxia targets remain
-  separate and unstarted.
+  `nereus-domain`, `nereus-metadata-spi`, and `v2M1FoundationCheck`; the accepted Oxia fork target is in progress, and
+  metadata-oxia remains a separate unstarted target.
 - The foundation supplies Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct aggregate
   foundation validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
   guards, and reproducible JAR/source-JAR/POM hashes. It deliberately supplies no NTA1 codec, Registry capacity,

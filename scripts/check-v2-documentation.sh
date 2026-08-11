@@ -31,6 +31,7 @@ required_v2_docs=(
     09-scenario-evidence-matrix.md
     detailed_design/m1/README.md
     detailed_design/m1/m1.1a-domain-spi-foundation.md
+    detailed_design/m1/m1.1a-oxia-client-continuity.md
     open-questions.md
     tradeoffs.md
 )
@@ -179,6 +180,10 @@ require_literal "no M1 PASS" "scripts/check-v2-m1-foundation.sh"
 require_literal 'M1 execution index' "docs/v2/detailed_design/m1/README.md"
 require_literal 'M1.1a-A domain and metadata SPI foundation' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal '## Implementation record' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
+require_literal 'M1.1a-O1 latest Oxia Java client notification continuity' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
+require_literal 'designStatus: Accepted' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
+require_literal 'implementationStatus: InProgress' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
+require_literal 'No server proto or RPC change is needed.' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
 require_literal 'Complete NTA1 codec/goldens remain OPEN' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
 require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal "V2 documentation baseline" ".github/workflows/build.yml"
@@ -304,8 +309,8 @@ require_literal '`writerRowBytes=120`' "docs/decisions/0085-v2-m1-foundation-sta
 require_literal 'M1.1a may now implement' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
 require_literal 'Complete NTA1 codec/goldens remain OPEN' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
 require_literal '`RegistryAdmissionEvidenceV1`' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
-require_literal 'ce8143e06bcb089a2916c8ce4bf64b40c1d4d5bc' "docs/v2/source-locks.json"
-require_literal '1934d55f0f619971d83f43fbc56865ce9221ca92' "docs/v2/source-locks.json"
+require_literal '24b730d1d66a1da701f4c99957361f6b3c5d748c' "docs/v2/source-locks.json"
+require_literal '37a17bef17202d5fd6e23282da5fd26d94865484' "docs/v2/source-locks.json"
 require_literal 'request-order greedy residue-free linear admission sizes the exact cumulative record list' "docs/v2/v2-scenarios.json"
 require_literal 'canonical-UUID/NLI1-derived compatibility-namespace Registry' "docs/v2/v2-scenarios.json"
 require_literal 'local store-wide continuity epoch' "docs/v2/v2-scenarios.json"
@@ -660,7 +665,7 @@ except (OSError, json.JSONDecodeError) as error:
     fail(f"invalid structured document: {error}")
 
 source_tuple = source.get("sourceTupleId", "")
-if source.get("schemaVersion") != 1 or not re.fullmatch(r"v2-m[0-9]+", source_tuple):
+if source.get("schemaVersion") != 2 or not re.fullmatch(r"v2-m[0-9]+", source_tuple):
     fail("source-locks.json has the wrong schema or tuple ID")
 if source.get("productLine") != "V2" or source.get("developmentVersion") != "0.2.0-SNAPSHOT":
     fail("source-locks.json has the wrong product line or version")
@@ -705,6 +710,139 @@ for item in source.get("forkDevelopmentBases", []):
         fail(f"{item['id']} improperly claims V2 evidence")
 if fork_ids != {"pulsar-v2-development-base", "kafka-v2-development-base"}:
     fail("fork development bases are incomplete")
+
+expected_dependency_bases = {
+    "oxia-client-v2-implementation-base": {
+        "id": "oxia-client-v2-implementation-base",
+        "repository": "https://github.com/nereusstream/oxia-client-java.git",
+        "branch": "main",
+        "version": "0.9.4",
+        "commit": "24b730d1d66a1da701f4c99957361f6b3c5d748c",
+        "role": "CLIENT_FORK_BASE",
+        "evidenceStatus": "IMPLEMENTATION_BASE_ONLY",
+    },
+    "oxia-server-v2-conformance-base": {
+        "id": "oxia-server-v2-conformance-base",
+        "repository": "https://github.com/nereusstream/oxia.git",
+        "branch": "main",
+        "nearestTag": "v0.16.3",
+        "commit": "37a17bef17202d5fd6e23282da5fd26d94865484",
+        "role": "SERVER_SOURCE_BASE",
+        "evidenceStatus": "IMPLEMENTATION_BASE_ONLY",
+    },
+}
+dependency_bases = source.get("dependencyImplementationBases", [])
+if len(dependency_bases) != len(expected_dependency_bases):
+    fail("dependency implementation bases are incomplete")
+for item in dependency_bases:
+    expected = expected_dependency_bases.get(item.get("id"))
+    if expected is None or item != expected:
+        fail(f"dependency implementation base is invalid: {item.get('id')!r}")
+
+fork_outputs = source.get("dependencyForkOutputs", [])
+if len(fork_outputs) != 1:
+    fail("dependency fork outputs must contain exactly the O1 client fork")
+fork_output = fork_outputs[0]
+expected_fork_identity = {
+    "id": "oxia-client-notification-continuity",
+    "repository": "https://github.com/nereusstream/oxia-client-java.git",
+    "implementationBaseId": "oxia-client-v2-implementation-base",
+    "implementationBaseCommit": expected_dependency_bases["oxia-client-v2-implementation-base"]["commit"],
+    "branch": "nereus/v2-m1.1a-o1-notification-continuity",
+}
+for key, value in expected_fork_identity.items():
+    if fork_output.get(key) != value:
+        fail(f"O1 fork output has invalid {key}")
+final_fork_commit = fork_output.get("finalForkCommit")
+if final_fork_commit is None:
+    if fork_output.get("evidenceStatus") != "PENDING":
+        fail("pending O1 fork output has a non-pending evidence status")
+elif not sha.fullmatch(str(final_fork_commit)):
+    fail("O1 final fork commit is not a full commit")
+elif fork_output.get("evidenceStatus") != "FOCUSED_EVIDENCE":
+    fail("final O1 fork output is not marked FOCUSED_EVIDENCE")
+if final_fork_commit == fork_output["implementationBaseCommit"]:
+    fail("O1 final fork commit overwrote the implementation base identity")
+
+bindings = source.get("dependencyEvidenceBindings", {})
+if set(bindings) != {"oxiaClientArtifacts", "oxiaServerRuntime", "oxiaFocusedCompatibility"}:
+    fail("dependency evidence bindings are incomplete")
+client_artifacts = bindings["oxiaClientArtifacts"]
+server_runtime = bindings["oxiaServerRuntime"]
+focused = bindings["oxiaFocusedCompatibility"]
+if client_artifacts.get("forkOutputId") != fork_output["id"]:
+    fail("client artifact binding does not reference the O1 fork")
+if client_artifacts.get("requiredArtifacts") != ["JAR", "SOURCE_JAR", "POM"]:
+    fail("client artifact binding has the wrong required artifact set")
+if set(client_artifacts.get("artifacts", {})) != {"jar", "sourceJar", "pom"}:
+    fail("client artifact binding is incomplete")
+if server_runtime.get("implementationBaseId") != "oxia-server-v2-conformance-base":
+    fail("server runtime binding has the wrong implementation base")
+server_source_commit = expected_dependency_bases["oxia-server-v2-conformance-base"]["commit"]
+if server_runtime.get("sourceCommit") != server_source_commit:
+    fail("server runtime source commit differs from the conformance base")
+if focused.get("clientForkOutputId") != fork_output["id"]:
+    fail("focused compatibility binding has the wrong client fork")
+if focused.get("serverSourceCommit") != server_source_commit:
+    fail("focused compatibility binding has the wrong server source")
+
+sha256 = re.compile(r"^[0-9a-f]{64}$")
+image_digest = re.compile(r"^sha256:[0-9a-f]{64}$")
+if final_fork_commit is None:
+    for name, artifact in client_artifacts["artifacts"].items():
+        if artifact != {"fileName": None, "sha256": None}:
+            fail(f"pending {name} artifact contains premature evidence")
+    if client_artifacts.get("receipt") is not None or client_artifacts.get("evidenceStatus") != "PENDING":
+        fail("pending client artifacts contain premature evidence")
+    if server_runtime != {
+        "implementationBaseId": "oxia-server-v2-conformance-base",
+        "sourceCommit": server_source_commit,
+        "imageReference": None,
+        "imageDigest": None,
+        "receipt": None,
+        "evidenceStatus": "PENDING",
+    }:
+        fail("pending server runtime contains premature or malformed evidence")
+    if focused != {
+        "clientForkOutputId": fork_output["id"],
+        "clientFinalForkCommit": None,
+        "serverSourceCommit": server_source_commit,
+        "serverImageDigest": None,
+        "testArtifact": {"fileName": None, "sha256": None},
+        "receipt": None,
+        "evidenceStatus": "PENDING",
+    }:
+        fail("pending focused compatibility contains premature or malformed evidence")
+else:
+    if client_artifacts.get("evidenceStatus") != "FOCUSED_EVIDENCE":
+        fail("qualified client artifacts are not marked FOCUSED_EVIDENCE")
+    for name, artifact in client_artifacts["artifacts"].items():
+        file_name = str(artifact.get("fileName", ""))
+        if not file_name or "/" in file_name or "\\" in file_name or not sha256.fullmatch(str(artifact.get("sha256", ""))):
+            fail(f"qualified {name} artifact identity is invalid")
+    if server_runtime.get("evidenceStatus") != "FOCUSED_EVIDENCE":
+        fail("qualified server runtime is not marked FOCUSED_EVIDENCE")
+    if not server_runtime.get("imageReference") or not image_digest.fullmatch(str(server_runtime.get("imageDigest", ""))):
+        fail("qualified server runtime image identity is invalid")
+    if focused.get("clientFinalForkCommit") != final_fork_commit:
+        fail("focused compatibility does not bind the final client fork")
+    if focused.get("serverImageDigest") != server_runtime["imageDigest"]:
+        fail("focused compatibility does not bind the server runtime image")
+    test_artifact = focused.get("testArtifact", {})
+    if not test_artifact.get("fileName") or "/" in test_artifact["fileName"] or "\\" in test_artifact["fileName"]:
+        fail("focused compatibility test artifact name is invalid")
+    if not sha256.fullmatch(str(test_artifact.get("sha256", ""))):
+        fail("focused compatibility test artifact digest is invalid")
+    if focused.get("evidenceStatus") != "FOCUSED_EVIDENCE":
+        fail("focused compatibility is not marked FOCUSED_EVIDENCE")
+    receipt_paths = {
+        client_artifacts.get("receipt"), server_runtime.get("receipt"), focused.get("receipt")
+    }
+    if None in receipt_paths:
+        fail("qualified O1 evidence is missing a receipt")
+    for receipt in receipt_paths:
+        if not (root / receipt).is_file():
+            fail(f"O1 evidence receipt does not exist: {receipt}")
 
 research_ids = set()
 for item in source.get("researchBaselines", []):

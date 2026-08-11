@@ -139,11 +139,13 @@ same-session reconnect must repeat A/read/B. `SessionLost` or process restart ro
 service-unit reacquisition creates a new acquisition ID bound to the current broker incarnation.
 
 The hook supplies a process-local, store-level opaque `WatchContinuityEpoch` with a ready barrier; provider connection,
-session, shard, and channel identities do not enter persisted wire. M1 reuses Oxia v0.9's existing no-start-offset
-dummy notification batch as that barrier through a client-only hook, with no server protocol/RPC change. Any continuity-
-unknown gap advances the epoch, invalidates every local V2 fence, discards the old offset, and obtains a new dummy
-barrier before bounded/coalesced A/read/B. Oxia client/server v0.9 commits in source locks are implementation bases;
-the final fork, client artifact, server image, and conformance are promotion evidence.
+session, shard, and channel identities do not enter persisted wire. M1 reuses the confirmed Oxia server base's existing
+no-start-offset dummy notification batch as that barrier through a client-only hook, with no server protocol/RPC
+change. Any continuity-unknown gap advances the epoch, invalidates every local V2 fence, discards the old offset, and
+obtains a new dummy barrier before bounded/coalesced A/read/B. Source-lock schema v2 records client
+`24b730d1d66a1da701f4c99957361f6b3c5d748c` and server
+`37a17bef17202d5fd6e23282da5fd26d94865484` as implementation/conformance bases; the final fork, client artifacts,
+server image, and focused conformance remain separate promotion evidence.
 
 The immutable 32-byte `ledgerIdCompatibilityNamespaceId` names the numeric space shared by all ledger-ID writers and is
 `SHA-256(NLI1 || u32be(36) || canonicalInstanceIdAscii[36])`. The input is exact lowercase canonical, non-zero,
