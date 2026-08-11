@@ -35,6 +35,8 @@ jobs:
         run: ./gradlew checkPhase0
       - name: V2 documentation baseline
         run: ./gradlew v2M0Check
+      - name: V2 M1.1a-A foundation boundary
+        run: ./gradlew v2M1FoundationCheck
       - name: Check code style
         run: ./gradlew spotlessCheck checkstyleMain checkstyleTest
       - name: Build

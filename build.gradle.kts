@@ -66,6 +66,31 @@ abstract class ReleaseVersionVerificationTask : DefaultTask() {
     }
 }
 
+abstract class V2FoundationDependencyVerificationTask : DefaultTask() {
+    @get:org.gradle.api.tasks.Classpath
+    abstract val domainCompileClasspath: org.gradle.api.file.ConfigurableFileCollection
+
+    @get:org.gradle.api.tasks.Classpath
+    abstract val metadataSpiCompileClasspath: org.gradle.api.file.ConfigurableFileCollection
+
+    @get:org.gradle.api.tasks.Classpath
+    abstract val allowedDomainArtifacts: org.gradle.api.file.ConfigurableFileCollection
+
+    @TaskAction
+    fun verifyDependencies() {
+        val domainFiles = domainCompileClasspath.files.mapTo(sortedSetOf()) { it.canonicalFile }
+        check(domainFiles.isEmpty()) {
+            "nereus-domain production classpath must be empty, found $domainFiles"
+        }
+
+        val metadataSpiFiles = metadataSpiCompileClasspath.files.mapTo(sortedSetOf()) { it.canonicalFile }
+        val allowedFiles = allowedDomainArtifacts.files.mapTo(sortedSetOf()) { it.canonicalFile }
+        check(metadataSpiFiles.size == 1 && allowedFiles.containsAll(metadataSpiFiles)) {
+            "nereus-metadata-spi production classpath must contain only :nereus-domain, found $metadataSpiFiles"
+        }
+    }
+}
+
 plugins {
     `base`
     `maven-publish`
@@ -723,8 +748,47 @@ tasks.register("v2M0Check") {
     dependsOn("v2DocumentationCheck")
 }
 
+val v2DomainCompileClasspath = project(":nereus-domain").configurations.named("compileClasspath")
+val v2MetadataSpiCompileClasspath = project(":nereus-metadata-spi").configurations.named("compileClasspath")
+val v2DomainMainOutput = project(":nereus-domain")
+    .extensions
+    .getByType<org.gradle.api.tasks.SourceSetContainer>()
+    .named("main")
+    .get()
+    .output
+val v2DomainJar = project(":nereus-domain").tasks.named<Jar>("jar").flatMap { it.archiveFile }
+
+tasks.register<V2FoundationDependencyVerificationTask>("v2M1FoundationDependencyCheck") {
+    group = "verification"
+    description = "Verify the M1.1a-A domain/SPI production dependency boundary."
+    dependsOn(":nereus-domain:compileJava", ":nereus-metadata-spi:compileJava")
+    domainCompileClasspath.from(v2DomainCompileClasspath)
+    metadataSpiCompileClasspath.from(v2MetadataSpiCompileClasspath)
+    allowedDomainArtifacts.from(v2DomainMainOutput)
+    allowedDomainArtifacts.from(v2DomainJar)
+}
+
+tasks.register<Exec>("v2M1FoundationApiCheck") {
+    group = "verification"
+    description = "Verify the M1.1a-A forbidden import, API, capability, and no-final-gate boundary."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m1-foundation.sh")
+}
+
+tasks.register("v2M1FoundationCheck") {
+    group = "verification"
+    description = "Verify only the partial M1.1a-A domain and metadata SPI foundation; this is not M1 PASS."
+    dependsOn(":nereus-domain:check")
+    dependsOn(":nereus-metadata-spi:check")
+    dependsOn("v2M1FoundationDependencyCheck")
+    dependsOn("v2M1FoundationApiCheck")
+    dependsOn("v2DocumentationCheck")
+}
+
 tasks.named("check") {
     dependsOn("v2DocumentationCheck")
+    dependsOn("v2M1FoundationDependencyCheck")
+    dependsOn("v2M1FoundationApiCheck")
 }
 
 tasks.register<Exec>("checkPhase3Documentation") {
