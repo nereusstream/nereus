@@ -63,6 +63,8 @@ if (pulsarCheckout != null) {
 rootProject.name = "nereus"
 
 include("nereus-bom")
+include("nereus-domain")
+include("nereus-metadata-spi")
 include("nereus-api")
 include("nereus-core")
 include("nereus-metadata-oxia")

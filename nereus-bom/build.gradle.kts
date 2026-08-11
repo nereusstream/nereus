@@ -23,6 +23,8 @@ javaPlatform {
 
 dependencies {
     constraints {
+        api(project(":nereus-domain"))
+        api(project(":nereus-metadata-spi"))
         api(project(":nereus-api"))
         api(project(":nereus-core"))
         api(project(":nereus-metadata-oxia"))
