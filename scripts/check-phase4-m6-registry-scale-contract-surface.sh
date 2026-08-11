@@ -63,8 +63,8 @@ require_pattern 'generations\s*\.\s*scanStreamRegistrations\(' "$scanner"
 require_literal "page.continuation().isPresent()" "$scanner"
 
 require_literal "phase4M6RegistryScaleCheck" "build.gradle.kts"
-require_literal "Checkpoint BH" "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BH" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M6RegistryScaleCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M6 16,448-stream all-shard pagination and cold-restart registry-scale contract surface: PASS"

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-matrix="$repo_root/docs/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md"
-manifest="$repo_root/docs/phase-9-kafka-native-storage/f9-scenarios.json"
+matrix="$repo_root/docs/v1/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md"
+manifest="$repo_root/docs/v1/phase-9-kafka-native-storage/f9-scenarios.json"
 
 fail() {
     echo "F9 scenario manifest: $*" >&2

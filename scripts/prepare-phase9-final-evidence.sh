@@ -8,8 +8,8 @@ pulsar_fork="${4:?Pulsar fork path is required}"
 output="${5:?output path is required}"
 rerun_tasks="${6:?rerun flag is required}"
 
-manifest="$repo/docs/phase-9-kafka-native-storage/f9-scenarios.json"
-matrix="$repo/docs/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md"
+manifest="$repo/docs/v1/phase-9-kafka-native-storage/f9-scenarios.json"
+matrix="$repo/docs/v1/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md"
 compatibility_report="$repo/nereus-kafka-adapter/build/f9-kafka-client-compatibility-evidence/compatibility-report.json"
 performance_report="$repo/nereus-kafka-adapter/build/f9-kafka-performance-evidence/performance-report.json"
 

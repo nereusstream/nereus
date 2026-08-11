@@ -94,6 +94,6 @@ require_literal "rejectsActivationBackfillFactsFromAnotherOpaqueReadinessEpoch" 
     "nereus-metadata-oxia/src/test/java/com/nereusstream/metadata/oxia/F4RecordValidationTest.java"
 require_literal "phase4M4ActivationMetadataCheck" "build.gradle.kts"
 require_literal "phase4M4ActivationMetadataCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 durable generation-activation metadata authority foundation verified."

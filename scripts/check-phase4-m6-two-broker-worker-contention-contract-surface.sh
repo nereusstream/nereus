@@ -71,8 +71,8 @@ reject_literal "Thread.sleep(" "$pulsar_test"
 require_literal "phase4M6TwoBrokerWorkerContentionPulsarCheck" "$repo_root/build.gradle.kts"
 require_literal '"-PtestRetryCount=0"' "$repo_root/build.gradle.kts"
 require_literal "phase4M6TwoBrokerWorkerContentionCheck" "$repo_root/build.gradle.kts"
-require_literal "Checkpoint BI" "$repo_root/docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BI" "$repo_root/docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M6TwoBrokerWorkerContentionCheck" \
-    "$repo_root/docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "$repo_root/docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M6 two-broker/two-worker contention, compressed read, exact MessageId, and BookKeeper coexistence surface: PASS"

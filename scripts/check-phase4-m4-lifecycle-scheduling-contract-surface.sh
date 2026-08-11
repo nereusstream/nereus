@@ -146,8 +146,8 @@ require_literal "restartReconstructsMarkedOwnerlessPlanAndDeletesExactBytes" "$o
 require_literal "routesEveryLifecycleAndDeduplicatesActiveCursorInventoryByStream" "$router_test"
 
 require_literal "phase4M4LifecycleSchedulingCheck" "build.gradle.kts"
-require_literal "Checkpoint AN" "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AN" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M4LifecycleSchedulingCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 metadata-first lifecycle scheduling, routing, and recovery surfaces verified."

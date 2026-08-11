@@ -96,8 +96,8 @@ reject_literal "Thread.sleep(" "$late_put_test"
 reject_literal "Thread.sleep(" "$integration"
 
 require_literal "phase4M4LatePutTombstoneCheck" "build.gradle.kts"
-require_literal "Checkpoint BB" "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BB" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M4LatePutTombstoneCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 guarded first/retried PUT, tombstone cuts, and external reappearance contract surface: PASS"

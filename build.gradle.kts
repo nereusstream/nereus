@@ -3628,8 +3628,8 @@ val phase9PrepareFinalEvidence =
             gradle.startParameter.isRerunTasks.toString(),
         )
         inputs.file("scripts/prepare-phase9-final-evidence.sh")
-        inputs.file("docs/phase-9-kafka-native-storage/f9-scenarios.json")
-        inputs.file("docs/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md")
+        inputs.file("docs/v1/phase-9-kafka-native-storage/f9-scenarios.json")
+        inputs.file("docs/v1/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md")
         outputs.file(phase9PreEvidence)
         outputs.upToDateWhen { false }
     }

@@ -6,7 +6,7 @@ build capabilities. Deleting a release branch is a separate decision and is neve
 
 Release records:
 
-- [`v0.1.0`](v0.1.0.md): V1 branch freeze; annotated tag and artifact publication pending.
+- [`v0.1.0`](../v1/releases/v0.1.0.md): frozen V1 branch record; annotated tag and artifact publication pending.
 
 ## 1. Naming and version authority
 

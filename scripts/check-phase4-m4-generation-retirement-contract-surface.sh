@@ -200,6 +200,6 @@ require_literal "journalIsReauthenticatedBeforeEveryMetadataBatch" "$coordinator
 require_literal "finalJournalReloadFencesPhysicalHeadAndDelete" "$coordinator_test"
 require_literal "phase4M4GenerationRetirementCheck" "build.gradle.kts"
 require_literal "phase4M4GenerationRetirementCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 view-specific/below-trim source eligibility, higher pre-drain, and authenticated destructive batches verified."

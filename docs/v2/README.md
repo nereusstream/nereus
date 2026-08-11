@@ -40,8 +40,8 @@ performance-first BookKeeper WAL.
 - Existing Java modules and Phase/Future evidence on `main` are V1 residue until replaced by a V2 milestone.
 - The ordinary CI Pulsar API checkout remains a legacy V1-residue build baseline until the V2 Pulsar slice replaces
   that code; it is recorded separately and is not the V2 fork-development or parity baseline.
-- The V1 implementation authority is branch `v0.1` at
-  `a14d925da5763f36208f8ddca7bef31f3eb90b0b`; it is historical evidence, not a V2 contract.
+- The V1 implementation authority is `v0.1@a14d925da5763f36208f8ddca7bef31f3eb90b0b`; it is historical evidence, not
+  a V2 contract.
 - No V1 API, durable schema, object format, or online compatibility obligation is carried into V2.
 
 ## Authority order
@@ -148,19 +148,20 @@ pooling is optional and remains below the independently owned sessions.
 
 ## Reading order
 
-1. [V2 Context Map](../../CONTEXT-MAP.md) and the linked Kafka, Pulsar, and Shared Storage glossaries
-2. [Correctness and append](01-correctness-and-append.md)
-3. [Protocol binding, Storage Epochs, and profiles](02-storage-profiles-and-topic-binding.md)
-4. [Object WAL](03-object-wal.md)
-5. [BookKeeper and Pulsar](04-bookkeeper-and-pulsar.md)
-6. [Manifest, read, retention, and GC](05-manifest-read-retention-gc.md)
-7. [Metadata backends and handoff](06-metadata-backends-and-handoff.md)
-8. [Protocol integrations and product gates](07-protocol-integrations.md)
-9. [Implementation plan and gates](08-implementation-plan-and-gates.md)
-10. [Scenario evidence matrix](09-scenario-evidence-matrix.md)
-11. [Architecture tradeoffs](tradeoffs.md)
-12. [Open questions](open-questions.md) and [grill session records](grill-notes/)
-13. [Structured source locks](source-locks.json) and [structured scenarios](v2-scenarios.json)
+1. [V2 Context Map](context-map.md) and the linked Kafka, Pulsar, and Shared Storage glossaries
+2. [Overall architecture](architecture.md)
+3. [Correctness and append](01-correctness-and-append.md)
+4. [Protocol binding, Storage Epochs, and profiles](02-storage-profiles-and-topic-binding.md)
+5. [Object WAL](03-object-wal.md)
+6. [BookKeeper and Pulsar](04-bookkeeper-and-pulsar.md)
+7. [Manifest, read, retention, and GC](05-manifest-read-retention-gc.md)
+8. [Metadata backends and handoff](06-metadata-backends-and-handoff.md)
+9. [Protocol integrations and product gates](07-protocol-integrations.md)
+10. [Implementation plan and gates](08-implementation-plan-and-gates.md)
+11. [Scenario evidence matrix](09-scenario-evidence-matrix.md)
+12. [Architecture tradeoffs](tradeoffs.md)
+13. [Open questions](open-questions.md) and [grill session records](grill-notes/)
+14. [Structured source locks](source-locks.json) and [structured scenarios](v2-scenarios.json)
 
 Accepted decisions:
 

@@ -63,6 +63,6 @@ require_literal "restartsWhenRootChangesDuringPinAndNeverAliasesAnotherCommit" \
     "nereus-core/src/test/java/com/nereusstream/core/recovery/CheckpointAppendReplayTest.java"
 require_literal "phase4M4CheckpointReplayCheck" "build.gradle.kts"
 require_literal "phase4M4CheckpointReplayCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 checkpoint-aware append replay surfaces verified."

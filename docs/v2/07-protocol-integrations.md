@@ -176,7 +176,8 @@ Kafka and Pulsar native writers.
 ## KoP
 
 KoP is intentionally outside the 0.2 runtime and release gates. Its existing design is retained at
-[KoP/Kafka compatibility](../design/nereus-future5-kop-compatibility.md) with status “Designed / deferred”. V2 must not
+[KoP/Kafka compatibility](../v1/design/nereus-future5-kop-compatibility.md) with status “Designed / deferred”. V2 must
+not
 delete that design or claim its payload/coordinator mapping is implemented. Before activation it requires a fresh audit
 against V2 bindings, protocol-native Kafka work, and the then-current KoP source.
 

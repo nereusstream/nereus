@@ -92,8 +92,8 @@ require_literal '"-PtestRetryCount=0"' "$repo_root/build.gradle.kts"
 require_literal "phase4M5Check" "$repo_root/build.gradle.kts"
 require_literal "phase4M5FinalCheck" "$repo_root/build.gradle.kts"
 require_literal "F4-M5 is complete/final-gated" \
-    "$repo_root/docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "$repo_root/docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "F4-M5 已完成并通过 final gate" \
-    "$repo_root/docs/phase-4-compaction-generation/README.md"
+    "$repo_root/docs/v1/phase-4-compaction-generation/README.md"
 
 echo "Phase 4 M5 async Object-WAL, logical retention, ownership-cut, and coexistence contract surface: PASS"

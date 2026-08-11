@@ -81,7 +81,7 @@ require_literal "successfulEnabledBackfillWaitsForClusterActivation" "$broker_te
 require_literal "activationFailureFailsTheBackfillCompletionPromise" "$broker_test"
 
 require_literal "phase4M5PublicationActivationCheck" "$repo_root/build.gradle.kts"
-require_literal "Checkpoint AC" "$repo_root/docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AC" "$repo_root/docs/v1/phase-4-compaction-generation/README.md"
 
 if rg -Fq -- "GenerationProtocolActivationStore" "$broker_storage"; then
     echo "broker storage must invoke the product coordinator and never own activation metadata" >&2

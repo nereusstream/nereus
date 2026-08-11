@@ -23,11 +23,11 @@ forbid_literal() {
 }
 
 authoritative_docs=(
-    "$repo_root/docs/phase-3-cursor-subscription/README.md"
-    "$repo_root/docs/phase-3-cursor-subscription/01-pulsar-api-and-call-path-audit.md"
-    "$repo_root/docs/phase-3-cursor-subscription/05-facade-broker-and-future-compatibility.md"
-    "$repo_root/docs/phase-3-cursor-subscription/06-implementation-plan-and-gates.md"
-    "$repo_root/docs/design/nereus-future3-cursor-subscription.md"
+    "$repo_root/docs/v1/phase-3-cursor-subscription/README.md"
+    "$repo_root/docs/v1/phase-3-cursor-subscription/01-pulsar-api-and-call-path-audit.md"
+    "$repo_root/docs/v1/phase-3-cursor-subscription/05-facade-broker-and-future-compatibility.md"
+    "$repo_root/docs/v1/phase-3-cursor-subscription/06-implementation-plan-and-gates.md"
+    "$repo_root/docs/v1/design/nereus-future3-cursor-subscription.md"
 )
 
 for path in "${authoritative_docs[@]}"; do
@@ -41,26 +41,26 @@ for path in "${authoritative_docs[@]}"; do
     fi
 done
 
-require_literal "Implemented / final-gated" "docs/phase-3-cursor-subscription/README.md"
-require_literal "F3-M1-M6 implemented/final-gated" "docs/design/nereus-commit-protocol.md"
-require_literal "CursorSnapshotInventory" "docs/phase-3-cursor-subscription/03-oxia-metadata-and-snapshot-format.md"
-require_literal "read-only F4 snapshot inventory" "docs/phase-3-cursor-subscription/README.md"
-require_literal 'terminal `DELETED`' "docs/phase-2-managed-ledger-facade/README.md"
-require_literal "immediate same-name open" "docs/phase-2-managed-ledger-facade/06-code-level-interface-contract.md"
-require_literal "Cursor snapshot inventory" "docs/design/nereus-terminology.md"
-require_literal "never authorizes deletion" "docs/design/nereus-terminology.md"
-require_literal "TTL policy-triggered expiry" "docs/phase-3-cursor-subscription/README.md"
+require_literal "Implemented / final-gated" "docs/v1/phase-3-cursor-subscription/README.md"
+require_literal "F3-M1-M6 implemented/final-gated" "docs/v1/design/nereus-commit-protocol.md"
+require_literal "CursorSnapshotInventory" "docs/v1/phase-3-cursor-subscription/03-oxia-metadata-and-snapshot-format.md"
+require_literal "read-only F4 snapshot inventory" "docs/v1/phase-3-cursor-subscription/README.md"
+require_literal 'terminal `DELETED`' "docs/v1/phase-2-managed-ledger-facade/README.md"
+require_literal "immediate same-name open" "docs/v1/phase-2-managed-ledger-facade/06-code-level-interface-contract.md"
+require_literal "Cursor snapshot inventory" "docs/v1/design/nereus-terminology.md"
+require_literal "never authorizes deletion" "docs/v1/design/nereus-terminology.md"
+require_literal "TTL policy-triggered expiry" "docs/v1/phase-3-cursor-subscription/README.md"
 
 for gate in phase3M6Check phase3M6FinalCheck phase3Check phase3FinalCheck; do
     require_literal "$gate" "build.gradle.kts"
-    require_literal "$gate" "docs/phase-3-cursor-subscription/06-implementation-plan-and-gates.md"
+    require_literal "$gate" "docs/v1/phase-3-cursor-subscription/06-implementation-plan-and-gates.md"
 done
 
 for stale in "M6 pending" "M6 next"; do
     forbid_literal \
         "$stale" \
-        "$repo_root/docs/phase-3-cursor-subscription" \
-        "$repo_root/docs/design/nereus-future3-cursor-subscription.md"
+        "$repo_root/docs/v1/phase-3-cursor-subscription" \
+        "$repo_root/docs/v1/design/nereus-future3-cursor-subscription.md"
 done
 
 for stale in \
@@ -76,20 +76,19 @@ for stale in \
     "Status: F3-M0/M0R design-gated；not implemented"; do
     forbid_literal \
         "$stale" \
-        "$repo_root/docs/phase-3-cursor-subscription" \
-        "$repo_root/docs/design/nereus-future3-cursor-subscription.md"
+        "$repo_root/docs/v1/phase-3-cursor-subscription" \
+        "$repo_root/docs/v1/design/nereus-future3-cursor-subscription.md"
 done
 
 link_docs=(
     "$repo_root/README.md"
-    "$repo_root/docs/phase-3-cursor-subscription"
-    "$repo_root/docs/design/README.md"
-    "$repo_root/docs/design/nereus-design-index.md"
-    "$repo_root/docs/design/nereus-future3-cursor-subscription.md"
-    "$repo_root/docs/design/nereus-future4-compaction-generation.md"
-    "$repo_root/docs/design/nereus-futures.md"
-    "$repo_root/docs/design/nereus-overall-architecture.md"
-    "$repo_root/docs/design/nereus-terminology.md"
+    "$repo_root/docs/v1/phase-3-cursor-subscription"
+    "$repo_root/docs/v2/README.md"
+    "$repo_root/docs/v1/design/nereus-future3-cursor-subscription.md"
+    "$repo_root/docs/v1/design/nereus-future4-compaction-generation.md"
+    "$repo_root/docs/v1/design/nereus-futures.md"
+    "$repo_root/docs/v2/architecture.md"
+    "$repo_root/docs/v1/design/nereus-terminology.md"
 )
 
 while IFS=: read -r source match; do

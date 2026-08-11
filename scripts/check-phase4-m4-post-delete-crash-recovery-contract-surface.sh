@@ -47,8 +47,8 @@ reject_literal "Thread.sleep(" "$integration"
 
 require_literal "tasks.register<Test>(\"f4M4IntegrationTest\")" "$module_build"
 require_literal "phase4M4PostDeleteCrashRecoveryCheck" "build.gradle.kts"
-require_literal "Checkpoint AT" "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AT" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M4PostDeleteCrashRecoveryCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 real post-DELETE/pre-root-CAS process-death recovery contract surface: PASS"

@@ -112,6 +112,6 @@ require_literal "ownerlessGlobalScopePagesTheExactCursorNamespaceAndDetectsDrift
     "nereus-managed-ledger/src/test/java/com/nereusstream/managedledger/retention/CursorSnapshotReferenceDomainTest.java"
 require_literal "phase4M4GlobalDomainsCheck" "build.gradle.kts"
 require_literal "phase4M4GlobalDomainsCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 activation-gated ownerless global scope and future sentinel verified."

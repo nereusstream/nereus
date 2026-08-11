@@ -91,7 +91,7 @@ require_literal "strictNpr1RoundTripAndIdentityDigestAreStable" "$projection_tes
 
 require_literal "phase4M4PhysicalRootBackfillCheck" "build.gradle.kts"
 require_literal "phase4M4PhysicalRootBackfillCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 if rg -Fq -- "listObjects(" "$repo_root/$coordinator"; then
     echo "live-reference physical-root backfill must not use object listing as coverage evidence" >&2

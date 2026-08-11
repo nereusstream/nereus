@@ -76,7 +76,7 @@ require_literal "nereus.generation-protocol is reserved by the broker" "$binding
 
 require_literal "phase4M5GenerationCapabilityCheck" "$repo_root/build.gradle.kts"
 require_literal "phase4M5GenerationCapabilityCheck" \
-    "$repo_root/docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
-require_literal "Checkpoint Y" "$repo_root/docs/phase-4-compaction-generation/README.md"
+    "$repo_root/docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "Checkpoint Y" "$repo_root/docs/v1/phase-4-compaction-generation/README.md"
 
 echo "Phase 4 M5 generation capability, deterministic broker readiness, and invalidation surface verified."

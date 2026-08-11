@@ -76,7 +76,7 @@ require_literal "scansAllShardsWithBoundedPagesAndExactLifecycleCounts" \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/gc/PhysicalObjectRootScannerTest.java"
 require_literal "phase4M4RootFenceCheck" "build.gradle.kts"
 require_literal "phase4M4RootFenceCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 if rg -q "deleteObject|deleteProtection|SourceRetirementMetadataStore|ObjectAuditRetirementStore" \
         "$repo_root/$gc"; then

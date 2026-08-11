@@ -82,8 +82,8 @@ require_literal ".isZero();" "$append_test"
 require_literal "ObjectProtectionType.REACHABLE_APPEND" "$append_test"
 
 require_literal "phase4M6AbandonedAppendIntentCheck" "$repo_root/build.gradle.kts"
-require_literal "Checkpoint BJ" "$repo_root/docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BJ" "$repo_root/docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M6AbandonedAppendIntentCheck" \
-    "$repo_root/docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "$repo_root/docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M6 protected-head ordering and abandoned append-intent GC surface: PASS"

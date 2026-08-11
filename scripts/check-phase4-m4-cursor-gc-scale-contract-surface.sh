@@ -50,8 +50,8 @@ require_literal "assertThat(context.objectStore.deleteCalls()).isEqualTo(3)" "$s
 require_literal "assertThat(context.scheduler.getQueue()).isEmpty()" "$scale_test"
 
 require_literal "phase4M4CursorGcScaleCheck" "build.gradle.kts"
-require_literal "Checkpoint AZ" "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AZ" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M4CursorGcScaleCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 10,000-root cursor snapshot classification/deletion and stack-bound contract surface: PASS"

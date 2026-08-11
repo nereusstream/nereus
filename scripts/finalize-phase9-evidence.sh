@@ -5,7 +5,7 @@ repo="${1:?repository path is required}"
 pre_evidence="${2:?pre-evidence path is required}"
 result_directory="${3:?aggregator result directory is required}"
 output="${4:?output path is required}"
-manifest="$repo/docs/phase-9-kafka-native-storage/f9-scenarios.json"
+manifest="$repo/docs/v1/phase-9-kafka-native-storage/f9-scenarios.json"
 
 fail() {
     echo "F9 final evidence: $*" >&2

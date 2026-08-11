@@ -51,8 +51,8 @@ reject_literal "Executors.newSingleThreadScheduledExecutor" "$s3_provider"
 reject_literal "Thread.sleep(" "$scale_test"
 
 require_literal "phase4M4TombstoneScaleCheck" "build.gradle.kts"
-require_literal "Checkpoint AY" "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AY" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M4TombstoneScaleCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 10,000-root dual-window tombstone retirement and bounded-deadline contract surface: PASS"

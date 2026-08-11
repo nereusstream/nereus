@@ -87,7 +87,7 @@ require_literal "readReconcilesPermanentProtectionAfterCursorCasResponseLoss" "$
 require_literal "guardedPutRejectsAChangedCursorAuthorityBeforeUploadingBytes" "$snapshot_test"
 require_literal "phase4M4CursorProtectionCheck" "build.gradle.kts"
 require_literal "phase4M4CursorProtectionCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 prepare_line="$(rg -n -F 'snapshotStore.prepareWrite' "$repo_root/$cursor_storage" | tail -1 | cut -d: -f1)"
 complete_line="$(rg -n -UP 'snapshotStore\s*\.\s*completeWrite' \

@@ -89,7 +89,7 @@ require_literal "everyDomainReferenceRequiresAnExactPlannedRemoval" \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/gc/GcPlanTest.java"
 require_literal "phase4M4ReferenceDomainsCheck" "build.gradle.kts"
 require_literal "phase4M4ReferenceDomainsCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 for domain in "$generation" "$append" "$materialization"; do
     if rg -q "scanStreamRegistrations|getStreamRegistration" "$repo_root/$domain"; then

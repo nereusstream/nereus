@@ -70,7 +70,7 @@ require_literal "lostLateDeleteResponseConvergesOnExactHeadAbsenceButKeepsTheRoo
 require_literal "ownerAppearingBeforeProviderDeleteInvalidatesTheLatePutAttempt" "$late_put_test"
 require_literal "phase4M4TombstoneRetirementCheck" "build.gradle.kts"
 require_literal "phase4M4TombstoneRetirementCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 references_line="$(rg -n -F 'deleteReferences(root, audits.references(), deadline)' "$repo_root/$coordinator" | head -1 | cut -d: -f1)"
 manifest_line="$(rg -n -F 'deleteManifest(root, audits.manifest(), deadline)' "$repo_root/$coordinator" | head -1 | cut -d: -f1)"

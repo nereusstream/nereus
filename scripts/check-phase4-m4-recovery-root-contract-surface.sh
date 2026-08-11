@@ -83,6 +83,6 @@ require_literal "publishesAndConvergesLostRecoveryRootCasResponse" \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/recovery/RecoveryCheckpointCoordinatorTest.java"
 require_literal "phase4M4RecoveryRootCheck" "build.gradle.kts"
 require_literal "phase4M4RecoveryRootCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 recovery-root publication and reconciliation surfaces verified."

@@ -74,7 +74,7 @@ require_literal "absenceAndLostDeleteResponseRequireCoordinatorLevelReproof" \
     "nereus-metadata-oxia/src/test/java/com/nereusstream/metadata/oxia/retirement/ObjectAuditRetirementStoreContractTest.java"
 require_literal "phase4M4RetirementMetadataCheck" "build.gradle.kts"
 require_literal "phase4M4RetirementMetadataCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 if rg -q "putIfAbsent|putIfVersion|rangeScan|list\(" \
         "$repo_root/nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/retirement"; then

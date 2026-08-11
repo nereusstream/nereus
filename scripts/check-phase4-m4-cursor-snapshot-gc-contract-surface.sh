@@ -68,7 +68,7 @@ reject_literal "physicalMetadataStore.deleteProtection(" "$scanner"
 
 require_literal "phase4M4CursorSnapshotGcCheck" "build.gradle.kts"
 require_literal "phase4M4CursorSnapshotGcCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
-require_literal "Checkpoint AJ" "docs/phase-4-compaction-generation/README.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "Checkpoint AJ" "docs/v1/phase-4-compaction-generation/README.md"
 
 echo "Phase 4 M4 cursor-snapshot GC contract surface: PASS"

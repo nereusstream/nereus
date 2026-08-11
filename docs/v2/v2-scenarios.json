@@ -792,7 +792,7 @@
       "id": "V2-KOP-001",
       "milestone": "M0",
       "contract": "KoP design remains present and explicitly deferred from 0.2 runtime and release gates",
-      "ownerDoc": "docs/design/nereus-future5-kop-compatibility.md",
+      "ownerDoc": "docs/v1/design/nereus-future5-kop-compatibility.md",
       "status": "PLANNED",
       "evidenceReceipt": null
     }

@@ -118,6 +118,6 @@ require_literal "oversizedGcPage" "$pulsar_test"
 require_literal "invalidGcLease" "$pulsar_test"
 
 require_literal "phase4M4PhysicalGcConfigCheck" "$repo_root/build.gradle.kts"
-require_literal "Checkpoint AO" "$repo_root/docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AO" "$repo_root/docs/v1/phase-4-compaction-generation/README.md"
 
 echo "Phase 4 M4 broker physical-GC configuration and provider-consumption contract verified."

@@ -100,7 +100,7 @@ require_literal "new DefaultGenerationZeroPhysicalReferencePublisher" \
     "nereus-pulsar-adapter/src/main/java/com/nereusstream/pulsar/DefaultNereusRuntimeProvider.java"
 require_literal "phase4M4ProtectedAppendCheck" "build.gradle.kts"
 require_literal "phase4M4ProtectedAppendCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 if rg -n "commitStableAppend" "$repo_root" --glob '*.java' >/dev/null; then
     echo "retired combined commitStableAppend remains in Java sources" >&2

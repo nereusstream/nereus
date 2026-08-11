@@ -2,15 +2,15 @@
 
 ## Status
 
-Accepted. The repository scaffold and product-owned modules are implemented；Pulsar/KoP source-tree integration and
-the Designed F9 native Kafka integration continue through organization forks. The Kafka-specific source/base decision
-is refined by ADR 0005.
+Accepted as a repository-wide topology decision for both product lines. The standalone product repository and
+organization-fork boundary remain current. V2 source locks select exact Pulsar and Kafka commits; KoP remains retained
+as design input but is deferred from the 0.2 runtime and release gates. ADR 0005 is historical V1/F9 rationale rather
+than current V2 authority.
 
 ## Context
 
-Nereus must integrate deeply with Apache Pulsar and KoP and, for F9, Apache Kafka, but the product should have its own
-GitHub
-identity, contribution graph, release history, and commercial packaging boundary.
+Nereus integrates deeply with Apache Pulsar and Apache Kafka while retaining KoP as deferred design input, but the
+product should have its own GitHub identity, contribution graph, release history, and commercial packaging boundary.
 
 Long-lived development directly inside an Apache Pulsar fork would make Nereus look like a Pulsar branch
 rather than an independent product. Keeping patch overlays in the product repository would also duplicate
@@ -24,7 +24,10 @@ Use organization forks for source-tree changes:
 
 - `github.com/nereusstream/pulsar`
 - `github.com/nereusstream/kop`
-- `github.com/nereusstream/kafka`（planned by F9；not created or pinned by this ADR）
+- `github.com/nereusstream/kafka`
+
+Individual product-line contracts and structured source locks, rather than this topology ADR, select the active fork
+branches and exact commits.
 
 Nereus-owned code lives in Gradle modules such as `nereus-core`, `nereus-metadata-oxia`, and
 `nereus-managed-ledger`.
@@ -32,7 +35,7 @@ Nereus-owned code lives in Gradle modules such as `nereus-core`, `nereus-metadat
 ## Consequences
 
 - Product commits land in a standalone repository rather than a fork.
-- Pulsar, KoP, and future Kafka source-tree changes have normal GitHub branch/PR history under the Nereus organization.
+- Pulsar, KoP, and Kafka source-tree changes have normal GitHub branch/PR history under the Nereus organization.
 - The main product repository remains smaller and focused.
 - Adapter module compile dependencies may need published snapshots, local composite builds, or explicit
   dependency substitution once fork-only APIs appear.

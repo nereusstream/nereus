@@ -107,8 +107,8 @@ require_literal "$pulsar_root" "physicalDeletionActivationRunsOnlyAfterPublicati
 require_literal "$pulsar_root" "physicalDeletionFailureFailsTheBackfillCompletionPromise" "$pulsar_test"
 
 require_literal "$repo_root" "phase4M4PhysicalDeletionActivationCheck" "build.gradle.kts"
-require_literal "$repo_root" "Checkpoint AR" "docs/phase-4-compaction-generation/README.md"
+require_literal "$repo_root" "Checkpoint AR" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "$repo_root" "phase4M4PhysicalDeletionActivationCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 physical-deletion activation and restart-scope contract surface: PASS"

@@ -87,7 +87,7 @@ require_literal "completePagedRootScanVetoesLiveReferenceAndRevalidatesEveryAuth
     "nereus-managed-ledger/src/test/java/com/nereusstream/managedledger/retention/CursorSnapshotReferenceDomainTest.java"
 require_literal "phase4M4ManagedLedgerDomainsCheck" "build.gradle.kts"
 require_literal "phase4M4ManagedLedgerDomainsCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 if rg -n 'com\.nereusstream\.materialization|scanStreamRegistrations|getStreamRegistration' \
         "$repo_root/$projection_domain" "$repo_root/$cursor_domain"; then

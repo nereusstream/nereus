@@ -600,14 +600,14 @@ tasks.register<Test>("f9EvidenceAggregatorTest") {
     systemProperty(
         "nereus.f9.manifest",
         rootProject.layout.projectDirectory
-            .file("docs/phase-9-kafka-native-storage/f9-scenarios.json")
+            .file("docs/v1/phase-9-kafka-native-storage/f9-scenarios.json")
             .asFile
             .absolutePath,
     )
     systemProperty(
         "nereus.f9.matrix",
         rootProject.layout.projectDirectory
-            .file("docs/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md")
+            .file("docs/v1/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md")
             .asFile
             .absolutePath,
     )

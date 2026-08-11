@@ -110,7 +110,7 @@ require_literal "publishesTopicCompactionOnlyIntoTheIsolatedTargetView" \
 
 for gate in phase4M3Check phase4M3FinalCheck; do
     require_literal "$gate" "build.gradle.kts"
-    require_literal "$gate" "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    require_literal "$gate" "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 done
 
 echo "Phase 4 M3 format, planner, worker, recovery, model, integration, and documentation surfaces verified."

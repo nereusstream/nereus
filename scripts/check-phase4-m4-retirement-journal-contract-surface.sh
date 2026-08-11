@@ -83,7 +83,7 @@ require_literal "neverSealsManifestWhenAnyJournalEntryIsMissing" \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/gc/DefaultGcRetirementJournalTest.java"
 require_literal "phase4M4RetirementJournalCheck" "build.gradle.kts"
 require_literal "phase4M4RetirementJournalCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 prepare_line="$(rg -n -F 'retirementJournal.prepare(' "$repo_root/$collector" | head -1 | cut -d: -f1)"
 mark_line="$(rg -n -F 'markCas(' "$repo_root/$collector" | head -1 | cut -d: -f1)"

@@ -41,8 +41,8 @@ require_literal "each shard must start with an empty continuation and advance op
 reject_literal "Thread.sleep(" "$integration"
 
 require_literal "phase4M4RootScaleCheck" "build.gradle.kts"
-require_literal "Checkpoint AX" "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AX" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M4RootScaleCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 real-Oxia hot-shard pagination and fresh-process root-scale contract surface: PASS"

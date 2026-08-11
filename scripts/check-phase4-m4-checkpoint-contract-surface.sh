@@ -59,13 +59,13 @@ require_literal "writer.string(value.cluster(), \"cluster\")" \
 require_literal "openRandomAccessReader" \
     "nereus-object-store/src/main/java/com/nereusstream/objectstore/checkpoint/DefaultRecoveryCheckpointCodecV1.java"
 require_literal "bodySha256 of every preceding byte" \
-    "docs/phase-4-compaction-generation/02-domain-api-and-object-format.md"
+    "docs/v1/phase-4-compaction-generation/02-domain-api-and-object-format.md"
 require_literal "lookupRejectsBadEntryCrcEvenWhenObjectAndFooterDigestsWereRecomputed" \
     "nereus-object-store/src/test/java/com/nereusstream/objectstore/checkpoint/RecoveryCheckpointStrictDecodeTest.java"
 require_literal "findsFirstMiddleAndLastCommitAcrossThreeSparseBlocks" \
     "nereus-object-store/src/test/java/com/nereusstream/objectstore/checkpoint/RecoveryCheckpointSparseDirectoryTest.java"
 require_literal "phase4M4CheckpointCheck" "build.gradle.kts"
 require_literal "phase4M4CheckpointCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 NRC1 object-protocol implementation checkpoint surfaces verified."

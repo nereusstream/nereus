@@ -50,8 +50,8 @@ reject_literal "Thread.sleep(" "$integration"
 require_literal "reload physical root after uncertain delete-intent CAS" "$collector"
 require_literal "exactReplacement(reloaded.orElseThrow(), replacement)" "$collector"
 require_literal "phase4M4TwoWorkerConvergenceCheck" "build.gradle.kts"
-require_literal "Checkpoint AV" "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AV" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M4TwoWorkerConvergenceCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 real two-worker DELETING-intent convergence contract surface: PASS"

@@ -19,6 +19,7 @@ require_literal() {
 
 required_v2_docs=(
     README.md
+    architecture.md
     01-correctness-and-append.md
     02-storage-profiles-and-topic-binding.md
     03-object-wal.md
@@ -54,15 +55,15 @@ for name in "${required_v2_docs[@]}"; do
     fi
 done
 
-for path in "$repo_root/docs/design/nereus-design-index.md" "$repo_root/docs/design/nereus-overall-architecture.md"; do
+for path in "$repo_root/docs/v2/README.md" "$repo_root/docs/v2/architecture.md"; do
     rg -q "^sourceTuple: ${source_tuple}$" "$path" || fail "${path#"$repo_root/"} does not use source tuple $source_tuple"
 done
 
 required_domain_docs=(
-    "$repo_root/CONTEXT-MAP.md"
-    "$repo_root/docs/domain/shared-storage/CONTEXT.md"
-    "$repo_root/docs/domain/kafka/CONTEXT.md"
-    "$repo_root/docs/domain/pulsar/CONTEXT.md"
+    "$repo_root/docs/v2/context-map.md"
+    "$repo_root/docs/v2/domain/shared-storage/CONTEXT.md"
+    "$repo_root/docs/v2/domain/kafka/CONTEXT.md"
+    "$repo_root/docs/v2/domain/pulsar/CONTEXT.md"
     "$repo_root/docs/decisions/0011-v2-position-domains-and-multi-protocol-fabric.md"
     "$repo_root/docs/decisions/0012-v2-storage-epochs-and-profile-evolution.md"
     "$repo_root/docs/decisions/0013-v2-cross-protocol-projection-and-migration-boundary.md"
@@ -143,11 +144,11 @@ for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
 done
 
-[[ -f "$repo_root/docs/design/nereus-future5-kop-compatibility.md" ]] || fail "KoP design document was removed"
+[[ -f "$repo_root/docs/v1/design/nereus-future5-kop-compatibility.md" ]] || fail "KoP design document was removed"
 
 require_literal "nereusVersion=0.2.0-SNAPSHOT" "gradle.properties"
-require_literal "Designed / deferred from the 0.2 runtime and release gates" "docs/design/nereus-future5-kop-compatibility.md"
-require_literal "v0.1@a14d925da5763f36208f8ddca7bef31f3eb90b0b" "docs/design/nereus-design-index.md"
+require_literal "Designed / deferred from the 0.2 runtime and release gates" "docs/v1/design/nereus-future5-kop-compatibility.md"
+require_literal "v0.1@a14d925da5763f36208f8ddca7bef31f3eb90b0b" "docs/v2/README.md"
 require_literal "191fbbe5a0430cc4c88b9a2be61cb5a492ec3494" "docs/v2/source-locks.json"
 require_literal "v2DocumentationCheck" "build.gradle.kts"
 require_literal "v2M0Check" "build.gradle.kts"
@@ -232,7 +233,7 @@ require_literal 'Cross-key application-side reread' "docs/decisions/0075-v2-bind
 require_literal '`ReadAdmissionEpochTerminalCut`' "docs/decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md"
 require_literal 'The first valid' "docs/decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md"
 require_literal 'generated on demand only' "docs/decisions/0076-v2-read-admission-terminal-cut-and-on-demand-epoch-proof.md"
-require_literal '**Read Admission Closure Anchor**' "docs/domain/shared-storage/CONTEXT.md"
+require_literal '**Read Admission Closure Anchor**' "docs/v2/domain/shared-storage/CONTEXT.md"
 require_literal '`ADMITTING`' "docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
 require_literal '`STOPPED`' "docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
 require_literal 'grants the same owner no-fallback reads under E+1' "docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
@@ -279,9 +280,9 @@ require_literal '1934d55f0f619971d83f43fbc56865ce9221ca92' "docs/v2/source-locks
 require_literal 'request-order greedy residue-free linear admission sizes the exact cumulative record list' "docs/v2/v2-scenarios.json"
 require_literal 'canonical-UUID/NLI1-derived compatibility-namespace Registry' "docs/v2/v2-scenarios.json"
 require_literal 'local store-wide continuity epoch' "docs/v2/v2-scenarios.json"
-require_literal "no online transition runtime exists" "docs/domain/shared-storage/CONTEXT.md"
-require_literal "no Projection Map store/runtime is shipped" "docs/domain/shared-storage/CONTEXT.md"
-require_literal "sole authority for attempt" "docs/domain/pulsar/CONTEXT.md"
+require_literal "no online transition runtime exists" "docs/v2/domain/shared-storage/CONTEXT.md"
+require_literal "no Projection Map store/runtime is shipped" "docs/v2/domain/shared-storage/CONTEXT.md"
+require_literal "sole authority for attempt" "docs/v2/domain/pulsar/CONTEXT.md"
 require_literal "NonNormativeQuestionLog" "docs/v2/open-questions.md"
 require_literal "NonNormativeSessionRecord" "docs/v2/grill-notes/01-protocol-position-fabric-and-migration.md"
 require_literal 'This closes `V2-OPEN-FABRIC-01`' "docs/v2/grill-notes/02-provider-sharing-and-protocol-cell-isolation.md"
@@ -480,8 +481,8 @@ done
 
 active_contracts=(
     "$repo_root/docs/v2"
-    "$repo_root/docs/design/nereus-design-index.md"
-    "$repo_root/docs/design/nereus-overall-architecture.md"
+    "$repo_root/docs/v2/README.md"
+    "$repo_root/docs/v2/architecture.md"
     "$repo_root/docs/decisions/0007-v2-wal-linearized-append.md"
     "$repo_root/docs/decisions/0008-v2-storage-profiles-and-ack-boundaries.md"
     "$repo_root/docs/decisions/0009-v2-protocol-native-data-paths.md"
@@ -555,8 +556,8 @@ active_contracts=(
     "$repo_root/docs/decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md"
     "$repo_root/docs/decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md"
     "$repo_root/docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
-    "$repo_root/CONTEXT-MAP.md"
-    "$repo_root/docs/domain"
+    "$repo_root/docs/v2/context-map.md"
+    "$repo_root/docs/v2/domain"
 )
 
 for stale in OBJECT_WAL_SYNC_OBJECT OBJECT_WAL_ASYNC_OBJECT BOOKKEEPER_WAL_SYNC_OBJECT; do
@@ -585,11 +586,11 @@ for unconfirmed_design_symbol in \
         --glob '!**/grill-notes/**' \
         -- "$unconfirmed_design_symbol" \
         "$repo_root/docs/v2" \
-        "$repo_root/docs/design/nereus-design-index.md" \
-        "$repo_root/docs/design/nereus-overall-architecture.md" \
+        "$repo_root/docs/v2/README.md" \
+        "$repo_root/docs/v2/architecture.md" \
         "$repo_root/docs/decisions" \
-        "$repo_root/CONTEXT-MAP.md" \
-        "$repo_root/docs/domain"; then
+        "$repo_root/docs/v2/context-map.md" \
+        "$repo_root/docs/v2/domain"; then
         fail "unconfirmed Grill proposal leaked into active V2 contracts: $unconfirmed_design_symbol"
     fi
 done
@@ -600,11 +601,11 @@ if rg -Fn \
     --glob '!**/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md' \
     -- 'OwnerReadQuiescenceAggregateV1' \
     "$repo_root/docs/v2" \
-    "$repo_root/docs/design/nereus-design-index.md" \
-    "$repo_root/docs/design/nereus-overall-architecture.md" \
+    "$repo_root/docs/v2/README.md" \
+    "$repo_root/docs/v2/architecture.md" \
     "$repo_root/docs/decisions" \
-    "$repo_root/CONTEXT-MAP.md" \
-    "$repo_root/docs/domain"; then
+    "$repo_root/docs/v2/context-map.md" \
+    "$repo_root/docs/v2/domain"; then
     fail "rejected per-batch OwnerReadQuiescenceAggregateV1 leaked into active V2 contracts"
 fi
 
@@ -647,7 +648,7 @@ if archive.get("branch") != "v0.1" or not sha.fullmatch(str(archive.get("commit"
 if archive.get("tag") is not None or archive.get("evidenceStatus") != "HISTORICAL_ONLY":
     fail("V1 archive must record the still-pending tag and historical-only evidence")
 
-release_record = (root / "docs/releases/v0.1.0.md").read_text()
+release_record = (root / "docs/v1/releases/v0.1.0.md").read_text()
 for value in (archive["branch"], archive["commit"]):
     if value not in release_record:
         fail(f"V1 release record does not contain {value}")
@@ -823,13 +824,14 @@ PY
 
 link_docs=(
     "$repo_root/README.md"
-    "$repo_root/CONTEXT-MAP.md"
-    "$repo_root/docs/domain"
+    "$repo_root/docs/v2/context-map.md"
+    "$repo_root/docs/v2/domain"
     "$repo_root/docs/v2"
-    "$repo_root/docs/design/README.md"
-    "$repo_root/docs/design/nereus-design-index.md"
-    "$repo_root/docs/design/nereus-overall-architecture.md"
-    "$repo_root/docs/design/nereus-future5-kop-compatibility.md"
+    "$repo_root/docs/v2/README.md"
+    "$repo_root/docs/v2/architecture.md"
+    "$repo_root/docs/v1/README.md"
+    "$repo_root/docs/v1/design/README.md"
+    "$repo_root/docs/v1/design/nereus-future5-kop-compatibility.md"
     "$repo_root/docs/decisions/0006-v0.2-clean-break-from-v0.1.md"
     "$repo_root/docs/decisions/0007-v2-wal-linearized-append.md"
     "$repo_root/docs/decisions/0008-v2-storage-profiles-and-ack-boundaries.md"
@@ -933,4 +935,45 @@ while IFS=: read -r source match; do
     [[ -e "$resolved" ]] || fail "broken local Markdown link in ${source#"$repo_root/"}: $target"
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "V2 documentation baseline: contexts, positions, epochs, profiles, cell-scoped providers, authority, source locks, scenarios, tradeoffs, receipts, and links verified."
+legacy_layout_paths=(
+    "$repo_root/CONTEXT-MAP.md"
+    "$repo_root/docs/design"
+    "$repo_root/docs/domain"
+    "$repo_root/docs/performance"
+    "$repo_root/docs/phase0"
+    "$repo_root/docs/phase-1-core-stream-storage"
+    "$repo_root/docs/phase-1.5-core-storage-foundation"
+    "$repo_root/docs/phase-2-managed-ledger-facade"
+    "$repo_root/docs/phase-3-cursor-subscription"
+    "$repo_root/docs/phase-4-compaction-generation"
+    "$repo_root/docs/phase-9-kafka-native-storage"
+    "$repo_root/docs/phase-bk-bookkeeper-primary-wal"
+    "$repo_root/docs/automq-like-stream-storage"
+    "$repo_root/docs/decisions/0002-separate-append-commit-index-and-materialization.md"
+    "$repo_root/docs/decisions/0004-insert-phase-1-5-generic-storage-foundation.md"
+    "$repo_root/docs/decisions/0005-native-kafka-fork-and-adapter-boundary.md"
+)
+for path in "${legacy_layout_paths[@]}"; do
+    [[ ! -e "$path" ]] || fail "legacy mixed V1/V2 path still exists: ${path#"$repo_root/"}"
+done
+
+required_archive_paths=(
+    "$repo_root/docs/v1/README.md"
+    "$repo_root/docs/v1/delivery-log.md"
+    "$repo_root/docs/v1/design/README.md"
+    "$repo_root/docs/v1/decisions/README.md"
+    "$repo_root/docs/v1/releases/v0.1.0.md"
+    "$repo_root/docs/v2/context-map.md"
+    "$repo_root/docs/v2/domain"
+)
+for path in "${required_archive_paths[@]}"; do
+    [[ -e "$path" ]] || fail "required separated documentation path is missing: ${path#"$repo_root/"}"
+done
+
+rg -q '^# Nereus V1 historical delivery log$' "$repo_root/docs/v1/delivery-log.md" || \
+    fail "V1 delivery log was not preserved under docs/v1"
+if rg -q '^## V1 historical delivery log$' "$repo_root/README.md"; then
+    fail "root README still embeds the V1 delivery log"
+fi
+
+echo "V2 documentation baseline: separated layout, contexts, positions, epochs, profiles, cell-scoped providers, authority, source locks, scenarios, tradeoffs, receipts, and links verified."

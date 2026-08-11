@@ -73,7 +73,7 @@ require_literal "unloadedBackfillCapturesExactLiveProjectionBeforeRegistration" 
 require_literal "backfillCandidateFreezesTheSameExactNpr1Identity" "$projection_test"
 
 require_literal "TenantResources.listTenantsAsync" \
-    "$repo_root/docs/phase-4-compaction-generation/06-pulsar-rollout-operations-and-compatibility.md"
+    "$repo_root/docs/v1/phase-4-compaction-generation/06-pulsar-rollout-operations-and-compatibility.md"
 require_literal "namespaceResources.listNamespacesAsync" "$backfill"
 require_literal "topicResources.listPersistentTopicsAsync" "$backfill"
 require_literal "SystemTopicNames.isSystemTopic" "$backfill"
@@ -106,8 +106,8 @@ require_literal "2f234d6b9baa3a760460090850d22734f94cd72d51fd0f27706fda272fc01d7
 require_literal "generationRegistrationBackfillConcurrency" "$configuration_test"
 require_literal "phase4M5RegistrationBackfillCheck" "$repo_root/build.gradle.kts"
 require_literal "phase4M5RegistrationBackfillCheck" \
-    "$repo_root/docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
-require_literal "Checkpoint Z" "$repo_root/docs/phase-4-compaction-generation/README.md"
+    "$repo_root/docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "Checkpoint Z" "$repo_root/docs/v1/phase-4-compaction-generation/README.md"
 
 if rg -Fq -- "compareAndSetGenerationProtocolActivation" "$backfill"; then
     echo "registration-backfill traversal must not write the durable activation proof" >&2

@@ -112,7 +112,7 @@ require_literal "assertThat(proofs).hasSize(2)" "$broker_backfill_test"
 require_literal "assertThat(proofs).hasValue(0)" "$broker_backfill_test"
 require_literal "currentGenerationCapabilityReadiness()" "$broker_capability_test"
 require_literal "phase4M5RegistrationProofCheck" "$repo_root/build.gradle.kts"
-require_literal "Checkpoint AA" "$repo_root/docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AA" "$repo_root/docs/v1/phase-4-compaction-generation/README.md"
 
 if rg -Fq -- "GenerationProtocolActivationStore" "$broker_backfill"; then
     echo "broker traversal must not own or mutate durable generation activation metadata" >&2

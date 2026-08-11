@@ -116,6 +116,6 @@ require_literal "unloadedTrimWaitsForReadinessOnlyWhenGenerationProtocolIsEnable
 require_literal "generationPolicyPreparationWaitsForMarkerAdmissionAndStablePolicyReload" "$topic_test"
 
 require_literal "phase4M5RetentionPolicyAdminCheck" "$repo_root/build.gradle.kts"
-require_literal "Checkpoint AI" "$repo_root/docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AI" "$repo_root/docs/v1/phase-4-compaction-generation/README.md"
 
 echo "Phase 4 M5 exact retention policy, generation admission, and loaded/unloaded admin routing verified."

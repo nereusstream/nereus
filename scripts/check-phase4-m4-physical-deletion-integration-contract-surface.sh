@@ -75,8 +75,8 @@ require_literal "PhysicalObjectLifecycle.DELETED" "$integration"
 require_literal "new ListObjectsResult(prefix, List.of(), Optional.empty())" "$integration"
 
 require_literal "phase4M4PhysicalDeletionIntegrationCheck" "build.gradle.kts"
-require_literal "Checkpoint AS" "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AS" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M4PhysicalDeletionIntegrationCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 real Oxia/LocalStack activation and restart-recovery contract surface: PASS"

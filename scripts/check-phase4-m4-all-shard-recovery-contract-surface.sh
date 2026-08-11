@@ -51,8 +51,8 @@ require_literal "opaqueContinuationDoesNotImplyCrossPageLogicalOrdering" "$scann
 require_literal "repeatedOpaqueContinuationFailsClosed" "$scanner_test"
 
 require_literal "phase4M4AllShardRecoveryCheck" "build.gradle.kts"
-require_literal "Checkpoint AW" "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AW" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M4AllShardRecoveryCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 all-shard metadata recovery and opaque LIST continuation contract surface: PASS"

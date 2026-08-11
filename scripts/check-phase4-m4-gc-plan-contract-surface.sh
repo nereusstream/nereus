@@ -71,7 +71,7 @@ require_literal "reconstructsPlanFromMarkedRootWithoutInventingPreviousOxiaVersi
     "nereus-materialization/src/test/java/com/nereusstream/materialization/gc/GcPlanTest.java"
 require_literal "phase4M4GcPlanCheck" "build.gradle.kts"
 require_literal "phase4M4GcPlanCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 if rg -q "ObjectStore|deleteObject|deleteIfVersion|compareAndSetRoot" \
         "$repo_root/$candidate" "$repo_root/$plan" "$repo_root/$config"; then

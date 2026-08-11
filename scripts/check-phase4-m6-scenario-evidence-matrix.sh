@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 pulsar_root="${1:-${NEREUS_PULSAR_CHECKOUT:-$repo_root/../nereusstream/pulsar}}"
-matrix="$repo_root/docs/phase-4-compaction-generation/08-m6-scenario-evidence-matrix.md"
+matrix="$repo_root/docs/v1/phase-4-compaction-generation/08-m6-scenario-evidence-matrix.md"
 build="$repo_root/build.gradle.kts"
 
 fail() {

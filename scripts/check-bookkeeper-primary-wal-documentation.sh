@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-design_dir="$repo_root/docs/phase-bk-bookkeeper-primary-wal"
+design_dir="$repo_root/docs/v1/phase-bk-bookkeeper-primary-wal"
 nereus_audit_lock="35c58c575c3da220633c53e48a581f16756ea047"
 pulsar_source_lock="2f9c1eb93be96e2036fbdc8c5e39545f21fa6200"
 
@@ -36,233 +36,233 @@ for name in "${required_docs[@]}"; do
 done
 
 require_literal "$nereus_audit_lock" \
-    "docs/phase-bk-bookkeeper-primary-wal/01-current-contract-and-source-audit.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/01-current-contract-and-source-audit.md"
 require_literal "$nereus_audit_lock" \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 for path in \
-    docs/phase-bk-bookkeeper-primary-wal/README.md \
-    docs/phase-bk-bookkeeper-primary-wal/01-current-contract-and-source-audit.md \
-    docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md \
-    docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md; do
+    docs/v1/phase-bk-bookkeeper-primary-wal/README.md \
+    docs/v1/phase-bk-bookkeeper-primary-wal/01-current-contract-and-source-audit.md \
+    docs/v1/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md \
+    docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md; do
     require_literal "$pulsar_source_lock" "$path"
 done
 
 require_literal "BookKeeper 4.18.0" \
-    "docs/phase-bk-bookkeeper-primary-wal/01-current-contract-and-source-audit.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/01-current-contract-and-source-audit.md"
 require_literal 'DeleteBuilder.withLedgerId(long)' \
-    "docs/phase-bk-bookkeeper-primary-wal/01-current-contract-and-source-audit.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/01-current-contract-and-source-audit.md"
 require_literal "F1-BK / BookKeeper Primary WAL Delivery" \
-    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/README.md"
 require_literal "explicit implementation evidence" \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY' \
-    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/README.md"
 require_literal 'CreateAdvBuilder.withLedgerId(long)' \
-    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/README.md"
 require_literal 'reserved-namespace exact ledger id' \
-    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/README.md"
 require_literal 'maxAppendRangesPerLedger' \
-    "docs/phase-bk-bookkeeper-primary-wal/02-domain-api-module-and-target-contract.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/02-domain-api-module-and-target-contract.md"
 require_literal 'CREATE_UNCERTAIN' \
-    "docs/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md"
 require_literal 'BookKeeperAllocationSlotRecord' \
-    "docs/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md"
 require_literal 'lateCreateHazard' \
-    "docs/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md"
 require_literal '${rangeSlot:05d}/${protectionSlot:02d}' \
-    "docs/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md"
 require_literal '${readerSlot:05d}' \
-    "docs/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md"
 require_literal 'BookKeeperLedgerIdNamespaceReservationRecord' \
-    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md"
 require_literal 'nereus.bookkeeper-primary-wal-activation' \
-    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md"
 require_literal 'BookKeeperLedgerIdNamespaceProvisioningCoordinator' \
-    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
     "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperLedgerIdNamespaceProvisioningCoordinator.java"
 require_literal 'BookKeeperProtocolActivationCoordinator' \
-    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
     "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperProtocolActivationCoordinator.java"
 require_literal 'NBKA1' \
-    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
     "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperProtocolActivationCodecV1.java"
 require_literal 'NBKAP1' \
-    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
     "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperProtocolActivation.java"
 require_literal 'BookKeeperBrokerReadinessProvider' \
-    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
     "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperBrokerReadinessProvider.java"
 require_literal 'activationKeepsPublicationIdentityStableButRebindsEveryDeletionRecord' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperProtocolAdministrationTest.java"
 require_literal 'deletionReadinessUsesTheStablePublicationBindingAndInvalidatesOnDrift' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'namespaceProvisionIsIdempotentAndRevokeIsTerminalVersionedCas' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperProtocolAdministrationTest.java"
 require_literal 'withRecovery(false)' \
-    "docs/phase-bk-bookkeeper-primary-wal/04-append-read-recovery-and-fencing.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/04-append-read-recovery-and-fencing.md"
 require_literal 'REQUIRED_OBJECT_GENERATION' \
-    "docs/phase-bk-bookkeeper-primary-wal/05-retention-materialization-and-completion.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/05-retention-materialization-and-completion.md"
 require_literal 'CommittedObjectGenerationAuthority' \
-    "docs/phase-bk-bookkeeper-primary-wal/05-retention-materialization-and-completion.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/05-retention-materialization-and-completion.md"
 require_literal 'BookKeeperSealedLedgerMaterializationTrigger' \
-    "docs/phase-bk-bookkeeper-primary-wal/05-retention-materialization-and-completion.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/05-retention-materialization-and-completion.md"
 require_literal 'BookKeeperLedgerRetentionService' \
-    "docs/phase-bk-bookkeeper-primary-wal/05-retention-materialization-and-completion.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/05-retention-materialization-and-completion.md" \
     "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperLedgerRetentionService.java"
 require_literal 'scansEveryShardAndRoutesOnlyTheExactBinding' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperLedgerRetentionScannerTest.java"
 require_literal 'oneRootFailureIsAccountedAndDoesNotStopLaterRootsOrShards' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperLedgerRetentionScannerTest.java"
 require_literal 'bookKeeperPrimaryWalM3SourceRetirementCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3LiveReadCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3SealedLedgerCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3RealServiceCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3PhysicalRetirementCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3ResponseLossCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3LagFailureCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3FinalCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2StableRecoveryCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2IsolationRetentionCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2AllocationAuthorityCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2Check' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2FinalCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'No online migration in BK-M0–M6' \
-    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md"
 require_literal 'BK-96' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'bookKeeperPrimaryWalDocumentationCheck' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M0 design/source audit       documentation-gated on 2026-07-19' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M2 BOOKKEEPER_WAL_ONLY       complete/final-gated on 2026-07-20' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT complete/final-gated on 2026-07-20' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M4 BOOKKEEPER_WAL_SYNC_OBJECT complete/final-gated on 2026-07-20' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M5 Pulsar rollout            complete/final-gated on 2026-07-22' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M6 aggregate final gate      complete/final-gated on 2026-07-22' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM6Check --rerun-tasks`：123/123 outer tasks in 10m22s' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalFinalCheck --rerun-tasks`：236/236 outer tasks in 30m57s' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BookKeeper Primary WAL Delivery is complete/final-gated' \
-    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/README.md"
 require_literal 'BK-M6 and the complete F1-BK / BookKeeper Primary WAL Delivery are complete/final-gated' \
-    "docs/phase-bk-bookkeeper-primary-wal/09-m6-executable-evidence-matrix.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/09-m6-executable-evidence-matrix.md"
 require_literal "$pulsar_source_lock" \
-    "docs/phase-bk-bookkeeper-primary-wal/09-m6-executable-evidence-matrix.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/09-m6-executable-evidence-matrix.md"
 require_literal 'bookKeeperPrimaryWalM5Check --rerun-tasks` passes 105/105 outer tasks in 6m47s' \
-    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/README.md"
 require_literal 'bookKeeperPrimaryWalM5FinalCheck --rerun-tasks` then passes' \
-    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/README.md"
 require_literal '231/231 fresh tasks in 27m42s' \
-    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/README.md"
 require_literal 'bookKeeperPrimaryWalM2FinalCheck` passed its 212-task aggregate' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3FinalCheck` passed its 223-task aggregate' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'multiEntryAppendUsesOneExactConsecutiveBookKeeperRange' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'byteRangeAndAgeRolloverPreserveWholeBatchesAndDenseOffsets' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'BookKeeperAppenderResourceTest.releasesEveryOwnedResource' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'void releasesEveryOwnedResource()' \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAppenderResourceTest.java"
 require_literal 'BookKeeperAppenderDeadlineTest.propagatesRemainingBudget' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'void propagatesRemainingBudget()' \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAppenderDeadlineTest.java"
 require_literal 'BookKeeperLedgerRecoveryTest.recoversEverySealCut' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'void recoversEverySealCut()' \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperLedgerRecoveryTest.java"
 require_literal 'newOwnerRecoveryOpenFencesLiveOldHandleAndPreventsOldHeadCommit' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'realReaderNeverRecoveryOpensVerifiesWholeRangeBeforeClippingAndFailsClosedOnChecksumDrift' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'realReaderFailsClosedOnCountIdAndConfigurationDrift' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'referenceAppearingAfterMarkUnmarksToSealedBeforeDelete' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperWalRetentionGateTest.java"
 require_literal 'disabledAndDryRunGcNeverMutateRootOrProvider' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperWalRetentionGateTest.java"
 require_literal 'referenceAfterMarkUnmarksAndSafeGcModesNeverDelete' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'oneProcessSharesOneRenewableSlotUntilItsFinalLocalRelease' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperReaderLeaseManagerTest.java"
 require_literal 'fixedSlotsBoundIndependentProcessesWithoutDeletingForeignOccupants' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperReaderLeaseManagerTest.java"
 require_literal 'finalRevalidationFailsWhenTheExactDurableLeaseDisappears' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperReaderLeaseManagerTest.java"
 require_literal 'renewalFailureDoesNotLeakTheRememberedDurableSlot' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperReaderLeaseManagerTest.java"
 require_literal 'realReaderSlotsArePerProcessBoundedAndFinalPinRevalidationFailsClosed' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'foreignLedgerRecreationAndNamespaceDriftStopBeforePhysicalDelete' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'partialRangeAndMixedLedgerTrimNeverDeleteLiveBookKeeperBytes' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'firstMiddleAndLastWriteFailureSealTheLedgerBeforeReuse' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'reachableHeadRecoveryRepairsGenerationZeroWithoutRewritingBookKeeper' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperStreamStorageIntegrationTest.java"
 require_literal 'defaultAdapterMakesDeferredSyncUnrepresentableAndAlwaysUsesEmptyWriteFlags' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperClientApiContractTest.java"
 require_literal 'BookKeeperAppendReservationIds' \
-    "docs/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md" \
     "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperAppendReservationIds.java"
 require_literal 'BookKeeperAppendRecoveryCoordinator' \
-    "docs/phase-bk-bookkeeper-primary-wal/04-append-read-recovery-and-fencing.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/04-append-read-recovery-and-fencing.md" \
     "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperAppendRecoveryCoordinator.java"
 require_literal 'currentSessionCommitsTheSameDurableRangeWithoutAnotherBookKeeperWrite' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAppendRecoveryCoordinatorTest.java"
 require_literal 'newSessionAbandonsUnreachableDurableRangeAndAllocatesAnotherLedger' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAppendRecoveryCoordinatorTest.java"
 require_literal 'restartRecoveryReusesCurrentSessionRangeAndFencesExpiredSessionRange' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'bookKeeperPrimaryWalDocumentationCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM1Check' "build.gradle.kts"
@@ -305,32 +305,32 @@ require_literal 'bookKeeperPrimaryWalM5TwoBrokerCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5Check' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5FinalCheck' "build.gradle.kts"
 require_literal 'NereusBookKeeperMultiBrokerIntegrationTest.preservesOwnershipProjectionAndStockIsolationAcrossBothTakeovers' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'NereusBookKeeperMultiBrokerIntegrationTest.preservesOwnershipProjectionAndStockIsolationAcrossBothTakeovers' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'NereusMixedPrimaryProfilesMultiBrokerTest.coexistsAcrossProfiles' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'NereusBookKeeperCapabilityRolloverTest.excludesOldBroker' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'NereusBookKeeperCapabilityRolloverTest.reestablishesExactAuthority' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'bookKeeperWalOnlyResolvesGenerationZeroWithoutAdmittingHigherGenerations' \
     "nereus-core/src/test/java/com/nereusstream/core/read/GenerationReadResolverTest.java"
 require_literal 'assertThat(reusedAfterReset).isSameAs(navigation)' \
     "nereus-managed-ledger/src/test/java/com/nereusstream/managedledger/NereusManagedLedgerFacadeTest.java"
 require_literal 'bookKeeperPrimaryWalM5AdminRoutingCheck --rerun-tasks` passes 103/103 outer tasks in 3m32s' \
-    "docs/phase-bk-bookkeeper-primary-wal/README.md" \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/README.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM5TwoBrokerCheck --rerun-tasks` passes 104/104 outer tasks in 4m59s' \
-    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/README.md"
 require_literal 'bookKeeperPrimaryWalM5TwoBrokerCheck --rerun-tasks` passes 104/104 outer tasks in 4m59s' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks' \
-    "docs/phase-bk-bookkeeper-primary-wal/README.md" \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/README.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM4FinalCheck --rerun-tasks` passes its 215-task aggregate' \
-    "docs/phase-bk-bookkeeper-primary-wal/README.md" \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/README.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2StableRecoveryCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2IsolationRetentionCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2AllocationAuthorityCheck' "build.gradle.kts"
@@ -355,19 +355,19 @@ require_literal 'sharedRealLagAdmissionRejectsBeforeBookKeeperIoAndRecoversAfter
 require_literal 'missingCommittedObjectVetoesBookKeeperRetirementAndFallsBackToExactRange' \
     "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
 require_literal 'syncObjectAcknowledgesOnlyAfterExactObjectGenerationIsNormallyReadable' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
 require_literal 'syncObjectUnreadablePublicationIsKnownCommittedAndRecoveryReusesBkRange' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
 require_literal 'syncObjectKeepsBkVisibleWhileProducerWaitsForObjectPublication' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
 require_literal 'syncObjectSequentialAppendsKeepOneDeterministicTaskPerBkRange' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
 require_literal 'syncRestartWaitsForExactObjectProofWithoutAnotherBookKeeperWrite' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAppendRecoveryCoordinatorTest.java"
 require_literal 'void throttlesAndRejectsBeforeWal' \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAsyncAdmissionTest.java"
@@ -392,12 +392,12 @@ require_literal 'healthyCommittedObjectGenerationRetiresOnlyMandatoryAsyncSource
 require_literal 'sealedLedgerTriggerRevalidatesExactRootAndUsesTheSharedMaterializationScanner' \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperWalRetentionGateTest.java"
 require_literal 'BookKeeperUncertainAllocationReconciler' \
-    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'class BookKeeperUncertainAllocationReconciler' \
     "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperUncertainAllocationReconciler.java"
 require_literal 'BookKeeperWriterStatePropertyTest' "nereus-bookkeeper/build.gradle.kts"
 require_literal 'realOxiaColdScanCoversEveryRootAndAllocationSlotShard' \
-    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+    "docs/v1/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'void realOxiaColdScanCoversEveryRootAndAllocationSlotShard' \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'class BookKeeperLedgerTransitionsTest' \
@@ -453,22 +453,22 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-primary-wal-m5-admin-routing-con
 fi
 
 global_links=(
-    docs/design/nereus-futures.md
-    docs/design/nereus-future1-core-stream-storage.md
-    docs/design/nereus-future4-compaction-generation.md
-    docs/design/nereus-commit-protocol.md
-    docs/design/nereus-terminology.md
-    docs/phase-1.5-core-storage-foundation/README.md
-    docs/phase-4-compaction-generation/README.md
+    docs/v1/design/nereus-futures.md
+    docs/v1/design/nereus-future1-core-stream-storage.md
+    docs/v1/design/nereus-future4-compaction-generation.md
+    docs/v1/design/nereus-commit-protocol.md
+    docs/v1/design/nereus-terminology.md
+    docs/v1/phase-1.5-core-storage-foundation/README.md
+    docs/v1/phase-4-compaction-generation/README.md
 )
 for path in "${global_links[@]}"; do
     require_literal "phase-bk-bookkeeper-primary-wal" "$path"
 done
 require_literal 'F1-BK BK-M0–M6 complete/final-gated' \
-    "docs/design/nereus-future4-compaction-generation.md"
+    "docs/v1/design/nereus-future4-compaction-generation.md"
 
 if rg -Fq -- 'production broker 中仍为 reserved，等待 BK-M5 rollout' \
-    "$repo_root/docs/design/nereus-future4-compaction-generation.md"; then
+    "$repo_root/docs/v1/design/nereus-future4-compaction-generation.md"; then
     echo "Future 4 design regressed to the pre-BK-M5 BookKeeper rollout status" >&2
     exit 1
 fi

@@ -94,7 +94,7 @@ require_literal "malformedKeysCannotBePromotedByPrefixMembership" "$families_tes
 
 require_literal "phase4M4ObjectInventoryCheck" "build.gradle.kts"
 require_literal "phase4M4ObjectInventoryCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
-require_literal "Checkpoint AL" "docs/phase-4-compaction-generation/README.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "Checkpoint AL" "docs/v1/phase-4-compaction-generation/README.md"
 
 echo "Phase 4 M4 object-inventory contract surface: PASS"

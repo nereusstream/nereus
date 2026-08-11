@@ -87,12 +87,12 @@ require_literal "quarantinesEveryDiscoveredCommittedIndexThatReferencesTheCorrup
 
 for gate in phase4M2Check phase4M2FinalCheck; do
     require_literal "$gate" "build.gradle.kts"
-    require_literal "$gate" "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    require_literal "$gate" "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 done
 
 require_literal "F4-M2 is complete/final-gated" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M2FinalCheck --rerun-tasks" \
-    "docs/phase-4-compaction-generation/README.md"
+    "docs/v1/phase-4-compaction-generation/README.md"
 
 echo "Phase 4 M2 publication, read, fallback, quarantine, test, integration, and documentation surfaces verified."

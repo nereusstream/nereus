@@ -128,7 +128,7 @@ require_literal "authorityLimitAndTransitionalRetentionFailClosed" "$managed_tes
 
 require_literal "phase4M4RegistrationRetirementCheck" "build.gradle.kts"
 require_literal "phase4M4RegistrationRetirementCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
-require_literal "Checkpoint AM" "docs/phase-4-compaction-generation/README.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "Checkpoint AM" "docs/v1/phase-4-compaction-generation/README.md"
 
 echo "Phase 4 M4 registration-retirement authority, ordering, and response-loss surfaces verified."

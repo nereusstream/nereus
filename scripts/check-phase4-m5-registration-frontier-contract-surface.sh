@@ -69,7 +69,7 @@ require_literal "openDoesNotReturnBeforeExactMaterializationRegistration" "$open
 
 require_literal "phase4M5RegistrationFrontierCheck" "build.gradle.kts"
 require_literal "phase4M5RegistrationFrontierCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 if rg -Fq -- "activateGenerationProtocol(" "$repo_root/$coordinator"; then
     echo "registration-frontier checkpoint must not manufacture the generation marker" >&2

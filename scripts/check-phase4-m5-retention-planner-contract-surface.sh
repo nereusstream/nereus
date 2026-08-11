@@ -102,6 +102,6 @@ require_literal "noOpStillRequiresFinalOwnershipButDoesNotMutate" "$service_test
 require_literal "lostOwnershipAfterDurableTrimFailsCallbackAndSkipsObserver" "$service_test"
 
 require_literal "phase4M5RetentionPlannerCheck" "$repo_root/build.gradle.kts"
-require_literal "Checkpoint AG" "$repo_root/docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AG" "$repo_root/docs/v1/phase-4-compaction-generation/README.md"
 
 echo "Phase 4 M5 stable logical-retention planning, authority revalidation, and F3 trim delegation verified."

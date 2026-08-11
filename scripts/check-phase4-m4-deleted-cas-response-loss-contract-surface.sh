@@ -56,8 +56,8 @@ reject_literal "Thread.sleep(" "$integration"
 require_literal "reload physical root after uncertain DELETED CAS" "$coordinator"
 require_literal "exactReplacement(" "$coordinator"
 require_literal "phase4M4DeletedCasResponseLossCheck" "build.gradle.kts"
-require_literal "Checkpoint AU" "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AU" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M4DeletedCasResponseLossCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 real DELETED-root CAS response-loss convergence contract surface: PASS"

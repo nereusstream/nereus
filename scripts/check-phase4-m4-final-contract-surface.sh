@@ -96,8 +96,8 @@ require_literal "phase4M4PhysicalGcMultiBrokerPulsarCheck" "build.gradle.kts"
 require_literal '"-PtestRetryCount=0"' "build.gradle.kts"
 require_literal "phase4M4FinalCheck" "build.gradle.kts"
 require_literal "phase4M4FinalCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "F4-M4 已完成并通过 final gate" \
-    "docs/phase-4-compaction-generation/README.md"
+    "docs/v1/phase-4-compaction-generation/README.md"
 
 echo "Phase 4 M4 stable-authority and real two-broker physical-GC contract surface: PASS"

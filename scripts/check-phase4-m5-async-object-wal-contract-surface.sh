@@ -90,6 +90,6 @@ require_literal "asyncObjectWalProfileUsesTheSameCommittedGenerationResolver" "$
 require_literal "bookKeeperWalOnlyResolvesGenerationZeroWithoutAdmittingHigherGenerations" "$resolver_test"
 
 require_literal "phase4M5AsyncObjectWalCheck" "$repo_root/build.gradle.kts"
-require_literal "Checkpoint AD" "$repo_root/docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AD" "$repo_root/docs/v1/phase-4-compaction-generation/README.md"
 
 echo "Phase 4 M5 async Object-WAL acknowledgement, protected generation-zero repair, and object-materializing profile seam verified."

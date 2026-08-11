@@ -65,8 +65,8 @@ require_literal "recovered.assertObjectAbsent(metadataCut)" "$integration_test"
 require_literal "recovered.assertObjectAbsent(protectionCut)" "$integration_test"
 
 require_literal "phase4M4SourceProtectionCutCheck" "build.gradle.kts"
-require_literal "Checkpoint BA" "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BA" "docs/v1/phase-4-compaction-generation/README.md"
 require_literal "phase4M4SourceProtectionCutCheck" \
-    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+    "docs/v1/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
 echo "Phase 4 M4 source/protection retirement process-cut and response-loss contract surface: PASS"
