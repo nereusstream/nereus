@@ -803,6 +803,11 @@ except (OSError, json.JSONDecodeError) as error:
 source_tuple = source.get("sourceTupleId", "")
 if source.get("schemaVersion") != 2 or not re.fullmatch(r"v2-m[0-9]+", source_tuple):
     fail("source-locks.json has the wrong schema or tuple ID")
+focused_source_tuple = source.get("focusedEvidenceSourceTupleId", "")
+if not re.fullmatch(r"v2-m[0-9]+", focused_source_tuple) or focused_source_tuple == source_tuple:
+    fail("source-locks.json must distinguish the historical focused-evidence tuple")
+if source_tuple != "v2-m1" or focused_source_tuple != "v2-m0":
+    fail("N2 must bind current tuple v2-m1 while preserving focused evidence at v2-m0")
 if source.get("productLine") != "V2" or source.get("developmentVersion") != "0.2.0-SNAPSHOT":
     fail("source-locks.json has the wrong product line or version")
 
@@ -1282,7 +1287,7 @@ if not (root / o2_evidence["receipt"]).is_file():
     fail("O2 local evidence receipt does not exist")
 o2_result = json.loads(o2_artifact_path.read_text())
 if (
-    o2_result.get("sourceTupleId") != source_tuple
+    o2_result.get("sourceTupleId") != focused_source_tuple
     or o2_result.get("result") != "PASS_LOCAL_SCAFFOLD_ONLY"
     or o2_result.get("promotionEligible") is not False
     or o2_result.get("nereus", {}).get("implementationCommit")
@@ -1340,7 +1345,7 @@ if not (root / q1_evidence["receipt"]).is_file():
     fail("M1.1b-Q1 readiness receipt does not exist")
 q1_result = json.loads(q1_artifact_path.read_text())
 if (
-    q1_result.get("sourceTupleId") != source_tuple
+    q1_result.get("sourceTupleId") != focused_source_tuple
     or q1_result.get("result") != "READINESS_EVIDENCE_ONLY"
     or q1_result.get("promotionEligible") is not False
     or q1_result.get("designStatus") != "Proposed"
@@ -1380,7 +1385,7 @@ if not (root / nta1_codec_evidence["receipt"]).is_file():
     fail("M1.1b NTA1 codec receipt does not exist")
 nta1_codec_result = json.loads(nta1_codec_artifact_path.read_text())
 if (
-    nta1_codec_result.get("sourceTupleId") != source_tuple
+    nta1_codec_result.get("sourceTupleId") != focused_source_tuple
     or nta1_codec_result.get("result") != "PASS_LOCAL_NTA1_CODEC_ONLY"
     or nta1_codec_result.get("promotionEligible") is not False
     or nta1_codec_result.get("implementationCommit")
@@ -1419,7 +1424,7 @@ if not (root / registry_capacity_evidence["receipt"]).is_file():
     fail("M1.1c-R0 Registry capacity receipt does not exist")
 registry_capacity_result = json.loads(registry_capacity_path.read_text())
 if (
-    registry_capacity_result.get("sourceTupleId") != source_tuple
+    registry_capacity_result.get("sourceTupleId") != focused_source_tuple
     or registry_capacity_result.get("result") != "REGISTRY_CAPACITY_READINESS_ONLY"
     or registry_capacity_result.get("promotionEligible") is not False
     or registry_capacity_result.get("registryConformance") is not False
@@ -1465,7 +1470,7 @@ if not (root / receipt_caps_evidence["receipt"]).is_file():
     fail("M1-2 receipt/parser cap receipt does not exist")
 receipt_caps_result = json.loads(receipt_caps_path.read_text())
 if (
-    receipt_caps_result.get("sourceTupleId") != source_tuple
+    receipt_caps_result.get("sourceTupleId") != focused_source_tuple
     or receipt_caps_result.get("result") != "RECEIPT_CAPACITY_READINESS_ONLY"
     or receipt_caps_result.get("promotionEligible") is not False
     or receipt_caps_result.get("productionReceiptParserImplemented") is not False
@@ -1619,8 +1624,20 @@ if matrix_statuses != json_statuses:
 implemented_not_run = {key for key, value in json_statuses.items() if value == "IMPLEMENTED_NOT_RUN"}
 if implemented_not_run != {"V2-META-003"}:
     fail(f"partial M1 foundation must promote only V2-META-003, found {sorted(implemented_not_run)}")
-if any(value == "PASSED_CURRENT_SOURCE" for value in json_statuses.values()):
-    fail("partial M1 foundation must not report a current-source scenario PASS")
+passed_current = {key for key, value in json_statuses.items() if value == "PASSED_CURRENT_SOURCE"}
+promotable_m1 = {f"V2-POSITION-{ordinal:03d}" for ordinal in range(3, 12)}
+if passed_current not in (set(), promotable_m1):
+    fail(f"N3 must promote either none or the exact M1 virtual-ledger set, found {sorted(passed_current)}")
+if passed_current:
+    expected_paths = {
+        **{f"V2-POSITION-{ordinal:03d}": "docs/v2/evidence/v2-m1/n3/registry-conformance.json"
+           for ordinal in range(3, 10)},
+        "V2-POSITION-010": "docs/v2/evidence/v2-m1/n3/harness-conformance.json",
+        "V2-POSITION-011": "docs/v2/evidence/v2-m1/n3/harness-conformance.json",
+    }
+    for item in scenarios["scenarios"]:
+        if item["id"] in promotable_m1 and item.get("evidenceReceipt") != expected_paths[item["id"]]:
+            fail(f"{item['id']} does not bind the exact N3 receipt")
 
 tradeoff_text = tradeoff_path.read_text()
 tradeoff_rows = re.findall(r"^\| (T-[A-Z]+-[0-9]{2}) \| (Accepted|Provisional) \|", tradeoff_text, re.M)

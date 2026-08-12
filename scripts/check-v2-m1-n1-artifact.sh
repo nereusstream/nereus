@@ -163,7 +163,7 @@ receipt_path = root / binding.get("receipt", "")
 receipt = json.loads(receipt_path.read_text())
 if receipt.get("schema") != "NEREUS_V2_N1_ARTIFACT_RECEIPT_V1":
     raise SystemExit("invalid N1 receipt schema")
-if receipt.get("sourceTupleId") != locks.get("sourceTupleId") or receipt.get("selectionEligible") is not False:
+if receipt.get("sourceTupleId") != locks.get("focusedEvidenceSourceTupleId") or receipt.get("selectionEligible") is not False:
     raise SystemExit("N1 receipt source tuple/promotion boundary mismatch")
 if receipt.get("sourceCommit") != source_commit or receipt.get("coordinateVersion") != coordinate:
     raise SystemExit("N1 receipt source/coordinate mismatch")

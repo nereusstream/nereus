@@ -4,7 +4,7 @@ designStatus: Accepted
 implementationStatus: Verified
 evidenceStatus: CurrentSourceReceipt
 authority: ImplementationDesign
-sourceTuple: v2-m0
+sourceTuple: v2-m1
 receipt: docs/v2/evidence/v2-m1/k1/k1-focused.json
 ---
 

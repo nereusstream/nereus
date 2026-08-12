@@ -4,7 +4,7 @@ designStatus: Accepted
 implementationStatus: InProgress
 evidenceStatus: DocumentationOnly
 authority: ExecutionIndex
-sourceTuple: v2-m0
+sourceTuple: v2-m1
 ---
 
 # M1 execution index
@@ -118,7 +118,7 @@ Each target owns one row below and must preserve unrelated worktree state.
 | `K1` | complete Kafka feature-2/API-32000/CreateTopics/image/publication authority | immutable N1 domain artifact | `v2M1K1FocusedCheck` | verified at Kafka `8afbc42566`: 39 tests in 16 suites, exact N1/source/schema boundary, [non-promotable receipt](../../evidence/v2-m1/k1/README.md) |
 | `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | immutable N1 artifact plus `M1.1a-O2` | Pulsar/Oxia focused source gate | focused source-qualified implementation and non-promotable receipt complete at Nereus `e9bcd039`; exact final promotion remains N2/N3 work |
 | `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | immutable N1 artifact, accepted `M1.1c-R0`, and `M1.1a-O2` | focused `REGISTRY_CONFORMANCE` input | [accepted code-level design](r1-virtual-ledger-registry.md); exact NLI1/NVR1/NVA1/RAE1 codecs, held interlock cut, immutable evidence, Store/CAS, response-loss, derived view, focused receipt, and real-Oxia gate verified; no allocator or scenario promotion |
-| `G1` | fast/exact/final M1 gates and production receipt validators | K1/P1/R1 plus accepted M1-2 receipt caps | `v2M1Check`, `v2M1ExactSourceCheck`, `v2M1FinalCheck` | [verified code-level design](g1-receipt-validation-and-gates.md) and [focused receipt](../../evidence/v2-m1/g1/README.md); parser/Final/gates and 49+14 tests complete; V1 prune and N2/N3 execution pending |
+| `G1` | fast/exact/final M1 gates and production receipt validators | K1/P1/R1 plus accepted M1-2 receipt caps | `v2M1Check`, `v2M1ExactSourceCheck`, `v2M1FinalCheck` | [verified code-level design](g1-receipt-validation-and-gates.md) and [focused receipt](../../evidence/v2-m1/g1/README.md); parser/Final/gates, 49+14 tests, and V1 prune are complete; trusted N2/N3 state is derived only from canonical evidence |
 | `V1P` | cut settings/BOM/publication/CI edges, then remove V1 sources/tasks/scripts and KoP runtime | replacement graph and candidate M1 gates | active-graph/V1-absence checks | complete: only BOM/domain/SPI/Oxia, V2 gates/tools, archives, and deferred design remain |
 | `N3` | receipts, attachments, exact scenario/index promotion only | trusted N2 execution | final receipt validation | evidence only |
 

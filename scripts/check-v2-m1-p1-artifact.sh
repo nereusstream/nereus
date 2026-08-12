@@ -164,7 +164,7 @@ if "SNAPSHOT" in pom_path.read_text() + module_path.read_text() or "changing=tru
 receipt = json.loads((root / binding["receipt"]).read_text())
 if receipt.get("schema") != "NEREUS_V2_P1_ARTIFACT_RECEIPT_V1":
     raise SystemExit("invalid P1 artifact receipt schema")
-if receipt.get("sourceTupleId") != locks.get("sourceTupleId"):
+if receipt.get("sourceTupleId") != locks.get("focusedEvidenceSourceTupleId"):
     raise SystemExit("P1 artifact receipt source tuple mismatch")
 if receipt.get("sourceCommit") != source or receipt.get("coordinateVersion") != coordinate:
     raise SystemExit("P1 artifact receipt source mismatch")

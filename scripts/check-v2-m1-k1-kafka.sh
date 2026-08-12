@@ -16,7 +16,7 @@ source = json.load(open(sys.argv[1]))
 binding = source.get("k1KafkaAuthorityBinding", {})
 n1 = source.get("n1ArtifactBinding", {})
 for value in (
-    source.get("sourceTupleId"),
+    source.get("focusedEvidenceSourceTupleId"),
     binding.get("implementationBaseCommit"),
     binding.get("finalForkCommit"),
     binding.get("branch"),

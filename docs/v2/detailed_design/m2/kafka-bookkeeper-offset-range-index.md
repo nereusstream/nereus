@@ -4,7 +4,7 @@ designStatus: Accepted
 implementationStatus: NotStarted
 evidenceStatus: NotRun
 authority: NormativeDetailedDesignWithOpenEvidence
-sourceTuple: v2-m0
+sourceTuple: v2-m1
 ---
 
 # M2 Kafka BookKeeper offset, run, and range-index design

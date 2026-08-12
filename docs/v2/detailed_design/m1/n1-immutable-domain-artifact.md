@@ -4,7 +4,7 @@ designStatus: Accepted
 implementationStatus: Verified
 evidenceStatus: CurrentSourceReceipt
 authority: ImplementationDesign
-sourceTuple: v2-m0
+sourceTuple: v2-m1
 receipt: docs/v2/evidence/v2-m1/n1/README.md
 ---
 
@@ -46,7 +46,8 @@ N1 `nereus-domain` version from the same bundle. No mutable Maven metadata file 
 
 The bundle also contains `source-commit.txt`, `coordinate-version.txt`, and a sorted `manifest.sha256`. The later N1
 evidence commit records every relative path, byte length, SHA-256, and the manifest SHA in `source-locks.json` and an
-append-only N1 receipt. `sourceTupleId` remains `v2-m0`; only N2 may promote the complete cross-repository tuple.
+append-only N1 receipt. That input remains bound to `v2-m0`; N2 separately promotes the complete cross-repository
+tuple to `v2-m1` without relabelling the immutable N1 receipt.
 
 ## Publication cut
 

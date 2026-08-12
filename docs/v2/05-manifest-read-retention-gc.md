@@ -4,7 +4,7 @@ designStatus: Accepted
 implementationStatus: NotStarted
 evidenceStatus: NotRun
 authority: Normative
-sourceTuple: v2-m0
+sourceTuple: v2-m1
 ---
 
 # Manifest, read, retention, and GC

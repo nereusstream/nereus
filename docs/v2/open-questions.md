@@ -4,7 +4,7 @@ designStatus: Proposed
 implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: NonNormativeQuestionLog
-sourceTuple: v2-m0
+sourceTuple: v2-m1
 ---
 
 # V2 open questions
@@ -92,15 +92,16 @@ descendants and recently closed evidence input are:
   admission; host/provider limits cannot change persisted-v1 parsing. This closes the stale numeric-cap OPEN, not the
   separately reviewed G1 production parser/resolver, now covered by its [focused receipt](evidence/v2-m1/g1/README.md),
   or trusted N3 promotion.
-- **Promotion evidence pending:** O1 now binds the final Oxia client fork, JAR/source-JAR/POM, exact server image, and
-  focused-test identities. Scenario promotion still requires the later executable continuity/Registry conformance and
-  trusted N3 receipt; those are implementation/promotion evidence rather than another prose-design decision.
+- **Promotion evidence is not a prose OPEN:** O1 binds the final Oxia client fork, JAR/source-JAR/POM, exact server
+  image, and focused-test identities. Executable continuity/Registry conformance and trusted N3 receipts are represented
+  only by the canonical evidence objects and scenario manifest, not by another design decision.
 
 O1, O2, R0, M1-2, N1, and focused K1/P1/R1 are governed by their accepted implementation designs and non-promotable
 receipts. K1 is exact-source complete at Kafka `8afbc42566`; P1 is exact-source complete at Pulsar `778862323d`; R1
 is focused-current complete at Nereus `8a213a85bf`; G1 parser/Final mechanics are focused-current complete at
 `ba11fe4a29`. None promotes a scenario or M1. The pure-V2 active graph and independent V1/KoP mechanical deletion are
-complete; N2/N3 and promotion descendants remain pending until their required implementation/evidence gates.
+complete. N2/N3 completion is derived from their required gate, receipt, Final-index, and scenario evidence rather than
+tracked as an architectural OPEN here.
 
 ## Restarted Grill 2: evidence frontier
 

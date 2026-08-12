@@ -100,7 +100,7 @@ receipt = json.loads(receipt_bytes)
 expected_receipt = {
     "schema": "NEREUS_V2_G1_FOCUSED_RECEIPT_V1",
     "kind": "G1_FOCUSED_ONLY",
-    "sourceTupleId": locks["sourceTupleId"],
+    "sourceTupleId": locks["focusedEvidenceSourceTupleId"],
     "result": "PASS_G1_FOCUSED_ONLY",
     "promotionEligible": False,
     "scenarioPromotion": False,

@@ -4,7 +4,7 @@ designStatus: Accepted
 implementationStatus: InProgress
 evidenceStatus: DocumentationOnly
 authority: NormativeIndex
-sourceTuple: v2-m0
+sourceTuple: v2-m1
 ---
 
 # Nereus V2 design index
@@ -16,10 +16,11 @@ performance-first BookKeeper WAL.
 
 ## Current status
 
-- `main` develops `0.2.0-SNAPSHOT` from source tuple `v2-m0`.
-- M0 remains the source-tuple label while M1 is `InProgress`: the additive M1.1a-A foundation is implemented, and the
-  M1.1a-O1 Oxia client fork is complete with focused current-source evidence. No V2 runtime is activated and no
-  scenario-promotion receipt exists.
+- `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
+  `v2-m0` identity instead of being relabelled.
+- M1 implementation and the pure-V2 active-graph prune are complete. The authoritative completion state is derived
+  only from the trusted Fast/Exact gate results, N3 receipts, Final index, and scenario manifest; focused receipts alone
+  never imply M1 PASS or activate an M2 data path.
 - M1 implementation-readiness Round 1 freezes the pure-active-graph, module, milestone, source-lock, gate, and
   cross-repository promotion boundaries in ADR 0081; that readiness decision alone did not claim an implementation.
 - M1 implementation-readiness Round 2 freezes the outer NTB1/NSE1/NTA1 domain contracts, exact M1 metadata
@@ -94,7 +95,8 @@ performance-first BookKeeper WAL.
 - The accepted [G1 validator design](detailed_design/m1/g1-receipt-validation-and-gates.md) is focused-current complete
   at Nereus `ba11fe4a29`: 49 production receipt/Final tests and 14 evidence-only allocator tests are clean, the three
   promotion gate surfaces are registered, and the [receipt](evidence/v2-m1/g1/README.md) remains
-  `PASS_G1_FOCUSED_ONLY`. Fast is blocked until V1 prune; Exact/Final and N2/N3 have not run.
+  `PASS_G1_FOCUSED_ONLY`. The pure-V2 graph is now the only active build/runtime graph; N2/N3 promotion is governed by
+  the trusted gate results and Final index rather than this historical focused receipt.
 - ADR 0086 fixes the Kafka BookKeeper semantic layout: one Kafka Offset Domain across profiles, one logical ledger
   chain per partition, low-frequency run/generation roots, packed in-ledger RecordBatch indexes, owner-local active-tail
   locators, targeted Fetch, bounded overlapping writes with ordered publication, and bounded checkpoint-tail recovery.

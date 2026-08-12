@@ -21,7 +21,7 @@ deps = source.get("dependencyEvidenceBindings", {})
 client = deps.get("oxiaClientArtifacts", {})
 server = deps.get("oxiaServerRuntime", {})
 values = (
-    source.get("sourceTupleId"),
+    source.get("focusedEvidenceSourceTupleId"),
     binding.get("implementationBaseCommit"),
     binding.get("finalForkCommit"),
     binding.get("branch"),

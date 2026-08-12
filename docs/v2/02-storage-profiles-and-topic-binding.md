@@ -4,7 +4,7 @@ designStatus: Accepted
 implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: Normative
-sourceTuple: v2-m0
+sourceTuple: v2-m1
 ---
 
 # Topic Protocol Binding, Storage Epochs, and profiles

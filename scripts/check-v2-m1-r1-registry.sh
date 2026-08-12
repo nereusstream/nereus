@@ -56,7 +56,7 @@ expected_receipt = {
     "schema": "NEREUS_V2_R1_FOCUSED_RECEIPT_V1",
     "kind": "R1_FOCUSED_ONLY",
     "conformanceKind": "REGISTRY_CONFORMANCE",
-    "sourceTupleId": locks.get("sourceTupleId"),
+    "sourceTupleId": locks.get("focusedEvidenceSourceTupleId"),
     "result": "PASS_R1_FOCUSED_ONLY",
     "selectionEligible": False,
     "promotionEligible": False,
