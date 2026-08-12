@@ -14,12 +14,12 @@
 
 package com.nereusstream.metadata.spi.capability;
 
-import com.nereusstream.domain.identity.TopicBindingId;
+import com.nereusstream.domain.protocol.TopicIncarnationIdentity;
 import com.nereusstream.metadata.spi.model.VersionedAggregateSnapshot;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
 /** Reads one immutable Topic Binding Aggregate authority snapshot. */
 public interface TopicBindingAggregateReader {
-    CompletionStage<Optional<VersionedAggregateSnapshot>> readAggregate(TopicBindingId bindingId);
+    CompletionStage<Optional<VersionedAggregateSnapshot>> readAggregate(TopicIncarnationIdentity incarnationIdentity);
 }

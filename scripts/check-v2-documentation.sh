@@ -32,6 +32,7 @@ required_v2_docs=(
     detailed_design/m1/README.md
     detailed_design/m1/m1.1a-domain-spi-foundation.md
     detailed_design/m1/m1.1a-oxia-client-continuity.md
+    detailed_design/m1/m1.1a-oxia-capability-scaffold.md
     open-questions.md
     tradeoffs.md
 )
@@ -185,6 +186,13 @@ require_literal 'designStatus: Accepted' "docs/v2/detailed_design/m1/m1.1a-oxia-
 require_literal 'evidenceStatus: CurrentSourceReceipt' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
 require_literal 'receipt: docs/v2/evidence/v2-m0/m1.1a-o1/focused-compatibility.md' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
 require_literal 'No server proto or RPC change is needed.' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
+require_literal 'M1.1a-O2 Nereus metadata-oxia capability scaffold' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
+require_literal 'designStatus: Accepted' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
+require_literal 'implementationStatus: InProgress' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
+require_literal 'On 2026-08-12 the user accepted this design' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
+require_literal 'Maven Local' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
+require_literal 'readAggregate(TopicBindingId)' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
+require_literal 'no P1/R1/M1 PASS' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
 require_literal 'Complete NTA1 codec/goldens remain OPEN' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
 require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal "V2 documentation baseline" ".github/workflows/build.yml"
@@ -776,9 +784,32 @@ server_runtime = bindings["oxiaServerRuntime"]
 focused = bindings["oxiaFocusedCompatibility"]
 if client_artifacts.get("forkOutputId") != fork_output["id"]:
     fail("client artifact binding does not reference the O1 fork")
-if client_artifacts.get("requiredArtifacts") != ["JAR", "SOURCE_JAR", "POM"]:
+expected_bundle_root = (
+    "gradle/locked-artifacts/oxia-client-java/"
+    "091a42c2780d92da56e9ec1f02ce1c3d988adc16"
+)
+if client_artifacts.get("bundleRoot") != expected_bundle_root:
+    fail("client artifact binding has the wrong immutable bundle root")
+if client_artifacts.get("requiredModules") != [
+    "io.github.oxia-db:oxia-client-api:0.9.4",
+    "io.github.oxia-db:oxia-client:0.9.4",
+]:
+    fail("client artifact binding has the wrong module set")
+if client_artifacts.get("requiredArtifacts") != [
+    "JAR", "SOURCE_JAR", "POM", "GRADLE_MODULE_METADATA"
+]:
     fail("client artifact binding has the wrong required artifact set")
-if set(client_artifacts.get("artifacts", {})) != {"jar", "sourceJar", "pom"}:
+expected_artifact_names = {
+    "clientApiJar",
+    "clientApiSourceJar",
+    "clientApiPom",
+    "clientApiGradleMetadata",
+    "clientJar",
+    "clientSourceJar",
+    "clientPom",
+    "clientGradleMetadata",
+}
+if set(client_artifacts.get("artifacts", {})) != expected_artifact_names:
     fail("client artifact binding is incomplete")
 if server_runtime.get("implementationBaseId") != "oxia-server-v2-conformance-base":
     fail("server runtime binding has the wrong implementation base")
@@ -794,8 +825,12 @@ sha256 = re.compile(r"^[0-9a-f]{64}$")
 image_digest = re.compile(r"^sha256:[0-9a-f]{64}$")
 if final_fork_commit is None:
     for name, artifact in client_artifacts["artifacts"].items():
-        if artifact != {"fileName": None, "sha256": None}:
+        if artifact != {"relativePath": None, "bytes": None, "sha256": None}:
             fail(f"pending {name} artifact contains premature evidence")
+    if client_artifacts.get("manifest") != {
+        "relativePath": None, "bytes": None, "sha256": None
+    }:
+        fail("pending client artifact bundle contains a premature manifest")
     if client_artifacts.get("receipt") is not None or client_artifacts.get("evidenceStatus") != "PENDING":
         fail("pending client artifacts contain premature evidence")
     if server_runtime != {
@@ -820,19 +855,96 @@ if final_fork_commit is None:
 else:
     if client_artifacts.get("evidenceStatus") != "FOCUSED_EVIDENCE":
         fail("qualified client artifacts are not marked FOCUSED_EVIDENCE")
+    bundle_path = root / expected_bundle_root
+    if not bundle_path.is_dir():
+        fail("qualified client artifact bundle does not exist")
     for name, artifact in client_artifacts["artifacts"].items():
-        file_name = str(artifact.get("fileName", ""))
-        if not file_name or "/" in file_name or "\\" in file_name or not sha256.fullmatch(str(artifact.get("sha256", ""))):
+        relative_path = pathlib.PurePosixPath(str(artifact.get("relativePath", "")))
+        if (
+            relative_path.is_absolute()
+            or ".." in relative_path.parts
+            or relative_path.parts[:1] != ("m2",)
+            or not isinstance(artifact.get("bytes"), int)
+            or artifact["bytes"] <= 0
+            or not sha256.fullmatch(str(artifact.get("sha256", "")))
+        ):
             fail(f"qualified {name} artifact identity is invalid")
     expected_artifacts = {
-        "jar": ("client-0.9.4.jar", "0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5"),
-        "sourceJar": ("client-0.9.4-sources.jar", "9dbfd9e9fafadc5415f1f6d53b0972f8acd3de5c8c957d4f96642e5e42e74a01"),
-        "pom": ("pom-default.xml", "b48db12a661e7c4510a30cc816c6b19c5af623dbe5245f8fb8c34ff6afec8659"),
+        "clientApiJar": (
+            "m2/io/github/oxia-db/oxia-client-api/0.9.4/oxia-client-api-0.9.4.jar",
+            38597,
+            "fa2a973c19eafa83c7f2efb8d727d744b5405fb13e5a6adb9a92225f672455bf",
+        ),
+        "clientApiSourceJar": (
+            "m2/io/github/oxia-db/oxia-client-api/0.9.4/oxia-client-api-0.9.4-sources.jar",
+            47855,
+            "1a1e1d1125827c19b0733db84911ff7dbdd93aedb481880f1b85510640e8e6bb",
+        ),
+        "clientApiPom": (
+            "m2/io/github/oxia-db/oxia-client-api/0.9.4/oxia-client-api-0.9.4.pom",
+            4822,
+            "1408ba3d6a9588303f0904e34329994a1c0e664210b3297966cb0a8b36930e77",
+        ),
+        "clientApiGradleMetadata": (
+            "m2/io/github/oxia-db/oxia-client-api/0.9.4/oxia-client-api-0.9.4.module",
+            6036,
+            "f4f2573b42dfd54ead0769cb990b32d8cf715ecc544d82d7c1b50e17573f5fec",
+        ),
+        "clientJar": (
+            "m2/io/github/oxia-db/oxia-client/0.9.4/oxia-client-0.9.4.jar",
+            385309,
+            "0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5",
+        ),
+        "clientSourceJar": (
+            "m2/io/github/oxia-db/oxia-client/0.9.4/oxia-client-0.9.4-sources.jar",
+            215856,
+            "9dbfd9e9fafadc5415f1f6d53b0972f8acd3de5c8c957d4f96642e5e42e74a01",
+        ),
+        "clientPom": (
+            "m2/io/github/oxia-db/oxia-client/0.9.4/oxia-client-0.9.4.pom",
+            6875,
+            "b48db12a661e7c4510a30cc816c6b19c5af623dbe5245f8fb8c34ff6afec8659",
+        ),
+        "clientGradleMetadata": (
+            "m2/io/github/oxia-db/oxia-client/0.9.4/oxia-client-0.9.4.module",
+            7775,
+            "1ac7c371b1bf0b7e571c597c09a1fe6acefe4e851892716b0b713061616d6d89",
+        ),
     }
     for name, expected in expected_artifacts.items():
         artifact = client_artifacts["artifacts"][name]
-        if (artifact["fileName"], artifact["sha256"]) != expected:
+        actual_identity = (artifact["relativePath"], artifact["bytes"], artifact["sha256"])
+        if actual_identity != expected:
             fail(f"qualified {name} artifact differs from the focused receipt")
+        artifact_path = bundle_path / artifact["relativePath"]
+        if not artifact_path.is_file() or artifact_path.stat().st_size != artifact["bytes"]:
+            fail(f"qualified {name} artifact is missing or has the wrong length")
+        if hashlib.sha256(artifact_path.read_bytes()).hexdigest() != artifact["sha256"]:
+            fail(f"qualified {name} artifact digest differs from source locks")
+    expected_manifest = {
+        "relativePath": "manifest.sha256",
+        "bytes": 1070,
+        "sha256": "521a7a3615b9f25d3e459633fff614f03208a13efda0ab9913b2255a9f2f40ab",
+    }
+    if client_artifacts.get("manifest") != expected_manifest:
+        fail("qualified client bundle manifest identity is invalid")
+    manifest_path = bundle_path / expected_manifest["relativePath"]
+    if (
+        not manifest_path.is_file()
+        or manifest_path.stat().st_size != expected_manifest["bytes"]
+        or hashlib.sha256(manifest_path.read_bytes()).hexdigest() != expected_manifest["sha256"]
+    ):
+        fail("qualified client bundle manifest differs from source locks")
+    manifest_entries = {
+        line.split("  ", 1)[1]: line.split("  ", 1)[0]
+        for line in manifest_path.read_text().splitlines()
+    }
+    expected_manifest_entries = {
+        artifact["relativePath"]: artifact["sha256"]
+        for artifact in client_artifacts["artifacts"].values()
+    }
+    if manifest_entries != expected_manifest_entries:
+        fail("qualified client bundle manifest is incomplete or inconsistent")
     if server_runtime.get("evidenceStatus") != "FOCUSED_EVIDENCE":
         fail("qualified server runtime is not marked FOCUSED_EVIDENCE")
     if not server_runtime.get("imageReference") or not image_digest.fullmatch(str(server_runtime.get("imageDigest", ""))):

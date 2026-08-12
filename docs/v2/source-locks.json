@@ -78,24 +78,63 @@
   "dependencyEvidenceBindings": {
     "oxiaClientArtifacts": {
       "forkOutputId": "oxia-client-notification-continuity",
+      "bundleRoot": "gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+      "requiredModules": [
+        "io.github.oxia-db:oxia-client-api:0.9.4",
+        "io.github.oxia-db:oxia-client:0.9.4"
+      ],
       "requiredArtifacts": [
         "JAR",
         "SOURCE_JAR",
-        "POM"
+        "POM",
+        "GRADLE_MODULE_METADATA"
       ],
       "artifacts": {
-        "jar": {
-          "fileName": "client-0.9.4.jar",
+        "clientApiJar": {
+          "relativePath": "m2/io/github/oxia-db/oxia-client-api/0.9.4/oxia-client-api-0.9.4.jar",
+          "bytes": 38597,
+          "sha256": "fa2a973c19eafa83c7f2efb8d727d744b5405fb13e5a6adb9a92225f672455bf"
+        },
+        "clientApiSourceJar": {
+          "relativePath": "m2/io/github/oxia-db/oxia-client-api/0.9.4/oxia-client-api-0.9.4-sources.jar",
+          "bytes": 47855,
+          "sha256": "1a1e1d1125827c19b0733db84911ff7dbdd93aedb481880f1b85510640e8e6bb"
+        },
+        "clientApiPom": {
+          "relativePath": "m2/io/github/oxia-db/oxia-client-api/0.9.4/oxia-client-api-0.9.4.pom",
+          "bytes": 4822,
+          "sha256": "1408ba3d6a9588303f0904e34329994a1c0e664210b3297966cb0a8b36930e77"
+        },
+        "clientApiGradleMetadata": {
+          "relativePath": "m2/io/github/oxia-db/oxia-client-api/0.9.4/oxia-client-api-0.9.4.module",
+          "bytes": 6036,
+          "sha256": "f4f2573b42dfd54ead0769cb990b32d8cf715ecc544d82d7c1b50e17573f5fec"
+        },
+        "clientJar": {
+          "relativePath": "m2/io/github/oxia-db/oxia-client/0.9.4/oxia-client-0.9.4.jar",
+          "bytes": 385309,
           "sha256": "0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5"
         },
-        "sourceJar": {
-          "fileName": "client-0.9.4-sources.jar",
+        "clientSourceJar": {
+          "relativePath": "m2/io/github/oxia-db/oxia-client/0.9.4/oxia-client-0.9.4-sources.jar",
+          "bytes": 215856,
           "sha256": "9dbfd9e9fafadc5415f1f6d53b0972f8acd3de5c8c957d4f96642e5e42e74a01"
         },
-        "pom": {
-          "fileName": "pom-default.xml",
+        "clientPom": {
+          "relativePath": "m2/io/github/oxia-db/oxia-client/0.9.4/oxia-client-0.9.4.pom",
+          "bytes": 6875,
           "sha256": "b48db12a661e7c4510a30cc816c6b19c5af623dbe5245f8fb8c34ff6afec8659"
+        },
+        "clientGradleMetadata": {
+          "relativePath": "m2/io/github/oxia-db/oxia-client/0.9.4/oxia-client-0.9.4.module",
+          "bytes": 7775,
+          "sha256": "1ac7c371b1bf0b7e571c597c09a1fe6acefe4e851892716b0b713061616d6d89"
         }
+      },
+      "manifest": {
+        "relativePath": "manifest.sha256",
+        "bytes": 1070,
+        "sha256": "521a7a3615b9f25d3e459633fff614f03208a13efda0ab9913b2255a9f2f40ab"
       },
       "receipt": "docs/v2/evidence/v2-m0/m1.1a-o1/client-artifacts.md",
       "evidenceStatus": "FOCUSED_EVIDENCE"

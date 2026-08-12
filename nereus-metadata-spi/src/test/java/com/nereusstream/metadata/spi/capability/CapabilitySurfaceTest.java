@@ -16,6 +16,7 @@ package com.nereusstream.metadata.spi.capability;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.nereusstream.domain.protocol.TopicIncarnationIdentity;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
@@ -62,6 +63,14 @@ class CapabilitySurfaceTest {
                         "compareAndSetRegistry")
                 .noneMatch(
                         name -> Set.of("get", "put", "delete", "list", "watch").contains(name));
+    }
+
+    @Test
+    void aggregateReaderAcceptsTheAuthorityReconstructingIncarnationIdentity() throws Exception {
+        Method reader =
+                TopicBindingAggregateReader.class.getDeclaredMethod("readAggregate", TopicIncarnationIdentity.class);
+
+        assertThat(reader.getParameterTypes()).containsExactly(TopicIncarnationIdentity.class);
     }
 
     @Test
