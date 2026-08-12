@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "sourceTupleId": "v2-m0",
+  "result": "READINESS_EVIDENCE_ONLY",
+  "promotionEligible": false,
+  "designStatus": "Proposed",
+  "productionCodecImplemented": false,
+  "runtimeActivated": false,
+  "scenarioPromotion": false,
+  "pinnedSources": {
+    "kafka": "76f62f3b83e882105219b6c7687dbde594a8b8a2",
+    "pulsar": "11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9"
+  },
+  "candidatePolicies": [
+    {
+      "name": "NONE",
+      "kind": 0,
+      "formatVersion": 0,
+      "payloadBytes": 0,
+      "status": "STRUCTURALLY_FROZEN"
+    },
+    {
+      "name": "ZSTD_FAST_IF_SMALLER_V1",
+      "kind": 1,
+      "formatVersion": 1,
+      "payloadBytes": 0,
+      "status": "RECOMMENDED_FOR_GRILL"
+    },
+    {
+      "name": "ZSTD_FAST_IF_SAVES_12_5_PERCENT_V1",
+      "kind": 2,
+      "formatVersion": 1,
+      "payloadBytes": 0,
+      "status": "ALTERNATIVE_FOR_GRILL"
+    }
+  ],
+  "fixedBytes": {
+    "nta1ExcludingCellAndIncarnation": 129,
+    "kafkaCell": 38,
+    "pulsarCell": 54,
+    "maxCellBytes": 54,
+    "kafkaIncarnationFixed": 26,
+    "pulsarIncarnationFixed": 22,
+    "kafkaMaxIncarnationBytes": 275
+  },
+  "capCandidates": [
+    {
+      "name": "performance-biased",
+      "perNameBytes": 4096,
+      "maxIncarnationBytes": 8214,
+      "maxNta1Bytes": 8397,
+      "maxLegalClassicPersistentVectorBytes": 8395,
+      "raw100kAllMaxLegalBytes": 839500000
+    },
+    {
+      "name": "compatibility-biased",
+      "perNameBytes": 16384,
+      "maxIncarnationBytes": 32790,
+      "maxNta1Bytes": 32973,
+      "maxLegalClassicPersistentVectorBytes": 32971,
+      "raw100kAllMaxLegalBytes": 3297100000
+    },
+    {
+      "name": "earlier-total-proposal",
+      "perNameBytes": 16384,
+      "maxNta1Bytes": 65536,
+      "status": "NOT_RECOMMENDED_OVERPROVISIONED"
+    }
+  ],
+  "measuredFourKibVectorBytes": [
+    194,
+    202,
+    442,
+    239,
+    261,
+    8395
+  ],
+  "typicalVectors": {
+    "kafka": {
+      "bytes": 202,
+      "sha256": "d5b3b88a17c2ccda75cc558b9787e47d32828c45a716c5cc44470739dbd33406",
+      "raw100kBytes": 20200000
+    },
+    "pulsar": {
+      "bytes": 261,
+      "sha256": "0e5bd01d5bab5388b80c138939267e7f8a895b16e5b17af40ffa23ae0d239713",
+      "raw100kBytes": 26100000
+    }
+  },
+  "maximumVectorDigests": {
+    "fourKib": {
+      "bytes": 8395,
+      "sha256": "f9a1afb80670da5a4d249f63885e07b20b2ef2cfba0f716c169203fe4f8fa0c2"
+    },
+    "sixteenKib": {
+      "bytes": 32971,
+      "sha256": "5a698b30d44aea459857d2368c8935c666a72f2b0dbbfb36b65d25180981b6c3"
+    }
+  },
+  "coverage": {
+    "legalProtocolProfileRows": 6,
+    "policyAlternativesMeasured": 2,
+    "strictUtf8": true,
+    "checkedArithmetic": true,
+    "allocationAfterLengthValidationOnly": true,
+    "pulsarNameConsistency": "CLASSIC_PERSISTENT_PINNED_ROUND_TRIP_CANDIDATE"
+  },
+  "limitations": [
+    "SYNTHETIC_BOUNDARY_DISTRIBUTION_NOT_PRODUCTION_HISTOGRAM",
+    "SCALABLE_PULSAR_TOPIC_DOMAINS_REQUIRE_GRILL_DECISION",
+    "NO_NWG1_COMPRESSION_BENCHMARK"
+  ]
+}
