@@ -317,6 +317,22 @@
     "promotionEligible": false,
     "evidenceStatus": "FOCUSED_EXACT_SOURCE_EVIDENCE"
   },
+  "r1RegistryAuthorityBinding": {
+    "implementationCommit": "8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d",
+    "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+    "oxiaClientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+    "oxiaClientManifestSha256": "521a7a3615b9f25d3e459633fff614f03208a13efda0ab9913b2255a9f2f40ab",
+    "oxiaServerSourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
+    "oxiaServerImageReference": "nereus/oxia-o1:37a17bef1720",
+    "oxiaServerImageDigest": "sha256:5aa715e4f19091931743e5af489af5f8d6ee15efcce6430a908c6f65cc6d6516",
+    "receipt": "docs/v2/evidence/v2-m1/r1/r1-focused.json",
+    "receiptBytes": 1652,
+    "receiptSha256": "c4786deec1dcbfed24e311afb767514e485ce87d2d482416c8b947e58343b8d5",
+    "result": "PASS_R1_FOCUSED_ONLY",
+    "conformanceKind": "REGISTRY_CONFORMANCE",
+    "promotionEligible": false,
+    "evidenceStatus": "FOCUSED_REAL_OXIA_EVIDENCE"
+  },
   "k1KafkaAuthorityBinding": {
     "implementationBaseId": "kafka-v2-development-base",
     "implementationBaseCommit": "76f62f3b83e882105219b6c7687dbde594a8b8a2",

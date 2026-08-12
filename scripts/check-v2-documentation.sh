@@ -266,6 +266,12 @@ require_literal 'v2M1P1FocusedCheck' "build.gradle.kts"
 require_literal '14 Nereus metadata suites with 94 tests' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal 'seven Pulsar suites with 34 tests' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal 'does not own Produce/Fetch' "docs/v2/08-implementation-plan-and-gates.md"
+require_literal 'NEREUS_V2_R1_FOCUSED_RECEIPT_V1' "docs/v2/evidence/v2-m1/r1/r1-focused.json"
+require_literal 'PASS_R1_FOCUSED_ONLY' "docs/v2/evidence/v2-m1/r1/r1-focused.json"
+require_literal 'conformanceKind=REGISTRY_CONFORMANCE' "docs/v2/detailed_design/m1/r1-virtual-ledger-registry.md"
+require_literal 'v2M1R1FocusedCheck' "build.gradle.kts"
+require_literal '35 tests, two metadata suites with eight tests' "docs/v2/detailed_design/m1/r1-virtual-ledger-registry.md"
+require_literal 'no allocator or promotion' "scripts/check-v2-m1-r1-registry.sh"
 require_literal 'v2M1ReceiptCapsCheck' "build.gradle.kts"
 require_literal 'no N1/N2/N3, scenario promotion, or M1 Final' "build.gradle.kts"
 require_literal 'no production parser, N1/N2/N3, scenario promotion, or M1 Final' "scripts/check-v2-m1-receipt-caps.sh"
@@ -1184,6 +1190,49 @@ if (
     or p1_receipt.get("tests", {}).get("pulsar", {}).get("passed") != 34
 ):
     fail("P1 focused receipt content or promotion boundary is invalid")
+
+r1 = source.get("r1RegistryAuthorityBinding", {})
+expected_r1 = {
+    "implementationCommit": "8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d",
+    "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+    "oxiaClientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+    "oxiaClientManifestSha256": "521a7a3615b9f25d3e459633fff614f03208a13efda0ab9913b2255a9f2f40ab",
+    "oxiaServerSourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
+    "oxiaServerImageReference": "nereus/oxia-o1:37a17bef1720",
+    "oxiaServerImageDigest": "sha256:5aa715e4f19091931743e5af489af5f8d6ee15efcce6430a908c6f65cc6d6516",
+    "receipt": "docs/v2/evidence/v2-m1/r1/r1-focused.json",
+    "receiptBytes": 1652,
+    "receiptSha256": "c4786deec1dcbfed24e311afb767514e485ce87d2d482416c8b947e58343b8d5",
+    "result": "PASS_R1_FOCUSED_ONLY",
+    "conformanceKind": "REGISTRY_CONFORMANCE",
+    "promotionEligible": False,
+    "evidenceStatus": "FOCUSED_REAL_OXIA_EVIDENCE",
+}
+if r1 != expected_r1:
+    fail("R1 Registry authority binding differs from focused real-Oxia evidence")
+r1_receipt_path = root / r1["receipt"]
+if (
+    not r1_receipt_path.is_file()
+    or r1_receipt_path.is_symlink()
+    or r1_receipt_path.stat().st_size != r1["receiptBytes"]
+    or hashlib.sha256(r1_receipt_path.read_bytes()).hexdigest() != r1["receiptSha256"]
+):
+    fail("R1 focused receipt identity differs from source locks")
+r1_receipt = json.loads(r1_receipt_path.read_text())
+if (
+    r1_receipt.get("kind") != "R1_FOCUSED_ONLY"
+    or r1_receipt.get("conformanceKind") != "REGISTRY_CONFORMANCE"
+    or r1_receipt.get("result") != "PASS_R1_FOCUSED_ONLY"
+    or r1_receipt.get("selectionEligible") is not False
+    or r1_receipt.get("promotionEligible") is not False
+    or r1_receipt.get("scenarioPromotion") is not False
+    or r1_receipt.get("nereusImplementationCommit") != r1["implementationCommit"]
+    or r1_receipt.get("tests", {}).get("domain", {}).get("passed") != 35
+    or r1_receipt.get("tests", {}).get("metadata", {}).get("passed") != 8
+    or r1_receipt.get("tests", {}).get("realOxia", {}).get("passed") != 2
+    or r1_receipt.get("allocatorModeSelected") is not False
+):
+    fail("R1 focused receipt content or non-promotion boundary is invalid")
 
 local_evidence_bindings = source.get("localImplementationEvidenceBindings", {})
 if set(local_evidence_bindings) != {

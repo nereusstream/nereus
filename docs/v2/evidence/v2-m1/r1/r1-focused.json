@@ -1,0 +1,61 @@
+{
+  "schema": "NEREUS_V2_R1_FOCUSED_RECEIPT_V1",
+  "kind": "R1_FOCUSED_ONLY",
+  "conformanceKind": "REGISTRY_CONFORMANCE",
+  "sourceTupleId": "v2-m0",
+  "result": "PASS_R1_FOCUSED_ONLY",
+  "selectionEligible": false,
+  "promotionEligible": false,
+  "scenarioPromotion": false,
+  "nereusImplementationCommit": "8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d",
+  "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+  "oxiaClientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+  "oxiaServerSourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
+  "oxiaServerImageDigest": "sha256:5aa715e4f19091931743e5af489af5f8d6ee15efcce6430a908c6f65cc6d6516",
+  "limits": {
+    "maxWriterCount": 14,
+    "maxRegistryCanonicalBytes": 51016,
+    "maxRegistryAdmissionEvidenceBytes": 4842,
+    "maxLifetimeAssignments": 256,
+    "assignmentRowBytes": 192
+  },
+  "tests": {
+    "domain": {
+      "suites": 4,
+      "discovered": 35,
+      "executed": 35,
+      "passed": 35,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "metadata": {
+      "suites": 2,
+      "discovered": 8,
+      "executed": 8,
+      "passed": 8,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "realOxia": {
+      "suites": 1,
+      "discovered": 2,
+      "executed": 2,
+      "passed": 2,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "allocatorModeSelected": false,
+  "requiredGate": "v2M1R1FocusedCheck",
+  "scope": [
+    "REGISTRY_AUTHORITY_AND_INTERLOCK_ONLY",
+    "NO_ALLOCATOR_MODE_SELECTION",
+    "NO_PULSAR_DATA_PATH_ACTIVATION",
+    "NO_SCENARIO_PROMOTION",
+    "NO_V1_PRUNE_CLAIM",
+    "NO_M1_PASS"
+  ]
+}

@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: DocumentationOnly
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: ImplementationDesign
 sourceTuple: v2-m0
+receipt: docs/v2/evidence/v2-m1/r1/README.md
 ---
 
 # R1 virtual-ledger Registry
@@ -95,6 +96,8 @@ Allocator rollover consumes that small immutable view; it never rereads or copie
 The focused R1 gate covers exact NLI1/NVR1/NVA1/RAE1 goldens and corruption; 14/15, 51,016/51,017, and 4,842-byte
 boundaries; lifecycle, overlap, reuse, geometry, and epoch matrices; writer rollout/interlock cuts; closed response-loss
 outcomes; concurrent assignment; derived-view staleness; real Oxia create/CAS/restart; and absence of allocator-mode
-selection. Local deterministic tests and two source-locked real-Oxia cases now exercise the implementation, but its
-receipt remains non-promotable until the focused R1 gate is generated and G1/N3 validate a final
-`REGISTRY_CONFORMANCE` envelope.
+selection. `v2M1R1FocusedCheck` binds four domain suites with 35 tests, two metadata suites with eight tests, and one
+source-locked real-Oxia suite with two tests; all have zero failure, error, and skip. The focused wrapper records
+`conformanceKind=REGISTRY_CONFORMANCE` but remains `R1_FOCUSED_ONLY`, `selectionEligible=false`, and
+`promotionEligible=false`. Only G1/N2/N3 may validate and promote the canonical RFC-8785/JCS receipt for the final
+source tuple.

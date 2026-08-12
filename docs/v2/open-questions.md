@@ -45,9 +45,10 @@ proposed receipt numeric cap. The dedicated design-review answer is preserved in
 The Nereus-local M1.1a-A module/identity/deterministic-ID/SPI/dependency foundation is implemented and locally gated.
 The Oxia O1 client-continuity target has a pushed final fork and focused evidence. Metadata-oxia O2 is also locally
 verified at Nereus `050f908a`: it consumes the immutable O1 client/API bundle, implements four single-key adapters and
-store-wide continuity invalidation, and binds 69 focused plus 299 whole-module tests in a non-promotable receipt. These
-slices cannot claim complete NTA1, Registry production codec/authority, receipt validator, M1 Final, or promotion
-evidence. The remaining descendants and recently closed evidence input are:
+store-wide continuity invalidation, and binds 69 focused plus 299 whole-module tests in a non-promotable receipt. Those
+early slices did not claim complete NTA1, Registry production authority, receipt validation, M1 Final, or promotion
+evidence. NTA1, K1, P1, and focused R1 are now implemented under narrower non-promotable receipts; the remaining
+descendants and recently closed evidence input are:
 
 - **Oxia O1 focused implementation complete:** the confirmed 2026-08-12 source audit uses Java client
   `24b730d1d66a1da701f4c99957361f6b3c5d748c` plus server
@@ -71,16 +72,19 @@ evidence. The remaining descendants and recently closed evidence input are:
   does not. The [Q1 receipt](evidence/v2-m0/m1.1b-q1/README.md) remains historical
   `READINESS_EVIDENCE_ONLY`. Production codec/goldens, pure-input admission, and O2 aggregate integration are complete
   at `01a70f17` with 55 domain, 73 focused O2, and 303 whole metadata-oxia tests in a
-  [non-promotable receipt](evidence/v2-m0/m1.1b/README.md). K1/P1/R1, real Oxia/Pulsar conformance, runtime activation,
-  and scenario PASS remain pending. A real existing-cluster inventory is deferred migration evidence, not a fresh-only
-  0.2 or M1-Final blocker.
-- **Registry capacity input accepted; R1 still pending:** the unsupported `maxWriterCount=8` candidate is rejected.
+  [non-promotable receipt](evidence/v2-m0/m1.1b/README.md). Its historical boundary remains unchanged; later K1/P1/R1
+  receipts do not promote it. A real existing-cluster inventory is deferred migration evidence, not a fresh-only 0.2
+  or M1-Final blocker.
+- **Registry capacity and focused R1 authority complete; promotion pending:** the unsupported `maxWriterCount=8`
+  candidate is rejected.
   The accepted [M1.1c-R0 spike design](detailed_design/m1/m1.1c-registry-capacity-spike.md), 18 focused tests, and
   `v2M1RegistryCapacityCheck` bind seven source-qualified/principal-generation cohorts per closed writer kind,
   `maxWriterCount=14`, the exact `184 + writerCount * 120 + sum(assignmentRowCanonicalBytes)` formula, and a
   51,016-byte largest legal canonical Registry value. The inherited 120/192/256/65,536 limits remain unchanged, with
-  14,520 bytes reserved margin. This closes only the R1 capacity input: production codec/store/interlock, real Oxia,
-  `REGISTRY_CONFORMANCE`, and scenario promotion remain pending.
+  14,520 bytes reserved margin. Production NLI1/NVR1/NVA1/RAE1, Store/interlock, response loss, derived views, and two
+  source-locked real-Oxia tests are now covered by `v2M1R1FocusedCheck` and the
+  [non-promotable R1 receipt](evidence/v2-m1/r1/README.md). Canonical G1 validation, N2/N3 receipt generation, allocator
+  selection, and scenario promotion remain pending.
 - **Receipt-cap input resolved; G1/N3 still pending:** ADR 0084 now owns the sole persisted-v1 cap table. The M1-2
   JDK-only test model, 36 clean focused tests, eleven representative sample families, and
   [`RECEIPT_CAPACITY_READINESS_ONLY`](evidence/v2-m0/m1-2-receipt-caps/README.md) evidence bind the formulas,
@@ -91,13 +95,10 @@ evidence. The remaining descendants and recently closed evidence input are:
   focused-test identities. Scenario promotion still requires the later executable continuity/Registry conformance and
   trusted N3 receipt; those are implementation/promotion evidence rather than another prose-design decision.
 
-O1, O2, R0, M1-2, N1, and focused K1 are governed by their accepted implementation designs and non-promotable
-receipts. K1 is exact-source complete at Kafka `8afbc42566` but does not promote a scenario or M1. P1 now has an
-accepted [code-level design](detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md), two source-locked real-Oxia
-lifecycle tests, and Pulsar native witness/fence primitives at `09fe914e4a`; its exact artifact lock, qualified native
-admission/all-writer wiring, combined source gate, and receipt remain pending. R1, the G1 production parser,
-Registry conformance, N2/N3, and promotion descendants remain OPEN, pending, or non-normative until their own required
-implementation/evidence gate or explicit design confirmation.
+O1, O2, R0, M1-2, N1, and focused K1/P1/R1 are governed by their accepted implementation designs and non-promotable
+receipts. K1 is exact-source complete at Kafka `8afbc42566`; P1 is exact-source complete at Pulsar `778862323d`; R1
+is focused-current complete at Nereus `8a213a85bf`. None promotes a scenario or M1. The G1 production parser,
+pure-V2 graph cut, N2/N3, and promotion descendants remain pending until their required implementation/evidence gates.
 
 ## Restarted Grill 2: evidence frontier
 

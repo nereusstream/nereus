@@ -3429,6 +3429,26 @@ tasks.register("v2M1P1FocusedCheck") {
     dependsOn("v2DocumentationCheck")
 }
 
+tasks.register<Exec>("v2M1R1FocusedSourceCheck") {
+    group = "verification"
+    description = "Run the R1 Registry wire, authority, interlock, and source-locked real-Oxia focused gate."
+    dependsOn(":nereus-domain:r1RegistryDomainTest")
+    dependsOn(":nereus-metadata-spi:check")
+    dependsOn(":nereus-metadata-oxia:r1MetadataTest")
+    dependsOn(":nereus-metadata-oxia:r1OxiaIntegrationTest")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m1-r1-registry.sh")
+}
+
+tasks.register("v2M1R1FocusedCheck") {
+    group = "verification"
+    description =
+        "Verify focused R1 Registry conformance only; no allocator selection, scenario promotion, V1 prune, or M1 PASS."
+    dependsOn("v2M1N1ArtifactCheck")
+    dependsOn("v2M1R1FocusedSourceCheck")
+    dependsOn("v2DocumentationCheck")
+}
+
 tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
     group = "verification"
     description = "Verify the clean local Apache Kafka source baseline used for the F9-M3 fork probe."

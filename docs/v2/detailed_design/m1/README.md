@@ -44,8 +44,11 @@ M1 started from these facts; the first bullet is now superseded by the implement
   `778862323d8a86e2f36064a12166e09918ed9429`: NPS1, closed transitions, selector/aggregate coordination,
   authoritative witness A/read/B, continuity invalidation, stale-install exclusion, atomic ACTIVE-fence primitives,
   source-locked real-Oxia lifecycle tests, native capability admission, and the combined non-promotable receipt are
-  implemented. R1 domain/wire implementation is in progress; final exact-source aggregation, pure-V2 graph pruning,
-  and final promotion remain pending. K1 is focused-exact complete but non-promotable.
+  implemented. R1 focused implementation is complete at Nereus
+  `8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d`: exact Registry wire, held writer interlock, response-loss authority,
+  derived views, and source-locked real-Oxia conformance are covered by a non-promotable receipt. Final exact-source
+  aggregation, pure-V2 graph pruning, and final promotion remain pending. K1 is focused-exact complete but
+  non-promotable.
   M1.1c-R0 has
   closed only the Registry writer-count/canonical-capacity input to R1, and M1-2 has closed only the persisted-v1
   receipt/parser cap input to the later G1 production validator.
@@ -112,8 +115,8 @@ Each target owns one row below and must preserve unrelated worktree state.
 | `N1` | immutable, non-overwriteable domain/SPI artifact with source/JAR/source-JAR/POM/metadata identities | accepted M1-2 receipt caps | `v2M1N1ArtifactCheck` | verified immutable input from source `330aaec3`; manifest `9058ff01`; [design and receipt](n1-immutable-domain-artifact.md) |
 | `K1` | complete Kafka feature-2/API-32000/CreateTopics/image/publication authority | immutable N1 domain artifact | `v2M1K1FocusedCheck` | verified at Kafka `8afbc42566`: 39 tests in 16 suites, exact N1/source/schema boundary, [non-promotable receipt](../../evidence/v2-m1/k1/README.md) |
 | `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | immutable N1 artifact plus `M1.1a-O2` | Pulsar/Oxia focused source gate | focused source-qualified implementation and non-promotable receipt complete at Nereus `e9bcd039`; exact final promotion remains N2/N3 work |
-| `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | immutable N1 artifact, accepted `M1.1c-R0`, and `M1.1a-O2` | `REGISTRY_CONFORMANCE` | [accepted code-level design](r1-virtual-ledger-registry.md); exact NLI1/NVR1/NVA1/RAE1 codecs, held interlock cut, immutable evidence, Store/CAS, response-loss and derived view implemented; focused gate/receipt pending |
-| `G1` | fast/exact/final M1 gates and production receipt validators | K1/P1/R1 plus accepted M1-2 receipt caps | `v2M1Check`, `v2M1ExactSourceCheck`, `v2M1FinalCheck` | M1-2 input accepted; blocked on K1/P1/R1 and the separately reviewed production validator |
+| `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | immutable N1 artifact, accepted `M1.1c-R0`, and `M1.1a-O2` | focused `REGISTRY_CONFORMANCE` input | [accepted code-level design](r1-virtual-ledger-registry.md); exact NLI1/NVR1/NVA1/RAE1 codecs, held interlock cut, immutable evidence, Store/CAS, response-loss, derived view, focused receipt, and real-Oxia gate verified; no allocator or scenario promotion |
+| `G1` | fast/exact/final M1 gates and production receipt validators | K1/P1/R1 plus accepted M1-2 receipt caps | `v2M1Check`, `v2M1ExactSourceCheck`, `v2M1FinalCheck` | M1-2 input and K1/P1/R1 focused evidence accepted; production validator and aggregate gates pending |
 | `V1P` | cut settings/BOM/publication/CI edges, then remove V1 sources/tasks/scripts and KoP runtime | replacement graph and candidate M1 gates | active-graph/V1-absence checks | last mechanical implementation step |
 | `N3` | receipts, attachments, exact scenario/index promotion only | trusted N2 execution | final receipt validation | evidence only |
 
@@ -186,9 +189,8 @@ The expected review sequence is:
    [M1.1c-R0 design](m1.1c-registry-capacity-spike.md), followed by an accepted cap;
 10. verified representative receipt/parser output evidence and accepted safety caps (complete at `75593faf`);
 11. immutable, non-overwriteable N1 domain/SPI artifact publication with JAR/source-JAR/POM/Gradle-metadata hashes;
-12. separate Kafka K1, Pulsar P1, and Registry R1 changes consuming exact N1 artifacts; K1 now has focused exact-source
-    evidence at Kafka `8afbc42566`; P1 has an accepted [code-level design](p1-pulsar-selector-and-ownership-fence.md)
-    and active implementation, while R1 and aggregate promotion remain pending;
+12. separate Kafka K1, Pulsar P1, and Registry R1 changes consuming exact N1 artifacts; all three now have focused,
+    non-promotable implementation receipts, while aggregate promotion remains pending;
 13. M1 fast/exact/final gate and receipt-validator implementation without promotion;
 14. settings/BOM/publication/CI cut;
 15. independent mechanical V1/KoP-runtime deletion;
@@ -209,6 +211,7 @@ must not start merely because the replacement modules compile.
 | `v2M1Nta1ReadinessCheck` | now | 14 evidence-only tests over real domain objects, candidate bounds/legality, strict UTF-8/EOF/overflow/allocation, and generated JSON equality | accepted caps/policy, production encoder/parser/goldens, backend/runtime conformance, scenario promotion, M1 PASS |
 | `v2M1RegistryCapacityCheck` | now | deterministic writer topology, exact 120/184/192/256/65,536 accounting, overflow and lifecycle rejection, generated evidence equality, and non-promotion boundary | R1 production codec/Store/interlock, real Oxia, allocator mode, `REGISTRY_CONFORMANCE`, scenario promotion, M1 PASS |
 | `v2M1ReceiptCapsCheck` | now | 36 clean focused tests over deterministic representative roots/attachments, JCS/parser/path/symlink boundaries, exact selected-cap formulas, committed/generated equality, and non-promotion boundary | production G1 validator, N1/K1/P1/R1, Final/N2/N3, scenario promotion, M1 PASS |
+| `v2M1R1FocusedCheck` | now | 35 domain, eight metadata, and two source-locked real-Oxia tests over exact Registry wire, held interlock, response loss, derived views, and allocator-mode absence | G1 canonical receipt validation, allocator mode, V1 prune, scenario promotion, M1 PASS |
 | `v2M1Check` | after K1/P1/R1 and graph cut | ordinary deterministic M1 fast suite and V1 absence | exact external source/artifact/runtime identity |
 | `v2M1ExactSourceCheck` | N2 | clean exact forks, immutable artifacts, real Oxia, focused fork tests | evidence provenance without trusted workflow/N3 |
 | `v2M1FinalCheck` | N2/N3 | referenced gate/receipt schema and aggregate result | work not explicitly referenced by the receipts |

@@ -86,6 +86,11 @@ performance-first BookKeeper WAL.
   tests, two real-Oxia tests, and 34 Pulsar tests are verified by `v2M1P1FocusedCheck` with zero failure/error/skip. The
   [receipt](evidence/v2-m1/p1/README.md) remains `P1_FOCUSED_ONLY`, `promotionEligible=false`, and does not activate
   BrokerService/PersistentTopic Produce/read paths, choose an allocator, prune V1, promote a scenario, or claim M1 PASS.
+- The accepted [R1 Registry design](detailed_design/m1/r1-virtual-ledger-registry.md) is focused-current complete at
+  Nereus `8a213a85bf`: exact NLI1/NVR1/NVA1/RAE1, held writer interlock, immutable evidence, closed response-loss
+  authority, derived views, 35 domain tests, eight metadata tests, and two source-locked real-Oxia tests are verified by
+  `v2M1R1FocusedCheck`. Its [receipt](evidence/v2-m1/r1/README.md) is a non-promotable
+  `R1_FOCUSED_ONLY` wrapper around the `REGISTRY_CONFORMANCE` subject; it selects no allocator and promotes no scenario.
 - ADR 0086 fixes the Kafka BookKeeper semantic layout: one Kafka Offset Domain across profiles, one logical ledger
   chain per partition, low-frequency run/generation roots, packed in-ledger RecordBatch indexes, owner-local active-tail
   locators, targeted Fetch, bounded overlapping writes with ordered publication, and bounded checkpoint-tail recovery.
@@ -342,8 +347,8 @@ and receipt accounting/path safety. ADR 0085 closes the M1.1a start boundary, mi
 client-only continuity direction, exact 120-byte writer row/evidence shape, and content-identified receipt/Final
 hierarchy. The later M1.1b acceptance closes the complete NTA1 FrameEncodingPolicy/legality/name/total table, and
 M1.1c-R0 closes the Registry writer-count/canonical-capacity input at 14 rows and 51,016 bytes. M1-2 closes the
-persisted-v1 receipt numeric caps; G1 production validation, R1 production conformance, and executable promotion
-evidence remain OPEN descendants. ADR 0086 resolves the
+persisted-v1 receipt numeric caps. R1 production authority now has focused real-Oxia evidence, while G1 canonical
+validation and executable N2/N3 promotion remain OPEN descendants. ADR 0086 resolves the
 Kafka BookKeeper semantic layout while leaving exact wire, numeric budgets, and dedicated-ledger scale as M2 evidence.
 ADR 0087 closes the protocol-frontier/ISR/idempotency/transaction/Fetch semantic layer, including fenced publication,
 native election adoption, compact descriptor transport, hard-bounded Observed/Applied eligibility, and distinct

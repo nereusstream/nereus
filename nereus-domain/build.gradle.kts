@@ -22,3 +22,17 @@ tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
 }
+
+tasks.register<Test>("r1RegistryDomainTest") {
+    group = "verification"
+    description = "Run the deterministic R1 Registry wire, capacity, evidence, and transition gate."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.domain.registry.RegistryCapacityEvidenceTest")
+        includeTestsMatching("com.nereusstream.domain.registry.Nvr1RegistryCodecV1Test")
+        includeTestsMatching("com.nereusstream.domain.registry.PulsarVirtualLedgerRegistryTransitionValidatorV1Test")
+        includeTestsMatching("com.nereusstream.domain.registry.RegistryAdmissionEvidenceV1Test")
+    }
+}
