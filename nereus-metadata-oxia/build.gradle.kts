@@ -199,6 +199,31 @@ tasks.register<Test>("p1MetadataTest") {
     }
 }
 
+tasks.register<Test>("r1OxiaIntegrationTest") {
+    group = "verification"
+    description = "Run R1 Registry create/CAS/restart conformance against source-locked real Oxia."
+    testClassesDirs = oxiaIntegrationTest.output.classesDirs
+    classpath = oxiaIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.R1RegistryOxiaIntegrationTest")
+    }
+}
+
+tasks.register<Test>("r1MetadataTest") {
+    group = "verification"
+    description = "Run the deterministic R1 Registry domain bridge, interlock, evidence, and mutation gate."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.codec.Nvr1RegistryAuthorityCodecTest")
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.capability.R1RegistryAuthorityTest")
+    }
+}
+
 val oxiaCapabilitySpikeReportDir = layout.buildDirectory.dir("reports/oxia-capability-spike")
 
 tasks.register<Test>("oxiaCapabilitySpike") {

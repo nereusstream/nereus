@@ -14,6 +14,7 @@
 
 package com.nereusstream.metadata.spi.model;
 
+import com.nereusstream.domain.identity.PulsarCellId;
 import java.util.Objects;
 
 /** One exact versioned Pulsar virtual-ledger Registry snapshot. */
@@ -22,5 +23,12 @@ public record VersionedRegistrySnapshot(
     public VersionedRegistrySnapshot {
         Objects.requireNonNull(value, "value");
         Objects.requireNonNull(metadataVersion, "metadataVersion");
+    }
+
+    public VersionedVirtualLedgerSliceViewV1 sliceView(PulsarCellId cellId) {
+        return new VersionedVirtualLedgerSliceViewV1(
+                value.domainValue().sliceView(Objects.requireNonNull(cellId, "cellId")),
+                metadataVersion,
+                value.canonicalStoredDigest());
     }
 }

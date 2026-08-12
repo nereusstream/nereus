@@ -26,6 +26,7 @@ import com.nereusstream.metadata.oxia.v2.mutation.ConditionalMutationEngine;
 import com.nereusstream.metadata.oxia.v2.mutation.ExactRecordResolver;
 import com.nereusstream.metadata.oxia.v2.mutation.MetadataVersionMapper;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
+import com.nereusstream.metadata.oxia.v2.registry.RegistryMutationAdmission;
 import com.nereusstream.metadata.spi.capability.PulsarVirtualLedgerNamespaceRegistryStore;
 import com.nereusstream.metadata.spi.model.ConditionalCasResult;
 import com.nereusstream.metadata.spi.model.CreateMutationResult;
@@ -42,18 +43,30 @@ public final class OxiaPulsarVirtualLedgerNamespaceRegistryStore implements Puls
     private final RegistryAuthorityCodec codec;
     private final OxiaConditionalClient client;
     private final ConditionalMutationEngine mutationEngine;
+    private final RegistryMutationAdmission mutationAdmission;
+
+    OxiaPulsarVirtualLedgerNamespaceRegistryStore(
+            OperationAdmission admission,
+            OxiaV2AuthorityKeys keys,
+            RegistryAuthorityCodec codec,
+            OxiaConditionalClient client,
+            ConditionalMutationEngine mutationEngine) {
+        this(admission, keys, codec, client, mutationEngine, scaffoldAdmission());
+    }
 
     public OxiaPulsarVirtualLedgerNamespaceRegistryStore(
             OperationAdmission admission,
             OxiaV2AuthorityKeys keys,
             RegistryAuthorityCodec codec,
             OxiaConditionalClient client,
-            ConditionalMutationEngine mutationEngine) {
+            ConditionalMutationEngine mutationEngine,
+            RegistryMutationAdmission mutationAdmission) {
         this.admission = Objects.requireNonNull(admission, "admission");
         this.keys = Objects.requireNonNull(keys, "keys");
         this.codec = Objects.requireNonNull(codec, "codec");
         this.client = Objects.requireNonNull(client, "client");
         this.mutationEngine = Objects.requireNonNull(mutationEngine, "mutationEngine");
+        this.mutationAdmission = Objects.requireNonNull(mutationAdmission, "mutationAdmission");
     }
 
     @Override
@@ -79,7 +92,8 @@ public final class OxiaPulsarVirtualLedgerNamespaceRegistryStore implements Puls
             String key = key(candidate);
             CanonicalBytes encoded = codec.encode(candidate);
             requireExactCandidateBytes(encoded, candidate);
-            return mutationEngine.create(key, encoded, resolver(key, candidate, null));
+            return mutationAdmission.executeCreate(
+                    candidate, () -> mutationEngine.create(key, encoded, resolver(key, candidate, null)));
         });
     }
 
@@ -97,8 +111,11 @@ public final class OxiaPulsarVirtualLedgerNamespaceRegistryStore implements Puls
             CanonicalBytes encoded = codec.encode(candidate);
             requireExactCandidateBytes(encoded, candidate);
             long expectedVersion = MetadataVersionMapper.toOxia(exactPredecessor.metadataVersion());
-            return mutationEngine.compareAndSet(
-                    key, encoded, expectedVersion, resolver(key, candidate, exactPredecessor));
+            return mutationAdmission.executeCompareAndSet(
+                    exactPredecessor,
+                    candidate,
+                    () -> mutationEngine.compareAndSet(
+                            key, encoded, expectedVersion, resolver(key, candidate, exactPredecessor)));
         });
     }
 
@@ -186,4 +203,24 @@ public final class OxiaPulsarVirtualLedgerNamespaceRegistryStore implements Puls
 
     private record RegistryIdentity(
             DeploymentId deploymentId, ReservationDomainId reservationDomainId, Sha256Digest namespaceId) {}
+
+    /** Package-private O2 fake-codec path; production composition always supplies explicit R1 admission. */
+    private static RegistryMutationAdmission scaffoldAdmission() {
+        return new RegistryMutationAdmission() {
+            @Override
+            public <T> CompletionStage<T> executeCreate(
+                    PulsarVirtualLedgerNamespaceRegistryValueV1 candidate,
+                    java.util.function.Supplier<CompletionStage<T>> protectedMutation) {
+                return protectedMutation.get();
+            }
+
+            @Override
+            public <T> CompletionStage<T> executeCompareAndSet(
+                    VersionedRegistrySnapshot predecessor,
+                    PulsarVirtualLedgerNamespaceRegistryValueV1 candidate,
+                    java.util.function.Supplier<CompletionStage<T>> protectedMutation) {
+                return protectedMutation.get();
+            }
+        };
+    }
 }

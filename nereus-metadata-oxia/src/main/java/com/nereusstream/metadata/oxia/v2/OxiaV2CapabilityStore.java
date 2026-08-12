@@ -32,6 +32,10 @@ import com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.mutation.ConditionalMutationEngine;
 import com.nereusstream.metadata.oxia.v2.mutation.MutationFailureClassifier;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
+import com.nereusstream.metadata.oxia.v2.registry.RegistryMutationAdmission;
+import com.nereusstream.metadata.oxia.v2.registry.RegistryWriterInterlock;
+import com.nereusstream.metadata.oxia.v2.registry.UnavailableRegistryMutationAdmission;
+import com.nereusstream.metadata.oxia.v2.registry.VerifiedRegistryMutationAdmissionV1;
 import com.nereusstream.metadata.spi.capability.PulsarTopicGenerationSelectorStore;
 import com.nereusstream.metadata.spi.capability.PulsarVirtualLedgerNamespaceRegistryStore;
 import com.nereusstream.metadata.spi.capability.TopicBindingAggregatePublisher;
@@ -51,6 +55,7 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
     private final PulsarTopicGenerationSelectorStore selectorStore;
     private final PulsarVirtualLedgerNamespaceRegistryStore registryStore;
     private final boolean pulsarSelectorReady;
+    private final boolean registryReady;
     private final AuthorityInvalidationRegistry invalidationRegistry;
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -59,7 +64,8 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
             StoreContinuity continuity,
             RevalidationScheduler scheduler,
             OxiaV2AuthorityKeys keys,
-            OxiaV2CodecSet codecs) {
+            OxiaV2CodecSet codecs,
+            RegistryWriterInterlock registryWriterInterlock) {
         this.client = Objects.requireNonNull(client, "client");
         this.continuity = Objects.requireNonNull(continuity, "continuity");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -71,6 +77,14 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
         OxiaConditionalClient conditionalClient = new AsyncOxiaConditionalClient(client);
         ConditionalMutationEngine mutationEngine =
                 new ConditionalMutationEngine(conditionalClient, new MutationFailureClassifier());
+        RegistryMutationAdmission registryAdmission;
+        if (codecs.registry().available() && registryWriterInterlock != null) {
+            registryAdmission = new VerifiedRegistryMutationAdmissionV1(registryWriterInterlock, keys, mutationEngine);
+            registryReady = true;
+        } else {
+            registryAdmission = new UnavailableRegistryMutationAdmission();
+            registryReady = false;
+        }
         aggregatePublisher =
                 new OxiaTopicBindingAggregatePublisher(this::requireOpen, keys, codecs.aggregate(), mutationEngine);
         aggregateReader =
@@ -78,7 +92,7 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
         selectorStore = new OxiaPulsarTopicGenerationSelectorStore(
                 this::requireOpen, keys, codecs.selector(), conditionalClient, mutationEngine);
         registryStore = new OxiaPulsarVirtualLedgerNamespaceRegistryStore(
-                this::requireOpen, keys, codecs.registry(), conditionalClient, mutationEngine);
+                this::requireOpen, keys, codecs.registry(), conditionalClient, mutationEngine, registryAdmission);
     }
 
     public StoreContinuitySnapshot continuitySnapshot() {
@@ -93,6 +107,11 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
     /** P1 metadata capability only; native ownership and R1 are separate activation requirements. */
     public boolean pulsarSelectorReady() {
         return pulsarSelectorReady;
+    }
+
+    /** True only when the exact NVR1 codec and a held writer-interlock provider are both installed. */
+    public boolean registryReady() {
+        return registryReady;
     }
 
     public TopicBindingAggregatePublisher aggregatePublisher() {

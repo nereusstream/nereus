@@ -52,18 +52,49 @@ uses exact `predecessor+1`.
 
 ## Admission, Store, and derived view
 
-Every create/CAS passes the same closed transition validator and a `RegistryMutationAdmissionV1` interlock before
-Oxia I/O. Its exact candidate evidence must prove fresh-root admission, exclusive admin/ACL control, legacy unrestricted
-principal revocation, negative allocation, complete authorized-writer equality, and fence/drain/revoke for each removed
-writer. The content-addressed evidence bytes are proof-only and never become allocation authority.
+Every create/CAS passes the same closed transition validator and `VerifiedRegistryMutationAdmissionV1` before the
+Registry I/O. A `RegistryWriterInterlock` owns one held asynchronous permit across immutable evidence creation, the
+Registry conditional mutation, and its exact reread. While that stage is outstanding, the provider must prevent
+writer start, principal resurrection, INSTANCEID mutation, and membership/interlock replacement. A pre-CAS snapshot
+without this held cut is insufficient.
+
+The exact content-addressed `RAE1` evidence excludes its own SHA and projects every candidate writer without the
+writer-row evidence reference, avoiding a hash cycle. Its SHA becomes both the Registry header reference and every
+candidate writer-row reference. The fixed header is 250 bytes:
+
+```text
+magic/schema                                      6
+deploymentId/reservationDomainId                 32
+canonical INSTANCEID                             36
+ledgerIdCompatibilityNamespaceId                 32
+candidateRegistryEpoch                            8
+predecessor presence + reserved zero              4
+predecessor/fresh-root/admin/negative digests    128
+admittedWriterCount/removedWriterCount             4
+```
+
+An admitted-writer proof section is 116 bytes: the 84 writer bytes preceding its evidence reference plus one
+source-qualification digest. A removed-writer section is 212 bytes: the admitted-writer section plus exact fence,
+drain, and principal-revocation digests. Both counts are bounded by 14, so the largest RAE1 value is 4,842 bytes.
+Create requires an absent predecessor, epoch one, no removal sections, fresh-root proof, exact INSTANCEID continuity,
+exclusive admin/ACL control, legacy unrestricted-principal revocation, negative-allocation proof, and complete
+authorized-writer equality. CAS additionally binds the exact predecessor NVR1 digest and requires one canonical
+removal section for each removed row.
+
+RAE1 is stored create-only at
+`<authorityRoot>/registry-admission-evidence/v1/<64-lowercase-sha256>` before the NVR1 mutation. Response uncertainty
+uses exact same-key reread. This internal proof store is not a fifth metadata SPI and never becomes allocation
+authority. `connectR1` requires an explicit interlock; O2/P1 composition keeps Registry mutation fail closed.
 
 The existing single-key Store retains closed exact mutation outcomes and response-unknown reread. A derived slice view
-binds namespace ID, Registry epoch, backend metadata version, and exact assignment. Allocator rollover consumes that
-small immutable view; it never rereads or copies NVR1.
+binds namespace ID, Registry epoch, backend metadata version, canonical Registry digest, and exact assignment.
+Allocator rollover consumes that small immutable view; it never rereads or copies NVR1.
 
 ## Evidence
 
-The focused R1 gate covers exact NLI1/NVR1 goldens and corruption; 14/15 and 51,016/51,017 boundaries; lifecycle,
-overlap, reuse, geometry, and epoch matrices; writer rollout/interlock cuts; closed response-loss outcomes; concurrent
-assignment; derived-view staleness; real Oxia create/CAS/restart; and absence of allocator-mode selection. Its receipt is
-non-promotable until G1 and N3 validate a final `REGISTRY_CONFORMANCE` envelope.
+The focused R1 gate covers exact NLI1/NVR1/NVA1/RAE1 goldens and corruption; 14/15, 51,016/51,017, and 4,842-byte
+boundaries; lifecycle, overlap, reuse, geometry, and epoch matrices; writer rollout/interlock cuts; closed response-loss
+outcomes; concurrent assignment; derived-view staleness; real Oxia create/CAS/restart; and absence of allocator-mode
+selection. Local deterministic tests and two source-locked real-Oxia cases now exercise the implementation, but its
+receipt remains non-promotable until the focused R1 gate is generated and G1/N3 validate a final
+`REGISTRY_CONFORMANCE` envelope.

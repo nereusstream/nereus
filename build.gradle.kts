@@ -340,6 +340,8 @@ val dockerBackedSubprojectTasks = mapOf(
     ":nereus-metadata-oxia" to setOf(
         "oxiaCapabilitySpike",
         "oxiaIntegrationTest",
+        "p1OxiaIntegrationTest",
+        "r1OxiaIntegrationTest",
         "f4OxiaIntegrationTest",
         "f9ActivationOxiaIntegrationTest",
         "f9OxiaIntegrationTest",

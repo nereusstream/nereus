@@ -16,7 +16,7 @@ package com.nereusstream.metadata.oxia.v2.codec;
 
 import java.util.Objects;
 
-/** Explicit codec composition; M1.1b supplies only the production aggregate codec. */
+/** Explicit codec composition for independently activated M1 authorities. */
 public record OxiaV2CodecSet(
         AggregateAuthorityCodec aggregate, SelectorAuthorityCodec selector, RegistryAuthorityCodec registry) {
     public OxiaV2CodecSet {
@@ -38,6 +38,12 @@ public record OxiaV2CodecSet(
                 new Nta1AggregateAuthorityCodec(),
                 new Nps1SelectorAuthorityCodec(),
                 new UnavailableRegistryAuthorityCodec());
+    }
+
+    /** R1 enables the exact Registry codec in addition to the already qualified P1 authorities. */
+    public static OxiaV2CodecSet productionR1() {
+        return new OxiaV2CodecSet(
+                new Nta1AggregateAuthorityCodec(), new Nps1SelectorAuthorityCodec(), new Nvr1RegistryAuthorityCodec());
     }
 
     public boolean allAvailable() {

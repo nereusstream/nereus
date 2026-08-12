@@ -63,4 +63,12 @@ public final class OxiaV2AuthorityKeys {
                 + "/"
                 + ledgerIdCompatibilityNamespaceId.toHex();
     }
+
+    public String registryAdmissionEvidenceKey(Sha256Digest evidenceDigest) {
+        Objects.requireNonNull(evidenceDigest, "evidenceDigest");
+        if (evidenceDigest.isZero()) {
+            throw new IllegalArgumentException("Registry admission-evidence digest must be non-zero");
+        }
+        return root + "/registry-admission-evidence/v1/" + evidenceDigest.toHex();
+    }
 }

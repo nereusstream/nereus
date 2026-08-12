@@ -18,6 +18,7 @@ import com.nereusstream.metadata.oxia.v2.codec.OxiaV2CodecSet;
 import com.nereusstream.metadata.oxia.v2.continuity.RevalidationScheduler;
 import com.nereusstream.metadata.oxia.v2.continuity.StoreContinuity;
 import com.nereusstream.metadata.oxia.v2.key.OxiaV2AuthorityKeys;
+import com.nereusstream.metadata.oxia.v2.registry.RegistryWriterInterlock;
 import io.oxia.client.api.AsyncOxiaClient;
 import io.oxia.client.api.OxiaClientBuilder;
 import java.util.Objects;
@@ -30,6 +31,23 @@ public final class OxiaV2CapabilityStoreFactory {
 
     public static CompletableFuture<OxiaV2CapabilityStore> connect(
             OxiaV2StoreConfiguration configuration, RevalidationScheduler scheduler) {
+        return connect(configuration, scheduler, OxiaV2CodecSet.productionP1(), null);
+    }
+
+    /** Connects the R1 Registry authority only when the deployment supplies its held writer interlock. */
+    public static CompletableFuture<OxiaV2CapabilityStore> connectR1(
+            OxiaV2StoreConfiguration configuration,
+            RevalidationScheduler scheduler,
+            RegistryWriterInterlock registryWriterInterlock) {
+        Objects.requireNonNull(registryWriterInterlock, "registryWriterInterlock");
+        return connect(configuration, scheduler, OxiaV2CodecSet.productionR1(), registryWriterInterlock);
+    }
+
+    private static CompletableFuture<OxiaV2CapabilityStore> connect(
+            OxiaV2StoreConfiguration configuration,
+            RevalidationScheduler scheduler,
+            OxiaV2CodecSet codecs,
+            RegistryWriterInterlock registryWriterInterlock) {
         Objects.requireNonNull(configuration, "configuration");
         Objects.requireNonNull(scheduler, "scheduler");
 
@@ -49,7 +67,7 @@ public final class OxiaV2CapabilityStoreFactory {
                 throw new CompletionException(unwrap(failure));
             }
             try {
-                return attach(client, scheduler, configuration, OxiaV2CodecSet.productionP1());
+                return attach(client, scheduler, configuration, codecs, registryWriterInterlock);
             } catch (RuntimeException | Error attachFailure) {
                 scheduler.close();
                 closeClient(client, attachFailure);
@@ -63,6 +81,15 @@ public final class OxiaV2CapabilityStoreFactory {
             RevalidationScheduler scheduler,
             OxiaV2StoreConfiguration configuration,
             OxiaV2CodecSet codecs) {
+        return attach(client, scheduler, configuration, codecs, null);
+    }
+
+    static OxiaV2CapabilityStore attach(
+            AsyncOxiaClient client,
+            RevalidationScheduler scheduler,
+            OxiaV2StoreConfiguration configuration,
+            OxiaV2CodecSet codecs,
+            RegistryWriterInterlock registryWriterInterlock) {
         Objects.requireNonNull(client, "client");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(configuration, "configuration");
@@ -70,7 +97,12 @@ public final class OxiaV2CapabilityStoreFactory {
         StoreContinuity continuity = StoreContinuity.attach(client, scheduler);
         try {
             return new OxiaV2CapabilityStore(
-                    client, continuity, scheduler, new OxiaV2AuthorityKeys(configuration.authorityRoot()), codecs);
+                    client,
+                    continuity,
+                    scheduler,
+                    new OxiaV2AuthorityKeys(configuration.authorityRoot()),
+                    codecs,
+                    registryWriterInterlock);
         } catch (RuntimeException | Error failure) {
             try {
                 continuity.close();
