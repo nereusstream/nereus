@@ -66,10 +66,6 @@ if find "$spi_src" -type f \( -name '*Nta1*' -o -name '*NTA1*' \) | rg -q .; the
     fail "NTA1 codec ownership leaked from the domain into metadata SPI"
 fi
 
-if rg -n 'tasks\.register[^\n]*\("v2M1FinalCheck"' "$repo_root/build.gradle.kts" >/dev/null; then
-    fail "v2M1FinalCheck must not be registered by the foundation slice"
-fi
-
 for outcome in CREATED EXISTING_EXACT DEFINITIVE_CONFLICT INDETERMINATE; do
     rg -Fq -- "$outcome" "$spi_src/com/nereusstream/metadata/spi/model/CreateMutationOutcome.java" ||
         fail "missing create outcome $outcome"

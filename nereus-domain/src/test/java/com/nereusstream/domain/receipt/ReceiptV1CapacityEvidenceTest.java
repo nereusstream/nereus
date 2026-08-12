@@ -14,28 +14,28 @@
 
 package com.nereusstream.domain.receipt;
 
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_ATTACHMENTS;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_CANONICAL_ROOT_BYTES;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_EXACT_JSON_INTEGER;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_PATH_BYTES;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_PATH_SEGMENTS;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_SANITIZED_LOG_BYTES;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_SCENARIOS;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_SINGLE_ATTACHMENT_BYTES;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_SUITES_PER_SCENARIO;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_TOTAL_ATTACHMENT_BYTES;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_ATTACHMENTS;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_CANONICAL_ROOT_BYTES;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_EXACT_JSON_INTEGER;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_PATH_BYTES;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_PATH_SEGMENTS;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_SANITIZED_LOG_BYTES;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_SCENARIOS;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_SINGLE_ATTACHMENT_BYTES;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_SUITES_PER_SCENARIO;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_TOTAL_ATTACHMENT_BYTES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.AttachmentKind;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.AttachmentRef;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.ReceiptKind;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.ReceiptRejectedException;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.ReceiptRoot;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.RejectionCode;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.ScenarioResult;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.SuiteResult;
 import com.nereusstream.domain.receipt.ReceiptV1CapacitySamples.EvidenceReport;
 import com.nereusstream.domain.receipt.ReceiptV1CapacitySamples.Sample;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.AttachmentKind;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.AttachmentRef;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.ReceiptKind;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.ReceiptRejectedException;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.ReceiptRoot;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.RejectionCode;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.ScenarioResult;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.SuiteResult;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -96,9 +96,9 @@ class ReceiptV1CapacityEvidenceTest {
     @Test
     void everySampleHasAStableCanonicalRoundTrip() {
         for (Sample sample : samples()) {
-            byte[] first = ReceiptV1CapacityModel.canonicalBytes(sample.root());
-            ReceiptRoot parsed = ReceiptV1CapacityModel.parseCanonical(first);
-            byte[] second = ReceiptV1CapacityModel.canonicalBytes(parsed);
+            byte[] first = VirtualLedgerReceiptV1.canonicalBytes(sample.root());
+            ReceiptRoot parsed = VirtualLedgerReceiptV1.parseCanonical(first);
+            byte[] second = VirtualLedgerReceiptV1.canonicalBytes(parsed);
 
             assertThat(parsed).as(sample.id()).isEqualTo(sample.root());
             assertThat(second).as(sample.id()).containsExactly(first);
@@ -137,99 +137,99 @@ class ReceiptV1CapacityEvidenceTest {
 
     @Test
     void canonicalRootByteBoundaryIsInclusive() {
-        ReceiptV1CapacityModel.requireRootBytes(MAX_CANONICAL_ROOT_BYTES);
+        VirtualLedgerReceiptV1.requireRootBytes(MAX_CANONICAL_ROOT_BYTES);
 
         assertRejected(
                 RejectionCode.RECEIPT_ROOT_BYTES_EXCEEDED,
-                () -> ReceiptV1CapacityModel.requireRootBytes((long) MAX_CANONICAL_ROOT_BYTES + 1));
+                () -> VirtualLedgerReceiptV1.requireRootBytes((long) MAX_CANONICAL_ROOT_BYTES + 1));
     }
 
     @Test
     void scenarioCountBoundaryIsInclusiveAndNonZero() {
-        ReceiptV1CapacityModel.requireScenarioCount(1);
-        ReceiptV1CapacityModel.requireScenarioCount(MAX_SCENARIOS);
+        VirtualLedgerReceiptV1.requireScenarioCount(1);
+        VirtualLedgerReceiptV1.requireScenarioCount(MAX_SCENARIOS);
         String oversized =
                 replaceArrayWithCopies(canonicalString(sample("foundation").root()), "scenarios", 17);
 
         assertRejected(
-                RejectionCode.RECEIPT_SCENARIO_COUNT_EXCEEDED, () -> ReceiptV1CapacityModel.requireScenarioCount(0));
+                RejectionCode.RECEIPT_SCENARIO_COUNT_EXCEEDED, () -> VirtualLedgerReceiptV1.requireScenarioCount(0));
         assertRejected(
                 RejectionCode.RECEIPT_SCENARIO_COUNT_EXCEEDED,
-                () -> ReceiptV1CapacityModel.requireScenarioCount(MAX_SCENARIOS + 1));
+                () -> VirtualLedgerReceiptV1.requireScenarioCount(MAX_SCENARIOS + 1));
         assertRejected(
                 RejectionCode.RECEIPT_SCENARIO_COUNT_EXCEEDED,
-                () -> ReceiptV1CapacityModel.parseCanonical(oversized.getBytes(StandardCharsets.UTF_8)));
+                () -> VirtualLedgerReceiptV1.parseCanonical(oversized.getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
     void suiteCountBoundaryIsInclusiveAndNonZero() {
-        ReceiptV1CapacityModel.requireSuiteCount(1);
-        ReceiptV1CapacityModel.requireSuiteCount(MAX_SUITES_PER_SCENARIO);
+        VirtualLedgerReceiptV1.requireSuiteCount(1);
+        VirtualLedgerReceiptV1.requireSuiteCount(MAX_SUITES_PER_SCENARIO);
         String oversized = replaceArrayWithCopies(
                 canonicalString(rootWithSuite(new SuiteResult("suite.one", 1, 1, 1, 0, 0, 0))), "suites", 129);
 
-        assertRejected(RejectionCode.RECEIPT_SUITE_COUNT_EXCEEDED, () -> ReceiptV1CapacityModel.requireSuiteCount(0));
+        assertRejected(RejectionCode.RECEIPT_SUITE_COUNT_EXCEEDED, () -> VirtualLedgerReceiptV1.requireSuiteCount(0));
         assertRejected(
                 RejectionCode.RECEIPT_SUITE_COUNT_EXCEEDED,
-                () -> ReceiptV1CapacityModel.requireSuiteCount(MAX_SUITES_PER_SCENARIO + 1));
+                () -> VirtualLedgerReceiptV1.requireSuiteCount(MAX_SUITES_PER_SCENARIO + 1));
         assertRejected(
                 RejectionCode.RECEIPT_SUITE_COUNT_EXCEEDED,
-                () -> ReceiptV1CapacityModel.parseCanonical(oversized.getBytes(StandardCharsets.UTF_8)));
+                () -> VirtualLedgerReceiptV1.parseCanonical(oversized.getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
     void attachmentCountBoundaryAllowsZeroAndIsInclusive() {
-        ReceiptV1CapacityModel.requireAttachmentCount(0);
-        ReceiptV1CapacityModel.requireAttachmentCount(MAX_ATTACHMENTS);
+        VirtualLedgerReceiptV1.requireAttachmentCount(0);
+        VirtualLedgerReceiptV1.requireAttachmentCount(MAX_ATTACHMENTS);
         String oversized =
                 replaceArrayWithCopies(canonicalString(rootWithAttachment("one.txt", new byte[0])), "attachments", 33);
 
         assertRejected(
                 RejectionCode.RECEIPT_ATTACHMENT_COUNT_EXCEEDED,
-                () -> ReceiptV1CapacityModel.requireAttachmentCount(MAX_ATTACHMENTS + 1));
+                () -> VirtualLedgerReceiptV1.requireAttachmentCount(MAX_ATTACHMENTS + 1));
         assertRejected(
                 RejectionCode.RECEIPT_ATTACHMENT_COUNT_EXCEEDED,
-                () -> ReceiptV1CapacityModel.parseCanonical(oversized.getBytes(StandardCharsets.UTF_8)));
+                () -> VirtualLedgerReceiptV1.parseCanonical(oversized.getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
     void singleAttachmentByteBoundaryIsInclusive() {
-        ReceiptV1CapacityModel.requireSingleAttachmentBytes(0);
-        ReceiptV1CapacityModel.requireSingleAttachmentBytes(MAX_SINGLE_ATTACHMENT_BYTES);
+        VirtualLedgerReceiptV1.requireSingleAttachmentBytes(0);
+        VirtualLedgerReceiptV1.requireSingleAttachmentBytes(MAX_SINGLE_ATTACHMENT_BYTES);
 
         assertRejected(
                 RejectionCode.RECEIPT_ATTACHMENT_BYTES_EXCEEDED,
-                () -> ReceiptV1CapacityModel.requireSingleAttachmentBytes((long) MAX_SINGLE_ATTACHMENT_BYTES + 1));
+                () -> VirtualLedgerReceiptV1.requireSingleAttachmentBytes((long) MAX_SINGLE_ATTACHMENT_BYTES + 1));
     }
 
     @Test
     void totalAttachmentByteBoundaryIsInclusive() {
-        ReceiptV1CapacityModel.requireTotalAttachmentBytes(0);
-        ReceiptV1CapacityModel.requireTotalAttachmentBytes(MAX_TOTAL_ATTACHMENT_BYTES);
+        VirtualLedgerReceiptV1.requireTotalAttachmentBytes(0);
+        VirtualLedgerReceiptV1.requireTotalAttachmentBytes(MAX_TOTAL_ATTACHMENT_BYTES);
 
         assertRejected(
                 RejectionCode.RECEIPT_ATTACHMENT_TOTAL_BYTES_EXCEEDED,
-                () -> ReceiptV1CapacityModel.requireTotalAttachmentBytes((long) MAX_TOTAL_ATTACHMENT_BYTES + 1));
+                () -> VirtualLedgerReceiptV1.requireTotalAttachmentBytes((long) MAX_TOTAL_ATTACHMENT_BYTES + 1));
     }
 
     @Test
     void sanitizedLogByteBoundaryIsIndependentAndInclusive() {
-        ReceiptV1CapacityModel.requireSanitizedLogBytes(0);
-        ReceiptV1CapacityModel.requireSanitizedLogBytes(MAX_SANITIZED_LOG_BYTES);
+        VirtualLedgerReceiptV1.requireSanitizedLogBytes(0);
+        VirtualLedgerReceiptV1.requireSanitizedLogBytes(MAX_SANITIZED_LOG_BYTES);
 
         assertRejected(
                 RejectionCode.RECEIPT_SANITIZED_LOG_BYTES_EXCEEDED,
-                () -> ReceiptV1CapacityModel.requireSanitizedLogBytes((long) MAX_SANITIZED_LOG_BYTES + 1));
+                () -> VirtualLedgerReceiptV1.requireSanitizedLogBytes((long) MAX_SANITIZED_LOG_BYTES + 1));
     }
 
     @Test
     void relativePathByteBoundaryIsInclusive() {
-        assertThat(ReceiptV1CapacityModel.validatePath("a".repeat(MAX_PATH_BYTES)))
+        assertThat(VirtualLedgerReceiptV1.validatePath("a".repeat(MAX_PATH_BYTES)))
                 .containsExactly("a".repeat(256));
 
         assertRejected(
                 RejectionCode.RECEIPT_PATH_BYTES_EXCEEDED,
-                () -> ReceiptV1CapacityModel.validatePath("a".repeat(MAX_PATH_BYTES + 1)));
+                () -> VirtualLedgerReceiptV1.validatePath("a".repeat(MAX_PATH_BYTES + 1)));
     }
 
     @Test
@@ -237,35 +237,35 @@ class ReceiptV1CapacityEvidenceTest {
         String accepted = String.join("/", java.util.Collections.nCopies(MAX_PATH_SEGMENTS, "a"));
         String rejected = String.join("/", java.util.Collections.nCopies(MAX_PATH_SEGMENTS + 1, "a"));
 
-        assertThat(ReceiptV1CapacityModel.validatePath(accepted)).hasSize(MAX_PATH_SEGMENTS);
+        assertThat(VirtualLedgerReceiptV1.validatePath(accepted)).hasSize(MAX_PATH_SEGMENTS);
         assertRejected(
-                RejectionCode.RECEIPT_PATH_SEGMENTS_EXCEEDED, () -> ReceiptV1CapacityModel.validatePath(rejected));
+                RejectionCode.RECEIPT_PATH_SEGMENTS_EXCEEDED, () -> VirtualLedgerReceiptV1.validatePath(rejected));
     }
 
     @Test
     void pathTraversalAbsolutePlatformAndNonAsciiFormsFailClosed() {
         for (String path :
                 List.of("/root", "tail/", "a//b", ".", "..", "a/../b", "a/./b", "a\\b", "C:a", "_a", "a/\u03b1")) {
-            assertRejected(RejectionCode.RECEIPT_PATH_INVALID, () -> ReceiptV1CapacityModel.validatePath(path));
+            assertRejected(RejectionCode.RECEIPT_PATH_INVALID, () -> VirtualLedgerReceiptV1.validatePath(path));
         }
     }
 
     @Test
     void checkedArithmeticRejectsAdditionAndMultiplicationOverflow() {
-        assertThat(ReceiptV1CapacityModel.checkedAdd(1, 2, 3)).isEqualTo(6);
-        assertThat(ReceiptV1CapacityModel.checkedMultiply(7, 9)).isEqualTo(63);
+        assertThat(VirtualLedgerReceiptV1.checkedAdd(1, 2, 3)).isEqualTo(6);
+        assertThat(VirtualLedgerReceiptV1.checkedMultiply(7, 9)).isEqualTo(63);
 
         assertRejected(
                 RejectionCode.RECEIPT_CHECKED_ARITHMETIC_OVERFLOW,
-                () -> ReceiptV1CapacityModel.checkedAdd(Long.MAX_VALUE, 1));
+                () -> VirtualLedgerReceiptV1.checkedAdd(Long.MAX_VALUE, 1));
         assertRejected(
                 RejectionCode.RECEIPT_CHECKED_ARITHMETIC_OVERFLOW,
-                () -> ReceiptV1CapacityModel.checkedMultiply(Long.MAX_VALUE, 2));
+                () -> VirtualLedgerReceiptV1.checkedMultiply(Long.MAX_VALUE, 2));
     }
 
     @Test
     void junitNormalizationAddsFailuresAndErrorsExactly() {
-        SuiteResult normalized = ReceiptV1CapacityModel.normalizeJUnit("suite.normalized", 11, 2, 3, 1, 1);
+        SuiteResult normalized = VirtualLedgerReceiptV1.normalizeJUnit("suite.normalized", 11, 2, 3, 1, 1);
 
         assertThat(normalized).isEqualTo(new SuiteResult("suite.normalized", 11, 10, 4, 5, 1, 1));
     }
@@ -274,19 +274,19 @@ class ReceiptV1CapacityEvidenceTest {
     void exactIntegerAndAccountingBoundariesFailClosed() {
         SuiteResult exact = new SuiteResult(
                 "suite.exact", MAX_EXACT_JSON_INTEGER, MAX_EXACT_JSON_INTEGER, MAX_EXACT_JSON_INTEGER, 0, 0, 0);
-        ReceiptV1CapacityModel.validate(rootWithSuite(exact));
+        VirtualLedgerReceiptV1.validate(rootWithSuite(exact));
 
         assertRejected(
                 RejectionCode.RECEIPT_WRONG_TYPE_OR_NUMBER,
-                () -> ReceiptV1CapacityModel.validate(
+                () -> VirtualLedgerReceiptV1.validate(
                         rootWithSuite(new SuiteResult("suite.tooLarge", MAX_EXACT_JSON_INTEGER + 1, 1, 1, 0, 0, 0))));
         assertRejected(
                 RejectionCode.RECEIPT_ACCOUNTING_INVALID,
-                () -> ReceiptV1CapacityModel.validate(
+                () -> VirtualLedgerReceiptV1.validate(
                         rootWithSuite(new SuiteResult("suite.badAccounting", 2, 2, 1, 0, 0, 0))));
         assertRejected(
                 RejectionCode.RECEIPT_ACCOUNTING_INVALID,
-                () -> ReceiptV1CapacityModel.normalizeJUnit("suite.negativePass", 1, 1, 1, 0, 0));
+                () -> VirtualLedgerReceiptV1.normalizeJUnit("suite.negativePass", 1, 1, 1, 0, 0));
     }
 
     @Test
@@ -295,7 +295,7 @@ class ReceiptV1CapacityEvidenceTest {
 
         assertRejected(
                 RejectionCode.RECEIPT_MANDATORY_RESULT_NOT_PASS,
-                () -> ReceiptV1CapacityModel.requireMandatoryPass(root, Set.of("suite.zero")));
+                () -> VirtualLedgerReceiptV1.requireMandatoryPass(root, Set.of("suite.zero")));
     }
 
     @Test
@@ -304,7 +304,7 @@ class ReceiptV1CapacityEvidenceTest {
 
         assertRejected(
                 RejectionCode.RECEIPT_MANDATORY_RESULT_NOT_PASS,
-                () -> ReceiptV1CapacityModel.requireMandatoryPass(root, Set.of("suite.skipped")));
+                () -> VirtualLedgerReceiptV1.requireMandatoryPass(root, Set.of("suite.skipped")));
     }
 
     @Test
@@ -313,7 +313,7 @@ class ReceiptV1CapacityEvidenceTest {
 
         assertRejected(
                 RejectionCode.RECEIPT_MANDATORY_RESULT_NOT_PASS,
-                () -> ReceiptV1CapacityModel.requireMandatoryPass(root, Set.of("suite.failed")));
+                () -> VirtualLedgerReceiptV1.requireMandatoryPass(root, Set.of("suite.failed")));
     }
 
     @Test
@@ -322,7 +322,7 @@ class ReceiptV1CapacityEvidenceTest {
 
         assertRejected(
                 RejectionCode.RECEIPT_MANDATORY_RESULT_NOT_PASS,
-                () -> ReceiptV1CapacityModel.requireMandatoryPass(root, Set.of("suite.aborted")));
+                () -> VirtualLedgerReceiptV1.requireMandatoryPass(root, Set.of("suite.aborted")));
     }
 
     @Test
@@ -331,7 +331,7 @@ class ReceiptV1CapacityEvidenceTest {
 
         assertRejected(
                 RejectionCode.RECEIPT_REQUIRED_SUITE_MISSING,
-                () -> ReceiptV1CapacityModel.requireMandatoryPass(root, Set.of("suite.absent")));
+                () -> VirtualLedgerReceiptV1.requireMandatoryPass(root, Set.of("suite.absent")));
     }
 
     @Test
@@ -350,14 +350,14 @@ class ReceiptV1CapacityEvidenceTest {
 
         assertRejected(
                 RejectionCode.RECEIPT_DUPLICATE_OR_UNSORTED_ID,
-                () -> ReceiptV1CapacityModel.validate(duplicateScenarios));
+                () -> VirtualLedgerReceiptV1.validate(duplicateScenarios));
         assertRejected(
                 RejectionCode.RECEIPT_DUPLICATE_OR_UNSORTED_ID,
-                () -> ReceiptV1CapacityModel.validate(new ReceiptRoot(
+                () -> VirtualLedgerReceiptV1.validate(new ReceiptRoot(
                         valid.schema(), valid.kind(), valid.sourceTuple(), List.of(duplicateSuites), List.of())));
         assertRejected(
                 RejectionCode.RECEIPT_DUPLICATE_OR_UNSORTED_ID,
-                () -> ReceiptV1CapacityModel.validate(duplicateAttachments));
+                () -> VirtualLedgerReceiptV1.validate(duplicateAttachments));
     }
 
     @Test
@@ -368,10 +368,10 @@ class ReceiptV1CapacityEvidenceTest {
 
         assertRejected(
                 RejectionCode.RECEIPT_UNKNOWN_OR_MISSING_FIELD,
-                () -> ReceiptV1CapacityModel.parseCanonical(unknown.getBytes(StandardCharsets.UTF_8)));
+                () -> VirtualLedgerReceiptV1.parseCanonical(unknown.getBytes(StandardCharsets.UTF_8)));
         assertRejected(
                 RejectionCode.RECEIPT_UNKNOWN_OR_MISSING_FIELD,
-                () -> ReceiptV1CapacityModel.parseCanonical(missing.getBytes(StandardCharsets.UTF_8)));
+                () -> VirtualLedgerReceiptV1.parseCanonical(missing.getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -381,7 +381,7 @@ class ReceiptV1CapacityEvidenceTest {
 
         assertRejected(
                 RejectionCode.RECEIPT_DUPLICATE_FIELD,
-                () -> ReceiptV1CapacityModel.parseCanonical(duplicate.getBytes(StandardCharsets.UTF_8)));
+                () -> VirtualLedgerReceiptV1.parseCanonical(duplicate.getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -397,24 +397,24 @@ class ReceiptV1CapacityEvidenceTest {
         for (String json : invalid) {
             assertRejected(
                     RejectionCode.RECEIPT_WRONG_TYPE_OR_NUMBER,
-                    () -> ReceiptV1CapacityModel.parseCanonical(json.getBytes(StandardCharsets.UTF_8)));
+                    () -> VirtualLedgerReceiptV1.parseCanonical(json.getBytes(StandardCharsets.UTF_8)));
         }
     }
 
     @Test
     void malformedUtf8BomAndTrailingDataFailBeforeCanonicality() {
-        byte[] canonical = ReceiptV1CapacityModel.canonicalBytes(validRoot());
+        byte[] canonical = VirtualLedgerReceiptV1.canonicalBytes(validRoot());
         byte[] bom = new byte[canonical.length + 3];
         System.arraycopy(new byte[] {(byte) 0xef, (byte) 0xbb, (byte) 0xbf}, 0, bom, 0, 3);
         System.arraycopy(canonical, 0, bom, 3, canonical.length);
 
         assertRejected(
                 RejectionCode.RECEIPT_MALFORMED_JSON,
-                () -> ReceiptV1CapacityModel.parseCanonical(new byte[] {(byte) 0xff}));
-        assertRejected(RejectionCode.RECEIPT_MALFORMED_JSON, () -> ReceiptV1CapacityModel.parseCanonical(bom));
+                () -> VirtualLedgerReceiptV1.parseCanonical(new byte[] {(byte) 0xff}));
+        assertRejected(RejectionCode.RECEIPT_MALFORMED_JSON, () -> VirtualLedgerReceiptV1.parseCanonical(bom));
         assertRejected(
                 RejectionCode.RECEIPT_MALFORMED_JSON,
-                () -> ReceiptV1CapacityModel.parseCanonical(
+                () -> VirtualLedgerReceiptV1.parseCanonical(
                         (new String(canonical, StandardCharsets.UTF_8) + "x").getBytes(StandardCharsets.UTF_8)));
     }
 
@@ -429,20 +429,20 @@ class ReceiptV1CapacityEvidenceTest {
 
         assertRejected(
                 RejectionCode.RECEIPT_NON_CANONICAL_JSON,
-                () -> ReceiptV1CapacityModel.parseCanonical((" " + canonical).getBytes(StandardCharsets.UTF_8)));
+                () -> VirtualLedgerReceiptV1.parseCanonical((" " + canonical).getBytes(StandardCharsets.UTF_8)));
         assertRejected(
                 RejectionCode.RECEIPT_NON_CANONICAL_JSON,
-                () -> ReceiptV1CapacityModel.parseCanonical(escapedDigit.getBytes(StandardCharsets.UTF_8)));
+                () -> VirtualLedgerReceiptV1.parseCanonical(escapedDigit.getBytes(StandardCharsets.UTF_8)));
         assertRejected(
                 RejectionCode.RECEIPT_NON_CANONICAL_JSON,
-                () -> ReceiptV1CapacityModel.parseCanonical(
+                () -> VirtualLedgerReceiptV1.parseCanonical(
                         canonical.replace(canonicalSuite, reorderedSuite).getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
     void schemaKindSourceTupleAndAttachmentKindAreClosed() {
         String canonical = canonicalString(validRoot());
-        String wrongSchema = canonical.replace(ReceiptV1CapacityModel.SCHEMA, "NEREUS_RECEIPT_V2");
+        String wrongSchema = canonical.replace(VirtualLedgerReceiptV1.SCHEMA, "NEREUS_RECEIPT_V2");
         String wrongKind = canonical.replace("HARNESS_CONFORMANCE_ONLY", "UNKNOWN_KIND");
         String wrongSource = canonical.replace(FIXTURE_SOURCE, "g".repeat(40));
         String attachment = canonicalString(sample("registry-readiness").root());
@@ -450,16 +450,16 @@ class ReceiptV1CapacityEvidenceTest {
 
         assertRejected(
                 RejectionCode.RECEIPT_SCHEMA_OR_KIND_INVALID,
-                () -> ReceiptV1CapacityModel.parseCanonical(wrongSchema.getBytes(StandardCharsets.UTF_8)));
+                () -> VirtualLedgerReceiptV1.parseCanonical(wrongSchema.getBytes(StandardCharsets.UTF_8)));
         assertRejected(
                 RejectionCode.RECEIPT_SCHEMA_OR_KIND_INVALID,
-                () -> ReceiptV1CapacityModel.parseCanonical(wrongKind.getBytes(StandardCharsets.UTF_8)));
+                () -> VirtualLedgerReceiptV1.parseCanonical(wrongKind.getBytes(StandardCharsets.UTF_8)));
         assertRejected(
                 RejectionCode.RECEIPT_SOURCE_TUPLE_INVALID,
-                () -> ReceiptV1CapacityModel.parseCanonical(wrongSource.getBytes(StandardCharsets.UTF_8)));
+                () -> VirtualLedgerReceiptV1.parseCanonical(wrongSource.getBytes(StandardCharsets.UTF_8)));
         assertRejected(
                 RejectionCode.RECEIPT_SCHEMA_OR_KIND_INVALID,
-                () -> ReceiptV1CapacityModel.parseCanonical(wrongAttachmentKind.getBytes(StandardCharsets.UTF_8)));
+                () -> VirtualLedgerReceiptV1.parseCanonical(wrongAttachmentKind.getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -475,7 +475,7 @@ class ReceiptV1CapacityEvidenceTest {
         int assignmentStart = 184 + 14 * 120;
         for (int index = 0; index < 256; index++) {
             byte[] row = Arrays.copyOfRange(first, assignmentStart + index * 192, assignmentStart + (index + 1) * 192);
-            assignmentRows.add(ReceiptV1CapacityModel.sha256(row));
+            assignmentRows.add(VirtualLedgerReceiptV1.sha256(row));
         }
         assertThat(assignmentRows).hasSize(256);
     }
@@ -507,16 +507,16 @@ class ReceiptV1CapacityEvidenceTest {
         Files.write(target, content);
         ReceiptRoot valid = rootWithAttachment("attachments/test-reports/result.txt", content);
 
-        assertThat(ReceiptV1CapacityModel.verifyAttachments(temporaryDirectory, valid))
+        assertThat(VirtualLedgerReceiptV1.verifyAttachments(temporaryDirectory, valid))
                 .containsEntry(AttachmentKind.TEST_REPORT, (long) content.length);
         assertRejected(
                 RejectionCode.RECEIPT_ATTACHMENT_LENGTH_MISMATCH,
-                () -> ReceiptV1CapacityModel.verifyAttachments(
+                () -> VirtualLedgerReceiptV1.verifyAttachments(
                         temporaryDirectory,
-                        replaceAttachment(valid, content.length + 1, ReceiptV1CapacityModel.sha256(content))));
+                        replaceAttachment(valid, content.length + 1, VirtualLedgerReceiptV1.sha256(content))));
         assertRejected(
                 RejectionCode.RECEIPT_ATTACHMENT_DIGEST_MISMATCH,
-                () -> ReceiptV1CapacityModel.verifyAttachments(
+                () -> VirtualLedgerReceiptV1.verifyAttachments(
                         temporaryDirectory, replaceAttachment(valid, content.length, "0".repeat(64))));
     }
 
@@ -530,7 +530,7 @@ class ReceiptV1CapacityEvidenceTest {
 
         assertRejected(
                 RejectionCode.RECEIPT_ATTACHMENT_SYMLINK,
-                () -> ReceiptV1CapacityModel.verifyAttachments(
+                () -> VirtualLedgerReceiptV1.verifyAttachments(
                         temporaryDirectory, rootWithAttachment("target-link.txt", content)));
 
         Path realDirectory = temporaryDirectory.resolve("real-directory");
@@ -540,7 +540,7 @@ class ReceiptV1CapacityEvidenceTest {
         Files.createSymbolicLink(ancestorLink, realDirectory.getFileName());
         assertRejected(
                 RejectionCode.RECEIPT_ATTACHMENT_SYMLINK,
-                () -> ReceiptV1CapacityModel.verifyAttachments(
+                () -> VirtualLedgerReceiptV1.verifyAttachments(
                         temporaryDirectory, rootWithAttachment("ancestor-link/data.txt", content)));
     }
 
@@ -551,32 +551,32 @@ class ReceiptV1CapacityEvidenceTest {
 
         assertRejected(
                 RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR,
-                () -> ReceiptV1CapacityModel.verifyAttachments(
+                () -> VirtualLedgerReceiptV1.verifyAttachments(
                         temporaryDirectory, rootWithAttachment("directory.txt", empty)));
         assertRejected(
                 RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR,
-                () -> ReceiptV1CapacityModel.verifyAttachments(
+                () -> VirtualLedgerReceiptV1.verifyAttachments(
                         temporaryDirectory, rootWithAttachment("missing.txt", empty)));
     }
 
     @Test
     void receiptRootFileRequiresARegularNoFollowInput(@TempDir Path temporaryDirectory) throws IOException {
-        byte[] canonical = ReceiptV1CapacityModel.canonicalBytes(validRoot());
+        byte[] canonical = VirtualLedgerReceiptV1.canonicalBytes(validRoot());
         Path regular = temporaryDirectory.resolve("receipt.json");
         Files.write(regular, canonical);
-        assertThat(ReceiptV1CapacityModel.parseCanonicalFile(regular)).isEqualTo(validRoot());
+        assertThat(VirtualLedgerReceiptV1.parseCanonicalFile(regular)).isEqualTo(validRoot());
 
         Path link = temporaryDirectory.resolve("receipt-link.json");
         Files.createSymbolicLink(link, regular.getFileName());
-        assertRejected(RejectionCode.RECEIPT_ROOT_NOT_REGULAR, () -> ReceiptV1CapacityModel.parseCanonicalFile(link));
+        assertRejected(RejectionCode.RECEIPT_ROOT_NOT_REGULAR, () -> VirtualLedgerReceiptV1.parseCanonicalFile(link));
         assertRejected(
                 RejectionCode.RECEIPT_ROOT_NOT_REGULAR,
-                () -> ReceiptV1CapacityModel.parseCanonicalFile(temporaryDirectory));
+                () -> VirtualLedgerReceiptV1.parseCanonicalFile(temporaryDirectory));
 
         Path oversized = temporaryDirectory.resolve("oversized.json");
         Files.write(oversized, new byte[MAX_CANONICAL_ROOT_BYTES + 1]);
         assertRejected(
-                RejectionCode.RECEIPT_ROOT_BYTES_EXCEEDED, () -> ReceiptV1CapacityModel.parseCanonicalFile(oversized));
+                RejectionCode.RECEIPT_ROOT_BYTES_EXCEEDED, () -> VirtualLedgerReceiptV1.parseCanonicalFile(oversized));
     }
 
     private static List<Sample> samples() {
@@ -607,7 +607,7 @@ class ReceiptV1CapacityEvidenceTest {
     private static ReceiptRoot rootWithAttachment(String path, byte[] content) {
         ReceiptRoot valid = validRoot();
         AttachmentRef attachment = new AttachmentRef(
-                AttachmentKind.TEST_REPORT, path, content.length, ReceiptV1CapacityModel.sha256(content));
+                AttachmentKind.TEST_REPORT, path, content.length, VirtualLedgerReceiptV1.sha256(content));
         return new ReceiptRoot(
                 valid.schema(), valid.kind(), valid.sourceTuple(), valid.scenarios(), List.of(attachment));
     }
@@ -619,7 +619,7 @@ class ReceiptV1CapacityEvidenceTest {
     }
 
     private static String canonicalString(ReceiptRoot root) {
-        return new String(ReceiptV1CapacityModel.canonicalBytes(root), StandardCharsets.UTF_8);
+        return new String(VirtualLedgerReceiptV1.canonicalBytes(root), StandardCharsets.UTF_8);
     }
 
     private static String replaceArrayWithCopies(String json, String field, int copies) {
@@ -665,7 +665,7 @@ class ReceiptV1CapacityEvidenceTest {
         Map<String, String> result = new TreeMap<>();
         try (var paths = Files.walk(root)) {
             for (Path path : paths.filter(Files::isRegularFile).toList()) {
-                result.put(root.relativize(path).toString(), ReceiptV1CapacityModel.sha256(Files.readAllBytes(path)));
+                result.put(root.relativize(path).toString(), VirtualLedgerReceiptV1.sha256(Files.readAllBytes(path)));
             }
         }
         return new LinkedHashMap<>(result);

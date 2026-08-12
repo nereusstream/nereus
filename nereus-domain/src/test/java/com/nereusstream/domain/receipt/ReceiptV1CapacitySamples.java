@@ -14,23 +14,23 @@
 
 package com.nereusstream.domain.receipt;
 
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_ATTACHMENTS;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_CANONICAL_ROOT_BYTES;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_PATH_BYTES;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_PATH_SEGMENTS;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_SANITIZED_LOG_BYTES;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_SCENARIOS;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_SINGLE_ATTACHMENT_BYTES;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_SUITES_PER_SCENARIO;
-import static com.nereusstream.domain.receipt.ReceiptV1CapacityModel.MAX_TOTAL_ATTACHMENT_BYTES;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.AttachmentKind;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.AttachmentRef;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.ReceiptKind;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.ReceiptRoot;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.RejectionCode;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.ScenarioResult;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.SourceTuple;
-import com.nereusstream.domain.receipt.ReceiptV1CapacityModel.SuiteResult;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_ATTACHMENTS;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_CANONICAL_ROOT_BYTES;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_PATH_BYTES;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_PATH_SEGMENTS;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_SANITIZED_LOG_BYTES;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_SCENARIOS;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_SINGLE_ATTACHMENT_BYTES;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_SUITES_PER_SCENARIO;
+import static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.MAX_TOTAL_ATTACHMENT_BYTES;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.AttachmentKind;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.AttachmentRef;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.ReceiptKind;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.ReceiptRoot;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.RejectionCode;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.ScenarioResult;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.SourceTuple;
+import com.nereusstream.domain.receipt.VirtualLedgerReceiptV1.SuiteResult;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -200,22 +200,22 @@ final class ReceiptV1CapacitySamples {
                             StandardOpenOption.TRUNCATE_EXISTING,
                             StandardOpenOption.WRITE);
                 }
-                byte[] rootBytes = ReceiptV1CapacityModel.canonicalBytes(sample.root());
+                byte[] rootBytes = VirtualLedgerReceiptV1.canonicalBytes(sample.root());
                 Files.write(
                         sampleRoot.resolve("receipt.json"),
                         rootBytes,
                         StandardOpenOption.CREATE,
                         StandardOpenOption.TRUNCATE_EXISTING,
                         StandardOpenOption.WRITE);
-                ReceiptRoot parsed = ReceiptV1CapacityModel.parseCanonical(rootBytes);
+                ReceiptRoot parsed = VirtualLedgerReceiptV1.parseCanonical(rootBytes);
                 if (!parsed.equals(sample.root())) {
                     throw new IllegalStateException("sample canonical round trip differs: " + sample.id());
                 }
-                ReceiptV1CapacityModel.verifyAttachments(sampleRoot, parsed);
+                VirtualLedgerReceiptV1.verifyAttachments(sampleRoot, parsed);
                 metrics.add(metrics(sample));
             }
             String json = renderEvidenceJson(sourceCommit, sourceLocksInputSha, metrics);
-            String jsonSha = ReceiptV1CapacityModel.sha256(json.getBytes(StandardCharsets.UTF_8));
+            String jsonSha = VirtualLedgerReceiptV1.sha256(json.getBytes(StandardCharsets.UTF_8));
             String markdown = renderEvidenceMarkdown(sourceCommit, sourceLocksInputSha, jsonSha, metrics);
             Files.writeString(
                     reportRoot.resolve("receipt-caps.json"),
@@ -396,8 +396,8 @@ final class ReceiptV1CapacitySamples {
 
     private static Sample o1Sample(SourceTuple source) {
         List<SuiteResult> suites = List.of(
-                        ReceiptV1CapacityModel.normalizeJUnit("o1.exactRuntimeCompatibility", 1, 0, 0, 0, 0),
-                        ReceiptV1CapacityModel.normalizeJUnit("o1.focusedLifecycleAndApi", 88, 0, 0, 0, 0))
+                        VirtualLedgerReceiptV1.normalizeJUnit("o1.exactRuntimeCompatibility", 1, 0, 0, 0, 0),
+                        VirtualLedgerReceiptV1.normalizeJUnit("o1.focusedLifecycleAndApi", 88, 0, 0, 0, 0))
                 .stream()
                 .sorted(Comparator.comparing(SuiteResult::suiteId))
                 .toList();
@@ -440,9 +440,9 @@ final class ReceiptV1CapacitySamples {
 
     private static Sample nta1Sample(SourceTuple source) {
         List<SuiteResult> suites = List.of(
-                        ReceiptV1CapacityModel.normalizeJUnit("nta1.domainAtReceiptClose", 55, 0, 0, 0, 0),
-                        ReceiptV1CapacityModel.normalizeJUnit("nta1.metadataOxiaV2AtReceiptClose", 73, 0, 0, 0, 0),
-                        ReceiptV1CapacityModel.normalizeJUnit("nta1.metadataOxiaWholeAtReceiptClose", 303, 0, 0, 0, 0))
+                        VirtualLedgerReceiptV1.normalizeJUnit("nta1.domainAtReceiptClose", 55, 0, 0, 0, 0),
+                        VirtualLedgerReceiptV1.normalizeJUnit("nta1.metadataOxiaV2AtReceiptClose", 73, 0, 0, 0, 0),
+                        VirtualLedgerReceiptV1.normalizeJUnit("nta1.metadataOxiaWholeAtReceiptClose", 303, 0, 0, 0, 0))
                 .stream()
                 .sorted(Comparator.comparing(SuiteResult::suiteId))
                 .toList();
@@ -493,7 +493,7 @@ final class ReceiptV1CapacitySamples {
                 ReceiptKind.REGISTRY_CONFORMANCE,
                 List.of(new ScenarioResult(
                         "V2-POSITION-003",
-                        List.of(ReceiptV1CapacityModel.normalizeJUnit("registry.capacity.readiness", 18, 0, 0, 0, 0)))),
+                        List.of(VirtualLedgerReceiptV1.normalizeJUnit("registry.capacity.readiness", 18, 0, 0, 0, 0)))),
                 attachments,
                 source);
     }
@@ -517,7 +517,7 @@ final class ReceiptV1CapacitySamples {
         for (int ordinal = 3; ordinal <= 9; ordinal++) {
             scenarios.add(new ScenarioResult(
                     String.format(Locale.ROOT, "V2-POSITION-%03d", ordinal),
-                    List.of(ReceiptV1CapacityModel.normalizeJUnit(
+                    List.of(VirtualLedgerReceiptV1.normalizeJUnit(
                             String.format(Locale.ROOT, "registry.scenario.%03d", ordinal), 4 + ordinal, 0, 0, 0, 0))));
         }
         return sample(
@@ -537,11 +537,11 @@ final class ReceiptV1CapacitySamples {
                 List.of(
                         new ScenarioResult(
                                 "V2-POSITION-010",
-                                List.of(ReceiptV1CapacityModel.normalizeJUnit(
+                                List.of(VirtualLedgerReceiptV1.normalizeJUnit(
                                         "harness.conformance.cuts", 12, 0, 0, 0, 0))),
                         new ScenarioResult(
                                 "V2-POSITION-011",
-                                List.of(ReceiptV1CapacityModel.normalizeJUnit(
+                                List.of(VirtualLedgerReceiptV1.normalizeJUnit(
                                         "harness.range.takeover", 16, 0, 0, 0, 0)))),
                 List.of(),
                 source);
@@ -617,16 +617,16 @@ final class ReceiptV1CapacitySamples {
                         attachment.kind(),
                         attachment.path(),
                         attachment.bytes().length,
-                        ReceiptV1CapacityModel.sha256(attachment.bytes())))
+                        VirtualLedgerReceiptV1.sha256(attachment.bytes())))
                 .toList();
-        ReceiptRoot root = new ReceiptRoot(ReceiptV1CapacityModel.SCHEMA, kind, source, sortedScenarios, references);
-        ReceiptV1CapacityModel.validate(root);
+        ReceiptRoot root = new ReceiptRoot(VirtualLedgerReceiptV1.SCHEMA, kind, source, sortedScenarios, references);
+        VirtualLedgerReceiptV1.validate(root);
         return new Sample(id, generator, root, sortedAttachments);
     }
 
     private static List<SuiteResult> suites(List<InventoryRow> rows) {
         return rows.stream()
-                .map(row -> ReceiptV1CapacityModel.normalizeJUnit(
+                .map(row -> VirtualLedgerReceiptV1.normalizeJUnit(
                         row.suiteId(), row.tests(), row.failures(), row.errors(), row.skipped(), 0))
                 .sorted(Comparator.comparing(SuiteResult::suiteId))
                 .toList();
@@ -714,9 +714,9 @@ final class ReceiptV1CapacitySamples {
                     .append("\",\"principalGeneration\":")
                     .append(index + 1)
                     .append(",\"principalSha256\":\"")
-                    .append(ReceiptV1CapacityModel.sha256(("principal/" + index).getBytes(StandardCharsets.UTF_8)))
+                    .append(VirtualLedgerReceiptV1.sha256(("principal/" + index).getBytes(StandardCharsets.UTF_8)))
                     .append("\",\"interlockSha256\":\"")
-                    .append(ReceiptV1CapacityModel.sha256(("interlock/" + index).getBytes(StandardCharsets.UTF_8)))
+                    .append(VirtualLedgerReceiptV1.sha256(("interlock/" + index).getBytes(StandardCharsets.UTF_8)))
                     .append("\",\"proofs\":[\"source-qualified\",\"independently-revocable\","
                             + "\"negative-allocation\"]}");
         }
@@ -738,7 +738,7 @@ final class ReceiptV1CapacitySamples {
                     .append(",\"sourceQualified\":true,\"allocationCapable\":true,\"lifecycle\":\"")
                     .append(index < 10 ? "ACTIVE" : "FENCED_DRAINING")
                     .append("\",\"revocationIndependent\":true,\"interlockDigest\":\"")
-                    .append(ReceiptV1CapacityModel.sha256(
+                    .append(VirtualLedgerReceiptV1.sha256(
                             ("interlock/snapshot/" + index).getBytes(StandardCharsets.UTF_8)))
                     .append("\"}");
         }
@@ -756,14 +756,14 @@ final class ReceiptV1CapacitySamples {
                 .append("\",\"detail\":\"")
                 .append(detail)
                 .append("; event-specific-id=")
-                .append(ReceiptV1CapacityModel.sha256((family + "/" + event).getBytes(StandardCharsets.UTF_8))
+                .append(VirtualLedgerReceiptV1.sha256((family + "/" + event).getBytes(StandardCharsets.UTF_8))
                         .substring(0, 16))
                 .append("; sourceTuple=v2-m0; retry=false; leafPayload=false; secretFields=absent\","
                         + "\"outcome\":\"FAIL_CLOSED\"}\n");
     }
 
     private static SampleMetrics metrics(Sample sample) {
-        byte[] rootBytes = ReceiptV1CapacityModel.canonicalBytes(sample.root());
+        byte[] rootBytes = VirtualLedgerReceiptV1.canonicalBytes(sample.root());
         long total = 0;
         long maxSingle = 0;
         int maxPathBytes = 0;
@@ -772,7 +772,7 @@ final class ReceiptV1CapacitySamples {
         Map<AttachmentKind, Long> byKind = new EnumMap<>(AttachmentKind.class);
         for (AttachmentData attachment : sample.attachments()) {
             int bytes = attachment.bytes().length;
-            total = ReceiptV1CapacityModel.checkedAdd(total, bytes);
+            total = VirtualLedgerReceiptV1.checkedAdd(total, bytes);
             maxSingle = Math.max(maxSingle, bytes);
             maxPathBytes = Math.max(maxPathBytes, attachment.path().length());
             maxPathSegments = Math.max(maxPathSegments, attachment.path().split("/", -1).length);
@@ -789,7 +789,7 @@ final class ReceiptV1CapacitySamples {
                 sample.id(),
                 sample.generator(),
                 rootBytes.length,
-                ReceiptV1CapacityModel.sha256(rootBytes),
+                VirtualLedgerReceiptV1.sha256(rootBytes),
                 sample.root().scenarios().size(),
                 maxSuites,
                 sample.root().attachments().size(),
@@ -1065,7 +1065,7 @@ final class ReceiptV1CapacitySamples {
                 java.util.Arrays.stream(RejectionCode.values()).map(Enum::name).collect(Collectors.joining("|"));
         String caps = "root=65536;scenarios=16;suites=128;attachments=32;single=262144;total=524288;"
                 + "path=256;segments=16;log=65536";
-        return ReceiptV1CapacityModel.sha256(
+        return VirtualLedgerReceiptV1.sha256(
                 (caps + ";samples=" + sampleIdentity + ";errors=" + errors).getBytes(StandardCharsets.UTF_8));
     }
 
@@ -1106,7 +1106,7 @@ final class ReceiptV1CapacitySamples {
             return readAsciiToken(SOURCE_LOCKS_INPUT_SHA_PATH, "[0-9a-f]{64}");
         }
         try {
-            return ReceiptV1CapacityModel.sha256(Files.readAllBytes(CURRENT_SOURCE_LOCKS));
+            return VirtualLedgerReceiptV1.sha256(Files.readAllBytes(CURRENT_SOURCE_LOCKS));
         } catch (IOException error) {
             throw new IllegalStateException("cannot hash current source locks", error);
         }
@@ -1125,7 +1125,7 @@ final class ReceiptV1CapacitySamples {
     }
 
     private static byte[] digest(String value) {
-        return java.util.HexFormat.of().parseHex(ReceiptV1CapacityModel.sha256(value.getBytes(StandardCharsets.UTF_8)));
+        return java.util.HexFormat.of().parseHex(VirtualLedgerReceiptV1.sha256(value.getBytes(StandardCharsets.UTF_8)));
     }
 
     private static byte[] digestPrefix(String value, int bytes) {

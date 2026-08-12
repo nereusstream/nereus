@@ -174,6 +174,9 @@ binds it. M1 gates are:
   held writer-interlock and immutable-evidence cuts, closed response-loss outcomes, derived-view binding, and allocator-mode
   absence. Its focused wrapper names `REGISTRY_CONFORMANCE` but is non-promotable; it cannot select an allocator, prune
   V1, promote a scenario, or claim M1 PASS;
+- `v2M1G1ValidatorCheck`: 49 production receipt/Final tests and 14 evidence-only allocator-cut tests, strict reference
+  verification, exact virtual-ledger scenario/kind policy, no gate rerun, and no allocator candidate in production; it
+  cannot prove the pure-V2 graph, exact final source tuple, scenario promotion, N2/N3, or M1 PASS;
 - `v2M1Check`: no Docker/fork/composite; local domain/schema/SPI/codec/harness, active-graph, and V1-absence checks;
 - `v2M1ExactSourceCheck`: clean exact forks before/after, isolated immutable artifacts, real Oxia, and focused fork tests;
 - `v2M1FinalCheck`: aggregate previous outcomes and receipt schema without rerunning their suites.

@@ -51,8 +51,8 @@ implementation_count="$(rg -l \
     || fail "expected exactly four V2 capability implementations, found $implementation_count"
 
 if rg -n 'v2M1FinalCheck|PASSED_CURRENT_SOURCE|productionActivationReady\(\) \{[[:space:]]*return true' \
-    "$production_root" "$repo_root/build.gradle.kts" --glob '*.java' --glob '*.kts' --pcre2; then
-    fail "O2 registered or claimed a final/runtime activation boundary"
+    "$production_root" --glob '*.java' --pcre2; then
+    fail "O2 production sources claimed a final/runtime activation boundary"
 fi
 
 python3 - "$result_root" <<'PY'

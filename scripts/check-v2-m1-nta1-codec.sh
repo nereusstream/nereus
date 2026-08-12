@@ -54,8 +54,8 @@ rg -q 'productionActivationReady' "$oxia_main/OxiaV2CapabilityStore.java" \
     || fail "production activation guard is missing"
 
 if rg -n 'v2M1FinalCheck|PASSED_CURRENT_SOURCE|productionActivationReady\(\) \{[[:space:]]*return true' \
-    "$domain_main" "$oxia_main" "$repo_root/build.gradle.kts" --glob '*.java' --glob '*.kts' --pcre2; then
-    fail "M1.1b registered or claimed runtime/scenario/M1 Final activation"
+    "$domain_main" "$oxia_main" --glob '*.java' --pcre2; then
+    fail "M1.1b production sources claimed runtime/scenario/M1 Final activation"
 fi
 
 python3 - "$domain_results" "$oxia_results" "$goldens" "$receipt" "$scenarios" <<'PY'

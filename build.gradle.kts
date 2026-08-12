@@ -3449,6 +3449,23 @@ tasks.register("v2M1R1FocusedCheck") {
     dependsOn("v2DocumentationCheck")
 }
 
+tasks.register<Exec>("v2M1G1ValidatorSourceCheck") {
+    group = "verification"
+    description = "Verify the production receipt/Final validator and evidence-only allocator harness boundary."
+    dependsOn(":nereus-domain:g1ReceiptValidationTest")
+    dependsOn(":nereus-domain:m1AllocatorHarnessTest")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m1-g1-validator.sh")
+}
+
+tasks.register("v2M1G1ValidatorCheck") {
+    group = "verification"
+    description = "Verify G1 parser/Final mechanics only; no scenario promotion, V1 prune, N2/N3, or M1 PASS."
+    dependsOn("v2M1G1ValidatorSourceCheck")
+    dependsOn("v2M1ReceiptCapsCheck")
+    dependsOn("v2DocumentationCheck")
+}
+
 tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
     group = "verification"
     description = "Verify the clean local Apache Kafka source baseline used for the F9-M3 fork probe."

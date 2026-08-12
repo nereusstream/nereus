@@ -36,3 +36,29 @@ tasks.register<Test>("r1RegistryDomainTest") {
         includeTestsMatching("com.nereusstream.domain.registry.RegistryAdmissionEvidenceV1Test")
     }
 }
+
+tasks.register<Test>("g1ReceiptValidationTest") {
+    group = "verification"
+    description = "Run the production G1 receipt, secure-reference, Final-index, and promotion-policy tests."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.domain.receipt.ReceiptV1CapacityEvidenceTest")
+        includeTestsMatching("com.nereusstream.domain.receipt.VirtualLedgerReceiptV1ProductionTest")
+        includeTestsMatching("com.nereusstream.domain.receipt.M1FinalResolverV1Test")
+        includeTestsMatching("com.nereusstream.domain.receipt.M1PromotionPolicyV1Test")
+    }
+}
+
+tasks.register<Test>("m1AllocatorHarnessTest") {
+    group = "verification"
+    description = "Run the evidence-only allocator candidate cuts without exposing a production mode or SPI."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.domain.registry.allocator.AllocatorEvidenceProtocolHarnessTest")
+        includeTestsMatching("com.nereusstream.domain.registry.allocator.RangeLeasedCandidateHarnessTest")
+    }
+}

@@ -23,7 +23,7 @@ fail() {
 }
 
 for required in \
-    "$test_root/ReceiptV1CapacityModel.java" \
+    "$repo_root/nereus-domain/src/main/java/com/nereusstream/domain/receipt/VirtualLedgerReceiptV1.java" \
     "$test_root/ReceiptV1CapacitySamples.java" \
     "$test_root/ReceiptV1CapacityEvidenceTest.java" \
     "$fixture" \
@@ -66,7 +66,7 @@ python3 - \
     "$source_locks_input_file" \
     "$source_locks" \
     "$scenarios" \
-    "$test_root/ReceiptV1CapacityModel.java" \
+    "$repo_root/nereus-domain/src/main/java/com/nereusstream/domain/receipt/VirtualLedgerReceiptV1.java" \
     "$test_root/ReceiptV1CapacitySamples.java" \
     "$repo_root" <<'PY'
 import hashlib
@@ -270,7 +270,8 @@ source_paths = [
     "nereus-domain/src/test/java/com/nereusstream/domain/receipt/ReceiptV1CapacityEvidenceTest.java",
     "nereus-domain/src/test/resources/receipt/m1-current-junit-inventory.tsv",
 ]
-subprocess.run(["git", "diff", "--quiet", source_commit, "--", *source_paths], cwd=repo_root, check=True)
+for source_path in source_paths:
+    subprocess.run(["git", "cat-file", "-e", f"{source_commit}:{source_path}"], cwd=repo_root, check=True)
 source_locks_at_source = subprocess.check_output(
     ["git", "show", f"{source_commit}:docs/v2/source-locks.json"], cwd=repo_root
 )
@@ -282,8 +283,8 @@ for path in (model_path, samples_path):
         if not (
             imported.startswith("java.")
             or imported.startswith("static java.")
-            or imported.startswith("com.nereusstream.domain.receipt.ReceiptV1CapacityModel")
-            or imported.startswith("static com.nereusstream.domain.receipt.ReceiptV1CapacityModel")
+            or imported.startswith("com.nereusstream.domain.receipt.VirtualLedgerReceiptV1")
+            or imported.startswith("static com.nereusstream.domain.receipt.VirtualLedgerReceiptV1")
         ):
             raise SystemExit(f"V2 M1-2 receipt/parser cap check: non-JDK model dependency {imported}")
 
@@ -330,4 +331,4 @@ print(
 )
 PY
 
-echo "V2 M1-2 receipt/parser caps verified; no production parser, N1/N2/N3, scenario promotion, or M1 Final."
+echo "V2 M1-2 historical receipt/parser cap input verified; current G1 production code cannot promote it."

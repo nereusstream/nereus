@@ -20,11 +20,14 @@ import java.io.InputStream;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
+import java.nio.file.SecureDirectoryStream;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -39,21 +42,21 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/** Test/evidence-only strict M1-2 receipt v1 capacity model. */
-final class ReceiptV1CapacityModel {
-    static final String SCHEMA = "NEREUS_VIRTUAL_LEDGER_RECEIPT_V1";
-    static final long MAX_EXACT_JSON_INTEGER = 9_007_199_254_740_991L;
-    static final int MAX_CANONICAL_ROOT_BYTES = 65_536;
-    static final int MAX_SCENARIOS = 16;
-    static final int MAX_SUITES_PER_SCENARIO = 128;
-    static final int MAX_ATTACHMENTS = 32;
-    static final int MAX_SINGLE_ATTACHMENT_BYTES = 262_144;
-    static final int MAX_TOTAL_ATTACHMENT_BYTES = 524_288;
-    static final int MAX_PATH_BYTES = 256;
-    static final int MAX_PATH_SEGMENTS = 16;
-    static final int MAX_SANITIZED_LOG_BYTES = 65_536;
-    static final int MAX_SCENARIO_ID_BYTES = 64;
-    static final int MAX_SUITE_ID_BYTES = 256;
+/** Production JDK-only parser, canonical codec, and attachment verifier for the closed receipt-v1 contract. */
+public final class VirtualLedgerReceiptV1 {
+    public static final String SCHEMA = "NEREUS_VIRTUAL_LEDGER_RECEIPT_V1";
+    public static final long MAX_EXACT_JSON_INTEGER = 9_007_199_254_740_991L;
+    public static final int MAX_CANONICAL_ROOT_BYTES = 65_536;
+    public static final int MAX_SCENARIOS = 16;
+    public static final int MAX_SUITES_PER_SCENARIO = 128;
+    public static final int MAX_ATTACHMENTS = 32;
+    public static final int MAX_SINGLE_ATTACHMENT_BYTES = 262_144;
+    public static final int MAX_TOTAL_ATTACHMENT_BYTES = 524_288;
+    public static final int MAX_PATH_BYTES = 256;
+    public static final int MAX_PATH_SEGMENTS = 16;
+    public static final int MAX_SANITIZED_LOG_BYTES = 65_536;
+    public static final int MAX_SCENARIO_ID_BYTES = 64;
+    public static final int MAX_SUITE_ID_BYTES = 256;
 
     private static final int MAX_JSON_ARRAY_ELEMENTS = 256;
     private static final int MAX_JSON_OBJECT_FIELDS = 16;
@@ -82,14 +85,14 @@ final class ReceiptV1CapacityModel {
             Set.of("aborted", "discovered", "executed", "failed", "passed", "skipped", "suiteId");
     private static final Set<String> ATTACHMENT_FIELDS = Set.of("attachmentKind", "length", "path", "sha256");
 
-    private ReceiptV1CapacityModel() {}
+    private VirtualLedgerReceiptV1() {}
 
-    enum ReceiptKind {
+    public enum ReceiptKind {
         REGISTRY_CONFORMANCE,
         HARNESS_CONFORMANCE_ONLY
     }
 
-    enum AttachmentKind {
+    public enum AttachmentKind {
         TEST_REPORT,
         REGISTRY_BYTES,
         REGISTRY_ADMISSION_EVIDENCE,
@@ -97,7 +100,7 @@ final class ReceiptV1CapacityModel {
         SANITIZED_LOG_EXCERPT
     }
 
-    enum RejectionCode {
+    public enum RejectionCode {
         RECEIPT_ROOT_NOT_REGULAR,
         RECEIPT_ROOT_BYTES_EXCEEDED,
         RECEIPT_MALFORMED_JSON,
@@ -127,25 +130,25 @@ final class ReceiptV1CapacityModel {
         RECEIPT_MANDATORY_RESULT_NOT_PASS
     }
 
-    static final class ReceiptRejectedException extends IllegalArgumentException {
+    public static final class ReceiptRejectedException extends IllegalArgumentException {
         private final RejectionCode code;
 
-        ReceiptRejectedException(RejectionCode code, String detail) {
+        public ReceiptRejectedException(RejectionCode code, String detail) {
             super(code + ": " + detail);
             this.code = Objects.requireNonNull(code, "code");
         }
 
-        ReceiptRejectedException(RejectionCode code, String detail, Throwable cause) {
+        public ReceiptRejectedException(RejectionCode code, String detail, Throwable cause) {
             super(code + ": " + detail, cause);
             this.code = Objects.requireNonNull(code, "code");
         }
 
-        RejectionCode code() {
+        public RejectionCode code() {
             return code;
         }
     }
 
-    record SourceTuple(
+    public record SourceTuple(
             String nereusCommit,
             String kafkaCommit,
             String pulsarCommit,
@@ -158,30 +161,30 @@ final class ReceiptV1CapacityModel {
             String oxiaServerImageDigest,
             String sourceLocksSha256) {}
 
-    record SuiteResult(
+    public record SuiteResult(
             String suiteId, long discovered, long executed, long passed, long failed, long skipped, long aborted) {}
 
-    record ScenarioResult(String scenarioId, List<SuiteResult> suites) {
-        ScenarioResult {
+    public record ScenarioResult(String scenarioId, List<SuiteResult> suites) {
+        public ScenarioResult {
             suites = List.copyOf(suites);
         }
     }
 
-    record AttachmentRef(AttachmentKind attachmentKind, String path, long length, String sha256) {}
+    public record AttachmentRef(AttachmentKind attachmentKind, String path, long length, String sha256) {}
 
-    record ReceiptRoot(
+    public record ReceiptRoot(
             String schema,
             ReceiptKind kind,
             SourceTuple sourceTuple,
             List<ScenarioResult> scenarios,
             List<AttachmentRef> attachments) {
-        ReceiptRoot {
+        public ReceiptRoot {
             scenarios = List.copyOf(scenarios);
             attachments = List.copyOf(attachments);
         }
     }
 
-    static ReceiptRoot parseCanonical(byte[] bytes) {
+    public static ReceiptRoot parseCanonical(byte[] bytes) {
         Objects.requireNonNull(bytes, "bytes");
         requireRootBytes(bytes.length);
         if (bytes.length >= 3
@@ -213,7 +216,7 @@ final class ReceiptV1CapacityModel {
         return receipt;
     }
 
-    static ReceiptRoot parseCanonicalFile(Path rootFile) {
+    public static ReceiptRoot parseCanonicalFile(Path rootFile) {
         Objects.requireNonNull(rootFile, "rootFile");
         BasicFileAttributes before = readAttributes(rootFile, RejectionCode.RECEIPT_ROOT_NOT_REGULAR);
         if (before.isSymbolicLink() || Files.isSymbolicLink(rootFile)) {
@@ -229,7 +232,7 @@ final class ReceiptV1CapacityModel {
         return parseCanonical(bytes);
     }
 
-    static byte[] canonicalBytes(ReceiptRoot receipt) {
+    public static byte[] canonicalBytes(ReceiptRoot receipt) {
         validate(receipt);
         StringBuilder output = new StringBuilder();
         output.append('{');
@@ -258,7 +261,20 @@ final class ReceiptV1CapacityModel {
         return bytes;
     }
 
-    static void validate(ReceiptRoot receipt) {
+    /** Returns the closed JCS object bytes used by the Final index source-tuple commitment. */
+    public static byte[] canonicalSourceTupleBytes(SourceTuple sourceTuple) {
+        validateSourceTuple(sourceTuple);
+        StringBuilder output = new StringBuilder(768);
+        appendSourceTuple(output, sourceTuple);
+        return output.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** Returns the lowercase SHA-256 commitment to {@link #canonicalSourceTupleBytes(SourceTuple)}. */
+    public static String sourceTupleSha256(SourceTuple sourceTuple) {
+        return sha256(canonicalSourceTupleBytes(sourceTuple));
+    }
+
+    public static void validate(ReceiptRoot receipt) {
         Objects.requireNonNull(receipt, "receipt");
         if (!SCHEMA.equals(receipt.schema()) || receipt.kind() == null) {
             throw reject(RejectionCode.RECEIPT_SCHEMA_OR_KIND_INVALID, "unknown schema or receipt kind");
@@ -316,7 +332,7 @@ final class ReceiptV1CapacityModel {
         }
     }
 
-    static SuiteResult normalizeJUnit(
+    public static SuiteResult normalizeJUnit(
             String suiteId, long tests, long failures, long errors, long skipped, long aborted) {
         requireCount(tests);
         requireCount(failures);
@@ -331,7 +347,7 @@ final class ReceiptV1CapacityModel {
         return suite;
     }
 
-    static void requireMandatoryPass(ReceiptRoot receipt, Set<String> requiredSuiteIds) {
+    public static void requireMandatoryPass(ReceiptRoot receipt, Set<String> requiredSuiteIds) {
         validate(receipt);
         Objects.requireNonNull(requiredSuiteIds, "requiredSuiteIds");
         Set<String> seen = new HashSet<>();
@@ -354,7 +370,7 @@ final class ReceiptV1CapacityModel {
         }
     }
 
-    static Map<AttachmentKind, Long> verifyAttachments(Path receiptDirectory, ReceiptRoot receipt) {
+    public static Map<AttachmentKind, Long> verifyAttachments(Path receiptDirectory, ReceiptRoot receipt) {
         validate(receipt);
         Objects.requireNonNull(receiptDirectory, "receiptDirectory");
         BasicFileAttributes rootAttributes =
@@ -376,57 +392,185 @@ final class ReceiptV1CapacityModel {
 
         Map<AttachmentKind, Long> verifiedByKind = new EnumMap<>(AttachmentKind.class);
         for (AttachmentRef attachment : receipt.attachments()) {
-            Path target = resolveWithoutLinks(realRoot, attachment.path());
-            BasicFileAttributes before = readAttributes(target, RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR);
-            if (before.isSymbolicLink() || Files.isSymbolicLink(target)) {
+            readVerifiedFile(realRoot, attachment.path(), attachment.length(), attachment.sha256());
+            verifiedByKind.merge(attachment.attachmentKind(), attachment.length(), VirtualLedgerReceiptV1::checkedAdd);
+        }
+        return Map.copyOf(verifiedByKind);
+    }
+
+    /** Securely opens and verifies one already bounded canonical relative reference. */
+    public static byte[] readVerifiedFile(
+            Path receiptDirectory, String canonicalPath, long expectedLength, String expectedSha256) {
+        Objects.requireNonNull(receiptDirectory, "receiptDirectory");
+        List<String> segments = validatePath(canonicalPath);
+        requireSingleAttachmentBytes(expectedLength);
+        if (!SHA256.matcher(Objects.requireNonNull(expectedSha256, "expectedSha256"))
+                .matches()) {
+            throw reject(RejectionCode.RECEIPT_ATTACHMENT_DIGEST_MISMATCH, "invalid expected SHA-256");
+        }
+        BasicFileAttributes rootAttributes =
+                readAttributes(receiptDirectory, RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR);
+        if (rootAttributes.isSymbolicLink()
+                || Files.isSymbolicLink(receiptDirectory)
+                || !rootAttributes.isDirectory()) {
+            throw reject(RejectionCode.RECEIPT_ATTACHMENT_SYMLINK, "receipt directory is not a direct directory");
+        }
+        Path secureRootPath;
+        try {
+            secureRootPath = receiptDirectory.toRealPath(LinkOption.NOFOLLOW_LINKS);
+        } catch (IOException error) {
+            throw new ReceiptRejectedException(
+                    RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "cannot resolve receipt directory", error);
+        }
+
+        List<SecureDirectoryStream<Path>> opened = new ArrayList<>();
+        try (DirectoryStream<Path> rootStream = Files.newDirectoryStream(secureRootPath)) {
+            if (!(rootStream instanceof SecureDirectoryStream<Path> secureRoot)) {
+                return readVerifiedFileWithoutSecureDirectoryStream(
+                        secureRootPath, canonicalPath, expectedLength, expectedSha256);
+            }
+            SecureDirectoryStream<Path> current = secureRoot;
+            for (int index = 0; index + 1 < segments.size(); index++) {
+                Path segment = Path.of(segments.get(index));
+                BasicFileAttributes attributes = secureAttributes(current, segment);
+                if (attributes.isSymbolicLink()) {
+                    throw reject(RejectionCode.RECEIPT_ATTACHMENT_SYMLINK, "path contains a symlink");
+                }
+                if (!attributes.isDirectory()) {
+                    throw reject(RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "path ancestor is not a directory");
+                }
+                SecureDirectoryStream<Path> child = current.newDirectoryStream(segment, LinkOption.NOFOLLOW_LINKS);
+                opened.add(child);
+                current = child;
+            }
+
+            Path fileName = Path.of(segments.get(segments.size() - 1));
+            BasicFileAttributes before = secureAttributes(current, fileName);
+            if (before.isSymbolicLink()) {
                 throw reject(RejectionCode.RECEIPT_ATTACHMENT_SYMLINK, "attachment is a symlink");
             }
             if (!before.isRegularFile()) {
                 throw reject(RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "attachment is not a regular file");
             }
-            if (before.size() != attachment.length()) {
-                throw reject(
-                        RejectionCode.RECEIPT_ATTACHMENT_LENGTH_MISMATCH,
-                        "declared and stat lengths differ for " + attachment.path());
+            if (before.size() != expectedLength) {
+                throw reject(RejectionCode.RECEIPT_ATTACHMENT_LENGTH_MISMATCH, "declared and stat lengths differ");
+            }
+            if (before.fileKey() == null) {
+                throw reject(RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "filesystem lacks stable file identity");
             }
 
             MessageDigest digest = sha256Digest();
             long actualLength = 0;
-            try (InputStream input = java.nio.channels.Channels.newInputStream(Files.newByteChannel(
-                    target, Set.<OpenOption>of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)))) {
+            ByteArrayOutputStream output = new ByteArrayOutputStream((int) Math.min(expectedLength, 8192));
+            try (InputStream input = java.nio.channels.Channels.newInputStream(current.newByteChannel(
+                    fileName, Set.<OpenOption>of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)))) {
                 byte[] buffer = new byte[8192];
                 int read;
                 while ((read = input.read(buffer)) != -1) {
                     actualLength = checkedAdd(actualLength, read);
-                    if (actualLength > attachment.length()) {
+                    if (actualLength > expectedLength) {
                         throw reject(
                                 RejectionCode.RECEIPT_ATTACHMENT_LENGTH_MISMATCH,
                                 "attachment contains bytes after its declared length");
                     }
                     digest.update(buffer, 0, read);
+                    output.write(buffer, 0, read);
                 }
-            } catch (ReceiptRejectedException error) {
-                throw error;
-            } catch (IOException error) {
-                throw new ReceiptRejectedException(
-                        RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "attachment read failed", error);
             }
-            if (actualLength != attachment.length()) {
-                throw reject(
-                        RejectionCode.RECEIPT_ATTACHMENT_LENGTH_MISMATCH,
-                        "attachment ended before its declared length");
+            if (actualLength != expectedLength) {
+                throw reject(RejectionCode.RECEIPT_ATTACHMENT_LENGTH_MISMATCH, "attachment ended early");
             }
-            String actualSha = toHex(digest.digest());
-            if (!actualSha.equals(attachment.sha256())) {
-                throw reject(
-                        RejectionCode.RECEIPT_ATTACHMENT_DIGEST_MISMATCH,
-                        "attachment SHA-256 differs for " + attachment.path());
+            if (!toHex(digest.digest()).equals(expectedSha256)) {
+                throw reject(RejectionCode.RECEIPT_ATTACHMENT_DIGEST_MISMATCH, "attachment SHA-256 differs");
             }
-            BasicFileAttributes after = readAttributes(target, RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR);
+            BasicFileAttributes after = secureAttributes(current, fileName);
             requireSameOpenFile(before, after, RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR);
-            verifiedByKind.merge(attachment.attachmentKind(), actualLength, ReceiptV1CapacityModel::checkedAdd);
+            return output.toByteArray();
+        } catch (ReceiptRejectedException error) {
+            throw error;
+        } catch (IOException error) {
+            throw new ReceiptRejectedException(
+                    RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "secure attachment read failed", error);
+        } finally {
+            for (int index = opened.size() - 1; index >= 0; index--) {
+                try {
+                    opened.get(index).close();
+                } catch (IOException ignored) {
+                    // A close failure cannot make an unverified file acceptable.
+                }
+            }
         }
-        return Map.copyOf(verifiedByKind);
+    }
+
+    private static byte[] readVerifiedFileWithoutSecureDirectoryStream(
+            Path realRoot, String canonicalPath, long expectedLength, String expectedSha256) {
+        Path target = resolveWithoutLinks(realRoot, canonicalPath);
+        BasicFileAttributes before = readAttributes(target, RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR);
+        if (before.isSymbolicLink() || Files.isSymbolicLink(target)) {
+            throw reject(RejectionCode.RECEIPT_ATTACHMENT_SYMLINK, "attachment is a symlink");
+        }
+        if (!before.isRegularFile()) {
+            throw reject(RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "attachment is not a regular file");
+        }
+        if (before.size() != expectedLength) {
+            throw reject(RejectionCode.RECEIPT_ATTACHMENT_LENGTH_MISMATCH, "declared and stat lengths differ");
+        }
+        if (before.fileKey() == null) {
+            throw reject(RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "filesystem lacks stable file identity");
+        }
+
+        MessageDigest digest = sha256Digest();
+        long actualLength = 0;
+        ByteArrayOutputStream output = new ByteArrayOutputStream((int) Math.min(expectedLength, 8192));
+        try (InputStream input = java.nio.channels.Channels.newInputStream(
+                Files.newByteChannel(target, Set.<OpenOption>of(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)))) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                actualLength = checkedAdd(actualLength, read);
+                if (actualLength > expectedLength) {
+                    throw reject(
+                            RejectionCode.RECEIPT_ATTACHMENT_LENGTH_MISMATCH,
+                            "attachment contains bytes after its declared length");
+                }
+                digest.update(buffer, 0, read);
+                output.write(buffer, 0, read);
+            }
+        } catch (ReceiptRejectedException error) {
+            throw error;
+        } catch (IOException error) {
+            throw new ReceiptRejectedException(
+                    RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "attachment read failed", error);
+        }
+        if (actualLength != expectedLength) {
+            throw reject(RejectionCode.RECEIPT_ATTACHMENT_LENGTH_MISMATCH, "attachment ended early");
+        }
+        if (!toHex(digest.digest()).equals(expectedSha256)) {
+            throw reject(RejectionCode.RECEIPT_ATTACHMENT_DIGEST_MISMATCH, "attachment SHA-256 differs");
+        }
+        BasicFileAttributes after = readAttributes(target, RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR);
+        requireSameOpenFile(before, after, RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR);
+        return output.toByteArray();
+    }
+
+    private static Path resolveWithoutLinks(Path realRoot, String canonicalPath) {
+        Path current = realRoot;
+        List<String> segments = validatePath(canonicalPath);
+        for (int index = 0; index < segments.size(); index++) {
+            current = current.resolve(segments.get(index));
+            BasicFileAttributes attributes = readAttributes(current, RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR);
+            if (attributes.isSymbolicLink() || Files.isSymbolicLink(current)) {
+                throw reject(RejectionCode.RECEIPT_ATTACHMENT_SYMLINK, "path contains a symlink");
+            }
+            if (index + 1 < segments.size() && !attributes.isDirectory()) {
+                throw reject(RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "path ancestor is not a directory");
+            }
+        }
+        Path normalized = current.normalize();
+        if (!normalized.startsWith(realRoot)) {
+            throw reject(RejectionCode.RECEIPT_PATH_INVALID, "normalized path leaves receipt root");
+        }
+        return normalized;
     }
 
     static void requireRootBytes(long bytes) {
@@ -515,7 +659,7 @@ final class ReceiptV1CapacityModel {
         }
     }
 
-    static String sha256(byte[] bytes) {
+    public static String sha256(byte[] bytes) {
         return toHex(sha256Digest().digest(bytes));
     }
 
@@ -665,24 +809,20 @@ final class ReceiptV1CapacityModel {
         }
     }
 
-    private static Path resolveWithoutLinks(Path realRoot, String canonicalPath) {
-        Path current = realRoot;
-        List<String> segments = validatePath(canonicalPath);
-        for (int index = 0; index < segments.size(); index++) {
-            current = current.resolve(segments.get(index));
-            BasicFileAttributes attributes = readAttributes(current, RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR);
-            if (attributes.isSymbolicLink() || Files.isSymbolicLink(current)) {
-                throw reject(RejectionCode.RECEIPT_ATTACHMENT_SYMLINK, "path contains a symlink");
+    private static BasicFileAttributes secureAttributes(SecureDirectoryStream<Path> directory, Path relative) {
+        try {
+            BasicFileAttributeView view =
+                    directory.getFileAttributeView(relative, BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+            if (view == null) {
+                throw reject(RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "filesystem lacks basic attributes");
             }
-            if (index + 1 < segments.size() && !attributes.isDirectory()) {
-                throw reject(RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "path ancestor is not a directory");
-            }
+            return view.readAttributes();
+        } catch (ReceiptRejectedException error) {
+            throw error;
+        } catch (IOException error) {
+            throw new ReceiptRejectedException(
+                    RejectionCode.RECEIPT_ATTACHMENT_NOT_REGULAR, "cannot read secure file attributes", error);
         }
-        Path normalized = current.normalize();
-        if (!normalized.startsWith(realRoot)) {
-            throw reject(RejectionCode.RECEIPT_PATH_INVALID, "normalized path leaves receipt root");
-        }
-        return normalized;
     }
 
     private static BasicFileAttributes readAttributes(Path path, RejectionCode code) {
@@ -697,9 +837,9 @@ final class ReceiptV1CapacityModel {
         if (after.isSymbolicLink() || !after.isRegularFile() || before.size() != after.size()) {
             throw reject(code, "file identity or attributes changed while reading");
         }
-        if (before.fileKey() != null
-                && after.fileKey() != null
-                && !before.fileKey().equals(after.fileKey())) {
+        if (before.fileKey() == null
+                || after.fileKey() == null
+                || !before.fileKey().equals(after.fileKey())) {
             throw reject(code, "file identity changed while reading");
         }
     }
