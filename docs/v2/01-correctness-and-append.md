@@ -50,6 +50,13 @@ Kafka makes all RecordBatch Frames from one partition storage append durable and
 Commit Set. Pulsar makes one ManagedLedger entry one frame/commit set. An Object group may contain several such units,
 but its physical PUT boundary cannot weaken either protocol's append atomicity.
 
+On Kafka BookKeeper-primary profiles, offset/entry admission remains ordered while a bounded set of BookKeeper writes
+may be in flight. Each complete append commit set stores durable group evidence in the ledger. Completion enters an
+ordered queue, and Durable/Readable/ACK publication advances only through the greatest contiguous Kafka prefix. Packed
+range-index checkpoints are asynchronous; pre-reserved owner-local locators make an ACKed tail readable meanwhile.
+No normal append creates a remote mapping/reservation record, and an earlier failed/unknown group fences recovery
+rather than allowing a later durable group to commit around the gap. ADR 0086 is authoritative.
+
 The owner must not acknowledge coverage because a local future completed if its Owner Epoch or Storage Epoch authority
 was fenced before the durability completion was validated.
 

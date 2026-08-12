@@ -104,6 +104,11 @@ uses deterministic assignment from durable roots or a separately bounded coordin
 When a coordinator or executor serves multiple Protocol Cells, assignment roots, queues, quotas, fencing, and task
 authority remain cell-scoped. Shared capacity never creates a cross-cell publication or deletion authority.
 
+For Kafka BookKeeper-primary profiles, KRaft/manifest authority stores only low-frequency current/sealed run and
+generation roots. One Produce/partition append never creates an Oxia/KRaft mapping or reservation row. Fine-grained
+RecordBatch-to-entry authority is packed into immutable in-ledger range-index blocks and the sealed run footer; the
+ACTIVE tail is owner-local and pre-reserved before offset allocation. ADR 0086 owns this split.
+
 ## Pulsar backend
 
 Pulsar uses MetadataStore/Oxia for Nereus-owned Topic Protocol Binding, Storage Epoch, virtual-ledger identity/chain,

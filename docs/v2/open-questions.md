@@ -512,6 +512,18 @@ The local Pulsar checkout already records an attempt UUID before calling the off
 opens offloaded reads from ledger metadata, and consults the offload context before BookKeeper deletion. Reusing that
 state machine best preserves the “not weaker than native Pulsar” requirement.
 
+### `V2-OPEN-BK-02`: resolved semantic layout; M2 numeric and scale evidence remains
+
+Resolved by [ADR 0086](../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md): Kafka uses one
+Position Domain across profiles; BookKeeper-primary paths use one logical ledger chain per partition, low-frequency
+run/generation roots, packed in-ledger RecordBatch range-index checkpoints, owner-local active-tail locators, targeted
+entry reads, and ordered publication over bounded overlapping I/O. Normal append writes no per-append remote metadata.
+
+The remaining M2 gate is executable rather than an architecture choice: freeze exact `NBKE2`/index/footer bytes and
+evidence-derived checkpoint/pipeline/recovery/rollover bounds, then prove dedicated-ledger viability at 10k/100k
+partitions. Failure blocks the profile or requires a new pooled-lane ADR; it cannot silently select a global mixed-
+partition ledger or restore V1 reservation dual writes.
+
 ### `V2-OPEN-BK-03`: resolved sealed-ledger execution
 
 Resolved by [ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md). 0.2 offloads sealed, non-current

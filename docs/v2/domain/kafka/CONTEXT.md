@@ -53,3 +53,28 @@ _Avoid_: Produce request, individual record, transaction
 All Kafka Frames decoded from one partition's single MemoryRecords storage append. Every member is durable and valid
 before any member becomes visible or acknowledged.
 _Avoid_: Object group, partial batch-prefix success, cross-partition request atomicity
+
+**Kafka BookKeeper Run**:
+One ACTIVE/SEALED/RETIRED ledger-generation node in a Kafka partition's logical BookKeeper chain. It binds one
+Binding/incarnation/partition, Storage Epoch, Owner Epoch, Provider Scope, ledger identity, and contiguous Kafka Offset
+Range. It is the rollover, recovery, materialization, retention, and source-retirement unit; it never turns entry IDs
+into Kafka offsets.
+_Avoid_: Global mixed-partition ledger, BookKeeper Position as Kafka Position, per-append metadata row
+
+**Kafka BookKeeper Range Index Block**:
+One immutable checksummed BookKeeper control entry containing packed floor-search locators from complete assigned Kafka
+RecordBatch ranges to exact DATA entries. The block is an asynchronous checkpoint and not an ACK prerequisite; the
+owner-local active-tail locator view covers ACKed data after the last block.
+_Avoid_: Oxia/KRaft row per Produce, one object per locator, record-count-derived coverage, ACK-time checkpoint
+
+**Kafka BookKeeper Ordered Pipeline**:
+The owner-local composition of pre-position capacity reservation, Kafka-native Offset Admission Sequencer, ordered
+ledger-entry submission, bounded overlapping BookKeeper futures, and contiguous commit/publication queue. Completion
+may be out of order; visibility and ACK may not advance around a gap.
+_Avoid_: Remote offset allocator, serial wait-before-next-submit, out-of-order committed frontier
+
+**Kafka BookKeeper Targeted Read**:
+Run floor lookup followed by index-block floor lookup and packed-locator search, then one target DATA entry or the
+minimum adjacent range. Routine validation uses BookKeeper digest, NBKE2 CRC32C, and Kafka RecordBatch header/CRC;
+whole-run SHA belongs to seal, scrub, recovery, and materialization.
+_Avoid_: Full append-extent read for one offset, range-wide SHA on every Fetch, cache as sole authority

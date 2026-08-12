@@ -184,6 +184,12 @@ Protocol Binding.
 
 ## Profile contracts
 
+For Kafka, all three profiles share one Kafka Offset Domain. Profile selection changes the primary-WAL ACK boundary,
+source-local physical index, preferred read source, and retirement eligibility; it never creates a profile-specific
+offset or consumer-group cursor. Object generations use an authenticated Object directory. BookKeeper-primary
+generations use ADR 0086's per-partition ledger run and packed in-ledger RecordBatch range index. A physical generation
+switch preserves exact Kafka coverage.
+
 ### `OBJECT_WAL`
 
 The Object group is the primary durable WAL. ACK waits for verified provider durability of the complete typed Protocol

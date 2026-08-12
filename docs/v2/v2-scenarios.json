@@ -551,7 +551,7 @@
     {
       "id": "V2-BK-003",
       "milestone": "M2",
-      "contract": "Kafka BookKeeper layout passes 10k and 100k partition resource spikes",
+      "contract": "the accepted one logical ledger chain per Kafka partition layout passes 10k and 100k resource evidence without silently selecting pooled ledgers",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -632,6 +632,38 @@
       "id": "V2-BK-013",
       "milestone": "M2",
       "contract": "NPD1 block policy evidence uses 1 4 8 16 MiB candidates without wire enums Deployment Namespace Topic owns defaults overrides Cell host only cap and resolved class persists per attempt",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-014",
+      "milestone": "M2",
+      "contract": "Kafka BookKeeper profiles preserve one Kafka Offset Domain while coarse run generation roots and packed in ledger RecordBatch locators map stable logical coverage to replaceable physical extents",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-015",
+      "milestone": "M2",
+      "contract": "one Kafka append commit set stores durable group evidence in BookKeeper performs zero per append remote control metadata IO and publishes only through an ordered contiguous queue over bounded overlapping writes",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-016",
+      "milestone": "M2",
+      "contract": "Kafka Fetch uses run index floor lookup and a targeted DATA entry read with entry local integrity rather than reading and hashing the complete append extent",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-BK-017",
+      "milestone": "M2",
+      "contract": "asynchronous range index checkpoints plus a sealed authenticated footer bound takeover to a declared entry byte time tail without losing or inventing an acknowledged Kafka prefix",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null

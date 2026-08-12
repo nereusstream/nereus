@@ -40,6 +40,11 @@ ledger chain. For Pulsar Object WAL, ADR 0022 assigns virtual-ledger ID allocati
 Pulsar-cell MetadataStore/Oxia authority; Object identity remains only a Physical Extent.
 V2 does not persist `ledgerBase + entryId` as a second Pulsar position truth.
 
+For Kafka BookKeeper-primary profiles, ADR 0086 fixes a two-level physical map without creating another Position
+Domain: low-frequency run/generation roots route a Kafka range to one per-partition ledger run, and packed immutable
+in-ledger locators route one assigned RecordBatch range to one DATA entry. Consumer-group offsets remain Kafka cursors;
+normal Produce/Fetch does not read or mutate one remote mapping row per append.
+
 ## Consequences
 
 - Shared manifests, handoff, trim, recovery, and GC carry binding-scoped typed coverage and frontiers.
@@ -49,6 +54,6 @@ V2 does not persist `ledgerBase + entryId` as a second Pulsar position truth.
   physical-delete authority.
 - A Topic Incarnation has exactly one Position Domain and one Native Write Authority at a time.
 
-This refines ADR 0007 and ADR 0009 and is further refined by ADR 0014 and ADR 0022. It is tracked by
+This refines ADR 0007 and ADR 0009 and is further refined by ADR 0014, ADR 0022, and ADR 0086. It is tracked by
 `T-POSITION-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `V2-POSITION-001..002`, `V2-MULTIPROTOCOL-001`, and
 `V2-FABRIC-001..003`.

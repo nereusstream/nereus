@@ -286,9 +286,16 @@ BookKeeper only as a Physical Extent. Pulsar BookKeeper profiles preserve native
 ordering, and lifecycle. Cross-ledger Pulsar Coverage is a ledger-keyed range collection; V2 does not persist
 `ledgerBase + entryId` as a universal offset.
 
-The exact Kafka ledger layout remains an M2 evidence gate. Pulsar async Object offload processes sealed non-current
-ledgers only; one native attempt publishes one bounded data Object followed by one deterministic sparse-index/root
-Object. It does not stream the current append ledger in 0.2. Pulsar Object WAL allocates increasing virtual ledger IDs
+Kafka BookKeeper profiles use one logical ledger chain per partition, low-frequency run/generation roots, packed
+in-ledger RecordBatch range-index checkpoints, and an owner-local active-tail locator. One partition append remains the
+atomic commit set; one RecordBatch is the read-index unit; one sealed run is the lifecycle unit. Bounded BookKeeper I/O
+may complete out of order, but publication/ACK advances only through the contiguous Kafka Offset prefix. Fetch uses
+run/block floor lookup and targeted entry reads rather than remote metadata or whole-extent checksum reads. M2 still
+owns exact `NBKE2` bytes, numeric bounds, and 10k/100k dedicated-ledger evidence; pooled ledgers require a future ADR.
+
+Pulsar async Object offload processes sealed non-current ledgers only; one native attempt publishes one bounded data
+Object followed by one deterministic sparse-index/root Object. It does not stream the current append ledger in 0.2.
+Pulsar Object WAL allocates increasing virtual ledger IDs
 from one fixed aligned `2^40`, never-reused Cell slice assigned by the 64-KiB/256-lifetime Registry selected for its
 immutable ledger-ID compatibility namespace. The Registry binds a complete writer commitment and exclusion interlock.
 Slice ownership survives broker/provider change and retirement leaves a permanent tombstone. 0.2 never resizes,
@@ -303,6 +310,8 @@ rollover/append-stall comparison, including mass broker takeover. Any RANGE cand
 ManagedLedger incarnation across owner-only head fencing, lets a new owner finish the same RESERVED grant, and burns at
 most one stale candidate. Installed-range use does not wait for allocator clear, but a high-priority reconciler must
 unblock the next Cell grant. These constraints do not select RANGE_LEASED.
+
+ADR 0086 is authoritative for the Kafka BookKeeper run/range-index and ordered-pipeline direction.
 
 For Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole attempt, completion,
 read/fallback, and deletion-eligibility authority. Nereus provides a `LedgerOffloader`; its manifest is derived and cannot

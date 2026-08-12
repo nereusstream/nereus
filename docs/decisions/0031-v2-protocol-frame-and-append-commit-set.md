@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted for Kafka and Pulsar `OBJECT_WAL`. Implementation and runtime evidence are not started at M0.
+Accepted for Kafka and Pulsar `OBJECT_WAL`; ADR 0086 extends the same Kafka frame/commit-set boundary to both Kafka
+BookKeeper-primary profiles. Implementation and runtime evidence are not started.
 
 ## Context
 
@@ -46,6 +47,11 @@ completion ticket to one whole Kafka append commit set or Pulsar entry. Frames, 
 messages never become independent ticket/ACK units. One shared verified extent feeds their compact read locators before
 frontier publication and ACK.
 
+For Kafka BookKeeper-primary profiles, ADR 0086 persists the same complete commit-set evidence in the BookKeeper data
+path. One assigned RecordBatch remains one lookup/DATA unit, while one partition storage append remains the all-or-none
+publication/ACK unit. BookKeeper I/O futures may overlap, but the ordered commit frontier cannot pass an earlier group;
+the range-index checkpoint is asynchronous and never splits or replaces commit-set authority.
+
 ## Consequences
 
 - `V2-OPEN-OBJ-08` is resolved.
@@ -61,5 +67,6 @@ This decision is refined by [ADRs 0037](0037-v2-object-wal-binding-context-epoch
 [0040](0040-v2-nwg1-append-unit-directory-and-colocation.md),
 [0064](0064-v2-object-wal-physical-and-binding-frontiers.md),
 [0066](0066-v2-pre-position-reservation-and-completion-ticket.md), and
-[0067](0067-v2-active-tail-readable-publication-and-index-boundary.md), refines ADR 0026, and is tracked by
+[0067](0067-v2-active-tail-readable-publication-and-index-boundary.md), with Kafka BookKeeper placement refined by
+[0086](0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md), refines ADR 0026, and is tracked by
 `T-PROTOCOL-01`, `T-OBJECT-01`, `V2-OBJ-002/004/006/007/012/021/023`, and `V2-READ-003/004`.

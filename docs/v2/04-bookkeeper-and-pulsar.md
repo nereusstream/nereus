@@ -1,6 +1,6 @@
 ---
 productLine: V2
-designStatus: Proposed
+designStatus: Accepted
 implementationStatus: NotStarted
 evidenceStatus: NotRun
 authority: NormativeWithOpenGates
@@ -9,9 +9,10 @@ sourceTuple: v2-m0
 
 # BookKeeper and Pulsar
 
-The profile and ACK boundaries, protocol-native position model, and Pulsar ManagedLedger offload authority are accepted.
-Exact Kafka ledger layout remains proposed until the M2 scale spike closes `V2-OPEN-BK-02`. Pulsar 0.2 offload execution
-and its one-data-plus-root Object pair are accepted.
+The profile and ACK boundaries, protocol-native position model, Kafka BookKeeper run/range-index direction, and Pulsar
+ManagedLedger offload authority are accepted. Exact Kafka `NBKE2` wire, numeric index/pipeline bounds, and dedicated-
+ledger capacity remain M2 evidence gates under `V2-OPEN-BK-02`. Pulsar 0.2 offload execution and its one-data-plus-root
+Object pair are accepted.
 
 ## Shared BookKeeper contract
 
@@ -28,12 +29,41 @@ native Pulsar BookKeeper path; Kafka retains Kafka Offsets regardless of its phy
 
 ## Kafka BookKeeper layout
 
-The starting design uses one active ledger per Kafka partition because it makes Kafka Offset continuity, ownership, seal,
-and retention easy to reason about. Each append joins a binding-scoped `KafkaOffsetRange` to a
-`BookKeeperExtent`; entry IDs are not exposed as Kafka Offsets. The layout is provisional under `T-LEDGER-01`.
-Before M2 freezes it, scale evidence must cover 10k and 100k partitions, open-handle memory, metadata operations,
-recovery time, bookie pressure, and rollover rate. The result may select pooled/striped ledgers only if partition
-fencing, typed coverage, and extent retirement remain unambiguous.
+ADR 0086 fixes one Kafka Position Domain across all three canonical profiles. Kafka Offset remains protocol truth;
+consumer-group committed offset is only a cursor into that domain and has no independent BookKeeper mapping. Object or
+BookKeeper generations may replace Physical Extents without changing the covered Kafka range. `OBJECT_WAL` uses its
+authenticated Object directory; the two BookKeeper-primary profiles use the run/range-index layout below.
+
+The default is one logical BookKeeper ledger chain per Kafka partition. One ACTIVE/SEALED/RETIRED run is the owner,
+rollover, recovery, materialization, retention, and source-retirement unit. BookKeeper journal/entry-log files are still
+physically shared; this is not a dedicated-disk choice. A global mixed-partition ledger is excluded from 0.2. A pooled
+cold-partition layout needs a future ADR and evidence rather than becoming an automatic scale fallback.
+
+Mapping has two levels: the Kafka authority/manifest system stores only low-frequency partition-to-run and sealed
+generation roots, while immutable `RANGE_INDEX_BLOCK` control entries inside the ledger map RecordBatch Kafka ranges
+to exact DATA entries. One partition storage append is one all-or-none `KafkaAppendCommitSet`; one complete
+RecordBatch is one lookup unit; one sealed run is one lifecycle unit. Offset coverage comes from each assigned
+RecordBatch header, never record count. The first implementation stores one RecordBatch per DATA entry.
+
+Before offset assignment, the owner reserves completion-tracker and active-tail-locator capacity. It assigns Kafka
+ranges and contiguous ledger-entry ranges in admission order, pipelines bounded BookKeeper writes, and publishes
+visibility/ACK only through the greatest contiguous successful group. A later durable group waits behind an earlier
+gap; definitive failure fences the run instead of committing around the hole. Index checkpoints are asynchronous and
+do not enter the ACK cut. Owner-local locators make the ACKed active tail readable before the next checkpoint.
+
+Random Fetch floor-searches run, index block, and packed locator, then reads only the target entry or minimum adjacent
+range. It validates BookKeeper digest, `NBKE2` CRC32C, and Kafka RecordBatch header/CRC. SHA-256 block/run roots serve
+seal, scrub, recovery, and materialization rather than forcing a full append-range hash on every Fetch.
+
+Takeover starts at the last valid index checkpoint, scans only a bounded entry/byte/time tail, reconstructs the greatest
+gap-free committed offset, seals the old run, publishes its footer/root, and opens a new run. Candidate checkpoint,
+index, locator, recovery-tail, pipeline, and rollover values remain evidence inputs. M2 must also cover 10k/100k
+partitions, open-handle memory, metadata operations, recovery time, bookie pressure, and rollover rate. Failure of that
+gate blocks the profile or triggers a new layout decision; it does not silently weaken the accepted authority.
+
+Normal append never writes one remote metadata reservation/mapping per Produce. The V1 reservation/protection and
+extent-wide `rangeChecksum` path is not retained or dual-written. Exact design and implementation cuts are in
+[the M2 Kafka BookKeeper detailed design](detailed_design/m2/kafka-bookkeeper-offset-range-index.md).
 
 ## Pulsar native BookKeeper path
 
@@ -112,6 +142,10 @@ ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.
 
 For Kafka `BOOKKEEPER_WAL_ASYNC_OBJECT`, the Nereus manifest joins sealed Kafka Offset Range coverage to the preferred
 Object Extent while retaining the BookKeeper Extent as protected fallback.
+Materialization may combine several SEALED Kafka BookKeeper runs, but the Object directory must reproduce their exact
+gap-free RecordBatch coverage. Publishing the new generation changes source selection only; Kafka offsets and group
+committed offsets remain unchanged. BookKeeper deletion still waits for generation publication, exact Object
+verification, logical retention, read-pin/source-protection drain, and response-loss-safe delete proof.
 
 For Pulsar, native ManagedLedger ledger/offload metadata is the sole authority for attempt identity, completion,
 offloaded read selection and fallback, and BookKeeper deletion eligibility. Nereus implements a custom
@@ -209,7 +243,7 @@ throttle, or stop new admission before BookKeeper capacity is exhausted. It neve
 into a synchronous Object write.
 
 Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, and `T-POLICY-01`. Required scenarios:
-`V2-BK-001..013`, `V2-POSITION-001..018`, and `V2-POLICY-001..002`. See
+`V2-BK-001..017`, `V2-POSITION-001..018`, and `V2-POLICY-001..002`. See
 [ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md),
 [ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md),
 [ADR 0022](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md),
@@ -231,4 +265,5 @@ Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, 
 [ADR 0057](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md), with RANGE takeover constrained by
 [ADR 0061](../decisions/0061-v2-pulsar-range-grant-owner-takeover.md) and M1 Registry/witness/evidence bounds refined by
 [ADRs 0082](../decisions/0082-v2-m1-domain-and-control-authority-contracts.md) and
-[0083](../decisions/0083-v2-m1-wire-control-and-evidence-bounds.md).
+[0083](../decisions/0083-v2-m1-wire-control-and-evidence-bounds.md), with the Kafka BookKeeper path fixed by
+[ADR 0086](../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md).

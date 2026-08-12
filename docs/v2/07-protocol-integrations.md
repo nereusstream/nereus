@@ -47,6 +47,14 @@ group WAL, immutable objects, asynchronous materialization, bounded handoff hint
 inflight limits. The exact research commits are recorded in [source locks](source-locks.json); research is not executable
 acceptance evidence.
 
+For both Kafka BookKeeper-primary profiles, ADR 0086 combines Kafka logical offsets with a Pulsar-style per-partition
+ledger lifecycle. Low-frequency run/generation roots route a Kafka range to one ACTIVE or SEALED run; packed immutable
+range-index control entries route one complete RecordBatch to one DATA entry. Owner-local locators cover the ACKed
+tail after the latest index checkpoint. Produce performs no per-append control-metadata mutation, and Fetch uses
+run/block floor lookup plus a targeted entry read. Offset/entry admission remains ordered while bounded BookKeeper
+futures overlap; the committed/ACK frontier never advances around a gap. Consumer-group offsets remain Kafka cursors,
+not BookKeeper coordinates.
+
 V2 Kafka metadata is enabled only by fresh-bootstrap finalized `nereus.storage.version=2`; the V2 build supports only
 `[2,2]`, rejects level-1 V1 state, and forbids runtime upgrade or downgrade. A successful native CreateTopics item
 atomically publishes logical aggregate schema v1 with the topic records. The sole exact, case-sensitive/no-trim input-

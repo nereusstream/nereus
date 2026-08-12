@@ -161,6 +161,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
     "$repo_root/docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
     "$repo_root/docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
+    "$repo_root/docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -210,6 +211,11 @@ require_literal 'no Docker/K1/P1/R1/runtime/scenario/M1 PASS' "build.gradle.kts"
 require_literal 'no Docker/runtime/scenario/M1 PASS' "build.gradle.kts"
 require_literal 'historical readiness evidence verified; no Docker, runtime activation, scenario promotion, or M1 PASS' "scripts/check-v2-m1-nta1-readiness.sh"
 require_literal 'production codec/goldens and exact-local evidence' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
+require_literal 'normal append creates a remote metadata reservation' "docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
+require_literal 'coverage comes from the assigned RecordBatch header' "docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
+require_literal 'does not implement this data layout' "docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
+require_literal 'M2 Kafka BookKeeper offset, run, and range-index design' "docs/v2/detailed_design/m2/kafka-bookkeeper-offset-range-index.md"
+require_literal 'No cut introduces a dual-write compatibility mode' "docs/v2/detailed_design/m2/kafka-bookkeeper-offset-range-index.md"
 require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal "V2 documentation baseline" ".github/workflows/build.yml"
 require_literal "Superseded by ADR 0012." "docs/decisions/0010-v2-topic-profile-binding.md"
@@ -407,6 +413,8 @@ require_literal "M1 Readiness Grill round 4" "docs/v2/grill-notes/25-m1-readines
 require_literal "不要同时维护 suite/scenario/aggregate 三套独立结果" "docs/v2/grill-notes/25-m1-readiness-round-4-leaf-witness-registry-and-receipt.md"
 require_literal "M1 Readiness Grill round 5" "docs/v2/grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md"
 require_literal "结论：Round 5 不能全部确认" "docs/v2/grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md"
+require_literal "Kafka BookKeeper offset, run, and range-index direction" "docs/v2/grill-notes/27-kafka-bookkeeper-offset-run-range-index-direction.md"
+require_literal "transitional dual write" "docs/v2/grill-notes/27-kafka-bookkeeper-offset-run-range-index-direction.md"
 require_literal "Metadata-oxia O2 is also locally" "docs/v2/open-questions.md"
 require_literal '`maxWriterCount=8` is a candidate' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
@@ -1241,6 +1249,7 @@ required_scenarios = {
     "V2-OBJ-019", "V2-OBJ-020", "V2-OBJ-021", "V2-OBJ-022", "V2-OBJ-023", "V2-OBJ-024",
     "V2-BK-001", "V2-BK-002", "V2-BK-003", "V2-BK-004", "V2-BK-005", "V2-BK-006",
     "V2-BK-007", "V2-BK-008", "V2-BK-009", "V2-BK-010", "V2-BK-011", "V2-BK-012", "V2-BK-013",
+    "V2-BK-014", "V2-BK-015", "V2-BK-016", "V2-BK-017",
     "V2-READ-001", "V2-READ-002", "V2-READ-003", "V2-READ-004", "V2-READ-005", "V2-READ-006",
     "V2-READ-007", "V2-READ-008", "V2-READ-009", "V2-READ-010", "V2-READ-011",
     "V2-READ-012", "V2-READ-013", "V2-READ-014", "V2-READ-015",
@@ -1405,6 +1414,7 @@ link_docs=(
     "$repo_root/docs/decisions/0083-v2-m1-wire-control-and-evidence-bounds.md"
     "$repo_root/docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
     "$repo_root/docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
+    "$repo_root/docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
 )
 
 while IFS=: read -r source match; do
