@@ -31,8 +31,14 @@ public final class PulsarClassicNameV1 {
 
     public static void validate(PulsarTopicIncarnationIdentity incarnation) {
         Objects.requireNonNull(incarnation, "incarnation");
-        int persistenceBytes = incarnation.persistenceName().value().bytes().length();
-        int topicBytes = incarnation.topicName().value().bytes().length();
+        validate(incarnation.persistenceName(), incarnation.topicName());
+    }
+
+    public static void validate(PulsarPersistenceName persistenceName, PulsarTopicName topicName) {
+        Objects.requireNonNull(persistenceName, "persistenceName");
+        Objects.requireNonNull(topicName, "topicName");
+        int persistenceBytes = persistenceName.value().bytes().length();
+        int topicBytes = topicName.value().bytes().length();
         if (persistenceBytes > MAX_PERSISTENCE_NAME_BYTES) {
             throw new IllegalArgumentException("Pulsar canonical persistence name exceeds 4096 UTF-8 bytes");
         }
@@ -40,9 +46,8 @@ public final class PulsarClassicNameV1 {
             throw new IllegalArgumentException("Pulsar canonical topic name exceeds 4096 UTF-8 bytes");
         }
 
-        Components topic = parseTopic(incarnation.topicName().value().value());
-        Components persistence =
-                parsePersistence(incarnation.persistenceName().value().value());
+        Components topic = parseTopic(topicName.value().value());
+        Components persistence = parsePersistence(persistenceName.value().value());
         if (!topic.tenant().equals(persistence.tenant())
                 || !topic.namespace().equals(persistence.namespace())
                 || !topic.localName().equals(persistence.localName())) {
@@ -58,8 +63,8 @@ public final class PulsarClassicNameV1 {
                 + URLEncoder.encode(topic.localName(), StandardCharsets.UTF_8);
         String expectedTopic =
                 TOPIC_PREFIX + persistence.tenant() + "/" + persistence.namespace() + "/" + persistence.localName();
-        if (!incarnation.persistenceName().value().value().equals(expectedPersistence)
-                || !incarnation.topicName().value().value().equals(expectedTopic)) {
+        if (!persistenceName.value().value().equals(expectedPersistence)
+                || !topicName.value().value().equals(expectedTopic)) {
             throw new IllegalArgumentException("Pulsar names are not the exact canonical classic round trip");
         }
     }
