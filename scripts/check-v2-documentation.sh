@@ -36,6 +36,7 @@ required_v2_docs=(
     detailed_design/m1/m1.1b-nta1-codec.md
     detailed_design/m1/m1.1c-registry-capacity-spike.md
     detailed_design/m1/n1-immutable-domain-artifact.md
+    detailed_design/m1/k1-kafka-kraft-metadata-authority.md
     open-questions.md
     tradeoffs.md
 )
@@ -237,6 +238,11 @@ require_literal 'receipt: docs/v2/evidence/v2-m1/n1/README.md' "docs/v2/detailed
 require_literal 'v2M1N1ArtifactCheck' "build.gradle.kts"
 require_literal 'IMMUTABLE_INPUT_ONLY' "docs/v2/source-locks.json"
 require_literal 'NEREUS_V2_N1_ARTIFACT_RECEIPT_V1' "docs/v2/evidence/v2-m1/n1/n1-artifact.json"
+require_literal 'K1 Kafka KRaft metadata authority' "docs/v2/detailed_design/m1/k1-kafka-kraft-metadata-authority.md"
+require_literal 'apiKey                         32000' "docs/v2/detailed_design/m1/k1-kafka-kraft-metadata-authority.md"
+require_literal 'TopicCreateCandidateV1' "docs/v2/detailed_design/m1/k1-kafka-kraft-metadata-authority.md"
+require_literal 'K1_FOCUSED_ONLY' "docs/v2/detailed_design/m1/k1-kafka-kraft-metadata-authority.md"
+require_literal 'does not own Produce/Fetch' "docs/v2/08-implementation-plan-and-gates.md"
 require_literal 'v2M1ReceiptCapsCheck' "build.gradle.kts"
 require_literal 'no N1/N2/N3, scenario promotion, or M1 Final' "build.gradle.kts"
 require_literal 'no production parser, N1/N2/N3, scenario promotion, or M1 Final' "scripts/check-v2-m1-receipt-caps.sh"

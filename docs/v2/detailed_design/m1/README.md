@@ -104,7 +104,7 @@ Each target owns one row below and must preserve unrelated worktree state.
 | `M1.1c-R0` | test/evidence-only Registry writer-cohort inventory and canonical-capacity accounting; no production authority | accepted [R0 design](m1.1c-registry-capacity-spike.md), `M1.1b`, and O2 fail-closed Registry port | `v2M1RegistryCapacityCheck`; readiness only | verified at Nereus `03d27256`: 18 focused tests and deterministic [non-promotable evidence](../../evidence/v2-m0/m1.1c-r0/README.md) accept 14 writers and 51,016 canonical bytes |
 | `M1-2` | strict receipt/parser cap model, representative roots/attachments, path and symlink safety, stable errors, and deterministic non-promotable evidence | M1.1a O1/O2 receipts, `M1.1b`, and `M1.1c-R0` | `v2M1ReceiptCapsCheck`; readiness only | verified at Nereus `75593faf`: 36 focused tests and deterministic [non-promotable evidence](../../evidence/v2-m0/m1-2-receipt-caps/README.md); ADR 0084 owns the accepted cap table |
 | `N1` | immutable, non-overwriteable domain/SPI artifact with source/JAR/source-JAR/POM/metadata identities | accepted M1-2 receipt caps | `v2M1N1ArtifactCheck` | verified immutable input from source `330aaec3`; manifest `9058ff01`; [design and receipt](n1-immutable-domain-artifact.md) |
-| `K1` | complete Kafka feature-2/API-32000/CreateTopics/image/publication authority | immutable N1 domain artifact | Kafka focused source gate | detailed design required |
+| `K1` | complete Kafka feature-2/API-32000/CreateTopics/image/publication authority | immutable N1 domain artifact | Kafka focused source gate | [accepted detailed design](k1-kafka-kraft-metadata-authority.md); implementation InProgress |
 | `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | immutable N1 artifact plus `M1.1a-O2` | Pulsar/Oxia focused source gate | detailed design required |
 | `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | immutable N1 artifact, accepted `M1.1c-R0`, and `M1.1a-O2` | `REGISTRY_CONFORMANCE` | capacity input accepted; production codec/store/interlock and conformance remain NotStarted |
 | `G1` | fast/exact/final M1 gates and production receipt validators | K1/P1/R1 plus accepted M1-2 receipt caps | `v2M1Check`, `v2M1ExactSourceCheck`, `v2M1FinalCheck` | M1-2 input accepted; blocked on K1/P1/R1 and the separately reviewed production validator |
@@ -180,7 +180,8 @@ The expected review sequence is:
    [M1.1c-R0 design](m1.1c-registry-capacity-spike.md), followed by an accepted cap;
 10. verified representative receipt/parser output evidence and accepted safety caps (complete at `75593faf`);
 11. immutable, non-overwriteable N1 domain/SPI artifact publication with JAR/source-JAR/POM/Gradle-metadata hashes;
-12. separate Kafka K1, Pulsar P1, and Registry R1 changes consuming exact N1 artifacts;
+12. separate Kafka K1, Pulsar P1, and Registry R1 changes consuming exact N1 artifacts; K1 now follows the accepted
+    [KRaft metadata-authority design](k1-kafka-kraft-metadata-authority.md);
 13. M1 fast/exact/final gate and receipt-validator implementation without promotion;
 14. settings/BOM/publication/CI cut;
 15. independent mechanical V1/KoP-runtime deletion;

@@ -142,6 +142,11 @@ builds, and an absent source-SHA repository directory. A later evidence-only bin
 source JAR, POM, Gradle metadata, byte lengths, and SHA-256 values. N1 is now verified from source `330aaec3` with
 manifest `9058ff01` by `v2M1N1ArtifactCheck`; it remains an input milestone rather than M1 PASS.
 
+K1 follows the accepted [Kafka KRaft metadata-authority design](detailed_design/m1/k1-kafka-kraft-metadata-authority.md)
+and consumes only that exact N1 artifact. Its implementation is now InProgress on the source-locked Kafka fork. K1
+owns feature 2, API 32000, direct domain mapping, CreateTopics/image/publication authority, and the focused fork gate;
+it does not own Produce/Fetch, M6 process activation, scenario promotion, or M1 PASS.
+
 `docs/v2/source-locks.json` is the sole expected-SHA authority for external Kafka/Pulsar/Oxia sources. Checkout paths
 may be overridden; expected SHAs may not. The manifest cannot self-lock the current Nereus commit; a promotion receipt
 binds it. M1 gates are:
