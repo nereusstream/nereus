@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted for the 0.2 M1 implementation. The complete NTA1 FrameEncodingPolicy/legality/cap table, Pulsar UTF-8 and
-total-payload caps, writer count, receipt/attachment numeric caps, and
+Accepted for the 0.2 M1 implementation. The 2026-08-12 M1.1b refinement closes the complete NTA1
+FrameEncodingPolicy/legality/cap table and Pulsar UTF-8/total-payload caps. Writer count, receipt/attachment numeric caps, and
 executable current-source evidence remain implementation-readiness descendants. ADR 0084 closes the protocol/leaf,
-Kafka precedence, minimal continuity, native hash, and receipt-accounting descendants while keeping the complete NTA1
-table, provider API/source tuple, Registry writer caps, and receipt numeric caps OPEN. ADR 0085 closes the client-only
+Kafka precedence, minimal continuity, native hash, and receipt-accounting descendants. Provider API/source tuple,
+Registry writer caps, and receipt numeric caps remain OPEN. ADR 0085 closes the client-only
 continuity direction and exact 120-byte writer row, removes receipt run identity, and permits M1.1a foundation work
 without claiming the deferred codecs or validators.
 
@@ -14,8 +14,8 @@ without claiming the deferred codecs or validators.
 
 NPC1 and NTI1 are now strict Java-17/JDK-only codecs over already bounded byte arrays, with literal golden/negative
 vectors, unsigned declared-length checks before allocation, raw Kafka UUID handling, strict UTF-8, positive Pulsar
-generation, and strict EOF. This does not implement or name an NTA1 codec, freeze a Pulsar/name/total cap, or activate
-Kafka/Pulsar wire integration.
+generation, and strict EOF. This foundation refinement did not implement or name an NTA1 codec or activate Kafka/Pulsar
+wire integration. The later accepted M1.1b contract freezes aggregate caps without changing that historical boundary.
 
 ## Context
 
@@ -73,21 +73,21 @@ NTI1 || u16be(PULSAR)
 Kafka accepts at most 249 bytes from its pinned ASCII topic-name alphabet and rejects the zero UUID plus the exact
 reserved-UUID set frozen before implementation. Pulsar generation is `1..Long.MAX_VALUE`, encoded as unsigned
 big-endian bits in the `u64be` field; zero or increment overflow fails closed. Pulsar's pinned source supplies no
-equivalent native name-length maximum, so its per-name and total UTF-8 caps remain V2 format decisions that must be
-fixed before a parser exists. The NTA1, NPC1, and NTI1 protocol discriminators must agree exactly. These encodings and
+equivalent native name-length maximum, so V2 fixes each classic-persistent canonical name at 4,096 UTF-8 bytes and
+requires pure-input inventory before a future existing-cluster import. The NTA1, NPC1, and NTI1 protocol discriminators must agree exactly. These encodings and
 hashes execute only at create/replay.
 
-### NTA1 structural boundary without invented numeric caps
+### NTA1 structural and numeric boundary
 
 NTA1 v1 is one flat, canonical, sequential aggregate encoding. It has no TLV, map, self-digest, unknown-field bag, or
 extension tail. `cellBytes` and `incarnationBytes` remain explicitly `u32be` length-framed. The initial sealed-end
 presence byte is exactly `0x00`; `0x01` is illegal in v1 rather than a hidden evolution channel. A future extension
 requires NTA2 and a new Kafka wire version.
 
-This decision does not call the payload “exact NTA1” yet. Before codec implementation, the remaining field widths,
-numeric enum codes, legal `NONE` combinations, discriminated variant payloads, strict Pulsar UTF-8 byte caps, total
-payload cap, and checked-arithmetic derivation must be frozen together. Deployment may only lower new-write admission;
-it cannot lower or reinterpret the persisted-v1 decoder cap.
+The accepted M1.1b table fixes `NONE={0,0,empty}`, `ZSTD_FAST_IF_SMALLER_V1={1,1,empty}`, the six legal
+protocol/profile rows, 4,096 bytes per classic-persistent Pulsar canonical name, and exact checked caps
+`54/8,214/8,397` for Cell/incarnation/NTA1. Deployment may only lower new-write admission; it cannot lower or
+reinterpret the persisted-v1 decoder cap.
 
 ### Kafka input-only profile and classifier
 
@@ -257,8 +257,8 @@ ledger union and other gate outputs; it cannot reinterpret one kind as another.
   all clients; the fresh-root admission proof supplies that safety without a second random identity.
 - Rebuild SHAs remain evidence facts rather than Registry migrations; completeness still depends on independently
   revocable principals, writer membership, and the allocation interlock.
-- Complete NTA1 policy/legality/caps, Registry writer count, and receipt numeric caps remain OPEN and must not be
-  inferred from this ADR.
+- Registry writer count and receipt numeric caps remain OPEN and must not be inferred from this ADR. Exact NTA1
+  production-codec evidence remains an M1.1b gate rather than a scenario PASS.
 
 This decision is refined by ADRs 0084 and 0085 and refines ADRs 0028, 0032, 0033, 0034, 0041, 0042, 0050, 0051, 0054, 0081, and 0082. It is tracked by
 `V2-META-003..006`, `V2-KAF-META-001..004`, `V2-POSITION-003..010`, and the M1 gates.

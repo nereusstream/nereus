@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted for the 0.2 metadata model. Implementation and runtime evidence are not started at M0.
+Accepted for the 0.2 metadata model. The exact NTA1 v1 table and parser caps were accepted on 2026-08-12; production
+implementation and exact-local evidence are owned by M1.1b and do not constitute runtime or scenario evidence.
 
 ## Context
 
@@ -56,16 +57,23 @@ sealed-end followed by EOF. Storage-profile codes are `OBJECT_WAL=1`, `BOOKKEEPE
 `NAMESPACE_OVERRIDE=3`, `TOPIC_EXPLICIT=4`, and `DEPLOYMENT_INTERNAL=5`. The catalog SHA audits the closed catalog;
 it never substitutes for the directly persisted resolved frame policy or creates a runtime catalog lookup.
 
-The exact FrameEncodingPolicy code/version/payload, complete profile/protocol/`NONE` legality matrix and goldens,
-Pulsar per-name UTF-8 caps, `maxCellBytes`, `maxIncarnationBytes`, `maxNta1Bytes`, and checked maximum-size formula are
-not yet frozen. They must be assigned together before complete codec implementation; until then the format must not be
-called exact NTA1. The 16-KiB-per-name and 64-KiB-total proposals remain candidates, not contracts. The final table uses
-fixed presence bytes, `u32be` lengths/counts, fixed-array widths, strict UTF-8 without NFC/lowercasing/replacement,
-checked arithmetic, and rejection of unknown discriminators, illegal presence, overflow, non-canonical values, and
-trailing bytes. Deployment may lower
-only new-write/admission ceilings; reading persisted NTA1 always uses the complete future fixed-v1 parser cap. Runtime
-cannot enlarge, recompute, or silently lower that decoder contract. A read followed by canonical logical re-encode
-preserves exact aggregate equality.
+NTA1 v1 accepts exactly `NONE={0,0,empty}` and `ZSTD_FAST_IF_SMALLER_V1={1,1,empty}`. Both Kafka and Pulsar require the
+non-NONE policy for `OBJECT_WAL` and `NONE` for `BOOKKEEPER_WAL_ONLY` and `BOOKKEEPER_WAL_ASYNC_OBJECT`; every other
+combination, unknown kind/version, mixed zero pair, and non-empty payload fails closed. NPD1 attempt compression is not
+an NTA1 policy.
+
+Each Pulsar canonical persistence/topic name is capped at 4,096 strict UTF-8 bytes. Version 1 admits only mutually
+consistent classic `persistent://` names; `topic://` and `segment://` require a future logical/wire contract. Exact
+fixed caps are `maxCellBytes=54`, `maxIncarnationBytes=8,214`, and `maxNta1Bytes=8,397`, where the fixed NTA1 portion is
+129 bytes and every maximum calculation uses checked arithmetic. The parser validates the total first, reads `u32be`
+as unsigned, and validates field cap plus remaining bytes before allocating the actual field. The earlier 16-KiB-name,
+64-KiB-total, and 12.5-percent policy proposals are rejected for v1.
+
+Fixed presence bytes, fixed-array widths, strict UTF-8 without NFC/lowercasing/replacement, overflow checks,
+non-canonical-value rejection, and strict EOF are mandatory. Deployment may lower only new-write/admission ceilings;
+reading persisted NTA1 always uses the complete fixed-v1 parser cap. Runtime cannot enlarge, recompute, or silently
+lower that decoder contract. A read followed by canonical logical re-encode preserves exact aggregate equality. A
+future import of an existing Pulsar cluster requires a qualifying pure-input name inventory; fresh deployments do not.
 
 ## Consequences
 
@@ -78,7 +86,7 @@ preserves exact aggregate equality.
 - M1 must prove NTA1 byte/golden vectors, strict UTF-8, every length/count/overflow/trailing-byte boundary, closed-
   discriminator rejection, required/`NONE` combinations, ordinal/back-reference validation, backend-to-logical
   equality without Kafka temporary NTA1 allocation, deterministic re-encode, fixed parser caps, and exclusion of every
-  mutable/retry-dependent field. Codec work cannot begin until the remaining table and caps are accepted.
+  mutable/retry-dependent field. M1.1b owns the production codec and exact-local evidence after this accepted table.
 
 This decision is refined by ADRs 0042/0043, 0050/0051, and 0082..0085, refines ADRs 0023/0028, and is tracked by `T-META-01`,
 `V2-META-002..007`, and `V2-KAF-META-002..005`.

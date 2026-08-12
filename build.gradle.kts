@@ -957,7 +957,7 @@ tasks.register<Exec>("v2M1Nta1ReadinessSourceCheck") {
 
 tasks.register("v2M1Nta1ReadinessCheck") {
     group = "verification"
-    description = "Verify M1.1b-Q1 readiness evidence only; no production codec/runtime/scenario/M1 PASS."
+    description = "Verify immutable M1.1b-Q1 readiness evidence; no Docker/runtime/scenario/M1 PASS."
     dependsOn(":nereus-domain:check")
     dependsOn("v2M1Nta1ReadinessSourceCheck")
     dependsOn("v2M1FoundationCheck")

@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted for the 0.2 M1 implementation and refined by ADR 0085. Complete NTA1 FrameEncodingPolicy/legality/caps,
-Registry writer-count capacity, and receipt attachment numeric caps remain OPEN. The client-only Oxia continuity shape
+Accepted for the 0.2 M1 implementation and refined by ADR 0085. The 2026-08-12 M1.1b refinement closes NTA1
+FrameEncodingPolicy/legality/caps. Registry writer-count capacity and receipt attachment numeric caps remain OPEN. The client-only Oxia continuity shape
 and 120-byte writer row are closed. Local protocol/leaf code and tests now exist; concrete fork/server-image identities,
 continuity/Registry conformance, and promotion evidence have not started.
 
@@ -58,8 +58,8 @@ leaf grammar, not a configurable backend root path. Selector and Aggregate value
 persistence name and, where applicable, generation; readers recompute the digest and leaf. The value does not repeat
 the digest. Digest collision, key/value name or generation mismatch, and protocol mismatch fail closed.
 
-Pulsar per-name UTF-8 caps, maximum-length vectors, and the complete NTA1 table remain OPEN. Hashing occurs only on
-create/replay/open control paths.
+NTA1 v1 caps both classic-persistent canonical name forms at 4,096 UTF-8 bytes, requires exact mutual rederivation, and
+uses the accepted `54/8,214/8,397` aggregate caps. Hashing occurs only on create/replay/open control paths.
 
 ### Kafka pseudo-config and remote-log admission
 

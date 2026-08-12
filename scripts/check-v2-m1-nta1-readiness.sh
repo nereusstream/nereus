@@ -22,9 +22,9 @@ fail() {
 [[ -f "$generated_evidence" ]] || fail "generated readiness JSON is missing"
 [[ -f "$committed_evidence" ]] || fail "committed readiness JSON is missing"
 
-if find "$production_root" -type f \( -iname '*nta1*' -o -iname '*topicbindingaggregatecodec*' \) -print -quit \
-    | rg -q .; then
-    fail "a production NTA1 encoder/parser class exists before design acceptance"
+if rg -n 'Nta1ReadinessHarness|Nta1ReadinessEvidenceTest|m1\.1b-q1/readiness\.json' "$production_root" \
+    --glob '*.java'; then
+    fail "production source references the historical Q1 candidate harness or artifact"
 fi
 
 if rg -n 'org\.testcontainers|Docker|docker compose|docker-compose' "$test_root" --glob '*.java'; then
@@ -94,8 +94,8 @@ if statuses.get("V2-META-003") != "IMPLEMENTED_NOT_RUN" or statuses.get("V2-META
     raise SystemExit("V2 M1.1b-Q1 readiness check: scenario status was promoted")
 
 design = design_path.read_text()
-if "designStatus: Proposed" not in design or "production NTA1 remains blocked" not in design:
-    raise SystemExit("V2 M1.1b-Q1 readiness check: Proposed/blocked design boundary is missing")
+if "designStatus: Accepted" not in design or "immutable receipt is retained as historical" not in design:
+    raise SystemExit("V2 M1.1b-Q1 readiness check: accepted-design/historical-Q1 boundary is missing")
 
 print(
     "V2 M1.1b-Q1 focused tests: "
@@ -103,4 +103,4 @@ print(
 )
 PY
 
-echo "V2 M1.1b-Q1 readiness evidence verified; no production codec, Docker, runtime activation, scenario promotion, or M1 PASS."
+echo "V2 M1.1b-Q1 historical readiness evidence verified; no Docker, runtime activation, scenario promotion, or M1 PASS."

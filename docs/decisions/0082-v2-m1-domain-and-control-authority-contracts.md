@@ -8,13 +8,16 @@ and the receipt-envelope direction. Exact aggregate field/variant tables, remain
 lifecycle hooks/source tuple, Registry writer schema, and remaining receipt payload fields remain implementation-readiness descendants. ADR 0084
 fixes the protocol codes and authority leaves, Kafka precedence/interlock, minimal local continuity semantics, native
 INSTANCEID hash, and receipt accounting/path safety while retaining evidence-derived caps and concrete provider hooks.
-ADR 0085 then permits M1.1a foundation work, closes the client-only continuity shape and 120-byte writer row, and
-retains the complete NTA1 policy/cap table, writer count, receipt caps, and executable evidence as explicit descendants.
+ADR 0085 then permits M1.1a foundation work and closes the client-only continuity shape and 120-byte writer row. The
+2026-08-12 M1.1b refinement closes the NTA1 policy/cap table; writer count, receipt caps, and promotion evidence remain
+explicit descendants.
 
 ### Implementation refinement (2026-08-11)
 
 The Nereus-local foundation now implements the accepted 16/32-byte identities, NTB1/NSE1 derivations, independent
-aggregate object model, direct foundation validator, four capability interfaces, and closed create/CAS results. Exact
+aggregate object model, direct foundation validator, four capability interfaces, and closed create/CAS results. The
+M1.1b accepted contract now fixes exact aggregate policy/name/total bounds; its production codec and exact-local
+evidence are a separate implementation slice. Exact
 stored outcomes carry versioned snapshots with canonical bytes and digest; no child or generic metadata authority was
 added. Kafka/Pulsar/Oxia physical authorities, complete NTA1, Registry conformance, and promotion evidence remain
 outside this refinement.
@@ -55,7 +58,8 @@ field ordering/codes are frozen before their implementation slice is activated. 
 is never ordinary append/read work. ADR 0083 owns the NPC1/NTI1 variant layouts: Pulsar `cellBytes` retains
 `reservationDomainId`; compatibility namespace, provider scope, and broker alias remain excluded. Protocol code zero
 and Kafka `ZERO_UUID`/`ONE_UUID` are invalid, Kafka names are at most 249 ASCII bytes, and Pulsar generation is positive
-signed-long with overflow rejection. ADR 0084 fixes `KAFKA=1` and `PULSAR=2`; Pulsar name/total caps remain OPEN.
+signed-long with overflow rejection. ADR 0084 fixes `KAFKA=1` and `PULSAR=2`; NTA1 v1 caps each classic-persistent
+Pulsar canonical name at 4,096 UTF-8 bytes and fixes total bounds through the 2026-08-12 M1.1b refinement.
 
 ### Logical aggregate and physical encodings
 
@@ -72,8 +76,10 @@ Evolution requires NTA2/logical schema v2 and a new Kafka wire version.
 Every parser cap is derived from the pinned protocol boundaries and then becomes a fixed v1 format constant. Deployment
 may lower only new-write/admission ceilings; decoding an already persisted NTA1 always uses the full fixed v1 format
 cap. Neither Deployment nor a runtime host may enlarge, recompute, or silently lower that persisted-format decoder
-limit. The complete ordered field/width/enum/`NONE`/variant table and Pulsar/total numeric caps remain open until that
-pinned-source derivation is recorded; no codec may infer them from the structural direction.
+limit. The accepted table is `NONE={0,0,empty}` and `ZSTD_FAST_IF_SMALLER_V1={1,1,empty}`, with Object requiring the
+latter and both BookKeeper profiles requiring NONE for both protocols. `maxCellBytes=54`,
+`maxIncarnationBytes=8,214`, and `maxNta1Bytes=8,397`; complete parser and allocation rules are owned by ADR 0033 and
+the accepted M1.1b detailed design.
 
 ### Production metadata capabilities
 
@@ -228,8 +234,8 @@ numeric caps remain open.
   local atomic fence comparison.
 - Registry updates remain rare, but writer admission now requires real namespace governance rather than a descriptive
   digest. Missing completeness or interlock evidence fails closed.
-- Complete NTA1 FrameEncodingPolicy/legality/caps, Registry writer count, receipt numeric caps, and promotion evidence
-  remain later readiness frontiers and cannot be inferred by code; they do not block the M1.1a identity/SPI slice.
+- The NTA1 FrameEncodingPolicy/legality/caps are accepted for M1.1b. Registry writer count, receipt numeric caps, and
+  promotion evidence remain later readiness frontiers and cannot be inferred by code.
 
 This decision is refined by ADRs 0083..0085 and refines ADRs 0023, 0028, 0032, 0033, 0034, 0041, 0042, 0050, 0051, 0054,
 0055, and 0081. It is tracked by

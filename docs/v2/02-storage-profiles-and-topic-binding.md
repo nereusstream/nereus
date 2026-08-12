@@ -58,7 +58,8 @@ Kafka UUID is raw 16 bytes and rejects ZERO/ONE; Kafka name is at most 249 ASCII
 signed-long with overflow rejection. Protocol codes are `KAFKA=1`, `PULSAR=2`; zero and all other v1 values fail.
 Pulsar uses ADR 0084's single NPN1 persistence-name digest under distinct selector/aggregate leaf prefixes and a
 19-digit generation. M1 accepts only ordinal zero, and random attempts, runtime configuration, time, log offsets, and
-backend versions cannot influence IDs. Pulsar/total caps remain OPEN.
+backend versions cannot influence IDs. NTA1 v1 accepts only classic `persistent://` Pulsar names, caps canonical
+persistence/topic names at 4,096 strict UTF-8 bytes each, and requires exact mutual rederivation.
 
 The one logical compatibility axis is `aggregateSchemaVersion=1`. Canonical `NTA1` persists only independent
 semantics: protocol, one binding ID, length-framed Cell/incarnation, one ordinal-zero Storage Epoch ID, resolved
@@ -66,19 +67,21 @@ profile/origin/catalog SHA, one `FrameEncodingPolicy` pair, and absent sealed en
 derived from protocol; primary WAL/digest/checksum/encryption are derived from profile plus fixed format contracts; the
 binding back-reference is the Aggregate's one binding ID. They are domain views, not repeated wire authorities.
 NTA1 is flat/sequential with no TLV/map/self-digest/tail and permits only `0x00` for initial sealed-end presence. Pure
-closed enums use one `u16`; only independently evolving typed payloads use kind/version with `NONE={0,0}`. The exact
-FrameEncodingPolicy table/payload, complete profile/protocol/NONE matrix and goldens, Pulsar name caps,
-`maxCellBytes/maxIncarnationBytes/maxNta1Bytes`, and checked maximum formula remain OPEN before complete codec work;
-16-KiB name and 64-KiB total values are candidates only. Deployment may lower only new-write/admission ceilings, never
-persisted-v1 decoding. Unknown/illegal combinations fail closed. `ACTIVE` is derived only
+closed enums use one `u16`; only independently evolving typed payloads use kind/version. NTA1 v1 accepts exactly
+`NONE={0,0,empty}` and `ZSTD_FAST_IF_SMALLER_V1={1,1,empty}`. Kafka/Pulsar `OBJECT_WAL` requires the latter;
+`BOOKKEEPER_WAL_ONLY` and `BOOKKEEPER_WAL_ASYNC_OBJECT` require NONE. The exact checked decoder caps are
+`maxCellBytes=54`, `maxIncarnationBytes=8,214`, and `maxNta1Bytes=8,397`; the 12.5-percent policy, 16-KiB names, and
+64-KiB rounded total are rejected for v1. Deployment may lower only new-write/admission ceilings, never persisted-v1
+decoding. Unknown/illegal combinations fail closed. `ACTIVE` is derived only
 after complete publication/validation and is not stored. The v1 aggregate excludes `CREATING`, delete/lifecycle/owner
 state, timestamps, attempts, controller offsets, backend versions, and untyped attributes. Oxia envelope schema 1 wraps
 NTA1; Kafka wire v0 maps generated fields directly to the domain validator without constructing temporary NTA1 bytes.
 
 M1.1a-A now implements the additive modules, frozen identity/ID codecs, minimal independent domain values and direct
 foundation validator, and four closed metadata capabilities. Its executable gate owns the production classpath/API
-boundary and local goldens. The separate continuity/backend/runtime work has not started. Complete NTA1 encoding/
-decoding, final legality, caps, and goldens remain M1.1b and cannot be claimed by this foundation slice.
+boundary and local goldens. The separate continuity/backend/runtime work has not started. The M1.1b production
+encoding/decoding and exact goldens are authorized by the accepted table but remain a separate slice and cannot be
+claimed by the foundation.
 
 At Kafka feature level 2, that physical record is one generated, typed, non-flexible
 `TopicBindingAggregateRecord(apiKey=32000, wireVersion=0)` owned by `TopicImage`, not an opaque attachment or parallel

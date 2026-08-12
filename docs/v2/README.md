@@ -32,27 +32,30 @@ performance-first BookKeeper WAL.
   schema remain OPEN.
 - M1 implementation-readiness Round 4 freezes `KAFKA=1/PULSAR=2`, NPN1 Pulsar authority leaves, Kafka last-wins/error/
   policy and remote-log admission, a local store-wide watch-continuity contract, canonical UUID/NLI1 namespace bytes,
-  and one receipt result hierarchy plus safe attachment grammar in ADR 0084. Complete NTA1/name caps, writer caps, and
-  receipt numeric caps remain OPEN; O1 now owns the confirmed Oxia client API, exact client/server bases, final fork,
+  and one receipt result hierarchy plus safe attachment grammar in ADR 0084. The later M1.1b acceptance closes
+  NTA1/name caps; writer and receipt numeric caps remain OPEN. O1 owns the confirmed Oxia client API, exact client/server bases, final fork,
   and focused artifact/runtime evidence without promoting `V2-META-006`.
 - M1 implementation-readiness Round 5 freezes minimal independent NTA1 semantics without claiming its complete codec,
   the Oxia client-only dummy ready barrier and source/artifact/image separation, two writer kinds plus a 120-byte row
   and immutable admission evidence, and one content-identified receipt/Final hierarchy in ADR 0085. M1.1a module,
-  identity, deterministic-ID, SPI, dependency, and continuity scaffolding may start; full NTA1 policy/caps, writer count,
-  receipt numeric caps, and executable promotion evidence remain OPEN.
+  identity, deterministic-ID, SPI, dependency, and continuity scaffolding may start. The 2026-08-12 M1.1b acceptance
+  subsequently closes the NTA1 v1 policy/name/total table; writer count, receipt numeric caps, and executable promotion
+  evidence remain OPEN.
 - The accepted [M1 execution index](detailed_design/m1/README.md) and
   [M1.1a-A code-level design](detailed_design/m1/m1.1a-domain-spi-foundation.md) split the first implementation into
   module, identity/domain, SPI/gate, continuity-fork, and metadata-oxia targets. The first three are implemented by
   `nereus-domain`, `nereus-metadata-spi`, and `v2M1FoundationCheck`; the Oxia fork is focused-evidence complete; and
   [metadata-oxia O2](detailed_design/m1/m1.1a-oxia-capability-scaffold.md) is locally verified by its locked dependency,
   69-test scaffold gate, 299-test whole-module compatibility run, and non-promotable local receipt.
-- [M1.1b-Q1](detailed_design/m1/m1.1b-nta1-codec.md) now has 14 evidence-only tests and a
+- [M1.1b-Q1](detailed_design/m1/m1.1b-nta1-codec.md) has 14 historical evidence-only tests and an immutable
   [structured readiness receipt](evidence/v2-m0/m1.1b-q1/README.md). It measures 4-KiB and 16-KiB Pulsar-name
-  candidates, checked 8,397/32,973-byte parser caps, all six protocol/profile rows, and strict allocation boundaries.
-  The design remains `Proposed`; no policy code, cap, production NTA1 codec, scenario status, or runtime was accepted.
+  candidates, checked 8,397/32,973-byte candidate parser caps, all six protocol/profile rows, and strict allocation
+  boundaries. The current design is now `Accepted`: v1 selects `ZSTD_FAST_IF_SMALLER_V1={1,1,empty}`, 4,096 bytes per
+  classic-persistent Pulsar name, and exact checked caps `54/8,214/8,397`. Q1 remains
+  `READINESS_EVIDENCE_ONLY`; production codec/exact-local evidence is the current M1.1b slice and changes no scenario.
 - The foundation supplies Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct aggregate
   foundation validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
-  guards, and reproducible JAR/source-JAR/POM hashes. It deliberately supplies no NTA1 codec, Registry capacity,
+  guards, and reproducible JAR/source-JAR/POM hashes. The foundation deliberately supplies no NTA1 codec, Registry capacity,
   complete production codec, Kafka/Pulsar activation, P1/R1, real backend conformance, or M1 Final/PASS claim. O2 now
   supplies only the fail-closed single-key backend scaffold.
 - Existing Java modules and Phase/Future evidence on `main` are V1 residue until replaced by a V2 milestone.
@@ -292,8 +295,8 @@ ADR 0083 fixes the next structural wire/control/evidence cuts. ADR 0084 closes p
 precedence and remote-log interlock, minimal store-wide continuity semantics, canonical UUID/NLI1 namespace identity,
 and receipt accounting/path safety. ADR 0085 closes the M1.1a start boundary, minimal independent aggregate semantics,
 client-only continuity direction, exact 120-byte writer row/evidence shape, and content-identified receipt/Final
-hierarchy. It deliberately retains the complete NTA1 FrameEncodingPolicy/legality/name/total caps, Registry writer
-count, receipt numeric caps, and executable promotion evidence as OPEN descendants. Partial recovery omission, numeric caps,
+hierarchy. The later M1.1b acceptance closes the complete NTA1 FrameEncodingPolicy/legality/name/total table. Registry
+writer count, receipt numeric caps, and executable promotion evidence remain OPEN descendants. Partial recovery omission, numeric caps,
 physical proof-fold/capability encodings, and any tombstone-deletion authority remain evidence gates. The rows below
 are the remaining active 0.2 evidence gates.
 

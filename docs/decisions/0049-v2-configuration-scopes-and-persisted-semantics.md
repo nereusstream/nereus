@@ -56,6 +56,10 @@ frame may still encode NONE when compression is ineligible or not beneficial. `B
 and attempt parameters activate at the offload attempt. A policy-catalog SHA qualifies the resolution source but never
 replaces the directly persisted resolved policy or requires an online catalog lookup during replay.
 
+For NTA1 v1 the closed values are `NONE={0,0,empty}` and
+`ZSTD_FAST_IF_SMALLER_V1={1,1,empty}`. The latter is required only by `OBJECT_WAL`; both BookKeeper profiles require
+`NONE`. Unknown or mixed pairs, the rejected 12.5-percent proposal, and any non-empty policy payload fail closed.
+
 A configurable identity is scoped to exactly one activation lifecycle. One enum or versioned class cannot combine a
 Storage-Epoch encoding choice, an Object-group packing/linger choice, a sealed-ledger offload-attempt choice, and host
 capacity. Related policies may be validated for compatibility, but each value is persisted and changed only at its own

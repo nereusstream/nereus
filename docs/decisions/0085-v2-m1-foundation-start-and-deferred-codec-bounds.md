@@ -3,12 +3,13 @@
 ## Status
 
 Accepted as the 0.2 M1 first-implementation boundary. The Nereus-local M1.1a-A domain/SPI foundation and intermediate
-gate are implemented. Complete NTA1 codec, Registry capacity, Oxia continuity/backend work, and promotion-receipt
-validators remain blocked or pending under the explicit descendants below. This ADR still claims no M1 PASS.
+gate are implemented. The 2026-08-12 M1.1b refinement accepts the exact NTA1 policy/cap contract and permits its
+production codec slice. Registry capacity, P1/R1/K1, runtime activation, and promotion-receipt validators remain
+blocked or pending under the explicit descendants below. This ADR still claims no M1 PASS.
 
-M1.1b-Q1 now has current-source readiness evidence, but this does not change the accepted decision: complete NTA1
-FrameEncodingPolicy semantics, Pulsar name caps, total cap, legality, codec, and goldens remain OPEN pending grill and
-explicit confirmation.
+M1.1b-Q1 remains immutable historical `READINESS_EVIDENCE_ONLY`. It informed but does not itself prove the accepted
+policy/name/cap table or production codec. The policy/name/cap grill is closed; production codec/golden evidence is the
+current M1.1b implementation gate.
 
 ### Implementation refinement (2026-08-11)
 
@@ -17,7 +18,7 @@ accepted zero/non-zero shape and profile-level NONE split. No non-NONE semantic 
 `v2M1FoundationCheck` verifies the domain/SPI classpaths, forbidden surfaces, module tests, documentation, and
 reproducible JAR/source-JAR/POM hashes without registering `v2M1FinalCheck`.
 
-### Readiness-evidence refinement (2026-08-12; non-normative candidates)
+### Readiness-evidence refinement (2026-08-12; historical non-normative candidates)
 
 The test-scope-only M1.1b-Q1 harness measures real current domain objects and a candidate flat wire without adding a
 production encoder/parser. Fourteen focused tests have zero failure/error/skip and cover all six protocol/profile rows,
@@ -46,12 +47,11 @@ Measured maximum legal classic-persistent vectors are 8,395 and 32,971 bytes. Ty
 index, object, and JVM overhead. The earlier 64-KiB total candidate admits 32,563 bytes beyond the 16-KiB-name formula
 without any currently legal field using that space.
 
-The Proposed detailed design recommends grilling `{kind=1,version=1,payload=empty}` as
-`ZSTD_FAST_IF_SMALLER_V1`, 4 KiB per canonical Pulsar name, and the exact derived 8,397-byte parser cap. It retains
-`ZSTD_FAST_IF_SAVES_12_5_PERCENT_V1`, 16 KiB/name, and the 32,973-byte cap as alternatives. These labels, codes, caps,
-and the candidate restriction to classic `persistent://` Pulsar names are evidence inputs only; none is accepted by
-this refinement. The structured result is `READINESS_EVIDENCE_ONLY`, `promotionEligible=false`, and changes no
-scenario status.
+The Q1 Proposed design recommended `{kind=1,version=1,payload=empty}` as `ZSTD_FAST_IF_SMALLER_V1`, 4 KiB per
+canonical Pulsar name, the exact derived 8,397-byte parser cap, and classic `persistent://` only. The user subsequently
+accepted those values on 2026-08-12 and rejected the 12.5-percent, 16-KiB-name, rounded-total, and scalable-domain
+alternatives for v1. That later decision does not rewrite Q1: its structured result remains
+`READINESS_EVIDENCE_ONLY`, `promotionEligible=false`, and changes no scenario status.
 
 ## Context
 
@@ -66,7 +66,7 @@ only after their own remaining tables and caps close.
 
 ## Decision
 
-### Minimal NTA1 direction; complete codec remains OPEN
+### Accepted NTA1 v1 direction and exact bounds
 
 NTA1 retains one schema axis, magic `NTA1`, `aggregateSchemaVersion=1`, flat sequential bytes, strict EOF,
 `epochOrdinal=0`, and `sealedEndPresence=0x00`. It has no binding/epoch sub-version, flags, reserved bytes, or extension
@@ -150,17 +150,17 @@ DEPLOYMENT_INTERNAL     = 5
 `policyCatalogSha256[32]` binds closed canonical catalog bytes for audit/source qualification. The resolved profile,
 origin, and frame policy remain directly persisted, and replay never depends on fetching that catalog.
 
-`FrameEncodingPolicy` is the only proposed independent Storage-Epoch format choice. OBJECT_WAL requires a non-NONE
+`FrameEncodingPolicy` is the only independent Storage-Epoch format choice. OBJECT_WAL requires a non-NONE
 closed policy describing compression eligibility, codec family/version, and fixed class semantics; an individual frame
 may still encode NONE when ineligible or unprofitable. BOOKKEEPER_WAL_ONLY and BOOKKEEPER_WAL_ASYNC_OBJECT store NONE;
 NPD1 attempt policy remains at the offload attempt.
 
-Complete NTA1 codec/goldens remain OPEN until one later decision freezes:
-
-1. exact FrameEncodingPolicy codes, payload, and profile legality;
-2. Pulsar canonical persistence/topic UTF-8 caps;
-3. `maxCellBytes`, `maxIncarnationBytes`, `maxNta1Bytes`, and checked maximum-size formula;
-4. the complete minimal protocol/profile/NONE legality matrix and golden bytes.
+The accepted values are `NONE={0,0,empty}` and `ZSTD_FAST_IF_SMALLER_V1={1,1,empty}`. Kafka and Pulsar Object rows
+require the latter; both BookKeeper rows require NONE. Each classic-persistent Pulsar canonical name is at most 4,096
+strict UTF-8 bytes and must rederive its peer exactly. The exact checked caps are `maxCellBytes=54`,
+`maxIncarnationBytes=8,214`, and `maxNta1Bytes=8,397`. Unknown/mixed policy pairs, the 12.5-percent alternative,
+non-empty payload, non-classic domains, oversize names, and all other profile combinations fail closed. M1.1b now owns
+production codec/goldens and exact-local evidence.
 
 The 16-KiB-per-name and 64-KiB-total candidates are not contracts. Parser allocation always follows only an already
 validated actual length; Deployment may lower new-write admission but not persisted decoding.
