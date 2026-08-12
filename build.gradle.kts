@@ -860,6 +860,11 @@ val v2DomainMainOutput = project(":nereus-domain")
     .named("main")
     .get()
     .output
+val v2DomainTestSourceSet = project(":nereus-domain")
+    .extensions
+    .getByType<org.gradle.api.tasks.SourceSetContainer>()
+    .named("test")
+    .get()
 val v2DomainJar = project(":nereus-domain").tasks.named<Jar>("jar").flatMap { it.archiveFile }
 val v2DomainSourcesJar = project(":nereus-domain").tasks.named<Jar>("sourcesJar").flatMap { it.archiveFile }
 val v2MetadataSpiJar = project(":nereus-metadata-spi").tasks.named<Jar>("jar").flatMap { it.archiveFile }
@@ -970,6 +975,38 @@ tasks.register<Exec>("v2M1RegistryCapacitySourceCheck") {
     dependsOn(":nereus-domain:test")
     workingDir = layout.projectDirectory.asFile
     commandLine("bash", "scripts/check-v2-m1-registry-capacity.sh")
+}
+
+tasks.register<org.gradle.api.tasks.testing.Test>("v2M1ReceiptCapsFocusedTest") {
+    group = "verification"
+    description = "Run only the deterministic M1-2 receipt/parser cap boundary suite."
+    dependsOn(":nereus-domain:testClasses")
+    testClassesDirs = v2DomainTestSourceSet.output.classesDirs
+    classpath = v2DomainTestSourceSet.runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.domain.receipt.ReceiptV1CapacityEvidenceTest")
+    }
+    workingDir = project(":nereus-domain").projectDir
+    binaryResultsDirectory.set(layout.buildDirectory.dir("test-results/v2-m1-receipt-caps/binary"))
+    reports.junitXml.outputLocation.set(layout.buildDirectory.dir("test-results/v2-m1-receipt-caps"))
+    reports.html.outputLocation.set(layout.buildDirectory.dir("reports/tests/v2-m1-receipt-caps"))
+    outputs.dir(project(":nereus-domain").layout.buildDirectory.dir("reports/v2-m1-receipt-caps"))
+}
+
+tasks.register<Exec>("v2M1ReceiptCapsSourceCheck") {
+    group = "verification"
+    description = "Verify M1-2 receipt cap evidence, focused counts, source binding, and production absence."
+    dependsOn("v2M1ReceiptCapsFocusedTest")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m1-receipt-caps.sh")
+}
+
+tasks.register("v2M1ReceiptCapsCheck") {
+    group = "verification"
+    description = "Verify M1-2 receipt/parser caps readiness only; no N1/N2/N3, scenario promotion, or M1 Final."
+    dependsOn("v2M1ReceiptCapsSourceCheck")
+    dependsOn("v2DocumentationCheck")
 }
 
 tasks.register("v2M1RegistryCapacityCheck") {

@@ -113,20 +113,23 @@ changes evidence status.
 
 | Cap | Selected v1 value | Evidence/rounding rule |
 | --- | ---: | --- |
-| canonical root bytes | 65,536 | next power of two at or above 2x the largest representative canonical root |
+| canonical root bytes | 65,536 | next power of two at or above 4x the largest representative canonical root |
 | scenarios per receipt | 16 | next power of two at or above 1.5x the nine closed M1 virtual-ledger scenario rows |
 | suites per scenario | 128 | next power of two at or above 1.5x the 73-suite current O2 whole-module report |
 | attachments per receipt | 32 | four references per each of five closed kinds, rounded up to a power of two |
 | one attachment bytes | 262,144 | next power of two at or above 2x the largest real current report corpus or R0 Registry value |
-| all attachment bytes | 524,288 | next power of two at or above 2x the kind-complete maximum representative bundle |
+| all attachment bytes | 524,288 | max of 2x the single cap and the next power of two at or above 2x the kind-complete bundle |
 | relative path bytes | 256 | next power of two at or above 2x the longest representative receipt-relative path |
-| relative path segments | 16 | power-of-two margin over the representative layout, with no empty segment |
+| relative path segments | 16 | next power of two at or above 2x the representative layout, with no empty segment |
 | one sanitized log excerpt bytes | 65,536 | next power of two at or above 4x the deterministic named fault/error excerpt |
 
 The evidence gate fails instead of silently changing a cap if an observation does not fit its stated rounding rule.
 The 51,016-byte Registry sample is the accepted R0 maximum and is never inflated to 65,536. The single-attachment cap
 also covers the measured current Nereus JUnit XML corpus; it is not derived by repeating filler. Total attachment
-arithmetic is checked before any file is opened or buffer allocated.
+arithmetic is checked before any file is opened or buffer allocated. The root uses fourfold rather than twofold
+headroom because its observed maximum combines the suite and attachment axes but not the independently closed
+multi-scenario axis; the cap must admit their conservative composition without pretending the sample is a promotion
+receipt.
 
 These are persisted-v1 format/parser caps. Deployment may lower admission for newly produced receipts, attachments,
 paths, or logs. A host, CI runner, upload service, environment variable, or Deployment value cannot enlarge, lower,
@@ -214,7 +217,7 @@ The harness renders strict canonical receipt roots plus content-addressed attach
 | O2 | current 73-suite/303-test whole module plus 10-suite/73-test V2 focus | largest current suite inventory |
 | NTA1 | current 13-suite/55 domain, 10-suite/73 O2 focus, and six golden digests | exact-local multi-suite result |
 | Registry readiness | current 18-test R0 result and exact 51,016-byte structured boundary fixture | maximum Registry attachment |
-| representative all-pass | the real current focused gate inventories, normalized once | ordinary PASS root/report |
+| representative all-pass | the measured required-baseline focused gate inventories, normalized once | ordinary PASS root/report |
 | multi-scenario | all nine closed M1 virtual-ledger scenario IDs split by their required receipt kind | scenario bound without kind substitution |
 | multi-suite | the 73 current O2 suite IDs and counts, not anonymous duplicate rows | suite/root bound |
 | maximum failure | one distinct case for every frozen error/required-result category | failed/aborted accounting and diagnostic bytes |
