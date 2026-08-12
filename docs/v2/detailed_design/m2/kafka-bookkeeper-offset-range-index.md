@@ -52,6 +52,7 @@ KafkaBookKeeperRunV1
   partitionId
   storageEpochId
   ownerEpoch
+  kafkaLeaderEpoch
   providerScopeIdentity
   runId
   ledgerId
@@ -74,6 +75,8 @@ The exact wire table is a required implementation-readiness child, but it must p
 
 - every entry starts with closed magic/version/type and checked total length;
 - DATA contains one exact raw broker-assigned Kafka RecordBatch in the first implementation;
+- RUN_HEADER, DATA, commit descriptor, range-index anchor, protocol checkpoints, and RUN_FOOTER bind the run's exact
+  Kafka leader epoch; raw batch fields are cross-checked where applicable;
 - DATA validates `baseOffset`, `lastOffsetDelta`, and raw batch CRC; record count is not offset span;
 - the terminal DATA/control payload binds complete append-group range, membership, physical bounds, epochs, identity,
   and payload digest;
@@ -119,15 +122,22 @@ combined tracker/locator capacity reservation
   -> per-group exact validation
   -> ordered contiguous commit queue
   -> hidden locator installation
-  -> coherent producer/transaction/leader-epoch state publication
-  -> release-publish Readable/Durable Frontier and Kafka LEO
-  -> final owner-fence equality check
-  -> ACK
+  -> acquire exact partition publication cut
+  -> fenced-CAS/check Binding/incarnation/storage/owner/Kafka-leader/stateVersion
+  -> coherent locator + producer/transaction/leader-epoch + Readable/Durable/LEO publication
+  -> release cut and wake local waiters/replica progress
+  -> optional response-time fence check
+  -> ACK or outcome-unknown/native fenced error
 ```
 
 Offsets and entry IDs are assigned in admission order. Completion may be out of order; publication may not. Index
 checkpoint publication is asynchronous and never delays ACK. Hard memory/in-flight limits are reserved before offset
 allocation and cause backpressure before a hole can be created.
+
+Kafka leadership/Owner/Storage transitions compete on the same publication cut. If a transition wins first, the stale
+callback cannot advance a frontier or wake a reader. If publication wins first, the commit set legally belongs to the
+old Kafka leader epoch even when the later response check withholds success. A Kafka leader-epoch change always closes
+the old ACTIVE run and opens a new run.
 
 ## Read path
 
@@ -151,10 +161,13 @@ validated.
 
 Takeover invalidates old local admission, opens the old ACTIVE ledger, selects the last compatible range-index /
 producer-state / transaction-index / leader-epoch checkpoint vector, and scans the bounded tail. Complete group
-descriptors determine the greatest continuous committed Kafka frontier. Uncommitted residue after a gap is never
-published. Recovery then finalizes all index coverage/footer, publishes SEALED, and opens
-a new run. Missing/corrupt checkpoints fall back only within the declared cumulative recovery envelope; they do not
-justify an unbounded full-ledger scan.
+descriptors determine `physicalRecoveredEndOffset`, not an automatically adopted Kafka LEO. Native election supplies
+the elected replica's `electionAdoptableEndOffset`; the candidate catches `replicaAppliedEndOffset` up to that boundary
+and starts with `min(physicalRecoveredEndOffset,electionAdoptableEndOffset)`. Later physical residue is inert. Recovery
+reconstructs producer/transaction/first-unstable/leader-epoch state; native Kafka separately restores/recomputes HW and
+then derives LSO. Recovery finalizes index coverage/footer, publishes SEALED, and opens a new leader-epoch-bound run.
+Missing/corrupt checkpoints fall back only within the declared cumulative recovery envelope; they do not justify an
+unbounded full-ledger scan.
 
 The old run retains its creator Owner Epoch. A qualified recovery/seal fence is a separate footer fact, and only the
 fresh run admits with the new Owner Epoch. Provider entries beyond the recovered logical end are inert residue.

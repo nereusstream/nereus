@@ -21,6 +21,10 @@ binding summary is not admitted in 0.2. Any future state that authorizes omissio
 correctness-critical recovery authority, not an accelerator/hint. Only evidence that the accepted recovery path misses
 a predeclared SLO may reopen such a certificate in a later decision.
 
+ADR 0087's Kafka `NWKCP1` is a separate Root-bound protocol-checkpoint Object family, not a row/page/Seal extension.
+Its producer/transaction/leader-epoch state cannot authorize physical inventory completeness, ACK, directory omission,
+protection release, or GC; conversely this physical page cannot recover Kafka protocol state by itself.
+
 The runtime `ProviderResolvedExtentDescriptor` may carry `walRunRootSha` for defensive queue/combiner validation. A
 Root-bound checkpoint page validates that value while admitting a descriptor, then encodes the Root identity exactly
 once in its page header. Its canonical physical row `ProviderResolvedExtentRowV1` contains only:

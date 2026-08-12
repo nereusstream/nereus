@@ -212,13 +212,13 @@ one complete Kafka commit set or Pulsar entry; coverage remains authority and ti
 Normal completion uses a ring/window and recovery uses bounded collect/sort with fresh tickets.
 
 One shared `VerifiedExtent` feeds compact, range-aggregated Kafka/Pulsar locator spans in a shard-owned segmented
-active-tail index. A binding installs the next contiguous locators hidden, publishes Readable/Durable frontiers, then
-ACKs; gap-behind locators remain invisible. A generic Protocol Coverage TreeMap is forbidden on the append/ACK hot
+active-tail index. A binding installs the next contiguous locators hidden and publishes Readable/Durable frontiers
+before ACK; Kafka first wins its exact fenced state-root cut. Gap-behind locators remain invisible. A generic Protocol Coverage TreeMap is forbidden on the append/ACK hot
 path, while no heavy index object per Binding/unit is frozen. A's typed gap cannot block B or physical checkpoint
 progress, and the ACK path adds no provider/KMS/metadata I/O or repeated directory decryption.
 
 `BindingReadViewSnapshot` is a logical capture, not one object per ACK/read. Append only installs hidden locators,
-release-publishes Readable/Durable frontiers, and ACKs. Low-frequency manifest handoff publishes source-selection
+publishes Readable/Durable frontiers (fence-protected for Kafka), and ACKs. Low-frequency manifest handoff publishes source-selection
 generations that readers pin for one Binding-scoped protocol read batch through allocation-free local RCU/epoch/hazard
 or reader-slot state. Each unfinished batch owns one slot from a bounded cross-Binding sharded pool. Standard hazard
 ordering publishes `{Binding,G}`, establishes StoreLoad, revalidates G, then captures a coherent generation-tagged
@@ -316,8 +316,9 @@ most one stale candidate. Installed-range use does not wait for allocator clear,
 unblock the next Cell grant. These constraints do not select RANGE_LEASED.
 
 ADR 0086 is authoritative for the Kafka BookKeeper run/range-index and ordered-pipeline direction. ADR 0087 owns the
-Kafka frontier, idempotency, transaction, shared-storage ISR/HW, delayed-Fetch, compaction-gap, and bounded protocol-
-recovery semantics layered over it.
+Kafka frontier, fenced publication, native duplicate semantics, transaction/HW/LSO recovery, compact follower
+descriptor transport, Observed/Applied and election-adoption boundaries, shared-storage ISR/HW, delayed-Fetch,
+compaction, and profile-neutral bounded protocol-checkpoint/recovery semantics layered over it.
 
 For Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole attempt, completion,
 read/fallback, and deletion-eligibility authority. Nereus provides a `LedgerOffloader`; its manifest is derived and cannot

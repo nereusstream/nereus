@@ -50,8 +50,9 @@ by ADR 0015.
 ### Default ledger lifecycle
 
 The 0.2 default is one logical BookKeeper ledger chain per Kafka Topic Partition. A run is bound to the exact Binding,
-Topic Incarnation, partition, Storage Epoch, Owner Epoch, Cell Provider Scope, ledger identity, and a contiguous Kafka
-Offset Range. Its lifecycle is `ACTIVE -> SEALED -> RETIRED`:
+Topic Incarnation, partition, Storage Epoch, Owner Epoch, Kafka leader epoch, Cell Provider Scope, ledger identity, and
+a contiguous Kafka Offset Range. Its lifecycle is `ACTIVE -> SEALED -> RETIRED`. A Kafka leader-epoch change always
+stops/reconciles the old run and opens a new one; Owner Epoch is not a substitute:
 
 - ACTIVE admits ordered append groups and has an open logical end;
 - SEALED has a final logical end, complete index directory, footer, and immutable physical bounds;
@@ -109,12 +110,14 @@ exactly associated control frame selected by the `NBKE2` design. ACK requires:
 4. every DATA entry and the complete append-group descriptor reached BookKeeper quorum and verified exact identity;
 5. the ordered commit queue reached this group without an earlier gap;
 6. the owner-local locator view was installed hidden, then locator, producer/transaction/leader-epoch state and
-   Readable/Durable Frontiers were coherently release-published as required by ADR 0087;
-7. the Owner Epoch/fence captured at admission still matched before success ACK.
+   Readable/Durable Frontiers passed ADR 0087's exact fenced coherent publication CAS/lock cut;
+7. only after legal publication may an optional response-time fence check decide success ACK versus outcome-unknown.
 
-The descriptor binds the complete Kafka range, first/last data-entry identity, member count, owner/storage epoch,
-commit-set/attempt identity, and exact payload digest. Response-unknown recovery accepts only exact identity and bytes.
-Same attempt plus same payload converges; overlapping Kafka coverage with different payload is an invariant violation.
+The descriptor binds the complete Kafka range, first/last data-entry identity, member count, owner/storage/Kafka leader
+epochs, commit-set/storage-attempt identity, and exact stored-assigned payload digest. Response-unknown storage
+recovery accepts only exact identity and bytes. This storage digest never changes native Kafka duplicate handling:
+PID/producer-epoch/base-sequence/last-sequence alone drive native duplicate lookup, while non-idempotent retries may
+append twice.
 
 No normal append creates a remote metadata reservation or individual mapping record. Index blocks are asynchronous
 checkpoints and are not in the ACK cut. The active tail remains readable through the pre-reserved owner-local locator
@@ -163,8 +166,10 @@ finds the greatest gap-free committed Kafka offset. It then writes/finalizes the
 opens a new run before new admission.
 
 Range-index coverage alone is insufficient to restore Kafka visibility. ADR 0087 requires one compatible range-index /
-producer-state / transaction-index / leader-epoch checkpoint vector and bounded suffix replay before LEO/HW/LSO or
-duplicate handling is restored.
+producer-state / transaction-index / leader-epoch checkpoint vector and bounded suffix replay. The scan yields a
+physical candidate end plus producer/transaction/first-unstable/leader-epoch state; the elected replica's native
+`electionAdoptableEndOffset` caps new-leader LEO, native recovery supplies HW, and only then is LSO derived. Shared
+physical residue beyond the elected boundary is never auto-adopted.
 
 Takeover does not rewrite the old run's creator Owner Epoch or reuse its admission authority. The footer records the
 qualified recovery/seal fence separately while preserving the run identity; only the new run admits under the new

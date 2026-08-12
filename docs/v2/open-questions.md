@@ -356,7 +356,8 @@ rows/page. Without a current-source receipt the Root remains `NONE`.
 ### `V2-OPEN-READ-02`: active-tail/manifest reader snapshot
 
 Resolved by [ADR 0069](../decisions/0069-v2-binding-read-view-generation-and-pin-boundary.md).
-`BindingReadViewSnapshot` is logical rather than one heap object per ACK/read; append release-publishes frontiers while
+`BindingReadViewSnapshot` is logical rather than one heap object per ACK/read; append publishes frontiers locally
+(through ADR 0087's exact fenced state-root cut for Kafka) while
 low-frequency source generations use allocation-free read-batch pins. One snapshot may span disjoint manifest/tail
 ranges, but atomic append units and declared whole-range fallback stay source-pure. Locator and protection retirement
 use two bounded drain stages; pressure never deletes early.
@@ -521,14 +522,24 @@ entry reads, and ordered publication over bounded overlapping I/O. Normal append
 
 [ADR 0087](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md) also resolves the protocol semantic
 shape: Allocated/Durable/LEO/HW/LSO remain distinct; shared BookKeeper durability does not replace logical ISR;
-producer/transaction/leader-epoch state publishes with locators; Fetch uses coherent isolation snapshots, delayed local
-wakeup, and floor-plus-successor lookup. A storage-native ISR shortcut is not an open implementation option.
+producer/transaction/leader-epoch state passes a fence-protected coherent publication with locators; compact native
+replica-Fetch descriptors split Observed/Applied progress; native election caps shared-tail adoption; WAL replay does
+not invent HW/LSO; Fetch uses coherent isolation snapshots, native aborted metadata, delayed local wakeup, and floor-
+plus-successor lookup. BK `NBKE2` and Object `NWKCP1` implement one protocol-checkpoint contract while physical Object
+checkpoint pages/Seal remain physical-only. A storage-native ISR shortcut is not an open implementation option.
 
 The remaining M2 gate is executable rather than an architecture choice: freeze exact `NBKE2`/index/footer/checkpoint
 bytes and evidence-derived pipeline/recovery/waiter/cursor/rollover bounds, then prove dedicated-ledger viability and
-the ADR-0087 protocol state machine at 10k/100k partitions. Failure blocks the profile or requires a new pooled-lane
+the ADR-0087 protocol state machine and `V2-KAF-DATA-001..022` at 10k/100k partitions. Failure blocks the profile or requires a new pooled-lane
 ADR; it cannot silently select a global mixed-
 partition ledger or restore V1 reservation dual writes.
+
+### `V2-OPEN-KAF-DATA-01`: `__share_group_state` initial profile remains OPEN
+
+The versioned 0.2 internal-topic Deployment policy now fixes `__consumer_offsets` and `__transaction_state` to
+`BOOKKEEPER_WAL_ONLY`. Classifier v1 also recognizes `__share_group_state`, but this review did not select its initial
+profile. It must receive an explicit evidence-backed mapping before M6/release activation; it cannot inherit a tenant
+default or silently select Object WAL.
 
 ### `V2-OPEN-BK-03`: resolved sealed-ledger execution
 

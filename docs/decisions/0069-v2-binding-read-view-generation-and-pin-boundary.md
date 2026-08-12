@@ -32,6 +32,10 @@ handoff instead publishes a low-frequency generation. Normal reads use an alloca
 such as RCU/epoch/hazard state or an event-loop reader slot; they perform no remote metadata I/O and do not allocate a
 pin/snapshot heap object or contend on one process-global `AtomicLong` by default.
 
+For Kafka, ADR 0087 refines step 2: the coherent state-root replacement is itself guarded by exact Binding/Storage /
+Owner/Kafka-leader/predecessor-version fences and competes with leadership transition. A later response check cannot
+repair a stale publication, so no reader/waiter observes the new frontier before that fenced cut succeeds.
+
 One pin covers exactly one binding-scoped protocol read batch: for example, one partition fetch/range or one
 ManagedLedger `readEntries` operation. A record, message, frame, or batch index does not receive its own pin, while a
 connection or unbounded streaming session cannot retain one indefinitely.

@@ -110,7 +110,9 @@ application/Admin-created topics follow the user-topic path. Classifier membersh
 storage bootstrap from native replication/minISR admission: M6 must disable that subsystem or prove compatible explicit
 settings before it is admitted.
 
-Built-ins reject an explicit profile and use only the versioned internal-topic Deployment policy. Every code path that
+Built-ins reject an explicit profile and use only the versioned internal-topic Deployment policy. Its initial 0.2
+mapping fixes `__consumer_offsets` and `__transaction_state` to `BOOKKEEPER_WAL_ONLY`;
+`__share_group_state` stays fail-closed until an explicit mapping is accepted. Every code path that
 can create a TopicImage topic must invoke the same pure resolution, aggregate construction, validation, and admission
 kernel; public CreateTopics is not a privileged completeness boundary. Only the exact pseudo-key above is intercepted.
 Unknown `nereus.*` names remain inputs to stock config validation and retain stock error precedence.

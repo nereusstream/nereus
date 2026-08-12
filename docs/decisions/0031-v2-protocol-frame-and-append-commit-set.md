@@ -54,7 +54,9 @@ the range-index checkpoint is asynchronous and never splits or replaces commit-s
 
 ADR 0087 further requires the publication of a complete Kafka commit set to advance its locator, producer-state delta,
 partition transaction/aborted-state delta, Kafka leader-epoch state, append result, and Readable/LEO frontier in one
-coherent partition-local cut. A commit set never represents cross-partition transaction atomicity.
+fence-protected coherent partition-local cut. The commit-set descriptor binds exact Kafka leader epoch, but payload
+digest is storage recovery proof and never changes native PID/epoch/sequence duplicate semantics. A commit set never
+represents cross-partition transaction atomicity.
 
 ## Consequences
 

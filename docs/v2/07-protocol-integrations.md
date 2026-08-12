@@ -61,11 +61,22 @@ Offset admission validates PID/epoch/sequence against committed plus speculative
 publication installs locators, producer state, transaction/aborted state, and leader-epoch state atomically before LEO
 or success ACK. `acks=1` waits for LEO, while `acks=all` preserves native ISR/minISR admission and waits for HW.
 
-Shared storage carries one physical payload copy, but followers still validate the exact descriptor/source and replay
-protocol state before advancing native replica-observed progress. BookKeeper quorum never silently substitutes for
-ISR/HW. Replica/read-uncommitted/read-committed Fetch use LEO/HW/LSO, delayed Fetch waits on local frontier changes,
-and compaction lookup uses floor plus coverage check plus successor. Each Fetch pins one coherent local view and
-performs no normal-path remote metadata lookup.
+Shared storage carries one physical payload copy. The leader sends compact ordered commit descriptors through the
+native replica-Fetch/fetcher channel; followers validate and durably journal them before advancing Observed, then read
+shared payload and apply producer/transaction/leader state through Applied. HW uses eligible Observed progress, while
+leader admission requires Applied through the native election-adoptable frontier. BookKeeper quorum never silently
+substitutes for ISR/HW. Kafka replication factor controls logical broker replicas/leader candidates/ISR, not the count
+of independent external-storage copies; BookKeeper quorum or Object durability controls physical redundancy, and a
+shared provider remains a correlated failure domain.
+
+Replica/read-uncommitted/read-committed Fetch use LEO/HW/LSO, delayed Fetch waits on local frontier changes, and
+compaction lookup uses floor plus coverage check plus successor. Read-committed returns native batches through LSO
+plus aborted-transaction response metadata rather than filtering bytes as a storage-only shortcut. Each Fetch pins one
+coherent local view and performs no normal-path remote metadata lookup.
+
+The 0.2 internal Deployment policy selects `BOOKKEEPER_WAL_ONLY` for `__consumer_offsets` and
+`__transaction_state`. `__share_group_state` remains fail-closed until its own explicit internal policy is frozen; no
+internal topic inherits a tenant default.
 
 V2 Kafka metadata is enabled only by fresh-bootstrap finalized `nereus.storage.version=2`; the V2 build supports only
 `[2,2]`, rejects level-1 V1 state, and forbids runtime upgrade or downgrade. A successful native CreateTopics item

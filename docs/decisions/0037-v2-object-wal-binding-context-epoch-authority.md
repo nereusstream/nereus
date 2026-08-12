@@ -22,6 +22,11 @@ contains the deterministic binding ID, complete typed Topic Incarnation Identity
 Epoch identity/token needed to validate its frames. Every frame refers to exactly one context and repeats or commits to
 the authority facts required to reject descriptor/context substitution.
 
+Kafka leader epoch is not a singular WalRun Root fact either. Each Kafka append-unit directory row/context binds its
+exact partition and Kafka leader epoch; all member frames and assigned RecordBatch headers cross-check it. A leader-
+epoch transition closes that partition's current append/run admission without forcing unrelated bindings to share one
+Root-level epoch.
+
 The group directory may summarize contexts and typed coverage for bounded lookup, but it cannot authorize a frame,
 replace the exact context, compare positions across bindings, or advance a frontier. Recovery validates the run root,
 then the complete context table, then every frame/context reference before reconstructing any binding's Durable

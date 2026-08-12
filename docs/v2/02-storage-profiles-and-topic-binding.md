@@ -191,6 +191,11 @@ generations use ADR 0086's per-partition ledger run and packed in-ledger RecordB
 switch preserves exact Kafka coverage. ADR 0087 further separates Allocated, profile-Durable, Readable/LEO, HW, and
 LSO. Profile durability may advance before Kafka visibility; Object materialization never advances LEO/HW/LSO.
 
+Kafka internal topics never inherit the user/tenant default. The versioned 0.2 Deployment policy selects
+`BOOKKEEPER_WAL_ONLY` for `__consumer_offsets` and `__transaction_state`. This prioritizes coordinator latency and
+keeps their initial compaction/recovery path off Object-group linger. `__share_group_state` remains fail-closed until
+its own explicit mapping is frozen; later async-Object selection requires a new policy version and matching evidence.
+
 ### `OBJECT_WAL`
 
 The Object group is the primary durable WAL. ACK waits for verified provider durability of the complete typed Protocol

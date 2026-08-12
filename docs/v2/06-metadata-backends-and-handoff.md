@@ -75,6 +75,8 @@ aggregate. Duplicate exact pseudo-keys are collapsed last-wins in one linear pas
 when the final value is legal. Unknown `nereus.*` keys remain stock-validator inputs. DescribeConfigs may synthesize a read-only aggregate
 projection; both AlterConfigs APIs reject every operation for the exact key. Classifier v1 gives only
 `__consumer_offsets`, `__transaction_state`, and `__share_group_state` an explicit internal Deployment policy;
+the 0.2 mapping fixes the first two to `BOOKKEEPER_WAL_ONLY`, while `__share_group_state` remains fail-closed pending
+an explicit selection;
 Streams/Connect/MM2/`__remote_log_metadata` remain ordinary user-path topics, and the KRaft metadata log is outside
 TopicImage. Every successful TopicImage topic has one aggregate. `CreateTopicPolicy` sees only native configs after
 pseudo removal. V2 admission requires `remote.log.storage.system.enable=false`; M1 tests the interlock and M6 proves

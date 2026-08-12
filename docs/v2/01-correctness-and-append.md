@@ -115,8 +115,10 @@ native ISR/minISR admission and waits for HW. Consumer `read_uncommitted` stops 
 and replica Fetch may read through LEO. Object materialization and checkpoint coverage never advance those bounds.
 
 Kafka producer identity `(producerId,producerEpoch,baseSequence,lastSequence)` is per RecordBatch and distinct from the
-storage attempt identity; a multi-batch commit set binds the ordered identity vector. Exact pending retries join one
-commit set and exact committed retries return its original Offset Range. Admission validates multiple in-flight
+storage attempt identity; a multi-batch commit set binds the ordered identity vector. Native Kafka duplicate lookup is
+not strengthened with a payload-digest conflict. Only the same explicit in-process request instance may join a pending
+future; a native committed duplicate returns its original Offset Range. Non-idempotent retries may duplicate.
+Admission validates multiple in-flight
 batches from one producer against committed state plus ordered speculative deltas before assigning new offsets. A
 timeout is outcome-unknown; speculative positions may be reused only after
 fenced recovery proves they never became readable/HW-covered and rolls back every coupled speculative state.
@@ -139,16 +141,19 @@ Binding/unit is required.
 
 Each shared Object's digest/header/directory/AEAD validation produces one reusable `VerifiedExtent`; member publication
 adds no HEAD/GET, KMS, metadata call, whole-Object verification, or repeated directory decryption. Locator budget is
-part of the pre-position reservation. A serialized binding cut installs the next contiguous range locators hidden,
-publishes Readable and Durable frontiers, and only then ACKs. A locator behind a typed gap remains invisible even when
-already installed.
+part of the pre-position reservation. A serialized binding cut installs the next contiguous range locators hidden and,
+for Kafka, checks exact Binding/incarnation/Storage/Owner/Kafka-leader/predecessor-state fences before one coherent
+state-root replacement publishes protocol state plus Readable/Durable/LEO. Leadership and ownership transitions
+compete on that same cut. A stale callback cannot publish then discover fence loss. Only a legal publication may wake
+readers and proceed to optional response fencing/ACK. A locator behind a typed gap remains invisible even when already
+installed.
 
 Takeover rebuilds Root/checkpoint/LIST physical inventory first and then publishes each Binding view independently.
 Manifest replacement must cover the same typed range and satisfy source-protection/read-pin conditions before active
 locators retire. This correctness path cannot be disabled by Topic policy.
 
-Append and source handoff have different publication lifetimes. Normal append installs hidden locators,
-release-publishes Readable/Durable frontiers, and ACKs without creating a snapshot object. Low-frequency manifest
+Append and source handoff have different publication lifetimes. Normal append installs hidden locators, performs the
+fenced Readable/Durable publication, and ACKs without creating a snapshot object. Low-frequency manifest
 handoff publishes a source-selection generation. A logical `BindingReadViewSnapshot` captures Binding/incarnation,
 Storage Epoch/Position Domain version, owner fence, Readable Frontier, active-tail version, manifest generation, and
 source-protection generation for one Binding-scoped protocol read batch. Allocation-free local pins are bounded; one

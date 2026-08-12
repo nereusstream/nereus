@@ -23,6 +23,10 @@ objects. If the next set would exceed a group limit, the group seals first. A si
 limit is rejected before protocol positions are allocated. One Pulsar entry/frame is likewise a complete directory
 unit.
 
+Every Kafka directory unit binds exact partition ID and Kafka leader epoch in addition to Binding/incarnation,
+Storage Epoch, and Owner Epoch. The shared WalRun Root has no singular Kafka leader epoch. A stale-epoch unit cannot be
+published by the fenced partition state cut, and recovery never adopts its physical bytes into another leader epoch.
+
 Each stored frame block has independent compression, AEAD encryption/authentication, and CRC32C/v1 validation. 0.2
 forbids compression spanning frames and forbids one whole-group AEAD stream. Header/directory integrity protects bounds,
 context references, membership, ordinals, and coverage descriptors. Per-frame CRC protects the decoded exact
@@ -46,6 +50,10 @@ unit but does not automatically block independently verified units from other bi
 envelope, fixed header, or directory authentication still blocks every member of the shared Object. Checkpoint
 publication inventories the provider-resolved Object and does not assert that every member has advanced its typed
 frontier.
+
+Kafka producer/transaction/leader-epoch checkpoint state is not added to this physical checkpoint page or the
+physical WalRun Seal. ADR 0087 assigns it to the separate Root-bound `NWKCP1` protocol-checkpoint Object family; either
+family may be missing without changing the other's authority.
 
 ADR 0067 reuses that one successful Object/header/directory validation as one owner-local `VerifiedExtent`; member
 bindings do not repeat provider, KMS, whole-Object, or directory-decryption work before ACK. Compact active-tail

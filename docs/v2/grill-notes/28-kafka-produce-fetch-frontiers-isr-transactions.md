@@ -8,6 +8,10 @@ The user confirmed this direction on 2026-08-12. Normative outcomes are in
 the accepted tradeoffs, and the places where it was normalized against earlier accepted V2 contracts. The reviewed
 Nereus parent was `5cca0e07a06d542ec778505469c67ff4e8cf2e73`.
 
+The implementation-readiness review in [round 29](29-kafka-implementation-readiness-publication-election-and-replication.md)
+refines this note where it discusses post-publication fence checks, recovery of the same LEO/LSO, follower progress,
+payload-digest duplicate conflicts, Kafka leader-epoch placement, Object protocol checkpoints, and internal defaults.
+
 ## Confirmed problem statement
 
 ADR 0086's physical mapping remains valid and is not replaced:
@@ -58,7 +62,8 @@ The user confirmed:
   result, and Readable/Durable frontiers;
 - Kafka PID/epoch/sequence identity is per RecordBatch and separate from the internal storage-attempt ID; a multi-batch
   commit set binds the complete ordered identity vector rather than assuming one producer;
-- exact pending retries join one future and exact committed retries return the original offset;
+- only the same explicit in-process request may join a pending future; native committed duplicate lookup uses
+  PID/epoch/sequence and returns the original offset without a Nereus payload-digest conflict;
 - multiple in-flight batches from one producer validate against committed state plus speculative deltas;
 - a definitively failed predecessor fences the run and makes later physical entries inert tail.
 
@@ -85,8 +90,9 @@ Kafka derives HW across ISR. A silent `BK quorum == HW` shortcut is rejected.
 
 One append commit set is partition-local, not a cross-partition transaction. Transaction Coordinator outcome plus
 partition control batches remains native Kafka authority. Producer, transaction/aborted, and leader-epoch checkpoint
-components cover explicit boundaries. Takeover starts from one compatible vector and scans a bounded suffix to recover
-the identical LEO, producer state, transaction state/LSO, and leader-epoch index.
+components cover explicit boundaries. As refined by round 29, takeover recovers a physical candidate plus
+producer/transaction/first-unstable/leader state; native election caps adopted LEO, native recovery supplies HW, and
+LSO is then derived.
 
 Async checkpoint cadence is configurable, but uncovered entries/bytes/age/time are hard and non-disableable. A sealed
 run must have a complete compatible vector. `ownerEpoch`, Kafka `leaderEpoch`, and Storage Epoch remain separate.
@@ -116,9 +122,8 @@ Two input phrases were adjusted instead of copied literally:
    may intentionally read disjoint Object and BookKeeper ranges. Source purity remains per append unit and per declared
    whole-range fallback, consistent with ADR 0069.
 
-The suggestion to default `__consumer_offsets` and `__transaction_state` to BookKeeper-only remains an evidence
-candidate, not a frozen 0.2 product default. Kafka internal-topic Deployment policy remains the authority until
-compaction/coordinator/transaction evidence selects a profile.
+Round 29 freezes `BOOKKEEPER_WAL_ONLY` for `__consumer_offsets` and `__transaction_state` in the versioned 0.2
+internal-topic Deployment policy. `__share_group_state` remains a separate fail-closed release gate.
 
 ## Required evidence
 
@@ -126,7 +131,7 @@ The confirmed minimum matrix covers out-of-order completion, predecessor failure
 same-producer in-flight sequences, crash at every suffix cut, HW below LEO, LSO below HW, transaction abort, ISR shrink,
 delayed Fetch, compaction gaps, generation change during Fetch, Object preferred/BK fallback and pin-safe GC, and
 pre-admission oversized rejection. The normative matrix adds leader-epoch recovery and random/sequential full-batch
-read evidence.
+read evidence; round 29 adds the mandatory `V2-KAF-DATA-017..022` readiness cuts.
 
 The primary performance risks are local state-machine and publication complexity rather than remote I/O: speculative
 producer state, ordered multi-state publication, waiter contention, active-tail/index memory, follower validation, and

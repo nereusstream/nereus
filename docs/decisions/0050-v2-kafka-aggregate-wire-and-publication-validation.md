@@ -38,7 +38,9 @@ become competing authorities.
 
 Classifier v1 uses the pinned `Topic.isInternal` set: `__consumer_offsets`, `__transaction_state`, and
 `__share_group_state`. Those topics reject explicit profile input and use only the versioned internal Deployment
-policy. Streams, Connect, MM2, `__remote_log_metadata`, and other application/Admin-created topics follow the user-
+policy. Its 0.2 initial mapping fixes `__consumer_offsets` and `__transaction_state` to
+`BOOKKEEPER_WAL_ONLY`; `__share_group_state` remains a fail-closed release gate until an explicit mapping is frozen.
+Streams, Connect, MM2, `__remote_log_metadata`, and other application/Admin-created topics follow the user-
 topic path; `__cluster_metadata` is not a TopicImage topic. V2 admission requires
 `remote.log.storage.system.enable=false` and fails closed rather than silently rewriting it. `__remote_log_metadata`
 gets no internal-profile exception. M1 proves this interlock; M6 proves a full process leaves RLMM inactive. Every live entry

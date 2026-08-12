@@ -169,14 +169,16 @@ _Avoid_: HEAD/GET/KMS per binding, repeated whole-directory decryption, provider
 **Active-Tail Read View**:
 The owner-local derived view that makes unmanifested acknowledged coverage readable. Logical isolation is per Binding;
 physical storage may use one shard-owned segmented Kafka-offset/Pulsar-ledger-entry range index. Locators install hidden
-before Readable/Durable frontiers publish and ACK; entries behind a gap remain invisible.
+before Readable/Durable frontiers publish and ACK; Kafka's publication is itself protected by the exact Binding /
+Storage/Owner/leader/state fence. Entries behind a gap remain invisible.
 _Avoid_: Disable switch, one heavy object per Binding/unit, generic ProtocolCoverage TreeMap on the hot path, ACK before
 locator publish
 
 **Binding Read View Snapshot**:
 The logical state captured for one Binding-scoped protocol read batch. It binds incarnation, epoch/Position Domain,
 owner fence, Readable Frontier, active-tail view, manifest generation, and source-protection generation, but need not be
-a heap object. Append release-publishes frontiers without creating generations; source handoff publishes and drains
+a heap object. Append publishes frontiers without creating generations (through ADR 0087's fenced state cut for
+Kafka); source handoff publishes and drains
 low-frequency pinned generations.
 _Avoid_: Snapshot object per ACK/read, record/message/frame pin, connection-lifetime pin, remote metadata read, one
 process-global refcount

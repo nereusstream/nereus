@@ -122,6 +122,8 @@ read-uncommitted, and read-committed
 Fetch select LEO, HW, and LSO respectively. A source generation change after capture never replans the request, but one
 snapshot may intentionally read disjoint non-overlapping Object and BookKeeper ranges. This is not a requirement that
 an entire Fetch use one source; source purity remains per atomic append unit and declared whole-range fallback.
+`read_committed` returns protocol-native batches through LSO plus Kafka's native aborted-transactions response metadata;
+the storage layer does not silently delete aborted batches/control markers as a replacement for Kafka Fetch semantics.
 
 `ObjectMaterializedFrontier` is only a contiguous routing hint derived from exact Source Map coverage. It does not
 advance LEO/HW/LSO. A sequential Fetch cursor is disposable and may not retain this read pin across requests; the next
@@ -155,8 +157,13 @@ not linearly scan a full partition or ManagedLedger under normal operation.
 
 ## Materialization and compaction
 
-Materialization converts readable primary-WAL/sealed sources into read-optimized Object segments. Compaction may change
-record visibility but preserves typed Protocol Coverage and protocol transaction/control-marker rules.
+Non-compacting materialization converts readable primary-WAL/sealed sources into read-optimized Object segments while
+preserving exact Kafka RecordBatch bytes. Kafka compaction is a distinct protocol-semantic rewrite: it may remove part
+of a batch, create sparse/empty batches or new batch boundaries, and rewrite CRC/timestamp fields while preserving
+logical offsets, producer recovery, control-marker/coordinator-epoch semantics, transaction/aborted metadata,
+tombstone retention, and native timestamp/ListOffsets behavior. It rebuilds every affected range, producer,
+transaction/aborted, leader-epoch, and timestamp index before generation publication. Typed coverage remains exact;
+byte identity with the pre-compaction generation is neither required nor claimed.
 
 Planner input is a frozen manifest/source root. A local metadata snapshot may schedule work but final publication
 revalidates durable authority. A newer generation or policy invalidates stale work before activation.

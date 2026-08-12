@@ -70,17 +70,21 @@ extent-wide `rangeChecksum` path is not retained or dual-written. Exact design a
 ADR 0087 separates `Allocated`, profile-`Durable`, `Readable/LEO`, Kafka HW, and Kafka LSO. The required order is
 `LogStart <= LSO <= HW <= LEO <= Durable <= Allocated`. A BookKeeper quorum result proves physical durability; it does
 not by itself become Kafka HW. `acks=1` waits for the coherent locator/producer/transaction/leader-epoch publication
-that advances LEO. `acks=all` retains native ISR/minISR admission and waits for HW.
+that advances LEO. That publication checks exact Binding/Storage/Owner/Kafka-leader/state fences under the same cut as
+leadership transition; a stale durability callback cannot publish then fail a later check. `acks=all` retains native
+ISR/minISR admission and waits for HW.
 
-The default shared-storage replica path writes payload bytes once. Followers validate the exact commit descriptor,
-physical source, Binding/incarnation, leader/owner/storage fences, coverage, integrity, producer/transaction delta, and
-leader-epoch delta before reporting native replica-observed progress. Kafka derives HW over the current ISR. No
-follower performs a second WAL payload append merely to preserve Kafka replication semantics.
+The default shared-storage replica path writes payload bytes once. Compact commit descriptors flow through native
+replica Fetch/fetcher, and followers validate/journal them before Observed progress. Payload/source read and producer /
+transaction/leader-state replay advance Applied later. Kafka derives HW over eligible Observed progress; leader
+admission requires Applied through the native election-adoptable frontier. No follower performs a second WAL payload
+append merely to preserve Kafka replication semantics.
 
 Producer-state, transaction-index, leader-epoch, and range-index checkpoints form one compatible recovery vector. A
-takeover scans only their bounded suffix and reconstructs the identical LEO, duplicate state, open/aborted transaction
-state, LSO, and leader-epoch map. Component checkpoint cadence is asynchronous, but aggregate uncovered
-entries/bytes/age/time and sealed-run completeness are mandatory.
+takeover scans only their bounded suffix to derive a physical candidate and producer/transaction/first-unstable /
+leader-epoch state. Native election caps adopted LEO; native recovery supplies HW; LSO is then derived. Physical bytes
+beyond the elected boundary remain inert. Component checkpoint cadence is asynchronous, but aggregate uncovered
+entries/bytes/age/time and sealed-run completeness are mandatory. Each BK run is bound to one Kafka leader epoch.
 
 Random Fetch performs floor plus coverage check plus successor so a compacted-away batch does not make the previous
 batch cover a hole. Replica/read-uncommitted/read-committed upper bounds are LEO/HW/LSO. Sequential reads may reuse a
@@ -265,7 +269,7 @@ throttle, or stop new admission before BookKeeper capacity is exhausted. It neve
 into a synchronous Object write.
 
 Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-KAFKA-01`, `T-PROTOCOL-01`, `T-POSITION-01`, and
-`T-POLICY-01`. Required scenarios: `V2-BK-001..017`, `V2-KAF-DATA-001..016`, `V2-POSITION-001..018`, and
+`T-POLICY-01`. Required scenarios: `V2-BK-001..017`, `V2-KAF-DATA-001..022`, `V2-POSITION-001..018`, and
 `V2-POLICY-001..002`. See
 [ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md),
 [ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md),

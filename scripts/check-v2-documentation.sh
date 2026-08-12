@@ -222,6 +222,13 @@ require_literal 'BookKeeper quorum durable == Kafka HW' "docs/decisions/0087-v2-
 require_literal 'floor + coverage check + successor' "docs/v2/grill-notes/28-kafka-produce-fetch-frontiers-isr-transactions.md"
 require_literal 'M2 Kafka Produce/Fetch frontiers and protocol recovery design' "docs/v2/detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md"
 require_literal 'No cut adds per-append control metadata' "docs/v2/detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md"
+require_literal 'Fenced coherent publication' "docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
+require_literal 'replicaAppliedEndOffset <= replicaObservedEndOffset' "docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
+require_literal 'newLeaderLEO = min(physicalRecoveredEndOffset, electionAdoptableEndOffset)' "docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
+require_literal 'KafkaProtocolCheckpointStore' "docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
+require_literal 'NWKCP1' "docs/v2/03-object-wal.md"
+require_literal 'Kafka implementation-readiness: publication, election, replication, and checkpoint closure' "docs/v2/grill-notes/29-kafka-implementation-readiness-publication-election-and-replication.md"
+require_literal 'Nereus adds no payload-based' "docs/v2/grill-notes/29-kafka-implementation-readiness-publication-election-and-replication.md"
 require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal "V2 documentation baseline" ".github/workflows/build.yml"
 require_literal "Superseded by ADR 0012." "docs/decisions/0010-v2-topic-profile-binding.md"
@@ -423,6 +430,7 @@ require_literal "Kafka BookKeeper offset, run, and range-index direction" "docs/
 require_literal "transitional dual write" "docs/v2/grill-notes/27-kafka-bookkeeper-offset-run-range-index-direction.md"
 require_literal "Kafka Produce/Fetch frontiers, ISR, and transaction closure" "docs/v2/grill-notes/28-kafka-produce-fetch-frontiers-isr-transactions.md"
 require_literal "One ambiguous \`committedEndOffset\` is rejected" "docs/v2/grill-notes/28-kafka-produce-fetch-frontiers-isr-transactions.md"
+require_literal "V2-KAF-DATA-017..022" "docs/v2/grill-notes/29-kafka-implementation-readiness-publication-election-and-replication.md"
 require_literal "Metadata-oxia O2 is also locally" "docs/v2/open-questions.md"
 require_literal '`maxWriterCount=8` is a candidate' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
@@ -1262,6 +1270,8 @@ required_scenarios = {
     "V2-KAF-DATA-005", "V2-KAF-DATA-006", "V2-KAF-DATA-007", "V2-KAF-DATA-008",
     "V2-KAF-DATA-009", "V2-KAF-DATA-010", "V2-KAF-DATA-011", "V2-KAF-DATA-012",
     "V2-KAF-DATA-013", "V2-KAF-DATA-014", "V2-KAF-DATA-015", "V2-KAF-DATA-016",
+    "V2-KAF-DATA-017", "V2-KAF-DATA-018", "V2-KAF-DATA-019", "V2-KAF-DATA-020",
+    "V2-KAF-DATA-021", "V2-KAF-DATA-022",
     "V2-READ-001", "V2-READ-002", "V2-READ-003", "V2-READ-004", "V2-READ-005", "V2-READ-006",
     "V2-READ-007", "V2-READ-008", "V2-READ-009", "V2-READ-010", "V2-READ-011",
     "V2-READ-012", "V2-READ-013", "V2-READ-014", "V2-READ-015",

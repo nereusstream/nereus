@@ -53,4 +53,4 @@ logical ISR; and Fetch keeps native isolation/delayed-read/compaction-gap behavi
 
 This decision is tracked by `T-PROTOCOL-01`, `T-KAFKA-01`, `T-META-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, and
 scenarios `V2-META-001`, `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`, `V2-KAF-001`,
-`V2-KAF-DATA-001..016`, and `V2-PUL-001`.
+`V2-KAF-DATA-001..022`, and `V2-PUL-001`.

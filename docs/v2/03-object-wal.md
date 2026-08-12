@@ -39,6 +39,7 @@ The group object is an `ObjectExtent`. Every frame independently carries:
 
 - Protocol Cell ID, Topic Protocol Binding ID, and Topic Incarnation;
 - Storage Epoch ID and Owner Epoch;
+- for Kafka, exact partition ID and Kafka leader epoch through its append-unit context;
 - Position Domain ID/version and typed Protocol Coverage;
 - protocol entry/record count;
 - exact protocol-native payload length and CRC32C/v1 Frame-payload checksum value;
@@ -53,9 +54,10 @@ redefine these boundaries.
 
 Immediately after the fixed header, NWG1 carries one authoritative bounded
 `BindingContextTable + AppendUnitDirectory`. Each context binds one exact binding incarnation, Storage Epoch, and Owner
-Epoch; every frame references one context. The WalRun Root is physical/run authority and never carries a singular topic
-epoch for a multi-binding run. Directory summaries accelerate bounded lookup but cannot replace frame/context
-validation or advance a frontier.
+Epoch; every frame references one context. Each Kafka append unit additionally binds exact partition ID and Kafka
+leader epoch. The WalRun Root is physical/run authority and never carries a singular topic or Kafka leader epoch for a
+multi-binding run. Directory summaries accelerate bounded lookup but cannot replace frame/context validation or
+advance a frontier.
 
 Routine random read and whole-Object durability use separate proof domains. Every leaf supplies the bounded exclusive
 `directoryPrefixEnd19`, so a known extent normally performs prefix GET then frame GET without HEAD or
@@ -114,11 +116,13 @@ For each Binding, one serialized cut installs locators for the next contiguous r
 provider-resolved shared Object may enter checkpoint and release B while A still waits. Per-binding and shard aggregate
 bounds isolate A before new position allocation without rolling the run for an ordinary typed gap.
 
-For Kafka, that same cut coherently publishes producer, transaction/aborted, and Kafka leader-epoch state before
-`ReadableFrontier` becomes LEO. `acks=1`, `acks=all`, HW, and LSO then follow ADR 0087; provider resolution or Object
-materialization alone never advances Kafka visibility. Neither an async physical checkpoint page nor one remote
-manifest mutation per commit set is added to the ACK cut. WalRun Root/key identity plus bounded LIST keeps resolved
-groups recoverable, while low-frequency manifest generations remain source-selection authority.
+For Kafka, that same cut compares exact Binding/incarnation, Storage Epoch, Owner Epoch, Kafka leader epoch, and
+predecessor state version before one fenced state-root replacement coherently publishes producer,
+transaction/aborted, leader-epoch state and `ReadableFrontier`/LEO. A stale callback cannot publish then discover its
+fence loss. `acks=1`, `acks=all`, HW, and LSO then follow ADR 0087; provider resolution or Object materialization alone
+never advances Kafka visibility. Neither an async physical checkpoint page nor one remote manifest mutation per
+commit set is added to the ACK cut. WalRun Root/key identity plus bounded LIST keeps resolved groups recoverable, while
+low-frequency manifest generations remain source-selection authority.
 
 Failure of Object digest, KMS envelope, fixed header, or directory AEAD blocks every member. After those layers
 validate, a frame/commit-set AEAD, CRC, native-checksum, or typed-coverage failure blocks only that binding's complete
@@ -213,6 +217,21 @@ uncovered lane tails; invalid pages fall back to full bounded run LIST. Besides 
 provider-resolved terminal sequence vector, one final checkpoint-head key/SHA, and minimum aggregate count/body-byte
 completeness facts. Three lane-local chains are not used.
 
+### Kafka protocol checkpoints are a separate Object family
+
+Physical extent checkpoint pages and `WalRunSealRecord` remain physical-only. They never carry Kafka producer state,
+transaction/aborted state, leader-epoch index, LEO, HW, or LSO. Kafka uses ADR 0087's profile-neutral protocol-
+checkpoint contract. For Object WAL, a distinct bounded content-addressed `NWKCP1` family is stored below a separate
+Root-bound sub-prefix and discovered under the same cumulative LIST/GET/decode/time recovery envelope.
+
+An `NWKCP1` Object may batch a bounded directory of partition rows. Each row binds exact Binding/incarnation,
+partition, Storage Epoch, Owner Epoch, Kafka leader epoch, covered-through offset, producer-state snapshot,
+transaction/aborted snapshot, and leader-epoch index. Exact wire, row caps, and batching values remain M3 evidence,
+but strict canonical integrity and bounded allocation are mandatory. A protocol checkpoint cannot authorize an ACK,
+omit physical inventory recovery, advance a frontier, release source protection, or permit GC. Missing/corrupt
+`NWKCP1` falls back to bounded NWG1 append-unit replay; recovery-envelope exhaustion fails closed. A closed run must
+have a complete terminal compatible protocol vector without adding logical fields to its physical Seal.
+
 Every run root fixes hard aggregate extent-count, canonical-byte, age, and recoverable-predecessor limits. All lane
 builders, plaintext/compressed/ciphertext/request/retry copies and in-flight work charge shared Cell/host ceilings;
 lanes instantiate lazily and never receive duplicate full run budgets. Before any limit can be crossed, the owner stops
@@ -238,7 +257,8 @@ is not required to make ACKed data durable or readable. Locator retirement waits
 source protection/read-pin safety.
 
 `BindingReadViewSnapshot` is a logical per-read-batch capture, not an immutable object created for each ACK/read. Append
-continues to install locators hidden and release-publish frontiers. Low-frequency source-selection generations are
+continues to install locators hidden and publish frontiers locally; Kafka uses the exact fenced state-root cut above.
+Low-frequency source-selection generations are
 pinned through a bounded sharded slot pool reused across Bindings; ordinary reads perform no metadata I/O, heap-pin
 allocation, or process-global refcount contention. Each unfinished partition fetch/range or ManagedLedger
 `readEntries` batch owns one exclusive slot, not each record/message/frame or an unbounded session.

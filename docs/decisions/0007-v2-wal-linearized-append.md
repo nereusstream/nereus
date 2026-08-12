@@ -43,6 +43,8 @@ rather than by allocating new positions blindly.
   Coverage allocated by its Position Domain.
 - `V2-INV-APP-03`: acknowledgement implies durable primary-WAL coverage for that complete Protocol Coverage.
 - `V2-INV-APP-04`: a fenced completion cannot advance the typed Durable Frontier or become readable.
+- `V2-INV-APP-04A`: the publication that advances a frontier is itself protected by the exact owner/protocol fence;
+  publishing first and checking the fence afterward is forbidden.
 - `V2-INV-APP-05`: recovery never infers success only from a cached position or control-metadata head.
 - `V2-INV-APP-06`: profile durability never substitutes for Kafka LEO/HW/LSO or a native protocol state transition.
 
@@ -54,4 +56,4 @@ rather than by allocating new positions blindly.
 - Provider-response-loss handling is part of correctness, not an optional retry optimization.
 
 This decision is tracked by `T-APPEND-01`, `T-POSITION-01`, `T-KAFKA-01`, scenarios `V2-APP-001` through
-`V2-APP-003`, and `V2-KAF-DATA-001..010`.
+`V2-APP-003`, and `V2-KAF-DATA-001..022`.

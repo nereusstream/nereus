@@ -687,7 +687,7 @@
     {
       "id": "V2-KAF-DATA-003",
       "milestone": "M2/M6",
-      "contract": "response loss plus exact producer identity retry converges to the original pending or committed Kafka offset range",
+      "contract": "response loss plus native PID epoch sequence duplicate handling converges without storage digest protocol semantics",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -703,7 +703,7 @@
     {
       "id": "V2-KAF-DATA-005",
       "milestone": "M2",
-      "contract": "takeover from one compatible range producer transaction leader epoch checkpoint vector plus bounded suffix reconstructs exact protocol state",
+      "contract": "takeover reconstructs physical and transaction state while native HW separately derives LSO",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -711,7 +711,7 @@
     {
       "id": "V2-KAF-DATA-006",
       "milestone": "M2/M6",
-      "contract": "replica Fetch may read to LEO while read uncommitted consumers stop at HW",
+      "contract": "replica Fetch may read to LEO while compact descriptor Observed and payload Applied progress remain distinct",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -719,7 +719,7 @@
     {
       "id": "V2-KAF-DATA-007",
       "milestone": "M2/M6",
-      "contract": "read committed consumers stop at LSO while read uncommitted consumers may read through HW",
+      "contract": "read committed stops at LSO and returns native batches plus aborted transaction metadata",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -727,7 +727,7 @@
     {
       "id": "V2-KAF-DATA-008",
       "milestone": "M2/M6",
-      "contract": "aborted transactional data remains hidden from read committed across leader change and materialization",
+      "contract": "aborted transactional data and control batches preserve native read committed behavior across leader change and materialization",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -782,8 +782,8 @@
     },
     {
       "id": "V2-KAF-DATA-015",
-      "milestone": "M2/M6",
-      "contract": "Kafka leader epoch remains distinct from Owner and Storage epochs and its index survives run and source changes",
+      "milestone": "M2/M3/M6",
+      "contract": "Kafka leader epoch is persisted in each BK and Object commit context and survives run and source changes",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -793,6 +793,54 @@
       "milestone": "M2/M6",
       "contract": "random Fetch targets one complete RecordBatch while sequential Fetch uses a revalidated byte bounded disposable cursor",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-017",
+      "milestone": "M2/M3/M6",
+      "contract": "a stale durability callback cannot pass fenced coherent publication or advance LEO",
+      "ownerDoc": "docs/v2/01-correctness-and-append.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-018",
+      "milestone": "M2/M6",
+      "contract": "new leader LEO is capped by native elected replica adoption rather than every recoverable shared byte",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-019",
+      "milestone": "M2/M6",
+      "contract": "compact descriptor transport separates durable replica Observed from payload and state Applied",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-020",
+      "milestone": "M2/M6",
+      "contract": "native duplicate identity remains separate from ingress stored and storage attempt digests",
+      "ownerDoc": "docs/v2/01-correctness-and-append.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-021",
+      "milestone": "M2/M3/M6",
+      "contract": "Object WAL protocol checkpoints recover through bounded NWKCP1 plus NWG1 suffix without changing physical checkpoint authority",
+      "ownerDoc": "docs/v2/03-object-wal.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-022",
+      "milestone": "M2/M5/M6",
+      "contract": "Kafka compaction preserves protocol semantics across partial sparse empty control and tombstone rewrites",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
       "status": "PLANNED",
       "evidenceReceipt": null
     },
