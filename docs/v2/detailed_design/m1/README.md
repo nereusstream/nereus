@@ -39,9 +39,9 @@ M1 started from these facts; the first bullet is now superseded by the implement
 
 - the M0 baseline had V2 implementation `NotStarted` and only documentation gates;
 - the active Gradle/BOM/CI graph is still V1 residue, including KoP runtime;
-- M1.1a alone is implementation-ready;
-- the NTA1 v1 contract is accepted and its M1.1b implementation is in progress; Registry writer capacity, receipt
-  numeric caps, and final promotion evidence remain OPEN or pending.
+- M1.1a is complete and M1.1b is exact-locally complete;
+- K1/P1/R1, Registry writer capacity, receipt numeric caps, exact-source execution, pure-V2 graph pruning, and final
+  promotion remain OPEN or pending.
 
 M1 completes only when `v2M1FinalCheck` validates the pure V2 active graph, exact-source results, and trusted receipts.
 Passing an intermediate slice gate cannot change M1 or a scenario to `PASSED_CURRENT_SOURCE`.
@@ -165,11 +165,15 @@ The expected review sequence is:
 6. metadata-oxia scaffolding;
 7. historical [M1.1b-Q1 evidence collection](m1.1b-nta1-codec.md) and completed M1.1b grill;
 8. accepted NTA1 production codec, goldens, inventory boundary, and O2 aggregate adapter;
-9. separate Kafka, Pulsar, and Registry changes;
-10. M1 fast/exact/final gate completion;
-11. settings/BOM/publication/CI cut;
-12. independent mechanical V1/KoP-runtime deletion;
-13. N2 execution and evidence-only N3 promotion.
+9. bounded Registry writer-cohort/count/bytes evidence and accepted cap;
+10. representative receipt/parser output evidence and accepted safety caps;
+11. immutable, non-overwriteable N1 domain/SPI artifact publication with JAR/source-JAR/POM/Gradle-metadata hashes;
+12. separate Kafka K1, Pulsar P1, and Registry R1 changes consuming exact N1 artifacts;
+13. M1 fast/exact/final gate and receipt-validator implementation without promotion;
+14. settings/BOM/publication/CI cut;
+15. independent mechanical V1/KoP-runtime deletion;
+16. N2 candidate source lock plus fast/exact/final execution over the pruned graph;
+17. evidence-only N3 promotion.
 
 Architecture changes, cross-repository source changes, and mass deletion must remain separate commits. The V1 prune
 must not start merely because the replacement modules compile.
@@ -181,7 +185,7 @@ must not start merely because the replacement modules compile.
 | `v2DocumentationCheck` / `v2M0Check` | now | accepted documentation/source/scenario consistency | any M1 implementation |
 | `v2M1FoundationCheck` | now | domain/SPI tests, dependency boundaries, forbidden API absence, reproducible JAR/source-JAR/POM hashes | complete NTA1, backend conformance, pure final graph, M1 PASS |
 | `v2M1OxiaScaffoldCheck` | now | locked O1 dependency resolution, four single-key adapters, local response-loss/continuity/race tests; after M1.1b the focused namespace has 73 clean tests | selector/Registry codecs, real Oxia/Pulsar conformance, P1/R1, runtime activation, scenario promotion, M1 PASS |
-| `v2M1Nta1CodecCheck` | now | production NTA1/validator, exact goldens, inventory boundary, O2 aggregate wiring, clean non-zero local tests, JDK-only and Q1 isolation | K1/P1/R1, real conformance/inventory, runtime activation, scenario promotion, M1 PASS/Final |
+| `v2M1Nta1CodecCheck` | now | production NTA1/validator, exact goldens, pure-input inventory boundary, O2 aggregate wiring, clean non-zero local tests, JDK-only and Q1 isolation | K1/P1/R1, real Oxia/Registry conformance, runtime activation, scenario promotion, M1 PASS/Final |
 | `v2M1Nta1ReadinessCheck` | now | 14 evidence-only tests over real domain objects, candidate bounds/legality, strict UTF-8/EOF/overflow/allocation, and generated JSON equality | accepted caps/policy, production encoder/parser/goldens, backend/runtime conformance, scenario promotion, M1 PASS |
 | `v2M1Check` | after K1/P1/R1 and graph cut | ordinary deterministic M1 fast suite and V1 absence | exact external source/artifact/runtime identity |
 | `v2M1ExactSourceCheck` | N2 | clean exact forks, immutable artifacts, real Oxia, focused fork tests | evidence provenance without trusted workflow/N3 |
@@ -189,6 +193,18 @@ must not start merely because the replacement modules compile.
 
 The intermediate foundation task has a deliberately different name from `v2M1Check`. It must report
 `InProgress`/foundation-only language and fail if a script or document calls it M1 Final or M1 PASS.
+
+## Remaining M1 validation boundary
+
+M1.1b-Q1 was readiness evidence used to freeze the production contract and is not rerun as a promotion suite. The
+foundation/NTA1 local tests remain in ordinary CI as regression protection. M1 still requires K1/P1/R1 functional
+tests, real-Oxia exact-source conformance, pure-V2 active-graph/V1-absence checks, N2 exact artifact/source validation,
+and the receipt-only N3 promotion. `v2M1FinalCheck` aggregates referenced outcomes and does not rerun those suites.
+
+Version 0.2 admits fresh deployments only. M1 tests the deterministic pure-input Pulsar name-inventory tool and its
+failure boundary, but does not require execution against a customer or existing production cluster. Real
+existing-cluster inventory is deferred migration evidence for a future import-capable release. The 10k/100k resource,
+AutoMQ comparison, and chaos campaigns remain M2/M3/M7/M8 work rather than M1 promotion requirements.
 
 ## Stop conditions
 

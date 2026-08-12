@@ -217,6 +217,32 @@ Applied; it may not report a weaker offset as observed. Descriptor traffic is ch
 provider reads/decode/catch-up are charged to explicit Cell/provider replica-read budgets. Missing descriptor-stream
 history uses bounded checkpoint/source catch-up and never introduces normal per-append control metadata.
 
+Observed progress is eligible for ISR/HW only while all of the following remain true for the unapplied interval:
+
+```text
+isrObservationEligible(replica) =
+    observationJournalDurableThrough(observedEndOffset)
+    && observedEndOffset - appliedEndOffset <= maxApplyLagOffsets
+    && unappliedBytes <= maxApplyLagBytes
+    && unappliedAge <= maxApplyLagTime
+    && recoverableSourceCovers([appliedEndOffset, observedEndOffset))
+```
+
+These are hard eligibility bounds, not advisory alarms. Before any bound is crossed, the implementation must stop
+advancing Observed, remove the replica from the native ISR/HW-eligible set, or backpressure the leader until Applied
+catches up. Native ISR/minISR transition and error semantics remain authoritative. Every replica still counted for HW
+must retain at least one verifiable recovery source for its complete unapplied interval. That source need not remain
+the original BookKeeper extent: a replacement Source Map generation is acceptable only when it proves identical Kafka
+offset coverage and protocol content plus compatible producer, transaction, leader-epoch, and checkpoint semantics.
+Source replacement and protection are range-aggregated lifecycle operations, never per-append remote metadata I/O.
+
+Loss, corruption, truncation, or disk loss of the `ReplicaObservationJournal` resets eligible Observed to the highest
+contiguous boundary proven by the surviving journal and Applied state. The replica is ineligible for ISR/HW beyond
+that boundary until bounded source recovery recreates and durably journals the proof. Exact lag values remain M2/M6
+evidence outputs; once selected they are versioned Cell/deployment admission bounds that a Topic cannot disable or
+enlarge. A host ceiling may force earlier backpressure or ISR removal but cannot reinterpret already reported
+progress.
+
 A follower does not write a second payload copy to the shared WAL and does not trust a leader-reported offset without
 validating and locally journaling the exact descriptor. Before it may become leader it must have
 `replicaAppliedEndOffset >= electionAdoptableEndOffset`. For replication factor one, HW may advance with LEO after the
@@ -259,10 +285,44 @@ rows, but each row binds Binding/incarnation, partition, Storage Epoch, Owner Ep
 
 Physical Object checkpoint pages and `WalRunSealRecord` remain physical-only. They never contain producer/transaction
 state and cannot authorize a protocol checkpoint, ACK, omission of physical recovery, frontier advance, protection
-release, or GC. `NWKCP1` is asynchronously discoverable under a separate exact WalRun Root sub-prefix and shares the
-run's cumulative LIST/GET/decode/time recovery envelope. Missing/corrupt protocol checkpoints fall back to bounded
-NWG1 suffix replay; exhaustion fails closed. A closed run has a complete terminal protocol-checkpoint vector without
-adding logical fields to the physical Seal.
+release, or GC. `NWKCP1` is stored under a separate exact WalRun Root sub-prefix, selected only by the protocol Head,
+and charged to the run's cumulative metadata-read/GET/decode/time recovery envelope. Missing/corrupt Head or Object
+state falls back to bounded NWG1 suffix replay; exhaustion fails closed.
+
+The latest selected Object checkpoint is owned by one low-frequency, Root-bound
+`KafkaProtocolCheckpointHeadV1`, independent of the physical checkpoint head and Seal:
+
+```text
+KafkaProtocolCheckpointHeadV1
+  walRunRootIdentity
+  publisherEpoch
+  state = OPEN | TERMINAL
+  checkpointOrdinal
+  predecessorCheckpointDigest
+  checkpointObjectKey
+  checkpointObjectLength
+  checkpointObjectDigest
+  coveredThroughVector
+```
+
+Publication first conditionally creates and completely verifies the content-addressed `NWKCP1`, then CASes the Head
+from the exact predecessor. Ordinal advances by exactly one, the predecessor digest must match the selected object,
+and every covered-through component is non-regressing. At most one candidate may remain unresolved per publisher;
+response loss converges only through exact reread of the object and Head. A publisher change CASes only the fenced
+publisher epoch while preserving the selected checkpoint. A fork, predecessor mismatch, regression, or stale
+publisher fails closed and can never be chosen by LIST order.
+
+After run admission stops and the final compatible checkpoint exists, an irreversible CAS changes the same Head from
+`OPEN` to `TERMINAL` and binds the terminal vector. That terminal Head value is the durable protocol-closure fact; the
+physical Seal remains a separate physical fact. A successor WalRun Root must bind both the predecessor physical
+Root/Seal identities and the exact terminal protocol-Head key plus canonical value digest before accepting Kafka
+append admission. It may not infer closure from a discoverable `NWKCP1` Object or from the physical Seal alone.
+
+Selected checkpoint Objects and their Head remain until the entire run has no successor, manifest, recovery,
+retention, or source dependency. Their deletion cannot precede retirement/deletion of the WAL/source on which their
+replay semantics depend. Unselected content-addressed residue may be reclaimed only after bounded authoritative
+non-reference proof. Neither terminal state nor deletion eligibility grants ACK, physical-recovery omission, source
+protection release, or source GC. Exact Head wire, vector caps, key grammar, and backend binding remain M3 evidence.
 
 Async creation is allowed, but finite aggregate uncovered entries/bytes/age/time are mandatory. Exhaustion causes
 checkpoint, backpressure, or rollover before ACKed recovery becomes unbounded.

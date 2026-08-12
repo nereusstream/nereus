@@ -232,6 +232,21 @@ omit physical inventory recovery, advance a frontier, release source protection,
 `NWKCP1` falls back to bounded NWG1 append-unit replay; recovery-envelope exhaustion fails closed. A closed run must
 have a complete terminal compatible protocol vector without adding logical fields to its physical Seal.
 
+One independent, low-frequency `KafkaProtocolCheckpointHeadV1` selects the latest legal checkpoint for a Root. Its
+logical value binds Root identity, fenced publisher epoch, `OPEN|TERMINAL`, ordinal, predecessor digest, exact
+checkpoint Object key/length/digest, and covered-through vector. A publisher conditionally creates and verifies the
+content-addressed Object before CASing the Head from the exact predecessor; ordinals advance by one and vectors are
+component-wise non-regressing. Response loss uses exact Object/Head reread, publisher takeover preserves the selected
+Head while changing the publisher epoch, and LIST order never resolves a fork or stale candidate.
+
+After admission stops and the final compatible vector is selected, an irreversible same-Head `OPEN -> TERMINAL` CAS
+is the durable protocol-closure fact. The successor Root binds its exact key and canonical value digest in addition to
+the predecessor's independent physical Root/Seal identities. Selected checkpoint Objects and the Head remain while
+any successor, manifest, recovery, retention, or source dependency references the run; deletion cannot precede the
+WAL/source on which checkpoint replay depends. Unselected residue requires bounded authoritative non-reference proof.
+The Head/terminal lifecycle remains outside append ACK and cannot authorize physical recovery omission, protection
+release, or source GC. Exact Head wire, key grammar, vector caps, and backend mapping are M3 evidence outputs.
+
 Every run root fixes hard aggregate extent-count, canonical-byte, age, and recoverable-predecessor limits. All lane
 builders, plaintext/compressed/ciphertext/request/retry copies and in-flight work charge shared Cell/host ceilings;
 lanes instantiate lazily and never receive duplicate full run budgets. Before any limit can be crossed, the owner stops

@@ -170,7 +170,9 @@ for its aggregate codec and retains unavailable selector/Registry codecs plus `p
 
 The local receipt binds 55 domain tests, 73 focused O2 tests, and 303 whole `nereus-metadata-oxia` tests with zero
 failure/error/skip. This is `PASS_LOCAL_NTA1_CODEC_ONLY`, `promotionEligible=false`; it does not alter the Q1 receipt,
-promote a scenario, or claim K1/P1/R1, real conformance/inventory, runtime activation, M1 PASS, or M1 Final.
+promote a scenario, or claim K1/P1/R1, real Oxia/Registry conformance, runtime activation, M1 PASS, or M1 Final. The
+pure-input inventory boundary is executable; running it against a real existing cluster is deferred migration
+evidence and is not a fresh-only 0.2 or M1-Final prerequisite.
 
 The 16-KiB-per-name and 64-KiB-total candidates are not contracts. Parser allocation always follows only an already
 validated actual length; Deployment may lower new-write admission but not persisted decoding.

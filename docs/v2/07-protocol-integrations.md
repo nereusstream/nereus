@@ -69,6 +69,14 @@ substitutes for ISR/HW. Kafka replication factor controls logical broker replica
 of independent external-storage copies; BookKeeper quorum or Object durability controls physical redundancy, and a
 shared provider remains a correlated failure domain.
 
+Observed is ISR/HW-eligible only while the journal is durable through that boundary, offset/byte/age Applied lag stays
+within hard evidence-derived limits, and a verifiable source covers the whole unapplied interval. A limit crossing
+stops Observed, shrinks native ISR eligibility, or backpressures the leader. Source generations may replace the
+original BK extent only with identical Kafka coverage/content and compatible producer/transaction/leader/checkpoint
+proof; protection cannot drain first. Journal loss/corruption/truncation rolls eligible Observed back to the highest
+contiguous surviving journal/Applied proof. These checks add no normal per-append control-metadata I/O and cannot be
+disabled or enlarged by a Topic.
+
 Replica/read-uncommitted/read-committed Fetch use LEO/HW/LSO, delayed Fetch waits on local frontier changes, and
 compaction lookup uses floor plus coverage check plus successor. Read-committed returns native batches through LSO
 plus aborted-transaction response metadata rather than filtering bytes as a storage-only shortcut. Each Fetch pins one

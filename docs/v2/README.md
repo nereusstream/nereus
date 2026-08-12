@@ -61,13 +61,13 @@ performance-first BookKeeper WAL.
   M2 still owns exact `NBKE2` bytes, numeric bounds, and 10k/100k evidence; no runtime is implied.
 - ADR 0087 fixes Kafka protocol semantics over every profile: distinct Allocated/Durable/LEO/HW/LSO frontiers,
   native duplicate identity plus speculative producer state, fenced locator/protocol publication, compact descriptor
-  replication with Observed/Applied progress, election-bounded tail adoption, profile-neutral BK/Object protocol
-  checkpoints, coherent/delayed Fetch, native read-committed metadata, and semantic compaction. M2/M3/M6
-  implementation and executable evidence remain NotStarted.
+  replication with hard-bounded Observed/Applied eligibility, election-bounded tail adoption, profile-neutral BK/Object
+  protocol checkpoints with an independent terminal Head, coherent/delayed Fetch, native read-committed metadata, and
+  semantic compaction. M2/M3/M6 implementation and executable evidence remain NotStarted.
 - The foundation supplies Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct aggregate
   foundation validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
-  guards, and reproducible JAR/source-JAR/POM hashes. The foundation deliberately supplies no NTA1 codec, Registry capacity,
-  Registry capacity, Kafka/Pulsar activation, P1/R1, real backend conformance, or M1 Final/PASS claim. O2 now supplies
+  guards, and reproducible JAR/source-JAR/POM hashes. The foundation deliberately supplies no NTA1 codec, Registry
+  capacity, Kafka/Pulsar activation, P1/R1, real backend conformance, or M1 Final/PASS claim. O2 now supplies
   production NTA1 only for its aggregate port; selector/Registry and activation remain fail closed.
 - Existing Java modules and Phase/Future evidence on `main` are V1 residue until replaced by a V2 milestone.
 - The ordinary CI Pulsar API checkout remains a legacy V1-residue build baseline until the V2 Pulsar slice replaces
@@ -313,8 +313,9 @@ hierarchy. The later M1.1b acceptance closes the complete NTA1 FrameEncodingPoli
 writer count, receipt numeric caps, and executable promotion evidence remain OPEN descendants. ADR 0086 resolves the
 Kafka BookKeeper semantic layout while leaving exact wire, numeric budgets, and dedicated-ledger scale as M2 evidence.
 ADR 0087 closes the protocol-frontier/ISR/idempotency/transaction/Fetch semantic layer, including fenced publication,
-native election adoption, compact descriptor transport, Observed/Applied progress, and distinct BK/Object protocol
-checkpoint carriers, without selecting Java structures or numeric queue/checkpoint/waiter bounds.
+native election adoption, compact descriptor transport, hard-bounded Observed/Applied eligibility, and distinct
+BK/Object protocol checkpoint carriers with a terminal selection Head, without selecting Java structures or numeric
+queue/checkpoint/waiter bounds.
 Partial recovery omission, numeric caps,
 physical proof-fold/capability encodings, and any tombstone-deletion authority remain evidence gates. The rows below
 are the remaining active 0.2 evidence gates.
@@ -331,7 +332,7 @@ are the remaining active 0.2 evidence gates.
 | `V2-OPEN-READ-08` | execute M4 evidence and freeze the bounded proof-window/head/fold physical representation and numeric caps without a per-batch accumulator | M4 durable proof wire freeze |
 | `V2-OPEN-READ-09` | execute M4/M5 evidence and freeze canonical capability/receipt encodings, verifier availability/revocation behavior, and admitted backend generations | M4/M5 takeover and GC capability freeze |
 | `V2-OPEN-READ-15` | execute M4/M5 tombstone lifetime/capacity and concrete-backend ordered-history/lineage/stale-create evidence before reconsidering a metadata-only tombstone-deletion authority; 0.2 otherwise retains `RETIRED_V1` permanently | M4/M5 optional metadata-retirement authority |
-| `V2-OPEN-BK-02` | freeze exact NBKE2/index/footer/checkpoint bytes and evidence-derived pipeline/recovery/waiter/cursor/rollover bounds, then validate the accepted one-ledger-chain-per-partition and ADR-0087 frontier/protocol layout at 10k and 100k partitions; pooled lanes or storage-native ISR require a new ADR | M2 Kafka data-path implementation admission |
+| `V2-OPEN-BK-02` | freeze exact NBKE2/index/footer/checkpoint bytes, NWKCP1 Head/vector/key caps, and evidence-derived apply-lag/pipeline/recovery/waiter/cursor/rollover bounds, then validate the accepted one-ledger-chain-per-partition and ADR-0087 frontier/protocol layout at 10k and 100k partitions; pooled lanes or storage-native ISR require a new ADR | M2 Kafka data-path implementation admission |
 | `V2-OPEN-KAF-DATA-01` | select an explicit evidence-backed initial profile for `__share_group_state`; it cannot inherit a tenant default, while `__consumer_offsets` and `__transaction_state` are already fixed to `BOOKKEEPER_WAL_ONLY` | M6/release internal-topic admission |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |
 

@@ -71,8 +71,9 @@ NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidenc
   does not. The [Q1 receipt](evidence/v2-m0/m1.1b-q1/README.md) remains historical
   `READINESS_EVIDENCE_ONLY`. Production codec/goldens, pure-input admission, and O2 aggregate integration are complete
   at `01a70f17` with 55 domain, 73 focused O2, and 303 whole metadata-oxia tests in a
-  [non-promotable receipt](evidence/v2-m0/m1.1b/README.md). K1/P1/R1, real Oxia/Pulsar conformance, a real
-  existing-cluster inventory, runtime activation, and scenario PASS remain pending.
+  [non-promotable receipt](evidence/v2-m0/m1.1b/README.md). K1/P1/R1, real Oxia/Pulsar conformance, runtime activation,
+  and scenario PASS remain pending. A real existing-cluster inventory is deferred migration evidence, not a fresh-only
+  0.2 or M1-Final blocker.
 - **Registry capacity OPEN:** `maxWriterCount=8` is a candidate until steady, concurrent binary/credential rollout,
   rollback, fenced residue, and bootstrap/admin cohorts plus the complete Registry size formula bound it. The fixed
   row is 120 bytes and there is no separate writer-set-byte cap.
@@ -84,7 +85,7 @@ NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidenc
   trusted N3 receipt; those are implementation/promotion evidence rather than another prose-design decision.
 
 O1 and O2 are governed by their accepted implementation designs and focused receipts. The remaining Registry-capacity,
-receipt-cap, K1/P1/R1, real conformance/inventory, and promotion descendants remain OPEN, pending, or
+receipt-cap, K1/P1/R1, real Oxia/Registry conformance, and promotion descendants remain OPEN, pending, or
 non-normative until their own required implementation/evidence
 gate or explicit design confirmation.
 
@@ -523,16 +524,18 @@ entry reads, and ordered publication over bounded overlapping I/O. Normal append
 [ADR 0087](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md) also resolves the protocol semantic
 shape: Allocated/Durable/LEO/HW/LSO remain distinct; shared BookKeeper durability does not replace logical ISR;
 producer/transaction/leader-epoch state passes a fence-protected coherent publication with locators; compact native
-replica-Fetch descriptors split Observed/Applied progress; native election caps shared-tail adoption; WAL replay does
-not invent HW/LSO; Fetch uses coherent isolation snapshots, native aborted metadata, delayed local wakeup, and floor-
-plus-successor lookup. BK `NBKE2` and Object `NWKCP1` implement one protocol-checkpoint contract while physical Object
-checkpoint pages/Seal remain physical-only. A storage-native ISR shortcut is not an open implementation option.
+replica-Fetch descriptors split Observed/Applied progress under mandatory journal/source and offset/byte/age lag
+bounds; native election caps shared-tail adoption; WAL replay does not invent HW/LSO; Fetch uses coherent isolation
+snapshots, native aborted metadata, delayed local wakeup, and floor-plus-successor lookup. BK `NBKE2` and Object
+`NWKCP1` implement one protocol-checkpoint contract; one fenced terminal `KafkaProtocolCheckpointHeadV1` selects Object
+checkpoints while physical Object checkpoint pages/Seal remain physical-only. A storage-native ISR shortcut is not an
+open implementation option.
 
 The remaining M2 gate is executable rather than an architecture choice: freeze exact `NBKE2`/index/footer/checkpoint
-bytes and evidence-derived pipeline/recovery/waiter/cursor/rollover bounds, then prove dedicated-ledger viability and
-the ADR-0087 protocol state machine and `V2-KAF-DATA-001..022` at 10k/100k partitions. Failure blocks the profile or requires a new pooled-lane
-ADR; it cannot silently select a global mixed-
-partition ledger or restore V1 reservation dual writes.
+bytes, exact NWKCP1 Head/vector/key caps, and evidence-derived apply-lag/pipeline/recovery/waiter/cursor/rollover
+bounds, then prove dedicated-ledger viability and the ADR-0087 protocol state machine and
+`V2-KAF-DATA-001..022` at 10k/100k partitions. Failure blocks the profile or requires a new pooled-lane ADR; it cannot
+silently select a global mixed-partition ledger or restore V1 reservation dual writes.
 
 ### `V2-OPEN-KAF-DATA-01`: `__share_group_state` initial profile remains OPEN
 

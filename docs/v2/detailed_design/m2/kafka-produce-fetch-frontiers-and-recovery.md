@@ -239,6 +239,26 @@ is bounded local protocol evidence, not an Oxia/KRaft authority. Descriptor byte
 provider reads/decode use Cell/provider replica-read budgets. Native Kafka owns ISR membership, minISR, HW, timeouts,
 and errors. Shared storage eliminates duplicate payload writes, not logical replica validation.
 
+The follower kernel exposes one closed eligibility decision:
+
+```text
+isrObservationEligible =
+    observationJournalDurableThrough(observedEndOffset)
+    && observedEndOffset - appliedEndOffset <= maxApplyLagOffsets
+    && unappliedBytes <= maxApplyLagBytes
+    && unappliedAge <= maxApplyLagTime
+    && recoverableSourceCovers([appliedEndOffset, observedEndOffset))
+```
+
+It evaluates the complete tuple before reporting new Observed progress and whenever lag age/bytes, journal health, or
+Source Map generation changes. Reaching a bound stops Observed advancement, removes native ISR/HW eligibility, or
+backpressures publication; it never silently leaves an indefinitely unapplied replica in ISR. A source-generation
+replacement is valid only with exact Kafka coverage/content and compatible producer/transaction/leader/checkpoint
+proof. Original BK protection may drain only after that replacement is installed for the unapplied range. Journal
+loss/corruption/truncation rolls eligible Observed back to the highest contiguous surviving journal/Applied proof and
+requires bounded catch-up before re-entry. M2/M6 evidence selects numeric bounds and measures ISR shrink, catch-up,
+source-retention cost, and failure availability; no Topic flag can disable or enlarge them.
+
 ## Transaction and leader-epoch state
 
 Partition transaction state includes ongoing transactions, first unstable offset, completed/aborted ranges, control
@@ -259,6 +279,27 @@ The Object physical extent checkpoint pages and physical Seal stay physical-only
 physical-recovery omission, frontier advance, source protection release, or GC. Missing/corrupt checkpoint state falls
 back to bounded NWG1 suffix replay. Checkpoint cadence is operational, but aggregate uncovered entries/bytes/age/time
 and a terminal compatible vector at run close are hard contracts.
+
+Object WAL selects checkpoints through one independent Root-bound `KafkaProtocolCheckpointHeadV1`. Its logical state
+contains Root identity, fenced publisher epoch, `OPEN|TERMINAL`, ordinal, predecessor digest, exact checkpoint object
+key/length/digest, and the covered-through vector. Publication is:
+
+```text
+conditional-create content-addressed NWKCP1
+  -> complete object verification
+  -> CAS Head from exact predecessor and publisher epoch
+```
+
+Ordinals advance by one, vectors never regress, one publisher has at most one unresolved candidate, and unknown
+responses converge by exact object/Head reread. Takeover changes only publisher epoch while preserving the selected
+Head. After admission stops and the final vector exists, `OPEN -> TERMINAL` is an irreversible same-Head CAS. A
+successor Root binds the exact terminal Head key/canonical-value digest separately from the physical Root/Seal lineage.
+LIST discovery alone never selects a checkpoint or proves terminal closure.
+
+Selected NWKCP1 Objects and the Head remain while any successor, manifest, recovery, retention, or source dependency
+references the run. Checkpoint deletion cannot precede the WAL/source required by its replay semantics. Unselected
+content-addressed residue needs bounded authoritative non-reference proof. Exact wire, vector/key caps, and backend
+mapping are M3 outputs; this lifecycle authority does not enter append ACK and never authorizes source GC.
 
 ## Takeover recovery
 

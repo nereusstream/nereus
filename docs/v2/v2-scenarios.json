@@ -815,7 +815,7 @@
     {
       "id": "V2-KAF-DATA-019",
       "milestone": "M2/M6",
-      "contract": "compact descriptor transport separates durable replica Observed from payload and state Applied",
+      "contract": "compact descriptor transport separates durable replica Observed from payload and state Applied while hard lag source and journal bounds gate ISR and HW eligibility",
       "ownerDoc": "docs/v2/07-protocol-integrations.md",
       "status": "PLANNED",
       "evidenceReceipt": null
@@ -831,7 +831,7 @@
     {
       "id": "V2-KAF-DATA-021",
       "milestone": "M2/M3/M6",
-      "contract": "Object WAL protocol checkpoints recover through bounded NWKCP1 plus NWG1 suffix without changing physical checkpoint authority",
+      "contract": "Object WAL protocol checkpoints recover through fenced terminal KafkaProtocolCheckpointHeadV1 selected NWKCP1 plus bounded NWG1 suffix without changing physical checkpoint authority",
       "ownerDoc": "docs/v2/03-object-wal.md",
       "status": "PLANNED",
       "evidenceReceipt": null
