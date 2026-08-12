@@ -90,6 +90,7 @@ Each target owns one row below and must preserve unrelated worktree state.
 | `M1.1a-E` | `v2M1FoundationCheck`, reproducible JAR/source-JAR/POM hashing, M1 `InProgress` handoff | `M1.1a-A..D` | foundation gate; never M1 PASS | local gate implemented; N1 promotion pending |
 | `M1.1a-O1` | expose ready/loss lifecycle from the Oxia client dummy barrier, including assignment-stream gaps and cancelable notification attempts; no server wire/RPC | confirmed client `24b730d1` / server `37a17bef` bases | fork focused tests and clean fork state | focused target complete at client `091a42c`; [design and evidence](m1.1a-oxia-client-continuity.md); no scenario promotion |
 | `M1.1a-O2` | V2 aggregate/selector/Registry adapter scaffolding and store-wide continuity capability | `M1.1a-D`, `M1.1a-O1` | local fake tests; exact-source conformance remains pending | locally verified at Nereus `050f908a`: 69 focused and 299 whole-module tests; [accepted design](m1.1a-oxia-capability-scaffold.md) and [local-only receipt](../../evidence/v2-m0/m1.1a-o2/README.md); no scenario promotion |
+| `M1.1b-Q1` | collect NTA1 bounds, legality, pinned-name, checked-arithmetic, and candidate-wire evidence | `M1.1a-E`; O2 codec port remains fail closed | `v2M1Nta1ReadinessCheck`; readiness only | [Proposed design](m1.1b-nta1-codec.md); no production codec or accepted caps |
 | `M1.1b` | freeze and implement complete NTA1 encoder/parser, legality table, caps, formula, and goldens | four accepted codec decisions plus evidence | exact codec gate | **OPEN; do not implement** |
 | `K1` | complete Kafka feature-2/API-32000/CreateTopics/image/publication authority | immutable post-M1.1b domain artifact | Kafka focused source gate | detailed design required |
 | `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | `M1.1b`, `M1.1a-O2` | Pulsar/Oxia focused source gate | detailed design required |
@@ -161,7 +162,7 @@ The expected review sequence is:
 4. SPI/test-fixture implementation and foundation gate;
 5. Oxia client fork in its repository;
 6. metadata-oxia scaffolding;
-7. evidence collection and a focused M1.1b grill;
+7. [M1.1b-Q1 evidence collection](m1.1b-nta1-codec.md) and a focused M1.1b grill;
 8. NTA1 codec;
 9. separate Kafka, Pulsar, and Registry changes;
 10. M1 fast/exact/final gate completion;

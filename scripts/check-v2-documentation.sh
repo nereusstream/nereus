@@ -33,6 +33,7 @@ required_v2_docs=(
     detailed_design/m1/m1.1a-domain-spi-foundation.md
     detailed_design/m1/m1.1a-oxia-client-continuity.md
     detailed_design/m1/m1.1a-oxia-capability-scaffold.md
+    detailed_design/m1/m1.1b-nta1-codec.md
     open-questions.md
     tradeoffs.md
 )
@@ -194,6 +195,10 @@ require_literal 'On 2026-08-12 the user accepted this design' "docs/v2/detailed_
 require_literal 'Maven Local' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
 require_literal 'readAggregate(TopicBindingId)' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
 require_literal 'no P1/R1/M1 PASS' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
+require_literal 'M1.1b-Q1 NTA1 codec bounds and legality readiness' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
+require_literal 'designStatus: Proposed' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
+require_literal 'READINESS_EVIDENCE_ONLY' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
+require_literal 'production NTA1 remains blocked' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
 require_literal 'Complete NTA1 codec/goldens remain OPEN' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
 require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal "V2 documentation baseline" ".github/workflows/build.yml"
