@@ -964,6 +964,22 @@ tasks.register("v2M1Nta1ReadinessCheck") {
     dependsOn("v2DocumentationCheck")
 }
 
+tasks.register<Exec>("v2M1RegistryCapacitySourceCheck") {
+    group = "verification"
+    description = "Verify deterministic R0 Registry capacity evidence, focused counts, and production absence."
+    dependsOn(":nereus-domain:test")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m1-registry-capacity.sh")
+}
+
+tasks.register("v2M1RegistryCapacityCheck") {
+    group = "verification"
+    description = "Verify M1.1c-R0 readiness only; no R1 authority/real Oxia/allocator/scenario/M1 PASS."
+    dependsOn(":nereus-domain:check")
+    dependsOn("v2M1RegistryCapacitySourceCheck")
+    dependsOn("v2DocumentationCheck")
+}
+
 tasks.register<Exec>("v2M1Nta1CodecSourceCheck") {
     group = "verification"
     description = "Verify production NTA1 v1, exact goldens, O2 aggregate wiring, and non-promotion scope."

@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "sourceTupleId": "v2-m0",
+  "result": "REGISTRY_CAPACITY_READINESS_ONLY",
+  "promotionEligible": false,
+  "registryConformance": false,
+  "productionRegistryAuthorityImplemented": false,
+  "allocatorModeSelected": false,
+  "runtimeActivated": false,
+  "scenarioPromotion": false,
+  "source": {
+    "nereusCommit": "c8cb92ff8aeff7859acdc20097bb3d018d4eb792",
+    "requiredBaselineCommit": "26728bec826ac72e5b893d4d19983d588feaca4f"
+  },
+  "fixedInputs": {
+    "writerKinds": 2,
+    "writerRowBytes": 120,
+    "fixedHeaderBytes": 184,
+    "maxRegistryEnvelopeBytes": 65536,
+    "maxAssignmentsEver": 256,
+    "maxAssignmentRowBytes": 192,
+    "sliceExponent": 40,
+    "oxiaExpectedVersionBytes": 8
+  },
+  "cohortBound": {
+    "slotsPerWriterKind": 7,
+    "maxWriterCount": 14,
+    "binaryCredentialMatrixPerKind": 4,
+    "rollbackPerKind": 1,
+    "fencedResiduePerKind": 1,
+    "allocationCapableBootstrapAdminPerKind": 1,
+    "rowMeaning": "SOURCE_QUALIFIED_COHORT_AND_INDEPENDENTLY_REVOCABLE_PRINCIPAL_GENERATION"
+  },
+  "formula": "184 + writerCount * 120 + sum(assignmentRowCanonicalBytes)",
+  "maximumBreakdown": {
+    "fixedHeaderBytes": 184,
+    "writerBytes": 1680,
+    "assignmentBytes": 49152,
+    "canonicalRegistryBytes": 51016,
+    "inheritedEnvelopeBytes": 65536,
+    "reservedMarginBytes": 14520,
+    "oxiaValueBytes": 51016,
+    "oxiaCasCandidateValueBytes": 51016,
+    "oxiaCasExpectedVersionBytes": 8,
+    "oxiaValuePlusVersionOperandsBytes": 51024,
+    "keyAndRpcFramingIncluded": false
+  },
+  "scenarios": [
+    {"id":"steady-native-bookkeeper","writerCount":1,"registryBytesAt256Rows":49456},
+      {"id":"steady-nereus-virtual-ledger","writerCount":1,"registryBytesAt256Rows":49456},
+      {"id":"combined-steady","writerCount":2,"registryBytesAt256Rows":49576},
+      {"id":"old-new-binary-coexistence","writerCount":4,"registryBytesAt256Rows":49816},
+      {"id":"binary-credential-two-by-two","writerCount":8,"registryBytesAt256Rows":50296},
+      {"id":"rollback-fresh-generations","writerCount":10,"registryBytesAt256Rows":50536},
+      {"id":"fenced-not-cleaned-residue","writerCount":12,"registryBytesAt256Rows":50776},
+      {"id":"allocation-capable-bootstrap-admin","writerCount":14,"registryBytesAt256Rows":51016}
+  ],
+  "rejectionCodes": [
+    "REGISTRY_WRITER_COUNT_EXCEEDED",
+    "REGISTRY_CANONICAL_BYTES_EXCEEDED",
+    "REGISTRY_ASSIGNMENT_COUNT_EXCEEDED",
+    "REGISTRY_ASSIGNMENT_ROW_BYTES_EXCEEDED",
+    "REGISTRY_OMITTED_AUTHORIZED_WRITER",
+    "REGISTRY_UNAUTHORIZED_WRITER",
+    "REGISTRY_WRITER_LIFECYCLE_VIOLATION"
+  ],
+  "testEvidence": {
+    "expectedFocusedTests": 18,
+    "expectedFailures": 0,
+    "expectedErrors": 0,
+    "expectedSkipped": 0,
+    "dynamicTests": false,
+    "internalRetries": false
+  },
+  "modelSha256": "b4f2290b513be9b2bd3a687e1c938a6d341a04cd8163f172f2a18f467c1910d2",
+  "limitations": [
+    "NO_R1_PRODUCTION_CODEC_STORE_OR_INTERLOCK",
+    "NO_REAL_OXIA_CONFORMANCE",
+    "NO_ALLOCATOR_MODE_SELECTION",
+    "NO_SCENARIO_PROMOTION",
+    "NO_10K_OR_100K_SCALE_BENCHMARK"
+  ]
+}
