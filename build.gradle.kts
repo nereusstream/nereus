@@ -168,6 +168,33 @@ abstract class V2FoundationArtifactVerificationTask : DefaultTask() {
     }
 }
 
+abstract class V2OxiaDependencyVerificationTask : DefaultTask() {
+    @get:org.gradle.api.tasks.Classpath
+    abstract val runtimeClasspath: org.gradle.api.file.ConfigurableFileCollection
+
+    @get:org.gradle.api.tasks.InputFiles
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.NONE)
+    abstract val lockedClientArtifacts: org.gradle.api.file.ConfigurableFileCollection
+
+    @TaskAction
+    fun verifyDependencies() {
+        val selected = runtimeClasspath.files
+            .filter { it.name == "oxia-client-0.9.4.jar" || it.name == "oxia-client-api-0.9.4.jar" }
+            .mapTo(sortedSetOf()) { it.canonicalFile }
+        val locked = lockedClientArtifacts.files.mapTo(sortedSetOf()) { it.canonicalFile }
+        check(selected == locked && selected.size == 2) {
+            "nereus-metadata-oxia must resolve exactly the locked O1 client/client-api pair; " +
+                "selected=$selected locked=$locked"
+        }
+        val forbidden = runtimeClasspath.files.filter {
+            it.name.startsWith("oxia-client-") && it.name.endsWith(".jar") && it.canonicalFile !in locked
+        }
+        check(forbidden.isEmpty()) {
+            "nereus-metadata-oxia contains an unqualified or duplicate Oxia client artifact: $forbidden"
+        }
+    }
+}
+
 plugins {
     `base`
     `maven-publish`
@@ -883,6 +910,40 @@ tasks.register("v2M1FoundationCheck") {
     dependsOn("v2M1FoundationDependencyCheck")
     dependsOn("v2M1FoundationApiCheck")
     dependsOn("v2M1FoundationArtifactCheck")
+    dependsOn("v2DocumentationCheck")
+}
+
+val v2OxiaLockedRoot = layout.projectDirectory.dir(
+    "gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16/m2/" +
+        "io/github/oxia-db",
+)
+
+tasks.register<V2OxiaDependencyVerificationTask>("v2M1OxiaDependencyCheck") {
+    group = "verification"
+    description = "Verify metadata-oxia resolves only the immutable O1 client/client-api bundle."
+    dependsOn(":nereus-metadata-oxia:compileJava")
+    runtimeClasspath.from(project(":nereus-metadata-oxia").configurations.named("runtimeClasspath"))
+    lockedClientArtifacts.from(
+        v2OxiaLockedRoot.file("oxia-client/0.9.4/oxia-client-0.9.4.jar"),
+        v2OxiaLockedRoot.file("oxia-client-api/0.9.4/oxia-client-api-0.9.4.jar"),
+    )
+}
+
+tasks.register<Exec>("v2M1OxiaScaffoldSourceCheck") {
+    group = "verification"
+    description = "Verify the local O2 source boundary and non-zero, zero-skip deterministic test report."
+    dependsOn(":nereus-metadata-oxia:test")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m1-oxia-scaffold.sh")
+}
+
+tasks.register("v2M1OxiaScaffoldCheck") {
+    group = "verification"
+    description = "Verify M1.1a-O2 local scaffold only; no P1/R1/runtime activation/scenario/M1 PASS."
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn("v2M1OxiaDependencyCheck")
+    dependsOn("v2M1OxiaScaffoldSourceCheck")
+    dependsOn("v2M1FoundationCheck")
     dependsOn("v2DocumentationCheck")
 }
 
