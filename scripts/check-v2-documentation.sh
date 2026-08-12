@@ -188,7 +188,8 @@ require_literal 'receipt: docs/v2/evidence/v2-m0/m1.1a-o1/focused-compatibility.
 require_literal 'No server proto or RPC change is needed.' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
 require_literal 'M1.1a-O2 Nereus metadata-oxia capability scaffold' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
 require_literal 'designStatus: Accepted' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
-require_literal 'implementationStatus: InProgress' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
+require_literal 'implementationStatus: Verified' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
+require_literal 'receipt: docs/v2/evidence/v2-m0/m1.1a-o2/README.md' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
 require_literal 'On 2026-08-12 the user accepted this design' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
 require_literal 'Maven Local' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
 require_literal 'readAggregate(TopicBindingId)' "docs/v2/detailed_design/m1/m1.1a-oxia-capability-scaffold.md"
@@ -391,7 +392,7 @@ require_literal "M1 Readiness Grill round 4" "docs/v2/grill-notes/25-m1-readines
 require_literal "不要同时维护 suite/scenario/aggregate 三套独立结果" "docs/v2/grill-notes/25-m1-readiness-round-4-leaf-witness-registry-and-receipt.md"
 require_literal "M1 Readiness Grill round 5" "docs/v2/grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md"
 require_literal "结论：Round 5 不能全部确认" "docs/v2/grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md"
-require_literal "Nereus-local M1.1a-A module/identity/deterministic-ID/SPI/dependency foundation is now implemented" "docs/v2/open-questions.md"
+require_literal "Metadata-oxia O2 is also locally" "docs/v2/open-questions.md"
 require_literal '`maxWriterCount=8` is a candidate' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
@@ -991,6 +992,66 @@ else:
         or focused_result.get("server", {}).get("imageDigest") != server_runtime["imageDigest"]
     ):
         fail("focused compatibility result does not bind the qualified source/runtime tuple")
+
+local_evidence_bindings = source.get("localImplementationEvidenceBindings", {})
+if set(local_evidence_bindings) != {"m1.1aO2Scaffold"}:
+    fail("local implementation evidence bindings are incomplete")
+o2_evidence = local_evidence_bindings["m1.1aO2Scaffold"]
+expected_o2_identity = {
+    "nereusImplementationCommit": "050f908afa1832694b99bd156b17c9e06b9e9a6c",
+    "clientFinalForkCommit": final_fork_commit,
+    "clientArtifactManifestSha256": client_artifacts["manifest"]["sha256"],
+    "serverSourceCommit": server_source_commit,
+    "serverRole": "READ_ONLY_NOT_EXECUTED_BY_O2",
+    "testArtifact": {
+        "path": "docs/v2/evidence/v2-m0/m1.1a-o2/focused-local-scaffold.json",
+        "bytes": 1803,
+        "sha256": "08fc6f6bd924ebed1350ee99666123e5c9303e5b4e05ec2cd2b6de9180865618",
+    },
+    "receipt": "docs/v2/evidence/v2-m0/m1.1a-o2/README.md",
+    "result": "PASS_LOCAL_SCAFFOLD_ONLY",
+    "promotionEligible": False,
+    "evidenceStatus": "FOCUSED_LOCAL_EVIDENCE",
+}
+if o2_evidence != expected_o2_identity:
+    fail("O2 local evidence binding differs from the focused receipt")
+o2_artifact_path = root / o2_evidence["testArtifact"]["path"]
+if (
+    not o2_artifact_path.is_file()
+    or o2_artifact_path.stat().st_size != o2_evidence["testArtifact"]["bytes"]
+    or hashlib.sha256(o2_artifact_path.read_bytes()).hexdigest()
+    != o2_evidence["testArtifact"]["sha256"]
+):
+    fail("O2 local result artifact differs from source locks")
+if not (root / o2_evidence["receipt"]).is_file():
+    fail("O2 local evidence receipt does not exist")
+o2_result = json.loads(o2_artifact_path.read_text())
+if (
+    o2_result.get("sourceTupleId") != source_tuple
+    or o2_result.get("result") != "PASS_LOCAL_SCAFFOLD_ONLY"
+    or o2_result.get("promotionEligible") is not False
+    or o2_result.get("nereus", {}).get("implementationCommit")
+    != o2_evidence["nereusImplementationCommit"]
+    or o2_result.get("oxiaClient", {}).get("finalForkCommit") != final_fork_commit
+    or o2_result.get("oxiaClient", {}).get("artifactManifestSha256")
+    != client_artifacts["manifest"]["sha256"]
+    or o2_result.get("oxiaServer", {}).get("sourceCommit") != server_source_commit
+    or o2_result.get("oxiaServer", {}).get("role") != "READ_ONLY_NOT_EXECUTED_BY_O2"
+    or o2_result.get("focusedTests")
+    != {
+        "suites": 9,
+        "discovered": 69,
+        "executed": 69,
+        "passed": 69,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "aborted": 0,
+    }
+    or o2_result.get("scope", {}).get("scenarioPromotion") is not False
+    or o2_result.get("scope", {}).get("m1Pass") is not False
+):
+    fail("O2 local result does not preserve its source, test, or non-promotion boundary")
 
 research_ids = set()
 for item in source.get("researchBaselines", []):

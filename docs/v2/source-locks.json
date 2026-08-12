@@ -160,6 +160,24 @@
       "evidenceStatus": "FOCUSED_EVIDENCE"
     }
   },
+  "localImplementationEvidenceBindings": {
+    "m1.1aO2Scaffold": {
+      "nereusImplementationCommit": "050f908afa1832694b99bd156b17c9e06b9e9a6c",
+      "clientFinalForkCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+      "clientArtifactManifestSha256": "521a7a3615b9f25d3e459633fff614f03208a13efda0ab9913b2255a9f2f40ab",
+      "serverSourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
+      "serverRole": "READ_ONLY_NOT_EXECUTED_BY_O2",
+      "testArtifact": {
+        "path": "docs/v2/evidence/v2-m0/m1.1a-o2/focused-local-scaffold.json",
+        "bytes": 1803,
+        "sha256": "08fc6f6bd924ebed1350ee99666123e5c9303e5b4e05ec2cd2b6de9180865618"
+      },
+      "receipt": "docs/v2/evidence/v2-m0/m1.1a-o2/README.md",
+      "result": "PASS_LOCAL_SCAFFOLD_ONLY",
+      "promotionEligible": false,
+      "evidenceStatus": "FOCUSED_LOCAL_EVIDENCE"
+    }
+  },
   "researchBaselines": [
     {
       "id": "automq-architecture-review",

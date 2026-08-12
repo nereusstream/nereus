@@ -42,13 +42,15 @@ performance-first BookKeeper WAL.
   receipt numeric caps, and executable promotion evidence remain OPEN.
 - The accepted [M1 execution index](detailed_design/m1/README.md) and
   [M1.1a-A code-level design](detailed_design/m1/m1.1a-domain-spi-foundation.md) split the first implementation into
-  module, identity/domain, SPI/gate, continuity-fork, and metadata-oxia targets. The first three are now implemented by
-  `nereus-domain`, `nereus-metadata-spi`, and `v2M1FoundationCheck`; the Oxia fork target is focused-evidence complete,
-  and metadata-oxia remains a separate unstarted target.
+  module, identity/domain, SPI/gate, continuity-fork, and metadata-oxia targets. The first three are implemented by
+  `nereus-domain`, `nereus-metadata-spi`, and `v2M1FoundationCheck`; the Oxia fork is focused-evidence complete; and
+  [metadata-oxia O2](detailed_design/m1/m1.1a-oxia-capability-scaffold.md) is locally verified by its locked dependency,
+  69-test scaffold gate, 299-test whole-module compatibility run, and non-promotable local receipt.
 - The foundation supplies Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct aggregate
   foundation validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
   guards, and reproducible JAR/source-JAR/POM hashes. It deliberately supplies no NTA1 codec, Registry capacity,
-  backend adapter, Kafka/Pulsar activation, or M1 Final/PASS claim.
+  complete production codec, Kafka/Pulsar activation, P1/R1, real backend conformance, or M1 Final/PASS claim. O2 now
+  supplies only the fail-closed single-key backend scaffold.
 - Existing Java modules and Phase/Future evidence on `main` are V1 residue until replaced by a V2 milestone.
 - The ordinary CI Pulsar API checkout remains a legacy V1-residue build baseline until the V2 Pulsar slice replaces
   that code; it is recorded separately and is not the V2 fork-development or parity baseline.

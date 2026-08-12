@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "sourceTupleId": "v2-m0",
+  "evidenceId": "m1.1a-o2-local-scaffold",
+  "evidenceStatus": "FOCUSED_LOCAL_EVIDENCE",
+  "result": "PASS_LOCAL_SCAFFOLD_ONLY",
+  "promotionEligible": false,
+  "nereus": {
+    "repository": "https://github.com/nereusstream/nereus.git",
+    "branch": "main",
+    "implementationCommit": "050f908afa1832694b99bd156b17c9e06b9e9a6c"
+  },
+  "oxiaClient": {
+    "repository": "https://github.com/nereusstream/oxia-client-java.git",
+    "implementationBaseCommit": "24b730d1d66a1da701f4c99957361f6b3c5d748c",
+    "finalForkCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+    "artifactBundleRoot": "gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+    "artifactManifestSha256": "521a7a3615b9f25d3e459633fff614f03208a13efda0ab9913b2255a9f2f40ab"
+  },
+  "oxiaServer": {
+    "repository": "https://github.com/nereusstream/oxia.git",
+    "sourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
+    "role": "READ_ONLY_NOT_EXECUTED_BY_O2"
+  },
+  "focusedTests": {
+    "suites": 9,
+    "discovered": 69,
+    "executed": 69,
+    "passed": 69,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "aborted": 0
+  },
+  "wholeModuleTests": {
+    "suites": 72,
+    "discovered": 299,
+    "executed": 299,
+    "passed": 299,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "aborted": 0
+  },
+  "gates": [
+    "v2DocumentationCheck",
+    "v2M1FoundationCheck",
+    "v2M1OxiaScaffoldCheck",
+    ":nereus-metadata-oxia:check",
+    "git diff --check"
+  ],
+  "scope": {
+    "dockerStarted": false,
+    "realOxiaConformance": false,
+    "realPulsarConformance": false,
+    "completeNta1": false,
+    "p1": false,
+    "r1": false,
+    "runtimeActivation": false,
+    "scenarioPromotion": false,
+    "m1Pass": false
+  }
+}

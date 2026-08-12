@@ -52,8 +52,10 @@ runtime leaves the active graph while its design documents remain.
 M1 has started with the explicitly partial M1.1a-A foundation: Java-17/JDK-only modules, bootstrap identities,
 ProtocolKind/NPC1/NTI1/NTB1/NSE1 and authority-leaf codecs, minimal independent aggregate domain types, four closed
 metadata capabilities, dependency/API boundaries, deterministic tests, and reproducible JAR/source-JAR/POM hashing.
-The separate Oxia continuity and metadata-oxia targets have not started. This foundation neither implements nor
-activates complete NTA1. M1.1b owns its strict codec/goldens after FrameEncodingPolicy, legality matrix,
+The separate Oxia client-continuity target is complete at final fork `091a42c`, and metadata-oxia O2 is locally
+verified at Nereus `050f908a` with its immutable client/API bundle, four single-key adapters, continuity scaffold,
+69 focused tests, 299 whole-module tests, and `promotionEligible=false` receipt. These slices neither implement nor
+activate complete NTA1, P1, or R1. M1.1b owns its strict codec/goldens after FrameEncodingPolicy, legality matrix,
 Pulsar/name/Cell/incarnation/total caps, and checked maximum formula close.
 
 ## M1 implementation and promotion contract

@@ -42,9 +42,11 @@ kinds, and one non-authoritative Final manifest. It explicitly did not accept co
 proposed receipt numeric cap. The dedicated design-review answer is preserved in
 [round 5](grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md).
 
-The Nereus-local M1.1a-A module/identity/deterministic-ID/SPI/dependency foundation is now implemented and locally
-gated. The separate Oxia O1 client-continuity target now has a pushed final fork and focused evidence; metadata-oxia
-scaffolding has not started. The foundation cannot claim complete
+The Nereus-local M1.1a-A module/identity/deterministic-ID/SPI/dependency foundation is implemented and locally gated.
+The Oxia O1 client-continuity target has a pushed final fork and focused evidence. Metadata-oxia O2 is also locally
+verified at Nereus `050f908a`: it consumes the immutable O1 client/API bundle, implements four single-key adapters and
+store-wide continuity invalidation, and binds 69 focused plus 299 whole-module tests in a non-promotable receipt. These
+slices cannot claim complete
 NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidence. The remaining descendants are:
 
 - **Oxia O1 focused implementation complete:** the confirmed 2026-08-12 source audit uses Java client
@@ -55,7 +57,11 @@ NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidenc
   assignment-stream loss/restoration publication and one cancelable notification attempt so no opaque retry can
   precede loss. Client final fork `091a42c2780d92da56e9ec1f02ce1c3d988adc16`, artifact hashes, exact server image,
   and focused compatibility receipt are bound separately in schema-v2 source locks. This closes only O1 execution;
-  it does not promote a scenario or start O2.
+  it does not promote a scenario. O2 subsequently consumed this exact fork without modifying it.
+- **Oxia O2 local scaffold complete:** the [accepted design](detailed_design/m1/m1.1a-oxia-capability-scaffold.md)
+  binds Nereus implementation `050f908a`, the complete O1 client/client-api bundle manifest, exact key/version and
+  conditional-reread adapters, continuity race cuts, 69 focused tests, and 299 whole-module V1-residue compatibility
+  tests. Its result is `PASS_LOCAL_SCAFFOLD_ONLY`, not real Oxia/Pulsar conformance, and `promotionEligible=false`.
 - **M1.1b codec OPEN:** exact `FrameEncodingPolicy` kind/version/payload, complete protocol/profile/`NONE` legality and
   goldens, Pulsar persistence/topic UTF-8 caps, `maxCellBytes`, `maxIncarnationBytes`, `maxNta1Bytes`, checked formula,
   and canonical topic-name/persistence-name consistency. The 16-KiB/64-KiB values are candidates only.
@@ -69,8 +75,9 @@ NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidenc
   focused-test identities. Scenario promotion still requires the later executable continuity/Registry conformance and
   trusted N3 receipt; those are implementation/promotion evidence rather than another prose-design decision.
 
-O1 is now governed by its accepted implementation design. The remaining codec, Registry-capacity, receipt-cap, O2,
-P1, and promotion descendants remain OPEN, pending, or non-normative until their own required implementation/evidence
+O1 and O2 are governed by their accepted implementation designs and focused receipts. The remaining codec,
+Registry-capacity, receipt-cap, P1/R1, real conformance, and promotion descendants remain OPEN, pending, or
+non-normative until their own required implementation/evidence
 gate or explicit design confirmation.
 
 ## Restarted Grill 2: evidence frontier

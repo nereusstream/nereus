@@ -31,9 +31,11 @@ store-wide continuity contract, canonical UUID/NLI1 namespace identity, and one 
 M1.1a foundation slice after removing derived NTA1 authorities, reusing the Oxia dummy barrier client-side, fixing a
 120-byte writer row, and removing receipt run/result duplication. The additive domain/SPI foundation and its local
 gate now exist. The client-only O1 continuity API/state machine, final client fork, exact server runtime, and focused
-evidence now exist, while O2 remains unstarted; V2 therefore remains `InProgress`. Complete NTA1
-FrameEncodingPolicy/name/total caps, writer count, metadata-oxia/Kafka/Pulsar runtime adapters, receipt caps, final
-provider-integration artifacts, and promotion evidence remain open or pending.
+evidence now exist. O2's single-key/continuity scaffold is locally verified with a non-promotable receipt; V2 remains
+`InProgress` because the activatable descendants are still absent. Complete NTA1
+FrameEncodingPolicy/name/total caps, writer count, complete metadata-oxia production codecs, Kafka/Pulsar runtime
+adapters, P1/R1, receipt caps, final provider-integration artifacts, and promotion evidence remain open or pending.
+The O2 scaffold deliberately cannot activate runtime.
 
 ## 2. Architecture
 

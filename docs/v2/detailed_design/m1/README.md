@@ -89,7 +89,7 @@ Each target owns one row below and must preserve unrelated worktree state.
 | `M1.1a-D` | exactly four production capabilities, closed outcomes, snapshots, deterministic test fakes | `M1.1a-C` | SPI contract tests | implemented and foundation-gated |
 | `M1.1a-E` | `v2M1FoundationCheck`, reproducible JAR/source-JAR/POM hashing, M1 `InProgress` handoff | `M1.1a-A..D` | foundation gate; never M1 PASS | local gate implemented; N1 promotion pending |
 | `M1.1a-O1` | expose ready/loss lifecycle from the Oxia client dummy barrier, including assignment-stream gaps and cancelable notification attempts; no server wire/RPC | confirmed client `24b730d1` / server `37a17bef` bases | fork focused tests and clean fork state | focused target complete at client `091a42c`; [design and evidence](m1.1a-oxia-client-continuity.md); no scenario promotion |
-| `M1.1a-O2` | V2 aggregate/selector/Registry adapter scaffolding and store-wide continuity capability | `M1.1a-D`, `M1.1a-O1` | local fake tests; exact-source conformance remains pending | implementation and 69-test local gate complete; focused evidence/final sync pending in batch 5; [accepted design](m1.1a-oxia-capability-scaffold.md) |
+| `M1.1a-O2` | V2 aggregate/selector/Registry adapter scaffolding and store-wide continuity capability | `M1.1a-D`, `M1.1a-O1` | local fake tests; exact-source conformance remains pending | locally verified at Nereus `050f908a`: 69 focused and 299 whole-module tests; [accepted design](m1.1a-oxia-capability-scaffold.md) and [local-only receipt](../../evidence/v2-m0/m1.1a-o2/README.md); no scenario promotion |
 | `M1.1b` | freeze and implement complete NTA1 encoder/parser, legality table, caps, formula, and goldens | four accepted codec decisions plus evidence | exact codec gate | **OPEN; do not implement** |
 | `K1` | complete Kafka feature-2/API-32000/CreateTopics/image/publication authority | immutable post-M1.1b domain artifact | Kafka focused source gate | detailed design required |
 | `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | `M1.1b`, `M1.1a-O2` | Pulsar/Oxia focused source gate | detailed design required |
@@ -132,8 +132,8 @@ Items 1 through 3 are implemented and locally gated as the M1.1a-A foundation de
 [M1.1a domain/SPI detailed design](m1.1a-domain-spi-foundation.md). Item 4 now has an
 [accepted latest-source audit and component design](m1.1a-oxia-client-continuity.md), a pushed final fork, immutable
 artifact/runtime identities, and focused current-source evidence. Item 5 now has a
-[accepted component design](m1.1a-oxia-capability-scaffold.md); its immutable artifact bundle and aggregate-reader
-correction are the first implementation batch. Runtime activation remains fail closed.
+[accepted, locally verified component design](m1.1a-oxia-capability-scaffold.md), immutable artifact bundle, corrected
+aggregate reader, four single-key adapters, and local-only receipt. Runtime activation remains fail closed.
 
 ## Scenario ownership during M1.1a
 
