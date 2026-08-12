@@ -192,6 +192,18 @@
       "designStatus": "Proposed",
       "productionCodecImplemented": false,
       "evidenceStatus": "READINESS_EVIDENCE"
+    },
+    "m1.1bNta1Codec": {
+      "nereusImplementationCommit": "01a70f17ec9176385e04242490a5fa4f6b230dda",
+      "testArtifact": {
+        "path": "docs/v2/evidence/v2-m0/m1.1b/implementation.json",
+        "bytes": 2244,
+        "sha256": "9390c3c286ec6c159b7da3481d0d93b964dad95c463c8b99b9260e631c959eba"
+      },
+      "receipt": "docs/v2/evidence/v2-m0/m1.1b/README.md",
+      "result": "PASS_LOCAL_NTA1_CODEC_ONLY",
+      "promotionEligible": false,
+      "evidenceStatus": "EXACT_LOCAL_EVIDENCE"
     }
   },
   "researchBaselines": [

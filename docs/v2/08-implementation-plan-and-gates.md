@@ -14,7 +14,7 @@ sourceTuple: v2-m0
 | Milestone | Scope | Current status | Required aggregate |
 | --- | --- | --- | --- |
 | M0 | V1 archive references, Context Map/glossaries, V2 ADRs/contracts, open-question/session logs, source/scenario manifests, tradeoff register, documentation gate | DocumentationGated | `v2M0Check` |
-| M1 | pure V2 active graph; Java-17/JDK-only domain and exact four-capability metadata SPI; NTB1/NSE1 identities and strict NTA1 aggregate; complete Kafka API-key-32000 KRaft record/image/CreateTopics pseudo-config/resolution/sizing/projection/publication authority; Pulsar selector CAS plus authoritative ABA-safe ownership witness, gap-safe stale-install exclusion, and local atomic ACTIVE fence; compatibility-namespace Registry, complete writer-set/interlock, versioned derived slice view, and `REGISTRY_CONFORMANCE`; allocator `HARNESS_CONFORMANCE_ONLY` with no mode selection; remove every active V1 runtime/gate | **InProgress: M1.1a foundation complete; M1.1b accepted/in progress** | `v2M1FinalCheck` |
+| M1 | pure V2 active graph; Java-17/JDK-only domain and exact four-capability metadata SPI; NTB1/NSE1 identities and strict NTA1 aggregate; complete Kafka API-key-32000 KRaft record/image/CreateTopics pseudo-config/resolution/sizing/projection/publication authority; Pulsar selector CAS plus authoritative ABA-safe ownership witness, gap-safe stale-install exclusion, and local atomic ACTIVE fence; compatibility-namespace Registry, complete writer-set/interlock, versioned derived slice view, and `REGISTRY_CONFORMANCE`; allocator `HARNESS_CONFORMANCE_ONLY` with no mode selection; remove every active V1 runtime/gate | **InProgress: M1.1a complete; M1.1b exact-local complete** | `v2M1FinalCheck` |
 | M2 | Owner Epoch lane, typed frontier contract, BookKeeper foundation, Pulsar deterministic NPD1-data/NPO1-root pair with checked 16-byte-row/streaming envelope and provider admission plus native-relative block-policy evidence, ManagedLedger-owned dual-source handle/read pins/final-delete revalidation and persisted BK_DELETE state/retention policy, Kafka ledger-layout scale spike | Planned | `v2M2Check` |
 | M3 | one-cell NWG1 Object WAL groups; binding-context epoch authority and commit-set co-location; run-key/per-Object AEAD; final class/lane leaf grammar and post-plan sequence allocation; up to three lazy lanes under one Root/pointer; provider-resolved physical frontier plus owner-local per-binding typed frontier; physical-only de-duplicated checkpoint rows/Seal; one publisher-epoch-fenced vector chain; pre-position tracker/locator reservation and local tickets; shared-verified range-aggregated active-tail publication before ACK; Root-fixed NONE/optional bounded provider-proof mode; provider-absent cuts; conservative bounded prefix/LIST recovery with no partial skip vector; provider/session evidence; fixed-slice Pulsar virtual-ledger path with RANGE evidence | Planned | `v2M3Check` |
 | M4 | manifest, protocol-position/timestamp indexes, Storage Epoch resolver, logical Binding read snapshot, bounded sharded generation-tagged hazard slots, ABA-safe lease word and terminal source drain, `ADMITTING/STOPPED` Binding selector with fused fallback-removal/E+1 cut, small inline closure-anchor set plus emergency STOPPED envelope, closed-verifier terminal publication and async batched prune, per-source first/shared-last intervals, deterministic on-demand proofs/window, exact inline/reference activation, explicit bounded O(N) reconciliation, and two-stage retirement | Planned | `v2M4Check` |
@@ -61,7 +61,10 @@ allocation boundaries. Its result is `READINESS_EVIDENCE_ONLY`, `promotionEligib
 production codec/goldens under the now accepted table: `NONE={0,0,empty}` and
 `ZSTD_FAST_IF_SMALLER_V1={1,1,empty}`, six legal rows, classic `persistent://`, 4,096 UTF-8 bytes per canonical Pulsar
 name, and exact checked caps `54/8,214/8,397`. Q1 remains historical/non-promotable. The production codec, exact
-goldens, pure-input inventory boundary, and O2 aggregate adapter are the current M1.1b local-evidence slice.
+goldens, pure-input inventory boundary, and O2 aggregate adapter are exact-locally complete at `01a70f17`. The
+[implementation receipt](evidence/v2-m0/m1.1b/README.md) binds 55 domain, 73 focused O2, and 303 whole metadata-oxia
+tests with zero failure/error/skip and `promotionEligible=false`. Selector/Registry codecs, K1/P1/R1, real
+conformance/inventory, runtime activation, scenario promotion, and M1 Final remain pending.
 
 ## M1 implementation and promotion contract
 
@@ -122,6 +125,8 @@ binds it. M1 gates are:
 
 - `v2M1FoundationCheck`: current partial domain/SPI unit, golden, API/dependency, documentation, and artifact-hash gate;
   it cannot prove backend/runtime conformance, the pure final graph, or M1 PASS;
+- `v2M1Nta1CodecCheck`: exact-local production NTA1/validator/goldens/inventory/O2-aggregate gate; it uses no Docker
+  and cannot prove K1/P1/R1, real conformance, runtime activation, scenario promotion, or M1 PASS;
 - `v2M1Check`: no Docker/fork/composite; local domain/schema/SPI/codec/harness, active-graph, and V1-absence checks;
 - `v2M1ExactSourceCheck`: clean exact forks before/after, isolated immutable artifacts, real Oxia, and focused fork tests;
 - `v2M1FinalCheck`: aggregate previous outcomes and receipt schema without rerunning their suites.

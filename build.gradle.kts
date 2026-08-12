@@ -877,7 +877,7 @@ tasks.register<V2FoundationDependencyVerificationTask>("v2M1FoundationDependency
 
 tasks.register<Exec>("v2M1FoundationApiCheck") {
     group = "verification"
-    description = "Verify the M1.1a-A forbidden import, API, capability, and no-final-gate boundary."
+    description = "Verify the M1.1a-A import, SPI capability, and no-final-gate boundary after later domain slices."
     workingDir = layout.projectDirectory.asFile
     commandLine("bash", "scripts/check-v2-m1-foundation.sh")
 }
@@ -961,6 +961,25 @@ tasks.register("v2M1Nta1ReadinessCheck") {
     dependsOn(":nereus-domain:check")
     dependsOn("v2M1Nta1ReadinessSourceCheck")
     dependsOn("v2M1FoundationCheck")
+    dependsOn("v2DocumentationCheck")
+}
+
+tasks.register<Exec>("v2M1Nta1CodecSourceCheck") {
+    group = "verification"
+    description = "Verify production NTA1 v1, exact goldens, O2 aggregate wiring, and non-promotion scope."
+    dependsOn(":nereus-domain:test", ":nereus-metadata-oxia:test")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m1-nta1-codec.sh")
+}
+
+tasks.register("v2M1Nta1CodecCheck") {
+    group = "verification"
+    description = "Verify M1.1b exact local codec only; no Docker/K1/P1/R1/runtime/scenario/M1 PASS."
+    dependsOn(":nereus-domain:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn("v2M1Nta1CodecSourceCheck")
+    dependsOn("v2M1Nta1ReadinessCheck")
+    dependsOn("v2M1OxiaScaffoldCheck")
     dependsOn("v2DocumentationCheck")
 }
 

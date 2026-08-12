@@ -162,6 +162,16 @@ strict UTF-8 bytes and must rederive its peer exactly. The exact checked caps ar
 non-empty payload, non-classic domains, oversize names, and all other profile combinations fail closed. M1.1b now owns
 production codec/goldens and exact-local evidence.
 
+### Production-codec refinement (2026-08-12; exact local only)
+
+Nereus `01a70f17ec9176385e04242490a5fa4f6b230dda` implements the domain-owned NTA1 v1 encoder, bounded parser, closed
+policy/profile validator, exact goldens, and pure-input existing-cluster name admission. O2 uses those canonical bytes
+for its aggregate codec and retains unavailable selector/Registry codecs plus `productionActivationReady=false`.
+
+The local receipt binds 55 domain tests, 73 focused O2 tests, and 303 whole `nereus-metadata-oxia` tests with zero
+failure/error/skip. This is `PASS_LOCAL_NTA1_CODEC_ONLY`, `promotionEligible=false`; it does not alter the Q1 receipt,
+promote a scenario, or claim K1/P1/R1, real conformance/inventory, runtime activation, M1 PASS, or M1 Final.
+
 The 16-KiB-per-name and 64-KiB-total candidates are not contracts. Parser allocation always follows only an already
 validated actual length; Deployment may lower new-write admission but not persisted decoding.
 

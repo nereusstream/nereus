@@ -201,8 +201,12 @@ require_literal 'READINESS_EVIDENCE_ONLY' "docs/v2/detailed_design/m1/m1.1b-nta1
 require_literal 'immutable receipt is retained as historical' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
 require_literal 'maxNta1Bytes=8,397' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
 require_literal 'ZSTD_FAST_IF_SMALLER_V1={kind=1,version=1,payload=empty}' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
-require_literal 'receipt: docs/v2/evidence/v2-m0/m1.1b-q1/README.md' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
+require_literal 'implementationStatus: Verified' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
+require_literal 'receipt: docs/v2/evidence/v2-m0/m1.1b/README.md' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
 require_literal 'v2M1Nta1ReadinessCheck' "build.gradle.kts"
+require_literal 'v2M1Nta1CodecCheck' "build.gradle.kts"
+require_literal 'PASS_LOCAL_NTA1_CODEC_ONLY' "docs/v2/evidence/v2-m0/m1.1b/README.md"
+require_literal 'no Docker/K1/P1/R1/runtime/scenario/M1 PASS' "build.gradle.kts"
 require_literal 'no Docker/runtime/scenario/M1 PASS' "build.gradle.kts"
 require_literal 'historical readiness evidence verified; no Docker, runtime activation, scenario promotion, or M1 PASS' "scripts/check-v2-m1-nta1-readiness.sh"
 require_literal 'production codec/goldens and exact-local evidence' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
@@ -1005,7 +1009,11 @@ else:
         fail("focused compatibility result does not bind the qualified source/runtime tuple")
 
 local_evidence_bindings = source.get("localImplementationEvidenceBindings", {})
-if set(local_evidence_bindings) != {"m1.1aO2Scaffold", "m1.1bQ1Nta1Readiness"}:
+if set(local_evidence_bindings) != {
+    "m1.1aO2Scaffold",
+    "m1.1bQ1Nta1Readiness",
+    "m1.1bNta1Codec",
+}:
     fail("local implementation evidence bindings are incomplete")
 o2_evidence = local_evidence_bindings["m1.1aO2Scaffold"]
 expected_o2_identity = {
@@ -1108,6 +1116,44 @@ if (
     or q1_result.get("coverage", {}).get("legalProtocolProfileRows") != 6
 ):
     fail("M1.1b-Q1 readiness result does not preserve its source, evidence, or non-promotion boundary")
+
+nta1_codec_evidence = local_evidence_bindings["m1.1bNta1Codec"]
+expected_nta1_codec_identity = {
+    "nereusImplementationCommit": "01a70f17ec9176385e04242490a5fa4f6b230dda",
+    "testArtifact": {
+        "path": "docs/v2/evidence/v2-m0/m1.1b/implementation.json",
+        "bytes": 2244,
+        "sha256": "9390c3c286ec6c159b7da3481d0d93b964dad95c463c8b99b9260e631c959eba",
+    },
+    "receipt": "docs/v2/evidence/v2-m0/m1.1b/README.md",
+    "result": "PASS_LOCAL_NTA1_CODEC_ONLY",
+    "promotionEligible": False,
+    "evidenceStatus": "EXACT_LOCAL_EVIDENCE",
+}
+if nta1_codec_evidence != expected_nta1_codec_identity:
+    fail("M1.1b NTA1 codec evidence binding differs from the exact-local receipt")
+nta1_codec_artifact_path = root / nta1_codec_evidence["testArtifact"]["path"]
+if (
+    not nta1_codec_artifact_path.is_file()
+    or nta1_codec_artifact_path.stat().st_size != nta1_codec_evidence["testArtifact"]["bytes"]
+    or hashlib.sha256(nta1_codec_artifact_path.read_bytes()).hexdigest()
+    != nta1_codec_evidence["testArtifact"]["sha256"]
+):
+    fail("M1.1b NTA1 codec artifact differs from source locks")
+if not (root / nta1_codec_evidence["receipt"]).is_file():
+    fail("M1.1b NTA1 codec receipt does not exist")
+nta1_codec_result = json.loads(nta1_codec_artifact_path.read_text())
+if (
+    nta1_codec_result.get("sourceTupleId") != source_tuple
+    or nta1_codec_result.get("result") != "PASS_LOCAL_NTA1_CODEC_ONLY"
+    or nta1_codec_result.get("promotionEligible") is not False
+    or nta1_codec_result.get("implementationCommit")
+    != nta1_codec_evidence["nereusImplementationCommit"]
+    or nta1_codec_result.get("scope", {}).get("runtimeActivated") is not False
+    or nta1_codec_result.get("scope", {}).get("scenarioPromotion") is not False
+    or nta1_codec_result.get("scope", {}).get("m1Pass") is not False
+):
+    fail("M1.1b NTA1 codec result does not preserve its exact-local/non-promotion boundary")
 
 research_ids = set()
 for item in source.get("researchBaselines", []):

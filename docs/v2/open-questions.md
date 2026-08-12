@@ -62,15 +62,17 @@ NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidenc
   binds Nereus implementation `050f908a`, the complete O1 client/client-api bundle manifest, exact key/version and
   conditional-reread adapters, continuity race cuts, 69 focused tests, and 299 whole-module V1-residue compatibility
   tests. Its result is `PASS_LOCAL_SCAFFOLD_ONLY`, not real Oxia/Pulsar conformance, and `promotionEligible=false`.
-- **M1.1b contract accepted; production evidence pending:** the
+- **M1.1b exact-local implementation complete; promotion evidence pending:** the
   [accepted design](detailed_design/m1/m1.1b-nta1-codec.md) freezes `NONE={0,0,empty}` and
   `ZSTD_FAST_IF_SMALLER_V1={1,1,empty}`, the six legal rows, classic `persistent://` only, 4,096 strict UTF-8 bytes per
   Pulsar canonical name, and exact checked `maxCellBytes/maxIncarnationBytes/maxNta1Bytes=54/8,214/8,397`. It rejects
   the 12.5-percent, 16-KiB-name, rounded-total, and scalable-domain alternatives for v1. No current customer inventory
   blocks 0.2; future existing-cluster import requires a qualified pure-input name inventory, while a fresh deployment
   does not. The [Q1 receipt](evidence/v2-m0/m1.1b-q1/README.md) remains historical
-  `READINESS_EVIDENCE_ONLY`; production codec/goldens, O2 aggregate integration, and exact-local evidence are pending
-  and still cannot claim a scenario PASS.
+  `READINESS_EVIDENCE_ONLY`. Production codec/goldens, pure-input admission, and O2 aggregate integration are complete
+  at `01a70f17` with 55 domain, 73 focused O2, and 303 whole metadata-oxia tests in a
+  [non-promotable receipt](evidence/v2-m0/m1.1b/README.md). K1/P1/R1, real Oxia/Pulsar conformance, a real
+  existing-cluster inventory, runtime activation, and scenario PASS remain pending.
 - **Registry capacity OPEN:** `maxWriterCount=8` is a candidate until steady, concurrent binary/credential rollout,
   rollback, fenced residue, and bootstrap/admin cohorts plus the complete Registry size formula bound it. The fixed
   row is 120 bytes and there is no separate writer-set-byte cap.
@@ -81,8 +83,8 @@ NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidenc
   focused-test identities. Scenario promotion still requires the later executable continuity/Registry conformance and
   trusted N3 receipt; those are implementation/promotion evidence rather than another prose-design decision.
 
-O1 and O2 are governed by their accepted implementation designs and focused receipts. The remaining NTA1
-implementation evidence, Registry-capacity, receipt-cap, P1/R1, real conformance, and promotion descendants remain OPEN, pending, or
+O1 and O2 are governed by their accepted implementation designs and focused receipts. The remaining Registry-capacity,
+receipt-cap, K1/P1/R1, real conformance/inventory, and promotion descendants remain OPEN, pending, or
 non-normative until their own required implementation/evidence
 gate or explicit design confirmation.
 

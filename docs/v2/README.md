@@ -52,12 +52,14 @@ performance-first BookKeeper WAL.
   candidates, checked 8,397/32,973-byte candidate parser caps, all six protocol/profile rows, and strict allocation
   boundaries. The current design is now `Accepted`: v1 selects `ZSTD_FAST_IF_SMALLER_V1={1,1,empty}`, 4,096 bytes per
   classic-persistent Pulsar name, and exact checked caps `54/8,214/8,397`. Q1 remains
-  `READINESS_EVIDENCE_ONLY`; production codec/exact-local evidence is the current M1.1b slice and changes no scenario.
+  `READINESS_EVIDENCE_ONLY`. The production slice is now exact-locally verified at `01a70f17`: 55 domain tests, 73
+  focused O2 tests, and 303 whole metadata-oxia tests bind the codec, exact goldens, inventory boundary, and aggregate
+  adapter in a [non-promotable receipt](evidence/v2-m0/m1.1b/README.md); no scenario changes.
 - The foundation supplies Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct aggregate
   foundation validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
   guards, and reproducible JAR/source-JAR/POM hashes. The foundation deliberately supplies no NTA1 codec, Registry capacity,
-  complete production codec, Kafka/Pulsar activation, P1/R1, real backend conformance, or M1 Final/PASS claim. O2 now
-  supplies only the fail-closed single-key backend scaffold.
+  Registry capacity, Kafka/Pulsar activation, P1/R1, real backend conformance, or M1 Final/PASS claim. O2 now supplies
+  production NTA1 only for its aggregate port; selector/Registry and activation remain fail closed.
 - Existing Java modules and Phase/Future evidence on `main` are V1 residue until replaced by a V2 milestone.
 - The ordinary CI Pulsar API checkout remains a legacy V1-residue build baseline until the V2 Pulsar slice replaces
   that code; it is recorded separately and is not the V2 fork-development or parity baseline.

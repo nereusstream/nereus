@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "sourceTupleId": "v2-m0",
+  "result": "PASS_LOCAL_NTA1_CODEC_ONLY",
+  "promotionEligible": false,
+  "implementationCommit": "01a70f17ec9176385e04242490a5fa4f6b230dda",
+  "policyTable": {
+    "NONE": {
+      "kind": 0,
+      "formatVersion": 0,
+      "payloadBytes": 0
+    },
+    "ZSTD_FAST_IF_SMALLER_V1": {
+      "kind": 1,
+      "formatVersion": 1,
+      "payloadBytes": 0
+    },
+    "legalProtocolProfileRows": 6
+  },
+  "caps": {
+    "maxCellBytes": 54,
+    "maxIncarnationBytes": 8214,
+    "maxNta1Bytes": 8397,
+    "maxPulsarPersistenceNameUtf8Bytes": 4096,
+    "maxPulsarTopicNameUtf8Bytes": 4096
+  },
+  "goldens": [
+    {
+      "name": "kafka.minimum",
+      "length": 194,
+      "sha256": "30b12e545168aa1b0e21a7af895e33e2408265a154be3d70df95e4b5ff27879b"
+    },
+    {
+      "name": "kafka.typical",
+      "length": 202,
+      "sha256": "48a6db09d4d7708984501f6b5c5c2a7385cd77a2181af58b154854a9b8512979"
+    },
+    {
+      "name": "kafka.boundary",
+      "length": 442,
+      "sha256": "bca9855a872fc8a3ae14fd11c080c2e3bccdb057aadfcd431a660f98e8c3ae95"
+    },
+    {
+      "name": "pulsar.minimum",
+      "length": 239,
+      "sha256": "14e04858189f8bf44379106b143cb9cad12c86145583c38b2220c3196dc87fad"
+    },
+    {
+      "name": "pulsar.typical",
+      "length": 271,
+      "sha256": "c678ac0be4215fbada2dce86a9b2a95572ccef453d90a8f8cd4f1bc38fd3d6e8"
+    },
+    {
+      "name": "pulsar.boundary",
+      "length": 8395,
+      "sha256": "90f45a1d09d59a6a677b40c261da913ea4166b66e3d387823c9c1c4ce0f2aaae"
+    }
+  ],
+  "testedAtReceiptClose": {
+    "domain": {
+      "suites": 13,
+      "tests": 55,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "metadataOxiaV2": {
+      "suites": 10,
+      "tests": 73,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "metadataOxiaWholeModule": {
+      "suites": 73,
+      "tests": 303,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "scope": {
+    "q1ReceiptRewritten": false,
+    "k1": false,
+    "p1": false,
+    "r1": false,
+    "realOxiaConformance": false,
+    "realPulsarInventory": false,
+    "runtimeActivated": false,
+    "scenarioPromotion": false,
+    "m1Pass": false,
+    "m1Final": false
+  }
+}

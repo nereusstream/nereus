@@ -62,8 +62,8 @@ for forbidden in \
     fi
 done
 
-if find "$domain_src" "$spi_src" -type f \( -name '*Nta1*' -o -name '*NTA1*' \) | rg -q .; then
-    fail "complete NTA1 codec or type was added to the foundation slice"
+if find "$spi_src" -type f \( -name '*Nta1*' -o -name '*NTA1*' \) | rg -q .; then
+    fail "NTA1 codec ownership leaked from the domain into metadata SPI"
 fi
 
 if rg -n 'tasks\.register[^\n]*\("v2M1FinalCheck"' "$repo_root/build.gradle.kts" >/dev/null; then
@@ -79,4 +79,4 @@ for outcome in APPLIED_EXACT PREDECESSOR_UNCHANGED DEFINITIVE_CONFLICT INDETERMI
         fail "missing CAS outcome $outcome"
 done
 
-echo "V2 M1.1a-A foundation API check passed (partial foundation only; no M1 PASS)."
+echo "V2 M1.1a-A foundation API check passed; later domain codecs do not change its partial boundary; no M1 PASS."
