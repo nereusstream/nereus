@@ -154,8 +154,12 @@ Writer kinds close to native BookKeeper ID allocation and Nereus virtual-ledger 
 revocable cohort uses one exact 120-byte row containing kind/contract, positive principal/interlock generations and
 non-zero SHA-256 values, plus typed evidence kind/version/SHA; there is no random writer-entry ID or generic external
 kind. Immutable `RegistryAdmissionEvidenceV1` proves the complete activation cut but is not allocation authority and is
-not read per rollover. `maxWriterCount=8` remains a candidate until bounded rollout/rollback/credential/residue/admin
-inventory and the complete Registry size formula derive it; there is no separate writer-set-byte cap.
+not read per rollover. M1.1c-R0 evidence freezes `maxWriterCount=14`: each of the two kinds has four
+binary-by-credential overlap rows, one fresh-principal rollback row, one fenced residue, and at most one
+allocation-capable bootstrap/admin row. The exact formula is
+`184 + writerCount * 120 + sum(assignmentRowCanonicalBytes)`, so the unchanged 256-by-192 assignment boundary produces
+a 51,016-byte largest legal canonical Registry/Oxia value and leaves 14,520 bytes inside the inherited 65,536-byte
+envelope. Row 15 and byte 51,017 fail with stable count/byte errors. There is no separate writer-set-byte cap.
 Patching one Pulsar generator alone is not a completeness proof. The Registry emits `REGISTRY_CONFORMANCE`; the former
 V1 allocator is removed or isolated rather than renamed. STRICT/RANGE candidate SPI and cut injection exist only in
 test/evidence code and emit `HARNESS_CONFORMANCE_ONLY` with schema-fixed `selectionEligible=false`; they persist no mode

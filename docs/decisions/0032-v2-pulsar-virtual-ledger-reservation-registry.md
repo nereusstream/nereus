@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted for Pulsar `OBJECT_WAL`. Implementation and runtime evidence are not started at M0.
+Accepted for Pulsar `OBJECT_WAL`. The 2026-08-12 M1.1c-R0 deterministic readiness evidence closes the writer-count
+and canonical-capacity inputs for R1. The R1 production Registry authority, real Oxia conformance, allocator selection,
+and runtime evidence remain pending.
 
 ## Context
 
@@ -88,10 +90,16 @@ binds only its closed kind/version/SHA; a row reference must resolve its exact c
 and all rows share one evidence bundle. Allocators and normal rollover never read the bundle. The Registry conformance
 receipt binds both final Registry and evidence bytes without writing itself back into either record.
 
-`writerRowBytes=120` is fixed. `maxWriterCount=8` remains a candidate, not a contract, until steady, rolling, rollback,
-credential/binary overlap, fenced residue, and bootstrap/admin cohorts produce a bounded inventory and complete
-Registry maximum-size formula. There is no separate writer-set-byte cap: final writer count, fixed row length,
-`maxRegistryBytes=65,536`, and the exact header/evidence/assignment formula provide the bound. The namespace hash
+`writerRowBytes=120` and `maxWriterCount=14` are fixed. The count is two closed writer kinds times seven bounded
+source-qualified/principal-generation cohorts per kind: the full old/new-binary by old/new-credential matrix, one
+fresh-principal rollback cohort, one fenced-but-not-cleaned residue, and at most one allocation-capable bootstrap/admin
+cohort. A control-only admin that cannot allocate ledger IDs is interlock evidence rather than a row. The exact
+capacity formula is `184 + writerCount * 120 + sum(assignmentRowCanonicalBytes)`, where at most 256 full row
+contributions of at most 192 bytes are admitted. Therefore the largest legal v1 canonical Registry/Oxia value is
+51,016 bytes and the unchanged 65,536-byte envelope retains 14,520 bytes of reserved compatibility margin. That margin
+cannot admit a fifteenth writer, a hidden field, or a larger assignment row. The stable first rejection is
+`REGISTRY_WRITER_COUNT_EXCEEDED` for row 15 and `REGISTRY_CANONICAL_BYTES_EXCEEDED` for byte 51,017; assignment count
+and row-size errors retain their more specific precedence. There is no separate writer-set-byte cap. The namespace hash
 excludes root URI/path, deployment/reservation-domain identity, and source/artifact SHA; copying an INSTANCEID is
 therefore conservatively the same compatibility namespace.
 

@@ -33,14 +33,15 @@ performance-first BookKeeper WAL.
 - M1 implementation-readiness Round 4 freezes `KAFKA=1/PULSAR=2`, NPN1 Pulsar authority leaves, Kafka last-wins/error/
   policy and remote-log admission, a local store-wide watch-continuity contract, canonical UUID/NLI1 namespace bytes,
   and one receipt result hierarchy plus safe attachment grammar in ADR 0084. The later M1.1b acceptance closes
-  NTA1/name caps; writer and receipt numeric caps remain OPEN. O1 owns the confirmed Oxia client API, exact client/server bases, final fork,
-  and focused artifact/runtime evidence without promoting `V2-META-006`.
+  NTA1/name caps, and M1.1c-R0 later closes the writer-count/canonical-capacity input; receipt numeric caps remain OPEN.
+  O1 owns the confirmed Oxia client API, exact client/server bases, final fork, and focused artifact/runtime evidence
+  without promoting `V2-META-006`.
 - M1 implementation-readiness Round 5 freezes minimal independent NTA1 semantics without claiming its complete codec,
   the Oxia client-only dummy ready barrier and source/artifact/image separation, two writer kinds plus a 120-byte row
   and immutable admission evidence, and one content-identified receipt/Final hierarchy in ADR 0085. M1.1a module,
   identity, deterministic-ID, SPI, dependency, and continuity scaffolding may start. The 2026-08-12 M1.1b acceptance
-  subsequently closes the NTA1 v1 policy/name/total table; writer count, receipt numeric caps, and executable promotion
-  evidence remain OPEN.
+  subsequently closes the NTA1 v1 policy/name/total table. M1.1c-R0 subsequently closes writer count and canonical
+  Registry capacity; receipt numeric caps and executable promotion evidence remain OPEN.
 - The accepted [M1 execution index](detailed_design/m1/README.md) and
   [M1.1a-A code-level design](detailed_design/m1/m1.1a-domain-spi-foundation.md) split the first implementation into
   module, identity/domain, SPI/gate, continuity-fork, and metadata-oxia targets. The first three are implemented by
@@ -58,9 +59,11 @@ performance-first BookKeeper WAL.
 - The accepted [M1.1c-R0 Registry-capacity design](detailed_design/m1/m1.1c-registry-capacity-spike.md) freezes an
   evidence-only writer-cohort/lifecycle model, a 184-byte fixed capacity-accounting header, exact checked sizing, and
   a non-promotion gate without implementing R1. It measures full binary-by-credential coexistence, rollback, fenced
-  residue, bootstrap/admin allocation capability, omitted writers, and add/fence/drain/remove ordering. The derived
-  `maxWriterCount=14` and 51,016-byte legal maximum remain candidates until the focused gate and immutable evidence
-  land; the inherited 120/192/256/65,536 contracts are unchanged and the production Registry codec remains unavailable.
+  residue, bootstrap/admin allocation capability, omitted writers, and add/fence/drain/remove ordering. Eighteen focused
+  tests and `v2M1RegistryCapacityCheck` bind Nereus `03d27256` to accepted `maxWriterCount=14`, a 51,016-byte largest
+  legal canonical Registry value, and 14,520-byte reserved margin in deterministic
+  [non-promotable evidence](evidence/v2-m0/m1.1c-r0/README.md). The inherited 120/192/256/65,536 contracts are unchanged,
+  every V2-POSITION scenario remains `PLANNED`, and the production Registry codec remains unavailable.
 - ADR 0086 fixes the Kafka BookKeeper semantic layout: one Kafka Offset Domain across profiles, one logical ledger
   chain per partition, low-frequency run/generation roots, packed in-ledger RecordBatch indexes, owner-local active-tail
   locators, targeted Fetch, bounded overlapping writes with ordered publication, and bounded checkpoint-tail recovery.
@@ -315,8 +318,9 @@ ADR 0083 fixes the next structural wire/control/evidence cuts. ADR 0084 closes p
 precedence and remote-log interlock, minimal store-wide continuity semantics, canonical UUID/NLI1 namespace identity,
 and receipt accounting/path safety. ADR 0085 closes the M1.1a start boundary, minimal independent aggregate semantics,
 client-only continuity direction, exact 120-byte writer row/evidence shape, and content-identified receipt/Final
-hierarchy. The later M1.1b acceptance closes the complete NTA1 FrameEncodingPolicy/legality/name/total table. Registry
-writer count, receipt numeric caps, and executable promotion evidence remain OPEN descendants. ADR 0086 resolves the
+hierarchy. The later M1.1b acceptance closes the complete NTA1 FrameEncodingPolicy/legality/name/total table, and
+M1.1c-R0 closes the Registry writer-count/canonical-capacity input at 14 rows and 51,016 bytes. Receipt numeric caps,
+R1 production conformance, and executable promotion evidence remain OPEN descendants. ADR 0086 resolves the
 Kafka BookKeeper semantic layout while leaving exact wire, numeric budgets, and dedicated-ledger scale as M2 evidence.
 ADR 0087 closes the protocol-frontier/ISR/idempotency/transaction/Fetch semantic layer, including fenced publication,
 native election adoption, compact descriptor transport, hard-bounded Observed/Applied eligibility, and distinct

@@ -4,8 +4,9 @@
 
 Accepted as the 0.2 M1 first-implementation boundary. The Nereus-local M1.1a-A domain/SPI foundation and intermediate
 gate are implemented. The 2026-08-12 M1.1b refinement accepts the exact NTA1 policy/cap contract and permits its
-production codec slice. Registry capacity, P1/R1/K1, runtime activation, and promotion-receipt validators remain
-blocked or pending under the explicit descendants below. This ADR still claims no M1 PASS.
+production codec slice. The later M1.1c-R0 readiness gate accepts Registry writer-count/canonical-capacity inputs;
+P1/R1/K1, runtime activation, real Registry conformance, and promotion-receipt validators remain blocked or pending
+under the explicit descendants below. This ADR still claims no M1 PASS.
 
 M1.1b-Q1 remains immutable historical `READINESS_EVIDENCE_ONLY`. It informed but does not itself prove the accepted
 policy/name/cap table or production codec. The policy/name/cap grill is closed; production codec/golden evidence is the
@@ -255,10 +256,35 @@ both use one bundle SHA, validation resolves each row to its exact bundle sectio
 `REGISTRY_CONFORMANCE` receipt binds both immutable evidence bytes and final Registry bytes without writing the receipt
 back into Registry, avoiding a hash cycle.
 
-`writerRowBytes=120` is fixed. `maxWriterCount=8` remains an OPEN sizing candidate until a bounded inventory covers
-steady cohorts, simultaneous binary and credential rollout, rollback, fenced residue, and any bootstrap/admin writer.
-There is no independent `maxWriterSetBytes`; final count plus the fixed row and exact Registry length formula provide
-the bound.
+`writerRowBytes=120` is fixed. The earlier `maxWriterCount=8` candidate is rejected by the complete overlap inventory.
+M1.1c-R0 accepts `maxWriterCount=14`, derived as two writer kinds times seven cohorts per kind: four for the complete
+old/new-binary by old/new-credential matrix, one rollback cohort with a fresh principal, one fenced residue, and at
+most one allocation-capable bootstrap/admin cohort. A control-only admin with no allocation capability remains
+interlock evidence rather than a row. There is no independent `maxWriterSetBytes`.
+
+The accepted exact capacity formula is:
+
+```text
+canonicalRegistryBytes =
+    184
+  + writerCount * 120
+  + sum(assignmentRowCanonicalBytes)
+```
+
+The inherited maximums remain 256 assignment rows, 192 bytes for each complete row contribution, and a 65,536-byte
+Registry envelope. Their simultaneous boundary is `184 + 14 * 120 + 256 * 192 = 51,016` canonical Registry/Oxia value
+bytes, with 14,520 reserved envelope bytes. The CAS expected-version operand adds exactly eight bytes, so value plus
+version operands are 51,024 bytes; key and RPC framing are not included. The reserved margin cannot admit a fifteenth
+writer or an unmodeled field. `REGISTRY_WRITER_COUNT_EXCEEDED` rejects row 15 before mutation even though its bytes fit
+the outer envelope; `REGISTRY_CANONICAL_BYTES_EXCEEDED` rejects byte 51,017. Assignment count and row-size errors retain
+their more specific precedence.
+
+Eighteen deterministic focused tests at Nereus `03d272567595c77051af3c473b4dbca8999d79d2` cover the complete scenario
+ladder, exact writer bytes/header/formula, checked overflow, omission/authorization, add-before-start,
+fence/drain/revoke/remove, rollback, residue, admin classification, and deterministic JSON/Markdown equality. The
+result is `REGISTRY_CAPACITY_READINESS_ONLY`, `promotionEligible=false`, and `registryConformance=false`. It leaves the
+O2 production Registry codec unavailable and does not implement R1, real Oxia, an allocator mode, scenario promotion,
+or M1 PASS.
 
 ### Receipt hierarchy and Final index
 
@@ -324,16 +350,17 @@ M1.1a may now implement:
 7. the Oxia client continuity fork using the existing dummy barrier without a server protocol change.
 
 M1.1a must not claim complete NTA1 codec or foundation-complete status. M1.1b owns the strict NTA1 parser/encoder and
-goldens after the four codec blockers close. `maxWriterCount` blocks the Registry codec/capacity gate, receipt numeric
-caps block the receipt validator/N3 promotion, and final artifact/image identities are promotion evidence; none blocks
-M1.1a.
+goldens after the four codec blockers close. M1.1c-R0 later closes only the writer-count/canonical-capacity input;
+production R1/Registry conformance remains separate. Receipt numeric caps block the receipt validator/N3 promotion,
+and final artifact/image identities are promotion evidence; none blocks M1.1a.
 
 ## Consequences
 
 - The first implementation commit can begin without inventing codec bytes or promotion limits.
 - Aggregate bytes persist only independent semantics; derived protocol/profile facts cannot drift into another authority.
 - Oxia disconnect recovery pays conservative store-wide revalidation but no new server protocol or durable cursor.
-- Registry rows are fixed and small; count remains evidence-derived.
+- Registry rows are fixed and small; the evidence-derived R1 input is 14 rows and a 51,016-byte largest legal value,
+  while production authority and conformance remain pending.
 - Receipts use content identity and one result hierarchy rather than a new run-ID allocator or duplicated PASS state.
 
 This decision refines ADRs 0032, 0033, 0049, 0051, and 0081..0084. It is tracked by `V2-META-003..006`,

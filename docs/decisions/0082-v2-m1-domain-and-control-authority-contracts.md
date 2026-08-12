@@ -9,8 +9,9 @@ lifecycle hooks/source tuple, Registry writer schema, and remaining receipt payl
 fixes the protocol codes and authority leaves, Kafka precedence/interlock, minimal local continuity semantics, native
 INSTANCEID hash, and receipt accounting/path safety while retaining evidence-derived caps and concrete provider hooks.
 ADR 0085 then permits M1.1a foundation work and closes the client-only continuity shape and 120-byte writer row. The
-2026-08-12 M1.1b refinement closes the NTA1 policy/cap table; writer count, receipt caps, and promotion evidence remain
-explicit descendants.
+2026-08-12 M1.1b refinement closes the NTA1 policy/cap table. The later M1.1c-R0 readiness gate closes the Registry
+writer-count/canonical-capacity input at 14 rows and 51,016 bytes without implementing R1. Receipt caps, R1 conformance,
+and promotion evidence remain explicit descendants.
 
 ### Implementation refinement (2026-08-11)
 
@@ -234,8 +235,9 @@ numeric caps remain open.
   local atomic fence comparison.
 - Registry updates remain rare, but writer admission now requires real namespace governance rather than a descriptive
   digest. Missing completeness or interlock evidence fails closed.
-- The NTA1 FrameEncodingPolicy/legality/caps are accepted for M1.1b. Registry writer count, receipt numeric caps, and
-  promotion evidence remain later readiness frontiers and cannot be inferred by code.
+- The NTA1 FrameEncodingPolicy/legality/caps are accepted for M1.1b. M1.1c-R0 executable evidence accepts
+  `maxWriterCount=14`, the 184-byte fixed accounting header, and the 51,016-byte largest legal canonical value as R1
+  inputs. Receipt numeric caps, production Registry conformance, and promotion evidence remain later frontiers.
 
 This decision is refined by ADRs 0083..0085 and refines ADRs 0023, 0028, 0032, 0033, 0034, 0041, 0042, 0050, 0051, 0054,
 0055, and 0081. It is tracked by

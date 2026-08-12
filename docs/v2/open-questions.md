@@ -46,8 +46,8 @@ The Nereus-local M1.1a-A module/identity/deterministic-ID/SPI/dependency foundat
 The Oxia O1 client-continuity target has a pushed final fork and focused evidence. Metadata-oxia O2 is also locally
 verified at Nereus `050f908a`: it consumes the immutable O1 client/API bundle, implements four single-key adapters and
 store-wide continuity invalidation, and binds 69 focused plus 299 whole-module tests in a non-promotable receipt. These
-slices cannot claim complete
-NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidence. The remaining descendants are:
+slices cannot claim complete NTA1, Registry production codec/authority, receipt validator, M1 Final, or promotion
+evidence. The remaining descendants and recently closed evidence input are:
 
 - **Oxia O1 focused implementation complete:** the confirmed 2026-08-12 source audit uses Java client
   `24b730d1d66a1da701f4c99957361f6b3c5d748c` plus server
@@ -74,14 +74,13 @@ NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidenc
   [non-promotable receipt](evidence/v2-m0/m1.1b/README.md). K1/P1/R1, real Oxia/Pulsar conformance, runtime activation,
   and scenario PASS remain pending. A real existing-cluster inventory is deferred migration evidence, not a fresh-only
   0.2 or M1-Final blocker.
-- **Registry capacity OPEN:** `maxWriterCount=8` is a candidate until steady, concurrent binary/credential rollout,
-  rollback, fenced residue, and bootstrap/admin cohorts plus the complete Registry size formula bound it. The fixed
-  row is 120 bytes and there is no separate writer-set-byte cap. The accepted
-  [M1.1c-R0 spike design](detailed_design/m1/m1.1c-registry-capacity-spike.md) replaces the unsupported eight-row
-  assumption with an executable candidate: seven source-qualified/principal-generation cohorts per closed writer kind,
-  a 184-byte fixed accounting header, and a derived 14-row/51,016-byte maximum. Those numbers remain OPEN until
-  `v2M1RegistryCapacityCheck` reproduces committed non-promotable evidence; R0 does not implement R1 or claim
-  `REGISTRY_CONFORMANCE`.
+- **Registry capacity input accepted; R1 still pending:** the unsupported `maxWriterCount=8` candidate is rejected.
+  The accepted [M1.1c-R0 spike design](detailed_design/m1/m1.1c-registry-capacity-spike.md), 18 focused tests, and
+  `v2M1RegistryCapacityCheck` bind seven source-qualified/principal-generation cohorts per closed writer kind,
+  `maxWriterCount=14`, the exact `184 + writerCount * 120 + sum(assignmentRowCanonicalBytes)` formula, and a
+  51,016-byte largest legal canonical Registry value. The inherited 120/192/256/65,536 limits remain unchanged, with
+  14,520 bytes reserved margin. This closes only the R1 capacity input: production codec/store/interlock, real Oxia,
+  `REGISTRY_CONFORMANCE`, and scenario promotion remain pending.
 - **Receipt-cap OPEN:** root/count/path/file/total/log parser and verification caps wait for representative all-pass,
   maximum-failure, fault-cut, Registry/interlock, and multi-scenario outputs. The root fields, attachment kinds,
   content identity, and Final reference hierarchy are already closed.
@@ -89,10 +88,9 @@ NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidenc
   focused-test identities. Scenario promotion still requires the later executable continuity/Registry conformance and
   trusted N3 receipt; those are implementation/promotion evidence rather than another prose-design decision.
 
-O1 and O2 are governed by their accepted implementation designs and focused receipts. The remaining Registry-capacity,
-receipt-cap, K1/P1/R1, real Oxia/Registry conformance, and promotion descendants remain OPEN, pending, or
-non-normative until their own required implementation/evidence
-gate or explicit design confirmation.
+O1, O2, and R0 are governed by their accepted implementation designs and focused receipts. The remaining receipt-cap,
+K1/P1/R1, real Oxia/Registry conformance, and promotion descendants remain OPEN, pending, or non-normative until their
+own required implementation/evidence gate or explicit design confirmation.
 
 ## Restarted Grill 2: evidence frontier
 

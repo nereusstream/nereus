@@ -161,6 +161,11 @@
       "contract": "exactly one admitted canonical-UUID/NLI1-derived compatibility-namespace Registry assigns non-overlapping never-reused Cell slices only after fresh-root proof, two closed writer kinds in canonical 120-byte rows, immutable admission evidence, and allocation interlock prove exclusion",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "requiredReceiptKind": "REGISTRY_CONFORMANCE",
+      "readinessEvidence": {
+        "path": "docs/v2/evidence/v2-m0/m1.1c-r0/registry-capacity.json",
+        "result": "REGISTRY_CAPACITY_READINESS_ONLY",
+        "promotionEligible": false
+      },
       "status": "PLANNED",
       "evidenceReceipt": null
     },

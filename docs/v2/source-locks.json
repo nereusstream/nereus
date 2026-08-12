@@ -204,6 +204,19 @@
       "result": "PASS_LOCAL_NTA1_CODEC_ONLY",
       "promotionEligible": false,
       "evidenceStatus": "EXACT_LOCAL_EVIDENCE"
+    },
+    "m1.1cR0RegistryCapacity": {
+      "nereusEvidenceCommit": "03d272567595c77051af3c473b4dbca8999d79d2",
+      "testArtifact": {
+        "path": "docs/v2/evidence/v2-m0/m1.1c-r0/registry-capacity.json",
+        "bytes": 3073,
+        "sha256": "62368e9d985842343829e7424eca3b7cefa70828e056be45c7cb5293db42ea7c"
+      },
+      "receipt": "docs/v2/evidence/v2-m0/m1.1c-r0/README.md",
+      "result": "REGISTRY_CAPACITY_READINESS_ONLY",
+      "promotionEligible": false,
+      "registryConformance": false,
+      "evidenceStatus": "READINESS_EVIDENCE"
     }
   },
   "researchBaselines": [

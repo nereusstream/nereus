@@ -118,14 +118,13 @@ persists nor activates a mode. M3 owns 10k/100k multi-broker capacity evidence a
 
 The Registry closes writer kinds to native BookKeeper and Nereus virtual-ledger ID allocation. Each cohort uses a
 120-byte canonical row; `RegistryAdmissionEvidenceV1` is bounded immutable activation proof, not allocation authority.
-`maxWriterCount=8` remains only a candidate pending the full bounded cohort/rollout/rollback/residue inventory and
-Registry size formula. The writer-count choice blocks the Registry codec/capacity gate, not M1.1a domain/SPI work.
 The accepted [M1.1c-R0 capacity-spike design](detailed_design/m1/m1.1c-registry-capacity-spike.md) now fixes the
-test/evidence method: two writer kinds, full binary-by-credential overlap, rollback, fenced residue, and optional
-allocation-capable bootstrap/admin cohorts are counted explicitly against a 184-byte fixed accounting header, the
-existing 120-byte writer row, and unchanged 192/256/65,536 assignment/envelope limits. Its derived
-`maxWriterCount=14` and 51,016-byte maximum remain candidates until the independent fast gate reproduces committed
-non-promotable evidence. R0 leaves the O2 Registry codec unavailable and cannot emit `REGISTRY_CONFORMANCE`.
+test/evidence method and `v2M1RegistryCapacityCheck` now reproduces 18 clean focused tests plus deterministic
+JSON/Markdown at Nereus `03d27256`. Two writer kinds, full binary-by-credential overlap, rollback, fenced residue, and
+optional allocation-capable bootstrap/admin cohorts derive the accepted `maxWriterCount=14`. A 184-byte fixed
+accounting header, the existing 120-byte writer row, and unchanged 192/256/65,536 assignment/envelope limits derive a
+51,016-byte largest legal value and 14,520-byte reserved margin. This closes the R1 capacity input only. R0 leaves the
+O2 Registry codec unavailable and cannot emit `REGISTRY_CONFORMANCE`.
 
 `docs/v2/source-locks.json` is the sole expected-SHA authority for external Kafka/Pulsar/Oxia sources. Checkout paths
 may be overridden; expected SHAs may not. The manifest cannot self-lock the current Nereus commit; a promotion receipt
@@ -135,8 +134,9 @@ binds it. M1 gates are:
   it cannot prove backend/runtime conformance, the pure final graph, or M1 PASS;
 - `v2M1Nta1CodecCheck`: exact-local production NTA1/validator/goldens/inventory/O2-aggregate gate; it uses no Docker
   and cannot prove K1/P1/R1, real conformance, runtime activation, scenario promotion, or M1 PASS;
-- `v2M1RegistryCapacityCheck`: deterministic R0 writer-count/canonical-byte readiness only; it must keep the
-  production Registry codec/Store/interlock absent, scenario status unchanged, and `promotionEligible=false`;
+- `v2M1RegistryCapacityCheck`: current deterministic R0 writer-count/canonical-byte readiness gate with 18 clean tests,
+  exact generated evidence equality, source/digest binding, and production/scenario absence checks; it cannot prove R1,
+  real Oxia, allocator selection, `REGISTRY_CONFORMANCE`, or M1 PASS;
 - `v2M1Check`: no Docker/fork/composite; local domain/schema/SPI/codec/harness, active-graph, and V1-absence checks;
 - `v2M1ExactSourceCheck`: clean exact forks before/after, isolated immutable artifacts, real Oxia, and focused fork tests;
 - `v2M1FinalCheck`: aggregate previous outcomes and receipt schema without rerunning their suites.

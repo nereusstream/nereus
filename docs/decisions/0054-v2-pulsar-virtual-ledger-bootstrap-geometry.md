@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted for Pulsar `OBJECT_WAL` in 0.2. Implementation and runtime evidence are not started at M0.
+Accepted for Pulsar `OBJECT_WAL` in 0.2. M1.1c-R0 now supplies deterministic readiness evidence for the Registry
+writer-count and derived legal-value maximum without implementing R1 or runtime authority.
 
 ## Context
 
@@ -18,6 +19,13 @@ reintroduce the collision that the registry is meant to prevent.
 - `maxRegistryBytes=65,536` canonical bytes;
 - `maxAssignmentsEver=256`, counting every RETIRED assignment forever;
 - `maxAssignmentRowBytes=192`, with the complete header plus rows also required to fit the byte cap.
+
+The later R0 capacity accounting preserves those constants exactly. With a 184-byte fixed header, 14 fixed 120-byte
+writer rows, and 256 full 192-byte assignment-row contributions, the largest legal v1 canonical Registry value is
+51,016 bytes. The inherited 65,536-byte cap remains the compatibility envelope, leaving 14,520 bytes reserved rather
+than redefining the assignment row as 190/194 bytes or admitting extra writers/fields. The Oxia CAS candidate value is
+the same 51,016 bytes; adding its exact eight-byte expected-version operand gives 51,024 application operand bytes,
+excluding configurable key and RPC framing.
 
 The reserved interval `[2^62, 2^63 - 2]` contains 4,194,303 complete `2^40` slices, so the bounded Registry rather than
 numeric space limits one compatibility namespace's selected reservation Registry. All constants are bootstrap

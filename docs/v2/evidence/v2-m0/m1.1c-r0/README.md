@@ -4,7 +4,7 @@
 
 `REGISTRY_CAPACITY_READINESS_ONLY`; `promotionEligible=false`; `registryConformance=false`.
 
-This deterministic test/evidence-only artifact binds Nereus `c8cb92ff8aeff7859acdc20097bb3d018d4eb792`, 18 focused tests, the exact
+This deterministic test/evidence-only artifact binds Nereus `03d272567595c77051af3c473b4dbca8999d79d2`, 18 focused tests, the exact
 184 + writerCount * 120 + assignment-row-sum formula, and the full bounded cohort lifecycle. It does
 not implement R1 production authority, select an allocator, run real Oxia, promote any V2-POSITION
 scenario, or emit `REGISTRY_CONFORMANCE`/`HARNESS_CONFORMANCE_ONLY`.
@@ -26,6 +26,6 @@ are unchanged. The margin cannot admit a fifteenth writer or hidden field.
 ## Artifact identity
 
 - JSON: `registry-capacity.json`
-- JSON SHA-256: `245207b8df4fefa639bc740a59706155544c7e9e587931960c7ec81c60a7c5d2`
+- JSON SHA-256: `62368e9d985842343829e7424eca3b7cefa70828e056be45c7cb5293db42ea7c`
 - required baseline: `26728bec826ac72e5b893d4d19983d588feaca4f`
 - expected focused tests: 18, failures/errors/skipped: 0/0/0

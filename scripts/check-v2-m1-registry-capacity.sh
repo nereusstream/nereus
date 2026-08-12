@@ -13,6 +13,7 @@ committed_json="$evidence_root/registry-capacity.json"
 committed_markdown="$evidence_root/README.md"
 source_commit_file="$evidence_root/source-commit.txt"
 scenarios="$repo_root/docs/v2/v2-scenarios.json"
+source_locks="$repo_root/docs/v2/source-locks.json"
 
 fail() {
     echo "V2 M1.1c-R0 Registry capacity check: $*" >&2
@@ -27,7 +28,8 @@ for required in \
     "$generated_markdown" \
     "$committed_json" \
     "$committed_markdown" \
-    "$source_commit_file"; do
+    "$source_commit_file" \
+    "$source_locks"; do
     [[ -f "$required" ]] || fail "missing ${required#"$repo_root/"}"
 done
 
@@ -61,7 +63,9 @@ python3 - \
     "$generated_markdown" \
     "$committed_markdown" \
     "$source_commit_file" \
-    "$scenarios" <<'PY'
+    "$scenarios" \
+    "$source_locks" \
+    "$repo_root" <<'PY'
 import hashlib
 import json
 import pathlib
@@ -78,6 +82,8 @@ import xml.etree.ElementTree as ET
     committed_markdown_path,
     source_commit_path,
     scenarios_path,
+    source_locks_path,
+    repo_root,
 ) = map(pathlib.Path, sys.argv[1:])
 
 suite = ET.parse(result_path).getroot()
@@ -194,6 +200,20 @@ subprocess.run(
     ],
     check=True,
 )
+subprocess.run(
+    [
+        "git",
+        "diff",
+        "--quiet",
+        source_commit,
+        "--",
+        "build.gradle.kts",
+        "nereus-domain/src/test/java/com/nereusstream/domain/registry/RegistryCapacityHarness.java",
+        "nereus-domain/src/test/java/com/nereusstream/domain/registry/RegistryCapacityEvidenceTest.java",
+    ],
+    cwd=repo_root,
+    check=True,
+)
 
 json_sha = hashlib.sha256(committed_json_bytes).hexdigest()
 markdown = committed_markdown_bytes.decode("utf-8")
@@ -201,11 +221,34 @@ if source_commit not in markdown or json_sha not in markdown:
     raise SystemExit("V2 M1.1c-R0 Registry capacity check: Markdown source or JSON digest binding drifted")
 
 scenario_data = json.loads(scenarios_path.read_text())
-statuses = {item["id"]: item["status"] for item in scenario_data["scenarios"]}
+scenario_items = {item["id"]: item for item in scenario_data["scenarios"]}
 for ordinal in range(3, 11):
     scenario_id = f"V2-POSITION-{ordinal:03d}"
-    if statuses.get(scenario_id) != "PLANNED":
+    if scenario_items.get(scenario_id, {}).get("status") != "PLANNED":
         raise SystemExit(f"V2 M1.1c-R0 Registry capacity check: {scenario_id} was promoted")
+if scenario_items["V2-POSITION-003"].get("readinessEvidence") != {
+    "path": "docs/v2/evidence/v2-m0/m1.1c-r0/registry-capacity.json",
+    "result": "REGISTRY_CAPACITY_READINESS_ONLY",
+    "promotionEligible": False,
+}:
+    raise SystemExit("V2 M1.1c-R0 Registry capacity check: scenario readiness binding drifted")
+
+source_locks = json.loads(source_locks_path.read_text())
+binding = source_locks.get("localImplementationEvidenceBindings", {}).get("m1.1cR0RegistryCapacity")
+if binding != {
+    "nereusEvidenceCommit": source_commit,
+    "testArtifact": {
+        "path": "docs/v2/evidence/v2-m0/m1.1c-r0/registry-capacity.json",
+        "bytes": len(committed_json_bytes),
+        "sha256": json_sha,
+    },
+    "receipt": "docs/v2/evidence/v2-m0/m1.1c-r0/README.md",
+    "result": "REGISTRY_CAPACITY_READINESS_ONLY",
+    "promotionEligible": False,
+    "registryConformance": False,
+    "evidenceStatus": "READINESS_EVIDENCE",
+}:
+    raise SystemExit("V2 M1.1c-R0 Registry capacity check: source-lock evidence binding drifted")
 
 print(
     "V2 M1.1c-R0 focused tests: "

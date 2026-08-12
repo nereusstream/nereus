@@ -3,16 +3,17 @@
 ## Status
 
 Accepted for the 0.2 M1 implementation and refined by ADR 0085. The 2026-08-12 M1.1b refinement closes NTA1
-FrameEncodingPolicy/legality/caps. Registry writer-count capacity and receipt attachment numeric caps remain OPEN. The client-only Oxia continuity shape
-and 120-byte writer row are closed. Local protocol/leaf code and tests now exist; concrete fork/server-image identities,
-continuity/Registry conformance, and promotion evidence have not started.
+FrameEncodingPolicy/legality/caps. M1.1c-R0 closes Registry writer-count/canonical-capacity readiness at 14 rows and a
+51,016-byte largest legal v1 value. Receipt attachment numeric caps remain OPEN. The client-only Oxia continuity shape
+and 120-byte writer row are closed. Local protocol/leaf and R0 test/evidence code exists; R1 production authority,
+Registry conformance, and promotion evidence have not started.
 
 ### Implementation refinement (2026-08-11)
 
 `ProtocolKindV1`, NPN1 digest, lowercase selector leaf, `<digest>/<generation19>` aggregate leaf, and key/value mismatch
 guards are implemented in `nereus-domain`. The Registry SPI value remains intentionally opaque beyond typed key
-identity/epoch and exact candidate bytes: it freezes no writer count, assignment parser, backend codec, or capacity
-validator.
+identity/epoch and exact candidate bytes: R0 freezes no production assignment parser, backend codec, or capacity
+validator and leaves the O2 Registry codec unavailable.
 
 ## Context
 
@@ -154,9 +155,15 @@ ADR 0085 closes two writer kinds (`NATIVE_BOOKKEEPER_LEDGER_ID=1`, `NEREUS_VIRTU
 120-byte row containing closed kind/contract, positive principal/interlock generations and non-zero 32-byte digests,
 plus closed evidence kind/version/SHA. It has no random writer-entry ID; exact tuple equality and Registry reread resolve
 response uncertainty. `RegistryAdmissionEvidenceV1` is immutable content-addressed admission proof, not allocation
-authority, and a row reference must resolve the exact cohort section. `maxWriterCount=8` remains only a candidate until
-the complete bounded cohort/rollout/rollback/residue inventory and Registry maximum-size formula derive it. No separate
-writer-set-byte cap is added. Deployment may lower admission but cannot enlarge format caps.
+authority, and a row reference must resolve the exact cohort section. At ADR 0085 acceptance, `maxWriterCount=8`
+remained only a candidate pending the complete bounded cohort/rollout/rollback/residue inventory and Registry
+maximum-size formula. M1.1c-R0 supplies that evidence and replaces the candidate with `maxWriterCount=14`: seven
+cohorts per kind cover the full
+binary-by-credential matrix, rollback, fenced residue, and at most one allocation-capable bootstrap/admin cohort. The
+exact formula `184 + writerCount * 120 + sum(assignmentRowCanonicalBytes)` yields 51,016 bytes at 14 writers and 256
+full 192-byte assignment rows, leaving 14,520 bytes inside the unchanged 65,536-byte envelope. Row 15 is
+`REGISTRY_WRITER_COUNT_EXCEEDED`; byte 51,017 is `REGISTRY_CANONICAL_BYTES_EXCEEDED`. No separate writer-set-byte cap is
+added. Deployment may lower admission but cannot enlarge format caps.
 
 ### Receipt accounting and attachment safety
 

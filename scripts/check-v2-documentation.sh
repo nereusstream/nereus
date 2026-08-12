@@ -34,6 +34,7 @@ required_v2_docs=(
     detailed_design/m1/m1.1a-oxia-client-continuity.md
     detailed_design/m1/m1.1a-oxia-capability-scaffold.md
     detailed_design/m1/m1.1b-nta1-codec.md
+    detailed_design/m1/m1.1c-registry-capacity-spike.md
     open-questions.md
     tradeoffs.md
 )
@@ -372,6 +373,12 @@ require_literal '`writerRowBytes=120`' "docs/decisions/0085-v2-m1-foundation-sta
 require_literal 'M1.1a may now implement' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
 require_literal '`maxNta1Bytes=8,397`' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
 require_literal '`RegistryAdmissionEvidenceV1`' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
+require_literal '`maxWriterCount=14`' "docs/decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md"
+require_literal '51,016 bytes' "docs/decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md"
+require_literal '`REGISTRY_WRITER_COUNT_EXCEEDED`' "docs/decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md"
+require_literal '`REGISTRY_CANONICAL_BYTES_EXCEEDED`' "docs/decisions/0032-v2-pulsar-virtual-ledger-reservation-registry.md"
+require_literal 'REGISTRY_CAPACITY_READINESS_ONLY' "docs/v2/evidence/v2-m0/m1.1c-r0/registry-capacity.json"
+require_literal '03d272567595c77051af3c473b4dbca8999d79d2' "docs/v2/source-locks.json"
 require_literal '24b730d1d66a1da701f4c99957361f6b3c5d748c' "docs/v2/source-locks.json"
 require_literal '37a17bef17202d5fd6e23282da5fd26d94865484' "docs/v2/source-locks.json"
 require_literal 'request-order greedy residue-free linear admission sizes the exact cumulative record list' "docs/v2/v2-scenarios.json"
@@ -451,7 +458,7 @@ require_literal "Kafka Produce/Fetch frontiers, ISR, and transaction closure" "d
 require_literal "One ambiguous \`committedEndOffset\` is rejected" "docs/v2/grill-notes/28-kafka-produce-fetch-frontiers-isr-transactions.md"
 require_literal "V2-KAF-DATA-017..022" "docs/v2/grill-notes/29-kafka-implementation-readiness-publication-election-and-replication.md"
 require_literal "Metadata-oxia O2 is also locally" "docs/v2/open-questions.md"
-require_literal '`maxWriterCount=8` is a candidate' "docs/v2/open-questions.md"
+require_literal 'It explicitly did not accept complete NTA1, `maxWriterCount=8`, or any' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-BK-01`' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-OBJ-02`' "docs/v2/open-questions.md"
@@ -1056,6 +1063,7 @@ if set(local_evidence_bindings) != {
     "m1.1aO2Scaffold",
     "m1.1bQ1Nta1Readiness",
     "m1.1bNta1Codec",
+    "m1.1cR0RegistryCapacity",
 }:
     fail("local implementation evidence bindings are incomplete")
 o2_evidence = local_evidence_bindings["m1.1aO2Scaffold"]
@@ -1198,6 +1206,51 @@ if (
 ):
     fail("M1.1b NTA1 codec result does not preserve its exact-local/non-promotion boundary")
 
+registry_capacity_evidence = local_evidence_bindings["m1.1cR0RegistryCapacity"]
+expected_registry_capacity_identity = {
+    "nereusEvidenceCommit": "03d272567595c77051af3c473b4dbca8999d79d2",
+    "testArtifact": {
+        "path": "docs/v2/evidence/v2-m0/m1.1c-r0/registry-capacity.json",
+        "bytes": 3073,
+        "sha256": "62368e9d985842343829e7424eca3b7cefa70828e056be45c7cb5293db42ea7c",
+    },
+    "receipt": "docs/v2/evidence/v2-m0/m1.1c-r0/README.md",
+    "result": "REGISTRY_CAPACITY_READINESS_ONLY",
+    "promotionEligible": False,
+    "registryConformance": False,
+    "evidenceStatus": "READINESS_EVIDENCE",
+}
+if registry_capacity_evidence != expected_registry_capacity_identity:
+    fail("M1.1c-R0 Registry capacity evidence binding differs from the deterministic receipt")
+registry_capacity_path = root / registry_capacity_evidence["testArtifact"]["path"]
+if (
+    not registry_capacity_path.is_file()
+    or registry_capacity_path.stat().st_size != registry_capacity_evidence["testArtifact"]["bytes"]
+    or hashlib.sha256(registry_capacity_path.read_bytes()).hexdigest()
+    != registry_capacity_evidence["testArtifact"]["sha256"]
+):
+    fail("M1.1c-R0 Registry capacity artifact differs from source locks")
+if not (root / registry_capacity_evidence["receipt"]).is_file():
+    fail("M1.1c-R0 Registry capacity receipt does not exist")
+registry_capacity_result = json.loads(registry_capacity_path.read_text())
+if (
+    registry_capacity_result.get("sourceTupleId") != source_tuple
+    or registry_capacity_result.get("result") != "REGISTRY_CAPACITY_READINESS_ONLY"
+    or registry_capacity_result.get("promotionEligible") is not False
+    or registry_capacity_result.get("registryConformance") is not False
+    or registry_capacity_result.get("productionRegistryAuthorityImplemented") is not False
+    or registry_capacity_result.get("allocatorModeSelected") is not False
+    or registry_capacity_result.get("runtimeActivated") is not False
+    or registry_capacity_result.get("scenarioPromotion") is not False
+    or registry_capacity_result.get("source", {}).get("nereusCommit")
+    != registry_capacity_evidence["nereusEvidenceCommit"]
+    or registry_capacity_result.get("cohortBound", {}).get("maxWriterCount") != 14
+    or registry_capacity_result.get("maximumBreakdown", {}).get("canonicalRegistryBytes") != 51016
+    or registry_capacity_result.get("maximumBreakdown", {}).get("reservedMarginBytes") != 14520
+    or registry_capacity_result.get("testEvidence", {}).get("expectedFocusedTests") != 18
+):
+    fail("M1.1c-R0 Registry capacity result does not preserve its bound or non-promotion boundary")
+
 research_ids = set()
 for item in source.get("researchBaselines", []):
     if item.get("id") in research_ids or not sha.fullmatch(str(item.get("commit", ""))):
@@ -1240,6 +1293,11 @@ expected_receipt_kinds = {
     "V2-POSITION-011": "HARNESS_CONFORMANCE_ONLY",
 }
 allowed_receipt_kinds = {"REGISTRY_CONFORMANCE", "HARNESS_CONFORMANCE_ONLY"}
+expected_registry_readiness = {
+    "path": "docs/v2/evidence/v2-m0/m1.1c-r0/registry-capacity.json",
+    "result": "REGISTRY_CAPACITY_READINESS_ONLY",
+    "promotionEligible": False,
+}
 scenario_ids = []
 for item in scenarios.get("scenarios", []):
     scenario_id = item.get("id", "")
@@ -1254,6 +1312,12 @@ for item in scenarios.get("scenarios", []):
     expected_receipt_kind = expected_receipt_kinds.get(scenario_id)
     if expected_receipt_kind is not None and receipt_kind != expected_receipt_kind:
         fail(f"{scenario_id} must require {expected_receipt_kind}")
+    readiness_evidence = item.get("readinessEvidence")
+    if scenario_id == "V2-POSITION-003":
+        if readiness_evidence != expected_registry_readiness:
+            fail("V2-POSITION-003 must bind the non-promotable M1.1c-R0 readiness artifact")
+    elif readiness_evidence is not None:
+        fail(f"{scenario_id} has an unexpected readinessEvidence binding")
     owner = root / str(item.get("ownerDoc", ""))
     if not owner.is_file():
         fail(f"{scenario_id} owner document does not exist")

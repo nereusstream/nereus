@@ -170,8 +170,11 @@ Writer kinds are `NATIVE_BOOKKEEPER_LEDGER_ID=1` and `NEREUS_VIRTUAL_LEDGER_ID=2
 uses one canonical 120-byte row with kind/contract, positive principal/interlock generations and non-zero digests, plus
 typed evidence kind/version/SHA; there is no random writer-entry ID or generic third kind. The bounded immutable
 `RegistryAdmissionEvidenceV1` proves the exact activation cut but is not allocation authority and is never read during
-rollover. `maxWriterCount=8` remains only a sizing candidate; the exact count waits for a bounded cohort/rollout/
-rollback/residue inventory and total Registry formula, with no independent writer-set-byte cap.
+rollover. M1.1c-R0 deterministic evidence accepts `maxWriterCount=14` from two kinds times seven bounded cohort slots
+and a 51,016-byte largest legal value from
+`184 + writerCount * 120 + sum(assignmentRowCanonicalBytes)`. The inherited 65,536-byte envelope, 256 assignments,
+192-byte full assignment-row contribution, and absence of an independent writer-set-byte cap remain unchanged. The
+14,520-byte margin is reserved; it cannot admit row 15 or byte 51,017.
 Allocators use a versioned derived slice view instead of rereading/copying the 64-KiB Registry per rollover. Missing,
 overlapping, drifted, revoked, incomplete, or capacity-exhausted authority blocks allocation. Registry conformance and
 allocator-harness receipts are distinct. Reservation checks are low-frequency control-plane work, not normal append
