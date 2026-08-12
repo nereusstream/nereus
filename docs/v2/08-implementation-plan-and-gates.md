@@ -55,8 +55,11 @@ metadata capabilities, dependency/API boundaries, deterministic tests, and repro
 The separate Oxia client-continuity target is complete at final fork `091a42c`, and metadata-oxia O2 is locally
 verified at Nereus `050f908a` with its immutable client/API bundle, four single-key adapters, continuity scaffold,
 69 focused tests, 299 whole-module tests, and `promotionEligible=false` receipt. These slices neither implement nor
-activate complete NTA1, P1, or R1. M1.1b owns its strict codec/goldens after FrameEncodingPolicy, legality matrix,
-Pulsar/name/Cell/incarnation/total caps, and checked maximum formula close.
+activate complete NTA1, P1, or R1. M1.1b-Q1 readiness evidence is complete at `94881e67`: 14 test-scope tests measure
+the 4-KiB and 16-KiB per-name candidates, 8,397/32,973-byte checked parser caps, all six legality rows, and strict
+allocation boundaries. Its result is `READINESS_EVIDENCE_ONLY`, `promotionEligible=false`; M1.1b still owns its strict
+production codec/goldens only after the Proposed FrameEncodingPolicy, legality matrix, name caps, and formula are
+grilled and explicitly accepted.
 
 ## M1 implementation and promotion contract
 

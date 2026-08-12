@@ -46,6 +46,10 @@ performance-first BookKeeper WAL.
   `nereus-domain`, `nereus-metadata-spi`, and `v2M1FoundationCheck`; the Oxia fork is focused-evidence complete; and
   [metadata-oxia O2](detailed_design/m1/m1.1a-oxia-capability-scaffold.md) is locally verified by its locked dependency,
   69-test scaffold gate, 299-test whole-module compatibility run, and non-promotable local receipt.
+- [M1.1b-Q1](detailed_design/m1/m1.1b-nta1-codec.md) now has 14 evidence-only tests and a
+  [structured readiness receipt](evidence/v2-m0/m1.1b-q1/README.md). It measures 4-KiB and 16-KiB Pulsar-name
+  candidates, checked 8,397/32,973-byte parser caps, all six protocol/profile rows, and strict allocation boundaries.
+  The design remains `Proposed`; no policy code, cap, production NTA1 codec, scenario status, or runtime was accepted.
 - The foundation supplies Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct aggregate
   foundation validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
   guards, and reproducible JAR/source-JAR/POM hashes. It deliberately supplies no NTA1 codec, Registry capacity,

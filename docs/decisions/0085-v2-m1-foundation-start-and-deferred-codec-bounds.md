@@ -6,12 +6,52 @@ Accepted as the 0.2 M1 first-implementation boundary. The Nereus-local M1.1a-A d
 gate are implemented. Complete NTA1 codec, Registry capacity, Oxia continuity/backend work, and promotion-receipt
 validators remain blocked or pending under the explicit descendants below. This ADR still claims no M1 PASS.
 
+M1.1b-Q1 now has current-source readiness evidence, but this does not change the accepted decision: complete NTA1
+FrameEncodingPolicy semantics, Pulsar name caps, total cap, legality, codec, and goldens remain OPEN pending grill and
+explicit confirmation.
+
 ### Implementation refinement (2026-08-11)
 
 The implementation uses an opaque structural `{kind,formatVersion,payload}` frame-policy value solely to validate the
 accepted zero/non-zero shape and profile-level NONE split. No non-NONE semantic code or payload contract is assigned.
 `v2M1FoundationCheck` verifies the domain/SPI classpaths, forbidden surfaces, module tests, documentation, and
 reproducible JAR/source-JAR/POM hashes without registering `v2M1FinalCheck`.
+
+### Readiness-evidence refinement (2026-08-12; non-normative candidates)
+
+The test-scope-only M1.1b-Q1 harness measures real current domain objects and a candidate flat wire without adding a
+production encoder/parser. Fourteen focused tests have zero failure/error/skip and cover all six protocol/profile rows,
+Kafka 249/250, 4-KiB and 16-KiB Pulsar per-name candidates, strict name round trip/UTF-8, unknown and illegal policy
+shapes, checked arithmetic, unsigned lengths, bounded allocation, truncation, and EOF.
+
+Frozen field widths produce these evidence facts:
+
+```text
+fixed NTA1 excluding Cell/incarnation = 129 bytes
+Kafka Cell = 38 bytes
+Pulsar Cell / maxCellBytes = 54 bytes
+Kafka maximum incarnation = 26 + 249 = 275 bytes
+
+4-KiB/name candidate:
+  maxPulsarIncarnationBytes = 22 + 4,096 + 4,096 = 8,214
+  maxNta1Bytes = 129 + 54 + 8,214 = 8,397
+
+16-KiB/name candidate:
+  maxPulsarIncarnationBytes = 22 + 16,384 + 16,384 = 32,790
+  maxNta1Bytes = 129 + 54 + 32,790 = 32,973
+```
+
+Measured maximum legal classic-persistent vectors are 8,395 and 32,971 bytes. Typical Kafka/Pulsar vectors are
+202/261 bytes. At 100k topics, raw all-maximum NTA1 bodies are about 839.5 MB versus 3.2971 GB, before backend envelope,
+index, object, and JVM overhead. The earlier 64-KiB total candidate admits 32,563 bytes beyond the 16-KiB-name formula
+without any currently legal field using that space.
+
+The Proposed detailed design recommends grilling `{kind=1,version=1,payload=empty}` as
+`ZSTD_FAST_IF_SMALLER_V1`, 4 KiB per canonical Pulsar name, and the exact derived 8,397-byte parser cap. It retains
+`ZSTD_FAST_IF_SAVES_12_5_PERCENT_V1`, 16 KiB/name, and the 32,973-byte cap as alternatives. These labels, codes, caps,
+and the candidate restriction to classic `persistent://` Pulsar names are evidence inputs only; none is accepted by
+this refinement. The structured result is `READINESS_EVIDENCE_ONLY`, `promotionEligible=false`, and changes no
+scenario status.
 
 ## Context
 

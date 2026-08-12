@@ -62,9 +62,15 @@ NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidenc
   binds Nereus implementation `050f908a`, the complete O1 client/client-api bundle manifest, exact key/version and
   conditional-reread adapters, continuity race cuts, 69 focused tests, and 299 whole-module V1-residue compatibility
   tests. Its result is `PASS_LOCAL_SCAFFOLD_ONLY`, not real Oxia/Pulsar conformance, and `promotionEligible=false`.
-- **M1.1b codec OPEN:** exact `FrameEncodingPolicy` kind/version/payload, complete protocol/profile/`NONE` legality and
-  goldens, Pulsar persistence/topic UTF-8 caps, `maxCellBytes`, `maxIncarnationBytes`, `maxNta1Bytes`, checked formula,
-  and canonical topic-name/persistence-name consistency. The 16-KiB/64-KiB values are candidates only.
+- **M1.1b-Q1 readiness evidence complete; codec still OPEN:** the
+  [Proposed design](detailed_design/m1/m1.1b-nta1-codec.md) and
+  [non-promotable receipt](evidence/v2-m0/m1.1b-q1/README.md) bind 14 tests and actual domain/candidate-wire
+  measurements. Frozen facts yield 129 fixed NTA1 bytes, `maxCellBytes=54`, Kafka max incarnation 275, and checked
+  parser-cap candidates 8,397 bytes at 4 KiB/name or 32,973 bytes at 16 KiB/name. The 64-KiB total is not recommended
+  for the zero-payload table because no legal field uses its extra 32,563 bytes. None of these candidate policy codes
+  or caps is accepted. The next grill must choose/defer `IF_SMALLER` versus `SAVES_12_5_PERCENT`, 4 KiB versus 16 KiB,
+  classic-persistent versus scalable Pulsar domains, exact versus rounded total, and whether production-name inventory
+  is mandatory. Production encoder/parser/goldens remain blocked until explicit acceptance.
 - **Registry capacity OPEN:** `maxWriterCount=8` is a candidate until steady, concurrent binary/credential rollout,
   rollback, fenced residue, and bootstrap/admin cohorts plus the complete Registry size formula bound it. The fixed
   row is 120 bytes and there is no separate writer-set-byte cap.

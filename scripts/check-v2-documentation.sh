@@ -199,6 +199,10 @@ require_literal 'M1.1b-Q1 NTA1 codec bounds and legality readiness' "docs/v2/det
 require_literal 'designStatus: Proposed' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
 require_literal 'READINESS_EVIDENCE_ONLY' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
 require_literal 'production NTA1 remains blocked' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
+require_literal 'receipt: docs/v2/evidence/v2-m0/m1.1b-q1/README.md' "docs/v2/detailed_design/m1/m1.1b-nta1-codec.md"
+require_literal 'v2M1Nta1ReadinessCheck' "build.gradle.kts"
+require_literal 'no production codec/runtime/scenario/M1 PASS' "build.gradle.kts"
+require_literal 'no production codec, Docker, runtime activation, scenario promotion, or M1 PASS' "scripts/check-v2-m1-nta1-readiness.sh"
 require_literal 'Complete NTA1 codec/goldens remain OPEN' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
 require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal "V2 documentation baseline" ".github/workflows/build.yml"
@@ -999,7 +1003,7 @@ else:
         fail("focused compatibility result does not bind the qualified source/runtime tuple")
 
 local_evidence_bindings = source.get("localImplementationEvidenceBindings", {})
-if set(local_evidence_bindings) != {"m1.1aO2Scaffold"}:
+if set(local_evidence_bindings) != {"m1.1aO2Scaffold", "m1.1bQ1Nta1Readiness"}:
     fail("local implementation evidence bindings are incomplete")
 o2_evidence = local_evidence_bindings["m1.1aO2Scaffold"]
 expected_o2_identity = {
@@ -1057,6 +1061,51 @@ if (
     or o2_result.get("scope", {}).get("m1Pass") is not False
 ):
     fail("O2 local result does not preserve its source, test, or non-promotion boundary")
+
+q1_evidence = local_evidence_bindings["m1.1bQ1Nta1Readiness"]
+fork_base_commits = {item["id"]: item["commit"] for item in source["forkDevelopmentBases"]}
+expected_q1_identity = {
+    "nereusEvidenceCommit": "94881e6749903e65eec63720c15eb200f69362d8",
+    "kafkaSourceCommit": fork_base_commits["kafka-v2-development-base"],
+    "pulsarSourceCommit": fork_base_commits["pulsar-v2-development-base"],
+    "testArtifact": {
+        "path": "docs/v2/evidence/v2-m0/m1.1b-q1/readiness.json",
+        "bytes": 2980,
+        "sha256": "e47520287ade2dea9350cd6ff78f4de17a3ab4a7fcb4acedcc920818c8cabd0a",
+    },
+    "receipt": "docs/v2/evidence/v2-m0/m1.1b-q1/README.md",
+    "result": "READINESS_EVIDENCE_ONLY",
+    "promotionEligible": False,
+    "designStatus": "Proposed",
+    "productionCodecImplemented": False,
+    "evidenceStatus": "READINESS_EVIDENCE",
+}
+if q1_evidence != expected_q1_identity:
+    fail("M1.1b-Q1 readiness evidence binding differs from the focused receipt")
+q1_artifact_path = root / q1_evidence["testArtifact"]["path"]
+if (
+    not q1_artifact_path.is_file()
+    or q1_artifact_path.stat().st_size != q1_evidence["testArtifact"]["bytes"]
+    or hashlib.sha256(q1_artifact_path.read_bytes()).hexdigest()
+    != q1_evidence["testArtifact"]["sha256"]
+):
+    fail("M1.1b-Q1 readiness artifact differs from source locks")
+if not (root / q1_evidence["receipt"]).is_file():
+    fail("M1.1b-Q1 readiness receipt does not exist")
+q1_result = json.loads(q1_artifact_path.read_text())
+if (
+    q1_result.get("sourceTupleId") != source_tuple
+    or q1_result.get("result") != "READINESS_EVIDENCE_ONLY"
+    or q1_result.get("promotionEligible") is not False
+    or q1_result.get("designStatus") != "Proposed"
+    or q1_result.get("productionCodecImplemented") is not False
+    or q1_result.get("runtimeActivated") is not False
+    or q1_result.get("scenarioPromotion") is not False
+    or q1_result.get("pinnedSources", {}).get("kafka") != q1_evidence["kafkaSourceCommit"]
+    or q1_result.get("pinnedSources", {}).get("pulsar") != q1_evidence["pulsarSourceCommit"]
+    or q1_result.get("coverage", {}).get("legalProtocolProfileRows") != 6
+):
+    fail("M1.1b-Q1 readiness result does not preserve its source, evidence, or non-promotion boundary")
 
 research_ids = set()
 for item in source.get("researchBaselines", []):

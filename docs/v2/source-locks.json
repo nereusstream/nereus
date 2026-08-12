@@ -176,6 +176,22 @@
       "result": "PASS_LOCAL_SCAFFOLD_ONLY",
       "promotionEligible": false,
       "evidenceStatus": "FOCUSED_LOCAL_EVIDENCE"
+    },
+    "m1.1bQ1Nta1Readiness": {
+      "nereusEvidenceCommit": "94881e6749903e65eec63720c15eb200f69362d8",
+      "kafkaSourceCommit": "76f62f3b83e882105219b6c7687dbde594a8b8a2",
+      "pulsarSourceCommit": "11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9",
+      "testArtifact": {
+        "path": "docs/v2/evidence/v2-m0/m1.1b-q1/readiness.json",
+        "bytes": 2980,
+        "sha256": "e47520287ade2dea9350cd6ff78f4de17a3ab4a7fcb4acedcc920818c8cabd0a"
+      },
+      "receipt": "docs/v2/evidence/v2-m0/m1.1b-q1/README.md",
+      "result": "READINESS_EVIDENCE_ONLY",
+      "promotionEligible": false,
+      "designStatus": "Proposed",
+      "productionCodecImplemented": false,
+      "evidenceStatus": "READINESS_EVIDENCE"
     }
   },
   "researchBaselines": [
