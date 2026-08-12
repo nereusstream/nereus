@@ -314,8 +314,22 @@ if binding != expected_binding:
 
 scenario_data = json.loads(scenarios_path.read_text())
 scenario_items = {item["id"]: item for item in scenario_data["scenarios"]}
-if any(item.get("status") == "PASSED_CURRENT_SOURCE" for item in scenario_items.values()):
-    raise SystemExit("V2 M1-2 receipt/parser cap check: scenario was promoted")
+passed = {scenario_id for scenario_id, item in scenario_items.items() if item.get("status") == "PASSED_CURRENT_SOURCE"}
+expected_n3 = {f"V2-POSITION-{ordinal:03d}" for ordinal in range(3, 12)}
+if passed and passed != expected_n3:
+    raise SystemExit("V2 M1-2 receipt/parser cap check: scenario state is not the exact N3 promotion footprint")
+if passed:
+    for ordinal in range(3, 12):
+        scenario_id = f"V2-POSITION-{ordinal:03d}"
+        expected_receipt = (
+            "docs/v2/evidence/v2-m1/n3/registry-conformance.json"
+            if ordinal <= 9
+            else "docs/v2/evidence/v2-m1/n3/harness-conformance.json"
+        )
+        if scenario_items[scenario_id].get("evidenceReceipt") != expected_receipt:
+            raise SystemExit("V2 M1-2 receipt/parser cap check: N3 scenario receipt binding drifted")
+    if not (repo_root / "docs/v2/evidence/v2-m1/n3/final-index.json").is_file():
+        raise SystemExit("V2 M1-2 receipt/parser cap check: N3 footprint exists without its Final index")
 policy_readiness = scenario_items.get("V2-POLICY-001", {}).get("readinessEvidence")
 if policy_readiness != {
     "path": "docs/v2/evidence/v2-m0/m1-2-receipt-caps/receipt-caps.json",
