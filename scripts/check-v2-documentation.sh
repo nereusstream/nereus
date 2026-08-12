@@ -258,7 +258,8 @@ require_literal 'implementationStatus: Verified' "docs/v2/detailed_design/m1/p1-
 require_literal 'NPS1 selector encoding' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal '84 + persistenceNameLength' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal 'P1_FOCUSED_ONLY' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
-require_literal 'nereus/v2-m1-p1-selector-fence' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
+require_literal 'nereus/v2-m1-p1-selector-fence-pure-v2' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
+require_literal 'd1cfd863b0e0ffad9c141abf68beeb2350a1ea16' "docs/v2/source-locks.json"
 require_literal '778862323d8a86e2f36064a12166e09918ed9429' "docs/v2/source-locks.json"
 require_literal 'NEREUS_V2_P1_FOCUSED_RECEIPT_V1' "docs/v2/evidence/v2-m1/p1/p1-focused.json"
 require_literal 'PASS_P1_FOCUSED_ONLY' "docs/v2/evidence/v2-m1/p1/p1-focused.json"
@@ -849,8 +850,18 @@ for item in source.get("forkDevelopmentBases", []):
     fork_ids.add(item["id"])
     if item.get("evidenceStatus") != "DEVELOPMENT_BASE_ONLY":
         fail(f"{item['id']} improperly claims V2 evidence")
-if fork_ids != {"pulsar-v2-development-base", "kafka-v2-development-base"}:
+if fork_ids != {"pulsar-v2-development-base", "pulsar-v2-pure-graph-base", "kafka-v2-development-base"}:
     fail("fork development bases are incomplete")
+pure_pulsar_base = next(item for item in source["forkDevelopmentBases"]
+                        if item["id"] == "pulsar-v2-pure-graph-base")
+if pure_pulsar_base != {
+    "id": "pulsar-v2-pure-graph-base",
+    "repository": "https://github.com/nereusstream/pulsar.git",
+    "branch": "branch-5.0-M1",
+    "commit": "8dae0236c0a0d405ed7f8303081080520fe91551",
+    "evidenceStatus": "DEVELOPMENT_BASE_ONLY",
+}:
+    fail("pure-V2 Pulsar development base is invalid")
 
 expected_dependency_bases = {
     "oxia-client-v2-implementation-base": {
@@ -1162,11 +1173,15 @@ if (
 
 p1 = source.get("p1PulsarAuthorityBinding", {})
 expected_p1 = {
-    "implementationBaseId": "pulsar-v2-development-base",
-    "implementationBaseCommit": "11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9",
+    "implementationBaseId": "pulsar-v2-pure-graph-base",
+    "implementationBaseCommit": "8dae0236c0a0d405ed7f8303081080520fe91551",
     "repository": "https://github.com/nereusstream/pulsar.git",
-    "branch": "nereus/v2-m1-p1-selector-fence",
-    "finalForkCommit": "778862323d8a86e2f36064a12166e09918ed9429",
+    "branch": "nereus/v2-m1-p1-selector-fence-pure-v2",
+    "finalForkCommit": "d1cfd863b0e0ffad9c141abf68beeb2350a1ea16",
+    "focusedImplementationBaseId": "pulsar-v2-development-base",
+    "focusedImplementationBaseCommit": "11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9",
+    "focusedBranch": "nereus/v2-m1-p1-selector-fence",
+    "focusedForkCommit": "778862323d8a86e2f36064a12166e09918ed9429",
     "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
     "p1MetadataSourceCommit": "23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
     "p1CoordinateVersion": "0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
@@ -1180,7 +1195,7 @@ expected_p1 = {
     "receiptSha256": "b36c219c997957e1c1e3221df21c6dca47338b20d8fb42a5d0410ab721055217",
     "result": "PASS_P1_FOCUSED_ONLY",
     "promotionEligible": False,
-    "evidenceStatus": "FOCUSED_EXACT_SOURCE_EVIDENCE",
+    "evidenceStatus": "FINAL_SOURCE_LOCK_WITH_FOCUSED_PROVENANCE",
 }
 if p1 != expected_p1:
     fail("P1 Pulsar authority binding differs from the focused exact-source receipt")
@@ -1197,7 +1212,9 @@ if (
     p1_receipt.get("kind") != "P1_FOCUSED_ONLY"
     or p1_receipt.get("result") != "PASS_P1_FOCUSED_ONLY"
     or p1_receipt.get("promotionEligible") is not False
-    or p1_receipt.get("pulsarFinalForkCommit") != p1["finalForkCommit"]
+    or p1_receipt.get("pulsarImplementationBaseCommit") != p1["focusedImplementationBaseCommit"]
+    or p1_receipt.get("pulsarFinalForkCommit") != p1["focusedForkCommit"]
+    or p1_receipt.get("pulsarBranch") != p1["focusedBranch"]
     or p1_receipt.get("tests", {}).get("nereusMetadata", {}).get("passed") != 94
     or p1_receipt.get("tests", {}).get("realOxia", {}).get("passed") != 2
     or p1_receipt.get("tests", {}).get("pulsar", {}).get("passed") != 34

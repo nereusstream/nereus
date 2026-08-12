@@ -88,6 +88,9 @@ tasks.register<Test>("p1MetadataTest") {
     useJUnitPlatform()
     filter {
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.*")
+        // R1 shares the V2 package but owns a separate receipt and exact-source gate.
+        excludeTestsMatching("com.nereusstream.metadata.oxia.v2.codec.Nvr1RegistryAuthorityCodecTest")
+        excludeTestsMatching("com.nereusstream.metadata.oxia.v2.capability.R1RegistryAuthorityTest")
     }
 }
 

@@ -37,6 +37,13 @@
       "evidenceStatus": "DEVELOPMENT_BASE_ONLY"
     },
     {
+      "id": "pulsar-v2-pure-graph-base",
+      "repository": "https://github.com/nereusstream/pulsar.git",
+      "branch": "branch-5.0-M1",
+      "commit": "8dae0236c0a0d405ed7f8303081080520fe91551",
+      "evidenceStatus": "DEVELOPMENT_BASE_ONLY"
+    },
+    {
       "id": "kafka-v2-development-base",
       "repository": "https://github.com/nereusstream/kafka.git",
       "branch": "nereus/future9-native-kafka-storage",
@@ -298,11 +305,15 @@
     "evidenceStatus": "IMMUTABLE_INPUT_ONLY"
   },
   "p1PulsarAuthorityBinding": {
-    "implementationBaseId": "pulsar-v2-development-base",
-    "implementationBaseCommit": "11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9",
+    "implementationBaseId": "pulsar-v2-pure-graph-base",
+    "implementationBaseCommit": "8dae0236c0a0d405ed7f8303081080520fe91551",
     "repository": "https://github.com/nereusstream/pulsar.git",
-    "branch": "nereus/v2-m1-p1-selector-fence",
-    "finalForkCommit": "778862323d8a86e2f36064a12166e09918ed9429",
+    "branch": "nereus/v2-m1-p1-selector-fence-pure-v2",
+    "finalForkCommit": "d1cfd863b0e0ffad9c141abf68beeb2350a1ea16",
+    "focusedImplementationBaseId": "pulsar-v2-development-base",
+    "focusedImplementationBaseCommit": "11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9",
+    "focusedBranch": "nereus/v2-m1-p1-selector-fence",
+    "focusedForkCommit": "778862323d8a86e2f36064a12166e09918ed9429",
     "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
     "p1MetadataSourceCommit": "23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
     "p1CoordinateVersion": "0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
@@ -316,7 +327,7 @@
     "receiptSha256": "b36c219c997957e1c1e3221df21c6dca47338b20d8fb42a5d0410ab721055217",
     "result": "PASS_P1_FOCUSED_ONLY",
     "promotionEligible": false,
-    "evidenceStatus": "FOCUSED_EXACT_SOURCE_EVIDENCE"
+    "evidenceStatus": "FINAL_SOURCE_LOCK_WITH_FOCUSED_PROVENANCE"
   },
   "r1RegistryAuthorityBinding": {
     "implementationCommit": "8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d",

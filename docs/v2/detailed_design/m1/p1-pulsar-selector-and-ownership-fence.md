@@ -21,13 +21,17 @@ retirement, or claim a scenario/M1 PASS. Full BrokerService/PersistentTopic proc
 The source inputs are:
 
 - Nereus `main` and immutable N1 domain/SPI source `330aaec349c51fb2ace52b1085e8a9e5a60b5e3e`;
-- Pulsar fork base `5.0.0-M1-nereus@11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9`;
+- Pulsar pure-V2 fork base `5.0.0-M1@8dae0236c0a0d405ed7f8303081080520fe91551`;
 - Oxia client continuity fork `091a42c2780d92da56e9ec1f02ce1c3d988adc16`;
 - Oxia server source `37a17bef17202d5fd6e23282da5fd26d94865484` and the source-locked focused image.
 
-Pulsar work is isolated on `nereus/v2-m1-p1-selector-fence` and is complete at clean pushed commit
-`778862323d8a86e2f36064a12166e09918ed9429`. Dynamic SNAPSHOT, `changing=true`, Maven Local, and a Nereus composite
-build are not allowed evidence inputs.
+The original focused receipt remains immutably bound to the V1-residue development base
+`11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9` and fork `778862323d8a86e2f36064a12166e09918ed9429`.
+The final M1 source is the clean pushed pure-V2 branch `nereus/v2-m1-p1-selector-fence-pure-v2` at
+`d1cfd863b0e0ffad9c141abf68beeb2350a1ea16`. It replays only the P1 authority commits onto the stock base and has no
+`nereus-pulsar-adapter`, `0.1.0-f2-dev`, non-V2 Nereus runtime, dynamic SNAPSHOT, `changing=true`, Maven Local, or
+Nereus composite-build input. The N2 exact-source gate reruns the focused inventory against this final fork; it does
+not relabel the historical receipt.
 
 ## NPS1 selector encoding
 
@@ -98,7 +102,9 @@ canonical broker/acquisition identities, closed transition validator that preced
 witness, A/read/B installer, and single-word local fence with stale-install and stale-close exclusion. Final fork
 `778862323d` additionally locks exact N1/P1/O1 artifacts, consumes opaque SPI metadata versions, cross-validates the
 selector/aggregate authority, aligns Oxia to 0.9.4, and adds a closed capability gate that rejects every unqualified
-ownership writer, TableView, syncer, continuity, or ordered-invalidation configuration. Exact P1 artifact
+ownership writer, TableView, syncer, continuity, or ordered-invalidation configuration. Pure-V2 final fork
+`d1cfd863b0` reproduces that V2 package and its 7-suite/34-test inventory on the stock `5.0.0-M1` graph while omitting
+the V1 adapter entirely. Exact P1 artifact
 packaging exposes only the V2 capability package, the public READY-only continuity permit used around A/read/B, and
 deterministic binary/source artifact tasks. The immutable bundle at Nereus `23064b3b` is locked as
 `com.nereusstream:nereus-metadata-oxia-p1:0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5`; two clean builds are

@@ -538,8 +538,6 @@ val kafkaForkCheckoutPath = providers.gradleProperty("kafkaForkCheckout")
 val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
-val v2PulsarDevelopmentRepository = layout.buildDirectory.dir("development-repository")
-
 tasks.register<Exec>("v2M1K1FocusedSourceCheck") {
     group = "verification"
     description = "Run the exact clean Kafka K1 metadata-authority focused gate; this is not M1 PASS."
@@ -565,7 +563,6 @@ tasks.register<Exec>("v2M1P1FocusedSourceCheck") {
         "bash",
         "scripts/check-v2-m1-p1-pulsar.sh",
         pulsarCheckoutPath.get(),
-        v2PulsarDevelopmentRepository.get().asFile.absolutePath,
     )
 }
 

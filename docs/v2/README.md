@@ -83,8 +83,9 @@ performance-first BookKeeper WAL.
   suites pass with zero failure/error/skip and the [receipt](evidence/v2-m1/k1/README.md) remains metadata-only,
   `promotionEligible=false`, and not M1 PASS.
 - The accepted [P1 Pulsar selector and ownership-fence design](detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md)
-  is focused-exact complete at clean pushed Pulsar commit `778862323d`: immutable N1/P1/O1 inputs, 94 Nereus metadata
-  tests, two real-Oxia tests, and 34 Pulsar tests are verified by `v2M1P1FocusedCheck` with zero failure/error/skip. The
+  preserves its focused receipt at Pulsar `778862323d` while locking final M1 execution to the clean pure-V2 fork
+  `d1cfd863b0`: immutable N1/P1/O1 inputs, 94 Nereus metadata tests, two real-Oxia tests, and 34 Pulsar tests are
+  rerun by `v2M1P1FocusedCheck` with zero failure/error/skip. The final fork contains no V1 adapter/runtime, and the
   [receipt](evidence/v2-m1/p1/README.md) remains `P1_FOCUSED_ONLY`, `promotionEligible=false`, and does not activate
   BrokerService/PersistentTopic Produce/read paths, choose an allocator, prune V1, promote a scenario, or claim M1 PASS.
 - The accepted [R1 Registry design](detailed_design/m1/r1-virtual-ledger-registry.md) is focused-current complete at

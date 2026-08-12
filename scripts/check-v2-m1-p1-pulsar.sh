@@ -2,8 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-pulsar_checkout="${1:?usage: check-v2-m1-p1-pulsar.sh PULSAR_CHECKOUT DEVELOPMENT_REPOSITORY}"
-development_repository="${2:?usage: check-v2-m1-p1-pulsar.sh PULSAR_CHECKOUT DEVELOPMENT_REPOSITORY}"
+pulsar_checkout="${1:?usage: check-v2-m1-p1-pulsar.sh PULSAR_CHECKOUT}"
 source_locks="$repo_root/docs/v2/source-locks.json"
 
 lock_values=()
@@ -20,11 +19,20 @@ p1 = source.get("p1MetadataCapabilityBinding", {})
 deps = source.get("dependencyEvidenceBindings", {})
 client = deps.get("oxiaClientArtifacts", {})
 server = deps.get("oxiaServerRuntime", {})
+if (
+    binding.get("implementationBaseId") != "pulsar-v2-pure-graph-base"
+    or binding.get("focusedImplementationBaseId") != "pulsar-v2-development-base"
+    or binding.get("evidenceStatus") != "FINAL_SOURCE_LOCK_WITH_FOCUSED_PROVENANCE"
+):
+    raise SystemExit("P1 pure-V2/focused provenance split is invalid")
 values = (
     source.get("focusedEvidenceSourceTupleId"),
     binding.get("implementationBaseCommit"),
     binding.get("finalForkCommit"),
     binding.get("branch"),
+    binding.get("focusedImplementationBaseCommit"),
+    binding.get("focusedForkCommit"),
+    binding.get("focusedBranch"),
     binding.get("receipt"),
     n1.get("sourceCommit"),
     n1.get("coordinateVersion"),
@@ -57,21 +65,24 @@ source_tuple="${lock_values[0]}"
 base_commit="${lock_values[1]}"
 final_commit="${lock_values[2]}"
 branch="${lock_values[3]}"
-receipt_relative="${lock_values[4]}"
-n1_source_commit="${lock_values[5]}"
-n1_coordinate="${lock_values[6]}"
-n1_manifest_sha="${lock_values[7]}"
-p1_source_commit="${lock_values[8]}"
-p1_coordinate="${lock_values[9]}"
-p1_jar_sha="${lock_values[10]}"
-p1_manifest_sha="${lock_values[11]}"
-oxia_output_id="${lock_values[12]}"
-oxia_client_commit="${lock_values[13]}"
-oxia_client_manifest_sha="${lock_values[14]}"
-oxia_server_commit="${lock_values[15]}"
-oxia_server_image_digest="${lock_values[16]}"
-receipt_bytes="${lock_values[17]}"
-receipt_sha="${lock_values[18]}"
+focused_base_commit="${lock_values[4]}"
+focused_final_commit="${lock_values[5]}"
+focused_branch="${lock_values[6]}"
+receipt_relative="${lock_values[7]}"
+n1_source_commit="${lock_values[8]}"
+n1_coordinate="${lock_values[9]}"
+n1_manifest_sha="${lock_values[10]}"
+p1_source_commit="${lock_values[11]}"
+p1_coordinate="${lock_values[12]}"
+p1_jar_sha="${lock_values[13]}"
+p1_manifest_sha="${lock_values[14]}"
+oxia_output_id="${lock_values[15]}"
+oxia_client_commit="${lock_values[16]}"
+oxia_client_manifest_sha="${lock_values[17]}"
+oxia_server_commit="${lock_values[18]}"
+oxia_server_image_digest="${lock_values[19]}"
+receipt_bytes="${lock_values[20]}"
+receipt_sha="${lock_values[21]}"
 receipt_path="$repo_root/$receipt_relative"
 
 [[ -f "$receipt_path" && ! -L "$receipt_path" ]] || { echo "P1 receipt is missing or unsafe" >&2; exit 1; }
@@ -163,9 +174,21 @@ if git -C "$pulsar_checkout" diff --unified=0 "$base_commit..$final_commit" -- \
     exit 1
 fi
 
+if rg -n 'nereus-pulsar-adapter|0\.1\.0-f2-dev|libs\.nereus\.pulsar\.adapter' \
+    "$pulsar_checkout/settings.gradle.kts" \
+    "$pulsar_checkout/gradle/libs.versions.toml" \
+    "$pulsar_checkout/pulsar-broker/build.gradle.kts"; then
+    echo "P1 pure-V2 source still depends on the V1 Pulsar adapter" >&2
+    exit 1
+fi
+if find "$pulsar_checkout/pulsar-broker/src/main/java/org/apache/pulsar/broker/storage/nereus" \
+    -type f ! -path '*/v2/*' -print | grep -q .; then
+    echo "P1 pure-V2 source still contains a non-V2 Nereus Pulsar runtime" >&2
+    exit 1
+fi
+
 run_gradle() {
-    (cd "$pulsar_checkout" && ./gradlew "$@" --no-daemon \
-        -PnereusDevelopmentRepository="$development_repository" -PtestFailFast=true)
+    (cd "$pulsar_checkout" && ./gradlew "$@" --no-daemon -PtestFailFast=true)
 }
 
 run_gradle :pulsar-broker:spotlessCheck :pulsar-broker:checkstyleMain :pulsar-broker:checkstyleTest
@@ -179,8 +202,8 @@ run_gradle :pulsar-broker:cleanTest :pulsar-broker:test \
     --tests 'org.apache.pulsar.broker.storage.nereus.v2.NereusPulsarAuthorityInstallerTest' \
     --tests 'org.apache.pulsar.broker.storage.nereus.v2.OxiaNereusPulsarBindingAuthorityProviderTest'
 
-python3 - "$repo_root" "$pulsar_checkout" "$receipt_relative" "$source_tuple" "$base_commit" \
-    "$final_commit" "$branch" "$n1_source_commit" "$p1_source_commit" "$p1_coordinate" "$p1_jar_sha" \
+python3 - "$repo_root" "$pulsar_checkout" "$receipt_relative" "$source_tuple" "$focused_base_commit" \
+    "$focused_final_commit" "$focused_branch" "$n1_source_commit" "$p1_source_commit" "$p1_coordinate" "$p1_jar_sha" \
     "$p1_manifest_sha" "$oxia_client_commit" "$oxia_server_commit" "$oxia_server_image_digest" <<'PY'
 import json
 import pathlib

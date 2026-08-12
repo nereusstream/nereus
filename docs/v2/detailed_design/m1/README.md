@@ -42,11 +42,13 @@ M1 started from these facts; the first bullet is now superseded by the implement
   mechanical commit removed V1 runtime modules, non-V2 Oxia sources/tests, Phase/F9 scripts, Admin Docker runtime, and
   KoP runtime while retaining `docs/v1`, V2/KoP design documents, and protected history;
 - M1.1a is complete and M1.1b is exact-locally complete;
-- P1 focused implementation is complete through Nereus `e9bcd039` and Pulsar
-  `778862323d8a86e2f36064a12166e09918ed9429`: NPS1, closed transitions, selector/aggregate coordination,
+- P1 focused implementation is complete through Nereus `e9bcd039`; its immutable focused receipt remains bound to
+  Pulsar `778862323d8a86e2f36064a12166e09918ed9429`. The final source-locked P1 fork is the pure-V2 branch at
+  `d1cfd863b0e0ffad9c141abf68beeb2350a1ea16`: NPS1, closed transitions, selector/aggregate coordination,
   authoritative witness A/read/B, continuity invalidation, stale-install exclusion, atomic ACTIVE-fence primitives,
   source-locked real-Oxia lifecycle tests, native capability admission, and the combined non-promotable receipt are
-  implemented. R1 focused implementation is complete at Nereus
+  implemented. The final fork contains no V1 adapter/runtime and is revalidated by N2 rather than relabelling the old
+  receipt. R1 focused implementation is complete at Nereus
   `8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d`: exact Registry wire, held writer interlock, response-loss authority,
   derived views, and source-locked real-Oxia conformance are covered by a non-promotable receipt. Final exact-source
   aggregation and final promotion remain pending. K1 is focused-exact complete but

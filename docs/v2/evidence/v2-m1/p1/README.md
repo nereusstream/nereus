@@ -10,3 +10,8 @@ one local ACTIVE fence. It does not activate BrokerService/PersistentTopic Produ
 promote a scenario, prune V1, or claim M1 PASS. Full process/data-path integration remains M6.
 
 `p1-artifact.json` remains the separate immutable adapter-input receipt. Neither receipt is promotion eligible.
+
+This historical focused receipt remains byte-for-byte bound to the V1-residue development fork
+`778862323d8a86e2f36064a12166e09918ed9429`; it is not rewritten. Final M1 exact-source execution instead uses the
+pure-V2 Pulsar fork `d1cfd863b0e0ffad9c141abf68beeb2350a1ea16` and records that execution in the N2 gate result and N3
+promotion receipts.
