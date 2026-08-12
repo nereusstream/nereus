@@ -20,6 +20,7 @@ import io.oxia.client.api.NotificationContinuitySnapshot;
 import io.oxia.client.api.NotificationContinuityState;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
 /** Bridges O1 client continuity into one process-local, store-wide invalidation word. */
@@ -29,6 +30,7 @@ public final class StoreContinuity implements AutoCloseable {
 
     private final Object transitionLock = new Object();
     private final AtomicReference<StoreContinuitySnapshot> snapshot = new AtomicReference<>(INITIAL);
+    private final CopyOnWriteArrayList<Runnable> invalidationListeners = new CopyOnWriteArrayList<>();
     private final RevalidationScheduler scheduler;
     private NotificationContinuityRegistration registration;
     private boolean closeStarted;
@@ -59,6 +61,25 @@ public final class StoreContinuity implements AutoCloseable {
         return snapshot.get();
     }
 
+    /**
+     * Registers a non-blocking callback for every store-wide invalidation. READY never invokes this
+     * callback and never grants authority.
+     */
+    public InvalidationRegistration onInvalidation(Runnable listener) {
+        Objects.requireNonNull(listener, "listener");
+        invalidationListeners.add(listener);
+        AtomicReference<Runnable> owned = new AtomicReference<>(listener);
+        if (snapshot.get().state() != StoreContinuityState.READY) {
+            invoke(listener);
+        }
+        return () -> {
+            Runnable registered = owned.getAndSet(null);
+            if (registered != null) {
+                invalidationListeners.remove(registered);
+            }
+        };
+    }
+
     Optional<InstallPermit> captureInstallPermit() {
         StoreContinuitySnapshot current = snapshot.get();
         if (current.state() != StoreContinuityState.READY) {
@@ -77,7 +98,9 @@ public final class StoreContinuity implements AutoCloseable {
 
     private void onClientSnapshot(NotificationContinuitySnapshot clientSnapshot) {
         Objects.requireNonNull(clientSnapshot, "clientSnapshot");
+        StoreContinuitySnapshot before = snapshot.get();
         StoreContinuitySnapshot request = transition(clientSnapshot);
+        notifyIfInvalidated(before, snapshot.get());
         if (request == null) {
             return;
         }
@@ -88,7 +111,9 @@ public final class StoreContinuity implements AutoCloseable {
             accepted = false;
         }
         if (!accepted) {
-            failClosedIfCurrent(request);
+            if (failClosedIfCurrent(request)) {
+                notifyInvalidationListeners();
+            }
         }
     }
 
@@ -132,13 +157,34 @@ public final class StoreContinuity implements AutoCloseable {
         }
     }
 
-    private void failClosedIfCurrent(StoreContinuitySnapshot expectedReady) {
+    private boolean failClosedIfCurrent(StoreContinuitySnapshot expectedReady) {
         synchronized (transitionLock) {
             StoreContinuitySnapshot current = snapshot.get();
             if (current.equals(expectedReady)) {
                 snapshot.set(new StoreContinuitySnapshot(
                         StoreContinuityState.ARMING, current.clientGeneration(), nextEpoch(current)));
+                return true;
             }
+            return false;
+        }
+    }
+
+    private void notifyIfInvalidated(StoreContinuitySnapshot before, StoreContinuitySnapshot after) {
+        if (after.invalidationEpoch() != before.invalidationEpoch()
+                || (after.state() == StoreContinuityState.CLOSED && before.state() != StoreContinuityState.CLOSED)) {
+            notifyInvalidationListeners();
+        }
+    }
+
+    private void notifyInvalidationListeners() {
+        invalidationListeners.forEach(StoreContinuity::invoke);
+    }
+
+    private static void invoke(Runnable listener) {
+        try {
+            listener.run();
+        } catch (RuntimeException ignored) {
+            // Invalidation fan-out must remain fail-isolated and must never trigger remote work here.
         }
     }
 
@@ -157,6 +203,7 @@ public final class StoreContinuity implements AutoCloseable {
     @Override
     public void close() {
         NotificationContinuityRegistration ownedRegistration;
+        boolean invalidated = false;
         synchronized (transitionLock) {
             if (closeStarted) {
                 return;
@@ -165,9 +212,13 @@ public final class StoreContinuity implements AutoCloseable {
             StoreContinuitySnapshot current = snapshot.get();
             if (current.state() != StoreContinuityState.CLOSED) {
                 publishClosed(current, current.clientGeneration());
+                invalidated = true;
             }
             ownedRegistration = registration;
             registration = null;
+        }
+        if (invalidated) {
+            notifyInvalidationListeners();
         }
         if (ownedRegistration != null) {
             ownedRegistration.close();
@@ -175,12 +226,17 @@ public final class StoreContinuity implements AutoCloseable {
     }
 
     private void closeLocally() {
+        boolean invalidated = false;
         synchronized (transitionLock) {
             closeStarted = true;
             StoreContinuitySnapshot current = snapshot.get();
             if (current.state() != StoreContinuityState.CLOSED) {
                 publishClosed(current, current.clientGeneration());
+                invalidated = true;
             }
+        }
+        if (invalidated) {
+            notifyInvalidationListeners();
         }
     }
 }

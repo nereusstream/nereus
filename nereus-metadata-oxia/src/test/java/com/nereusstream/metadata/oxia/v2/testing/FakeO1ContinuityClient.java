@@ -15,6 +15,7 @@
 package com.nereusstream.metadata.oxia.v2.testing;
 
 import io.oxia.client.api.AsyncOxiaClient;
+import io.oxia.client.api.Notification;
 import io.oxia.client.api.NotificationContinuityRegistration;
 import io.oxia.client.api.NotificationContinuitySnapshot;
 import io.oxia.client.api.NotificationContinuityState;
@@ -30,6 +31,7 @@ public final class FakeO1ContinuityClient {
     private final AsyncOxiaClient proxy;
     private NotificationContinuitySnapshot current;
     private Consumer<NotificationContinuitySnapshot> listener;
+    private final List<Consumer<Notification>> notificationListeners = new ArrayList<>();
     private boolean registrationClosed;
     private boolean clientClosed;
     private boolean callbackBeforeRegistrationReturns;
@@ -57,6 +59,12 @@ public final class FakeO1ContinuityClient {
                         }
                         return registration();
                     }
+                    if (method.getName().equals("notifications")) {
+                        @SuppressWarnings("unchecked")
+                        Consumer<Notification> requested = (Consumer<Notification>) arguments[0];
+                        notificationListeners.add(requested);
+                        return null;
+                    }
                     if (method.getName().equals("close")) {
                         clientClosed = true;
                         lifecycleEvents.add("client-close");
@@ -83,6 +91,10 @@ public final class FakeO1ContinuityClient {
         if (listener != null && !registrationClosed) {
             listener.accept(current);
         }
+    }
+
+    public void emit(Notification notification) {
+        notificationListeners.forEach(listener -> listener.accept(notification));
     }
 
     public boolean registrationClosed() {

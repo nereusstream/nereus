@@ -14,6 +14,7 @@
 
 package com.nereusstream.metadata.oxia.v2;
 
+import com.nereusstream.domain.protocol.PulsarTopicIncarnationIdentity;
 import com.nereusstream.metadata.oxia.v2.capability.OxiaPulsarTopicGenerationSelectorStore;
 import com.nereusstream.metadata.oxia.v2.capability.OxiaPulsarVirtualLedgerNamespaceRegistryStore;
 import com.nereusstream.metadata.oxia.v2.capability.OxiaTopicBindingAggregatePublisher;
@@ -23,6 +24,8 @@ import com.nereusstream.metadata.oxia.v2.codec.OxiaV2CodecSet;
 import com.nereusstream.metadata.oxia.v2.continuity.RevalidationScheduler;
 import com.nereusstream.metadata.oxia.v2.continuity.StoreContinuity;
 import com.nereusstream.metadata.oxia.v2.continuity.StoreContinuitySnapshot;
+import com.nereusstream.metadata.oxia.v2.invalidation.AuthorityInvalidationRegistration;
+import com.nereusstream.metadata.oxia.v2.invalidation.AuthorityInvalidationRegistry;
 import com.nereusstream.metadata.oxia.v2.key.OxiaV2AuthorityKeys;
 import com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.mutation.ConditionalMutationEngine;
@@ -46,6 +49,7 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
     private final PulsarTopicGenerationSelectorStore selectorStore;
     private final PulsarVirtualLedgerNamespaceRegistryStore registryStore;
     private final boolean pulsarSelectorReady;
+    private final AuthorityInvalidationRegistry invalidationRegistry;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     OxiaV2CapabilityStore(
@@ -61,6 +65,7 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
         Objects.requireNonNull(codecs, "codecs");
         pulsarSelectorReady =
                 codecs.aggregate().available() && codecs.selector().available();
+        invalidationRegistry = pulsarSelectorReady ? new AuthorityInvalidationRegistry(client, continuity, keys) : null;
         OxiaConditionalClient conditionalClient = new AsyncOxiaConditionalClient(client);
         ConditionalMutationEngine mutationEngine =
                 new ConditionalMutationEngine(conditionalClient, new MutationFailureClassifier());
@@ -113,6 +118,16 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
         return new PulsarTopicAuthorityCoordinator(aggregatePublisher, aggregateReader, selectorStore);
     }
 
+    /** Arms exact P1 key and store-wide continuity invalidation before authority reads. */
+    public AuthorityInvalidationRegistration registerPulsarAuthorityInvalidation(
+            PulsarTopicIncarnationIdentity incarnation, Runnable invalidation) {
+        requireOpen();
+        if (!pulsarSelectorReady || invalidationRegistry == null) {
+            throw new IllegalStateException("P1 selector invalidation capability is unavailable");
+        }
+        return invalidationRegistry.register(incarnation, invalidation);
+    }
+
     AsyncOxiaClient client() {
         return client;
     }
@@ -133,6 +148,13 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
             return;
         }
         Exception failure = null;
+        if (invalidationRegistry != null) {
+            try {
+                invalidationRegistry.close();
+            } catch (RuntimeException closeFailure) {
+                failure = closeFailure;
+            }
+        }
         try {
             continuity.close();
         } catch (RuntimeException closeFailure) {

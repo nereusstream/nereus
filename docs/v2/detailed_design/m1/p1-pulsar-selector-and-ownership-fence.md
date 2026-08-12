@@ -86,6 +86,14 @@ adapters continue sharing one `AsyncOxiaClient`, conditional mutation engine, au
 epoch. `productionActivationReady()` remains false until R1 and native runtime composition are present; a narrower
 `pulsarSelectorReady()` may report the codec/store capability only.
 
+The current Nereus implementation now includes the exact NPS1 codec and transition kernel, the
+`PulsarTopicAuthorityCoordinator` reserve/create/reread/activate/delete state machine, and a capability-store-owned
+exact-key plus store-wide continuity invalidation registry. The latter arms before authority reads, supports bounded
+idempotent local deregistration, de-duplicates one binding callback across its selector and aggregate keys, handles
+range deletion, and treats READY only as permission to revalidate. Native ownership witness/A-read-B/local-fence work,
+real-Oxia focused execution, and the P1 source-qualified receipt remain pending; this partial implementation is not P1
+completion or promotion evidence.
+
 Notification callbacks invalidate but never grant admission. Continuity registration is armed before authority reads.
 READY only permits bounded revalidation; a gap, ARMING, CLOSED, reassignment, client close, or unknown reconnect first
 invalidates all P1 local words. Exact record notifications invalidate the affected binding. Registration and close are

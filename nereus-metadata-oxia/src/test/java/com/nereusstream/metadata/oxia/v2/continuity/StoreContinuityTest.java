@@ -21,9 +21,38 @@ import io.oxia.client.api.NotificationContinuityState;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class StoreContinuityTest {
+    @Test
+    void invalidationRegistrationNeverTreatsReadyAsAuthority() {
+        FakeO1ContinuityClient client = new FakeO1ContinuityClient(1, NotificationContinuityState.READY);
+        StoreContinuity continuity = StoreContinuity.attach(client.client(), new RecordingRevalidationScheduler());
+        AtomicInteger invalidations = new AtomicInteger();
+        InvalidationRegistration registration = continuity.onInvalidation(invalidations::incrementAndGet);
+
+        client.emit(2, NotificationContinuityState.ARMING);
+        client.emit(2, NotificationContinuityState.READY);
+        client.emit(3, NotificationContinuityState.ARMING);
+
+        assertThat(invalidations).hasValue(2);
+        registration.close();
+        client.emit(3, NotificationContinuityState.CLOSED);
+        assertThat(invalidations).hasValue(2);
+    }
+
+    @Test
+    void registrationWhileArmingIsImmediatelyFailClosed() {
+        FakeO1ContinuityClient client = new FakeO1ContinuityClient(1, NotificationContinuityState.ARMING);
+        StoreContinuity continuity = StoreContinuity.attach(client.client(), new RecordingRevalidationScheduler());
+        AtomicInteger invalidations = new AtomicInteger();
+
+        continuity.onInvalidation(invalidations::incrementAndGet);
+
+        assertThat(invalidations).hasValue(1);
+    }
+
     @Test
     void initialArmingSnapshotIsFailClosed() {
         FakeO1ContinuityClient client = new FakeO1ContinuityClient(1, NotificationContinuityState.ARMING);

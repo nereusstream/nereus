@@ -40,7 +40,9 @@ M1 started from these facts; the first bullet is now superseded by the implement
 - the M0 baseline had V2 implementation `NotStarted` and only documentation gates;
 - the active Gradle/BOM/CI graph is still V1 residue, including KoP runtime;
 - M1.1a is complete and M1.1b is exact-locally complete;
-- P1 implementation is in progress under its accepted code-level design. R1, final exact-source aggregation,
+- P1 implementation is in progress: NPS1, closed transitions, the selector/aggregate coordinator, and exact-key plus
+  continuity invalidation are implemented locally; native ownership witness/A-read-B/ACTIVE fence and real-Oxia
+  focused evidence remain pending. R1, final exact-source aggregation,
   pure-V2 graph pruning, and final promotion remain OPEN or pending. K1 is focused-exact complete but non-promotable.
   M1.1c-R0 has
   closed only the Registry writer-count/canonical-capacity input to R1, and M1-2 has closed only the persisted-v1
