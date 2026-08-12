@@ -40,12 +40,12 @@ M1 started from these facts; the first bullet is now superseded by the implement
 - the M0 baseline had V2 implementation `NotStarted` and only documentation gates;
 - the active Gradle/BOM/CI graph is still V1 residue, including KoP runtime;
 - M1.1a is complete and M1.1b is exact-locally complete;
-- P1 implementation is in progress: NPS1, closed transitions, the selector/aggregate coordinator, exact-key plus
-  continuity invalidation, two source-locked real-Oxia lifecycle tests, Pulsar fork native witness/A-read-B/atomic
-  ACTIVE-fence primitives through `09fe914e4a`, and the filtered deterministic P1 artifact builder are implemented.
-  The immutable P1 adapter input from Nereus `23064b3b` is now locked and separately gated. Native capability
-  admission, the combined source-qualified gate/receipt, R1, final exact-source aggregation,
-  pure-V2 graph pruning, and final promotion remain OPEN or pending. K1 is focused-exact complete but non-promotable.
+- P1 focused implementation is complete through Nereus `e9bcd039` and Pulsar
+  `778862323d8a86e2f36064a12166e09918ed9429`: NPS1, closed transitions, selector/aggregate coordination,
+  authoritative witness A/read/B, continuity invalidation, stale-install exclusion, atomic ACTIVE-fence primitives,
+  source-locked real-Oxia lifecycle tests, native capability admission, and the combined non-promotable receipt are
+  implemented. R1 domain/wire implementation is in progress; final exact-source aggregation, pure-V2 graph pruning,
+  and final promotion remain pending. K1 is focused-exact complete but non-promotable.
   M1.1c-R0 has
   closed only the Registry writer-count/canonical-capacity input to R1, and M1-2 has closed only the persisted-v1
   receipt/parser cap input to the later G1 production validator.
@@ -111,8 +111,8 @@ Each target owns one row below and must preserve unrelated worktree state.
 | `M1-2` | strict receipt/parser cap model, representative roots/attachments, path and symlink safety, stable errors, and deterministic non-promotable evidence | M1.1a O1/O2 receipts, `M1.1b`, and `M1.1c-R0` | `v2M1ReceiptCapsCheck`; readiness only | verified at Nereus `75593faf`: 36 focused tests and deterministic [non-promotable evidence](../../evidence/v2-m0/m1-2-receipt-caps/README.md); ADR 0084 owns the accepted cap table |
 | `N1` | immutable, non-overwriteable domain/SPI artifact with source/JAR/source-JAR/POM/metadata identities | accepted M1-2 receipt caps | `v2M1N1ArtifactCheck` | verified immutable input from source `330aaec3`; manifest `9058ff01`; [design and receipt](n1-immutable-domain-artifact.md) |
 | `K1` | complete Kafka feature-2/API-32000/CreateTopics/image/publication authority | immutable N1 domain artifact | `v2M1K1FocusedCheck` | verified at Kafka `8afbc42566`: 39 tests in 16 suites, exact N1/source/schema boundary, [non-promotable receipt](../../evidence/v2-m1/k1/README.md) |
-| `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | immutable N1 artifact plus `M1.1a-O2` | Pulsar/Oxia focused source gate | [accepted code-level design](p1-pulsar-selector-and-ownership-fence.md); Nereus real-Oxia lifecycle, Pulsar native primitives, and immutable adapter artifact implemented; native admission/combined receipt pending |
-| `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | immutable N1 artifact, accepted `M1.1c-R0`, and `M1.1a-O2` | `REGISTRY_CONFORMANCE` | capacity input accepted; production codec/store/interlock and conformance remain NotStarted |
+| `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | immutable N1 artifact plus `M1.1a-O2` | Pulsar/Oxia focused source gate | focused source-qualified implementation and non-promotable receipt complete at Nereus `e9bcd039`; exact final promotion remains N2/N3 work |
+| `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | immutable N1 artifact, accepted `M1.1c-R0`, and `M1.1a-O2` | `REGISTRY_CONFORMANCE` | [accepted code-level design](r1-virtual-ledger-registry.md); exact NLI1/NVR1/NVA1 domain codec and transition work in progress; Store/interlock and conformance pending |
 | `G1` | fast/exact/final M1 gates and production receipt validators | K1/P1/R1 plus accepted M1-2 receipt caps | `v2M1Check`, `v2M1ExactSourceCheck`, `v2M1FinalCheck` | M1-2 input accepted; blocked on K1/P1/R1 and the separately reviewed production validator |
 | `V1P` | cut settings/BOM/publication/CI edges, then remove V1 sources/tasks/scripts and KoP runtime | replacement graph and candidate M1 gates | active-graph/V1-absence checks | last mechanical implementation step |
 | `N3` | receipts, attachments, exact scenario/index promotion only | trusted N2 execution | final receipt validation | evidence only |
