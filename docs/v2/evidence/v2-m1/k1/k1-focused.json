@@ -1,0 +1,32 @@
+{
+  "schema": "NEREUS_V2_K1_FOCUSED_RECEIPT_V1",
+  "kind": "K1_FOCUSED_ONLY",
+  "sourceTupleId": "v2-m0",
+  "result": "PASS_K1_FOCUSED_ONLY",
+  "promotionEligible": false,
+  "kafkaImplementationBaseCommit": "76f62f3b83e882105219b6c7687dbde594a8b8a2",
+  "kafkaFinalForkCommit": "8afbc425660f3466bdc3255e3dd4eb43f8685af1",
+  "kafkaBranch": "nereus/future9-native-kafka-storage",
+  "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+  "n1CoordinateVersion": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+  "n1DomainJarSha256": "2c605ef675c388953f3d2046e02f17bff6b7273a04e4ab8d09cf60be59095600",
+  "n1DomainPomSha256": "39ca614a8be63e1ef737e808d8ed886fb023f63943fdc537f3660ef030644e75",
+  "n1ManifestSha256": "9058ff01f9029f12d9fd2d0a7bc0456322bd5b2d19223a3961ee2201a07b91bb",
+  "testSuites": 16,
+  "tests": {
+    "discovered": 39,
+    "executed": 39,
+    "passed": 39,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "requiredGate": "v2M1K1FocusedCheck",
+  "scope": [
+    "KAFKA_KRAFT_METADATA_AUTHORITY_ONLY",
+    "NO_PRODUCE_FETCH_RUNTIME",
+    "NO_SCENARIO_PROMOTION",
+    "NO_V1_PRUNE_CLAIM",
+    "NO_M1_PASS"
+  ]
+}

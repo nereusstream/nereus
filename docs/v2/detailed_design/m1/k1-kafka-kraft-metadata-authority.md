@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: DocumentationOnly
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: ImplementationDesign
 sourceTuple: v2-m0
+receipt: docs/v2/evidence/v2-m1/k1/k1-focused.json
 ---
 
 # K1 Kafka KRaft metadata authority
@@ -224,6 +225,19 @@ The repository-side K1 checker verifies exact Kafka before/after commit and clea
 focused XML test accounting, generated schema/API inventory, no metadata SPI/Oxia/dynamic dependency, and no
 Produce/Fetch/V1-prune/scenario-promotion claim. Its receipt is `K1_FOCUSED_ONLY` with
 `promotionEligible=false`; N2 later binds it into the exact source tuple.
+
+## Implemented focused evidence
+
+K1 is implemented at clean, pushed Kafka fork commit
+`8afbc425660f3466bdc3255e3dd4eb43f8685af1`, descended from the immutable implementation base
+`76f62f3b83e882105219b6c7687dbde594a8b8a2`. The seven reviewable commits cover the locked N1 dependency, feature and
+generated record, image authority, CreateTopics admission, Admin projection, and exact boundary tests.
+
+`v2M1K1FocusedCheck` executes 39 exact tests in 16 suites with zero failure, error, or skip and validates the generated
+schema, clean before/after source, remote branch, immutable N1 JAR/POM/manifest identities, dependency boundary, and
+absence of Produce/Fetch integration. The committed [receipt](../../evidence/v2-m1/k1/README.md) is
+`K1_FOCUSED_ONLY` and `promotionEligible=false`. K1 therefore completes the Kafka M1 metadata authority but does not
+complete P1/R1/G1, prune V1, activate broker data paths, promote scenarios, or claim M1 PASS.
 
 ## Commit sequence and stop conditions
 

@@ -91,8 +91,9 @@ evidence. The remaining descendants and recently closed evidence input are:
   focused-test identities. Scenario promotion still requires the later executable continuity/Registry conformance and
   trusted N3 receipt; those are implementation/promotion evidence rather than another prose-design decision.
 
-O1, O2, R0, and M1-2 are governed by their accepted implementation designs and focused receipts. K1/P1/R1, the G1
-production parser, real Oxia/Registry conformance, N1/N2/N3, and promotion descendants remain OPEN, pending, or
+O1, O2, R0, M1-2, N1, and focused K1 are governed by their accepted implementation designs and non-promotable
+receipts. K1 is exact-source complete at Kafka `8afbc42566` but does not promote a scenario or M1. P1/R1, the G1
+production parser, real Oxia/Registry conformance, N2/N3, and promotion descendants remain OPEN, pending, or
 non-normative until their own required implementation/evidence gate or explicit design confirmation.
 
 ## Restarted Grill 2: evidence frontier

@@ -242,6 +242,12 @@ require_literal 'K1 Kafka KRaft metadata authority' "docs/v2/detailed_design/m1/
 require_literal 'apiKey                         32000' "docs/v2/detailed_design/m1/k1-kafka-kraft-metadata-authority.md"
 require_literal 'TopicCreateCandidateV1' "docs/v2/detailed_design/m1/k1-kafka-kraft-metadata-authority.md"
 require_literal 'K1_FOCUSED_ONLY' "docs/v2/detailed_design/m1/k1-kafka-kraft-metadata-authority.md"
+require_literal 'implementationStatus: Verified' "docs/v2/detailed_design/m1/k1-kafka-kraft-metadata-authority.md"
+require_literal 'receipt: docs/v2/evidence/v2-m1/k1/k1-focused.json' "docs/v2/detailed_design/m1/k1-kafka-kraft-metadata-authority.md"
+require_literal '8afbc425660f3466bdc3255e3dd4eb43f8685af1' "docs/v2/source-locks.json"
+require_literal 'PASS_K1_FOCUSED_ONLY' "docs/v2/evidence/v2-m1/k1/k1-focused.json"
+require_literal 'v2M1K1FocusedCheck' "build.gradle.kts"
+require_literal '39 exact tests in 16 suites' "docs/v2/detailed_design/m1/k1-kafka-kraft-metadata-authority.md"
 require_literal 'does not own Produce/Fetch' "docs/v2/08-implementation-plan-and-gates.md"
 require_literal 'v2M1ReceiptCapsCheck' "build.gradle.kts"
 require_literal 'no N1/N2/N3, scenario promotion, or M1 Final' "build.gradle.kts"
@@ -1080,6 +1086,43 @@ else:
         or focused_result.get("server", {}).get("imageDigest") != server_runtime["imageDigest"]
     ):
         fail("focused compatibility result does not bind the qualified source/runtime tuple")
+
+k1 = source.get("k1KafkaAuthorityBinding", {})
+expected_k1 = {
+    "implementationBaseId": "kafka-v2-development-base",
+    "implementationBaseCommit": "76f62f3b83e882105219b6c7687dbde594a8b8a2",
+    "repository": "https://github.com/nereusstream/kafka.git",
+    "branch": "nereus/future9-native-kafka-storage",
+    "finalForkCommit": "8afbc425660f3466bdc3255e3dd4eb43f8685af1",
+    "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+    "n1DomainJarSha256": "2c605ef675c388953f3d2046e02f17bff6b7273a04e4ab8d09cf60be59095600",
+    "receipt": "docs/v2/evidence/v2-m1/k1/k1-focused.json",
+    "receiptBytes": 1145,
+    "receiptSha256": "1dc854b6ea517d76d6c4d9c4f6a8323c502e587c983123b52f3b7e5d6f510950",
+    "result": "PASS_K1_FOCUSED_ONLY",
+    "promotionEligible": False,
+    "evidenceStatus": "FOCUSED_EXACT_SOURCE_EVIDENCE",
+}
+if k1 != expected_k1:
+    fail("K1 Kafka authority binding differs from the focused exact-source receipt")
+k1_receipt_path = root / k1["receipt"]
+if (
+    not k1_receipt_path.is_file()
+    or k1_receipt_path.is_symlink()
+    or k1_receipt_path.stat().st_size != k1["receiptBytes"]
+    or hashlib.sha256(k1_receipt_path.read_bytes()).hexdigest() != k1["receiptSha256"]
+):
+    fail("K1 focused receipt identity differs from source locks")
+k1_receipt = json.loads(k1_receipt_path.read_text())
+if (
+    k1_receipt.get("kind") != "K1_FOCUSED_ONLY"
+    or k1_receipt.get("result") != "PASS_K1_FOCUSED_ONLY"
+    or k1_receipt.get("promotionEligible") is not False
+    or k1_receipt.get("kafkaFinalForkCommit") != k1["finalForkCommit"]
+    or k1_receipt.get("tests", {}).get("passed") != 39
+    or k1_receipt.get("tests", {}).get("skipped") != 0
+):
+    fail("K1 focused receipt content or promotion boundary is invalid")
 
 local_evidence_bindings = source.get("localImplementationEvidenceBindings", {})
 if set(local_evidence_bindings) != {

@@ -3356,6 +3356,26 @@ val kafkaForkCheckoutPath = providers.gradleProperty("kafkaForkCheckout")
     .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
 
+tasks.register<Exec>("v2M1K1FocusedSourceCheck") {
+    group = "verification"
+    description = "Run the exact clean Kafka K1 metadata-authority focused gate; this is not M1 PASS."
+    usesService(kafkaCheckoutGate)
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-v2-m1-k1-kafka.sh",
+        kafkaForkCheckoutPath.get(),
+    )
+}
+
+tasks.register("v2M1K1FocusedCheck") {
+    group = "verification"
+    description = "Verify K1 metadata authority only; no Produce/Fetch, scenario promotion, V1 prune, or M1 PASS."
+    dependsOn("v2M1N1ArtifactCheck")
+    dependsOn("v2M1K1FocusedSourceCheck")
+    dependsOn("v2DocumentationCheck")
+}
+
 tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
     group = "verification"
     description = "Verify the clean local Apache Kafka source baseline used for the F9-M3 fork probe."

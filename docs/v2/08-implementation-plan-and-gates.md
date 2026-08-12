@@ -143,9 +143,10 @@ source JAR, POM, Gradle metadata, byte lengths, and SHA-256 values. N1 is now ve
 manifest `9058ff01` by `v2M1N1ArtifactCheck`; it remains an input milestone rather than M1 PASS.
 
 K1 follows the accepted [Kafka KRaft metadata-authority design](detailed_design/m1/k1-kafka-kraft-metadata-authority.md)
-and consumes only that exact N1 artifact. Its implementation is now InProgress on the source-locked Kafka fork. K1
-owns feature 2, API 32000, direct domain mapping, CreateTopics/image/publication authority, and the focused fork gate;
-it does not own Produce/Fetch, M6 process activation, scenario promotion, or M1 PASS.
+and consumes only that exact N1 artifact. It is focused-exact complete at the clean pushed Kafka commit `8afbc42566`:
+feature 2, API 32000, direct domain mapping, CreateTopics/image/publication authority, and Admin projection pass 39
+tests in 16 suites under `v2M1K1FocusedCheck`. The receipt remains `K1_FOCUSED_ONLY` and
+`promotionEligible=false`; K1 does not own Produce/Fetch, M6 process activation, scenario promotion, or M1 PASS.
 
 `docs/v2/source-locks.json` is the sole expected-SHA authority for external Kafka/Pulsar/Oxia sources. Checkout paths
 may be overridden; expected SHAs may not. The manifest cannot self-lock the current Nereus commit; a promotion receipt
@@ -163,6 +164,9 @@ binds it. M1 gates are:
   checks; it cannot prove the G1 production validator, N1/K1/P1/R1, N2/N3, scenario promotion, or M1 PASS/Final;
 - `v2M1N1ArtifactCheck`: exact source-qualified domain/SPI bundle, two-build reproducibility, POM/Gradle-metadata
   dependency boundary, artifact digests, and non-promotable receipt; it cannot prove K1/P1/R1 or M1 PASS;
+- `v2M1K1FocusedCheck`: exact clean Kafka fork, immutable N1 input, generated API inventory, 39 exact zero-skip tests,
+  dependency/runtime-scope checks, and a non-promotable K1 receipt; it cannot prove P1/R1/G1, V1 prune, scenario
+  promotion, broker data-path activation, or M1 PASS;
 - `v2M1Check`: no Docker/fork/composite; local domain/schema/SPI/codec/harness, active-graph, and V1-absence checks;
 - `v2M1ExactSourceCheck`: clean exact forks before/after, isolated immutable artifacts, real Oxia, and focused fork tests;
 - `v2M1FinalCheck`: aggregate previous outcomes and receipt schema without rerunning their suites.

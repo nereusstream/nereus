@@ -78,7 +78,9 @@ performance-first BookKeeper WAL.
   [N1 receipt](evidence/v2-m1/n1/README.md) are now verified by `v2M1N1ArtifactCheck`.
 - The accepted [K1 Kafka KRaft metadata-authority design](detailed_design/m1/k1-kafka-kraft-metadata-authority.md)
   translates feature 2, API 32000, direct domain mapping, CreateTopics, TopicImage publication, and Admin projection
-  into the source-locked fork. K1 implementation is InProgress and remains metadata-only, focused, and non-promotable.
+  into the source-locked fork. K1 is focused-exact complete at pushed Kafka commit `8afbc42566`: 39 exact tests in 16
+  suites pass with zero failure/error/skip and the [receipt](evidence/v2-m1/k1/README.md) remains metadata-only,
+  `promotionEligible=false`, and not M1 PASS.
 - ADR 0086 fixes the Kafka BookKeeper semantic layout: one Kafka Offset Domain across profiles, one logical ledger
   chain per partition, low-frequency run/generation roots, packed in-ledger RecordBatch indexes, owner-local active-tail
   locators, targeted Fetch, bounded overlapping writes with ordered publication, and bounded checkpoint-tail recovery.

@@ -228,6 +228,21 @@
     "receipt": "docs/v2/evidence/v2-m1/n1/n1-artifact.json",
     "evidenceStatus": "IMMUTABLE_INPUT_ONLY"
   },
+  "k1KafkaAuthorityBinding": {
+    "implementationBaseId": "kafka-v2-development-base",
+    "implementationBaseCommit": "76f62f3b83e882105219b6c7687dbde594a8b8a2",
+    "repository": "https://github.com/nereusstream/kafka.git",
+    "branch": "nereus/future9-native-kafka-storage",
+    "finalForkCommit": "8afbc425660f3466bdc3255e3dd4eb43f8685af1",
+    "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+    "n1DomainJarSha256": "2c605ef675c388953f3d2046e02f17bff6b7273a04e4ab8d09cf60be59095600",
+    "receipt": "docs/v2/evidence/v2-m1/k1/k1-focused.json",
+    "receiptBytes": 1145,
+    "receiptSha256": "1dc854b6ea517d76d6c4d9c4f6a8323c502e587c983123b52f3b7e5d6f510950",
+    "result": "PASS_K1_FOCUSED_ONLY",
+    "promotionEligible": false,
+    "evidenceStatus": "FOCUSED_EXACT_SOURCE_EVIDENCE"
+  },
   "localImplementationEvidenceBindings": {
     "m1.1aO2Scaffold": {
       "nereusImplementationCommit": "050f908afa1832694b99bd156b17c9e06b9e9a6c",
