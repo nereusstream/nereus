@@ -71,6 +71,10 @@ performance-first BookKeeper WAL.
   sample families, source-lock input SHA, formulas, observed maxima, stable error categories, and JSON SHA. ADR 0084
   is the sole normative cap table. This is test/evidence-only: no production parser, N1/K1/P1/R1, N2/N3, scenario
   promotion, or M1 Final was added.
+- The accepted [N1 artifact design](detailed_design/m1/n1-immutable-domain-artifact.md) publishes only the domain and
+  metadata-SPI modules under an exact source-qualified coordinate and absent source-SHA repository path. It requires
+  two byte-identical clean builds and later locks every JAR/source-JAR/POM/Gradle-metadata length and SHA; this is an
+  immutable K1/P1/R1 input, not a source-tuple promotion or M1 PASS.
 - ADR 0086 fixes the Kafka BookKeeper semantic layout: one Kafka Offset Domain across profiles, one logical ledger
   chain per partition, low-frequency run/generation roots, packed in-ledger RecordBatch indexes, owner-local active-tail
   locators, targeted Fetch, bounded overlapping writes with ordered publication, and bounded checkpoint-tail recovery.

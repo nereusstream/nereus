@@ -35,6 +35,7 @@ required_v2_docs=(
     detailed_design/m1/m1.1a-oxia-capability-scaffold.md
     detailed_design/m1/m1.1b-nta1-codec.md
     detailed_design/m1/m1.1c-registry-capacity-spike.md
+    detailed_design/m1/n1-immutable-domain-artifact.md
     open-questions.md
     tradeoffs.md
 )
@@ -229,6 +230,9 @@ require_literal 'implementationStatus: Verified' "docs/v2/detailed_design/m1/m1-
 require_literal 'receipt: docs/v2/evidence/v2-m0/m1-2-receipt-caps/README.md' "docs/v2/detailed_design/m1/m1-2-receipt-parser-caps.md"
 require_literal 'ADR 0084 is the sole normative cap table' "docs/v2/evidence/v2-m0/m1-2-receipt-caps/README.md"
 require_literal 'RECEIPT_CAPACITY_READINESS_ONLY' "docs/v2/evidence/v2-m0/m1-2-receipt-caps/receipt-caps.json"
+require_literal 'N1 immutable domain and metadata-SPI artifact' "docs/v2/detailed_design/m1/n1-immutable-domain-artifact.md"
+require_literal '0.2.0-n1.<40-lowercase-hex Nereus source commit>' "docs/v2/detailed_design/m1/n1-immutable-domain-artifact.md"
+require_literal 'refuse any attempt to publish when that final directory already exists' "docs/v2/detailed_design/m1/n1-immutable-domain-artifact.md"
 require_literal 'v2M1ReceiptCapsCheck' "build.gradle.kts"
 require_literal 'no N1/N2/N3, scenario promotion, or M1 Final' "build.gradle.kts"
 require_literal 'no production parser, N1/N2/N3, scenario promotion, or M1 Final' "scripts/check-v2-m1-receipt-caps.sh"

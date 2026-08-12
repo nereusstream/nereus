@@ -203,13 +203,13 @@ plugins {
 
 group = providers.gradleProperty("nereusGroup").get()
 val configuredNereusVersion = providers.gradleProperty("nereusVersion").get()
-val releaseLineVersion = configuredNereusVersion
-    .removeSuffix("-SNAPSHOT")
-    .removeSuffix("-f2-dev")
-    .removeSuffix("-f9-dev")
-check(Regex("[0-9]+\\.[0-9]+\\.[0-9]+").matches(releaseLineVersion)) {
-    "nereusVersion must derive from X.Y.Z, X.Y.Z-SNAPSHOT, X.Y.Z-f2-dev, or X.Y.Z-f9-dev"
+val supportedNereusVersion =
+    Regex("([0-9]+\\.[0-9]+\\.[0-9]+)(?:-SNAPSHOT|-f2-dev|-f9-dev|-n1\\.[0-9a-f]{40})?")
+val configuredVersionMatch = requireNotNull(supportedNereusVersion.matchEntire(configuredNereusVersion)) {
+    "nereusVersion must be X.Y.Z, X.Y.Z-SNAPSHOT, X.Y.Z-f2-dev, X.Y.Z-f9-dev, " +
+        "or source-qualified X.Y.Z-n1.<40-lowercase-hex>"
 }
+val releaseLineVersion = configuredVersionMatch.groupValues[1]
 val phase2DevelopmentVersion = "$releaseLineVersion-f2-dev"
 val phase9DevelopmentVersion = "$releaseLineVersion-f9-dev"
 val pulsarDevelopmentGateRequested = gradle.startParameter.taskNames.any { requested ->

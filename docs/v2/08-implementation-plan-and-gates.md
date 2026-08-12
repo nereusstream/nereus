@@ -136,6 +136,11 @@ table; the JSON is its machine projection and binds SHA-256
 input. It adds no production parser/constant authority, N1/K1/P1/R1, real Oxia/Registry conformance, N2/N3, scenario
 promotion, or M1 Final.
 
+N1 follows the accepted [immutable artifact design](detailed_design/m1/n1-immutable-domain-artifact.md). It uses a
+clean pushed Nereus source commit, the exact `0.2.0-n1.<40-hex-source-SHA>` coordinate, two byte-identical clean
+builds, and an absent source-SHA repository directory. A later evidence-only binding records the binary JAR,
+source JAR, POM, Gradle metadata, byte lengths, and SHA-256 values. N1 remains an input milestone rather than M1 PASS.
+
 `docs/v2/source-locks.json` is the sole expected-SHA authority for external Kafka/Pulsar/Oxia sources. Checkout paths
 may be overridden; expected SHAs may not. The manifest cannot self-lock the current Nereus commit; a promotion receipt
 binds it. M1 gates are:
