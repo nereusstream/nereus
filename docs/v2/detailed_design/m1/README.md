@@ -38,8 +38,9 @@ The authoring baseline is the clean M0 split commit
 M1 started from these facts; the first bullet is now superseded by the implementation record below:
 
 - the M0 baseline had V2 implementation `NotStarted` and only documentation gates;
-- settings, BOM, publication, ordinary CI, and `nereus-metadata-oxia` compilation now expose only the four V2 M1
-  modules/packages. The disconnected V1/KoP source tree is still present pending the independent mechanical deletion;
+- settings, BOM, publication, ordinary CI, and source tree now expose only the four V2 M1 modules. The independent
+  mechanical commit removed V1 runtime modules, non-V2 Oxia sources/tests, Phase/F9 scripts, Admin Docker runtime, and
+  KoP runtime while retaining `docs/v1`, V2/KoP design documents, and protected history;
 - M1.1a is complete and M1.1b is exact-locally complete;
 - P1 focused implementation is complete through Nereus `e9bcd039` and Pulsar
   `778862323d8a86e2f36064a12166e09918ed9429`: NPS1, closed transitions, selector/aggregate coordination,
@@ -48,7 +49,7 @@ M1 started from these facts; the first bullet is now superseded by the implement
   implemented. R1 focused implementation is complete at Nereus
   `8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d`: exact Registry wire, held writer interlock, response-loss authority,
   derived views, and source-locked real-Oxia conformance are covered by a non-promotable receipt. Final exact-source
-  aggregation, mechanical V1/KoP deletion, and final promotion remain pending. K1 is focused-exact complete but
+  aggregation and final promotion remain pending. K1 is focused-exact complete but
   non-promotable.
   M1.1c-R0 has
   closed only the Registry writer-count/canonical-capacity input to R1, and M1-2 has closed only the persisted-v1
@@ -118,7 +119,7 @@ Each target owns one row below and must preserve unrelated worktree state.
 | `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | immutable N1 artifact plus `M1.1a-O2` | Pulsar/Oxia focused source gate | focused source-qualified implementation and non-promotable receipt complete at Nereus `e9bcd039`; exact final promotion remains N2/N3 work |
 | `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | immutable N1 artifact, accepted `M1.1c-R0`, and `M1.1a-O2` | focused `REGISTRY_CONFORMANCE` input | [accepted code-level design](r1-virtual-ledger-registry.md); exact NLI1/NVR1/NVA1/RAE1 codecs, held interlock cut, immutable evidence, Store/CAS, response-loss, derived view, focused receipt, and real-Oxia gate verified; no allocator or scenario promotion |
 | `G1` | fast/exact/final M1 gates and production receipt validators | K1/P1/R1 plus accepted M1-2 receipt caps | `v2M1Check`, `v2M1ExactSourceCheck`, `v2M1FinalCheck` | [verified code-level design](g1-receipt-validation-and-gates.md) and [focused receipt](../../evidence/v2-m1/g1/README.md); parser/Final/gates and 49+14 tests complete; V1 prune and N2/N3 execution pending |
-| `V1P` | cut settings/BOM/publication/CI edges, then remove V1 sources/tasks/scripts and KoP runtime | replacement graph and candidate M1 gates | active-graph/V1-absence checks | edge cut complete: only BOM/domain/SPI/Oxia compile or publish; independent mechanical deletion pending |
+| `V1P` | cut settings/BOM/publication/CI edges, then remove V1 sources/tasks/scripts and KoP runtime | replacement graph and candidate M1 gates | active-graph/V1-absence checks | complete: only BOM/domain/SPI/Oxia, V2 gates/tools, archives, and deferred design remain |
 | `N3` | receipts, attachments, exact scenario/index promotion only | trusted N2 execution | final receipt validation | evidence only |
 
 ## Codex target boundaries
@@ -194,7 +195,7 @@ The expected review sequence is:
     non-promotable implementation receipts, while aggregate promotion remains pending;
 13. M1 fast/exact/final gate and receipt-validator implementation without promotion;
 14. settings/BOM/publication/CI cut (complete; V1 files remain disconnected for reviewability);
-15. independent mechanical V1/KoP-runtime deletion;
+15. independent mechanical V1/KoP-runtime deletion (complete);
 16. N2 candidate source lock plus fast/exact/final execution over the pruned graph;
 17. evidence-only N3 promotion.
 
@@ -214,7 +215,7 @@ must not start merely because the replacement modules compile.
 | `v2M1ReceiptCapsCheck` | now | 36 clean focused tests over deterministic representative roots/attachments, JCS/parser/path/symlink boundaries, exact selected-cap formulas, committed/generated equality, and non-promotion boundary | production G1 validator, N1/K1/P1/R1, Final/N2/N3, scenario promotion, M1 PASS |
 | `v2M1R1FocusedCheck` | now | 35 domain, eight metadata, and two source-locked real-Oxia tests over exact Registry wire, held interlock, response loss, derived views, and allocator-mode absence | final source-tuple conformance receipt, allocator mode, V1 prune, scenario promotion, M1 PASS |
 | `v2M1G1ValidatorCheck` | now | production strict receipt parser, secure bounded reference verification, non-rerunning Final resolver, exact virtual-ledger promotion policy, and evidence-only allocator harness isolation | pure-V2 graph, exact-source tuple, scenario promotion, N2/N3, M1 PASS |
-| `v2M1Check` | after the independent mechanical deletion | ordinary deterministic M1 fast suite and V1 absence | exact external source/artifact/runtime identity |
+| `v2M1Check` | now | ordinary deterministic M1 fast suite and V1 absence | exact external source/artifact/runtime identity |
 | `v2M1ExactSourceCheck` | N2 | clean exact forks, immutable artifacts, real Oxia, focused fork tests | evidence provenance without trusted workflow/N3 |
 | `v2M1FinalCheck` | N2/N3 | referenced gate/receipt schema and aggregate result | work not explicitly referenced by the receipts |
 

@@ -99,9 +99,8 @@ descendants and recently closed evidence input are:
 O1, O2, R0, M1-2, N1, and focused K1/P1/R1 are governed by their accepted implementation designs and non-promotable
 receipts. K1 is exact-source complete at Kafka `8afbc42566`; P1 is exact-source complete at Pulsar `778862323d`; R1
 is focused-current complete at Nereus `8a213a85bf`; G1 parser/Final mechanics are focused-current complete at
-`ba11fe4a29`. None promotes a scenario or M1. The settings/BOM/publication/CI edge cut is complete; independent V1/KoP
-mechanical deletion, N2/N3, and promotion descendants remain pending until their required implementation/evidence
-gates.
+`ba11fe4a29`. None promotes a scenario or M1. The pure-V2 active graph and independent V1/KoP mechanical deletion are
+complete; N2/N3 and promotion descendants remain pending until their required implementation/evidence gates.
 
 ## Restarted Grill 2: evidence frontier
 

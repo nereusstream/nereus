@@ -11,5 +11,5 @@ Oxia source.
 
 The focused result is `PASS_G1_FOCUSED_ONLY`, not a canonical conformance receipt and not M1 Final. It does not prove
 the pure-V2 graph, run Exact Source, select an allocator, promote a scenario, perform N2/N3, or claim M1 PASS. The
-settings/BOM/publication/CI edge cut is complete, but the registered Fast gate remains intentionally blocked until the
-independent V1/KoP mechanical deletion is complete.
+pure-V2 graph prune is complete, making the registered Fast gate executable; it still does not prove Exact Source,
+Final, N2/N3, scenario promotion, or M1 PASS.

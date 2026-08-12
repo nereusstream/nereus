@@ -22,5 +22,5 @@ jobs:
           java-version: '21'
       - name: V2 documentation baseline
         run: ./gradlew v2M0Check
-      - name: V2 M1 local graph boundary
-        run: ./gradlew v2M1FoundationCheck v2M1Nta1CodecCheck v2M1ReceiptCapsCheck v2M1G1ValidatorCheck
+      - name: V2 M1 fast gate
+        run: ./gradlew v2M1Check

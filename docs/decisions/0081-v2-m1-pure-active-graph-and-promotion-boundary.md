@@ -14,10 +14,10 @@ does not weaken the requirement to remove the active V1/KoP runtime graph before
 
 ### Active-graph edge-cut refinement (2026-08-13)
 
-The accepted first prune cut now limits settings, BOM, publication, ordinary CI, and compiled
-`nereus-metadata-oxia` sources to BOM/domain/SPI/Oxia only. It deliberately leaves the disconnected V1/KoP files for
-the next independent mechanical commit. This intermediate state is reviewable but is not `v2M1Check`, N2, N3, or M1
-PASS; the active-graph gate continues to fail closed until those physical residues are removed.
+The accepted first prune cut limited settings, BOM, publication, ordinary CI, and compiled `nereus-metadata-oxia`
+sources to BOM/domain/SPI/Oxia only. The following independent mechanical commit removed the disconnected V1/KoP
+runtime files, non-V2 Oxia sources/tests, Phase/F9 scripts, and V1 Admin Docker runtime while retaining archives and
+deferred design. This completes the pure active-graph precondition but is not N2, N3, or M1 PASS.
 
 ## Context
 

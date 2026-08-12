@@ -715,6 +715,5 @@ tasks.register<JavaExec>("v2M1FinalCheck") {
 }
 
 tasks.named("check") {
-    dependsOn("v2M0Check", "v2M1FoundationCheck", "v2M1Nta1CodecCheck", "v2M1ReceiptCapsCheck")
-    dependsOn("v2M1G1ValidatorCheck")
+    dependsOn("v2M1Check")
 }
