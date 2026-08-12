@@ -2,7 +2,7 @@
 productLine: V2
 designStatus: Accepted
 implementationStatus: InProgress
-evidenceStatus: NotRun
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeEvidencePlan
 sourceTuple: v2-m1
 ---

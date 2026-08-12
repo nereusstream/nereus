@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: DocumentationOnly
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: ExecutionIndex
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m1/n3/final-index.json
 ---
 
 # M1 execution index
@@ -50,9 +51,9 @@ M1 started from these facts; the first bullet is now superseded by the implement
   implemented. The final fork contains no V1 adapter/runtime and is revalidated by N2 rather than relabelling the old
   receipt. R1 focused implementation is complete at Nereus
   `8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d`: exact Registry wire, held writer interlock, response-loss authority,
-  derived views, and source-locked real-Oxia conformance are covered by a non-promotable receipt. Final exact-source
-  aggregation and final promotion remain pending. K1 is focused-exact complete but
-  non-promotable.
+  derived views, and source-locked real-Oxia conformance are covered by a non-promotable focused receipt. Final
+  exact-source aggregation and evidence-only N3 promotion are complete; K1/P1/R1 focused receipts remain
+  non-promotable on their own.
   M1.1c-R0 has
   closed only the Registry writer-count/canonical-capacity input to R1, and M1-2 has closed only the persisted-v1
   receipt/parser cap input to the later G1 production validator.
@@ -109,7 +110,7 @@ Each target owns one row below and must preserve unrelated worktree state.
 | `M1.1a-B` | bootstrap IDs, `ProtocolKindV1`, NPC1/NTI1/NPN1 leaves, NTB1/NSE1 IDs, strict names and goldens | `M1.1a-A` | domain unit/golden tests | implemented and foundation-gated |
 | `M1.1a-C` | minimal independent aggregate values and foundation-only validator | `M1.1a-B` | semantic/negative API tests; no NTA1 activation | implemented and foundation-gated |
 | `M1.1a-D` | exactly four production capabilities, closed outcomes, snapshots, deterministic test fakes | `M1.1a-C` | SPI contract tests | implemented and foundation-gated |
-| `M1.1a-E` | `v2M1FoundationCheck`, reproducible JAR/source-JAR/POM hashing, M1 `InProgress` handoff | `M1.1a-A..D` | foundation gate; never M1 PASS | local gate implemented; N1 promotion pending |
+| `M1.1a-E` | `v2M1FoundationCheck`, reproducible JAR/source-JAR/POM hashing, M1 `InProgress` handoff | `M1.1a-A..D` | foundation gate; never M1 PASS | local gate implemented; immutable N1 input later verified and source-bound |
 | `M1.1a-O1` | expose ready/loss lifecycle from the Oxia client dummy barrier, including assignment-stream gaps and cancelable notification attempts; no server wire/RPC | confirmed client `24b730d1` / server `37a17bef` bases | fork focused tests and clean fork state | focused target complete at client `091a42c`; [design and evidence](m1.1a-oxia-client-continuity.md); no scenario promotion |
 | `M1.1a-O2` | V2 aggregate/selector/Registry adapter scaffolding and store-wide continuity capability | `M1.1a-D`, `M1.1a-O1` | local fake tests; exact-source conformance remains pending | locally verified at Nereus `050f908a`: 69 focused and 299 whole-module tests; [accepted design](m1.1a-oxia-capability-scaffold.md) and [local-only receipt](../../evidence/v2-m0/m1.1a-o2/README.md); no scenario promotion |
 | `M1.1b-Q1` | collect NTA1 bounds, legality, pinned-name, checked-arithmetic, and candidate-wire evidence | `M1.1a-E`; O2 codec port remains fail closed | `v2M1Nta1ReadinessCheck`; readiness only | historical evidence complete at `94881e67`: 14 focused tests and immutable [non-promotable receipt](../../evidence/v2-m0/m1.1b-q1/README.md) |
@@ -118,11 +119,11 @@ Each target owns one row below and must preserve unrelated worktree state.
 | `M1-2` | strict receipt/parser cap model, representative roots/attachments, path and symlink safety, stable errors, and deterministic non-promotable evidence | M1.1a O1/O2 receipts, `M1.1b`, and `M1.1c-R0` | `v2M1ReceiptCapsCheck`; readiness only | verified at Nereus `75593faf`: 36 focused tests and deterministic [non-promotable evidence](../../evidence/v2-m0/m1-2-receipt-caps/README.md); ADR 0084 owns the accepted cap table |
 | `N1` | immutable, non-overwriteable domain/SPI artifact with source/JAR/source-JAR/POM/metadata identities | accepted M1-2 receipt caps | `v2M1N1ArtifactCheck` | verified immutable input from source `330aaec3`; manifest `9058ff01`; [design and receipt](n1-immutable-domain-artifact.md) |
 | `K1` | complete Kafka feature-2/API-32000/CreateTopics/image/publication authority | immutable N1 domain artifact | `v2M1K1FocusedCheck` | verified at Kafka `8afbc42566`: 39 tests in 16 suites, exact N1/source/schema boundary, [non-promotable receipt](../../evidence/v2-m1/k1/README.md) |
-| `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | immutable N1 artifact plus `M1.1a-O2` | Pulsar/Oxia focused source gate | focused source-qualified implementation and non-promotable receipt complete at Nereus `e9bcd039`; exact final promotion remains N2/N3 work |
-| `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | immutable N1 artifact, accepted `M1.1c-R0`, and `M1.1a-O2` | focused `REGISTRY_CONFORMANCE` input | [accepted code-level design](r1-virtual-ledger-registry.md); exact NLI1/NVR1/NVA1/RAE1 codecs, held interlock cut, immutable evidence, Store/CAS, response-loss, derived view, focused receipt, and real-Oxia gate verified; no allocator or scenario promotion |
+| `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | immutable N1 artifact plus `M1.1a-O2` | Pulsar/Oxia focused source gate | focused source-qualified implementation and non-promotable receipt complete at Nereus `e9bcd039`; pure-V2 Pulsar `d1cfd863` is bound by the final Exact Source result |
+| `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | immutable N1 artifact, accepted `M1.1c-R0`, and `M1.1a-O2` | focused `REGISTRY_CONFORMANCE` input | [accepted code-level design](r1-virtual-ledger-registry.md); exact wire/Store/interlock/response-loss/derived-view and real-Oxia gates are verified; N3 `REGISTRY_CONFORMANCE` promotes exactly `V2-POSITION-003..009`; no allocator mode is selected |
 | `G1` | fast/exact/final M1 gates and production receipt validators | K1/P1/R1 plus accepted M1-2 receipt caps | `v2M1Check`, `v2M1ExactSourceCheck`, `v2M1FinalCheck` | [verified code-level design](g1-receipt-validation-and-gates.md) and [focused receipt](../../evidence/v2-m1/g1/README.md); parser/Final/gates, 49+14 tests, and V1 prune are complete; trusted N2/N3 state is derived only from canonical evidence |
 | `V1P` | cut settings/BOM/publication/CI edges, then remove V1 sources/tasks/scripts and KoP runtime | replacement graph and candidate M1 gates | active-graph/V1-absence checks | complete: only BOM/domain/SPI/Oxia, V2 gates/tools, archives, and deferred design remain |
-| `N3` | receipts, attachments, exact scenario/index promotion only | trusted N2 execution | final receipt validation | evidence only |
+| `N3` | receipts, attachments, exact scenario/index promotion only | trusted N2 execution | final receipt validation | complete: exact evidence-only promotion accepted by `v2M1FinalCheck` |
 
 ## Codex target boundaries
 
@@ -193,8 +194,8 @@ The expected review sequence is:
    [M1.1c-R0 design](m1.1c-registry-capacity-spike.md), followed by an accepted cap;
 10. verified representative receipt/parser output evidence and accepted safety caps (complete at `75593faf`);
 11. immutable, non-overwriteable N1 domain/SPI artifact publication with JAR/source-JAR/POM/Gradle-metadata hashes;
-12. separate Kafka K1, Pulsar P1, and Registry R1 changes consuming exact N1 artifacts; all three now have focused,
-    non-promotable implementation receipts, while aggregate promotion remains pending;
+12. separate Kafka K1, Pulsar P1, and Registry R1 changes consuming exact N1 artifacts; all three retain focused,
+    non-promotable implementation receipts, while aggregate promotion is now carried only by N2/N3 evidence;
 13. M1 fast/exact/final gate and receipt-validator implementation without promotion;
 14. settings/BOM/publication/CI cut (complete; V1 files remain disconnected for reviewability);
 15. independent mechanical V1/KoP-runtime deletion (complete);
@@ -227,9 +228,9 @@ The intermediate foundation task has a deliberately different name from `v2M1Che
 ## Remaining M1 validation boundary
 
 M1.1b-Q1 was readiness evidence used to freeze the production contract and is not rerun as a promotion suite. The
-foundation/NTA1 local tests remain in ordinary CI as regression protection. M1 still requires K1/P1/R1 functional
-tests, real-Oxia exact-source conformance, pure-V2 active-graph/V1-absence checks, N2 exact artifact/source validation,
-and the receipt-only N3 promotion. `v2M1FinalCheck` aggregates referenced outcomes and does not rerun those suites.
+foundation/NTA1 local tests remain in ordinary CI as regression protection. K1/P1/R1 functional tests, real-Oxia
+exact-source conformance, pure-V2 active-graph/V1-absence checks, N2 exact artifact/source validation, and receipt-only
+N3 promotion are complete. `v2M1FinalCheck` aggregates those referenced outcomes without rerunning them.
 
 Version 0.2 admits fresh deployments only. M1 tests the deterministic pure-input Pulsar name-inventory tool and its
 failure boundary, but does not require execution against a customer or existing production cluster. Real

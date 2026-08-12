@@ -2,7 +2,7 @@
 productLine: V2
 designStatus: Proposed
 implementationStatus: InProgress
-evidenceStatus: NotRun
+evidenceStatus: CurrentSourceReceipt
 authority: NonNormativeQuestionLog
 sourceTuple: v2-m1
 ---
@@ -75,7 +75,7 @@ descendants and recently closed evidence input are:
   [non-promotable receipt](evidence/v2-m0/m1.1b/README.md). Its historical boundary remains unchanged; later K1/P1/R1
   receipts do not promote it. A real existing-cluster inventory is deferred migration evidence, not a fresh-only 0.2
   or M1-Final blocker.
-- **Registry capacity and focused R1 authority complete; promotion pending:** the unsupported `maxWriterCount=8`
+- **Registry capacity, R1 authority, and exact Registry promotion complete:** the unsupported `maxWriterCount=8`
   candidate is rejected.
   The accepted [M1.1c-R0 spike design](detailed_design/m1/m1.1c-registry-capacity-spike.md), 18 focused tests, and
   `v2M1RegistryCapacityCheck` bind seven source-qualified/principal-generation cohorts per closed writer kind,
@@ -83,15 +83,15 @@ descendants and recently closed evidence input are:
   51,016-byte largest legal canonical Registry value. The inherited 120/192/256/65,536 limits remain unchanged, with
   14,520 bytes reserved margin. Production NLI1/NVR1/NVA1/RAE1, Store/interlock, response loss, derived views, and two
   source-locked real-Oxia tests are now covered by `v2M1R1FocusedCheck` and the
-  [non-promotable R1 receipt](evidence/v2-m1/r1/README.md). Canonical G1 validation is now focused-current; N2/N3
-  receipt generation, allocator selection, and scenario promotion remain pending.
-- **Receipt-cap input and G1 validator resolved; N3 still pending:** ADR 0084 now owns the sole persisted-v1 cap table. The M1-2
+  [non-promotable R1 receipt](evidence/v2-m1/r1/README.md). Canonical N3 `REGISTRY_CONFORMANCE` now promotes exactly
+  `V2-POSITION-003..009`; allocator mode selection remains a later evidence decision.
+- **Receipt-cap input, G1 validator, and N3 Final resolved:** ADR 0084 now owns the sole persisted-v1 cap table. The M1-2
   JDK-only test model, 36 clean focused tests, eleven representative sample families, and
   [`RECEIPT_CAPACITY_READINESS_ONLY`](evidence/v2-m0/m1-2-receipt-caps/README.md) evidence bind the formulas,
   observed maxima, stable rejection taxonomy, source commit, and JSON SHA. Deployment may only lower new-receipt
   admission; host/provider limits cannot change persisted-v1 parsing. This closes the stale numeric-cap OPEN, not the
   separately reviewed G1 production parser/resolver, now covered by its [focused receipt](evidence/v2-m1/g1/README.md),
-  or trusted N3 promotion.
+  or the trusted N3 promotion now represented by canonical receipts and the Final index.
 - **Promotion evidence is not a prose OPEN:** O1 binds the final Oxia client fork, JAR/source-JAR/POM, exact server
   image, and focused-test identities. Executable continuity/Registry conformance and trusted N3 receipts are represented
   only by the canonical evidence objects and scenario manifest, not by another design decision.

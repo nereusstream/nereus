@@ -71,7 +71,6 @@ in_progress_docs=(
     06-metadata-backends-and-handoff.md
     08-implementation-plan-and-gates.md
     09-scenario-evidence-matrix.md
-    detailed_design/m1/README.md
     detailed_design/m1/m1.1a-domain-spi-foundation.md
     open-questions.md
     tradeoffs.md
@@ -80,6 +79,14 @@ for name in "${in_progress_docs[@]}"; do
     rg -q '^implementationStatus: InProgress$' "$v2_dir/$name" ||
         fail "docs/v2/$name must report the partial M1 foundation as InProgress"
 done
+
+m1_index="$v2_dir/detailed_design/m1/README.md"
+rg -q '^implementationStatus: Verified$' "$m1_index" ||
+    fail "docs/v2/detailed_design/m1/README.md must report completed M1 as Verified"
+rg -q '^evidenceStatus: CurrentSourceReceipt$' "$m1_index" ||
+    fail "docs/v2/detailed_design/m1/README.md must bind current-source evidence"
+rg -q '^receipt: docs/v2/evidence/v2-m1/n3/final-index.json$' "$m1_index" ||
+    fail "docs/v2/detailed_design/m1/README.md must bind the N3 Final index"
 
 for path in "$repo_root/docs/v2/README.md" "$repo_root/docs/v2/architecture.md"; do
     rg -q "^sourceTuple: ${source_tuple}$" "$path" || fail "${path#"$repo_root/"} does not use source tuple $source_tuple"

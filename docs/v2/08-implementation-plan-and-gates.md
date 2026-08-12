@@ -2,7 +2,7 @@
 productLine: V2
 designStatus: Accepted
 implementationStatus: InProgress
-evidenceStatus: DocumentationOnly
+evidenceStatus: CurrentSourceReceipt
 authority: NormativePlan
 sourceTuple: v2-m1
 ---
@@ -23,8 +23,8 @@ sourceTuple: v2-m1
 | M7 | fencing, planned handoff, bounded recovery, cell-local drain/close isolation, mixed-profile operations | Planned | `v2M7Check` |
 | M8 | scale, shared-infrastructure/noisy-neighbor chaos, exact-source AutoMQ comparison, Pulsar native parity, release evidence | Planned | `v2M8Check` and `v2FinalCheck` |
 
-M0 gates and the partial `v2M1FoundationCheck` are registered. The latter is explicitly not `v2M1Check` or a PASS
-claim; every later M1/M2-M8 task name in this plan remains a future contract until implemented.
+M0 and M1 Fast/Exact/Final gates are registered, and the current M1 Final evidence is complete. The intermediate
+`v2M1FoundationCheck` remains explicitly non-promotable; M2-M8 task names remain future contracts until implemented.
 
 ADR 0015 limits 0.2 to one initial Storage Epoch per Topic Incarnation and no online profile-transition runtime. ADR 0016
 excludes Kafka/Pulsar Access Projection and Migration Link runtime. Their future state machines, Pulsar
@@ -49,13 +49,13 @@ separate mechanical commits. Architecture, gate rewiring, and the large deletion
 deprecated or retained as a compatibility shim; protected `v0.1`/`v0.1.0` history preserves the old product line. KoP
 runtime leaves the active graph while its design documents remain.
 
-M1 has started with the explicitly partial M1.1a-A foundation: Java-17/JDK-only modules, bootstrap identities,
+M1 began with the explicitly partial M1.1a-A foundation: Java-17/JDK-only modules, bootstrap identities,
 ProtocolKind/NPC1/NTI1/NTB1/NSE1 and authority-leaf codecs, minimal independent aggregate domain types, four closed
 metadata capabilities, dependency/API boundaries, deterministic tests, and reproducible JAR/source-JAR/POM hashing.
 The separate Oxia client-continuity target is complete at final fork `091a42c`, and metadata-oxia O2 is locally
 verified at Nereus `050f908a` with its immutable client/API bundle, four single-key adapters, continuity scaffold,
-69 focused tests, 299 whole-module tests, and `promotionEligible=false` receipt. These slices neither implement nor
-activate NTA1, P1, or R1. M1.1b-Q1 readiness evidence is complete at `94881e67`: 14 test-scope tests measure
+69 focused tests, 299 whole-module tests, and `promotionEligible=false` receipt. Those slices by themselves did not
+implement or activate NTA1, P1, or R1. M1.1b-Q1 readiness evidence is complete at `94881e67`: 14 test-scope tests measure
 the 4-KiB and 16-KiB per-name candidates, 8,397/32,973-byte checked parser caps, all six legality rows, and strict
 allocation boundaries. Its result is `READINESS_EVIDENCE_ONLY`, `promotionEligible=false`; M1.1b still owns its strict
 production codec/goldens under the now accepted table: `NONE={0,0,empty}` and
@@ -64,9 +64,10 @@ name, and exact checked caps `54/8,214/8,397`. Q1 remains historical/non-promota
 goldens, pure-input inventory boundary, and O2 aggregate adapter are exact-locally complete at `01a70f17`. The
 [implementation receipt](evidence/v2-m0/m1.1b/README.md) binds 55 domain, 73 focused O2, and 303 whole metadata-oxia
 tests with zero failure/error/skip and `promotionEligible=false`. Selector/Registry codecs, K1/P1/R1, real
-Oxia/Registry conformance, runtime activation, scenario promotion, and M1 Final remain pending. Real existing-cluster
-inventory is deferred migration evidence; fresh-only 0.2 requires the pure-input tool and boundary tests, not a
-customer-cluster execution.
+Oxia/Registry conformance, exact-source aggregation, scenario promotion, and M1 Final were completed by their later
+M1 slices and canonical N2/N3 evidence; the historical receipts in this paragraph remain non-promotable. Real
+existing-cluster inventory is deferred migration evidence; fresh-only 0.2 requires the pure-input tool and boundary
+tests, not a customer-cluster execution.
 
 ## M1 implementation and promotion contract
 

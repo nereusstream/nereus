@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted for the 0.2 M1 implementation and cross-repository promotion workflow. The additive `nereus-domain` and
-`nereus-metadata-spi` foundation plus its intermediate gate now exist. Pure-active-graph pruning, fork/runtime work,
-promotion receipts, and M1 Final remain unstarted or pending.
+Accepted for the 0.2 M1 implementation and cross-repository promotion workflow. M1 implementation, the pure-V2
+active-graph prune, exact-source validation, N3 receipts, and M1 Final are complete for the current source tuple. The
+focused slice receipts remain deliberately non-promotable; current completion comes only from the canonical N3
+evidence and scenario manifest accepted by `v2M1FinalCheck`.
 
 ### Implementation refinement (2026-08-11)
 
@@ -17,7 +18,14 @@ does not weaken the requirement to remove the active V1/KoP runtime graph before
 The accepted first prune cut limited settings, BOM, publication, ordinary CI, and compiled `nereus-metadata-oxia`
 sources to BOM/domain/SPI/Oxia only. The following independent mechanical commit removed the disconnected V1/KoP
 runtime files, non-V2 Oxia sources/tests, Phase/F9 scripts, and V1 Admin Docker runtime while retaining archives and
-deferred design. This completes the pure active-graph precondition but is not N2, N3, or M1 PASS.
+deferred design. This completed the pure active-graph precondition before N2/N3 promotion.
+
+### Promotion completion refinement (2026-08-13)
+
+The trusted N2 execution produced canonical Fast and Exact Source PASS results over the pure-V2 graph and exact
+Kafka/Pulsar/Oxia/artifact tuple. Evidence-only N3 promotes exactly `V2-POSITION-003..011` through one
+`REGISTRY_CONFORMANCE`, one `HARNESS_CONFORMANCE_ONLY`, and one Final index. No allocator mode or M2 data path is
+selected or activated.
 
 ## Context
 

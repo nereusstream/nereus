@@ -1,8 +1,8 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
-evidenceStatus: NotRun
+implementationStatus: InProgress
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeWithOpenGates
 sourceTuple: v2-m1
 ---

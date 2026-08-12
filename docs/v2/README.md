@@ -2,7 +2,7 @@
 productLine: V2
 designStatus: Accepted
 implementationStatus: InProgress
-evidenceStatus: DocumentationOnly
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeIndex
 sourceTuple: v2-m1
 ---
@@ -355,8 +355,8 @@ client-only continuity direction, exact 120-byte writer row/evidence shape, and 
 hierarchy. The later M1.1b acceptance closes the complete NTA1 FrameEncodingPolicy/legality/name/total table, and
 M1.1c-R0 closes the Registry writer-count/canonical-capacity input at 14 rows and 51,016 bytes. M1-2 closes the
 persisted-v1 receipt numeric caps. R1 production authority now has focused real-Oxia evidence. G1 production
-receipt/Final validation is implemented under a focused non-promotion gate, while executable Fast/Exact/Final
-aggregation, pure-V2 pruning, and N2/N3 promotion remain OPEN descendants. ADR 0086 resolves the
+receipt/Final validation is implemented under a focused non-promotion gate. Executable Fast/Exact/Final aggregation,
+pure-V2 pruning, and N2/N3 promotion are complete for the current source tuple. ADR 0086 resolves the
 Kafka BookKeeper semantic layout while leaving exact wire, numeric budgets, and dedicated-ledger scale as M2 evidence.
 ADR 0087 closes the protocol-frontier/ISR/idempotency/transaction/Fetch semantic layer, including fenced publication,
 native election adoption, compact descriptor transport, hard-bounded Observed/Applied eligibility, and distinct
