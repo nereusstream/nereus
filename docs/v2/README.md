@@ -74,7 +74,8 @@ performance-first BookKeeper WAL.
 - The accepted [N1 artifact design](detailed_design/m1/n1-immutable-domain-artifact.md) publishes only the domain and
   metadata-SPI modules under an exact source-qualified coordinate and absent source-SHA repository path. It requires
   two byte-identical clean builds and later locks every JAR/source-JAR/POM/Gradle-metadata length and SHA; this is an
-  immutable K1/P1/R1 input, not a source-tuple promotion or M1 PASS.
+  immutable K1/P1/R1 input, not a source-tuple promotion or M1 PASS. Source `330aaec3`, manifest `9058ff01`, and the
+  [N1 receipt](evidence/v2-m1/n1/README.md) are now verified by `v2M1N1ArtifactCheck`.
 - ADR 0086 fixes the Kafka BookKeeper semantic layout: one Kafka Offset Domain across profiles, one logical ledger
   chain per partition, low-frequency run/generation roots, packed in-ledger RecordBatch indexes, owner-local active-tail
   locators, targeted Fetch, bounded overlapping writes with ordered publication, and bounded checkpoint-tail recovery.

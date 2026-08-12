@@ -160,6 +160,74 @@
       "evidenceStatus": "FOCUSED_EVIDENCE"
     }
   },
+  "n1ArtifactBinding": {
+    "sourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+    "coordinateVersion": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+    "bundleRoot": "gradle/locked-artifacts/nereus-n1/330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+    "requiredModules": [
+      "com.nereusstream:nereus-domain:0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+      "com.nereusstream:nereus-metadata-spi:0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e"
+    ],
+    "artifacts": {
+      "domainJar": {
+        "relativePath": "m2/com/nereusstream/nereus-domain/0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/nereus-domain-0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e.jar",
+        "bytes": 70491,
+        "sha256": "2c605ef675c388953f3d2046e02f17bff6b7273a04e4ab8d09cf60be59095600"
+      },
+      "domainSourceJar": {
+        "relativePath": "m2/com/nereusstream/nereus-domain/0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/nereus-domain-0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e-sources.jar",
+        "bytes": 42044,
+        "sha256": "8ecedcc192a1b00846e9645758fff3a939944070ce201702495f3b59a7e8a129"
+      },
+      "domainPom": {
+        "relativePath": "m2/com/nereusstream/nereus-domain/0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/nereus-domain-0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e.pom",
+        "bytes": 1243,
+        "sha256": "39ca614a8be63e1ef737e808d8ed886fb023f63943fdc537f3660ef030644e75"
+      },
+      "domainGradleMetadata": {
+        "relativePath": "m2/com/nereusstream/nereus-domain/0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/nereus-domain-0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e.module",
+        "bytes": 3008,
+        "sha256": "5d2cc505058186a841be484ca0425cc1a1801a8d663340349268a260d4947d19"
+      },
+      "metadataSpiJar": {
+        "relativePath": "m2/com/nereusstream/nereus-metadata-spi/0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/nereus-metadata-spi-0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e.jar",
+        "bytes": 18790,
+        "sha256": "65827a76cea73b5116e7833813094ca144575d9141780d01d344f52f635a00b5"
+      },
+      "metadataSpiSourceJar": {
+        "relativePath": "m2/com/nereusstream/nereus-metadata-spi/0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/nereus-metadata-spi-0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e-sources.jar",
+        "bytes": 14758,
+        "sha256": "7255139607b6c76f1ad214d8d9a425ea9e98ba5eb835588a84c90ded651183fe"
+      },
+      "metadataSpiPom": {
+        "relativePath": "m2/com/nereusstream/nereus-metadata-spi/0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/nereus-metadata-spi-0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e.pom",
+        "bytes": 1522,
+        "sha256": "c069f14da0457a2a92412aa7dd4ce8920f4ae60f326a889a9a86a562e1169f2d"
+      },
+      "metadataSpiGradleMetadata": {
+        "relativePath": "m2/com/nereusstream/nereus-metadata-spi/0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/nereus-metadata-spi-0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e.module",
+        "bytes": 3530,
+        "sha256": "4f4f94c42d00ac189182ca1f46c65bca43b7cd4fa4dcb8dff0c186c341a0a0fa"
+      },
+      "sourceCommitFile": {
+        "relativePath": "source-commit.txt",
+        "bytes": 41,
+        "sha256": "b063cae29b63cea6d977228e8c84cd3bbd6e0c10f214b0544143b12198453724"
+      },
+      "coordinateVersionFile": {
+        "relativePath": "coordinate-version.txt",
+        "bytes": 50,
+        "sha256": "ad7fb8cc8ded6a31d8c14fd4aa6d992b1e29cd993e9864ee7d2cf5e3f75fd099"
+      }
+    },
+    "manifest": {
+      "relativePath": "manifest.sha256",
+      "bytes": 1987,
+      "sha256": "9058ff01f9029f12d9fd2d0a7bc0456322bd5b2d19223a3961ee2201a07b91bb"
+    },
+    "receipt": "docs/v2/evidence/v2-m1/n1/n1-artifact.json",
+    "evidenceStatus": "IMMUTABLE_INPUT_ONLY"
+  },
   "localImplementationEvidenceBindings": {
     "m1.1aO2Scaffold": {
       "nereusImplementationCommit": "050f908afa1832694b99bd156b17c9e06b9e9a6c",

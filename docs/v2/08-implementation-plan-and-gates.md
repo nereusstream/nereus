@@ -139,7 +139,8 @@ promotion, or M1 Final.
 N1 follows the accepted [immutable artifact design](detailed_design/m1/n1-immutable-domain-artifact.md). It uses a
 clean pushed Nereus source commit, the exact `0.2.0-n1.<40-hex-source-SHA>` coordinate, two byte-identical clean
 builds, and an absent source-SHA repository directory. A later evidence-only binding records the binary JAR,
-source JAR, POM, Gradle metadata, byte lengths, and SHA-256 values. N1 remains an input milestone rather than M1 PASS.
+source JAR, POM, Gradle metadata, byte lengths, and SHA-256 values. N1 is now verified from source `330aaec3` with
+manifest `9058ff01` by `v2M1N1ArtifactCheck`; it remains an input milestone rather than M1 PASS.
 
 `docs/v2/source-locks.json` is the sole expected-SHA authority for external Kafka/Pulsar/Oxia sources. Checkout paths
 may be overridden; expected SHAs may not. The manifest cannot self-lock the current Nereus commit; a promotion receipt
@@ -155,6 +156,8 @@ binds it. M1 gates are:
 - `v2M1ReceiptCapsCheck`: current deterministic M1-2 readiness gate with 36 clean focused tests, generated/committed
   byte equality, JSON/source/source-lock/digest binding, formula recomputation, production-absence and non-promotion
   checks; it cannot prove the G1 production validator, N1/K1/P1/R1, N2/N3, scenario promotion, or M1 PASS/Final;
+- `v2M1N1ArtifactCheck`: exact source-qualified domain/SPI bundle, two-build reproducibility, POM/Gradle-metadata
+  dependency boundary, artifact digests, and non-promotable receipt; it cannot prove K1/P1/R1 or M1 PASS;
 - `v2M1Check`: no Docker/fork/composite; local domain/schema/SPI/codec/harness, active-graph, and V1-absence checks;
 - `v2M1ExactSourceCheck`: clean exact forks before/after, isolated immutable artifacts, real Oxia, and focused fork tests;
 - `v2M1FinalCheck`: aggregate previous outcomes and receipt schema without rerunning their suites.

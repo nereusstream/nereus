@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: DocumentationOnly
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: ImplementationDesign
 sourceTuple: v2-m0
+receipt: docs/v2/evidence/v2-m1/n1/README.md
 ---
 
 # N1 immutable domain and metadata-SPI artifact
@@ -82,3 +83,10 @@ coordinate, or a source-lock mismatch fails closed. N1 success remains an immuta
 The source/publisher commit and the artifact/evidence commit stay separate. K1 starts only after the latter passes and
 is pushed. Subsequent Kafka/Pulsar repositories record the N1 coordinate and artifact digests they actually resolved;
 they must not rebuild N1 from their own checkout or silently select a newer bundle.
+
+## Implementation record
+
+N1 source commit `330aaec349c51fb2ace52b1085e8a9e5a60b5e3e` was pushed before publication. Two clean builds were byte-identical,
+and the selected manifest SHA-256 is `9058ff01f9029f12d9fd2d0a7bc0456322bd5b2d19223a3961ee2201a07b91bb`.
+The exact bundle and non-promotable receipt are locked by `docs/v2/source-locks.json`. This verifies N1 only as the
+K1/P1/R1 artifact input; M1 remains `InProgress`.

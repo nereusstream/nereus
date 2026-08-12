@@ -1,0 +1,30 @@
+{
+  "schema": "NEREUS_V2_N1_ARTIFACT_RECEIPT_V1",
+  "sourceTupleId": "v2-m0",
+  "result": "QUALIFIED_IMMUTABLE_INPUT",
+  "selectionEligible": false,
+  "sourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+  "coordinateVersion": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+  "bundleRoot": "gradle/locked-artifacts/nereus-n1/330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+  "manifestSha256": "9058ff01f9029f12d9fd2d0a7bc0456322bd5b2d19223a3961ee2201a07b91bb",
+  "artifactCount": 10,
+  "artifactBytes": 155477,
+  "manifestBytes": 1987,
+  "cleanBuilds": 2,
+  "byteIdentical": true,
+  "tests": {
+    "discovered": 119,
+    "executed": 119,
+    "passed": 119,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "requiredGate": "v2M1N1ArtifactCheck",
+  "scope": [
+    "N1_DOMAIN_AND_METADATA_SPI_INPUT_ONLY",
+    "NO_K1_P1_R1_ACTIVATION",
+    "NO_SOURCE_TUPLE_PROMOTION",
+    "NO_M1_PASS"
+  ]
+}

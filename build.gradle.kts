@@ -918,6 +918,21 @@ tasks.register("v2M1FoundationCheck") {
     dependsOn("v2DocumentationCheck")
 }
 
+tasks.register<Exec>("v2M1N1ArtifactSourceCheck") {
+    group = "verification"
+    description = "Verify the immutable, source-qualified N1 domain/SPI bundle and non-promotable receipt."
+    dependsOn("v2M1FoundationCheck")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m1-n1-artifact.sh")
+}
+
+tasks.register("v2M1N1ArtifactCheck") {
+    group = "verification"
+    description = "Verify N1 as an exact K1/P1/R1 input only; no source-tuple promotion or M1 PASS."
+    dependsOn("v2M1N1ArtifactSourceCheck")
+    dependsOn("v2DocumentationCheck")
+}
+
 val v2OxiaLockedRoot = layout.projectDirectory.dir(
     "gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16/m2/" +
         "io/github/oxia-db",
@@ -1040,6 +1055,7 @@ tasks.named("check") {
     dependsOn("v2DocumentationCheck")
     dependsOn("v2M1FoundationDependencyCheck")
     dependsOn("v2M1FoundationApiCheck")
+    dependsOn("v2M1N1ArtifactSourceCheck")
 }
 
 tasks.register<Exec>("checkPhase3Documentation") {
