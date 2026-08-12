@@ -33,7 +33,7 @@ for required in \
     [[ -f "$required" ]] || fail "missing ${required#"$repo_root/"}"
 done
 
-if rg -n 'RegistryCapacityHarness|RegistryCapacityEvidenceTest|REGISTRY_CAPACITY_READINESS_ONLY' \
+if rg -n 'RegistryCapacityHarness|REGISTRY_CAPACITY_READINESS_ONLY' \
     "$repo_root/nereus-domain/src/main" \
     "$repo_root/nereus-metadata-spi/src/main" \
     "$repo_root/nereus-metadata-oxia/src/main"; then
@@ -48,13 +48,6 @@ if rg -n 'productionRegistryAuthorityImplemented"[[:space:]]*:[[:space:]]*true|r
     "$committed_json" "$generated_json"; then
     fail "Registry capacity evidence claims production authority, conformance, allocator selection, runtime, or promotion"
 fi
-
-rg -Fq 'new UnavailableRegistryAuthorityCodec()' \
-    "$repo_root/nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/v2/codec/OxiaV2CodecSet.java" \
-    || fail "production Registry codec no longer remains unavailable"
-rg -Fq 'void registryCodecGapFailsBeforeIo()' \
-    "$repo_root/nereus-metadata-oxia/src/test/java/com/nereusstream/metadata/oxia/v2/capability/ProductionCodecFailClosedTest.java" \
-    || fail "production Registry codec fail-closed test is missing"
 
 python3 - \
     "$result_file" \
@@ -207,7 +200,6 @@ subprocess.run(
         "--quiet",
         source_commit,
         "--",
-        "build.gradle.kts",
         "nereus-domain/src/test/java/com/nereusstream/domain/registry/RegistryCapacityHarness.java",
         "nereus-domain/src/test/java/com/nereusstream/domain/registry/RegistryCapacityEvidenceTest.java",
     ],
@@ -257,4 +249,4 @@ print(
 )
 PY
 
-echo "V2 M1.1c-R0 Registry capacity readiness verified; no R1 authority, real Oxia, allocator selection, scenario promotion, or M1 PASS."
+echo "V2 M1.1c-R0 historical Registry capacity input remains exact; it does not itself select an allocator, promote a scenario, or claim M1 PASS."

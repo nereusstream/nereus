@@ -224,7 +224,7 @@ require_literal 'REGISTRY_CAPACITY_READINESS_ONLY' "docs/v2/detailed_design/m1/m
 require_literal 'does not implement or activate the R1 Registry codec' "docs/v2/detailed_design/m1/m1.1c-registry-capacity-spike.md"
 require_literal 'v2M1RegistryCapacityCheck' "build.gradle.kts"
 require_literal 'no R1 authority/real Oxia/allocator/scenario/M1 PASS' "build.gradle.kts"
-require_literal 'Registry capacity readiness verified; no R1 authority, real Oxia, allocator selection, scenario promotion, or M1 PASS' "scripts/check-v2-m1-registry-capacity.sh"
+require_literal 'historical Registry capacity input remains exact; it does not itself select an allocator, promote a scenario, or claim M1 PASS' "scripts/check-v2-m1-registry-capacity.sh"
 require_literal 'REGISTRY_CAPACITY_READINESS_ONLY' "docs/v2/evidence/v2-m0/m1.1c-r0/registry-capacity.json"
 require_literal '`maxWriterCount=14`' "docs/v2/evidence/v2-m0/m1.1c-r0/README.md"
 require_literal 'M1-2 receipt/parser capacity and attachment-safety boundary' "docs/v2/detailed_design/m1/m1-2-receipt-parser-caps.md"
@@ -834,8 +834,8 @@ if (
 ):
     fail("legacy ordinary-build baseline is invalid or improperly claims V2 evidence")
 workflow = (root / ".github/workflows/build.yml").read_text()
-if legacy_build[0]["commit"] not in workflow:
-    fail("legacy ordinary-build baseline differs from the CI checkout")
+if legacy_build[0]["commit"] in workflow:
+    fail("historical V1 ordinary-build baseline must not remain in the V2 active CI graph")
 
 fork_ids = set()
 for item in source.get("forkDevelopmentBases", []):

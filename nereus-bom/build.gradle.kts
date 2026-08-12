@@ -25,16 +25,7 @@ dependencies {
     constraints {
         api(project(":nereus-domain"))
         api(project(":nereus-metadata-spi"))
-        api(project(":nereus-api"))
-        api(project(":nereus-core"))
         api(project(":nereus-metadata-oxia"))
-        api(project(":nereus-object-store"))
-        api(project(":nereus-materialization"))
-        api(project(":nereus-bookkeeper"))
-        api(project(":nereus-managed-ledger"))
-        api(project(":nereus-pulsar-adapter"))
-        api(project(":nereus-kop-adapter"))
-        api(project(":nereus-kafka-adapter"))
     }
 }
 
@@ -44,7 +35,7 @@ publishing {
             from(components["javaPlatform"])
             pom {
                 name.set(project.name)
-                description.set("Nereus module ${project.name}")
+                description.set("Nereus V2 module ${project.name}")
                 url.set("https://nereusstream.com")
                 licenses {
                     license {

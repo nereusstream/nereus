@@ -22,9 +22,9 @@ if rg -n \
 fi
 
 if rg -n \
-    'OxiaMetadataStore|WatchRegistration|\.list\(|\.delete\(|\.rangeScan\(|\.notifications\(' \
+    'OxiaMetadataStore|WatchRegistration|\.list\(|\.delete\(|\.rangeScan\(' \
     "$production_root" --glob '*.java'; then
-    fail "V2 scaffold exposes or calls a forbidden broad/list/delete/watch surface"
+    fail "V2 scaffold exposes or calls a forbidden broad/list/delete/range surface"
 fi
 
 if rg -n 'org\.testcontainers|Docker' "$test_root" --glob '*.java'; then

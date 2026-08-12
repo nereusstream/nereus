@@ -135,7 +135,6 @@ subprocess.run(["git", "-C", str(root), "cat-file", "-e", implementation + "^{co
 subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", implementation, "HEAD"], check=True)
 subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", implementation, "origin/main"], check=True)
 implementation_paths = [
-    "build.gradle.kts",
     "nereus-domain/build.gradle.kts",
     "nereus-domain/src/main/java/com/nereusstream/domain/receipt",
     "nereus-domain/src/test/java/com/nereusstream/domain/registry/allocator",
@@ -145,6 +144,11 @@ implementation_paths = [
 ]
 subprocess.run(["git", "-C", str(root), "diff", "--quiet", implementation, "HEAD", "--", *implementation_paths], check=True)
 subprocess.run(["git", "-C", str(root), "diff", "--quiet", "--", *implementation_paths], check=True)
+
+root_build = (root / "build.gradle.kts").read_text()
+for gate in ("v2M1Check", "v2M1ExactSourceCheck", "v2M1FinalCheck"):
+    if f'tasks.register("{gate}")' not in root_build and f'tasks.register<JavaExec>("{gate}")' not in root_build:
+        raise SystemExit(f"G1 registered gate disappeared after the active-graph cut: {gate}")
 
 scenarios = json.loads((root / "docs/v2/v2-scenarios.json").read_text())["scenarios"]
 required = {f"V2-POSITION-{ordinal:03d}" for ordinal in range(3, 12)}
