@@ -18,9 +18,10 @@ import com.nereusstream.domain.bytes.CanonicalBytes;
 import java.util.Objects;
 
 /**
- * An opaque logical frame-policy value with only the frozen NONE/non-NONE shape.
+ * A logical frame-policy value whose accepted NTA1 v1 catalog is validated separately.
  *
- * <p>This type deliberately assigns no non-NONE kind, version, payload schema, or cap.
+ * <p>The value type retains the structural pair so physical mappings can be rejected by the production validator;
+ * {@link FrameEncodingPolicyCatalogV1} owns the closed accepted values.
  */
 public record FrameEncodingPolicyValueV1(int kind, int formatVersion, CanonicalBytes payload) {
     private static final int MAX_U16 = 0xffff;
