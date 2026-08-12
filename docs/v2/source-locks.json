@@ -71,8 +71,8 @@
       "implementationBaseId": "oxia-client-v2-implementation-base",
       "implementationBaseCommit": "24b730d1d66a1da701f4c99957361f6b3c5d748c",
       "branch": "nereus/v2-m1.1a-o1-notification-continuity",
-      "finalForkCommit": null,
-      "evidenceStatus": "PENDING"
+      "finalForkCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+      "evidenceStatus": "FOCUSED_EVIDENCE"
     }
   ],
   "dependencyEvidenceBindings": {
@@ -85,40 +85,40 @@
       ],
       "artifacts": {
         "jar": {
-          "fileName": null,
-          "sha256": null
+          "fileName": "client-0.9.4.jar",
+          "sha256": "0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5"
         },
         "sourceJar": {
-          "fileName": null,
-          "sha256": null
+          "fileName": "client-0.9.4-sources.jar",
+          "sha256": "9dbfd9e9fafadc5415f1f6d53b0972f8acd3de5c8c957d4f96642e5e42e74a01"
         },
         "pom": {
-          "fileName": null,
-          "sha256": null
+          "fileName": "pom-default.xml",
+          "sha256": "b48db12a661e7c4510a30cc816c6b19c5af623dbe5245f8fb8c34ff6afec8659"
         }
       },
-      "receipt": null,
-      "evidenceStatus": "PENDING"
+      "receipt": "docs/v2/evidence/v2-m0/m1.1a-o1/client-artifacts.md",
+      "evidenceStatus": "FOCUSED_EVIDENCE"
     },
     "oxiaServerRuntime": {
       "implementationBaseId": "oxia-server-v2-conformance-base",
       "sourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
-      "imageReference": null,
-      "imageDigest": null,
-      "receipt": null,
-      "evidenceStatus": "PENDING"
+      "imageReference": "nereus/oxia-o1:37a17bef1720",
+      "imageDigest": "sha256:5aa715e4f19091931743e5af489af5f8d6ee15efcce6430a908c6f65cc6d6516",
+      "receipt": "docs/v2/evidence/v2-m0/m1.1a-o1/server-runtime.md",
+      "evidenceStatus": "FOCUSED_EVIDENCE"
     },
     "oxiaFocusedCompatibility": {
       "clientForkOutputId": "oxia-client-notification-continuity",
-      "clientFinalForkCommit": null,
+      "clientFinalForkCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
       "serverSourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
-      "serverImageDigest": null,
+      "serverImageDigest": "sha256:5aa715e4f19091931743e5af489af5f8d6ee15efcce6430a908c6f65cc6d6516",
       "testArtifact": {
-        "fileName": null,
-        "sha256": null
+        "fileName": "focused-compatibility.json",
+        "sha256": "80d59b7e9596d1ba17e05100aa16a26a69a73e709001e044e436a3da0bb887c4"
       },
-      "receipt": null,
-      "evidenceStatus": "PENDING"
+      "receipt": "docs/v2/evidence/v2-m0/m1.1a-o1/focused-compatibility.md",
+      "evidenceStatus": "FOCUSED_EVIDENCE"
     }
   },
   "researchBaselines": [

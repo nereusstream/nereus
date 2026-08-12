@@ -182,7 +182,8 @@ require_literal 'M1.1a-A domain and metadata SPI foundation' "docs/v2/detailed_d
 require_literal '## Implementation record' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal 'M1.1a-O1 latest Oxia Java client notification continuity' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
 require_literal 'designStatus: Accepted' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
-require_literal 'implementationStatus: InProgress' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
+require_literal 'evidenceStatus: CurrentSourceReceipt' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
+require_literal 'receipt: docs/v2/evidence/v2-m0/m1.1a-o1/focused-compatibility.md' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
 require_literal 'No server proto or RPC change is needed.' "docs/v2/detailed_design/m1/m1.1a-oxia-client-continuity.md"
 require_literal 'Complete NTA1 codec/goldens remain OPEN' "docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
 require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
@@ -645,6 +646,7 @@ fi
 
 python3 - "$repo_root" <<'PY'
 import json
+import hashlib
 import pathlib
 import re
 import sys
@@ -761,6 +763,8 @@ elif not sha.fullmatch(str(final_fork_commit)):
     fail("O1 final fork commit is not a full commit")
 elif fork_output.get("evidenceStatus") != "FOCUSED_EVIDENCE":
     fail("final O1 fork output is not marked FOCUSED_EVIDENCE")
+if final_fork_commit is not None and final_fork_commit != "091a42c2780d92da56e9ec1f02ce1c3d988adc16":
+    fail("O1 final fork commit differs from the qualified focused fork")
 if final_fork_commit == fork_output["implementationBaseCommit"]:
     fail("O1 final fork commit overwrote the implementation base identity")
 
@@ -820,10 +824,25 @@ else:
         file_name = str(artifact.get("fileName", ""))
         if not file_name or "/" in file_name or "\\" in file_name or not sha256.fullmatch(str(artifact.get("sha256", ""))):
             fail(f"qualified {name} artifact identity is invalid")
+    expected_artifacts = {
+        "jar": ("client-0.9.4.jar", "0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5"),
+        "sourceJar": ("client-0.9.4-sources.jar", "9dbfd9e9fafadc5415f1f6d53b0972f8acd3de5c8c957d4f96642e5e42e74a01"),
+        "pom": ("pom-default.xml", "b48db12a661e7c4510a30cc816c6b19c5af623dbe5245f8fb8c34ff6afec8659"),
+    }
+    for name, expected in expected_artifacts.items():
+        artifact = client_artifacts["artifacts"][name]
+        if (artifact["fileName"], artifact["sha256"]) != expected:
+            fail(f"qualified {name} artifact differs from the focused receipt")
     if server_runtime.get("evidenceStatus") != "FOCUSED_EVIDENCE":
         fail("qualified server runtime is not marked FOCUSED_EVIDENCE")
     if not server_runtime.get("imageReference") or not image_digest.fullmatch(str(server_runtime.get("imageDigest", ""))):
         fail("qualified server runtime image identity is invalid")
+    if (
+        server_runtime["imageReference"] != "nereus/oxia-o1:37a17bef1720"
+        or server_runtime["imageDigest"]
+        != "sha256:5aa715e4f19091931743e5af489af5f8d6ee15efcce6430a908c6f65cc6d6516"
+    ):
+        fail("qualified server runtime differs from the exact-source image receipt")
     if focused.get("clientFinalForkCommit") != final_fork_commit:
         fail("focused compatibility does not bind the final client fork")
     if focused.get("serverImageDigest") != server_runtime["imageDigest"]:
@@ -833,6 +852,8 @@ else:
         fail("focused compatibility test artifact name is invalid")
     if not sha256.fullmatch(str(test_artifact.get("sha256", ""))):
         fail("focused compatibility test artifact digest is invalid")
+    if test_artifact.get("fileName") != "focused-compatibility.json":
+        fail("focused compatibility points to the wrong result artifact")
     if focused.get("evidenceStatus") != "FOCUSED_EVIDENCE":
         fail("focused compatibility is not marked FOCUSED_EVIDENCE")
     receipt_paths = {
@@ -843,6 +864,21 @@ else:
     for receipt in receipt_paths:
         if not (root / receipt).is_file():
             fail(f"O1 evidence receipt does not exist: {receipt}")
+    focused_artifact_path = root / pathlib.Path(focused["receipt"]).parent / test_artifact["fileName"]
+    if not focused_artifact_path.is_file():
+        fail("focused compatibility result artifact does not exist")
+    actual_focused_sha = hashlib.sha256(focused_artifact_path.read_bytes()).hexdigest()
+    if actual_focused_sha != test_artifact["sha256"]:
+        fail("focused compatibility result artifact digest differs from source locks")
+    focused_result = json.loads(focused_artifact_path.read_text())
+    if (
+        focused_result.get("result") != "PASS_FOCUSED_ONLY"
+        or focused_result.get("promotionEligible") is not False
+        or focused_result.get("client", {}).get("finalForkCommit") != final_fork_commit
+        or focused_result.get("server", {}).get("sourceCommit") != server_source_commit
+        or focused_result.get("server", {}).get("imageDigest") != server_runtime["imageDigest"]
+    ):
+        fail("focused compatibility result does not bind the qualified source/runtime tuple")
 
 research_ids = set()
 for item in source.get("researchBaselines", []):

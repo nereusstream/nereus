@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "OXIA_NOTIFICATION_CONTINUITY_FOCUSED",
+  "sourceTupleId": "v2-m0",
+  "client": {
+    "repository": "https://github.com/nereusstream/oxia-client-java.git",
+    "implementationBaseCommit": "24b730d1d66a1da701f4c99957361f6b3c5d748c",
+    "branch": "nereus/v2-m1.1a-o1-notification-continuity",
+    "finalForkCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+    "protoSha256": "d2f3f4487eb28bc0c4bd40225ea49a875f8684bd35c477aa093229826b7d2ba2"
+  },
+  "server": {
+    "repository": "https://github.com/nereusstream/oxia.git",
+    "sourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
+    "imageReference": "nereus/oxia-o1:37a17bef1720",
+    "imageDigest": "sha256:5aa715e4f19091931743e5af489af5f8d6ee15efcce6430a908c6f65cc6d6516",
+    "architecture": "arm64",
+    "operatingSystem": "linux"
+  },
+  "tests": {
+    "focusedUnit": {
+      "discovered": 88,
+      "executed": 88,
+      "passed": 88,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "fullCheck": {
+      "discovered": 365,
+      "executed": 365,
+      "passed": 365,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "exactRuntimeCompatibility": {
+      "className": "io.oxia.client.it.NotificationContinuityCompatibilityIT",
+      "discovered": 1,
+      "executed": 1,
+      "passed": 1,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "assertions": [
+        "no-offset first dummy establishes ARMING then READY",
+        "the exact generation ready stage completes",
+        "a non-empty current-server notification payload is decoded and delivered exactly once"
+      ],
+      "rawJUnitXml": {
+        "fileName": "TEST-io.oxia.client.it.NotificationContinuityCompatibilityIT.xml",
+        "lengthBytes": 10058,
+        "sha256": "c34caebda3f85df5eb4627718ccd664ca51086144e62ea55383f3000bd9ba827"
+      }
+    },
+    "serverNativeNotification": {
+      "command": "go test ./oxiad/dataserver/controller/lead -run '^TestLeaderController_Notifications' -count=1",
+      "result": "PASS"
+    }
+  },
+  "result": "PASS_FOCUSED_ONLY",
+  "promotionEligible": false,
+  "excludedClaims": [
+    "V2-META-006 current-source pass",
+    "M1.1a completion",
+    "M1 completion",
+    "metadata-oxia O2 implementation"
+  ]
+}
