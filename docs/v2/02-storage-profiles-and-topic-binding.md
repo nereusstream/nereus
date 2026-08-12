@@ -188,23 +188,27 @@ For Kafka, all three profiles share one Kafka Offset Domain. Profile selection c
 source-local physical index, preferred read source, and retirement eligibility; it never creates a profile-specific
 offset or consumer-group cursor. Object generations use an authenticated Object directory. BookKeeper-primary
 generations use ADR 0086's per-partition ledger run and packed in-ledger RecordBatch range index. A physical generation
-switch preserves exact Kafka coverage.
+switch preserves exact Kafka coverage. ADR 0087 further separates Allocated, profile-Durable, Readable/LEO, HW, and
+LSO. Profile durability may advance before Kafka visibility; Object materialization never advances LEO/HW/LSO.
 
 ### `OBJECT_WAL`
 
 The Object group is the primary durable WAL. ACK waits for verified provider durability of the complete typed Protocol
-Coverage.
+Coverage plus owner-local locator and Kafka producer/transaction/leader-epoch publication. The WalRun Root/key/LIST
+contract makes the immutable group recoverable; no per-commit-set manifest mutation or async checkpoint page is added
+to the ACK cut.
 The profile accepts batching latency in exchange for lower storage and request cost. Post-ack materialization remains
 asynchronous and cannot weaken readability of acknowledged WAL ranges.
 
 ### `BOOKKEEPER_WAL_ONLY`
 
-ACK waits for the configured BookKeeper quorum. Object storage is not required for append, recovery, read, or retention.
+ACK waits for the configured BookKeeper quorum and coherent owner-local protocol publication. Object storage is not
+required for append, recovery, read, or retention.
 The profile explicitly accepts BookKeeper cost in exchange for low-latency quorum writes.
 
 ### `BOOKKEEPER_WAL_ASYNC_OBJECT`
 
-ACK has the same BookKeeper boundary as the WAL-only profile. Sealed Protocol Coverage is asynchronously materialized
+ACK has the same BookKeeper and protocol-publication boundary as the WAL-only profile. Sealed Protocol Coverage is asynchronously materialized
 to Object storage. Lag policy may throttle or stop admission, but it never changes a completed ACK into a synchronous
 Object wait.
 For Kafka, BookKeeper source deletion requires the Nereus manifest and source-protection proof. For Pulsar, native

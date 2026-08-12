@@ -78,3 +78,34 @@ Run floor lookup followed by index-block floor lookup and packed-locator search,
 minimum adjacent range. Routine validation uses BookKeeper digest, NBKE2 CRC32C, and Kafka RecordBatch header/CRC;
 whole-run SHA belongs to seal, scrub, recovery, and materialization.
 _Avoid_: Full append-extent read for one offset, range-wide SHA on every Fetch, cache as sole authority
+
+**Kafka Partition Frontier Set**:
+The coherent `LogStart <= LSO <= HW <= Readable/LEO <= Durable <= Allocated` state. Allocated is speculative admission,
+Durable is the contiguous profile proof, LEO adds locator and protocol-state publication, HW is native ISR progress,
+and LSO is transaction stability. Object materialization/checkpoint coverage are not visibility frontiers.
+_Avoid_: One committedEndOffset, BookKeeper quorum as HW, Object materialization as LEO
+
+**Kafka Ordered Protocol Commit**:
+The partition-local cut that publishes a complete append commit set's locators, committed producer delta,
+transaction/aborted delta, leader-epoch state, original append result, and Readable/Durable frontiers together.
+Multiple storage futures may complete out of order; this cut never passes a predecessor gap.
+_Avoid_: Data-visible-before-producer-state, producer-state-before-data, per-append Oxia CAS
+
+**Kafka Shared-Storage Replica Observation**:
+A follower's validated observation of one exact shared physical commit descriptor plus its producer/transaction /
+leader-epoch effects. Kafka's native ISR/minISR surface consumes that observation to derive HW; the follower does not
+write a duplicate WAL payload.
+_Avoid_: Trusting leader-reported LEO, equating BookKeeper quorum with ISR, duplicate physical replica writes
+
+**Kafka Fetch View**:
+One allocation-free coherent local capture of Binding/incarnation, owner/leader/storage fences, run/active-tail/source
+views, Log Start/LEO/HW/LSO, transaction/aborted index, leader-epoch index, and source protection for one partition read
+batch, plus a versioned committed-producer-state reference when the native path needs it. Replica, read-uncommitted,
+and read-committed upper bounds are LEO, HW, and LSO.
+_Avoid_: Remote metadata per Fetch, mixed-generation torn state, connection-lifetime source pin
+
+**Kafka Coverage-Aware Lookup**:
+Run/index floor search followed by a coverage check and, when the floor does not contain the requested offset, the first
+successor surviving RecordBatch across block/run boundaries. It handles compacted-away batches without changing
+Kafka offsets.
+_Avoid_: Floor-only lookup, record-count-derived span, splitting a compressed RecordBatch

@@ -519,9 +519,15 @@ Position Domain across profiles; BookKeeper-primary paths use one logical ledger
 run/generation roots, packed in-ledger RecordBatch range-index checkpoints, owner-local active-tail locators, targeted
 entry reads, and ordered publication over bounded overlapping I/O. Normal append writes no per-append remote metadata.
 
-The remaining M2 gate is executable rather than an architecture choice: freeze exact `NBKE2`/index/footer bytes and
-evidence-derived checkpoint/pipeline/recovery/rollover bounds, then prove dedicated-ledger viability at 10k/100k
-partitions. Failure blocks the profile or requires a new pooled-lane ADR; it cannot silently select a global mixed-
+[ADR 0087](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md) also resolves the protocol semantic
+shape: Allocated/Durable/LEO/HW/LSO remain distinct; shared BookKeeper durability does not replace logical ISR;
+producer/transaction/leader-epoch state publishes with locators; Fetch uses coherent isolation snapshots, delayed local
+wakeup, and floor-plus-successor lookup. A storage-native ISR shortcut is not an open implementation option.
+
+The remaining M2 gate is executable rather than an architecture choice: freeze exact `NBKE2`/index/footer/checkpoint
+bytes and evidence-derived pipeline/recovery/waiter/cursor/rollover bounds, then prove dedicated-ledger viability and
+the ADR-0087 protocol state machine at 10k/100k partitions. Failure blocks the profile or requires a new pooled-lane
+ADR; it cannot silently select a global mixed-
 partition ledger or restore V1 reservation dual writes.
 
 ### `V2-OPEN-BK-03`: resolved sealed-ledger execution

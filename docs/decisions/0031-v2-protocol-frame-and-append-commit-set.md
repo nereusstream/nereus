@@ -52,6 +52,10 @@ path. One assigned RecordBatch remains one lookup/DATA unit, while one partition
 publication/ACK unit. BookKeeper I/O futures may overlap, but the ordered commit frontier cannot pass an earlier group;
 the range-index checkpoint is asynchronous and never splits or replaces commit-set authority.
 
+ADR 0087 further requires the publication of a complete Kafka commit set to advance its locator, producer-state delta,
+partition transaction/aborted-state delta, Kafka leader-epoch state, append result, and Readable/LEO frontier in one
+coherent partition-local cut. A commit set never represents cross-partition transaction atomicity.
+
 ## Consequences
 
 - `V2-OPEN-OBJ-08` is resolved.
@@ -63,10 +67,11 @@ the range-index checkpoint is asynchronous and never splits or replaces commit-s
 - M3 must prove Kafka multi-batch all-or-none cuts and corrupted membership rejection, Pulsar entry identity, empty
   Kafka batch coverage, native-checksum independence, and Object-group boundaries that do not leak into append truth.
 
-This decision is refined by [ADRs 0037](0037-v2-object-wal-binding-context-epoch-authority.md),
+This decision refines ADR 0026 and is further refined by [ADRs 0037](0037-v2-object-wal-binding-context-epoch-authority.md),
 [0040](0040-v2-nwg1-append-unit-directory-and-colocation.md),
 [0064](0064-v2-object-wal-physical-and-binding-frontiers.md),
 [0066](0066-v2-pre-position-reservation-and-completion-ticket.md), and
 [0067](0067-v2-active-tail-readable-publication-and-index-boundary.md), with Kafka BookKeeper placement refined by
-[0086](0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md), refines ADR 0026, and is tracked by
+[0086](0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md) and Kafka protocol publication refined by
+[0087](0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md). It is tracked by
 `T-PROTOCOL-01`, `T-OBJECT-01`, `V2-OBJ-002/004/006/007/012/021/023`, and `V2-READ-003/004`.

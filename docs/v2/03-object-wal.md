@@ -114,6 +114,12 @@ For each Binding, one serialized cut installs locators for the next contiguous r
 provider-resolved shared Object may enter checkpoint and release B while A still waits. Per-binding and shard aggregate
 bounds isolate A before new position allocation without rolling the run for an ordinary typed gap.
 
+For Kafka, that same cut coherently publishes producer, transaction/aborted, and Kafka leader-epoch state before
+`ReadableFrontier` becomes LEO. `acks=1`, `acks=all`, HW, and LSO then follow ADR 0087; provider resolution or Object
+materialization alone never advances Kafka visibility. Neither an async physical checkpoint page nor one remote
+manifest mutation per commit set is added to the ACK cut. WalRun Root/key identity plus bounded LIST keeps resolved
+groups recoverable, while low-frequency manifest generations remain source-selection authority.
+
 Failure of Object digest, KMS envelope, fixed header, or directory AEAD blocks every member. After those layers
 validate, a frame/commit-set AEAD, CRC, native-checksum, or typed-coverage failure blocks only that binding's complete
 commit set; other independently validated bindings may advance. M3 must prove both shared and binding-local failure
@@ -299,7 +305,8 @@ and close lifecycle. A compatible lower-level transport may be pooled, but a cel
 close cannot mutate another session. A provider-wide physical outage may still affect every attached cell.
 
 Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required scenarios: `V2-OBJ-001..024`,
-`V2-READ-003..015`, `V2-POLICY-001..002`, and `V2-FABRIC-002`. See
+`V2-READ-003..015`, `V2-KAF-DATA-001..005`, `V2-KAF-DATA-011..013`, `V2-POLICY-001..002`, and
+`V2-FABRIC-002`. See
 [ADR 0018](../decisions/0018-v2-object-wal-uncertain-put-proof.md),
 [ADR 0021](../decisions/0021-v2-object-wal-checksum-domains.md),
 [ADR 0025](../decisions/0025-v2-initial-checksum-algorithms-and-provider-proof.md),
@@ -335,4 +342,5 @@ Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required sc
 [ADR 0077](../decisions/0077-v2-fused-selector-closure-and-no-fallback-epoch-cut.md) and
 [ADR 0078](../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md),
 [ADR 0079](../decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md), and
-[ADR 0080](../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md).
+[ADR 0080](../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md), plus
+[ADR 0087](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md).

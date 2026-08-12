@@ -116,6 +116,17 @@ Late mismatched callbacks are no-ops and nonresponsive work consumes bounded qua
 disjoint manifest and active-tail ranges, while one atomic append unit and every declared whole-range fallback remain
 source-pure.
 
+For Kafka, ADR 0087 extends the coherent capture with Kafka leader epoch, Log Start, LEO/Readable, HW, LSO,
+committed-producer-state generation, transaction/aborted-index generation, and leader-epoch-index generation. Replica,
+read-uncommitted, and read-committed
+Fetch select LEO, HW, and LSO respectively. A source generation change after capture never replans the request, but one
+snapshot may intentionally read disjoint non-overlapping Object and BookKeeper ranges. This is not a requirement that
+an entire Fetch use one source; source purity remains per atomic append unit and declared whole-range fallback.
+
+`ObjectMaterializedFrontier` is only a contiguous routing hint derived from exact Source Map coverage. It does not
+advance LEO/HW/LSO. A sequential Fetch cursor is disposable and may not retain this read pin across requests; the next
+Fetch captures a new view and discards the cursor unless every run/source/index/state identity still matches.
+
 Reclamation durably publishes `PREFERRED_WITH_FALLBACK` first and drains older pins before retiring obsolete index
 state. One later Binding/incarnation selector CAS competes atomically with takeover/read grant and performs the complete
 `PWF(O,E,ADMITTING) -> PO(O,E+1,ADMITTING,batch[last=E],anchor[E])` cut. It closes E, grants no-fallback E+1, and
@@ -190,6 +201,6 @@ A corrupt preferred generation is quarantined. The reader may fall back only to 
 the source was safely retired and the preferred generation is corrupt, the result is an unrecoverable data error; the
 system does not synthesize records or silently skip the requested Protocol Coverage.
 
-Relevant tradeoffs: `T-MANIFEST-01`, `T-POSITION-01`, `T-PROJECTION-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required
-scenarios: `V2-READ-001..015`, `V2-OBJ-002/020..024`, `V2-BK-007..008`, `V2-BK-011`,
-`V2-PROJECTION-001`, `V2-POLICY-001..002`, and `V2-FABRIC-003`.
+Relevant tradeoffs: `T-MANIFEST-01`, `T-KAFKA-01`, `T-POSITION-01`, `T-PROJECTION-01`, `T-POLICY-01`, and
+`T-FABRIC-01`. Required scenarios: `V2-READ-001..015`, `V2-OBJ-002/020..024`, `V2-BK-007..008`, `V2-BK-011`,
+`V2-KAF-DATA-006..012/015..016`, `V2-PROJECTION-001`, `V2-POLICY-001..002`, and `V2-FABRIC-003`.

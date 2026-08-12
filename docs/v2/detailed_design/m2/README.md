@@ -15,6 +15,7 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | Slice | Design | Status |
 | --- | --- | --- |
 | M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | semantic direction accepted; exact NBKE2 bytes/numeric bounds/evidence not started |
+| M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | protocol semantics accepted; exact Java/wire/integration/evidence not started |
 
 M1 remains the active implementation milestone. This index does not authorize starting M2 before M1 promotion or
 claim `v2M2Check` exists.

@@ -11,7 +11,8 @@ sourceTuple: v2-m0
 
 ## Delivery boundary
 
-This design implements [ADR 0086](../../../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md).
+This design implements [ADR 0086](../../../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md)
+and is refined by [the Kafka protocol-frontier design](kafka-produce-fetch-frontiers-and-recovery.md).
 It is not part of M1/K1. M1 establishes topic metadata authority; M2 establishes the Kafka BookKeeper data path.
 Existing V1 appender/reader/reservation code is evidence only and is replaced rather than wrapped, dual-written, or
 retained as a compatibility path.
@@ -118,7 +119,8 @@ combined tracker/locator capacity reservation
   -> per-group exact validation
   -> ordered contiguous commit queue
   -> hidden locator installation
-  -> release-publish Readable/Durable Frontier
+  -> coherent producer/transaction/leader-epoch state publication
+  -> release-publish Readable/Durable Frontier and Kafka LEO
   -> final owner-fence equality check
   -> ACK
 ```
@@ -135,20 +137,22 @@ The common random-read path is:
 run floor lookup
   -> index-block floor lookup
   -> cached or one-block read
-  -> packed-locator binary search
+  -> packed-locator floor + coverage check + cross-block/run successor
   -> targeted DATA entry read
   -> BK digest + NBKE2 CRC + Kafka header/CRC validation
 ```
 
-The reader must not fetch the complete append extent merely to validate an old range checksum. A Fetch spanning
+The reader must not fetch the complete append extent merely to validate an old range checksum. Compaction holes select
+the first surviving successor batch when the floor does not cover the requested offset. A Fetch spanning
 multiple adjacent RecordBatches may coalesce the minimum continuous entry range after each requested locator is
 validated.
 
 ## Recovery and seal
 
-Takeover invalidates old local admission, opens the old ACTIVE ledger, selects the last valid checkpoint, and scans the
-bounded tail. Complete group descriptors determine the greatest continuous committed Kafka frontier. Uncommitted
-residue after a gap is never published. Recovery then finalizes all index coverage/footer, publishes SEALED, and opens
+Takeover invalidates old local admission, opens the old ACTIVE ledger, selects the last compatible range-index /
+producer-state / transaction-index / leader-epoch checkpoint vector, and scans the bounded tail. Complete group
+descriptors determine the greatest continuous committed Kafka frontier. Uncommitted residue after a gap is never
+published. Recovery then finalizes all index coverage/footer, publishes SEALED, and opens
 a new run. Missing/corrupt checkpoints fall back only within the declared cumulative recovery envelope; they do not
 justify an unbounded full-ledger scan.
 

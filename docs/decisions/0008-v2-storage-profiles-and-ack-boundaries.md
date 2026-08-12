@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted for the V2 design and refined by ADR 0012. Implementation and runtime evidence are not started at M0.
+Accepted for the V2 design and refined by ADRs 0012 and 0087. Implementation and runtime evidence are not started at
+M0.
 
 ## Context
 
@@ -14,11 +15,15 @@ predictable quorum durability.
 
 V2 exposes exactly three topic-level storage profiles, selected immutably within each Storage Epoch:
 
-| Profile | Acknowledgement boundary | Background object work | Optimization target |
+| Profile | Primary-WAL durability boundary | Background object work | Optimization target |
 | --- | --- | --- | --- |
 | `OBJECT_WAL` | the complete typed Protocol Coverage is durable in an Object WAL group | materialize Object WAL into read-optimized Object segments | storage cost |
-| `BOOKKEEPER_WAL_ONLY` | the complete typed Protocol Coverage is acknowledged by the configured BookKeeper quorum | none | write latency and predictable hot-path performance |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | the complete typed Protocol Coverage is acknowledged by the configured BookKeeper quorum | offload sealed BookKeeper coverage into read-optimized Object segments | hot-path performance plus eventual cold-cost reduction |
+| `BOOKKEEPER_WAL_ONLY` | the complete typed Protocol Coverage is accepted by the configured BookKeeper quorum | none | write latency and predictable hot-path performance |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | the complete typed Protocol Coverage is accepted by the configured BookKeeper quorum | offload sealed BookKeeper coverage into read-optimized Object segments | hot-path performance plus eventual cold-cost reduction |
+
+The table freezes each profile's primary-WAL durability proof, not a shortcut around native protocol visibility. Kafka
+publishes locator/producer/transaction/leader-epoch state before LEO, lets `acks=1` complete at that readable boundary,
+and still waits for native ISR-derived HW for `acks=all`. Object materialization never advances Kafka LEO/HW/LSO.
 
 There is no BookKeeper profile that waits synchronously for both BookKeeper and Object storage. Such a path would pay
 the latency and request cost of both systems without improving the normal product objective. A future compliance-driven

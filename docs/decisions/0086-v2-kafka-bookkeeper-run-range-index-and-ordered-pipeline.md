@@ -5,7 +5,8 @@
 Accepted for the 0.2 Kafka Position Domain and BookKeeper-primary profiles. This ADR freezes the semantic authority,
 index granularity, ACK/publication order, and recovery shape. Exact `NBKE2`/run/index wire bytes, numeric checkpoint
 cadence, memory limits, pipeline depth, ledger rollover policy, and 10k/100k resource admission remain M2 evidence
-outputs. Implementation and executable evidence have not started.
+outputs. ADR 0087 refines Kafka protocol frontiers, producer/transaction state, ISR/HW, and Fetch semantics on this
+physical layout. Implementation and executable evidence have not started.
 
 ## Context
 
@@ -107,7 +108,8 @@ exactly associated control frame selected by the `NBKE2` design. ACK requires:
    order, even though their BookKeeper futures may overlap;
 4. every DATA entry and the complete append-group descriptor reached BookKeeper quorum and verified exact identity;
 5. the ordered commit queue reached this group without an earlier gap;
-6. the owner-local locator view was installed hidden, then Readable/Durable Frontier was release-published;
+6. the owner-local locator view was installed hidden, then locator, producer/transaction/leader-epoch state and
+   Readable/Durable Frontiers were coherently release-published as required by ADR 0087;
 7. the Owner Epoch/fence captured at admission still matched before success ACK.
 
 The descriptor binds the complete Kafka range, first/last data-entry identity, member count, owner/storage epoch,
@@ -130,7 +132,8 @@ Admission order fixes Kafka ranges and ledger-entry ranges. Multiple append grou
 but visibility and ACK advance only through the greatest contiguous successful Kafka prefix. If group B becomes durable
 before group A, B waits. A definitive A failure or unresolved gap fences the run, prevents B from becoming visible,
 recovers the greatest contiguous committed offset, seals or quarantines the old run, and retries eligible unacknowledged
-work only under a fresh run/fence. The system never commits around a hole.
+work only under a fresh run/fence. The system never commits around a hole. The ordered publication cut includes native
+producer/transaction and Kafka leader-epoch state rather than advancing a storage-only `committedEndOffset`.
 
 Pipeline depth, per-partition/global in-flight bytes, fairness, and early backpressure are Cell/host operational bounds.
 They cannot change persisted ordering or recovery semantics.
@@ -142,7 +145,8 @@ For a requested offset, the reader:
 1. floor-searches the run manifest/generation root;
 2. floor-searches the sealed footer directory or ACTIVE-tail directory;
 3. reads or cache-hits one bounded `RANGE_INDEX_BLOCK`;
-4. binary-searches the packed locator array;
+4. binary-searches the packed locator array, accepts the floor only if it covers the requested offset, and otherwise
+   follows the first successor across the block/run boundary;
 5. reads the selected DATA entry, or the minimum contiguous entries needed for the Fetch result;
 6. validates BookKeeper digest, `NBKE2` entry CRC32C, and Kafka RecordBatch CRC/header coverage.
 
@@ -157,6 +161,10 @@ After owner fencing/takeover, recovery opens the old ACTIVE ledger, validates th
 and scans only the unchecked tail. It interprets DATA/control type explicitly, validates append-group descriptors, and
 finds the greatest gap-free committed Kafka offset. It then writes/finalizes the footer, publishes the sealed run, and
 opens a new run before new admission.
+
+Range-index coverage alone is insufficient to restore Kafka visibility. ADR 0087 requires one compatible range-index /
+producer-state / transaction-index / leader-epoch checkpoint vector and bounded suffix replay before LEO/HW/LSO or
+duplicate handling is restored.
 
 Takeover does not rewrite the old run's creator Owner Epoch or reuse its admission authority. The footer records the
 qualified recovery/seal fence separately while preserving the run identity; only the new run admits under the new
@@ -173,7 +181,8 @@ For `BOOKKEEPER_WAL_ASYNC_OBJECT`, materialization may combine one or more SEALE
 preserving exact Kafka coverage. A new generation may select Object as preferred and the old BookKeeper runs as
 protected fallback. BookKeeper deletion still requires complete Object coverage/integrity, durable generation
 publication, reader-pin/source-protection drain, logical retention, and exact deletion proof. Kafka offsets and consumer
-group offsets never change.
+group offsets never change. Producer, transaction/aborted, and leader-epoch side indexes must describe the same
+compatible logical cut; materialization never advances Kafka LEO, HW, or LSO.
 
 ## Consequences and tradeoffs
 
@@ -203,5 +212,6 @@ Required evidence covers at least:
 - async Object generation switch with stable Kafka/group offsets and safe BookKeeper fallback/deletion;
 - 10k/100k partition handle/memory/metadata/rollover/recovery evidence.
 
-This ADR refines ADRs 0011, 0031, 0066, and 0067. It resolves the Kafka ledger-layout semantic choice; the numeric and
-scale gate formerly called `V2-OPEN-BK-02` remains executable M2 evidence rather than an open architecture choice.
+This ADR refines ADRs 0011, 0031, 0066, and 0067 and is further refined by ADR 0087. It resolves the Kafka ledger-layout
+semantic choice; the numeric and scale gate formerly called `V2-OPEN-BK-02` remains executable M2 evidence rather than
+an open architecture choice.

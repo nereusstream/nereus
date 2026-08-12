@@ -45,6 +45,10 @@ Domain: low-frequency run/generation roots route a Kafka range to one per-partit
 in-ledger locators route one assigned RecordBatch range to one DATA entry. Consumer-group offsets remain Kafka cursors;
 normal Produce/Fetch does not read or mutate one remote mapping row per append.
 
+ADR 0087 keeps Kafka sub-frontiers inside that same Position Domain: Allocated, profile-Durable, Readable/LEO, HW, and
+LSO are distinct boundaries over Kafka offsets, not new physical positions. Object materialization and checkpoint
+coverage route/recover sources without becoming Kafka visibility frontiers.
+
 ## Consequences
 
 - Shared manifests, handoff, trim, recovery, and GC carry binding-scoped typed coverage and frontiers.
@@ -54,6 +58,6 @@ normal Produce/Fetch does not read or mutate one remote mapping row per append.
   physical-delete authority.
 - A Topic Incarnation has exactly one Position Domain and one Native Write Authority at a time.
 
-This refines ADR 0007 and ADR 0009 and is further refined by ADR 0014, ADR 0022, and ADR 0086. It is tracked by
+This refines ADR 0007 and ADR 0009 and is further refined by ADR 0014, ADR 0022, ADR 0086, and ADR 0087. It is tracked by
 `T-POSITION-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, `V2-POSITION-001..002`, `V2-MULTIPROTOCOL-001`, and
 `V2-FABRIC-001..003`.

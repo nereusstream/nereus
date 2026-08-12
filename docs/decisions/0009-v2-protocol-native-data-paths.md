@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for the V2 design and refined by ADR 0011, ADR 0013, and ADR 0014. Implementation and runtime evidence are not
+Accepted for the V2 design and refined by ADRs 0011, 0013, 0014, and 0087. Implementation and runtime evidence are not
 started at M0.
 
 ## Context
@@ -39,6 +39,10 @@ The control plane is split by capability rather than represented by one universa
 KRaft stores durable, low-churn roots. Ephemeral worker coordination must not create an unbounded high-churn KRaft log.
 Fast handoff records are hints and never replace the durable primary WAL plus ownership authority.
 
+ADR 0087 makes the Kafka boundary executable: profile durability, LEO, HW, and LSO remain distinct; the ordered local
+publication cut includes locators plus producer/transaction/leader-epoch state; shared physical storage does not replace
+logical ISR; and Fetch keeps native isolation/delayed-read/compaction-gap behavior without remote metadata I/O.
+
 ## Consequences
 
 - Kafka can be optimized against AutoMQ without forcing Kafka abstractions through Pulsar/Oxia.
@@ -47,5 +51,6 @@ Fast handoff records are hints and never replace the durable primary WAL plus ow
 - Some logic is deliberately duplicated at the protocol boundary to preserve native behavior.
 - The Shared Storage Context cannot require every protocol to expose a common numeric range.
 
-This decision is tracked by `T-PROTOCOL-01`, `T-META-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, and scenarios
-`V2-META-001`, `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`, `V2-KAF-001`, and `V2-PUL-001`.
+This decision is tracked by `T-PROTOCOL-01`, `T-KAFKA-01`, `T-META-01`, `T-MULTIPROTOCOL-01`, `T-FABRIC-01`, and
+scenarios `V2-META-001`, `V2-MULTIPROTOCOL-001`, `V2-FABRIC-001..003`, `V2-KAF-001`,
+`V2-KAF-DATA-001..016`, and `V2-PUL-001`.

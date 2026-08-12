@@ -65,6 +65,28 @@ Normal append never writes one remote metadata reservation/mapping per Produce. 
 extent-wide `rangeChecksum` path is not retained or dual-written. Exact design and implementation cuts are in
 [the M2 Kafka BookKeeper detailed design](detailed_design/m2/kafka-bookkeeper-offset-range-index.md).
 
+### Kafka protocol frontiers on shared BookKeeper
+
+ADR 0087 separates `Allocated`, profile-`Durable`, `Readable/LEO`, Kafka HW, and Kafka LSO. The required order is
+`LogStart <= LSO <= HW <= LEO <= Durable <= Allocated`. A BookKeeper quorum result proves physical durability; it does
+not by itself become Kafka HW. `acks=1` waits for the coherent locator/producer/transaction/leader-epoch publication
+that advances LEO. `acks=all` retains native ISR/minISR admission and waits for HW.
+
+The default shared-storage replica path writes payload bytes once. Followers validate the exact commit descriptor,
+physical source, Binding/incarnation, leader/owner/storage fences, coverage, integrity, producer/transaction delta, and
+leader-epoch delta before reporting native replica-observed progress. Kafka derives HW over the current ISR. No
+follower performs a second WAL payload append merely to preserve Kafka replication semantics.
+
+Producer-state, transaction-index, leader-epoch, and range-index checkpoints form one compatible recovery vector. A
+takeover scans only their bounded suffix and reconstructs the identical LEO, duplicate state, open/aborted transaction
+state, LSO, and leader-epoch map. Component checkpoint cadence is asynchronous, but aggregate uncovered
+entries/bytes/age/time and sealed-run completeness are mandatory.
+
+Random Fetch performs floor plus coverage check plus successor so a compacted-away batch does not make the previous
+batch cover a hole. Replica/read-uncommitted/read-committed upper bounds are LEO/HW/LSO. Sequential reads may reuse a
+version-checked disposable cursor but capture a fresh pinned read view per Fetch. Detailed implementation is in
+[the M2 Kafka Produce/Fetch design](detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md).
+
 ## Pulsar native BookKeeper path
 
 For Pulsar BookKeeper profiles, ManagedLedger remains the native append/read/cursor lifecycle. Nereus must not insert a
@@ -242,8 +264,9 @@ Async offload exposes pending ledgers/bytes/age and the oldest unmaterialized ty
 throttle, or stop new admission before BookKeeper capacity is exhausted. It never changes an already admitted append
 into a synchronous Object write.
 
-Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, and `T-POLICY-01`. Required scenarios:
-`V2-BK-001..017`, `V2-POSITION-001..018`, and `V2-POLICY-001..002`. See
+Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-KAFKA-01`, `T-PROTOCOL-01`, `T-POSITION-01`, and
+`T-POLICY-01`. Required scenarios: `V2-BK-001..017`, `V2-KAF-DATA-001..016`, `V2-POSITION-001..018`, and
+`V2-POLICY-001..002`. See
 [ADR 0017](../decisions/0017-v2-pulsar-managed-ledger-offload-authority.md),
 [ADR 0020](../decisions/0020-v2-pulsar-sealed-ledger-async-offload.md),
 [ADR 0022](../decisions/0022-v2-pulsar-object-wal-virtual-ledger-authority.md),
@@ -266,4 +289,5 @@ Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-PROTOCOL-01`, `T-POSITION-01`, 
 [ADR 0061](../decisions/0061-v2-pulsar-range-grant-owner-takeover.md) and M1 Registry/witness/evidence bounds refined by
 [ADRs 0082](../decisions/0082-v2-m1-domain-and-control-authority-contracts.md) and
 [0083](../decisions/0083-v2-m1-wire-control-and-evidence-bounds.md), with the Kafka BookKeeper path fixed by
-[ADR 0086](../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md).
+[ADR 0086](../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md) and its protocol semantics by
+[ADR 0087](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md).

@@ -669,6 +669,134 @@
       "evidenceReceipt": null
     },
     {
+      "id": "V2-KAF-DATA-001",
+      "milestone": "M2",
+      "contract": "out of order primary WAL completion never advances durable LEO or acknowledgement past a predecessor",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-002",
+      "milestone": "M2",
+      "contract": "a definitive predecessor failure fences the run and leaves later physical entries unreachable without a Kafka offset hole",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-003",
+      "milestone": "M2/M6",
+      "contract": "response loss plus exact producer identity retry converges to the original pending or committed Kafka offset range",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-004",
+      "milestone": "M2",
+      "contract": "one producer pipelines sequence contiguous batches through committed plus speculative producer state without duplicate allocation",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-005",
+      "milestone": "M2",
+      "contract": "takeover from one compatible range producer transaction leader epoch checkpoint vector plus bounded suffix reconstructs exact protocol state",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-006",
+      "milestone": "M2/M6",
+      "contract": "replica Fetch may read to LEO while read uncommitted consumers stop at HW",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-007",
+      "milestone": "M2/M6",
+      "contract": "read committed consumers stop at LSO while read uncommitted consumers may read through HW",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-008",
+      "milestone": "M2/M6",
+      "contract": "aborted transactional data remains hidden from read committed across leader change and materialization",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-009",
+      "milestone": "M6",
+      "contract": "acks all preserves native ISR minISR and HW semantics after shared storage becomes durable",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-010",
+      "milestone": "M2/M6",
+      "contract": "delayed Fetch is lost wakeup safe and waits on the isolation specific local frontier without provider polling",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-011",
+      "milestone": "M2/M5",
+      "contract": "offset lookup uses floor plus coverage check plus successor across block and run compaction gaps",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-012",
+      "milestone": "M2/M4/M5/M6",
+      "contract": "a Fetch pins one coherent generation plan and does not replan when Object BookKeeper source selection changes",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-013",
+      "milestone": "M4/M5/M6",
+      "contract": "verified Object preferred plus protected BookKeeper fallback remains readable until exact view and protection retirement",
+      "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-014",
+      "milestone": "M2",
+      "contract": "oversized or capacity rejected Produce fails before offset admission",
+      "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-015",
+      "milestone": "M2/M6",
+      "contract": "Kafka leader epoch remains distinct from Owner and Storage epochs and its index survives run and source changes",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
+      "id": "V2-KAF-DATA-016",
+      "milestone": "M2/M6",
+      "contract": "random Fetch targets one complete RecordBatch while sequential Fetch uses a revalidated byte bounded disposable cursor",
+      "ownerDoc": "docs/v2/07-protocol-integrations.md",
+      "status": "PLANNED",
+      "evidenceReceipt": null
+    },
+    {
       "id": "V2-READ-001",
       "milestone": "M4",
       "contract": "one binding scoped logical read snapshot survives active tail manifest publication protected fallback and two stage reclamation",

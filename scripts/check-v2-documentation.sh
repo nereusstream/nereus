@@ -162,6 +162,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
     "$repo_root/docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
     "$repo_root/docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
+    "$repo_root/docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -216,6 +217,11 @@ require_literal 'coverage comes from the assigned RecordBatch header' "docs/deci
 require_literal 'does not implement this data layout' "docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
 require_literal 'M2 Kafka BookKeeper offset, run, and range-index design' "docs/v2/detailed_design/m2/kafka-bookkeeper-offset-range-index.md"
 require_literal 'No cut introduces a dual-write compatibility mode' "docs/v2/detailed_design/m2/kafka-bookkeeper-offset-range-index.md"
+require_literal 'trimStartOffset <= lastStableOffset <= highWatermark' "docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
+require_literal 'BookKeeper quorum durable == Kafka HW' "docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
+require_literal 'floor + coverage check + successor' "docs/v2/grill-notes/28-kafka-produce-fetch-frontiers-isr-transactions.md"
+require_literal 'M2 Kafka Produce/Fetch frontiers and protocol recovery design' "docs/v2/detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md"
+require_literal 'No cut adds per-append control metadata' "docs/v2/detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md"
 require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal "V2 documentation baseline" ".github/workflows/build.yml"
 require_literal "Superseded by ADR 0012." "docs/decisions/0010-v2-topic-profile-binding.md"
@@ -415,6 +421,8 @@ require_literal "M1 Readiness Grill round 5" "docs/v2/grill-notes/26-m1-readines
 require_literal "结论：Round 5 不能全部确认" "docs/v2/grill-notes/26-m1-readiness-round-5-foundation-start-and-deferred-codecs.md"
 require_literal "Kafka BookKeeper offset, run, and range-index direction" "docs/v2/grill-notes/27-kafka-bookkeeper-offset-run-range-index-direction.md"
 require_literal "transitional dual write" "docs/v2/grill-notes/27-kafka-bookkeeper-offset-run-range-index-direction.md"
+require_literal "Kafka Produce/Fetch frontiers, ISR, and transaction closure" "docs/v2/grill-notes/28-kafka-produce-fetch-frontiers-isr-transactions.md"
+require_literal "One ambiguous \`committedEndOffset\` is rejected" "docs/v2/grill-notes/28-kafka-produce-fetch-frontiers-isr-transactions.md"
 require_literal "Metadata-oxia O2 is also locally" "docs/v2/open-questions.md"
 require_literal '`maxWriterCount=8` is a candidate' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
@@ -1250,6 +1258,10 @@ required_scenarios = {
     "V2-BK-001", "V2-BK-002", "V2-BK-003", "V2-BK-004", "V2-BK-005", "V2-BK-006",
     "V2-BK-007", "V2-BK-008", "V2-BK-009", "V2-BK-010", "V2-BK-011", "V2-BK-012", "V2-BK-013",
     "V2-BK-014", "V2-BK-015", "V2-BK-016", "V2-BK-017",
+    "V2-KAF-DATA-001", "V2-KAF-DATA-002", "V2-KAF-DATA-003", "V2-KAF-DATA-004",
+    "V2-KAF-DATA-005", "V2-KAF-DATA-006", "V2-KAF-DATA-007", "V2-KAF-DATA-008",
+    "V2-KAF-DATA-009", "V2-KAF-DATA-010", "V2-KAF-DATA-011", "V2-KAF-DATA-012",
+    "V2-KAF-DATA-013", "V2-KAF-DATA-014", "V2-KAF-DATA-015", "V2-KAF-DATA-016",
     "V2-READ-001", "V2-READ-002", "V2-READ-003", "V2-READ-004", "V2-READ-005", "V2-READ-006",
     "V2-READ-007", "V2-READ-008", "V2-READ-009", "V2-READ-010", "V2-READ-011",
     "V2-READ-012", "V2-READ-013", "V2-READ-014", "V2-READ-015",
@@ -1288,7 +1300,7 @@ required_tradeoffs = {
     "T-APPEND-01", "T-PROTOCOL-01", "T-POSITION-01",
     "T-MULTIPROTOCOL-01", "T-FABRIC-01", "T-PROFILE-01", "T-MIGRATION-01",
     "T-PROJECTION-01", "T-OBJECT-01",
-    "T-BK-01", "T-LEDGER-01", "T-META-01", "T-MANIFEST-01",
+    "T-BK-01", "T-LEDGER-01", "T-KAFKA-01", "T-META-01", "T-MANIFEST-01",
     "T-HANDOFF-01", "T-COMPAT-01", "T-BENCH-01", "T-KOP-01",
 }
 missing_tradeoffs = required_tradeoffs - set(tradeoff_ids)
@@ -1415,6 +1427,7 @@ link_docs=(
     "$repo_root/docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
     "$repo_root/docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
     "$repo_root/docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
+    "$repo_root/docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
 )
 
 while IFS=: read -r source match; do

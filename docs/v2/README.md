@@ -59,6 +59,10 @@ performance-first BookKeeper WAL.
   chain per partition, low-frequency run/generation roots, packed in-ledger RecordBatch indexes, owner-local active-tail
   locators, targeted Fetch, bounded overlapping writes with ordered publication, and bounded checkpoint-tail recovery.
   M2 still owns exact `NBKE2` bytes, numeric bounds, and 10k/100k evidence; no runtime is implied.
+- ADR 0087 fixes Kafka protocol semantics over every profile: distinct Allocated/Durable/LEO/HW/LSO frontiers,
+  pre-offset idempotency/speculative producer state, ordered locator/producer/transaction/leader-epoch publication,
+  logical shared-storage ISR, coherent/delayed Fetch, compaction-gap successor lookup, and compatible bounded recovery.
+  M2/M6 implementation and executable evidence remain NotStarted.
 - The foundation supplies Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct aggregate
   foundation validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
   guards, and reproducible JAR/source-JAR/POM hashes. The foundation deliberately supplies no NTA1 codec, Registry capacity,
@@ -273,6 +277,7 @@ Accepted decisions:
 - [ADR 0084: M1 leaf, witness, Registry, and receipt contracts](../decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md)
 - [ADR 0085: M1 foundation start and deferred codec bounds](../decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md)
 - [ADR 0086: Kafka BookKeeper run, range index, and ordered pipeline](../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md)
+- [ADR 0087: Kafka Produce/Fetch frontiers, shared-storage ISR, and protocol recovery](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md)
 
 ## Open design gates
 
@@ -305,6 +310,8 @@ client-only continuity direction, exact 120-byte writer row/evidence shape, and 
 hierarchy. The later M1.1b acceptance closes the complete NTA1 FrameEncodingPolicy/legality/name/total table. Registry
 writer count, receipt numeric caps, and executable promotion evidence remain OPEN descendants. ADR 0086 resolves the
 Kafka BookKeeper semantic layout while leaving exact wire, numeric budgets, and dedicated-ledger scale as M2 evidence.
+ADR 0087 closes the protocol-frontier/ISR/idempotency/transaction/Fetch semantic layer without selecting Java
+structures or numeric queue/checkpoint/waiter bounds.
 Partial recovery omission, numeric caps,
 physical proof-fold/capability encodings, and any tombstone-deletion authority remain evidence gates. The rows below
 are the remaining active 0.2 evidence gates.
@@ -321,7 +328,7 @@ are the remaining active 0.2 evidence gates.
 | `V2-OPEN-READ-08` | execute M4 evidence and freeze the bounded proof-window/head/fold physical representation and numeric caps without a per-batch accumulator | M4 durable proof wire freeze |
 | `V2-OPEN-READ-09` | execute M4/M5 evidence and freeze canonical capability/receipt encodings, verifier availability/revocation behavior, and admitted backend generations | M4/M5 takeover and GC capability freeze |
 | `V2-OPEN-READ-15` | execute M4/M5 tombstone lifetime/capacity and concrete-backend ordered-history/lineage/stale-create evidence before reconsidering a metadata-only tombstone-deletion authority; 0.2 otherwise retains `RETIRED_V1` permanently | M4/M5 optional metadata-retirement authority |
-| `V2-OPEN-BK-02` | freeze exact NBKE2/index/footer bytes and evidence-derived checkpoint/pipeline/recovery/rollover bounds, then validate the accepted one-ledger-chain-per-partition layout at 10k and 100k partitions; pooled lanes require a new ADR | M2 Kafka BK implementation admission |
+| `V2-OPEN-BK-02` | freeze exact NBKE2/index/footer/checkpoint bytes and evidence-derived pipeline/recovery/waiter/cursor/rollover bounds, then validate the accepted one-ledger-chain-per-partition and ADR-0087 frontier/protocol layout at 10k and 100k partitions; pooled lanes or storage-native ISR require a new ADR | M2 Kafka data-path implementation admission |
 | `V2-OPEN-BENCH-01` | pin clean AutoMQ and native Pulsar acceptance baselines plus thresholds | M8 performance execution |
 
 `V2-OPEN-MIGRATION-02..03`, `V2-OPEN-PUL-MIGRATION-01`, and `V2-OPEN-PROJECTION-01..03` remain recorded as deferred

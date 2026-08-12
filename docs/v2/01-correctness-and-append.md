@@ -55,7 +55,9 @@ may be in flight. Each complete append commit set stores durable group evidence 
 ordered queue, and Durable/Readable/ACK publication advances only through the greatest contiguous Kafka prefix. Packed
 range-index checkpoints are asynchronous; pre-reserved owner-local locators make an ACKed tail readable meanwhile.
 No normal append creates a remote mapping/reservation record, and an earlier failed/unknown group fences recovery
-rather than allowing a later durable group to commit around the gap. ADR 0086 is authoritative.
+rather than allowing a later durable group to commit around the gap. The same coherent publication cut installs
+producer, transaction/aborted, and Kafka leader-epoch state; a storage-only `committedEndOffset` is forbidden. ADRs
+0086 and 0087 are authoritative.
 
 The owner must not acknowledge coverage because a local future completed if its Owner Epoch or Storage Epoch authority
 was fenced before the durability completion was validated.
@@ -98,6 +100,26 @@ Required ordering is `TrimFrontier <= ReadableFrontier <= DurableFrontier <= All
 defined only by that binding's Position Domain. A normal successful append closes only when its returned coverage is
 inside Readable and Durable coverage. A failed or uncertain append may leave allocation ahead of durability only until
 owner-local resolution or recovery. Recovery never exposes an unproven gap.
+
+For Kafka, the generic frontiers are refined rather than renamed into one committed end:
+
+```text
+TrimFrontier / Log Start <= LastStableOffset <= HighWatermark
+                         <= ReadableFrontier / LEO <= DurableFrontier <= AllocatedFrontier
+```
+
+`AllocatedFrontier` is speculative owner-local admission. `DurableFrontier` is the greatest contiguous profile proof.
+`ReadableFrontier` becomes Kafka LEO only after locators plus producer/transaction/leader-epoch state publish
+coherently. Kafka ISR owns HW and transaction stability owns LSO. `acks=1` waits for Readable/LEO; `acks=all` obeys
+native ISR/minISR admission and waits for HW. Consumer `read_uncommitted` stops at HW, `read_committed` stops at LSO,
+and replica Fetch may read through LEO. Object materialization and checkpoint coverage never advance those bounds.
+
+Kafka producer identity `(producerId,producerEpoch,baseSequence,lastSequence)` is per RecordBatch and distinct from the
+storage attempt identity; a multi-batch commit set binds the ordered identity vector. Exact pending retries join one
+commit set and exact committed retries return its original Offset Range. Admission validates multiple in-flight
+batches from one producer against committed state plus ordered speculative deltas before assigning new offsets. A
+timeout is outcome-unknown; speculative positions may be reused only after
+fenced recovery proves they never became readable/HW-covered and rolls back every coupled speculative state.
 
 Frontiers from different Topic Protocol Bindings, Topic Incarnations, or Position Domains are not comparable. Pulsar
 cross-ledger ordering comes from the authoritative Ledger Chain; V2 does not derive a permanent
@@ -175,6 +197,10 @@ A retry may return the original success or fail closed. It may not allocate diff
 the same idempotency identity. For Object WAL after process loss, a provider-present group is verified and reconciled;
 a conclusively absent never-ACKed group fences the old run at its proven frontier and may be rebuilt only in a fresh run.
 Unknown presence remains fail-closed. V2 does not pretend a deterministic nonce recreates lost ciphertext.
+
+For Kafka, response reconciliation also restores producer sequence, partition transaction/aborted state, and Kafka
+leader-epoch state at the same contiguous cut as locators and LEO. It may not decide a duplicate from storage attempt ID
+alone or expose bytes while producer state remains behind.
 
 ## Hot-path contract
 

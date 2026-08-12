@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted for the V2 design and refined by ADR 0011. Implementation and runtime evidence are not started at M0.
+Accepted for the V2 design and refined by ADRs 0011 and 0087. Implementation and runtime evidence are not started at
+M0.
 
 ## Context
 
@@ -20,7 +21,9 @@ For each Topic Protocol Binding and Topic Incarnation:
 1. control metadata grants one exclusive Owner Epoch before append admission;
 2. the Native Write Authority allocates positions according to the binding's Position Domain;
 3. the selected primary WAL establishes a durable, contiguous Protocol Frontier for that binding;
-4. an append is acknowledged only after its complete typed Protocol Coverage belongs to that durable frontier;
+4. an append becomes protocol-ACK eligible only after its complete typed Protocol Coverage belongs to that durable
+   frontier and its protocol-local readable/state publication is complete; a native protocol may require a later
+   visibility frontier such as Kafka HW for `acks=all`;
 5. normal append performs no remote control-metadata read or mutation;
 6. manifests and lifecycle roots are published after durability and are not append linearization points.
 
@@ -41,6 +44,7 @@ rather than by allocating new positions blindly.
 - `V2-INV-APP-03`: acknowledgement implies durable primary-WAL coverage for that complete Protocol Coverage.
 - `V2-INV-APP-04`: a fenced completion cannot advance the typed Durable Frontier or become readable.
 - `V2-INV-APP-05`: recovery never infers success only from a cached position or control-metadata head.
+- `V2-INV-APP-06`: profile durability never substitutes for Kafka LEO/HW/LSO or a native protocol state transition.
 
 ## Consequences
 
@@ -49,5 +53,5 @@ rather than by allocating new positions blindly.
 - Writer-lane serialization and ownership renewal become explicit availability and backpressure boundaries.
 - Provider-response-loss handling is part of correctness, not an optional retry optimization.
 
-This decision is tracked by `T-APPEND-01`, `T-POSITION-01`, and scenarios `V2-APP-001` through
-`V2-APP-003`.
+This decision is tracked by `T-APPEND-01`, `T-POSITION-01`, `T-KAFKA-01`, scenarios `V2-APP-001` through
+`V2-APP-003`, and `V2-KAF-DATA-001..010`.

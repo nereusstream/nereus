@@ -163,6 +163,10 @@ The append sequence is:
 7. return the protocol-native success only for fully covered positions;
 8. publish sealed/read-optimized generations asynchronously.
 
+Kafka further separates Allocated, profile-Durable, Readable/LEO, HW, and LSO. The ordered publication cut includes
+locator, producer, transaction/aborted, and Kafka leader-epoch state; `acks=1` waits for LEO and `acks=all` waits for
+native ISR-derived HW. BookKeeper/Object durability never silently replaces ISR or transaction visibility.
+
 Control metadata is not the append linearization point. A timeout is an uncertain outcome resolved from deterministic
 identity, binding/incarnation, Storage Epoch, Owner Epoch, typed coverage, length, checksum, and durable predecessor
 coverage.
@@ -311,7 +315,9 @@ ManagedLedger incarnation across owner-only head fencing, lets a new owner finis
 most one stale candidate. Installed-range use does not wait for allocator clear, but a high-priority reconciler must
 unblock the next Cell grant. These constraints do not select RANGE_LEASED.
 
-ADR 0086 is authoritative for the Kafka BookKeeper run/range-index and ordered-pipeline direction.
+ADR 0086 is authoritative for the Kafka BookKeeper run/range-index and ordered-pipeline direction. ADR 0087 owns the
+Kafka frontier, idempotency, transaction, shared-storage ISR/HW, delayed-Fetch, compaction-gap, and bounded protocol-
+recovery semantics layered over it.
 
 For Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`, ManagedLedger ledger/offload metadata is the sole attempt, completion,
 read/fallback, and deletion-eligibility authority. Nereus provides a `LedgerOffloader`; its manifest is derived and cannot
