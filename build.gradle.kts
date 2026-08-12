@@ -314,8 +314,6 @@ tasks.register("v2M0Check") {
     dependsOn("v2DocumentationCheck")
 }
 
-val v2DomainMainSourceSet = project(":nereus-domain")
-    .extensions.getByType<SourceSetContainer>().named("main").get()
 val v2DomainJar = project(":nereus-domain").tasks.named<Jar>("jar").flatMap { it.archiveFile }
 val v2DomainSourcesJar = project(":nereus-domain").tasks.named<Jar>("sourcesJar").flatMap { it.archiveFile }
 val v2MetadataSpiJar = project(":nereus-metadata-spi").tasks.named<Jar>("jar").flatMap { it.archiveFile }
@@ -667,51 +665,45 @@ val v2M1ExactGateResultPath = providers.gradleProperty("v2M1ExactGateResult")
 tasks.register<JavaExec>("v2M1FastGateResult") {
     group = "verification"
     description = "Write the canonical PASS reference only after v2M1Check succeeds."
-    dependsOn("v2M1Check", ":nereus-domain:classes")
-    classpath = v2DomainMainSourceSet.runtimeClasspath
+    dependsOn("v2M1Check", ":nereus-domain:jar")
+    classpath = files(v2DomainJar)
     mainClass.set("com.nereusstream.domain.receipt.M1EvidenceCli")
-    doFirst {
-        setArgs(
-            listOf(
-                "write-gate-result",
-                "V2_M1_FAST",
-                v2M1SourceTupleSha.get(),
-                "PASS",
-                v2M1FastGateResultPath.get(),
-            ),
-        )
-    }
+    setArgs(
+        listOf(
+            "write-gate-result",
+            "V2_M1_FAST",
+            v2M1SourceTupleSha.get(),
+            "PASS",
+            v2M1FastGateResultPath.get(),
+        ),
+    )
 }
 
 tasks.register<JavaExec>("v2M1ExactSourceGateResult") {
     group = "verification"
     description = "Write the canonical PASS reference only after v2M1ExactSourceCheck succeeds."
-    dependsOn("v2M1ExactSourceCheck", ":nereus-domain:classes")
-    classpath = v2DomainMainSourceSet.runtimeClasspath
+    dependsOn("v2M1ExactSourceCheck", ":nereus-domain:jar")
+    classpath = files(v2DomainJar)
     mainClass.set("com.nereusstream.domain.receipt.M1EvidenceCli")
-    doFirst {
-        setArgs(
-            listOf(
-                "write-gate-result",
-                "V2_M1_EXACT_SOURCE",
-                v2M1SourceTupleSha.get(),
-                "PASS",
-                v2M1ExactGateResultPath.get(),
-            ),
-        )
-    }
+    setArgs(
+        listOf(
+            "write-gate-result",
+            "V2_M1_EXACT_SOURCE",
+            v2M1SourceTupleSha.get(),
+            "PASS",
+            v2M1ExactGateResultPath.get(),
+        ),
+    )
 }
 
 val v2M1FinalIndexPath = providers.gradleProperty("v2M1FinalIndex")
 tasks.register<JavaExec>("v2M1FinalCheck") {
     group = "verification"
     description = "Resolve one canonical Final index without rerunning Fast, Exact Source, or any referenced suite."
-    dependsOn(":nereus-domain:classes")
-    classpath = v2DomainMainSourceSet.runtimeClasspath
+    dependsOn(":nereus-domain:jar")
+    classpath = files(v2DomainJar)
     mainClass.set("com.nereusstream.domain.receipt.M1EvidenceCli")
-    doFirst {
-        setArgs(listOf("validate-final", v2M1FinalIndexPath.get()))
-    }
+    setArgs(listOf("validate-final", v2M1FinalIndexPath.get()))
 }
 
 tasks.named("check") {

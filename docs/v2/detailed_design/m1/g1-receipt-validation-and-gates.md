@@ -84,6 +84,10 @@ production domain, metadata SPI, or metadata Oxia code. Its only promotable enve
 - `v2M1FinalCheck` accepts an explicit Final index and only resolves its referenced canonical objects. It never depends
   on the Fast or Exact execution tasks and therefore cannot accidentally rerun them.
 
+The three promotion CLI tasks execute from the already built JDK-only `nereus-domain` JAR and resolve their complete
+argument vector during task configuration. This avoids cross-project runtime-classpath resolution and script-object
+closures, so Gradle configuration-cache storage is itself part of the executable N2 gate boundary.
+
 Before N2, focused evidence remains non-promotable and scenarios remain `PLANNED`. N2 generates gate results and
 canonical receipts under the final source tuple. N3 may commit only those evidence objects and the exactly covered
 scenario promotion. Any code, gate, ADR, or source-lock change returns to N2.
