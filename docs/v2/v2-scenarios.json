@@ -171,8 +171,8 @@
         "result": "REGISTRY_CAPACITY_READINESS_ONLY",
         "promotionEligible": false
       },
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m1/n3/registry-conformance.json"
     },
     {
       "id": "V2-POSITION-004",
@@ -180,8 +180,8 @@
       "contract": "one bounded compatibility-namespace Registry Store is slice-allocation authority; key/value namespace identity and registryEpoch plus one are exact, immutable evidence is proof-only, and allocators use namespace-bound versioned derived slice views",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "requiredReceiptKind": "REGISTRY_CONFORMANCE",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m1/n3/registry-conformance.json"
     },
     {
       "id": "V2-POSITION-005",
@@ -189,8 +189,8 @@
       "contract": "virtual ledger slice owner identity is the durable deployment reservation domain and Pulsar Protocol Cell tuple inside one immutable compatibility namespace independent of broker and provider state",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "requiredReceiptKind": "REGISTRY_CONFORMANCE",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m1/n3/registry-conformance.json"
     },
     {
       "id": "V2-POSITION-006",
@@ -198,8 +198,8 @@
       "contract": "registry wire and validator make ACTIVE→RETIRING→RETIRED irreversible and retain retired assignments permanently",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "requiredReceiptKind": "REGISTRY_CONFORMANCE",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m1/n3/registry-conformance.json"
     },
     {
       "id": "V2-POSITION-007",
@@ -207,8 +207,8 @@
       "contract": "every Cell has one immutable aligned power of two slice and deployment capacity is bounded by numeric and lifetime encoded registry limits",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "requiredReceiptKind": "REGISTRY_CONFORMANCE",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m1/n3/registry-conformance.json"
     },
     {
       "id": "V2-POSITION-008",
@@ -216,8 +216,8 @@
       "contract": "registry admission rejects resize, relocation, extension, second-slice attachment, wrap, borrow, and reuse before allocation",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "requiredReceiptKind": "REGISTRY_CONFORMANCE",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m1/n3/registry-conformance.json"
     },
     {
       "id": "V2-POSITION-009",
@@ -225,8 +225,8 @@
       "contract": "Registry bootstrap fixes k=40, 64 KiB, 256 lifetime assignments, and 192-byte rows and rejects a second logical domain in the same compatibility namespace",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "requiredReceiptKind": "REGISTRY_CONFORMANCE",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m1/n3/registry-conformance.json"
     },
     {
       "id": "V2-POSITION-010",
@@ -234,8 +234,8 @@
       "contract": "the allocator harness deterministically exercises candidate cuts and emits only content-identified RFC-8785/JCS HARNESS_CONFORMANCE_ONLY with schema-fixed selectionEligible false and no run-ID authority",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "requiredReceiptKind": "HARNESS_CONFORMANCE_ONLY",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m1/n3/harness-conformance.json"
     },
     {
       "id": "V2-POSITION-011",
@@ -243,8 +243,8 @@
       "contract": "the evidence-only RANGE candidate preserves incarnation-owned grants across owner takeover and deterministically converges response-loss cuts without production activation",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
       "requiredReceiptKind": "HARNESS_CONFORMANCE_ONLY",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m1/n3/harness-conformance.json"
     },
     {
       "id": "V2-POSITION-012",
