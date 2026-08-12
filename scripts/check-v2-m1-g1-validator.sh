@@ -70,4 +70,87 @@ for directory, expected_suites in expected.items():
 print("G1 production validator: 4 suites/49 tests; allocator evidence: 2 suites/14 tests; all clean")
 PY
 
+python3 - "$repo_root" <<'PY'
+import hashlib
+import json
+import pathlib
+import subprocess
+import sys
+
+root = pathlib.Path(sys.argv[1])
+locks = json.loads((root / "docs/v2/source-locks.json").read_text())
+binding = locks.get("g1ReceiptValidatorBinding")
+expected_binding = {
+    "implementationCommit": "ba11fe4a29c3158bb4d7c46e379c9a918745b7ef",
+    "receipt": "docs/v2/evidence/v2-m1/g1/g1-focused.json",
+    "receiptBytes": 1156,
+    "receiptSha256": "a48debba0f9cb959ca48763936d6f41b6ac99bae1d2ac9434490e5280983d0a8",
+    "result": "PASS_G1_FOCUSED_ONLY",
+    "promotionEligible": False,
+    "evidenceStatus": "FOCUSED_LOCAL_VALIDATOR_EVIDENCE",
+}
+if binding != expected_binding:
+    raise SystemExit("G1 source-lock binding differs")
+
+receipt_path = root / binding["receipt"]
+receipt_bytes = receipt_path.read_bytes()
+if len(receipt_bytes) != binding["receiptBytes"] or hashlib.sha256(receipt_bytes).hexdigest() != binding["receiptSha256"]:
+    raise SystemExit("G1 focused receipt length or digest differs")
+receipt = json.loads(receipt_bytes)
+expected_receipt = {
+    "schema": "NEREUS_V2_G1_FOCUSED_RECEIPT_V1",
+    "kind": "G1_FOCUSED_ONLY",
+    "sourceTupleId": locks["sourceTupleId"],
+    "result": "PASS_G1_FOCUSED_ONLY",
+    "promotionEligible": False,
+    "scenarioPromotion": False,
+    "m1Final": False,
+    "nereusImplementationCommit": binding["implementationCommit"],
+    "tests": {
+        "receiptValidator": {"suites": 4, "discovered": 49, "executed": 49, "passed": 49,
+                             "failed": 0, "errors": 0, "skipped": 0},
+        "allocatorEvidence": {"suites": 2, "discovered": 14, "executed": 14, "passed": 14,
+                              "failed": 0, "errors": 0, "skipped": 0},
+    },
+    "productionReceiptParserImplemented": True,
+    "finalRerunsReferencedGates": False,
+    "allocatorModeSelected": False,
+    "registeredGates": ["v2M1Check", "v2M1ExactSourceCheck", "v2M1FinalCheck"],
+    "requiredGate": "v2M1G1ValidatorCheck",
+    "scope": [
+        "PRODUCTION_RECEIPT_AND_FINAL_VALIDATION_ONLY",
+        "EVIDENCE_ONLY_ALLOCATOR_HARNESS",
+        "NO_V1_PRUNE_CLAIM",
+        "NO_EXACT_FINAL_SOURCE_TUPLE",
+        "NO_SCENARIO_PROMOTION",
+        "NO_N2_OR_N3",
+        "NO_M1_PASS",
+    ],
+}
+if receipt != expected_receipt:
+    raise SystemExit("G1 focused receipt content or non-promotion boundary differs")
+
+implementation = binding["implementationCommit"]
+subprocess.run(["git", "-C", str(root), "cat-file", "-e", implementation + "^{commit}"], check=True)
+subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", implementation, "HEAD"], check=True)
+subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", implementation, "origin/main"], check=True)
+implementation_paths = [
+    "build.gradle.kts",
+    "nereus-domain/build.gradle.kts",
+    "nereus-domain/src/main/java/com/nereusstream/domain/receipt",
+    "nereus-domain/src/test/java/com/nereusstream/domain/registry/allocator",
+    "scripts/check-v2-m1-active-graph.sh",
+    "scripts/check-v2-m1-exact-source.sh",
+    "scripts/check-v2-m1-fast.sh",
+]
+subprocess.run(["git", "-C", str(root), "diff", "--quiet", implementation, "HEAD", "--", *implementation_paths], check=True)
+subprocess.run(["git", "-C", str(root), "diff", "--quiet", "--", *implementation_paths], check=True)
+
+scenarios = json.loads((root / "docs/v2/v2-scenarios.json").read_text())["scenarios"]
+required = {f"V2-POSITION-{ordinal:03d}" for ordinal in range(3, 12)}
+rows = {row["id"]: row for row in scenarios if row["id"] in required}
+if set(rows) != required or any(row.get("status") != "PLANNED" or row.get("evidenceReceipt") is not None for row in rows.values()):
+    raise SystemExit("G1 focused evidence prematurely promoted a virtual-ledger scenario")
+PY
+
 echo "V2 M1 G1 production validator and evidence-only allocator harness verified; no scenario promotion or M1 PASS."

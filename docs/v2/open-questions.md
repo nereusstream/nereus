@@ -83,22 +83,24 @@ descendants and recently closed evidence input are:
   51,016-byte largest legal canonical Registry value. The inherited 120/192/256/65,536 limits remain unchanged, with
   14,520 bytes reserved margin. Production NLI1/NVR1/NVA1/RAE1, Store/interlock, response loss, derived views, and two
   source-locked real-Oxia tests are now covered by `v2M1R1FocusedCheck` and the
-  [non-promotable R1 receipt](evidence/v2-m1/r1/README.md). Canonical G1 validation, N2/N3 receipt generation, allocator
-  selection, and scenario promotion remain pending.
-- **Receipt-cap input resolved; G1/N3 still pending:** ADR 0084 now owns the sole persisted-v1 cap table. The M1-2
+  [non-promotable R1 receipt](evidence/v2-m1/r1/README.md). Canonical G1 validation is now focused-current; N2/N3
+  receipt generation, allocator selection, and scenario promotion remain pending.
+- **Receipt-cap input and G1 validator resolved; N3 still pending:** ADR 0084 now owns the sole persisted-v1 cap table. The M1-2
   JDK-only test model, 36 clean focused tests, eleven representative sample families, and
   [`RECEIPT_CAPACITY_READINESS_ONLY`](evidence/v2-m0/m1-2-receipt-caps/README.md) evidence bind the formulas,
   observed maxima, stable rejection taxonomy, source commit, and JSON SHA. Deployment may only lower new-receipt
   admission; host/provider limits cannot change persisted-v1 parsing. This closes the stale numeric-cap OPEN, not the
-  separately reviewed G1 production parser/resolver or trusted N3 promotion.
+  separately reviewed G1 production parser/resolver, now covered by its [focused receipt](evidence/v2-m1/g1/README.md),
+  or trusted N3 promotion.
 - **Promotion evidence pending:** O1 now binds the final Oxia client fork, JAR/source-JAR/POM, exact server image, and
   focused-test identities. Scenario promotion still requires the later executable continuity/Registry conformance and
   trusted N3 receipt; those are implementation/promotion evidence rather than another prose-design decision.
 
 O1, O2, R0, M1-2, N1, and focused K1/P1/R1 are governed by their accepted implementation designs and non-promotable
 receipts. K1 is exact-source complete at Kafka `8afbc42566`; P1 is exact-source complete at Pulsar `778862323d`; R1
-is focused-current complete at Nereus `8a213a85bf`. None promotes a scenario or M1. The G1 production parser,
-pure-V2 graph cut, N2/N3, and promotion descendants remain pending until their required implementation/evidence gates.
+is focused-current complete at Nereus `8a213a85bf`; G1 parser/Final mechanics are focused-current complete at
+`ba11fe4a29`. None promotes a scenario or M1. The pure-V2 graph cut, N2/N3, and promotion descendants remain pending
+until their required implementation/evidence gates.
 
 ## Restarted Grill 2: evidence frontier
 

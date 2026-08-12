@@ -1,11 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: DocumentationOnly
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: ImplementationDesign
 sourceTuple: v2-m0
-receipt: null
+receipt: docs/v2/evidence/v2-m1/g1/README.md
 ---
 
 # G1 receipt validation and M1 gates
@@ -90,7 +90,9 @@ scenario promotion. Any code, gate, ADR, or source-lock change returns to N2.
 
 ## Focused verification
 
-The first implementation cut runs four receipt suites with 49 tests and two allocator evidence suites with 14 tests.
+The focused implementation at Nereus `ba11fe4a29c3158bb4d7c46e379c9a918745b7ef` runs four receipt suites with 49
+tests and two allocator evidence suites with 14 tests.
 It checks exact inventory, zero failure/error/skip, JDK-only imports, absence of test/build execution from Final, and
-absence of allocator candidates in production. A later focused receipt binds the exact implementation commit. It is
-not Fast, Exact Source, Final, N2, N3, or M1 PASS evidence.
+absence of allocator candidates in production. The [focused receipt](../../evidence/v2-m1/g1/README.md) binds the
+exact implementation commit and remains `PASS_G1_FOCUSED_ONLY`. It is not Fast, Exact Source, Final, N2, N3, or M1
+PASS evidence.

@@ -1,0 +1,48 @@
+{
+  "schema": "NEREUS_V2_G1_FOCUSED_RECEIPT_V1",
+  "kind": "G1_FOCUSED_ONLY",
+  "sourceTupleId": "v2-m0",
+  "result": "PASS_G1_FOCUSED_ONLY",
+  "promotionEligible": false,
+  "scenarioPromotion": false,
+  "m1Final": false,
+  "nereusImplementationCommit": "ba11fe4a29c3158bb4d7c46e379c9a918745b7ef",
+  "tests": {
+    "receiptValidator": {
+      "suites": 4,
+      "discovered": 49,
+      "executed": 49,
+      "passed": 49,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "allocatorEvidence": {
+      "suites": 2,
+      "discovered": 14,
+      "executed": 14,
+      "passed": 14,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "productionReceiptParserImplemented": true,
+  "finalRerunsReferencedGates": false,
+  "allocatorModeSelected": false,
+  "registeredGates": [
+    "v2M1Check",
+    "v2M1ExactSourceCheck",
+    "v2M1FinalCheck"
+  ],
+  "requiredGate": "v2M1G1ValidatorCheck",
+  "scope": [
+    "PRODUCTION_RECEIPT_AND_FINAL_VALIDATION_ONLY",
+    "EVIDENCE_ONLY_ALLOCATOR_HARNESS",
+    "NO_V1_PRUNE_CLAIM",
+    "NO_EXACT_FINAL_SOURCE_TUPLE",
+    "NO_SCENARIO_PROMOTION",
+    "NO_N2_OR_N3",
+    "NO_M1_PASS"
+  ]
+}

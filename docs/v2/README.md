@@ -91,6 +91,10 @@ performance-first BookKeeper WAL.
   authority, derived views, 35 domain tests, eight metadata tests, and two source-locked real-Oxia tests are verified by
   `v2M1R1FocusedCheck`. Its [receipt](evidence/v2-m1/r1/README.md) is a non-promotable
   `R1_FOCUSED_ONLY` wrapper around the `REGISTRY_CONFORMANCE` subject; it selects no allocator and promotes no scenario.
+- The accepted [G1 validator design](detailed_design/m1/g1-receipt-validation-and-gates.md) is focused-current complete
+  at Nereus `ba11fe4a29`: 49 production receipt/Final tests and 14 evidence-only allocator tests are clean, the three
+  promotion gate surfaces are registered, and the [receipt](evidence/v2-m1/g1/README.md) remains
+  `PASS_G1_FOCUSED_ONLY`. Fast is blocked until V1 prune; Exact/Final and N2/N3 have not run.
 - ADR 0086 fixes the Kafka BookKeeper semantic layout: one Kafka Offset Domain across profiles, one logical ledger
   chain per partition, low-frequency run/generation roots, packed in-ledger RecordBatch indexes, owner-local active-tail
   locators, targeted Fetch, bounded overlapping writes with ordered publication, and bounded checkpoint-tail recovery.
