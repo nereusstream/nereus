@@ -873,6 +873,11 @@ val v2DomainMainOutput = project(":nereus-domain")
     .named("main")
     .get()
     .output
+val v2DomainMainSourceSet = project(":nereus-domain")
+    .extensions
+    .getByType<org.gradle.api.tasks.SourceSetContainer>()
+    .named("main")
+    .get()
 val v2DomainTestSourceSet = project(":nereus-domain")
     .extensions
     .getByType<org.gradle.api.tasks.SourceSetContainer>()
@@ -3464,6 +3469,118 @@ tasks.register("v2M1G1ValidatorCheck") {
     dependsOn("v2M1G1ValidatorSourceCheck")
     dependsOn("v2M1ReceiptCapsCheck")
     dependsOn("v2DocumentationCheck")
+}
+
+tasks.register<Exec>("v2M1ActiveGraphCheck") {
+    group = "verification"
+    description = "Verify the final pure-V2 settings/runtime graph and V1/KoP-runtime absence."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m1-active-graph.sh")
+}
+
+tasks.register<Exec>("v2M1FastSourceCheck") {
+    group = "verification"
+    description = "Aggregate already executed deterministic local M1 tests and the pure-V2 graph boundary."
+    dependsOn(":nereus-domain:check")
+    dependsOn(":nereus-metadata-spi:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn("v2M1FoundationDependencyCheck")
+    dependsOn("v2M1FoundationApiCheck")
+    dependsOn("v2M1G1ValidatorSourceCheck")
+    dependsOn("v2M1ActiveGraphCheck")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m1-fast.sh")
+}
+
+tasks.register("v2M1Check") {
+    group = "verification"
+    description = "Run the no-Docker/no-fork M1 fast gate including the final pure-V2/V1-absence graph."
+    dependsOn("v2M1FastSourceCheck")
+    dependsOn("v2DocumentationCheck")
+}
+
+val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
+    .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
+    .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
+val oxiaServerCheckoutPath = providers.gradleProperty("oxiaServerCheckout")
+    .orElse(providers.environmentVariable("NEREUS_OXIA_SERVER_CHECKOUT"))
+    .orElse(layout.projectDirectory.dir("../../nereusstream/oxia").asFile.absolutePath)
+
+tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
+    group = "verification"
+    description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."
+    dependsOn("v2M1K1FocusedCheck")
+    dependsOn("v2M1P1FocusedCheck")
+    dependsOn("v2M1R1FocusedCheck")
+    dependsOn("v2M1G1ValidatorCheck")
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-v2-m1-exact-source.sh",
+        kafkaForkCheckoutPath.get(),
+        pulsarCheckoutPath.get(),
+        oxiaClientCheckoutPath.get(),
+        oxiaServerCheckoutPath.get(),
+    )
+}
+
+tasks.register("v2M1ExactSourceCheck") {
+    group = "verification"
+    description = "Run the trusted exact-source M1 gate; no Final aggregation or scenario promotion."
+    dependsOn("v2M1ExactSourceAggregateCheck")
+    dependsOn("v2DocumentationCheck")
+}
+
+val v2M1SourceTupleSha = providers.gradleProperty("v2M1SourceTupleSha")
+val v2M1FastGateResultPath = providers.gradleProperty("v2M1FastGateResult")
+    .orElse(layout.buildDirectory.file("v2-m1/gates/fast.json").map { it.asFile.absolutePath })
+val v2M1ExactGateResultPath = providers.gradleProperty("v2M1ExactGateResult")
+    .orElse(layout.buildDirectory.file("v2-m1/gates/exact-source.json").map { it.asFile.absolutePath })
+
+tasks.register<JavaExec>("v2M1FastGateResult") {
+    group = "verification"
+    description = "Write the canonical PASS reference only after v2M1Check succeeds."
+    dependsOn("v2M1Check", ":nereus-domain:classes")
+    classpath = v2DomainMainSourceSet.runtimeClasspath
+    mainClass.set("com.nereusstream.domain.receipt.M1EvidenceCli")
+    doFirst {
+        setArgs(listOf(
+            "write-gate-result",
+            "V2_M1_FAST",
+            v2M1SourceTupleSha.get(),
+            "PASS",
+            v2M1FastGateResultPath.get(),
+        ))
+    }
+}
+
+tasks.register<JavaExec>("v2M1ExactSourceGateResult") {
+    group = "verification"
+    description = "Write the canonical PASS reference only after v2M1ExactSourceCheck succeeds."
+    dependsOn("v2M1ExactSourceCheck", ":nereus-domain:classes")
+    classpath = v2DomainMainSourceSet.runtimeClasspath
+    mainClass.set("com.nereusstream.domain.receipt.M1EvidenceCli")
+    doFirst {
+        setArgs(listOf(
+            "write-gate-result",
+            "V2_M1_EXACT_SOURCE",
+            v2M1SourceTupleSha.get(),
+            "PASS",
+            v2M1ExactGateResultPath.get(),
+        ))
+    }
+}
+
+val v2M1FinalIndexPath = providers.gradleProperty("v2M1FinalIndex")
+tasks.register<JavaExec>("v2M1FinalCheck") {
+    group = "verification"
+    description = "Resolve one canonical Final index without rerunning Fast, Exact Source, or any referenced suite."
+    dependsOn(":nereus-domain:classes")
+    classpath = v2DomainMainSourceSet.runtimeClasspath
+    mainClass.set("com.nereusstream.domain.receipt.M1EvidenceCli")
+    doFirst {
+        setArgs(listOf("validate-final", v2M1FinalIndexPath.get()))
+    }
 }
 
 tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
