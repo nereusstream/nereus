@@ -8,7 +8,7 @@ spotless = "8.4.0"
 # Source-composite selector only. This version is declared by the locked fork checkout but is not resolved from a
 # Maven snapshot repository; settings.gradle.kts fails source-bound tasks when the checkout is absent.
 pulsar = "5.0.0-M1-SNAPSHOT"
-oxia = "0.9.0"
+oxia = "0.9.4"
 slf4j = "2.0.18"
 grpc = "1.75.0"
 opentelemetry = "1.63.0"

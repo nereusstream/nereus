@@ -22,6 +22,28 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = "lockedOxiaO1"
+                    url = uri(
+                        rootDir.resolve(
+                            "gradle/locked-artifacts/oxia-client-java/" +
+                                "091a42c2780d92da56e9ec1f02ce1c3d988adc16/m2",
+                        ),
+                    )
+                    metadataSources {
+                        gradleMetadata()
+                        mavenPom()
+                        artifact()
+                    }
+                }
+            }
+            filter {
+                includeModule("io.github.oxia-db", "oxia-client")
+                includeModule("io.github.oxia-db", "oxia-client-api")
+            }
+        }
         mavenCentral()
         maven {
             url = uri("https://packages.confluent.io/maven/")

@@ -30,6 +30,7 @@ configurations[oxiaCapabilitySpike.runtimeOnlyConfigurationName].extendsFrom(
 
 dependencies {
     api(project(":nereus-api"))
+    implementation(project(":nereus-metadata-spi"))
     implementation(platform(libs.grpc.bom))
     implementation(platform(libs.opentelemetry.bom))
     implementation(platform(libs.opentelemetry.bom.alpha))
