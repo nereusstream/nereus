@@ -14,7 +14,7 @@
 
 package com.nereusstream.metadata.oxia.v2.capability;
 
-import com.nereusstream.domain.aggregate.TopicBindingAggregateFoundationValidatorV1;
+import com.nereusstream.domain.aggregate.TopicBindingAggregateValidatorV1;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.codec.DeterministicTopicIdsV1;
 import com.nereusstream.domain.protocol.PulsarTopicIncarnationIdentity;
@@ -60,7 +60,7 @@ public final class OxiaTopicBindingAggregatePublisher implements TopicBindingAgg
             AggregatePublicationCandidate candidate) {
         admission.requireOpen();
         Objects.requireNonNull(candidate, "candidate");
-        TopicBindingAggregateFoundationValidatorV1.validate(candidate.aggregate());
+        TopicBindingAggregateValidatorV1.validate(candidate.aggregate());
         if (!(candidate.aggregate().binding().incarnationIdentity()
                 instanceof PulsarTopicIncarnationIdentity incarnation)) {
             throw new IllegalArgumentException("O2 Oxia aggregate publisher accepts only Pulsar incarnations");
@@ -103,7 +103,7 @@ public final class OxiaTopicBindingAggregatePublisher implements TopicBindingAgg
         }
         VersionedAggregateSnapshot snapshot = codec.decode(
                 key, incarnation, record.storedBytes(), MetadataVersionMapper.fromOxia(record.versionId()));
-        TopicBindingAggregateFoundationValidatorV1.validate(snapshot.aggregate());
+        TopicBindingAggregateValidatorV1.validate(snapshot.aggregate());
         if (!incarnation.equals(snapshot.binding().incarnationIdentity())
                 || !key.equals(keys.aggregateKey(snapshot.binding().incarnationIdentity()))
                 || !snapshot.binding()

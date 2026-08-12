@@ -20,7 +20,7 @@ import com.nereusstream.metadata.spi.model.AggregatePublicationCandidate;
 import com.nereusstream.metadata.spi.model.MetadataVersion;
 import com.nereusstream.metadata.spi.model.VersionedAggregateSnapshot;
 
-/** Narrow internal aggregate codec port; complete NTA1 remains outside O2. */
+/** Narrow internal aggregate codec port; O2 production uses canonical NTA1 v1 only. */
 public interface AggregateAuthorityCodec extends AuthorityValueCodec {
     CanonicalBytes encode(AggregatePublicationCandidate candidate);
 

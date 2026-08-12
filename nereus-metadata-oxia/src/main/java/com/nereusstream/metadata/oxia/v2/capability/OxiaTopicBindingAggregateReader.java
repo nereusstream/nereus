@@ -14,7 +14,7 @@
 
 package com.nereusstream.metadata.oxia.v2.capability;
 
-import com.nereusstream.domain.aggregate.TopicBindingAggregateFoundationValidatorV1;
+import com.nereusstream.domain.aggregate.TopicBindingAggregateValidatorV1;
 import com.nereusstream.domain.codec.DeterministicTopicIdsV1;
 import com.nereusstream.domain.protocol.PulsarTopicIncarnationIdentity;
 import com.nereusstream.domain.protocol.TopicIncarnationIdentity;
@@ -73,7 +73,7 @@ public final class OxiaTopicBindingAggregateReader implements TopicBindingAggreg
         }
         VersionedAggregateSnapshot snapshot = codec.decode(
                 key, incarnation, record.storedBytes(), MetadataVersionMapper.fromOxia(record.versionId()));
-        TopicBindingAggregateFoundationValidatorV1.validate(snapshot.aggregate());
+        TopicBindingAggregateValidatorV1.validate(snapshot.aggregate());
         if (!incarnation.equals(snapshot.binding().incarnationIdentity())
                 || !key.equals(keys.aggregateKey(snapshot.binding().incarnationIdentity()))
                 || !snapshot.binding()

@@ -100,6 +100,6 @@ class OxiaV2CapabilityStoreTest {
                 client.client(),
                 scheduler,
                 new OxiaV2StoreConfiguration("localhost:6648", "test", "/nereus/test"),
-                OxiaV2CodecSet.productionUnavailable());
+                OxiaV2CodecSet.productionAggregateOnly());
     }
 }

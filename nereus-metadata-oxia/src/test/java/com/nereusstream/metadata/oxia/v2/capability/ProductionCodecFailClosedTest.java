@@ -23,6 +23,7 @@ import com.nereusstream.metadata.oxia.v2.mutation.ConditionalMutationEngine;
 import com.nereusstream.metadata.oxia.v2.mutation.MutationFailureClassifier;
 import com.nereusstream.metadata.oxia.v2.testing.DeterministicOxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.testing.O2TestValues;
+import com.nereusstream.metadata.spi.model.CreateMutationOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +37,7 @@ class ProductionCodecFailClosedTest {
     void setUp() {
         client = new DeterministicOxiaConditionalClient();
         var keys = new OxiaV2AuthorityKeys("/nereus/test");
-        var codecs = OxiaV2CodecSet.productionUnavailable();
+        var codecs = OxiaV2CodecSet.productionAggregateOnly();
         var engine = new ConditionalMutationEngine(client, new MutationFailureClassifier());
         aggregateReader = new OxiaTopicBindingAggregateReader(() -> {}, keys, codecs.aggregate(), client);
         selectorStore = new OxiaPulsarTopicGenerationSelectorStore(() -> {}, keys, codecs.selector(), client, engine);
@@ -45,27 +46,49 @@ class ProductionCodecFailClosedTest {
     }
 
     @Test
-    void aggregateCodecGapFailsBeforeIo() {
-        assertUnavailable(() -> aggregateReader
-                .readAggregate(O2TestValues.incarnation(1))
-                .toCompletableFuture()
-                .join());
+    void aggregateProductionCodecReadsTheSingleKeyWithoutActivatingOtherCapabilities() {
+        assertThat(aggregateReader
+                        .readAggregate(O2TestValues.incarnation(1))
+                        .toCompletableFuture()
+                        .join())
+                .isEmpty();
+        assertThat(client.readCount()).isOne();
     }
 
     @Test
-    void aggregatePublisherCodecGapFailsBeforeIo() {
+    void aggregatePublisherUsesCanonicalProductionNta1() {
         var keys = new OxiaV2AuthorityKeys("/nereus/test");
-        var codecs = OxiaV2CodecSet.productionUnavailable();
+        var codecs = OxiaV2CodecSet.productionAggregateOnly();
         var publisher = new OxiaTopicBindingAggregatePublisher(
                 () -> {},
                 keys,
                 codecs.aggregate(),
                 new ConditionalMutationEngine(client, new MutationFailureClassifier()));
 
-        assertUnavailable(() -> publisher
-                .publishIfAbsent(O2TestValues.aggregateCandidate("aggregate"))
+        var result = publisher
+                .publishIfAbsent(O2TestValues.productionAggregateCandidate())
                 .toCompletableFuture()
-                .join());
+                .join();
+        assertThat(result.outcome()).isEqualTo(CreateMutationOutcome.CREATED);
+        assertThat(client.createCount()).isOne();
+    }
+
+    @Test
+    void aggregatePublisherRejectsNonNta1CandidateBeforeIo() {
+        var keys = new OxiaV2AuthorityKeys("/nereus/test");
+        var codecs = OxiaV2CodecSet.productionAggregateOnly();
+        var publisher = new OxiaTopicBindingAggregatePublisher(
+                () -> {},
+                keys,
+                codecs.aggregate(),
+                new ConditionalMutationEngine(client, new MutationFailureClassifier()));
+
+        assertThatThrownBy(() -> publisher
+                        .publishIfAbsent(O2TestValues.aggregateCandidate("not-nta1"))
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseInstanceOf(IllegalArgumentException.class);
+        assertThat(client.createCount()).isZero();
     }
 
     @Test

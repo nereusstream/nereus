@@ -24,6 +24,7 @@ import com.nereusstream.domain.aggregate.TopicBindingV1;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.domain.codec.DeterministicTopicIdsV1;
+import com.nereusstream.domain.codec.Nta1CodecV1;
 import com.nereusstream.domain.identity.DeploymentId;
 import com.nereusstream.domain.identity.Id128;
 import com.nereusstream.domain.identity.PulsarCellId;
@@ -56,8 +57,8 @@ public final class O2TestValues {
 
     public static PulsarTopicIncarnationIdentity incarnation(long generation) {
         return new PulsarTopicIncarnationIdentity(
-                PulsarPersistenceName.fromString("persistent://tenant/ns/orders"),
-                PulsarTopicName.fromString("orders"),
+                PulsarPersistenceName.fromString("tenant/ns/persistent/orders"),
+                PulsarTopicName.fromString("persistent://tenant/ns/orders"),
                 new PulsarBindingGeneration(generation));
     }
 
@@ -88,6 +89,13 @@ public final class O2TestValues {
                 candidate.canonicalStoredBytes(),
                 candidate.canonicalStoredDigest(),
                 MetadataVersionMapper.fromOxia(version));
+    }
+
+    public static AggregatePublicationCandidate productionAggregateCandidate() {
+        TopicBindingAggregateV1 aggregate =
+                aggregateCandidate("test-only-placeholder").aggregate();
+        CanonicalBytes bytes = Nta1CodecV1.encode(aggregate);
+        return new AggregatePublicationCandidate(aggregate, bytes, Sha256Digest.hash(bytes));
     }
 
     public static PulsarTopicGenerationSelectorValueV1 selector(

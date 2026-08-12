@@ -16,7 +16,7 @@ package com.nereusstream.metadata.oxia.v2.codec;
 
 import java.util.Objects;
 
-/** Explicit codec composition; production uses the fail-closed unavailable set in O2. */
+/** Explicit codec composition; M1.1b supplies only the production aggregate codec. */
 public record OxiaV2CodecSet(
         AggregateAuthorityCodec aggregate, SelectorAuthorityCodec selector, RegistryAuthorityCodec registry) {
     public OxiaV2CodecSet {
@@ -25,9 +25,9 @@ public record OxiaV2CodecSet(
         Objects.requireNonNull(registry, "registry");
     }
 
-    public static OxiaV2CodecSet productionUnavailable() {
+    public static OxiaV2CodecSet productionAggregateOnly() {
         return new OxiaV2CodecSet(
-                new UnavailableAggregateAuthorityCodec(),
+                new Nta1AggregateAuthorityCodec(),
                 new UnavailableSelectorAuthorityCodec(),
                 new UnavailableRegistryAuthorityCodec());
     }

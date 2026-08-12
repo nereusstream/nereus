@@ -35,7 +35,7 @@ import io.oxia.client.api.AsyncOxiaClient;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Owns the shared client and store-wide O2 lifecycle; production adapters remain fail closed. */
+/** Owns the shared client and store-wide O2 lifecycle; selector/Registry and activation remain fail closed. */
 public final class OxiaV2CapabilityStore implements AutoCloseable {
     private final AsyncOxiaClient client;
     private final StoreContinuity continuity;
@@ -74,7 +74,7 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
         return continuity.current();
     }
 
-    /** O2 cannot activate until later slices supply complete accepted production codecs and fences. */
+    /** O2 cannot activate until later slices supply selector/Registry codecs and ownership fences. */
     public boolean productionActivationReady() {
         return false;
     }
