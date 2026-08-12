@@ -65,9 +65,10 @@ flowchart TD
 
     B1 --> K1["Kafka K1 authority"]
     B1 --> P1["Pulsar selector and ownership fence"]
-    B1 --> R1["Registry and writer interlock"]
+    B1 --> R0["M1.1c-R0: Registry capacity evidence"]
+    R0 --> R1["Registry and writer interlock"]
     O2 --> P1
-    O2 --> R1
+    O2 --> R0
 
     K1 --> N2["N2 exact source tuple and gates"]
     P1 --> N2
@@ -93,9 +94,10 @@ Each target owns one row below and must preserve unrelated worktree state.
 | `M1.1a-O2` | V2 aggregate/selector/Registry adapter scaffolding and store-wide continuity capability | `M1.1a-D`, `M1.1a-O1` | local fake tests; exact-source conformance remains pending | locally verified at Nereus `050f908a`: 69 focused and 299 whole-module tests; [accepted design](m1.1a-oxia-capability-scaffold.md) and [local-only receipt](../../evidence/v2-m0/m1.1a-o2/README.md); no scenario promotion |
 | `M1.1b-Q1` | collect NTA1 bounds, legality, pinned-name, checked-arithmetic, and candidate-wire evidence | `M1.1a-E`; O2 codec port remains fail closed | `v2M1Nta1ReadinessCheck`; readiness only | historical evidence complete at `94881e67`: 14 focused tests and immutable [non-promotable receipt](../../evidence/v2-m0/m1.1b-q1/README.md) |
 | `M1.1b` | implement the accepted NTA1 encoder/parser/validator, exact caps/goldens, pure-input Pulsar inventory boundary, and O2 aggregate codec | accepted [M1.1b design](m1.1b-nta1-codec.md) plus Q1 evidence | `v2M1Nta1CodecCheck`; exact local only | exact-local implementation complete at `01a70f17`; 55 domain, 73 focused O2, 303 whole metadata-oxia tests; [non-promotable receipt](../../evidence/v2-m0/m1.1b/README.md) |
+| `M1.1c-R0` | test/evidence-only Registry writer-cohort inventory and canonical-capacity accounting; no production authority | accepted [R0 design](m1.1c-registry-capacity-spike.md), `M1.1b`, and O2 fail-closed Registry port | `v2M1RegistryCapacityCheck`; readiness only | design accepted; evidence not run; `maxWriterCount=14` remains a candidate until the gate closes |
 | `K1` | complete Kafka feature-2/API-32000/CreateTopics/image/publication authority | immutable post-M1.1b domain artifact | Kafka focused source gate | detailed design required |
 | `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | `M1.1b`, `M1.1a-O2` | Pulsar/Oxia focused source gate | detailed design required |
-| `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | accepted writer-count capacity plus `M1.1a-O2` | `REGISTRY_CONFORMANCE` | capacity evidence blocked |
+| `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | accepted `M1.1c-R0` result plus `M1.1a-O2` | `REGISTRY_CONFORMANCE` | capacity evidence blocked; no production authority in R0 |
 | `G1` | fast/exact/final M1 gates and receipt validators | K1/P1/R1 plus accepted receipt caps | `v2M1Check`, `v2M1ExactSourceCheck`, `v2M1FinalCheck` | partially evidence blocked |
 | `V1P` | cut settings/BOM/publication/CI edges, then remove V1 sources/tasks/scripts and KoP runtime | replacement graph and candidate M1 gates | active-graph/V1-absence checks | last mechanical implementation step |
 | `N3` | receipts, attachments, exact scenario/index promotion only | trusted N2 execution | final receipt validation | evidence only |
@@ -165,7 +167,8 @@ The expected review sequence is:
 6. metadata-oxia scaffolding;
 7. historical [M1.1b-Q1 evidence collection](m1.1b-nta1-codec.md) and completed M1.1b grill;
 8. accepted NTA1 production codec, goldens, inventory boundary, and O2 aggregate adapter;
-9. bounded Registry writer-cohort/count/bytes evidence and accepted cap;
+9. bounded Registry writer-cohort/count/bytes evidence under the accepted
+   [M1.1c-R0 design](m1.1c-registry-capacity-spike.md), followed by an accepted cap;
 10. representative receipt/parser output evidence and accepted safety caps;
 11. immutable, non-overwriteable N1 domain/SPI artifact publication with JAR/source-JAR/POM/Gradle-metadata hashes;
 12. separate Kafka K1, Pulsar P1, and Registry R1 changes consuming exact N1 artifacts;
@@ -187,6 +190,7 @@ must not start merely because the replacement modules compile.
 | `v2M1OxiaScaffoldCheck` | now | locked O1 dependency resolution, four single-key adapters, local response-loss/continuity/race tests; after M1.1b the focused namespace has 73 clean tests | selector/Registry codecs, real Oxia/Pulsar conformance, P1/R1, runtime activation, scenario promotion, M1 PASS |
 | `v2M1Nta1CodecCheck` | now | production NTA1/validator, exact goldens, pure-input inventory boundary, O2 aggregate wiring, clean non-zero local tests, JDK-only and Q1 isolation | K1/P1/R1, real Oxia/Registry conformance, runtime activation, scenario promotion, M1 PASS/Final |
 | `v2M1Nta1ReadinessCheck` | now | 14 evidence-only tests over real domain objects, candidate bounds/legality, strict UTF-8/EOF/overflow/allocation, and generated JSON equality | accepted caps/policy, production encoder/parser/goldens, backend/runtime conformance, scenario promotion, M1 PASS |
+| `v2M1RegistryCapacityCheck` | after R0 harness lands | deterministic writer topology, exact 120/184/192/256/65,536 accounting, overflow and lifecycle rejection, generated evidence equality, and non-promotion boundary | R1 production codec/Store/interlock, real Oxia, allocator mode, `REGISTRY_CONFORMANCE`, scenario promotion, M1 PASS |
 | `v2M1Check` | after K1/P1/R1 and graph cut | ordinary deterministic M1 fast suite and V1 absence | exact external source/artifact/runtime identity |
 | `v2M1ExactSourceCheck` | N2 | clean exact forks, immutable artifacts, real Oxia, focused fork tests | evidence provenance without trusted workflow/N3 |
 | `v2M1FinalCheck` | N2/N3 | referenced gate/receipt schema and aggregate result | work not explicitly referenced by the receipts |
@@ -212,7 +216,8 @@ Stop the active slice and return to design/evidence work if it would require any
 
 - choosing a `FrameEncodingPolicy` kind/version/payload or an NTA1/Pulsar name cap;
 - implementing an NTA1 encoder/parser or claiming canonical aggregate bytes before M1.1b;
-- selecting `maxWriterCount=8` or completing the Registry codec/capacity gate;
+- accepting any Registry writer-count/canonical-byte result before `v2M1RegistryCapacityCheck` reproduces the R0
+  evidence, or treating R0 as a production Registry codec/capacity gate;
 - selecting receipt/attachment numeric caps or promoting an N3 receipt;
 - adding an Oxia server RPC/wire change, durable notification cursor, or persisted connection/session/shard identity;
 - exposing a fifth production metadata capability, generic key/value facade, child binding/Epoch store, or allocator

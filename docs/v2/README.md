@@ -55,6 +55,12 @@ performance-first BookKeeper WAL.
   `READINESS_EVIDENCE_ONLY`. The production slice is now exact-locally verified at `01a70f17`: 55 domain tests, 73
   focused O2 tests, and 303 whole metadata-oxia tests bind the codec, exact goldens, inventory boundary, and aggregate
   adapter in a [non-promotable receipt](evidence/v2-m0/m1.1b/README.md); no scenario changes.
+- The accepted [M1.1c-R0 Registry-capacity design](detailed_design/m1/m1.1c-registry-capacity-spike.md) freezes an
+  evidence-only writer-cohort/lifecycle model, a 184-byte fixed capacity-accounting header, exact checked sizing, and
+  a non-promotion gate without implementing R1. It measures full binary-by-credential coexistence, rollback, fenced
+  residue, bootstrap/admin allocation capability, omitted writers, and add/fence/drain/remove ordering. The derived
+  `maxWriterCount=14` and 51,016-byte legal maximum remain candidates until the focused gate and immutable evidence
+  land; the inherited 120/192/256/65,536 contracts are unchanged and the production Registry codec remains unavailable.
 - ADR 0086 fixes the Kafka BookKeeper semantic layout: one Kafka Offset Domain across profiles, one logical ledger
   chain per partition, low-frequency run/generation roots, packed in-ledger RecordBatch indexes, owner-local active-tail
   locators, targeted Fetch, bounded overlapping writes with ordered publication, and bounded checkpoint-tail recovery.

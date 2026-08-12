@@ -76,7 +76,12 @@ NTA1, Registry codec/capacity, receipt validator, M1 Final, or promotion evidenc
   0.2 or M1-Final blocker.
 - **Registry capacity OPEN:** `maxWriterCount=8` is a candidate until steady, concurrent binary/credential rollout,
   rollback, fenced residue, and bootstrap/admin cohorts plus the complete Registry size formula bound it. The fixed
-  row is 120 bytes and there is no separate writer-set-byte cap.
+  row is 120 bytes and there is no separate writer-set-byte cap. The accepted
+  [M1.1c-R0 spike design](detailed_design/m1/m1.1c-registry-capacity-spike.md) replaces the unsupported eight-row
+  assumption with an executable candidate: seven source-qualified/principal-generation cohorts per closed writer kind,
+  a 184-byte fixed accounting header, and a derived 14-row/51,016-byte maximum. Those numbers remain OPEN until
+  `v2M1RegistryCapacityCheck` reproduces committed non-promotable evidence; R0 does not implement R1 or claim
+  `REGISTRY_CONFORMANCE`.
 - **Receipt-cap OPEN:** root/count/path/file/total/log parser and verification caps wait for representative all-pass,
   maximum-failure, fault-cut, Registry/interlock, and multi-scenario outputs. The root fields, attachment kinds,
   content identity, and Final reference hierarchy are already closed.
