@@ -69,6 +69,7 @@ public final class OxiaPulsarTopicGenerationSelectorStore implements PulsarTopic
         return AdapterFutures.localValidation(() -> {
             prepare();
             Objects.requireNonNull(candidate, "candidate");
+            PulsarTopicGenerationTransitionsV1.requireFirstCreate(candidate);
             String key = keys.selectorKey(candidate.persistenceName());
             CanonicalBytes encoded = codec.encode(candidate);
             requireExactCandidateBytes(encoded, candidate);
@@ -83,6 +84,7 @@ public final class OxiaPulsarTopicGenerationSelectorStore implements PulsarTopic
             prepare();
             Objects.requireNonNull(exactPredecessor, "exactPredecessor");
             Objects.requireNonNull(candidate, "candidate");
+            PulsarTopicGenerationTransitionsV1.requireCas(exactPredecessor.value(), candidate);
             if (!exactPredecessor.value().persistenceName().equals(candidate.persistenceName())) {
                 throw new IllegalArgumentException("selector predecessor and candidate authority identities differ");
             }

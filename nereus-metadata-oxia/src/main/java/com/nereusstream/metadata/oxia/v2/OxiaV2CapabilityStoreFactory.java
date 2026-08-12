@@ -49,7 +49,7 @@ public final class OxiaV2CapabilityStoreFactory {
                 throw new CompletionException(unwrap(failure));
             }
             try {
-                return attach(client, scheduler, configuration, OxiaV2CodecSet.productionAggregateOnly());
+                return attach(client, scheduler, configuration, OxiaV2CodecSet.productionP1());
             } catch (RuntimeException | Error attachFailure) {
                 scheduler.close();
                 closeClient(client, attachFailure);

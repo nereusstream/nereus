@@ -32,6 +32,14 @@ public record OxiaV2CodecSet(
                 new UnavailableRegistryAuthorityCodec());
     }
 
+    /** P1 enables the aggregate and selector authorities while Registry remains fail closed. */
+    public static OxiaV2CodecSet productionP1() {
+        return new OxiaV2CodecSet(
+                new Nta1AggregateAuthorityCodec(),
+                new Nps1SelectorAuthorityCodec(),
+                new UnavailableRegistryAuthorityCodec());
+    }
+
     public boolean allAvailable() {
         return aggregate.available() && selector.available() && registry.available();
     }

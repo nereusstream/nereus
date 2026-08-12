@@ -44,6 +44,7 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
     private final TopicBindingAggregateReader aggregateReader;
     private final PulsarTopicGenerationSelectorStore selectorStore;
     private final PulsarVirtualLedgerNamespaceRegistryStore registryStore;
+    private final boolean pulsarSelectorReady;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     OxiaV2CapabilityStore(
@@ -57,6 +58,8 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(keys, "keys");
         Objects.requireNonNull(codecs, "codecs");
+        pulsarSelectorReady =
+                codecs.aggregate().available() && codecs.selector().available();
         OxiaConditionalClient conditionalClient = new AsyncOxiaConditionalClient(client);
         ConditionalMutationEngine mutationEngine =
                 new ConditionalMutationEngine(conditionalClient, new MutationFailureClassifier());
@@ -77,6 +80,11 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
     /** O2 cannot activate until later slices supply selector/Registry codecs and ownership fences. */
     public boolean productionActivationReady() {
         return false;
+    }
+
+    /** P1 metadata capability only; native ownership and R1 are separate activation requirements. */
+    public boolean pulsarSelectorReady() {
+        return pulsarSelectorReady;
     }
 
     public TopicBindingAggregatePublisher aggregatePublisher() {
