@@ -224,6 +224,15 @@ require_literal 'no R1 authority/real Oxia/allocator/scenario/M1 PASS' "build.gr
 require_literal 'Registry capacity readiness verified; no R1 authority, real Oxia, allocator selection, scenario promotion, or M1 PASS' "scripts/check-v2-m1-registry-capacity.sh"
 require_literal 'REGISTRY_CAPACITY_READINESS_ONLY' "docs/v2/evidence/v2-m0/m1.1c-r0/registry-capacity.json"
 require_literal '`maxWriterCount=14`' "docs/v2/evidence/v2-m0/m1.1c-r0/README.md"
+require_literal 'M1-2 receipt/parser capacity and attachment-safety boundary' "docs/v2/detailed_design/m1/m1-2-receipt-parser-caps.md"
+require_literal 'implementationStatus: Verified' "docs/v2/detailed_design/m1/m1-2-receipt-parser-caps.md"
+require_literal 'receipt: docs/v2/evidence/v2-m0/m1-2-receipt-caps/README.md' "docs/v2/detailed_design/m1/m1-2-receipt-parser-caps.md"
+require_literal 'ADR 0084 is the sole normative cap table' "docs/v2/evidence/v2-m0/m1-2-receipt-caps/README.md"
+require_literal 'RECEIPT_CAPACITY_READINESS_ONLY' "docs/v2/evidence/v2-m0/m1-2-receipt-caps/receipt-caps.json"
+require_literal 'v2M1ReceiptCapsCheck' "build.gradle.kts"
+require_literal 'no N1/N2/N3, scenario promotion, or M1 Final' "build.gradle.kts"
+require_literal 'no production parser, N1/N2/N3, scenario promotion, or M1 Final' "scripts/check-v2-m1-receipt-caps.sh"
+require_literal 'M1-2 freezes this sole normative receipt-v1 cap table' "docs/decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md"
 require_literal 'normal append creates a remote metadata reservation' "docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
 require_literal 'coverage comes from the assigned RecordBatch header' "docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
 require_literal 'does not implement this data layout' "docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
@@ -1064,6 +1073,7 @@ if set(local_evidence_bindings) != {
     "m1.1bQ1Nta1Readiness",
     "m1.1bNta1Codec",
     "m1.1cR0RegistryCapacity",
+    "m1.2ReceiptParserCaps",
 }:
     fail("local implementation evidence bindings are incomplete")
 o2_evidence = local_evidence_bindings["m1.1aO2Scaffold"]
@@ -1251,6 +1261,51 @@ if (
 ):
     fail("M1.1c-R0 Registry capacity result does not preserve its bound or non-promotion boundary")
 
+receipt_caps_evidence = local_evidence_bindings["m1.2ReceiptParserCaps"]
+expected_receipt_caps_identity = {
+    "nereusEvidenceCommit": "75593faf11c5934908d6ffcd9977648f8fa49ea2",
+    "sourceLocksInputSha256": "4eeec6ea5f1445b8e3494c83be4289b3b4a6df17a48678d5b181f61298317814",
+    "testArtifact": {
+        "path": "docs/v2/evidence/v2-m0/m1-2-receipt-caps/receipt-caps.json",
+        "bytes": 8172,
+        "sha256": "2197c814dc887d742cdda119f4e68c4f5f2276df0f44b15de3d524a2445c692d",
+    },
+    "receipt": "docs/v2/evidence/v2-m0/m1-2-receipt-caps/README.md",
+    "result": "RECEIPT_CAPACITY_READINESS_ONLY",
+    "promotionEligible": False,
+    "productionReceiptParserImplemented": False,
+    "evidenceStatus": "READINESS_EVIDENCE",
+}
+if receipt_caps_evidence != expected_receipt_caps_identity:
+    fail("M1-2 receipt/parser cap evidence binding differs from the deterministic receipt")
+receipt_caps_path = root / receipt_caps_evidence["testArtifact"]["path"]
+if (
+    not receipt_caps_path.is_file()
+    or receipt_caps_path.stat().st_size != receipt_caps_evidence["testArtifact"]["bytes"]
+    or hashlib.sha256(receipt_caps_path.read_bytes()).hexdigest()
+    != receipt_caps_evidence["testArtifact"]["sha256"]
+):
+    fail("M1-2 receipt/parser cap artifact differs from source locks")
+if not (root / receipt_caps_evidence["receipt"]).is_file():
+    fail("M1-2 receipt/parser cap receipt does not exist")
+receipt_caps_result = json.loads(receipt_caps_path.read_text())
+if (
+    receipt_caps_result.get("sourceTupleId") != source_tuple
+    or receipt_caps_result.get("result") != "RECEIPT_CAPACITY_READINESS_ONLY"
+    or receipt_caps_result.get("promotionEligible") is not False
+    or receipt_caps_result.get("productionReceiptParserImplemented") is not False
+    or receipt_caps_result.get("runtimeActivated") is not False
+    or receipt_caps_result.get("scenarioPromotion") is not False
+    or receipt_caps_result.get("m1Final") is not False
+    or receipt_caps_result.get("sampleRootsAreTestVectors") is not True
+    or receipt_caps_result.get("source", {}).get("nereusCommit")
+    != receipt_caps_evidence["nereusEvidenceCommit"]
+    or receipt_caps_result.get("source", {}).get("sourceLocksInputSha256")
+    != receipt_caps_evidence["sourceLocksInputSha256"]
+    or receipt_caps_result.get("testEvidence", {}).get("expectedFocusedTests") != 36
+):
+    fail("M1-2 receipt/parser cap result does not preserve its bound or non-promotion boundary")
+
 research_ids = set()
 for item in source.get("researchBaselines", []):
     if item.get("id") in research_ids or not sha.fullmatch(str(item.get("commit", ""))):
@@ -1298,6 +1353,11 @@ expected_registry_readiness = {
     "result": "REGISTRY_CAPACITY_READINESS_ONLY",
     "promotionEligible": False,
 }
+expected_receipt_caps_readiness = {
+    "path": "docs/v2/evidence/v2-m0/m1-2-receipt-caps/receipt-caps.json",
+    "result": "RECEIPT_CAPACITY_READINESS_ONLY",
+    "promotionEligible": False,
+}
 scenario_ids = []
 for item in scenarios.get("scenarios", []):
     scenario_id = item.get("id", "")
@@ -1316,6 +1376,9 @@ for item in scenarios.get("scenarios", []):
     if scenario_id == "V2-POSITION-003":
         if readiness_evidence != expected_registry_readiness:
             fail("V2-POSITION-003 must bind the non-promotable M1.1c-R0 readiness artifact")
+    elif scenario_id == "V2-POLICY-001":
+        if readiness_evidence != expected_receipt_caps_readiness:
+            fail("V2-POLICY-001 must bind the non-promotable M1-2 readiness artifact")
     elif readiness_evidence is not None:
         fail(f"{scenario_id} has an unexpected readinessEvidence binding")
     owner = root / str(item.get("ownerDoc", ""))

@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "sourceTupleId": "v2-m0",
+  "result": "RECEIPT_CAPACITY_READINESS_ONLY",
+  "promotionEligible": false,
+  "productionReceiptParserImplemented": false,
+  "runtimeActivated": false,
+  "scenarioPromotion": false,
+  "m1Final": false,
+  "sampleRootsAreTestVectors": true,
+  "source": {
+    "nereusCommit": "75593faf11c5934908d6ffcd9977648f8fa49ea2",
+    "requiredBaselineCommit": "7ede023e19774309268350a866932804787a52a7",
+    "sourceLocksInputSha256": "4eeec6ea5f1445b8e3494c83be4289b3b4a6df17a48678d5b181f61298317814"
+  },
+  "caps": {
+    "canonicalRootBytes": 65536,
+    "scenariosPerReceipt": 16,
+    "suitesPerScenario": 128,
+    "attachmentsPerReceipt": 32,
+    "singleAttachmentBytes": 262144,
+    "totalAttachmentBytes": 524288,
+    "relativePathBytes": 256,
+    "relativePathSegments": 16,
+    "sanitizedLogBytes": 65536
+  },
+  "observations": {
+    "preM1_2BaselineJUnitXml": {
+      "suites": 91,
+      "tests": 386,
+      "bytes": 96248,
+      "largestLockedExternalXmlBytes": 10058
+    },
+    "closedM1VirtualLedgerScenarioRows": 9,
+    "registryMaximumBytes": 51016,
+    "maxima": {
+      "canonicalRootBytes": 16079,
+      "scenariosInOneKindSpecificReceipt": 7,
+      "suitesPerScenario": 73,
+      "attachmentsPerReceipt": 20,
+      "generatedSingleAttachmentBytes": 84025,
+      "kindCompleteBundleBytes": 158760,
+      "relativePathBytes": 115,
+      "relativePathSegments": 5,
+      "sanitizedLogBytes": 15425
+    },
+    "samples": [
+      {"id":"fault-cut","generator":"ONE_DISTINCT_ABORTED_CASE_PER_NAMED_CONTINUITY_RESPONSE_AND_ROLLOUT_CUT","rootBytes":4123,"rootSha256":"d951e01f4ce4c7231e9fe052a5847cd8ffc5466b7c662c8b84e6a1f1661273a7","scenarios":1,"maxSuitesPerScenario":24,"attachments":1,"maxSingleAttachmentBytes":15425,"totalAttachmentBytes":15425,"maxPathBytes":70,"maxPathSegments":4,"sanitizedLogBytes":15425,"bytesByKind":{"SANITIZED_LOG_EXCERPT":15425}},
+      {"id":"foundation","generator":"REQUIRED_BASELINE_DOMAIN_AND_METADATA_SPI_JUNIT_INVENTORY","rootBytes":3849,"rootSha256":"9a7bc1c2ae485c44a2a0188fd8fabf69cb432737902f3cbc15c2ffe5cc796f8f","scenarios":1,"maxSuitesPerScenario":18,"attachments":1,"maxSingleAttachmentBytes":17267,"totalAttachmentBytes":17267,"maxPathBytes":64,"maxPathSegments":4,"sanitizedLogBytes":0,"bytesByKind":{"TEST_REPORT":17267}},
+      {"id":"maximum-failure","generator":"ONE_DISTINCT_FAILED_CASE_PER_STABLE_REJECTION_CATEGORY","rootBytes":4617,"rootSha256":"c6221d49ed444e532711bec9e332f7648cb6906ecd9f04c7a374e5451a2d11ff","scenarios":1,"maxSuitesPerScenario":27,"attachments":1,"maxSingleAttachmentBytes":8612,"totalAttachmentBytes":8612,"maxPathBytes":69,"maxPathSegments":4,"sanitizedLogBytes":0,"bytesByKind":{"TEST_REPORT":8612}},
+      {"id":"multi-scenario-harness","generator":"TWO_HARNESS_ROWS_WITH_SCHEMA_DERIVED_NON_SELECTION","rootBytes":1274,"rootSha256":"7937b7116efa0f9676b492d723553c44c3d0c816a4c15a8e0c8aa71bc56317f2","scenarios":2,"maxSuitesPerScenario":1,"attachments":0,"maxSingleAttachmentBytes":0,"totalAttachmentBytes":0,"maxPathBytes":0,"maxPathSegments":0,"sanitizedLogBytes":0,"bytesByKind":{}},
+      {"id":"multi-scenario-registry","generator":"SEVEN_REGISTRY_CONFORMANCE_ROWS_WITHOUT_HARNESS_SUBSTITUTION","rootBytes":2042,"rootSha256":"27d69259c7bca89e3d7040a7a07919d2ddc22834b8795c64edcec8a8e4c65ce3","scenarios":7,"maxSuitesPerScenario":1,"attachments":0,"maxSingleAttachmentBytes":0,"totalAttachmentBytes":0,"maxPathBytes":0,"maxPathSegments":0,"sanitizedLogBytes":0,"bytesByKind":{}},
+      {"id":"multi-suite","generator":"EXACT_73_REQUIRED_BASELINE_O2_SUITE_IDS_AND_COUNTS","rootBytes":12240,"rootSha256":"8462a7b4ee56035ce30abb89f5cd28c21de20fc76ba78a60bcb87781b39521e9","scenarios":1,"maxSuitesPerScenario":73,"attachments":0,"maxSingleAttachmentBytes":0,"totalAttachmentBytes":0,"maxPathBytes":0,"maxPathSegments":0,"sanitizedLogBytes":0,"bytesByKind":{}},
+      {"id":"nta1","generator":"LOCKED_M1_1B_COUNTS_AND_SIX_GOLDEN_DIGESTS","rootBytes":1557,"rootSha256":"0953a78ab1c7ce526713df67e08d5e54d2ffc3c947bcd2483bad34132468bf18","scenarios":1,"maxSuitesPerScenario":3,"attachments":1,"maxSingleAttachmentBytes":466,"totalAttachmentBytes":466,"maxPathBytes":53,"maxPathSegments":4,"sanitizedLogBytes":0,"bytesByKind":{"TEST_REPORT":466}},
+      {"id":"o1","generator":"LOCKED_O1_RECEIPT_COUNTS_AND_10058_BYTE_XML_FACT","rootBytes":1480,"rootSha256":"13fd7a5fdd80d608c30b51b48a89b835a3956443a63ca2fc7d535749ed105c83","scenarios":1,"maxSuitesPerScenario":2,"attachments":1,"maxSingleAttachmentBytes":233,"totalAttachmentBytes":233,"maxPathBytes":115,"maxPathSegments":5,"sanitizedLogBytes":0,"bytesByKind":{"TEST_REPORT":233}},
+      {"id":"o2","generator":"REQUIRED_BASELINE_73_SUITE_303_TEST_METADATA_OXIA_INVENTORY","rootBytes":12431,"rootSha256":"d3388c8cb95520fd53c65939bb5d1828c2a66470e063531cd790f232b94fec9d","scenarios":1,"maxSuitesPerScenario":73,"attachments":1,"maxSingleAttachmentBytes":66888,"totalAttachmentBytes":66888,"maxPathBytes":58,"maxPathSegments":4,"sanitizedLogBytes":0,"bytesByKind":{"TEST_REPORT":66888}},
+      {"id":"registry-readiness","generator":"R0_184_PLUS_14X120_PLUS_256X192_AND_KIND_COMPLETE_BUNDLE","rootBytes":2136,"rootSha256":"cb587e263764cd927b7da79e9d45a949c5438d30ac9ef7f9604e64af949d4ba6","scenarios":1,"maxSuitesPerScenario":1,"attachments":5,"maxSingleAttachmentBytes":84025,"totalAttachmentBytes":158760,"maxPathBytes":70,"maxPathSegments":4,"sanitizedLogBytes":15425,"bytesByKind":{"TEST_REPORT":84025,"REGISTRY_BYTES":51016,"REGISTRY_ADMISSION_EVIDENCE":4924,"WRITER_INTERLOCK_SNAPSHOT":3370,"SANITIZED_LOG_EXCERPT":15425}},
+      {"id":"representative-all-pass","generator":"REQUIRED_BASELINE_O2_73_SUITES_SPLIT_INTO_20_NAMED_REPORTS","rootBytes":16079,"rootSha256":"99da57208bfe87414d48fc3a47aee98e20e5049d164278c48c5aaf712a62f09a","scenarios":1,"maxSuitesPerScenario":73,"attachments":20,"maxSingleAttachmentBytes":7063,"totalAttachmentBytes":69547,"maxPathBytes":59,"maxPathSegments":5,"sanitizedLogBytes":0,"bytesByKind":{"TEST_REPORT":69547}}
+    ]
+  },
+  "formulas": {
+    "canonicalRootBytes": "nextPowerOfTwoAtLeast(4 * observedRootBytes)",
+    "scenariosPerReceipt": "nextPowerOfTwoAtLeast(ceil(9 * 1.5))",
+    "suitesPerScenario": "nextPowerOfTwoAtLeast(ceil(73 * 1.5))",
+    "attachmentsPerReceipt": "nextPowerOfTwoAtLeast(5 closed kinds * 4 refs)",
+    "singleAttachmentBytes": "nextPowerOfTwoAtLeast(2 * max(96248, 51016))",
+    "totalAttachmentBytes": "max(nextPowerOfTwoAtLeast(2 * kindCompleteBundleBytes), 2 * singleAttachmentBytes)",
+    "relativePathBytes": "nextPowerOfTwoAtLeast(2 * observedPathBytes)",
+    "relativePathSegments": "nextPowerOfTwoAtLeast(2 * observedSegments)",
+    "sanitizedLogBytes": "nextPowerOfTwoAtLeast(4 * observedSanitizedLogBytes)"
+  },
+  "testEvidence": {
+    "expectedFocusedTests": 36,
+    "expectedFailures": 0,
+    "expectedErrors": 0,
+    "expectedSkipped": 0,
+    "dynamicTests": false,
+    "internalRetries": false
+  },
+  "rejectionCodes": ["RECEIPT_ROOT_NOT_REGULAR","RECEIPT_ROOT_BYTES_EXCEEDED","RECEIPT_MALFORMED_JSON","RECEIPT_NON_CANONICAL_JSON","RECEIPT_DUPLICATE_FIELD","RECEIPT_UNKNOWN_OR_MISSING_FIELD","RECEIPT_WRONG_TYPE_OR_NUMBER","RECEIPT_SCHEMA_OR_KIND_INVALID","RECEIPT_SOURCE_TUPLE_INVALID","RECEIPT_SCENARIO_COUNT_EXCEEDED","RECEIPT_SUITE_COUNT_EXCEEDED","RECEIPT_ATTACHMENT_COUNT_EXCEEDED","RECEIPT_DUPLICATE_OR_UNSORTED_ID","RECEIPT_ACCOUNTING_INVALID","RECEIPT_PATH_INVALID","RECEIPT_PATH_BYTES_EXCEEDED","RECEIPT_PATH_SEGMENTS_EXCEEDED","RECEIPT_ATTACHMENT_BYTES_EXCEEDED","RECEIPT_ATTACHMENT_TOTAL_BYTES_EXCEEDED","RECEIPT_SANITIZED_LOG_BYTES_EXCEEDED","RECEIPT_ATTACHMENT_NOT_REGULAR","RECEIPT_ATTACHMENT_SYMLINK","RECEIPT_ATTACHMENT_LENGTH_MISMATCH","RECEIPT_ATTACHMENT_DIGEST_MISMATCH","RECEIPT_CHECKED_ARITHMETIC_OVERFLOW","RECEIPT_REQUIRED_SUITE_MISSING","RECEIPT_MANDATORY_RESULT_NOT_PASS"],
+  "modelSha256": "2ed6b8b49747ce4aafe4e00425ee27046fe64fb71e5a86d22882c05e62ba14be",
+  "limitations": [
+    "NO_PRODUCTION_RECEIPT_PARSER_OR_G1_FINAL_GATE",
+    "NO_N1_K1_P1_OR_R1",
+    "NO_REAL_OXIA_OR_REGISTRY_CONFORMANCE",
+    "NO_SCENARIO_PROMOTION_OR_N3_RECEIPT",
+    "NO_10K_OR_100K_SCALE_BENCHMARK"
+  ]
+}

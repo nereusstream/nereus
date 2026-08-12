@@ -14,7 +14,7 @@ sourceTuple: v2-m0
 | Milestone | Scope | Current status | Required aggregate |
 | --- | --- | --- | --- |
 | M0 | V1 archive references, Context Map/glossaries, V2 ADRs/contracts, open-question/session logs, source/scenario manifests, tradeoff register, documentation gate | DocumentationGated | `v2M0Check` |
-| M1 | pure V2 active graph; Java-17/JDK-only domain and exact four-capability metadata SPI; NTB1/NSE1 identities and strict NTA1 aggregate; complete Kafka API-key-32000 KRaft record/image/CreateTopics pseudo-config/resolution/sizing/projection/publication authority; Pulsar selector CAS plus authoritative ABA-safe ownership witness, gap-safe stale-install exclusion, and local atomic ACTIVE fence; compatibility-namespace Registry, complete writer-set/interlock, versioned derived slice view, and `REGISTRY_CONFORMANCE`; allocator `HARNESS_CONFORMANCE_ONLY` with no mode selection; remove every active V1 runtime/gate | **InProgress: M1.1a complete; M1.1b exact-local complete** | `v2M1FinalCheck` |
+| M1 | pure V2 active graph; Java-17/JDK-only domain and exact four-capability metadata SPI; NTB1/NSE1 identities and strict NTA1 aggregate; complete Kafka API-key-32000 KRaft record/image/CreateTopics pseudo-config/resolution/sizing/projection/publication authority; Pulsar selector CAS plus authoritative ABA-safe ownership witness, gap-safe stale-install exclusion, and local atomic ACTIVE fence; compatibility-namespace Registry, complete writer-set/interlock, versioned derived slice view, and `REGISTRY_CONFORMANCE`; allocator `HARNESS_CONFORMANCE_ONLY` with no mode selection; remove every active V1 runtime/gate | **InProgress: M1.1a complete; M1.1b exact-local and M1-2 caps complete** | `v2M1FinalCheck` |
 | M2 | Owner Epoch lane and typed frontier; Kafka BookKeeper per-partition leader-epoch-bound run chain, NBKE2 DATA/control frames, packed RecordBatch range indexes, pre-position reservation, bounded overlapping writes and fenced ordered locator/producer/transaction/leader-epoch publication; distinct Allocated/Durable/LEO/HW/LSO state, native duplicate semantics plus storage-retry digests, speculative producer deltas, profile-neutral checkpoint kernel with BK implementation, compact follower-descriptor/Observed/Applied/election-adoption primitives with hard journal/source/apply-lag eligibility, targeted floor+coverage+successor Fetch, delayed-wakeup seam, sequential cursor, bounded suffix recovery, async-Object source switch, and 10k/100k evidence; Pulsar deterministic NPD1-data/NPO1-root pair with checked 16-byte-row/streaming envelope and provider admission plus native-relative block-policy evidence; ManagedLedger-owned dual-source handle/read pins/final-delete revalidation and persisted BK_DELETE state/retention policy | Planned | `v2M2Check` |
 | M3 | one-cell NWG1 Object WAL groups; binding-context epoch authority, exact per-commit Kafka leader epoch, and commit-set co-location; run-key/per-Object AEAD; final class/lane leaf grammar and post-plan sequence allocation; up to three lazy lanes under one Root/pointer; provider-resolved physical frontier plus owner-local per-binding typed frontier; physical-only de-duplicated checkpoint rows/Seal; separate bounded Root-bound NWKCP1 Kafka protocol-checkpoint family selected by an independent publisher-fenced OPEN/TERMINAL Head; one publisher-epoch-fenced physical vector chain; pre-position tracker/locator reservation and local tickets; shared-verified range-aggregated fenced active-tail publication before ACK; Root-fixed NONE/optional bounded provider-proof mode; provider-absent cuts; conservative bounded prefix/LIST recovery with no partial skip vector; provider/session evidence; fixed-slice Pulsar virtual-ledger path with RANGE evidence | Planned | `v2M3Check` |
 | M4 | manifest, protocol-position/timestamp indexes, Storage Epoch resolver, logical Binding read snapshot, bounded sharded generation-tagged hazard slots, ABA-safe lease word and terminal source drain, `ADMITTING/STOPPED` Binding selector with fused fallback-removal/E+1 cut, small inline closure-anchor set plus emergency STOPPED envelope, closed-verifier terminal publication and async batched prune, per-source first/shared-last intervals, deterministic on-demand proofs/window, exact inline/reference activation, explicit bounded O(N) reconciliation, and two-stage retirement | Planned | `v2M4Check` |
@@ -126,6 +126,16 @@ accounting header, the existing 120-byte writer row, and unchanged 192/256/65,53
 51,016-byte largest legal value and 14,520-byte reserved margin. This closes the R1 capacity input only. R0 leaves the
 O2 Registry codec unavailable and cannot emit `REGISTRY_CONFORMANCE`.
 
+The accepted [M1-2 receipt/parser-cap design](detailed_design/m1/m1-2-receipt-parser-caps.md) is verified at Nereus
+`75593faf` by 36 clean focused tests and deterministic
+[readiness evidence](evidence/v2-m0/m1-2-receipt-caps/README.md). Eleven named sample families bind the measured
+pre-M1-2 Foundation/O1/O2/NTA1 and Registry inputs, representative all-pass, multi-scenario/multi-suite,
+maximum-failure, fault-cut, exact Registry attachment, and sanitized-log shapes. ADR 0084 is the sole normative cap
+table; the JSON is its machine projection and binds SHA-256
+`2197c814dc887d742cdda119f4e68c4f5f2276df0f44b15de3d524a2445c692d`. This closes only G1's persisted-v1 numeric
+input. It adds no production parser/constant authority, N1/K1/P1/R1, real Oxia/Registry conformance, N2/N3, scenario
+promotion, or M1 Final.
+
 `docs/v2/source-locks.json` is the sole expected-SHA authority for external Kafka/Pulsar/Oxia sources. Checkout paths
 may be overridden; expected SHAs may not. The manifest cannot self-lock the current Nereus commit; a promotion receipt
 binds it. M1 gates are:
@@ -137,6 +147,9 @@ binds it. M1 gates are:
 - `v2M1RegistryCapacityCheck`: current deterministic R0 writer-count/canonical-byte readiness gate with 18 clean tests,
   exact generated evidence equality, source/digest binding, and production/scenario absence checks; it cannot prove R1,
   real Oxia, allocator selection, `REGISTRY_CONFORMANCE`, or M1 PASS;
+- `v2M1ReceiptCapsCheck`: current deterministic M1-2 readiness gate with 36 clean focused tests, generated/committed
+  byte equality, JSON/source/source-lock/digest binding, formula recomputation, production-absence and non-promotion
+  checks; it cannot prove the G1 production validator, N1/K1/P1/R1, N2/N3, scenario promotion, or M1 PASS/Final;
 - `v2M1Check`: no Docker/fork/composite; local domain/schema/SPI/codec/harness, active-graph, and V1-absence checks;
 - `v2M1ExactSourceCheck`: clean exact forks before/after, isolated immutable artifacts, real Oxia, and focused fork tests;
 - `v2M1FinalCheck`: aggregate previous outcomes and receipt schema without rerunning their suites.
@@ -157,8 +170,8 @@ IDs, or separately authoritative aggregate result. Attachment kinds are `TEST_RE
 Cross-M1 scenario rows are split before promotion so future evidence cannot be borrowed. N3 may change only receipts,
 attachments, and their exactly covered scenario status/index; it may not modify code, gates, workflows, ADRs, or source
 locks. The Final index is a typed path/length/SHA promotion manifest, not another result authority. Evidence-derived
-root/count/path/file/total/log caps remain OPEN until representative early-M1 outputs establish them; they block the
-receipt validator/N3 promotion, not M1.1a.
+root/count/path/file/total/log caps are now accepted in ADR 0084 from M1-2 evidence. The production G1 validator and
+trusted N3 promotion remain pending; the readiness gate cannot stand in for either.
 
 ## Status model
 

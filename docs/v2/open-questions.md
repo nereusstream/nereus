@@ -81,16 +81,19 @@ evidence. The remaining descendants and recently closed evidence input are:
   51,016-byte largest legal canonical Registry value. The inherited 120/192/256/65,536 limits remain unchanged, with
   14,520 bytes reserved margin. This closes only the R1 capacity input: production codec/store/interlock, real Oxia,
   `REGISTRY_CONFORMANCE`, and scenario promotion remain pending.
-- **Receipt-cap OPEN:** root/count/path/file/total/log parser and verification caps wait for representative all-pass,
-  maximum-failure, fault-cut, Registry/interlock, and multi-scenario outputs. The root fields, attachment kinds,
-  content identity, and Final reference hierarchy are already closed.
+- **Receipt-cap input resolved; G1/N3 still pending:** ADR 0084 now owns the sole persisted-v1 cap table. The M1-2
+  JDK-only test model, 36 clean focused tests, eleven representative sample families, and
+  [`RECEIPT_CAPACITY_READINESS_ONLY`](evidence/v2-m0/m1-2-receipt-caps/README.md) evidence bind the formulas,
+  observed maxima, stable rejection taxonomy, source commit, and JSON SHA. Deployment may only lower new-receipt
+  admission; host/provider limits cannot change persisted-v1 parsing. This closes the stale numeric-cap OPEN, not the
+  separately reviewed G1 production parser/resolver or trusted N3 promotion.
 - **Promotion evidence pending:** O1 now binds the final Oxia client fork, JAR/source-JAR/POM, exact server image, and
   focused-test identities. Scenario promotion still requires the later executable continuity/Registry conformance and
   trusted N3 receipt; those are implementation/promotion evidence rather than another prose-design decision.
 
-O1, O2, and R0 are governed by their accepted implementation designs and focused receipts. The remaining receipt-cap,
-K1/P1/R1, real Oxia/Registry conformance, and promotion descendants remain OPEN, pending, or non-normative until their
-own required implementation/evidence gate or explicit design confirmation.
+O1, O2, R0, and M1-2 are governed by their accepted implementation designs and focused receipts. K1/P1/R1, the G1
+production parser, real Oxia/Registry conformance, N1/N2/N3, and promotion descendants remain OPEN, pending, or
+non-normative until their own required implementation/evidence gate or explicit design confirmation.
 
 ## Restarted Grill 2: evidence frontier
 

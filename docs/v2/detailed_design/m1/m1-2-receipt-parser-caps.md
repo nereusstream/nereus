@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: DocumentationOnly
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: ImplementationDesign
 sourceTuple: v2-m0
+receipt: docs/v2/evidence/v2-m0/m1-2-receipt-caps/README.md
 ---
 
 # M1-2 receipt/parser capacity and attachment-safety boundary
@@ -12,7 +13,7 @@ sourceTuple: v2-m0
 ## Role and sequencing boundary
 
 This is the code-level design for the receipt/parser-cap slice between M1.1c-R0 and immutable N1 artifact
-publication. It closes the numeric inputs needed by the later G1 receipt validator. It does not implement G1, register
+publication. It has closed the numeric inputs needed by the later G1 receipt validator. It does not implement G1, register
 `v2M1Check`, `v2M1ExactSourceCheck`, or `v2M1FinalCheck`, publish N1, enter K1/P1/R1, prune V1, or promote a scenario.
 
 [ADR 0084](../../../decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md) remains the normative receipt
@@ -105,36 +106,25 @@ Each attachment is exactly `{attachmentKind,length,path,sha256}`. Kinds remain c
 `REGISTRY_BYTES`, `REGISTRY_ADMISSION_EVIDENCE`, `WRITER_INTERLOCK_SNAPSHOT`, and `SANITIZED_LOG_EXCERPT`. `length` is
 the declared byte length, not a character count or allocation request. Paths are strictly increasing and unique.
 
-## Selected v1 hard caps and derivation rule
+## Accepted v1 hard caps and derivation evidence
 
-The following table is the only complete numeric table for this slice. ADR 0084 will name this table and its evidence
-SHA rather than copying it. The executable harness must reproduce every observation and formula before the closeout
-changes evidence status.
+[ADR 0084](../../../decisions/0084-v2-m1-leaf-witness-registry-and-receipt-contracts.md) now owns the sole normative
+numeric table. The exact machine projection is
+[`receipt-caps.json`](../../evidence/v2-m0/m1-2-receipt-caps/receipt-caps.json); this design intentionally does not
+maintain a second cap table.
 
-| Cap | Selected v1 value | Evidence/rounding rule |
-| --- | ---: | --- |
-| canonical root bytes | 65,536 | next power of two at or above 4x the largest representative canonical root |
-| scenarios per receipt | 16 | next power of two at or above 1.5x the nine closed M1 virtual-ledger scenario rows |
-| suites per scenario | 128 | next power of two at or above 1.5x the 73-suite current O2 whole-module report |
-| attachments per receipt | 32 | four references per each of five closed kinds, rounded up to a power of two |
-| one attachment bytes | 262,144 | next power of two at or above 2x the largest real current report corpus or R0 Registry value |
-| all attachment bytes | 524,288 | max of 2x the single cap and the next power of two at or above 2x the kind-complete bundle |
-| relative path bytes | 256 | next power of two at or above 2x the longest representative receipt-relative path |
-| relative path segments | 16 | next power of two at or above 2x the representative layout, with no empty segment |
-| one sanitized log excerpt bytes | 65,536 | next power of two at or above 4x the deterministic named fault/error excerpt |
+The required-baseline JUnit inventory measures 91 suites, 386 tests, and 96,248 XML bytes. The generated samples
+observe maxima of 16,079 canonical-root bytes, seven scenarios in one kind-specific root, 73 suites per scenario, 20
+attachments, 84,025 bytes in one generated attachment, 158,760 total bytes in the kind-complete bundle, a 115-byte
+five-segment path, and a 15,425-byte sanitized log. The Registry fixture is the exact structured 51,016-byte R0
+maximum. The evidence JSON records and the gate recomputes every rounding/composition formula; a drift fails rather
+than silently changing an ADR cap. No representative artifact uses anonymous repeated filler.
 
-The evidence gate fails instead of silently changing a cap if an observation does not fit its stated rounding rule.
-The 51,016-byte Registry sample is the accepted R0 maximum and is never inflated to 65,536. The single-attachment cap
-also covers the measured current Nereus JUnit XML corpus; it is not derived by repeating filler. Total attachment
-arithmetic is checked before any file is opened or buffer allocated. The root uses fourfold rather than twofold
-headroom because its observed maximum combines the suite and attachment axes but not the independently closed
-multi-scenario axis; the cap must admit their conservative composition without pretending the sample is a promotion
-receipt.
-
-These are persisted-v1 format/parser caps. Deployment may lower admission for newly produced receipts, attachments,
-paths, or logs. A host, CI runner, upload service, environment variable, or Deployment value cannot enlarge, lower,
-or reinterpret the persisted-v1 parser boundary. Existing v1 evidence is always checked against the full frozen table.
-A v2 expansion requires a new schema and contract rather than consuming local memory or upload headroom.
+The fourfold root margin conservatively composes the independently closed scenario axis with the largest observed
+suite/attachment root. Report/Registry, total-bundle, path, segment, and sanitized-log margins use the exact formulas
+in the evidence. These are persisted-v1 parser invariants: Deployment may lower only new-receipt admission, while a
+host, CI runner, upload service, environment, or provider cannot enlarge, lower, or reinterpret parsing of persisted
+v1 bytes. Expansion requires a new schema.
 
 ## Parser input and validation order
 
@@ -259,18 +249,15 @@ commit/baseline ancestry, source-lock input SHA, evidence SHA/length binding, pr
 non-promotion guards. It fails on zero tests, any failure/error/skip, digest/source mismatch, nondeterministic output,
 or a cap/formula drift. It is independent from `v2M1RegistryCapacityCheck` and does not become `v2M1Check`.
 
-## Delivery and completion
+## Implementation record and stop boundary
 
-1. land this accepted design and execution-index ordering;
-2. add the test-only JDK model, strict narrow parser, attachment verifier, representative samples, and focused tests;
-3. commit that implementation, bind its exact source commit, add the independent fast gate, and generate deterministic
-   JSON/Markdown readiness evidence;
-4. update only ADR 0084 with the normative cap closure, then synchronize the M1 index, plans/matrices, open questions,
-   V2 README, source locks, and documentation checker without changing a scenario to `PASSED_CURRENT_SOURCE`;
-5. run the focused gate, affected module checks, JSON/shell/generated-byte checks, documentation gates, and M0 gate;
-6. stop. N1 publication, K1/P1/R1, G1 production parser/Final, graph pruning, N2, and N3 need separate authorization.
+The test-only JDK model, narrow parser, attachment verifier, representative generators, 36 focused tests, and
+independent gate are source-bound to Nereus `75593faf11c5934908d6ffcd9977648f8fa49ea2`. The committed JSON/Markdown
+are byte-identical to fresh generation; the JSON SHA-256 is
+`2197c814dc887d742cdda119f4e68c4f5f2276df0f44b15de3d524a2445c692d`. The gate checks non-zero clean tests,
+formula/cap stability, source ancestry, source-lock input identity, generated/committed equality, JDK-only scope,
+production absence, and scenario non-promotion.
 
-This slice completes only when the committed evidence is byte-identical to fresh generation, its source commit contains
-the exact harness/tests, every selected cap is derived from a named sample with the stated margin, the fast gate passes
-with non-zero clean tests, linked authority/status documents agree, and no production or scenario-promotion surface was
-added.
+ADR 0084, the M1 index, plan/matrix, structured scenario readiness pointer, open questions, README, source locks, and
+documentation checker are synchronized without changing any scenario to `PASSED_CURRENT_SOURCE`. This slice stops
+here. N1 publication, K1/P1/R1, G1 production parser/Final, graph pruning, N2, and N3 need separate authorization.

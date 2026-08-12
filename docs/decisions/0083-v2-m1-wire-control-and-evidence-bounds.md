@@ -5,9 +5,10 @@
 Accepted for the 0.2 M1 implementation. The 2026-08-12 M1.1b refinement closes the complete NTA1
 FrameEncodingPolicy/legality/cap table and Pulsar UTF-8/total-payload caps. The M1.1c-R0 executable readiness slice
 later closes Registry writer-count and canonical-capacity inputs without implementing R1. Receipt/attachment numeric
-caps and executable promotion evidence remain implementation-readiness descendants. ADR 0084 closes the protocol/leaf,
-Kafka precedence, minimal continuity, native hash, and receipt-accounting descendants. Provider API/source tuple,
-production Registry conformance, and receipt numeric caps remain OPEN. ADR 0085 closes the client-only
+caps and executable promotion evidence were implementation-readiness descendants. ADR 0084 closes the protocol/leaf,
+Kafka precedence, minimal continuity, native hash, receipt accounting, and—through the later M1-2 evidence—persisted-
+v1 receipt caps. Provider API/source tuple, the G1 production validator, production Registry conformance, and
+promotion evidence remain OPEN. ADR 0085 closes the client-only
 continuity direction and exact 120-byte writer row, removes receipt run identity, and permits M1.1a foundation work
 without claiming the deferred codecs or validators.
 
@@ -261,8 +262,9 @@ ledger union and other gate outputs; it cannot reinterpret one kind as another.
 - Rebuild SHAs remain evidence facts rather than Registry migrations; completeness still depends on independently
   revocable principals, writer membership, and the allocation interlock.
 - Registry writer count/canonical bytes are accepted only through the later M1.1c-R0 evidence as
-  `14/51,016`; they are not inferred from this ADR. Receipt numeric caps and R1 conformance remain OPEN, and neither
-  NTA1 nor R0 readiness evidence is a scenario PASS.
+  `14/51,016`; they are not inferred from this ADR. Receipt numeric caps are accepted only through ADR 0084 plus M1-2
+  evidence, not inferred here. G1/R1 conformance remains OPEN, and NTA1, R0, or M1-2 readiness evidence is not a
+  scenario PASS.
 
 This decision is refined by ADRs 0084 and 0085 and refines ADRs 0028, 0032, 0033, 0034, 0041, 0042, 0050, 0051, 0054, 0081, and 0082. It is tracked by
 `V2-META-003..006`, `V2-KAF-META-001..004`, `V2-POSITION-003..010`, and the M1 gates.

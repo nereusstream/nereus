@@ -40,6 +40,11 @@
       "milestone": "M1",
       "contract": "the typed resolver makes correctness/parser caps non-configurable, Product/Deployment owns base defaults, Namespace/Topic may narrow new-write admission but never persisted-v1 decode, Cell/host only cap, and one policy type cannot span activation lifecycles",
       "ownerDoc": "docs/v2/02-storage-profiles-and-topic-binding.md",
+      "readinessEvidence": {
+        "path": "docs/v2/evidence/v2-m0/m1-2-receipt-caps/receipt-caps.json",
+        "result": "RECEIPT_CAPACITY_READINESS_ONLY",
+        "promotionEligible": false
+      },
       "status": "PLANNED",
       "evidenceReceipt": null
     },

@@ -217,6 +217,20 @@
       "promotionEligible": false,
       "registryConformance": false,
       "evidenceStatus": "READINESS_EVIDENCE"
+    },
+    "m1.2ReceiptParserCaps": {
+      "nereusEvidenceCommit": "75593faf11c5934908d6ffcd9977648f8fa49ea2",
+      "sourceLocksInputSha256": "4eeec6ea5f1445b8e3494c83be4289b3b4a6df17a48678d5b181f61298317814",
+      "testArtifact": {
+        "path": "docs/v2/evidence/v2-m0/m1-2-receipt-caps/receipt-caps.json",
+        "bytes": 8172,
+        "sha256": "2197c814dc887d742cdda119f4e68c4f5f2276df0f44b15de3d524a2445c692d"
+      },
+      "receipt": "docs/v2/evidence/v2-m0/m1-2-receipt-caps/README.md",
+      "result": "RECEIPT_CAPACITY_READINESS_ONLY",
+      "promotionEligible": false,
+      "productionReceiptParserImplemented": false,
+      "evidenceStatus": "READINESS_EVIDENCE"
     }
   },
   "researchBaselines": [
