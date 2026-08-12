@@ -254,11 +254,17 @@ require_literal '8afbc425660f3466bdc3255e3dd4eb43f8685af1' "docs/v2/source-locks
 require_literal 'PASS_K1_FOCUSED_ONLY' "docs/v2/evidence/v2-m1/k1/k1-focused.json"
 require_literal 'v2M1K1FocusedCheck' "build.gradle.kts"
 require_literal '39 exact tests in 16 suites' "docs/v2/detailed_design/m1/k1-kafka-kraft-metadata-authority.md"
-require_literal 'implementationStatus: InProgress' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
+require_literal 'implementationStatus: Verified' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal 'NPS1 selector encoding' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal '84 + persistenceNameLength' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal 'P1_FOCUSED_ONLY' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal 'nereus/v2-m1-p1-selector-fence' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
+require_literal '778862323d8a86e2f36064a12166e09918ed9429' "docs/v2/source-locks.json"
+require_literal 'NEREUS_V2_P1_FOCUSED_RECEIPT_V1' "docs/v2/evidence/v2-m1/p1/p1-focused.json"
+require_literal 'PASS_P1_FOCUSED_ONLY' "docs/v2/evidence/v2-m1/p1/p1-focused.json"
+require_literal 'v2M1P1FocusedCheck' "build.gradle.kts"
+require_literal '14 Nereus metadata suites with 94 tests' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
+require_literal 'seven Pulsar suites with 34 tests' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal 'does not own Produce/Fetch' "docs/v2/08-implementation-plan-and-gates.md"
 require_literal 'v2M1ReceiptCapsCheck' "build.gradle.kts"
 require_literal 'no N1/N2/N3, scenario promotion, or M1 Final' "build.gradle.kts"
@@ -1134,6 +1140,50 @@ if (
     or k1_receipt.get("tests", {}).get("skipped") != 0
 ):
     fail("K1 focused receipt content or promotion boundary is invalid")
+
+p1 = source.get("p1PulsarAuthorityBinding", {})
+expected_p1 = {
+    "implementationBaseId": "pulsar-v2-development-base",
+    "implementationBaseCommit": "11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9",
+    "repository": "https://github.com/nereusstream/pulsar.git",
+    "branch": "nereus/v2-m1-p1-selector-fence",
+    "finalForkCommit": "778862323d8a86e2f36064a12166e09918ed9429",
+    "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+    "p1MetadataSourceCommit": "23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+    "p1CoordinateVersion": "0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+    "p1JarSha256": "71502aa8895df44e95fbf2d2b7205fb7c6aed870babb5c6cfa4731a0a9b91e84",
+    "p1ManifestSha256": "a46dbbec8a3a7f01b08cbcf189f3a02dc9bb360f96d55d1e0c15f036f748fd37",
+    "oxiaClientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+    "oxiaServerSourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
+    "oxiaServerImageDigest": "sha256:5aa715e4f19091931743e5af489af5f8d6ee15efcce6430a908c6f65cc6d6516",
+    "receipt": "docs/v2/evidence/v2-m1/p1/p1-focused.json",
+    "receiptBytes": 1808,
+    "receiptSha256": "b36c219c997957e1c1e3221df21c6dca47338b20d8fb42a5d0410ab721055217",
+    "result": "PASS_P1_FOCUSED_ONLY",
+    "promotionEligible": False,
+    "evidenceStatus": "FOCUSED_EXACT_SOURCE_EVIDENCE",
+}
+if p1 != expected_p1:
+    fail("P1 Pulsar authority binding differs from the focused exact-source receipt")
+p1_receipt_path = root / p1["receipt"]
+if (
+    not p1_receipt_path.is_file()
+    or p1_receipt_path.is_symlink()
+    or p1_receipt_path.stat().st_size != p1["receiptBytes"]
+    or hashlib.sha256(p1_receipt_path.read_bytes()).hexdigest() != p1["receiptSha256"]
+):
+    fail("P1 focused receipt identity differs from source locks")
+p1_receipt = json.loads(p1_receipt_path.read_text())
+if (
+    p1_receipt.get("kind") != "P1_FOCUSED_ONLY"
+    or p1_receipt.get("result") != "PASS_P1_FOCUSED_ONLY"
+    or p1_receipt.get("promotionEligible") is not False
+    or p1_receipt.get("pulsarFinalForkCommit") != p1["finalForkCommit"]
+    or p1_receipt.get("tests", {}).get("nereusMetadata", {}).get("passed") != 94
+    or p1_receipt.get("tests", {}).get("realOxia", {}).get("passed") != 2
+    or p1_receipt.get("tests", {}).get("pulsar", {}).get("passed") != 34
+):
+    fail("P1 focused receipt content or promotion boundary is invalid")
 
 local_evidence_bindings = source.get("localImplementationEvidenceBindings", {})
 if set(local_evidence_bindings) != {

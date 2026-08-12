@@ -1,0 +1,57 @@
+{
+  "schema": "NEREUS_V2_P1_FOCUSED_RECEIPT_V1",
+  "kind": "P1_FOCUSED_ONLY",
+  "sourceTupleId": "v2-m0",
+  "result": "PASS_P1_FOCUSED_ONLY",
+  "selectionEligible": false,
+  "promotionEligible": false,
+  "pulsarImplementationBaseCommit": "11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9",
+  "pulsarFinalForkCommit": "778862323d8a86e2f36064a12166e09918ed9429",
+  "pulsarBranch": "nereus/v2-m1-p1-selector-fence",
+  "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+  "p1MetadataSourceCommit": "23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+  "p1CoordinateVersion": "0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+  "p1JarSha256": "71502aa8895df44e95fbf2d2b7205fb7c6aed870babb5c6cfa4731a0a9b91e84",
+  "p1ManifestSha256": "a46dbbec8a3a7f01b08cbcf189f3a02dc9bb360f96d55d1e0c15f036f748fd37",
+  "oxiaClientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+  "oxiaServerSourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
+  "oxiaServerImageDigest": "sha256:5aa715e4f19091931743e5af489af5f8d6ee15efcce6430a908c6f65cc6d6516",
+  "tests": {
+    "nereusMetadata": {
+      "suites": 14,
+      "discovered": 94,
+      "executed": 94,
+      "passed": 94,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "realOxia": {
+      "suites": 1,
+      "discovered": 2,
+      "executed": 2,
+      "passed": 2,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "pulsar": {
+      "suites": 7,
+      "discovered": 34,
+      "executed": 34,
+      "passed": 34,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "requiredGate": "v2M1P1FocusedCheck",
+  "scope": [
+    "PULSAR_SELECTOR_OWNERSHIP_FENCE_ONLY",
+    "NO_PRODUCE_FETCH_RUNTIME",
+    "NO_REGISTRY_OR_ALLOCATOR_SELECTION",
+    "NO_SCENARIO_PROMOTION",
+    "NO_V1_PRUNE_CLAIM",
+    "NO_M1_PASS"
+  ]
+}

@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: DocumentationOnly
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: ImplementationDesign
 sourceTuple: v2-m0
+receipt: docs/v2/evidence/v2-m1/p1/README.md
 ---
 
 # P1 Pulsar selector and ownership fence
@@ -24,9 +25,9 @@ The source inputs are:
 - Oxia client continuity fork `091a42c2780d92da56e9ec1f02ce1c3d988adc16`;
 - Oxia server source `37a17bef17202d5fd6e23282da5fd26d94865484` and the source-locked focused image.
 
-Pulsar work is isolated on `nereus/v2-m1-p1-selector-fence`. The final fork commit and exact P1 receipt are filled only
-after clean focused execution. Dynamic SNAPSHOT, `changing=true`, Maven Local, and a Nereus composite build are not
-allowed evidence inputs.
+Pulsar work is isolated on `nereus/v2-m1-p1-selector-fence` and is complete at clean pushed commit
+`778862323d8a86e2f36064a12166e09918ed9429`. Dynamic SNAPSHOT, `changing=true`, Maven Local, and a Nereus composite
+build are not allowed evidence inputs.
 
 ## NPS1 selector encoding
 
@@ -92,16 +93,20 @@ exact-key plus store-wide continuity invalidation registry. The latter arms befo
 idempotent local deregistration, de-duplicates one binding callback across its selector and aggregate keys, handles
 range deletion, and treats READY only as permission to revalidate. The source-locked real-Oxia integration now proves
 concurrent exact creator convergence, lifecycle restart/recreation, exact aggregate reread, and record-notification
-invalidation in two focused, zero-skip tests against `nereus/oxia-o1:37a17bef1720`. Pulsar fork `09fe914e4a` adds the
+invalidation in two focused, zero-skip tests against `nereus/oxia-o1:37a17bef1720`. Pulsar fork `09fe914e4a` first added the
 canonical broker/acquisition identities, closed transition validator that precedes `force`, authoritative direct-get
-witness, A/read/B installer, and single-word local fence with stale-install and stale-close exclusion. Exact P1 artifact
+witness, A/read/B installer, and single-word local fence with stale-install and stale-close exclusion. Final fork
+`778862323d` additionally locks exact N1/P1/O1 artifacts, consumes opaque SPI metadata versions, cross-validates the
+selector/aggregate authority, aligns Oxia to 0.9.4, and adds a closed capability gate that rejects every unqualified
+ownership writer, TableView, syncer, continuity, or ordered-invalidation configuration. Exact P1 artifact
 packaging exposes only the V2 capability package, the public READY-only continuity permit used around A/read/B, and
 deterministic binary/source artifact tasks. The immutable bundle at Nereus `23064b3b` is locked as
 `com.nereusstream:nereus-metadata-oxia-p1:0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5`; two clean builds are
 byte-identical, and `v2M1P1ArtifactCheck` verifies the closed package, exact N1/O1 dependencies, source descriptors,
-manifest, current non-zero regression tests, and non-promotion receipt. Native capability admission, the combined
-source gate, and the final P1 source-qualified receipt remain pending; this immutable adapter input is not P1
-completion or promotion evidence.
+manifest, current non-zero regression tests, and non-promotion receipt. `v2M1P1FocusedCheck` now binds that artifact,
+the clean pushed Pulsar fork, 14 Nereus metadata suites with 94 tests, one real-Oxia suite with two tests, and
+seven Pulsar suites with 34 tests. Every selected test has zero failure/error/skip. The resulting `P1_FOCUSED_ONLY` receipt
+remains `promotionEligible=false`; it is not process activation, scenario promotion, or M1 PASS.
 
 Notification callbacks invalidate but never grant admission. Continuity registration is armed before authority reads.
 READY only permits bounded revalidation; a gap, ARMING, CLOSED, reassignment, client close, or unknown reconnect first
@@ -182,6 +187,7 @@ creator and generation overflow; exact aggregate coupling; authoritative A/B mis
 gap/reconnect/SessionLost; stale installer; old completion after invalidation; local hot-path capture/recheck; unsupported
 backend refusal; clean exact source before/after; and real Oxia CAS/notification continuity.
 
-P1 is complete only when both repositories are clean and pushed, the exact source/artifact/receipt identities are
-committed, all selected tests have non-zero counts and zero failure/error/skip, and the focused gate passes. That result
-still does not select an allocator, prune V1, activate full process data paths, promote a scenario, or complete M1.
+The focused P1 implementation is complete: both repositories are clean and pushed, exact source/artifact/receipt
+identities are committed, all selected tests have non-zero counts and zero failure/error/skip, and
+`v2M1P1FocusedCheck` passes. This result still does not select an allocator, prune V1, activate full process data paths,
+promote a scenario, or complete M1.

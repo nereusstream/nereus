@@ -401,6 +401,7 @@ val dockerBackedPulsarExecTasks = setOf(
     "bookKeeperPrimaryWalM5Check",
 )
 val pulsarCheckoutExecTasks = setOf(
+    "v2M1P1FocusedSourceCheck",
     "phase2PulsarCheck",
     "phase2PulsarFinalCheck",
     "phase3M4PulsarCheck",
@@ -3399,6 +3400,30 @@ tasks.register("v2M1K1FocusedCheck") {
     description = "Verify K1 metadata authority only; no Produce/Fetch, scenario promotion, V1 prune, or M1 PASS."
     dependsOn("v2M1N1ArtifactCheck")
     dependsOn("v2M1K1FocusedSourceCheck")
+    dependsOn("v2DocumentationCheck")
+}
+
+tasks.register<Exec>("v2M1P1FocusedSourceCheck") {
+    group = "verification"
+    description = "Run the exact clean Pulsar P1 selector/ownership focused gate; this is not M1 PASS."
+    dependsOn(":nereus-metadata-oxia:p1MetadataTest")
+    dependsOn(":nereus-metadata-oxia:p1OxiaIntegrationTest")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-v2-m1-p1-pulsar.sh",
+        pulsarCheckoutPath.get(),
+        phase2DevelopmentRepository.get().asFile.absolutePath,
+    )
+}
+
+tasks.register("v2M1P1FocusedCheck") {
+    group = "verification"
+    description = "Verify P1 selector/ownership fence only; no Produce/read runtime, scenario promotion, V1 prune, or M1 PASS."
+    dependsOn("v2M1N1ArtifactCheck")
+    dependsOn("v2M1P1ArtifactCheck")
+    dependsOn("v2M1P1FocusedSourceCheck")
     dependsOn("v2DocumentationCheck")
 }
 
