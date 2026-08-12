@@ -12,14 +12,17 @@
  * limitations under the License.
  */
 
-package com.nereusstream.metadata.oxia.v2.continuity;
+package com.nereusstream.metadata.oxia.v2.mutation;
 
-/** Non-blocking, coalescing handoff to a future authoritative revalidation owner. */
-public interface RevalidationScheduler extends AutoCloseable {
-    /** Returns false if the request cannot be accepted; rejection keeps the store fail closed. */
-    boolean request(long clientGeneration, long invalidationEpoch);
+import com.nereusstream.domain.bytes.CanonicalBytes;
+import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 
-    /** Stops admission and drains or cancels work according to the owned local executor contract. */
-    @Override
-    void close();
+/** Narrow one-key client port: exact get, create-if-absent, and version CAS only. */
+public interface OxiaConditionalClient {
+    CompletionStage<Optional<AuthorityRecord>> read(String key);
+
+    CompletionStage<Void> createIfAbsent(String key, CanonicalBytes storedBytes);
+
+    CompletionStage<Void> compareAndSet(String key, CanonicalBytes storedBytes, long expectedVersionId);
 }

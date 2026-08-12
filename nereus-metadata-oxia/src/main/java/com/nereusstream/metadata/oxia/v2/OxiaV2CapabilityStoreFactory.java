@@ -14,8 +14,10 @@
 
 package com.nereusstream.metadata.oxia.v2;
 
+import com.nereusstream.metadata.oxia.v2.codec.OxiaV2CodecSet;
 import com.nereusstream.metadata.oxia.v2.continuity.RevalidationScheduler;
 import com.nereusstream.metadata.oxia.v2.continuity.StoreContinuity;
+import com.nereusstream.metadata.oxia.v2.key.OxiaV2AuthorityKeys;
 import io.oxia.client.api.AsyncOxiaClient;
 import io.oxia.client.api.OxiaClientBuilder;
 import java.util.Objects;
@@ -47,7 +49,7 @@ public final class OxiaV2CapabilityStoreFactory {
                 throw new CompletionException(unwrap(failure));
             }
             try {
-                return attach(client, scheduler);
+                return attach(client, scheduler, configuration, OxiaV2CodecSet.productionUnavailable());
             } catch (RuntimeException | Error attachFailure) {
                 scheduler.close();
                 closeClient(client, attachFailure);
@@ -56,9 +58,27 @@ public final class OxiaV2CapabilityStoreFactory {
         });
     }
 
-    static OxiaV2CapabilityStore attach(AsyncOxiaClient client, RevalidationScheduler scheduler) {
+    static OxiaV2CapabilityStore attach(
+            AsyncOxiaClient client,
+            RevalidationScheduler scheduler,
+            OxiaV2StoreConfiguration configuration,
+            OxiaV2CodecSet codecs) {
+        Objects.requireNonNull(client, "client");
+        Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(configuration, "configuration");
+        Objects.requireNonNull(codecs, "codecs");
         StoreContinuity continuity = StoreContinuity.attach(client, scheduler);
-        return new OxiaV2CapabilityStore(client, continuity, scheduler);
+        try {
+            return new OxiaV2CapabilityStore(
+                    client, continuity, scheduler, new OxiaV2AuthorityKeys(configuration.authorityRoot()), codecs);
+        } catch (RuntimeException | Error failure) {
+            try {
+                continuity.close();
+            } catch (RuntimeException closeFailure) {
+                failure.addSuppressed(closeFailure);
+            }
+            throw failure;
+        }
     }
 
     private static Throwable unwrap(Throwable failure) {

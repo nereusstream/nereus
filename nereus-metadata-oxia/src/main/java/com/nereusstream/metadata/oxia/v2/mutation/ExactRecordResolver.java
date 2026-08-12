@@ -12,14 +12,13 @@
  * limitations under the License.
  */
 
-package com.nereusstream.metadata.oxia.v2.continuity;
+package com.nereusstream.metadata.oxia.v2.mutation;
 
-/** Non-blocking, coalescing handoff to a future authoritative revalidation owner. */
-public interface RevalidationScheduler extends AutoCloseable {
-    /** Returns false if the request cannot be accepted; rejection keeps the store fail closed. */
-    boolean request(long clientGeneration, long invalidationEpoch);
+/** Decodes and classifies one exact same-key reread for a typed adapter. */
+public interface ExactRecordResolver<T> {
+    T decode(AuthorityRecord record);
 
-    /** Stops admission and drains or cancels work according to the owned local executor contract. */
-    @Override
-    void close();
+    boolean isCandidateExact(T snapshot);
+
+    boolean isPredecessorExact(T snapshot);
 }
