@@ -40,8 +40,8 @@ M1 started from these facts; the first bullet is now superseded by the implement
 - the M0 baseline had V2 implementation `NotStarted` and only documentation gates;
 - the active Gradle/BOM/CI graph is still V1 residue, including KoP runtime;
 - M1.1a is complete and M1.1b is exact-locally complete;
-- K1/P1/R1, receipt numeric caps, exact-source execution, pure-V2 graph pruning, and final promotion remain OPEN or
-  pending. M1.1c-R0 has closed only the Registry writer-count/canonical-capacity input to R1.
+- K1/P1/R1, M1-2 executable receipt-cap evidence, exact-source execution, pure-V2 graph pruning, and final promotion
+  remain OPEN or pending. M1.1c-R0 has closed only the Registry writer-count/canonical-capacity input to R1.
 
 M1 completes only when `v2M1FinalCheck` validates the pure V2 active graph, exact-source results, and trusted receipts.
 Passing an intermediate slice gate cannot change M1 or a scenario to `PASSED_CURRENT_SOURCE`.
@@ -54,7 +54,7 @@ flowchart TD
     A1 --> A2["M1.1a-B: identity and deterministic IDs"]
     A2 --> A3["M1.1a-C: minimal aggregate semantics"]
     A3 --> A4["M1.1a-D: four metadata SPIs and fakes"]
-    A4 --> A5["M1.1a-E: foundation gate and N1 artifact"]
+    A4 --> A5["M1.1a-E: foundation gate and N1 candidate"]
 
     D0 --> O1["M1.1a-O1: Oxia client continuity fork"]
     A4 --> O2["M1.1a-O2: metadata-oxia capability scaffold"]
@@ -63,12 +63,18 @@ flowchart TD
     A5 --> Q1["Evidence for M1.1b caps and legality"]
     Q1 --> B1["M1.1b: exact NTA1 codec and goldens"]
 
-    B1 --> K1["Kafka K1 authority"]
-    B1 --> P1["Pulsar selector and ownership fence"]
     B1 --> R0["M1.1c-R0: Registry capacity evidence"]
-    R0 --> R1["Registry and writer interlock"]
-    O2 --> P1
     O2 --> R0
+
+    B1 --> C1["M1-2: receipt/parser cap evidence"]
+    R0 --> C1
+    O1 --> C1
+    O2 --> C1
+    C1 --> N1["immutable N1 domain artifact"]
+    N1 --> K1["Kafka K1 authority"]
+    N1 --> P1["Pulsar selector and ownership fence"]
+    N1 --> R1["Registry and writer interlock"]
+    O2 --> P1
 
     K1 --> N2["N2 exact source tuple and gates"]
     P1 --> N2
@@ -95,10 +101,12 @@ Each target owns one row below and must preserve unrelated worktree state.
 | `M1.1b-Q1` | collect NTA1 bounds, legality, pinned-name, checked-arithmetic, and candidate-wire evidence | `M1.1a-E`; O2 codec port remains fail closed | `v2M1Nta1ReadinessCheck`; readiness only | historical evidence complete at `94881e67`: 14 focused tests and immutable [non-promotable receipt](../../evidence/v2-m0/m1.1b-q1/README.md) |
 | `M1.1b` | implement the accepted NTA1 encoder/parser/validator, exact caps/goldens, pure-input Pulsar inventory boundary, and O2 aggregate codec | accepted [M1.1b design](m1.1b-nta1-codec.md) plus Q1 evidence | `v2M1Nta1CodecCheck`; exact local only | exact-local implementation complete at `01a70f17`; 55 domain, 73 focused O2, 303 whole metadata-oxia tests; [non-promotable receipt](../../evidence/v2-m0/m1.1b/README.md) |
 | `M1.1c-R0` | test/evidence-only Registry writer-cohort inventory and canonical-capacity accounting; no production authority | accepted [R0 design](m1.1c-registry-capacity-spike.md), `M1.1b`, and O2 fail-closed Registry port | `v2M1RegistryCapacityCheck`; readiness only | verified at Nereus `03d27256`: 18 focused tests and deterministic [non-promotable evidence](../../evidence/v2-m0/m1.1c-r0/README.md) accept 14 writers and 51,016 canonical bytes |
-| `K1` | complete Kafka feature-2/API-32000/CreateTopics/image/publication authority | immutable post-M1.1b domain artifact | Kafka focused source gate | detailed design required |
-| `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | `M1.1b`, `M1.1a-O2` | Pulsar/Oxia focused source gate | detailed design required |
-| `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | accepted `M1.1c-R0` result plus `M1.1a-O2` | `REGISTRY_CONFORMANCE` | capacity input accepted; production codec/store/interlock and conformance remain NotStarted |
-| `G1` | fast/exact/final M1 gates and receipt validators | K1/P1/R1 plus accepted receipt caps | `v2M1Check`, `v2M1ExactSourceCheck`, `v2M1FinalCheck` | partially evidence blocked |
+| `M1-2` | strict receipt/parser cap model, representative roots/attachments, path and symlink safety, stable errors, and deterministic non-promotable evidence | M1.1a O1/O2 receipts, `M1.1b`, and `M1.1c-R0` | `v2M1ReceiptCapsCheck`; readiness only | accepted [implementation design](m1-2-receipt-parser-caps.md); evidence implementation pending |
+| `N1` | immutable, non-overwriteable domain/SPI artifact with source/JAR/source-JAR/POM/metadata identities | accepted M1-2 receipt caps | immutable artifact publication gate | pending; this slice does not publish it |
+| `K1` | complete Kafka feature-2/API-32000/CreateTopics/image/publication authority | immutable N1 domain artifact | Kafka focused source gate | detailed design required |
+| `P1` | selector CAS, authoritative ownership A/read/B, atomic ACTIVE fence and invalidation | immutable N1 artifact plus `M1.1a-O2` | Pulsar/Oxia focused source gate | detailed design required |
+| `R1` | compatibility-namespace Registry, writer commitment/interlock, derived views | immutable N1 artifact, accepted `M1.1c-R0`, and `M1.1a-O2` | `REGISTRY_CONFORMANCE` | capacity input accepted; production codec/store/interlock and conformance remain NotStarted |
+| `G1` | fast/exact/final M1 gates and production receipt validators | K1/P1/R1 plus accepted M1-2 receipt caps | `v2M1Check`, `v2M1ExactSourceCheck`, `v2M1FinalCheck` | blocked until M1-2 evidence closes and K1/P1/R1 exist |
 | `V1P` | cut settings/BOM/publication/CI edges, then remove V1 sources/tasks/scripts and KoP runtime | replacement graph and candidate M1 gates | active-graph/V1-absence checks | last mechanical implementation step |
 | `N3` | receipts, attachments, exact scenario/index promotion only | trusted N2 execution | final receipt validation | evidence only |
 
@@ -191,6 +199,7 @@ must not start merely because the replacement modules compile.
 | `v2M1Nta1CodecCheck` | now | production NTA1/validator, exact goldens, pure-input inventory boundary, O2 aggregate wiring, clean non-zero local tests, JDK-only and Q1 isolation | K1/P1/R1, real Oxia/Registry conformance, runtime activation, scenario promotion, M1 PASS/Final |
 | `v2M1Nta1ReadinessCheck` | now | 14 evidence-only tests over real domain objects, candidate bounds/legality, strict UTF-8/EOF/overflow/allocation, and generated JSON equality | accepted caps/policy, production encoder/parser/goldens, backend/runtime conformance, scenario promotion, M1 PASS |
 | `v2M1RegistryCapacityCheck` | after R0 harness lands | deterministic writer topology, exact 120/184/192/256/65,536 accounting, overflow and lifecycle rejection, generated evidence equality, and non-promotion boundary | R1 production codec/Store/interlock, real Oxia, allocator mode, `REGISTRY_CONFORMANCE`, scenario promotion, M1 PASS |
+| `v2M1ReceiptCapsCheck` | after the M1-2 harness lands | deterministic representative roots/attachments, JCS/parser/path/symlink boundaries, exact selected-cap formulas, committed/generated equality, and non-promotion boundary | production G1 validator, N1/K1/P1/R1, Final/N2/N3, scenario promotion, M1 PASS |
 | `v2M1Check` | after K1/P1/R1 and graph cut | ordinary deterministic M1 fast suite and V1 absence | exact external source/artifact/runtime identity |
 | `v2M1ExactSourceCheck` | N2 | clean exact forks, immutable artifacts, real Oxia, focused fork tests | evidence provenance without trusted workflow/N3 |
 | `v2M1FinalCheck` | N2/N3 | referenced gate/receipt schema and aggregate result | work not explicitly referenced by the receipts |
@@ -218,7 +227,8 @@ Stop the active slice and return to design/evidence work if it would require any
 - implementing an NTA1 encoder/parser or claiming canonical aggregate bytes before M1.1b;
 - accepting any Registry writer-count/canonical-byte result before `v2M1RegistryCapacityCheck` reproduces the R0
   evidence, or treating R0 as a production Registry codec/capacity gate;
-- selecting receipt/attachment numeric caps or promoting an N3 receipt;
+- changing the accepted M1-2 cap table without its deterministic evidence gate, implementing the production G1
+  validator inside M1-2, or promoting an N3 receipt;
 - adding an Oxia server RPC/wire change, durable notification cursor, or persisted connection/session/shard identity;
 - exposing a fifth production metadata capability, generic key/value facade, child binding/Epoch store, or allocator
   candidate SPI;
