@@ -188,5 +188,5 @@ if not planned and not promoted:
 if promoted and not (root / "docs/v2/evidence/v2-m1/n3/final-index.json").is_file():
     raise SystemExit("R1 N3 promotion footprint exists without its Final index")
 
-print("R1 focused Registry conformance verified: 4/35 domain, 2/8 metadata, 1/2 real Oxia; no allocator selection and no focused-receipt promotion")
+print("R1 focused Registry conformance verified: 4/35 domain, 2/8 metadata, 1/2 real Oxia; no allocator or promotion from focused evidence")
 PY
