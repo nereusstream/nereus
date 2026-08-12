@@ -37,6 +37,7 @@ required_v2_docs=(
     detailed_design/m1/m1.1c-registry-capacity-spike.md
     detailed_design/m1/n1-immutable-domain-artifact.md
     detailed_design/m1/k1-kafka-kraft-metadata-authority.md
+    detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md
     open-questions.md
     tradeoffs.md
 )
@@ -248,6 +249,11 @@ require_literal '8afbc425660f3466bdc3255e3dd4eb43f8685af1' "docs/v2/source-locks
 require_literal 'PASS_K1_FOCUSED_ONLY' "docs/v2/evidence/v2-m1/k1/k1-focused.json"
 require_literal 'v2M1K1FocusedCheck' "build.gradle.kts"
 require_literal '39 exact tests in 16 suites' "docs/v2/detailed_design/m1/k1-kafka-kraft-metadata-authority.md"
+require_literal 'implementationStatus: InProgress' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
+require_literal 'NPS1 selector encoding' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
+require_literal '84 + persistenceNameLength' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
+require_literal 'P1_FOCUSED_ONLY' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
+require_literal 'nereus/v2-m1-p1-selector-fence' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal 'does not own Produce/Fetch' "docs/v2/08-implementation-plan-and-gates.md"
 require_literal 'v2M1ReceiptCapsCheck' "build.gradle.kts"
 require_literal 'no N1/N2/N3, scenario promotion, or M1 Final' "build.gradle.kts"
