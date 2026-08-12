@@ -553,7 +553,7 @@ final class ReceiptV1CapacitySamples {
                 .toList();
         return sample(
                 "multi-suite",
-                "EXACT_73_CURRENT_O2_SUITE_IDS_AND_COUNTS",
+                "EXACT_73_REQUIRED_BASELINE_O2_SUITE_IDS_AND_COUNTS",
                 ReceiptKind.HARNESS_CONFORMANCE_ONLY,
                 List.of(new ScenarioResult("V2-POSITION-010", suites(oxiaRows))),
                 List.of(),
@@ -925,13 +925,20 @@ final class ReceiptV1CapacitySamples {
                 any generated `REGISTRY_CONFORMANCE` / `HARNESS_CONFORMANCE_ONLY` test vector as an authoritative
                 N2, N3, or M1 Final receipt.
 
-                ## Selected v1 caps
+                ## Authority and generation rules
 
-                - canonical root: 65,536 bytes;
-                - scenarios: 16; suites/scenario: 128; attachments: 32;
-                - single/total attachments: 262,144 / 524,288 bytes;
-                - safe POSIX-relative path: 256 bytes / 16 segments;
-                - sanitized log excerpt: 65,536 bytes.
+                ADR 0084 is the sole normative cap table. `receipt-caps.json` is its machine-checked evidence
+                projection; this Markdown does not maintain another numeric cap table.
+
+                The baseline inventory is the sorted, exact module/suite count and XML-byte snapshot from the three
+                focused Gradle test tasks at the required baseline. Representative reports retain every named suite
+                and normalized count. The Registry attachment is the structured R0 `184 + 14*120 + 256*192` layout;
+                maximum-failure and sanitized-log artifacts emit one distinct semantic row per stable rejection or
+                named fault cut. No artifact is enlarged with an anonymous repeated string.
+
+                The JSON records the executable formulas. Root headroom is fourfold because the largest sample does
+                not simultaneously maximize the independently closed scenario axis; report/Registry, bundle, path,
+                segment, and log margins use their stated twofold/fourfold or closed-kind composition rules.
 
                 Observed maxima were %d root bytes, %d scenarios in one kind-specific root, %d suites, %d attachment
                 references, %d generated single-attachment bytes, %d kind-complete bundle bytes, %d path bytes, %d
