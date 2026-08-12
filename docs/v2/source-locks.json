@@ -228,6 +228,74 @@
     "receipt": "docs/v2/evidence/v2-m1/n1/n1-artifact.json",
     "evidenceStatus": "IMMUTABLE_INPUT_ONLY"
   },
+  "p1MetadataCapabilityBinding": {
+    "sourceCommit": "23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+    "coordinateVersion": "0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+    "bundleRoot": "gradle/locked-artifacts/nereus-p1/23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+    "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+    "n1CoordinateVersion": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+    "oxiaClientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+    "oxiaClientVersion": "0.9.4",
+    "requiredModules": [
+      "com.nereusstream:nereus-metadata-oxia-p1:0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5"
+    ],
+    "artifacts": {
+      "p1Jar": {
+        "relativePath": "m2/com/nereusstream/nereus-metadata-oxia-p1/0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5/nereus-metadata-oxia-p1-0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5.jar",
+        "bytes": 85254,
+        "sha256": "71502aa8895df44e95fbf2d2b7205fb7c6aed870babb5c6cfa4731a0a9b91e84"
+      },
+      "p1SourceJar": {
+        "relativePath": "m2/com/nereusstream/nereus-metadata-oxia-p1/0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5/nereus-metadata-oxia-p1-0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5-sources.jar",
+        "bytes": 51353,
+        "sha256": "42d343cba033bd56f92f443d544c011377df54f66a57acccd09cd4e832ce038b"
+      },
+      "p1Pom": {
+        "relativePath": "m2/com/nereusstream/nereus-metadata-oxia-p1/0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5/nereus-metadata-oxia-p1-0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5.pom",
+        "bytes": 1668,
+        "sha256": "be2556b4c7b0472831122343f740212ca4c9939a06366157bc0dc623cb436f88"
+      },
+      "p1GradleMetadata": {
+        "relativePath": "m2/com/nereusstream/nereus-metadata-oxia-p1/0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5/nereus-metadata-oxia-p1-0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5.module",
+        "bytes": 3859,
+        "sha256": "7a00cebfbd17eaa4889cc2b9ba596de20224fc46b4983e6391923a13aeb30757"
+      },
+      "sourceCommitFile": {
+        "relativePath": "source-commit.txt",
+        "bytes": 41,
+        "sha256": "e9518077fb7ba8925b964cc1bd60071297fde7f692207438a7515e6651ccc60c"
+      },
+      "coordinateVersionFile": {
+        "relativePath": "coordinate-version.txt",
+        "bytes": 50,
+        "sha256": "ff6c9b74e4f8eec37ab33241bf40b35eb3fed8e8fb71ea949b0a9ea6c856c750"
+      },
+      "n1SourceCommitFile": {
+        "relativePath": "n1-source-commit.txt",
+        "bytes": 41,
+        "sha256": "b063cae29b63cea6d977228e8c84cd3bbd6e0c10f214b0544143b12198453724"
+      },
+      "n1CoordinateVersionFile": {
+        "relativePath": "n1-coordinate-version.txt",
+        "bytes": 50,
+        "sha256": "ad7fb8cc8ded6a31d8c14fd4aa6d992b1e29cd993e9864ee7d2cf5e3f75fd099"
+      },
+      "oxiaClientSourceCommitFile": {
+        "relativePath": "oxia-client-source-commit.txt",
+        "bytes": 41,
+        "sha256": "3101ba160dc9b756c5d5f9c1cc0aceb9d85900d3b8dcc15fe39483f13b17bf7c"
+      }
+    },
+    "manifest": {
+      "relativePath": "manifest.sha256",
+      "bytes": 1411,
+      "sha256": "a46dbbec8a3a7f01b08cbcf189f3a02dc9bb360f96d55d1e0c15f036f748fd37"
+    },
+    "receipt": "docs/v2/evidence/v2-m1/p1/p1-artifact.json",
+    "result": "PASS_P1_ARTIFACT_INPUT_ONLY",
+    "promotionEligible": false,
+    "evidenceStatus": "IMMUTABLE_INPUT_ONLY"
+  },
   "k1KafkaAuthorityBinding": {
     "implementationBaseId": "kafka-v2-development-base",
     "implementationBaseCommit": "76f62f3b83e882105219b6c7687dbde594a8b8a2",

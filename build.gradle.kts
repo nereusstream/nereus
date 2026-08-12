@@ -943,6 +943,22 @@ tasks.register("v2M1N1ArtifactCheck") {
     dependsOn("v2DocumentationCheck")
 }
 
+tasks.register<Exec>("v2M1P1ArtifactSourceCheck") {
+    group = "verification"
+    description = "Verify the immutable, source-qualified P1 metadata capability bundle and non-promotable receipt."
+    dependsOn(":nereus-metadata-oxia:p1MetadataTest")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m1-p1-artifact.sh")
+}
+
+tasks.register("v2M1P1ArtifactCheck") {
+    group = "verification"
+    description = "Verify the exact P1 adapter input only; no native capability, source-tuple promotion, or M1 PASS."
+    dependsOn("v2M1N1ArtifactCheck")
+    dependsOn("v2M1P1ArtifactSourceCheck")
+    dependsOn("v2DocumentationCheck")
+}
+
 val v2OxiaLockedRoot = layout.projectDirectory.dir(
     "gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16/m2/" +
         "io/github/oxia-db",

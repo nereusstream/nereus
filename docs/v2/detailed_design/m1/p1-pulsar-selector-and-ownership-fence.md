@@ -95,10 +95,12 @@ concurrent exact creator convergence, lifecycle restart/recreation, exact aggreg
 invalidation in two focused, zero-skip tests against `nereus/oxia-o1:37a17bef1720`. Pulsar fork `09fe914e4a` adds the
 canonical broker/acquisition identities, closed transition validator that precedes `force`, authoritative direct-get
 witness, A/read/B installer, and single-word local fence with stale-install and stale-close exclusion. Exact P1 artifact
-packaging now exposes only the V2 capability package, the public READY-only continuity permit used around A/read/B,
-and deterministic binary/source artifact tasks; the source-qualified bundle is published only from a clean, already
-pushed `main` commit and cannot publish the surrounding V1 module graph. Artifact locking, native capability admission,
-the combined source gate, and the P1 source-qualified receipt remain pending; these partial results are not P1
+packaging exposes only the V2 capability package, the public READY-only continuity permit used around A/read/B, and
+deterministic binary/source artifact tasks. The immutable bundle at Nereus `23064b3b` is locked as
+`com.nereusstream:nereus-metadata-oxia-p1:0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5`; two clean builds are
+byte-identical, and `v2M1P1ArtifactCheck` verifies the closed package, exact N1/O1 dependencies, source descriptors,
+manifest, current non-zero regression tests, and non-promotion receipt. Native capability admission, the combined
+source gate, and the final P1 source-qualified receipt remain pending; this immutable adapter input is not P1
 completion or promotion evidence.
 
 Notification callbacks invalidate but never grant admission. Continuity registration is armed before authority reads.

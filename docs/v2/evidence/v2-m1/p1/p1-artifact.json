@@ -1,0 +1,27 @@
+{
+  "schema": "NEREUS_V2_P1_ARTIFACT_RECEIPT_V1",
+  "sourceTupleId": "v2-m0",
+  "sourceCommit": "23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+  "coordinateVersion": "0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+  "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+  "n1CoordinateVersion": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+  "oxiaClientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+  "oxiaClientVersion": "0.9.4",
+  "manifestSha256": "a46dbbec8a3a7f01b08cbcf189f3a02dc9bb360f96d55d1e0c15f036f748fd37",
+  "artifactBytes": 142357,
+  "cleanBuilds": 2,
+  "byteIdentical": true,
+  "testSelection": "com.nereusstream.metadata.oxia.v2.*",
+  "tests": {
+    "discovered": 94,
+    "executed": 94,
+    "passed": 94,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "result": "PASS_P1_ARTIFACT_INPUT_ONLY",
+  "selectionEligible": false,
+  "promotionEligible": false,
+  "boundary": "Immutable P1 adapter input only; no native Pulsar capability, combined source proof, scenario promotion, M1 Final, or M1 PASS."
+}

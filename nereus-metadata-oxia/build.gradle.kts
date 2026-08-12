@@ -188,6 +188,17 @@ tasks.register<Test>("p1OxiaIntegrationTest") {
     }
 }
 
+tasks.register<Test>("p1MetadataTest") {
+    group = "verification"
+    description = "Run the deterministic P1 V2 metadata capability unit gate."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.*")
+    }
+}
+
 val oxiaCapabilitySpikeReportDir = layout.buildDirectory.dir("reports/oxia-capability-spike")
 
 tasks.register<Test>("oxiaCapabilitySpike") {
