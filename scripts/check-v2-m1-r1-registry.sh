@@ -174,8 +174,19 @@ scenarios = json.loads((root / "docs/v2/v2-scenarios.json").read_text())["scenar
 position = {row["id"]: row for row in scenarios if row["id"] in {f"V2-POSITION-{i:03d}" for i in range(3, 10)}}
 if set(position) != {f"V2-POSITION-{i:03d}" for i in range(3, 10)}:
     raise SystemExit("R1 scenario inventory is incomplete")
-if any(row.get("status") != "PLANNED" or row.get("evidenceReceipt") is not None for row in position.values()):
-    raise SystemExit("R1 focused evidence prematurely promoted a scenario")
+planned = all(
+    row.get("status") == "PLANNED" and row.get("evidenceReceipt") is None
+    for row in position.values()
+)
+promoted = all(
+    row.get("status") == "PASSED_CURRENT_SOURCE"
+    and row.get("evidenceReceipt") == "docs/v2/evidence/v2-m1/n3/registry-conformance.json"
+    for row in position.values()
+)
+if not planned and not promoted:
+    raise SystemExit("R1 scenario state is neither pre-N3 PLANNED nor the exact Registry N3 promotion footprint")
+if promoted and not (root / "docs/v2/evidence/v2-m1/n3/final-index.json").is_file():
+    raise SystemExit("R1 N3 promotion footprint exists without its Final index")
 
-print("R1 focused Registry conformance verified: 4/35 domain, 2/8 metadata, 1/2 real Oxia; no allocator or promotion")
+print("R1 focused Registry conformance verified: 4/35 domain, 2/8 metadata, 1/2 real Oxia; no allocator selection and no focused-receipt promotion")
 PY

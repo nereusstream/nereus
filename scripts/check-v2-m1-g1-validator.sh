@@ -157,8 +157,25 @@ for relative in (
 scenarios = json.loads((root / "docs/v2/v2-scenarios.json").read_text())["scenarios"]
 required = {f"V2-POSITION-{ordinal:03d}" for ordinal in range(3, 12)}
 rows = {row["id"]: row for row in scenarios if row["id"] in required}
-if set(rows) != required or any(row.get("status") != "PLANNED" or row.get("evidenceReceipt") is not None for row in rows.values()):
-    raise SystemExit("G1 focused evidence prematurely promoted a virtual-ledger scenario")
+if set(rows) != required:
+    raise SystemExit("G1 virtual-ledger scenario inventory is incomplete")
+planned = all(
+    row.get("status") == "PLANNED" and row.get("evidenceReceipt") is None
+    for row in rows.values()
+)
+promoted = all(
+    row.get("status") == "PASSED_CURRENT_SOURCE"
+    and row.get("evidenceReceipt") == (
+        "docs/v2/evidence/v2-m1/n3/registry-conformance.json"
+        if ordinal <= 9
+        else "docs/v2/evidence/v2-m1/n3/harness-conformance.json"
+    )
+    for ordinal, row in ((int(scenario_id.rsplit("-", 1)[1]), row) for scenario_id, row in rows.items())
+)
+if not planned and not promoted:
+    raise SystemExit("G1 scenario state is neither pre-N3 PLANNED nor the exact N3 promotion footprint")
+if promoted and not (root / "docs/v2/evidence/v2-m1/n3/final-index.json").is_file():
+    raise SystemExit("G1 N3 promotion footprint exists without its Final index")
 PY
 
-echo "V2 M1 G1 production validator and evidence-only allocator harness verified; no scenario promotion or M1 PASS."
+echo "V2 M1 G1 production validator and evidence-only allocator harness verified; focused evidence remains non-promotable, and any current promotion is restricted to the exact N3 footprint."
