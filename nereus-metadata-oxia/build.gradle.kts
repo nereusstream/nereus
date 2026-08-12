@@ -151,6 +151,19 @@ tasks.register<Test>("f9ActivationOxiaIntegrationTest") {
     }
 }
 
+tasks.register<Test>("p1OxiaIntegrationTest") {
+    group = "verification"
+    description = "Run the P1 selector, aggregate, restart, and notification gate against source-locked real Oxia."
+    testClassesDirs = oxiaIntegrationTest.output.classesDirs
+    classpath = oxiaIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.PulsarP1OxiaIntegrationTest")
+    }
+}
+
 val oxiaCapabilitySpikeReportDir = layout.buildDirectory.dir("reports/oxia-capability-spike")
 
 tasks.register<Test>("oxiaCapabilitySpike") {

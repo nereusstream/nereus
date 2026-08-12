@@ -93,9 +93,11 @@ evidence. The remaining descendants and recently closed evidence input are:
 
 O1, O2, R0, M1-2, N1, and focused K1 are governed by their accepted implementation designs and non-promotable
 receipts. K1 is exact-source complete at Kafka `8afbc42566` but does not promote a scenario or M1. P1 now has an
-accepted [code-level design](detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md) and is in implementation;
-R1, the G1 production parser, real Oxia/Registry conformance, N2/N3, and promotion descendants remain OPEN, pending, or
-non-normative until their own required implementation/evidence gate or explicit design confirmation.
+accepted [code-level design](detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md), two source-locked real-Oxia
+lifecycle tests, and Pulsar native witness/fence primitives at `09fe914e4a`; its exact artifact lock, qualified native
+admission/all-writer wiring, combined source gate, and receipt remain pending. R1, the G1 production parser,
+Registry conformance, N2/N3, and promotion descendants remain OPEN, pending, or non-normative until their own required
+implementation/evidence gate or explicit design confirmation.
 
 ## Restarted Grill 2: evidence frontier
 

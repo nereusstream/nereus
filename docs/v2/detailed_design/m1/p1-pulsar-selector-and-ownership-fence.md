@@ -90,9 +90,13 @@ The current Nereus implementation now includes the exact NPS1 codec and transiti
 `PulsarTopicAuthorityCoordinator` reserve/create/reread/activate/delete state machine, and a capability-store-owned
 exact-key plus store-wide continuity invalidation registry. The latter arms before authority reads, supports bounded
 idempotent local deregistration, de-duplicates one binding callback across its selector and aggregate keys, handles
-range deletion, and treats READY only as permission to revalidate. Native ownership witness/A-read-B/local-fence work,
-real-Oxia focused execution, and the P1 source-qualified receipt remain pending; this partial implementation is not P1
-completion or promotion evidence.
+range deletion, and treats READY only as permission to revalidate. The source-locked real-Oxia integration now proves
+concurrent exact creator convergence, lifecycle restart/recreation, exact aggregate reread, and record-notification
+invalidation in two focused, zero-skip tests against `nereus/oxia-o1:37a17bef1720`. Pulsar fork `09fe914e4a` adds the
+canonical broker/acquisition identities, closed transition validator that precedes `force`, authoritative direct-get
+witness, A/read/B installer, and single-word local fence with stale-install and stale-close exclusion. Exact P1 artifact
+locking, capability admission/all-writer transition wiring, the combined source gate, and the P1 source-qualified
+receipt remain pending; these partial results are not P1 completion or promotion evidence.
 
 Notification callbacks invalidate but never grant admission. Continuity registration is armed before authority reads.
 READY only permits bounded revalidation; a gap, ARMING, CLOSED, reassignment, client close, or unknown reconnect first
