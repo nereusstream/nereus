@@ -41,9 +41,10 @@ M1 started from these facts; the first bullet is now superseded by the implement
 - the active Gradle/BOM/CI graph is still V1 residue, including KoP runtime;
 - M1.1a is complete and M1.1b is exact-locally complete;
 - P1 implementation is in progress: NPS1, closed transitions, the selector/aggregate coordinator, exact-key plus
-  continuity invalidation, two source-locked real-Oxia lifecycle tests, and Pulsar fork native witness/A-read-B/atomic
-  ACTIVE-fence primitives through `09fe914e4a` are implemented. Exact P1 artifact locking, capability admission and
-  all-writer transition wiring, the combined source-qualified gate/receipt, R1, final exact-source aggregation,
+  continuity invalidation, two source-locked real-Oxia lifecycle tests, Pulsar fork native witness/A-read-B/atomic
+  ACTIVE-fence primitives through `09fe914e4a`, and the filtered deterministic P1 artifact builder are implemented.
+  Immutable P1 artifact locking, native capability admission, the combined source-qualified gate/receipt, R1,
+  final exact-source aggregation,
   pure-V2 graph pruning, and final promotion remain OPEN or pending. K1 is focused-exact complete but non-promotable.
   M1.1c-R0 has
   closed only the Registry writer-count/canonical-capacity input to R1, and M1-2 has closed only the persisted-v1

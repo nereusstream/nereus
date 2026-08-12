@@ -80,7 +80,8 @@ public final class StoreContinuity implements AutoCloseable {
         };
     }
 
-    Optional<InstallPermit> captureInstallPermit() {
+    /** Captures a READY-only cut for a later exact continuity check. */
+    public Optional<InstallPermit> captureInstallPermit() {
         StoreContinuitySnapshot current = snapshot.get();
         if (current.state() != StoreContinuityState.READY) {
             return Optional.empty();
@@ -88,7 +89,8 @@ public final class StoreContinuity implements AutoCloseable {
         return Optional.of(new InstallPermit(current.clientGeneration(), current.invalidationEpoch()));
     }
 
-    boolean isCurrent(InstallPermit permit) {
+    /** Checks the full generation and invalidation epoch; the permit never grants authority. */
+    public boolean isCurrent(InstallPermit permit) {
         Objects.requireNonNull(permit, "permit");
         StoreContinuitySnapshot current = snapshot.get();
         return current.state() == StoreContinuityState.READY

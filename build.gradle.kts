@@ -204,10 +204,20 @@ plugins {
 group = providers.gradleProperty("nereusGroup").get()
 val configuredNereusVersion = providers.gradleProperty("nereusVersion").get()
 val supportedNereusVersion =
-    Regex("([0-9]+\\.[0-9]+\\.[0-9]+)(?:-SNAPSHOT|-f2-dev|-f9-dev|-n1\\.[0-9a-f]{40})?")
+    Regex(
+        "([0-9]+\\.[0-9]+\\.[0-9]+)" +
+            "(?:-SNAPSHOT|-f2-dev|-f9-dev|-n1\\.[0-9a-f]{40}|-p1\\.[0-9a-f]{40})?",
+    )
 val configuredVersionMatch = requireNotNull(supportedNereusVersion.matchEntire(configuredNereusVersion)) {
     "nereusVersion must be X.Y.Z, X.Y.Z-SNAPSHOT, X.Y.Z-f2-dev, X.Y.Z-f9-dev, " +
-        "or source-qualified X.Y.Z-n1.<40-lowercase-hex>"
+        "or source-qualified X.Y.Z-n1.<40-lowercase-hex>/X.Y.Z-p1.<40-lowercase-hex>"
+}
+if ("-p1." in configuredNereusVersion) {
+    val allowedP1ArtifactTasks = setOf("clean", "p1ArtifactJar", "p1ArtifactSourcesJar")
+    check(gradle.startParameter.taskNames.isNotEmpty()
+            && gradle.startParameter.taskNames.all { it.substringAfterLast(':') in allowedP1ArtifactTasks }) {
+        "The source-qualified P1 coordinate is restricted to the filtered metadata capability artifact tasks"
+    }
 }
 val releaseLineVersion = configuredVersionMatch.groupValues[1]
 val phase2DevelopmentVersion = "$releaseLineVersion-f2-dev"

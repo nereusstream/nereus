@@ -21,6 +21,7 @@ import com.nereusstream.metadata.oxia.v2.capability.OxiaTopicBindingAggregatePub
 import com.nereusstream.metadata.oxia.v2.capability.OxiaTopicBindingAggregateReader;
 import com.nereusstream.metadata.oxia.v2.capability.PulsarTopicAuthorityCoordinator;
 import com.nereusstream.metadata.oxia.v2.codec.OxiaV2CodecSet;
+import com.nereusstream.metadata.oxia.v2.continuity.InstallPermit;
 import com.nereusstream.metadata.oxia.v2.continuity.RevalidationScheduler;
 import com.nereusstream.metadata.oxia.v2.continuity.StoreContinuity;
 import com.nereusstream.metadata.oxia.v2.continuity.StoreContinuitySnapshot;
@@ -37,6 +38,7 @@ import com.nereusstream.metadata.spi.capability.TopicBindingAggregatePublisher;
 import com.nereusstream.metadata.spi.capability.TopicBindingAggregateReader;
 import io.oxia.client.api.AsyncOxiaClient;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Owns the shared client and store-wide O2 lifecycle; selector/Registry and activation remain fail closed. */
@@ -126,6 +128,33 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
             throw new IllegalStateException("P1 selector invalidation capability is unavailable");
         }
         return invalidationRegistry.register(incarnation, invalidation);
+    }
+
+    /**
+     * Captures the current P1 continuity cut after invalidation registration is armed.
+     *
+     * <p>An empty result means that authoritative installation must fail closed. A returned permit
+     * is only an input to the later {@link #isCurrent(InstallPermit)} check and never grants ACTIVE
+     * authority on its own.
+     */
+    public Optional<InstallPermit> capturePulsarInstallPermit() {
+        requireOpen();
+        if (!pulsarSelectorReady) {
+            return Optional.empty();
+        }
+        return continuity.captureInstallPermit();
+    }
+
+    /** Returns whether the exact captured continuity cut is still READY and current. */
+    public boolean isCurrent(InstallPermit permit) {
+        requireOpen();
+        return continuity.isCurrent(Objects.requireNonNull(permit, "permit"));
+    }
+
+    /** Returns the current process-local invalidation epoch for one-word native fence invalidation. */
+    public long currentInvalidationEpoch() {
+        requireOpen();
+        return continuity.current().invalidationEpoch();
     }
 
     AsyncOxiaClient client() {

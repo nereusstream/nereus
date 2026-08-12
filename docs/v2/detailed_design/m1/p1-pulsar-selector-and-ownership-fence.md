@@ -95,8 +95,11 @@ concurrent exact creator convergence, lifecycle restart/recreation, exact aggreg
 invalidation in two focused, zero-skip tests against `nereus/oxia-o1:37a17bef1720`. Pulsar fork `09fe914e4a` adds the
 canonical broker/acquisition identities, closed transition validator that precedes `force`, authoritative direct-get
 witness, A/read/B installer, and single-word local fence with stale-install and stale-close exclusion. Exact P1 artifact
-locking, capability admission/all-writer transition wiring, the combined source gate, and the P1 source-qualified
-receipt remain pending; these partial results are not P1 completion or promotion evidence.
+packaging now exposes only the V2 capability package, the public READY-only continuity permit used around A/read/B,
+and deterministic binary/source artifact tasks; the source-qualified bundle is published only from a clean, already
+pushed `main` commit and cannot publish the surrounding V1 module graph. Artifact locking, native capability admission,
+the combined source gate, and the P1 source-qualified receipt remain pending; these partial results are not P1
+completion or promotion evidence.
 
 Notification callbacks invalidate but never grant admission. Continuity registration is armed before authority reads.
 READY only permits bounded revalidation; a gap, ARMING, CLOSED, reassignment, client close, or unknown reconnect first

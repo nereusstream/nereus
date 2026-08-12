@@ -14,5 +14,20 @@
 
 package com.nereusstream.metadata.oxia.v2.continuity;
 
-/** Package-internal cut checked by a future P1 installer after authoritative rereads. */
-record InstallPermit(long clientGeneration, long invalidationEpoch) {}
+/**
+ * Process-local P1 cut captured before authoritative reads and checked immediately before
+ * installing a local ACTIVE fence.
+ *
+ * <p>The values are never persisted and never grant authority by themselves. They only prove that
+ * the same READY notification-continuity generation remained current across an A/read/B sequence.
+ */
+public record InstallPermit(long clientGeneration, long invalidationEpoch) {
+    public InstallPermit {
+        if (clientGeneration < 0) {
+            throw new IllegalArgumentException("clientGeneration must not be negative");
+        }
+        if (invalidationEpoch <= 0) {
+            throw new IllegalArgumentException("invalidationEpoch must be positive");
+        }
+    }
+}

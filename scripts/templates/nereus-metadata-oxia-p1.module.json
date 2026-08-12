@@ -1,0 +1,85 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.nereusstream",
+    "module": "nereus-metadata-oxia-p1",
+    "version": "@P1_VERSION@",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {"group": "com.nereusstream", "module": "nereus-domain", "version": {"requires": "@N1_VERSION@"}},
+        {"group": "com.nereusstream", "module": "nereus-metadata-spi", "version": {"requires": "@N1_VERSION@"}},
+        {"group": "io.github.oxia-db", "module": "oxia-client", "version": {"requires": "@OXIA_VERSION@"}}
+      ],
+      "files": [
+        {
+          "name": "@JAR_NAME@",
+          "url": "@JAR_NAME@",
+          "size": @JAR_SIZE@,
+          "sha512": "@JAR_SHA512@",
+          "sha256": "@JAR_SHA256@",
+          "sha1": "@JAR_SHA1@",
+          "md5": "@JAR_MD5@"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {"group": "com.nereusstream", "module": "nereus-domain", "version": {"requires": "@N1_VERSION@"}},
+        {"group": "com.nereusstream", "module": "nereus-metadata-spi", "version": {"requires": "@N1_VERSION@"}},
+        {"group": "io.github.oxia-db", "module": "oxia-client", "version": {"requires": "@OXIA_VERSION@"}}
+      ],
+      "files": [
+        {
+          "name": "@JAR_NAME@",
+          "url": "@JAR_NAME@",
+          "size": @JAR_SIZE@,
+          "sha512": "@JAR_SHA512@",
+          "sha256": "@JAR_SHA256@",
+          "sha1": "@JAR_SHA1@",
+          "md5": "@JAR_MD5@"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "@SOURCES_NAME@",
+          "url": "@SOURCES_NAME@",
+          "size": @SOURCES_SIZE@,
+          "sha512": "@SOURCES_SHA512@",
+          "sha256": "@SOURCES_SHA256@",
+          "sha1": "@SOURCES_SHA1@",
+          "md5": "@SOURCES_MD5@"
+        }
+      ]
+    }
+  ]
+}

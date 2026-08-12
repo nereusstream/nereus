@@ -1,3 +1,5 @@
+import org.gradle.jvm.tasks.Jar
+
 /*
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +16,28 @@
 
 plugins {
     `java-test-fixtures`
+}
+
+val p1ArtifactJar by tasks.registering(Jar::class) {
+    group = "build"
+    description = "Build the source-qualified P1-only metadata capability artifact."
+    archiveBaseName.set("nereus-metadata-oxia-p1")
+    from(sourceSets.main.get().output)
+    include("com/nereusstream/metadata/oxia/v2/**")
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+    dependsOn(tasks.named("classes"))
+}
+
+val p1ArtifactSourcesJar by tasks.registering(Jar::class) {
+    group = "build"
+    description = "Build sources for the source-qualified P1-only metadata capability artifact."
+    archiveBaseName.set("nereus-metadata-oxia-p1")
+    archiveClassifier.set("sources")
+    from(sourceSets.main.get().allSource)
+    include("com/nereusstream/metadata/oxia/v2/**")
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
 }
 
 val oxiaCapabilitySpike by sourceSets.creating {

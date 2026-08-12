@@ -17,6 +17,7 @@ package com.nereusstream.metadata.oxia.v2;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.metadata.oxia.v2.codec.OxiaV2CodecSet;
+import com.nereusstream.metadata.oxia.v2.continuity.InstallPermit;
 import com.nereusstream.metadata.oxia.v2.testing.FakeO1ContinuityClient;
 import com.nereusstream.metadata.oxia.v2.testing.O2TestValues;
 import com.nereusstream.metadata.oxia.v2.testing.RecordingRevalidationScheduler;
@@ -94,6 +95,32 @@ class OxiaV2CapabilityStoreTest {
         second.close();
     }
 
+    @Test
+    void p1InstallPermitIsPublicButNeverGrantsAcrossContinuityLoss() throws Exception {
+        FakeO1ContinuityClient client = new FakeO1ContinuityClient(1, NotificationContinuityState.READY);
+        OxiaV2CapabilityStore store = attachP1(client, new RecordingRevalidationScheduler());
+
+        InstallPermit permit = store.capturePulsarInstallPermit().orElseThrow();
+        long capturedEpoch = store.currentInvalidationEpoch();
+        assertThat(store.isCurrent(permit)).isTrue();
+
+        client.emit(2, NotificationContinuityState.ARMING);
+
+        assertThat(store.currentInvalidationEpoch()).isGreaterThan(capturedEpoch);
+        assertThat(store.isCurrent(permit)).isFalse();
+        assertThat(store.capturePulsarInstallPermit()).isEmpty();
+        store.close();
+    }
+
+    @Test
+    void aggregateOnlyStoreCannotExportAP1InstallPermit() throws Exception {
+        FakeO1ContinuityClient client = new FakeO1ContinuityClient(1, NotificationContinuityState.READY);
+        OxiaV2CapabilityStore store = attach(client, new RecordingRevalidationScheduler());
+
+        assertThat(store.capturePulsarInstallPermit()).isEmpty();
+        store.close();
+    }
+
     private static OxiaV2CapabilityStore attach(
             FakeO1ContinuityClient client, RecordingRevalidationScheduler scheduler) {
         return OxiaV2CapabilityStoreFactory.attach(
@@ -101,5 +128,14 @@ class OxiaV2CapabilityStoreTest {
                 scheduler,
                 new OxiaV2StoreConfiguration("localhost:6648", "test", "/nereus/test"),
                 OxiaV2CodecSet.productionAggregateOnly());
+    }
+
+    private static OxiaV2CapabilityStore attachP1(
+            FakeO1ContinuityClient client, RecordingRevalidationScheduler scheduler) {
+        return OxiaV2CapabilityStoreFactory.attach(
+                client.client(),
+                scheduler,
+                new OxiaV2StoreConfiguration("localhost:6648", "test", "/nereus/test"),
+                OxiaV2CodecSet.productionP1());
     }
 }
