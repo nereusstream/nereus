@@ -18,6 +18,7 @@ import com.nereusstream.metadata.oxia.v2.capability.OxiaPulsarTopicGenerationSel
 import com.nereusstream.metadata.oxia.v2.capability.OxiaPulsarVirtualLedgerNamespaceRegistryStore;
 import com.nereusstream.metadata.oxia.v2.capability.OxiaTopicBindingAggregatePublisher;
 import com.nereusstream.metadata.oxia.v2.capability.OxiaTopicBindingAggregateReader;
+import com.nereusstream.metadata.oxia.v2.capability.PulsarTopicAuthorityCoordinator;
 import com.nereusstream.metadata.oxia.v2.codec.OxiaV2CodecSet;
 import com.nereusstream.metadata.oxia.v2.continuity.RevalidationScheduler;
 import com.nereusstream.metadata.oxia.v2.continuity.StoreContinuity;
@@ -101,6 +102,15 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
 
     public PulsarVirtualLedgerNamespaceRegistryStore registryStore() {
         return registryStore;
+    }
+
+    /** Creates the P1 coordinator over this store's exact narrow capabilities. */
+    public PulsarTopicAuthorityCoordinator pulsarTopicAuthorityCoordinator() {
+        requireOpen();
+        if (!pulsarSelectorReady) {
+            throw new IllegalStateException("P1 selector capability is unavailable");
+        }
+        return new PulsarTopicAuthorityCoordinator(aggregatePublisher, aggregateReader, selectorStore);
     }
 
     AsyncOxiaClient client() {

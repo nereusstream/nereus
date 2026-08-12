@@ -63,9 +63,13 @@ public final class O2TestValues {
     }
 
     public static AggregatePublicationCandidate aggregateCandidate(String storedValue) {
+        return aggregateCandidate(storedValue, 1);
+    }
+
+    public static AggregatePublicationCandidate aggregateCandidate(String storedValue, long generation) {
         PulsarProtocolCellIdentity cell =
                 new PulsarProtocolCellIdentity(DEPLOYMENT, RESERVATION, new PulsarCellId(new Id128(5, 6)));
-        PulsarTopicIncarnationIdentity incarnation = incarnation(1);
+        PulsarTopicIncarnationIdentity incarnation = incarnation(generation);
         TopicBindingId bindingId = DeterministicTopicIdsV1.deriveBindingId(cell, incarnation);
         StorageEpochId epochId = DeterministicTopicIdsV1.deriveStorageEpochId(bindingId, 0);
         TopicBindingAggregateV1 aggregate = new TopicBindingAggregateV1(
@@ -92,8 +96,12 @@ public final class O2TestValues {
     }
 
     public static AggregatePublicationCandidate productionAggregateCandidate() {
+        return productionAggregateCandidate(1);
+    }
+
+    public static AggregatePublicationCandidate productionAggregateCandidate(long generation) {
         TopicBindingAggregateV1 aggregate =
-                aggregateCandidate("test-only-placeholder").aggregate();
+                aggregateCandidate("test-only-placeholder", generation).aggregate();
         CanonicalBytes bytes = Nta1CodecV1.encode(aggregate);
         return new AggregatePublicationCandidate(aggregate, bytes, Sha256Digest.hash(bytes));
     }
