@@ -703,7 +703,7 @@ tasks.register<Exec>("v2M1EvidenceFreshnessBoundaryTest") {
     group = "verification"
     description = "Run deterministic checkout-to-Final freshness boundary tests."
     workingDir = layout.projectDirectory.asFile
-    commandLine("python3", "scripts/test-v2-m1-evidence-freshness.py")
+    commandLine("python3", "scripts/check-v2-m1-evidence-freshness-tests.py")
 }
 
 tasks.register<Exec>("v2M1EvidenceFreshnessCheck") {

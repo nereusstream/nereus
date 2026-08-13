@@ -154,10 +154,10 @@ for gate in ("v2M1Check", "v2M1ExactSourceCheck", "v2M1EvidenceFreshnessCheck", 
 for relative in (
     "scripts/check-v2-m1-active-graph.sh",
     "scripts/check-v2-m1-evidence-freshness.sh",
+    "scripts/check-v2-m1-evidence-freshness.py",
     "scripts/check-v2-m1-exact-source.sh",
     "scripts/check-v2-m1-fast.sh",
-    "scripts/test-v2-m1-evidence-freshness.py",
-    "scripts/v2_m1_evidence_freshness.py",
+    "scripts/check-v2-m1-evidence-freshness-tests.py",
 ):
     if not (root / relative).is_file():
         raise SystemExit(f"G1 gate implementation disappeared after the active-graph cut: {relative}")

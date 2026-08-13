@@ -13,7 +13,7 @@ import tempfile
 import unittest
 
 
-SCRIPT = pathlib.Path(__file__).with_name("v2_m1_evidence_freshness.py")
+SCRIPT = pathlib.Path(__file__).with_name("check-v2-m1-evidence-freshness.py")
 
 
 def git(root: pathlib.Path, *args: str) -> str:

@@ -7,4 +7,4 @@ if [[ $# -ne 1 ]]; then
 fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec python3 "$repo_root/scripts/v2_m1_evidence_freshness.py" "$repo_root" "$1"
+exec python3 "$repo_root/scripts/check-v2-m1-evidence-freshness.py" "$repo_root" "$1"
