@@ -123,8 +123,9 @@ M1 has three non-duplicating gates:
 Zero discovered tests, skipped mandatory tests, failures, dirty/source-changing checkouts, stale Final evidence, or
 digest mismatches cannot pass. Fast PR CI runs `v2M1Check`; exact/final gates run only after the repository's promotion
 workflow is backed by a protected `v2-m1-promotion` environment and dedicated `nereus-v2-m1` runner. That workflow
-regenerates Fast/Exact gate results and byte-compares them with the committed N3 references before Final; its YAML,
-environment configuration, runner registration, or a queued run is not promotion evidence without a successful run.
+regenerates Fast/Exact gate results, normalized JUnit reports, both canonical receipts, and the Final index, then
+byte-compares all seven N3 files before Final; its YAML, environment configuration, runner registration, or a queued
+run is not promotion evidence without a successful run.
 
 Cross-repository promotion uses four stages and at least five commits:
 

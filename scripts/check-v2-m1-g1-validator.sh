@@ -155,9 +155,11 @@ for relative in (
     "scripts/check-v2-m1-active-graph.sh",
     "scripts/check-v2-m1-evidence-freshness.sh",
     "scripts/check-v2-m1-evidence-freshness.py",
+    "scripts/check-v2-m1-evidence-freshness-tests.py",
+    "scripts/check-v2-m1-n3-evidence-publisher.py",
     "scripts/check-v2-m1-exact-source.sh",
     "scripts/check-v2-m1-fast.sh",
-    "scripts/check-v2-m1-evidence-freshness-tests.py",
+    "scripts/publish-v2-m1-n3-evidence.py",
 ):
     if not (root / relative).is_file():
         raise SystemExit(f"G1 gate implementation disappeared after the active-graph cut: {relative}")

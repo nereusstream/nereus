@@ -100,8 +100,9 @@ descendants and recently closed evidence input are:
 - **Current re-promotion operational blocker:** the repository now defines the exact-source/Final workflow contract,
   but as of 2026-08-13 the GitHub repository has no `v2-m1-promotion` Environment and reports zero self-hosted runners.
   A protected environment, one `nereus-v2-m1` runner with the source-qualified Oxia image, and a successful workflow
-  run are required before refreshed N3 evidence may claim current M1 completion. This is not an allocator or runtime
-  architecture OPEN and cannot be closed by committing the workflow YAML alone.
+  run that regenerates and byte-compares all seven gate/report/receipt/Final files are required before refreshed N3
+  evidence may claim current M1 completion. This is not an allocator or runtime architecture OPEN and cannot be closed
+  by committing the workflow YAML alone.
 
 O1, O2, R0, M1-2, N1, and focused K1/P1/R1 are governed by their accepted implementation designs and non-promotable
 receipts. K1 is exact-source complete at Kafka `8afbc42566`; P1 preserves its focused receipt at Pulsar `778862323d`

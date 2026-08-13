@@ -706,10 +706,17 @@ tasks.register<Exec>("v2M1EvidenceFreshnessBoundaryTest") {
     commandLine("python3", "scripts/check-v2-m1-evidence-freshness-tests.py")
 }
 
+tasks.register<Exec>("v2M1N3EvidencePublisherBoundaryTest") {
+    group = "verification"
+    description = "Run deterministic JUnit-to-canonical-N3 evidence publisher boundary tests."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m1-n3-evidence-publisher.py")
+}
+
 tasks.register<Exec>("v2M1EvidenceFreshnessCheck") {
     group = "verification"
     description = "Require Final evidence to bind this clean checkout through evidence-only descendant commits."
-    dependsOn("v2M1EvidenceFreshnessBoundaryTest")
+    dependsOn("v2M1EvidenceFreshnessBoundaryTest", "v2M1N3EvidencePublisherBoundaryTest")
     workingDir = layout.projectDirectory.asFile
     commandLine("bash", "scripts/check-v2-m1-evidence-freshness.sh", v2M1FinalIndexPath.get())
 }

@@ -88,10 +88,14 @@ jobs:
           command -v rg
           docker image inspect "$(python3 -c 'import json; print(json.load(open("docs/v2/source-locks.json"))["dependencyEvidenceBindings"]["oxiaServerRuntime"]["imageReference"])')"
 
-      - name: Regenerate source-bound Fast and Exact gate results
+      - name: Regenerate source-bound gates, reports, receipts, and Final index
         shell: bash
         run: |
           source_tuple_sha="$(python3 -c 'import json; print(json.load(open("docs/v2/evidence/v2-m1/n3/final-index.json"))["sourceTupleSha"])')"
+          tested_nereus_commit="$(python3 -c 'import json; print(json.load(open("docs/v2/evidence/v2-m1/n3/harness-conformance.json"))["sourceTuple"]["nereusCommit"])')"
+          computed_source_tuple_sha="$(python3 scripts/publish-v2-m1-n3-evidence.py source-tuple-sha \
+            --repo-root . --nereus-commit "$tested_nereus_commit")"
+          test "$computed_source_tuple_sha" = "$source_tuple_sha"
           ./gradlew v2M1FastGateResult v2M1ExactSourceGateResult \
             -Pv2M1SourceTupleSha="$source_tuple_sha" \
             -Pv2M1FastGateResult="$RUNNER_TEMP/fast.json" \
@@ -101,8 +105,13 @@ jobs:
             -PoxiaClientCheckout="$RUNNER_TEMP/nereus-v2-m1-trusted/oxia-client-java" \
             -PoxiaServerCheckout="$RUNNER_TEMP/nereus-v2-m1-trusted/oxia" \
             --no-build-cache --rerun-tasks
-          cmp "$RUNNER_TEMP/fast.json" docs/v2/evidence/v2-m1/n3/gates/fast.json
-          cmp "$RUNNER_TEMP/exact-source.json" docs/v2/evidence/v2-m1/n3/gates/exact-source.json
+          python3 scripts/publish-v2-m1-n3-evidence.py generate \
+            --repo-root . \
+            --nereus-commit "$tested_nereus_commit" \
+            --fast-gate "$RUNNER_TEMP/fast.json" \
+            --exact-gate "$RUNNER_TEMP/exact-source.json" \
+            --output "$RUNNER_TEMP/nereus-v2-m1-n3-generated"
+          diff -r "$RUNNER_TEMP/nereus-v2-m1-n3-generated" docs/v2/evidence/v2-m1/n3
 
       - name: Validate fresh committed Final evidence
         shell: bash

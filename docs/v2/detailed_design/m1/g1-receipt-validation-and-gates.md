@@ -98,8 +98,9 @@ canonical receipts under the final source tuple. N3 may commit only those eviden
 scenario promotion. Any code, gate, workflow, ADR, or source-lock change returns to N2. The promotion workflow requires
 a protected `v2-m1-promotion` environment and dedicated `nereus-v2-m1` runner, checks out the source-locked external
 repositories, requires the source-qualified Oxia image, regenerates both gate-result bytes, compares them with N3, and
-then invokes Final. Missing environment/runner configuration, a queued workflow, or an unsuccessful run means no
-refreshed promotion evidence.
+then deterministically rebuilds the normalized JUnit attachments, both receipts, and Final index. All seven generated
+files must byte-match N3 before Final. Missing environment/runner configuration, a queued workflow, or an unsuccessful
+run means no refreshed promotion evidence.
 
 ## Focused verification
 
