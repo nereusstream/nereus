@@ -49,8 +49,9 @@ M1 started from these facts; the first bullet is now superseded by the implement
   authoritative witness A/read/B, continuity invalidation, stale-install exclusion, atomic ACTIVE-fence primitives,
   source-locked real-Oxia lifecycle tests, native capability admission, and the combined non-promotable receipt are
   implemented. The final fork contains no V1 adapter/runtime and is revalidated by N2 rather than relabelling the old
-  receipt. R1 focused implementation is complete at Nereus
-  `8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d`: exact Registry wire, held writer interlock, response-loss authority,
+  receipt. R1 preserves its focused receipt at Nereus `8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d` and locks current
+  exact-source execution to `42598fe63324ceceb07d39114ff36a770af35eb9`: exact Registry wire, held writer interlock,
+  response-loss authority,
   derived views, and source-locked real-Oxia conformance are covered by a non-promotable focused receipt. Final
   exact-source aggregation and evidence-only N3 promotion are complete; K1/P1/R1 focused receipts remain
   non-promotable on their own.

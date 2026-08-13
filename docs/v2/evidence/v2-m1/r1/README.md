@@ -13,3 +13,7 @@ canonical RFC-8785/JCS N3 receipt and not a scenario or M1 PASS.
 
 No STRICT/RANGE allocator mode is selected, no Pulsar data path is activated, and every `V2-POSITION-003..009` scenario
 remains `PLANNED` until the trusted promotion cut validates the final source tuple.
+
+This receipt is not rewritten after shared Oxia V2 fixes. Current N2 execution binds the same closed inventory to
+Nereus `42598fe63324ceceb07d39114ff36a770af35eb9`; the current source tuple is recorded only by the Exact Source gate and
+N3 receipt.

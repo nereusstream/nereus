@@ -1252,7 +1252,8 @@ if (
 
 r1 = source.get("r1RegistryAuthorityBinding", {})
 expected_r1 = {
-    "implementationCommit": "8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d",
+    "implementationCommit": "42598fe63324ceceb07d39114ff36a770af35eb9",
+    "focusedImplementationCommit": "8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d",
     "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
     "oxiaClientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
     "oxiaClientManifestSha256": "521a7a3615b9f25d3e459633fff614f03208a13efda0ab9913b2255a9f2f40ab",
@@ -1285,7 +1286,7 @@ if (
     or r1_receipt.get("selectionEligible") is not False
     or r1_receipt.get("promotionEligible") is not False
     or r1_receipt.get("scenarioPromotion") is not False
-    or r1_receipt.get("nereusImplementationCommit") != r1["implementationCommit"]
+    or r1_receipt.get("nereusImplementationCommit") != r1["focusedImplementationCommit"]
     or r1_receipt.get("tests", {}).get("domain", {}).get("passed") != 35
     or r1_receipt.get("tests", {}).get("metadata", {}).get("passed") != 8
     or r1_receipt.get("tests", {}).get("realOxia", {}).get("passed") != 2

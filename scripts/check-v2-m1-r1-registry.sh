@@ -33,7 +33,8 @@ deps = locks.get("dependencyEvidenceBindings", {})
 client = deps.get("oxiaClientArtifacts", {})
 server = deps.get("oxiaServerRuntime", {})
 expected_binding = {
-    "implementationCommit": "8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d",
+    "implementationCommit": "42598fe63324ceceb07d39114ff36a770af35eb9",
+    "focusedImplementationCommit": "8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d",
     "n1SourceCommit": n1.get("sourceCommit"),
     "oxiaClientSourceCommit": forks.get("oxia-client-notification-continuity", {}).get("finalForkCommit"),
     "oxiaClientManifestSha256": client.get("manifest", {}).get("sha256"),
@@ -61,7 +62,7 @@ expected_receipt = {
     "selectionEligible": False,
     "promotionEligible": False,
     "scenarioPromotion": False,
-    "nereusImplementationCommit": binding["implementationCommit"],
+    "nereusImplementationCommit": binding["focusedImplementationCommit"],
     "n1SourceCommit": n1.get("sourceCommit"),
     "oxiaClientSourceCommit": binding["oxiaClientSourceCommit"],
     "oxiaServerSourceCommit": binding["oxiaServerSourceCommit"],

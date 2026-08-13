@@ -88,8 +88,9 @@ performance-first BookKeeper WAL.
   rerun by `v2M1P1FocusedCheck` with zero failure/error/skip. The final fork contains no V1 adapter/runtime, and the
   [receipt](evidence/v2-m1/p1/README.md) remains `P1_FOCUSED_ONLY`, `promotionEligible=false`, and does not activate
   BrokerService/PersistentTopic Produce/read paths, choose an allocator, prune V1, promote a scenario, or claim M1 PASS.
-- The accepted [R1 Registry design](detailed_design/m1/r1-virtual-ledger-registry.md) is focused-current complete at
-  Nereus `8a213a85bf`: exact NLI1/NVR1/NVA1/RAE1, held writer interlock, immutable evidence, closed response-loss
+- The accepted [R1 Registry design](detailed_design/m1/r1-virtual-ledger-registry.md) preserves its focused receipt at
+  Nereus `8a213a85bf` and binds current exact-source execution to `42598fe633`: exact NLI1/NVR1/NVA1/RAE1, held writer
+  interlock, immutable evidence, closed response-loss
   authority, derived views, 35 domain tests, eight metadata tests, and two source-locked real-Oxia tests are verified by
   `v2M1R1FocusedCheck`. Its [receipt](evidence/v2-m1/r1/README.md) is a non-promotable
   `R1_FOCUSED_ONLY` wrapper around the `REGISTRY_CONFORMANCE` subject; it selects no allocator and promotes no scenario.

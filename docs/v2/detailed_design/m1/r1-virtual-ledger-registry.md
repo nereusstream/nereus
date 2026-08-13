@@ -2,7 +2,7 @@
 productLine: V2
 designStatus: Accepted
 implementationStatus: Verified
-evidenceStatus: CurrentSourceReceipt
+evidenceStatus: HistoricalFocusedReceiptPlusCurrentExactSource
 authority: ImplementationDesign
 sourceTuple: v2-m1
 receipt: docs/v2/evidence/v2-m1/r1/README.md
@@ -93,11 +93,16 @@ Allocator rollover consumes that small immutable view; it never rereads or copie
 
 ## Evidence
 
-The focused R1 gate covers exact NLI1/NVR1/NVA1/RAE1 goldens and corruption; 14/15, 51,016/51,017, and 4,842-byte
+The immutable focused receipt remains bound to Nereus `8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d`. Current exact-source
+execution is bound to Nereus `42598fe63324ceceb07d39114ff36a770af35eb9`, which additionally closes shared Oxia
+conditional-mutation and invalidation lifecycle races without changing the R1 wire, limits, suite inventory, or
+non-promotion boundary. The focused R1 gate covers exact NLI1/NVR1/NVA1/RAE1 goldens and corruption; 14/15,
+51,016/51,017, and 4,842-byte
 boundaries; lifecycle, overlap, reuse, geometry, and epoch matrices; writer rollout/interlock cuts; closed response-loss
 outcomes; concurrent assignment; derived-view staleness; real Oxia create/CAS/restart; and absence of allocator-mode
 selection. `v2M1R1FocusedCheck` binds four domain suites with 35 tests, two metadata suites with eight tests, and one
 source-locked real-Oxia suite with two tests; all have zero failure, error, and skip. The focused wrapper records
 `conformanceKind=REGISTRY_CONFORMANCE` but remains `R1_FOCUSED_ONLY`, `selectionEligible=false`, and
 `promotionEligible=false`. Only G1/N2/N3 may validate and promote the canonical RFC-8785/JCS receipt for the final
-source tuple.
+source tuple. N2 reruns that inventory against the current implementation commit; it does not relabel the historical
+focused receipt.
