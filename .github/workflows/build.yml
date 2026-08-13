@@ -11,8 +11,11 @@ on:
     - cron: '7/15 * * * *'
       timezone: 'Asia/Shanghai'
 
+permissions:
+  contents: read
+
 jobs:
-  build:
+  documentation:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +23,18 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Install verification tools
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: V2 documentation baseline
         run: ./gradlew v2M0Check
-      - name: V2 M1 fast gate
-        run: ./gradlew v2M1Check
+
+  m1-fast-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: V2 M1 fast source gate
+        run: ./gradlew v2M1FastSourceCheck
