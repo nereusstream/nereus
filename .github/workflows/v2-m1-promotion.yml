@@ -1,0 +1,128 @@
+name: V2 M1 Trusted Promotion
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2-m1-trusted-promotion
+  cancel-in-progress: false
+
+jobs:
+  exact-source-and-final:
+    environment: v2-m1-promotion
+    runs-on: [self-hosted, nereus-v2-m1]
+    timeout-minutes: 180
+    steps:
+      - name: Check out Nereus candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read immutable source locks
+        id: locks
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          locks = json.loads(Path("docs/v2/source-locks.json").read_text())
+          values = {
+              "kafka_commit": locks["k1KafkaAuthorityBinding"]["finalForkCommit"],
+              "kafka_branch": locks["k1KafkaAuthorityBinding"]["branch"],
+              "pulsar_commit": locks["p1PulsarAuthorityBinding"]["finalForkCommit"],
+              "pulsar_branch": locks["p1PulsarAuthorityBinding"]["branch"],
+              "oxia_client_commit": next(
+                  row["finalForkCommit"]
+                  for row in locks["dependencyForkOutputs"]
+                  if row["id"] == "oxia-client-notification-continuity"
+              ),
+              "oxia_server_commit": locks["dependencyEvidenceBindings"]["oxiaServerRuntime"]["sourceCommit"],
+          }
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              for name, value in values.items():
+                  output.write(f"{name}={value}\n")
+          PY
+
+      - name: Check out source-locked Kafka
+        uses: actions/checkout@v4
+        with:
+          repository: nereusstream/kafka
+          ref: ${{ steps.locks.outputs.kafka_commit }}
+          path: trusted/kafka
+          fetch-depth: 0
+
+      - name: Check out source-locked Pulsar
+        uses: actions/checkout@v4
+        with:
+          repository: nereusstream/pulsar
+          ref: ${{ steps.locks.outputs.pulsar_commit }}
+          path: trusted/pulsar
+          fetch-depth: 0
+
+      - name: Check out source-locked Oxia client
+        uses: actions/checkout@v4
+        with:
+          repository: nereusstream/oxia-client-java
+          ref: ${{ steps.locks.outputs.oxia_client_commit }}
+          path: trusted/oxia-client-java
+          fetch-depth: 0
+
+      - name: Check out source-locked Oxia server
+        uses: actions/checkout@v4
+        with:
+          repository: nereusstream/oxia
+          ref: ${{ steps.locks.outputs.oxia_server_commit }}
+          path: trusted/oxia
+          fetch-depth: 0
+
+      - name: Materialize locked remote-tracking branches
+        shell: bash
+        run: |
+          git -C trusted/kafka fetch --no-tags origin \
+            "+refs/heads/${{ steps.locks.outputs.kafka_branch }}:refs/remotes/origin/${{ steps.locks.outputs.kafka_branch }}"
+          git -C trusted/kafka checkout --detach "${{ steps.locks.outputs.kafka_commit }}"
+          git -C trusted/pulsar fetch --no-tags origin \
+            "+refs/heads/${{ steps.locks.outputs.pulsar_branch }}:refs/remotes/origin/${{ steps.locks.outputs.pulsar_branch }}"
+          git -C trusted/pulsar checkout --detach "${{ steps.locks.outputs.pulsar_commit }}"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verify trusted runner prerequisites
+        shell: bash
+        run: |
+          command -v docker
+          command -v python3
+          command -v rg
+          docker image inspect "$(python3 -c 'import json; print(json.load(open("docs/v2/source-locks.json"))["dependencyEvidenceBindings"]["oxiaServerRuntime"]["imageReference"])')"
+
+      - name: Regenerate source-bound Fast and Exact gate results
+        shell: bash
+        run: |
+          source_tuple_sha="$(python3 -c 'import json; print(json.load(open("docs/v2/evidence/v2-m1/n3/final-index.json"))["sourceTupleSha"])')"
+          ./gradlew v2M1FastGateResult v2M1ExactSourceGateResult \
+            -Pv2M1SourceTupleSha="$source_tuple_sha" \
+            -Pv2M1FastGateResult="$RUNNER_TEMP/fast.json" \
+            -Pv2M1ExactGateResult="$RUNNER_TEMP/exact-source.json" \
+            -PkafkaForkCheckout="$GITHUB_WORKSPACE/trusted/kafka" \
+            -PpulsarCheckout="$GITHUB_WORKSPACE/trusted/pulsar" \
+            -PoxiaClientCheckout="$GITHUB_WORKSPACE/trusted/oxia-client-java" \
+            -PoxiaServerCheckout="$GITHUB_WORKSPACE/trusted/oxia" \
+            --no-build-cache --rerun-tasks
+          cmp "$RUNNER_TEMP/fast.json" docs/v2/evidence/v2-m1/n3/gates/fast.json
+          cmp "$RUNNER_TEMP/exact-source.json" docs/v2/evidence/v2-m1/n3/gates/exact-source.json
+
+      - name: Validate fresh committed Final evidence
+        shell: bash
+        run: >-
+          ./gradlew v2M1FinalCheck
+          -Pv2M1FinalIndex=docs/v2/evidence/v2-m1/n3/final-index.json
+          --no-build-cache --rerun-tasks

@@ -97,7 +97,9 @@ performance-first BookKeeper WAL.
   at Nereus `ba11fe4a29`: 49 production receipt/Final tests and 14 evidence-only allocator tests are clean, the three
   promotion gate surfaces are registered, and the [receipt](evidence/v2-m1/g1/README.md) remains
   `PASS_G1_FOCUSED_ONLY`. The pure-V2 graph is now the only active build/runtime graph; N2/N3 promotion is governed by
-  the trusted gate results and Final index rather than this historical focused receipt.
+  the trusted gate results and Final index rather than this historical focused receipt. Final now also requires the
+  receipt-bound tested Nereus commit to precede a linear evidence-only N3 descendant and rejects dirty, source-lock-
+  mismatched, merge, empty, or non-evidence changes through `v2M1EvidenceFreshnessCheck`.
 - ADR 0086 fixes the Kafka BookKeeper semantic layout: one Kafka Offset Domain across profiles, one logical ledger
   chain per partition, low-frequency run/generation roots, packed in-ledger RecordBatch indexes, owner-local active-tail
   locators, targeted Fetch, bounded overlapping writes with ordered publication, and bounded checkpoint-tail recovery.

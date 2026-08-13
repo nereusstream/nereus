@@ -143,13 +143,21 @@ subprocess.run(["git", "-C", str(root), "diff", "--quiet", implementation, "HEAD
 subprocess.run(["git", "-C", str(root), "diff", "--quiet", "--", *implementation_paths], check=True)
 
 root_build = (root / "build.gradle.kts").read_text()
-for gate in ("v2M1Check", "v2M1ExactSourceCheck", "v2M1FinalCheck"):
-    if f'tasks.register("{gate}")' not in root_build and f'tasks.register<JavaExec>("{gate}")' not in root_build:
+for gate in ("v2M1Check", "v2M1ExactSourceCheck", "v2M1EvidenceFreshnessCheck", "v2M1FinalCheck"):
+    registrations = (
+        f'tasks.register("{gate}")',
+        f'tasks.register<Exec>("{gate}")',
+        f'tasks.register<JavaExec>("{gate}")',
+    )
+    if not any(registration in root_build for registration in registrations):
         raise SystemExit(f"G1 registered gate disappeared after the active-graph cut: {gate}")
 for relative in (
     "scripts/check-v2-m1-active-graph.sh",
+    "scripts/check-v2-m1-evidence-freshness.sh",
     "scripts/check-v2-m1-exact-source.sh",
     "scripts/check-v2-m1-fast.sh",
+    "scripts/test-v2-m1-evidence-freshness.py",
+    "scripts/v2_m1_evidence_freshness.py",
 ):
     if not (root / relative).is_file():
         raise SystemExit(f"G1 gate implementation disappeared after the active-graph cut: {relative}")

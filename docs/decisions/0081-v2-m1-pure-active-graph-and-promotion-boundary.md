@@ -115,10 +115,16 @@ M1 has three non-duplicating gates:
   active module graph, and V1 absence;
 - `v2M1ExactSourceCheck` verifies clean exact Kafka/Pulsar checkouts before and after execution, uses an isolated
   immutable artifact repository, runs real Oxia and focused fork suites, and rejects every source/artifact mismatch;
-- `v2M1FinalCheck` aggregates those outcomes and validates the receipt schema without rerunning their suites.
+- `v2M1FinalCheck` first runs `v2M1EvidenceFreshnessCheck`, then aggregates those outcomes and validates the receipt
+  schema without rerunning their suites. Freshness requires a clean checkout, the receipt-bound Nereus commit as a
+  strict ancestor of HEAD, the current source-lock-file digest, and a linear descendant history in which every changed
+  path is under `docs/v2/evidence/v2-m1/n3/`.
 
-Zero discovered tests, skipped mandatory tests, failures, dirty/source-changing checkouts, or digest mismatches cannot
-pass. Fast PR CI runs `v2M1Check`; exact/final gates run in a trusted promotion workflow.
+Zero discovered tests, skipped mandatory tests, failures, dirty/source-changing checkouts, stale Final evidence, or
+digest mismatches cannot pass. Fast PR CI runs `v2M1Check`; exact/final gates run only after the repository's promotion
+workflow is backed by a protected `v2-m1-promotion` environment and dedicated `nereus-v2-m1` runner. That workflow
+regenerates Fast/Exact gate results and byte-compares them with the committed N3 references before Final; its YAML,
+environment configuration, runner registration, or a queued run is not promotion evidence without a successful run.
 
 Cross-repository promotion uses four stages and at least five commits:
 

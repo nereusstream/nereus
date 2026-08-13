@@ -599,7 +599,12 @@ tasks.register<Exec>("v2M1G1ValidatorSourceCheck") {
 tasks.register("v2M1G1ValidatorCheck") {
     group = "verification"
     description = "Verify G1 parser/Final mechanics only; no scenario promotion, V1 prune, N2/N3, or M1 PASS."
-    dependsOn("v2M1G1ValidatorSourceCheck", "v2M1ReceiptCapsCheck", "v2DocumentationCheck")
+    dependsOn(
+        "v2M1G1ValidatorSourceCheck",
+        "v2M1ReceiptCapsCheck",
+        "v2M1EvidenceFreshnessBoundaryTest",
+        "v2DocumentationCheck",
+    )
 }
 
 tasks.register<Exec>("v2M1ActiveGraphCheck") {
@@ -694,10 +699,25 @@ tasks.register<JavaExec>("v2M1ExactSourceGateResult") {
 }
 
 val v2M1FinalIndexPath = providers.gradleProperty("v2M1FinalIndex")
+tasks.register<Exec>("v2M1EvidenceFreshnessBoundaryTest") {
+    group = "verification"
+    description = "Run deterministic checkout-to-Final freshness boundary tests."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/test-v2-m1-evidence-freshness.py")
+}
+
+tasks.register<Exec>("v2M1EvidenceFreshnessCheck") {
+    group = "verification"
+    description = "Require Final evidence to bind this clean checkout through evidence-only descendant commits."
+    dependsOn("v2M1EvidenceFreshnessBoundaryTest")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m1-evidence-freshness.sh", v2M1FinalIndexPath.get())
+}
+
 tasks.register<JavaExec>("v2M1FinalCheck") {
     group = "verification"
     description = "Resolve one canonical Final index without rerunning Fast, Exact Source, or any referenced suite."
-    dependsOn(":nereus-domain:jar")
+    dependsOn(":nereus-domain:jar", "v2M1EvidenceFreshnessCheck")
     classpath = files(v2DomainJar)
     mainClass.set("com.nereusstream.domain.receipt.M1EvidenceCli")
     setArgs(listOf("validate-final", v2M1FinalIndexPath.get()))

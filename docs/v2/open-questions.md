@@ -91,10 +91,17 @@ descendants and recently closed evidence input are:
   observed maxima, stable rejection taxonomy, source commit, and JSON SHA. Deployment may only lower new-receipt
   admission; host/provider limits cannot change persisted-v1 parsing. This closes the stale numeric-cap OPEN, not the
   separately reviewed G1 production parser/resolver, now covered by its [focused receipt](evidence/v2-m1/g1/README.md),
-  or the trusted N3 promotion now represented by canonical receipts and the Final index.
+  or the trusted N3 promotion now represented by canonical receipts and the Final index. Final freshness is executable:
+  the receipt-bound Nereus commit must be a strict ancestor of a clean checkout, every intervening commit must be
+  single-parent and N3-evidence-only, and the receipt source-lock digest must equal the current file bytes.
 - **Promotion evidence is not a prose OPEN:** O1 binds the final Oxia client fork, JAR/source-JAR/POM, exact server
   image, and focused-test identities. Executable continuity/Registry conformance and trusted N3 receipts are represented
   only by the canonical evidence objects and scenario manifest, not by another design decision.
+- **Current re-promotion operational blocker:** the repository now defines the exact-source/Final workflow contract,
+  but as of 2026-08-13 the GitHub repository has no `v2-m1-promotion` Environment and reports zero self-hosted runners.
+  A protected environment, one `nereus-v2-m1` runner with the source-qualified Oxia image, and a successful workflow
+  run are required before refreshed N3 evidence may claim current M1 completion. This is not an allocator or runtime
+  architecture OPEN and cannot be closed by committing the workflow YAML alone.
 
 O1, O2, R0, M1-2, N1, and focused K1/P1/R1 are governed by their accepted implementation designs and non-promotable
 receipts. K1 is exact-source complete at Kafka `8afbc42566`; P1 preserves its focused receipt at Pulsar `778862323d`

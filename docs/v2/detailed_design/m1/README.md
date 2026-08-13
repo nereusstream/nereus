@@ -220,7 +220,8 @@ must not start merely because the replacement modules compile.
 | `v2M1G1ValidatorCheck` | now | production strict receipt parser, secure bounded reference verification, non-rerunning Final resolver, exact virtual-ledger promotion policy, and evidence-only allocator harness isolation | pure-V2 graph, exact-source tuple, scenario promotion, N2/N3, M1 PASS |
 | `v2M1Check` | now | ordinary deterministic M1 fast suite and V1 absence | exact external source/artifact/runtime identity |
 | `v2M1ExactSourceCheck` | N2 | clean exact forks, immutable artifacts, real Oxia, focused fork tests | evidence provenance without trusted workflow/N3 |
-| `v2M1FinalCheck` | N2/N3 | referenced gate/receipt schema and aggregate result | work not explicitly referenced by the receipts |
+| `v2M1EvidenceFreshnessCheck` | N3 | clean checkout, source-lock hash, tested-source ancestry, and evidence-only descendant history | any referenced gate execution |
+| `v2M1FinalCheck` | N2/N3 | fresh referenced gate/receipt schema and aggregate result | work not explicitly referenced by the receipts |
 
 The intermediate foundation task has a deliberately different name from `v2M1Check`. It must report
 `InProgress`/foundation-only language and fail if a script or document calls it M1 Final or M1 PASS.
@@ -230,7 +231,8 @@ The intermediate foundation task has a deliberately different name from `v2M1Che
 M1.1b-Q1 was readiness evidence used to freeze the production contract and is not rerun as a promotion suite. The
 foundation/NTA1 local tests remain in ordinary CI as regression protection. K1/P1/R1 functional tests, real-Oxia
 exact-source conformance, pure-V2 active-graph/V1-absence checks, N2 exact artifact/source validation, and receipt-only
-N3 promotion are complete. `v2M1FinalCheck` aggregates those referenced outcomes without rerunning them.
+N3 promotion are complete. `v2M1FinalCheck` first rejects any checkout newer than its tested source through a
+non-evidence path, then aggregates the referenced outcomes without rerunning them.
 
 Version 0.2 admits fresh deployments only. M1 tests the deterministic pure-input Pulsar name-inventory tool and its
 failure boundary, but does not require execution against a customer or existing production cluster. Real

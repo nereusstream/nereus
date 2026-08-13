@@ -184,10 +184,14 @@ bind the exact N2 Nereus commit and SHA-256 of the `v2-m1` source-lock bytes ins
   cannot prove the pure-V2 graph, exact final source tuple, scenario promotion, N2/N3, or M1 PASS;
 - `v2M1Check`: no Docker/fork/composite; local domain/schema/SPI/codec/harness, active-graph, and V1-absence checks;
 - `v2M1ExactSourceCheck`: clean exact forks before/after, isolated immutable artifacts, real Oxia, and focused fork tests;
-- `v2M1FinalCheck`: aggregate previous outcomes and receipt schema without rerunning their suites.
+- `v2M1EvidenceFreshnessCheck`: clean current checkout, exact source-lock digest, strict tested-source ancestry, and
+  only linear `docs/v2/evidence/v2-m1/n3/` descendant commits;
+- `v2M1FinalCheck`: require freshness, then aggregate previous outcomes and receipt schema without rerunning suites.
 
-Zero tests, skipped mandatory tests, failure, dirtied/changed source, or digest mismatch fails. PR CI runs the fast gate;
-trusted promotion runs Exact/Final. Promotion uses N1 foundation, P1/K1 fork commits, N2 source-tuple/final execution,
+Zero tests, skipped mandatory tests, failure, dirtied/changed source, stale evidence, or digest mismatch fails. PR CI
+runs the fast gate; trusted promotion requires the protected `v2-m1-promotion` environment and `nereus-v2-m1` runner
+to regenerate and byte-compare Fast/Exact gate results before Final. Promotion uses N1 foundation, P1/K1 fork commits,
+N2 source-tuple/final execution,
 then evidence-only N3. Virtual-ledger conformance payloads use one strict RFC-8785/JCS envelope with the closed kinds
 `REGISTRY_CONFORMANCE | HARNESS_CONFORMANCE_ONLY`; this is not the universe of all M1 evidence kinds. Each receipt binds
 N2/P1/K1, source-lock digest, domain JAR/POM SHAs, Oxia server image plus client/test identities, closed receipt kind,
