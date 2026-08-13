@@ -4,9 +4,10 @@
 
 Accepted as the 0.2 M1 first-implementation boundary. The Nereus-local M1.1a-A domain/SPI foundation and intermediate
 gate are implemented. The 2026-08-12 M1.1b refinement accepts the exact NTA1 policy/cap contract and permits its
-production codec slice. The later M1.1c-R0 readiness gate accepts Registry writer-count/canonical-capacity inputs;
-P1/R1/K1, runtime activation, real Registry conformance, and promotion-receipt validators remain blocked or pending
-under the explicit descendants below. This ADR still claims no M1 PASS.
+production codec slice. The later M1.1c-R0 readiness gate accepts Registry writer-count/canonical-capacity inputs. At
+this foundation cut, P1/R1/K1, real Registry conformance, and promotion-receipt validators were blocked descendants;
+they are now complete under their own focused gates and canonical N2/N3 evidence. This ADR itself still claims no M1
+PASS, while the current M1 completion is derived only from the trusted Final evidence.
 
 M1.1b-Q1 remains immutable historical `READINESS_EVIDENCE_ONLY`. It informed but does not itself prove the accepted
 policy/name/cap table or production codec. The policy/name/cap grill is closed; production codec/golden evidence is the
@@ -332,10 +333,11 @@ References contain typed ID, relative path, length, and SHA-256. The validator r
 computes final status. A stored `gateOutcome` or aggregate result cannot override those inputs; any display value is
 derived and exact-rechecked.
 
-All proposed root/count/path/file/total/log numeric caps remain OPEN until early M1 representative all-pass, maximum-
-failure, fault-cut, Registry/evidence/interlock, and multi-scenario outputs establish actual p99/max plus margin. Root
-parser caps must derive from closed row widths/counts. Streaming attachment hashing does not make file size a JSON wire
-field, and workflow operational ceilings cannot become persisted format caps without evidence.
+At this foundation cut, all proposed root/count/path/file/total/log numeric caps remained OPEN until early M1
+representative all-pass, maximum-failure, fault-cut, Registry/evidence/interlock, and multi-scenario outputs established
+actual maxima plus margin. M1-2 later supplied that deterministic evidence, and ADR 0084 now owns the sole persisted-v1
+table. Root parser caps derive from closed row widths/counts. Streaming attachment hashing does not make file size a
+JSON wire field, and workflow operational ceilings cannot become persisted format caps without evidence.
 
 ### First implementation slice
 

@@ -148,9 +148,10 @@ Registry and harness receipts cannot substitute for one another.
 
 The Final index is only a promotion manifest containing `schema`, `sourceTupleSha`, `requiredGateRefs[]`, and
 `receiptRefs[]`. Each typed reference binds safe relative path, length, and SHA-256. The validator reads those objects
-and computes final status; a persisted display status, if any, is exact-rechecked and never overrides them. Exact root,
-count, path, attachment, and log numeric caps remain OPEN until representative early-M1 all-pass, maximum-failure,
-fault-cut, Registry/interlock, and multi-scenario evidence derives them with margin.
+and computes final status; a persisted display status, if any, is exact-rechecked and never overrides them. At this
+readiness decision, exact root, count, path, attachment, and log numeric caps remained OPEN until representative
+early-M1 all-pass, maximum-failure, fault-cut, Registry/interlock, and multi-scenario evidence derived them with margin.
+M1-2 later supplied that evidence and ADR 0084 now owns the sole persisted-v1 numeric cap table.
 
 N3 may commit only receipts/evidence attachments and the scenario status/index exactly covered by them. It cannot
 change code, gates, workflows, ADRs, or source locks; such a change returns to N2 and reruns promotion. Content hashes

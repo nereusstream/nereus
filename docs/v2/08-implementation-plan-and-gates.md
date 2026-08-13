@@ -104,8 +104,8 @@ The provider hook exports only a local store-wide `WatchContinuityEpoch` plus re
 connection/session/shard identities are not persisted. A gap invalidates all store fences and triggers bounded,
 coalesced A/read/B recovery. The accepted O1 client fork uses the confirmed server base's existing no-start-offset dummy
 notification batch as the ready barrier and adds no server wire/RPC; a gap discards the old offset and obtains a new
-barrier. Source-lock schema v2 owns the confirmed implementation/conformance bases while final fork/artifact/server-
-image identities and conformance remain distinct pending promotion evidence.
+barrier. Source-lock schema v2 keeps the confirmed implementation/conformance bases and final fork/artifact/server-
+image identities distinct; canonical N2/N3 evidence now binds and verifies that exact tuple.
 
 M1 implements the mode-independent virtual-ledger Registry bound to the immutable 32-byte ledger-ID compatibility
 namespace `SHA-256(NLI1 || u32be(36) || canonicalInstanceIdAscii[36])`. Only an exact lowercase canonical non-zero

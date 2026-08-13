@@ -6,11 +6,12 @@ Accepted for the 0.2 M1 implementation. The 2026-08-12 M1.1b refinement closes t
 FrameEncodingPolicy/legality/cap table and Pulsar UTF-8/total-payload caps. The M1.1c-R0 executable readiness slice
 later closes Registry writer-count and canonical-capacity inputs without implementing R1. Receipt/attachment numeric
 caps and executable promotion evidence were implementation-readiness descendants. ADR 0084 closes the protocol/leaf,
-Kafka precedence, minimal continuity, native hash, receipt accounting, and—through the later M1-2 evidence—persisted-
-v1 receipt caps. Provider API/source tuple, the G1 production validator, production Registry conformance, and
-promotion evidence remain OPEN. ADR 0085 closes the client-only
-continuity direction and exact 120-byte writer row, removes receipt run identity, and permits M1.1a foundation work
-without claiming the deferred codecs or validators.
+Kafka precedence, minimal continuity, native hash, receipt accounting, and—through the later M1-2 evidence—persisted-v1
+receipt caps. ADR 0085 closes the client-only continuity direction and exact 120-byte writer row, removes receipt run
+identity, and permits M1.1a foundation work without claiming the deferred codecs or validators. The provider source
+tuple, G1 production validator, production Registry conformance, and trusted N2/N3 promotion are now implemented and
+current-source verified; their authority comes from source locks and canonical N3 evidence, not from relabelling this
+readiness decision.
 
 ### Implementation refinement (2026-08-11)
 

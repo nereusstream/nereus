@@ -3,15 +3,15 @@
 ## Status
 
 Accepted for the 0.2 M1 implementation. ADR 0083 fixes NPC1/NTI1 layout, flat NTA1 structure, Kafka pseudo-config and
-linear admission, the first Pulsar witness-adapter candidate boundary, INSTANCEID-derived Registry identity with inline writers,
-and the receipt-envelope direction. Exact aggregate field/variant tables, remaining numeric caps, concrete provider
-lifecycle hooks/source tuple, Registry writer schema, and remaining receipt payload fields remain implementation-readiness descendants. ADR 0084
-fixes the protocol codes and authority leaves, Kafka precedence/interlock, minimal local continuity semantics, native
-INSTANCEID hash, and receipt accounting/path safety while retaining evidence-derived caps and concrete provider hooks.
+linear admission, the first Pulsar witness-adapter candidate boundary, INSTANCEID-derived Registry identity with inline
+writers, and the receipt-envelope direction. At this readiness cut, exact aggregate field/variant tables, remaining
+numeric caps, concrete provider lifecycle hooks/source tuple, Registry writer schema, and remaining receipt payload
+fields were implementation-readiness descendants. ADR 0084 fixes the protocol codes and authority leaves, Kafka
+precedence/interlock, minimal local continuity semantics, native INSTANCEID hash, and receipt accounting/path safety.
 ADR 0085 then permits M1.1a foundation work and closes the client-only continuity shape and 120-byte writer row. The
-2026-08-12 M1.1b refinement closes the NTA1 policy/cap table. The later M1.1c-R0 readiness gate closes the Registry
-writer-count/canonical-capacity input at 14 rows and 51,016 bytes without implementing R1. Receipt caps, R1 conformance,
-and promotion evidence remain explicit descendants.
+2026-08-12 M1.1b refinement closes the NTA1 policy/cap table, M1.1c-R0 closes the Registry capacity input, and M1-2
+closes the receipt caps. G1, R1, and canonical N2/N3 evidence now close the remaining M1 descendants for the current
+source tuple; the earlier focused receipts remain non-promotable.
 
 ### Implementation refinement (2026-08-11)
 

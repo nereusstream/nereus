@@ -97,12 +97,12 @@ descendants and recently closed evidence input are:
 - **Promotion evidence is not a prose OPEN:** O1 binds the final Oxia client fork, JAR/source-JAR/POM, exact server
   image, and focused-test identities. Executable continuity/Registry conformance and trusted N3 receipts are represented
   only by the canonical evidence objects and scenario manifest, not by another design decision.
-- **Current re-promotion execution state:** as of 2026-08-13 the repository has a `v2-m1-promotion` Environment with a
+- **Current promotion execution state:** as of 2026-08-13 the repository has a `v2-m1-promotion` Environment with a
   required reviewer and a `main`-only deployment policy. The dedicated macOS ARM64 runner is online with the
-  `nereus-v2-m1` label and the source-qualified Oxia image. A successful workflow run that regenerates and byte-compares
-  all seven gate/report/receipt/Final files is still required before refreshed N3 evidence may claim current M1
-  completion. Environment/runner configuration alone is not promotion evidence and this is not an allocator or runtime
-  architecture OPEN.
+  `nereus-v2-m1` label and the source-qualified Oxia image. The protected workflow has completed a successful exact-head
+  run that regenerated and byte-compared all seven gate/report/receipt/Final files before `v2M1FinalCheck`. Current M1
+  completion remains valid only while that successful run, the canonical N3 evidence, and `main` name the same head;
+  Environment/runner configuration alone is not promotion evidence or an allocator/runtime architecture OPEN.
 
 O1, O2, R0, M1-2, N1, and focused K1/P1/R1 are governed by their accepted implementation designs and non-promotable
 receipts. K1 is exact-source complete at Kafka `8afbc42566`; P1 preserves its focused receipt at Pulsar `778862323d`

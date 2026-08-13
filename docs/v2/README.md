@@ -25,12 +25,13 @@ performance-first BookKeeper WAL.
   cross-repository promotion boundaries in ADR 0081; that readiness decision alone did not claim an implementation.
 - M1 implementation-readiness Round 2 freezes the outer NTB1/NSE1/NTA1 domain contracts, exact M1 metadata
   capabilities/results, Kafka topic-create authority, Pulsar ownership-fence capability, and compatibility-namespace
-  Registry/writer-set evidence boundary in ADR 0082; exact descendant byte tables/adapters remain OPEN.
+  Registry/writer-set evidence boundary in ADR 0082. At that readiness cut, exact descendant byte tables/adapters were
+  still open; ADRs 0083 through 0085 and the completed M1 slices now close the M1 descendants.
 - M1 implementation-readiness Round 3 freezes NPC1/NTI1 layouts and flat NTA1 structure; one Kafka profile input and
   linear residue-free batch admission; the Oxia-backed ELM witness-candidate boundary (current source proves primitives,
   not the adapter); INSTANCEID-derived, fresh-only Registry identity with inline writers; and the canonical virtual-
-  ledger evidence envelope in ADR 0083. Exact numeric tables, caps, provider hooks, hash preimage, and receipt inner
-  schema remain OPEN.
+  ledger evidence envelope in ADR 0083. At that readiness cut, exact numeric tables, caps, provider hooks, hash
+  preimage, and receipt inner schema remained open; later accepted contracts and current-source gates now close them.
 - M1 implementation-readiness Round 4 freezes `KAFKA=1/PULSAR=2`, NPN1 Pulsar authority leaves, Kafka last-wins/error/
   policy and remote-log admission, a local store-wide watch-continuity contract, canonical UUID/NLI1 namespace bytes,
   and one receipt result hierarchy plus safe attachment grammar in ADR 0084. The later M1.1b acceptance closes
@@ -43,8 +44,8 @@ performance-first BookKeeper WAL.
   and immutable admission evidence, and one content-identified receipt/Final hierarchy in ADR 0085. M1.1a module,
   identity, deterministic-ID, SPI, dependency, and continuity scaffolding may start. The 2026-08-12 M1.1b acceptance
   subsequently closes the NTA1 v1 policy/name/total table. M1.1c-R0 subsequently closes writer count and canonical
-  Registry capacity; M1-2 now closes only receipt numeric inputs, while the production validator and executable
-  promotion evidence remain OPEN.
+  Registry capacity; M1-2 closes only receipt numeric inputs. The separately reviewed G1 validator and executable N2/N3
+  promotion evidence are now complete for the current source tuple.
 - The accepted [M1 execution index](detailed_design/m1/README.md) and
   [M1.1a-A code-level design](detailed_design/m1/m1.1a-domain-spi-foundation.md) split the first implementation into
   module, identity/domain, SPI/gate, continuity-fork, and metadata-oxia targets. The first three are implemented by
@@ -66,7 +67,8 @@ performance-first BookKeeper WAL.
   tests and `v2M1RegistryCapacityCheck` bind Nereus `03d27256` to accepted `maxWriterCount=14`, a 51,016-byte largest
   legal canonical Registry value, and 14,520-byte reserved margin in deterministic
   [non-promotable evidence](evidence/v2-m0/m1.1c-r0/README.md). The inherited 120/192/256/65,536 contracts are unchanged,
-  every V2-POSITION scenario remains `PLANNED`, and the production Registry codec remains unavailable.
+  at the R0 readiness cut every V2-POSITION scenario was `PLANNED` and the production Registry codec was unavailable.
+  R1 and canonical N3 evidence now promote exactly `V2-POSITION-003..011` as described below.
 - The accepted [M1-2 receipt/parser-cap design](detailed_design/m1/m1-2-receipt-parser-caps.md), 36 focused tests, and
   deterministic [readiness evidence](evidence/v2-m0/m1-2-receipt-caps/README.md) bind Nereus `75593faf`, eleven named
   sample families, source-lock input SHA, formulas, observed maxima, stable error categories, and JSON SHA. ADR 0084
@@ -112,14 +114,14 @@ performance-first BookKeeper WAL.
   replication with hard-bounded Observed/Applied eligibility, election-bounded tail adoption, profile-neutral BK/Object
   protocol checkpoints with an independent terminal Head, coherent/delayed Fetch, native read-committed metadata, and
   semantic compaction. M2/M3/M6 implementation and executable evidence remain NotStarted.
-- The foundation supplies Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct aggregate
-  foundation validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
-  guards, and reproducible JAR/source-JAR/POM hashes. The foundation deliberately supplies no NTA1 codec, Registry
-  capacity, Kafka/Pulsar activation, P1/R1, real backend conformance, or M1 Final/PASS claim. O2 now supplies
-  production NTA1 only for its aggregate port; selector/Registry and activation remain fail closed.
-- Existing Java modules and Phase/Future evidence on `main` are V1 residue until replaced by a V2 milestone.
-- The ordinary CI Pulsar API checkout remains a legacy V1-residue build baseline until the V2 Pulsar slice replaces
-  that code; it is recorded separately and is not the V2 fork-development or parity baseline.
+- The initial foundation supplied Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct
+  aggregate validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
+  guards, and reproducible JAR/source-JAR/POM hashes. It deliberately made no NTA1, Registry, P1/R1, real-backend, or
+  M1 Final claim; later source-locked slices and canonical N3 evidence now supply those M1 descendants.
+- The active Java/build/publication/ordinary-CI graph on `main` is pure V2. V1 implementation is retained only in
+  protected history and `docs/v1`; historical Phase/Future records are not executable authority.
+- Source locks retain the former ordinary-build Pulsar API checkout only as `HISTORICAL_ONLY`. Final P1 exact-source
+  execution uses `nereus/v2-m1-p1-selector-fence-pure-v2` at `072aa1c440`.
 - The V1 implementation authority is `v0.1@a14d925da5763f36208f8ddca7bef31f3eb90b0b`; it is historical evidence, not
   a V2 contract.
 - No V1 API, durable schema, object format, or online compatibility obligation is carried into V2.

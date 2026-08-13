@@ -5,9 +5,10 @@
 Accepted for the 0.2 M1 implementation and refined by ADR 0085. The 2026-08-12 M1.1b refinement closes NTA1
 FrameEncodingPolicy/legality/caps. M1.1c-R0 closes Registry writer-count/canonical-capacity readiness at 14 rows and a
 51,016-byte largest legal v1 value. M1-2 closes the receipt-v1 root/count/attachment/path/log parser caps from
-deterministic non-promotable evidence. The client-only Oxia continuity shape and 120-byte writer row are closed. Local
-protocol/leaf, R0, and M1-2 test/evidence code exists; the G1 production receipt validator, R1 production authority,
-Registry conformance, N1/N2/N3, M1 Final, and promotion evidence have not started.
+deterministic non-promotable evidence. The client-only Oxia continuity shape and 120-byte writer row are closed. The
+initial protocol/leaf, R0, and M1-2 records remain historical focused evidence. G1 production receipt validation, R1
+production authority, Registry conformance, N1/N2/N3, and M1 Final are now complete for the current source tuple; only
+the canonical N3 receipts, scenario manifest, and Final index provide promotion authority.
 
 ### Implementation refinement (2026-08-11)
 
