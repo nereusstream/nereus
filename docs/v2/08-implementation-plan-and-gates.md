@@ -172,8 +172,8 @@ bind the exact N2 Nereus commit and SHA-256 of the `v2-m1` source-lock bytes ins
 - `v2M1K1FocusedCheck`: exact clean Kafka fork, immutable N1 input, generated API inventory, 39 exact zero-skip tests,
   dependency/runtime-scope checks, and a non-promotable K1 receipt; it cannot prove P1/R1/G1, V1 prune, scenario
   promotion, broker data-path activation, or M1 PASS;
-- `v2M1P1FocusedCheck`: exact clean Pulsar fork, immutable N1/P1/O1 inputs, 94 Nereus metadata tests, two real-Oxia
-  tests, 34 Pulsar tests, native capability/runtime-scope checks, and a non-promotable P1 receipt; it cannot prove R1/G1,
+- `v2M1P1FocusedCheck`: exact clean Pulsar fork, immutable N1/P1/O1 inputs, 100 Nereus metadata tests, two real-Oxia
+  tests, 36 Pulsar tests, native capability/runtime-scope checks, and a non-promotable P1 receipt; it cannot prove R1/G1,
   full BrokerService/PersistentTopic data-path activation, V1 prune, scenario promotion, or M1 PASS;
 - `v2M1R1FocusedCheck`: exact N1/O1 inputs, 35 domain tests, eight metadata tests, two source-locked real-Oxia tests,
   held writer-interlock and immutable-evidence cuts, closed response-loss outcomes, derived-view binding, and allocator-mode

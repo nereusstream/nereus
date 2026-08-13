@@ -28,7 +28,7 @@ The source inputs are:
 The original focused receipt remains immutably bound to the V1-residue development base
 `11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9` and fork `778862323d8a86e2f36064a12166e09918ed9429`.
 The final M1 source is the clean pushed pure-V2 branch `nereus/v2-m1-p1-selector-fence-pure-v2` at
-`d1cfd863b0e0ffad9c141abf68beeb2350a1ea16`. It replays only the P1 authority commits onto the stock base and has no
+`072aa1c440f85b808f60e7ea59de8a73c4e2a202`. It replays only the P1 authority commits onto the stock base and has no
 `nereus-pulsar-adapter`, `0.1.0-f2-dev`, non-V2 Nereus runtime, dynamic SNAPSHOT, `changing=true`, Maven Local, or
 Nereus composite-build input. The N2 exact-source gate reruns the focused inventory against this final fork; it does
 not relabel the historical receipt.
@@ -103,16 +103,19 @@ witness, A/read/B installer, and single-word local fence with stale-install and 
 `778862323d` additionally locks exact N1/P1/O1 artifacts, consumes opaque SPI metadata versions, cross-validates the
 selector/aggregate authority, aligns Oxia to 0.9.4, and adds a closed capability gate that rejects every unqualified
 ownership writer, TableView, syncer, continuity, or ordered-invalidation configuration. Pure-V2 final fork
-`d1cfd863b0` reproduces that V2 package and its 7-suite/34-test inventory on the stock `5.0.0-M1` graph while omitting
-the V1 adapter entirely. Exact P1 artifact
+`072aa1c440` reproduces that V2 package on the stock `5.0.0-M1` graph while omitting the V1 adapter entirely, binds
+each invalidation callback to its installed sequence, keeps exhausted sequences permanently invalid, and locks the
+final source-qualified P1 bundle. Exact P1 artifact
 packaging exposes only the V2 capability package, the public READY-only continuity permit used around A/read/B, and
-deterministic binary/source artifact tasks. The immutable bundle at Nereus `23064b3b` is locked as
-`com.nereusstream:nereus-metadata-oxia-p1:0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5`; two clean builds are
+deterministic binary/source artifact tasks. The immutable bundle at Nereus `17497c37` is locked as
+`com.nereusstream:nereus-metadata-oxia-p1:0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45`; two clean builds are
 byte-identical, and `v2M1P1ArtifactCheck` verifies the closed package, exact N1/O1 dependencies, source descriptors,
 manifest, current non-zero regression tests, and non-promotion receipt. `v2M1P1FocusedCheck` now binds that artifact,
-the clean pushed Pulsar fork, 14 Nereus metadata suites with 94 tests, one real-Oxia suite with two tests, and
-seven Pulsar suites with 34 tests. Every selected test has zero failure/error/skip. The resulting `P1_FOCUSED_ONLY` receipt
-remains `promotionEligible=false`; it is not process activation, scenario promotion, or M1 PASS.
+the clean pushed Pulsar fork, 14 Nereus metadata suites with 100 tests, one real-Oxia suite with two tests, and
+seven Pulsar suites with 36 tests. Every selected current-source test has zero failure/error/skip. The immutable
+historical `P1_FOCUSED_ONLY` receipt remains `promotionEligible=false` at its original 94/34 inventory; current
+execution is bound by the N2 gate and N3 receipts rather than relabelling it. Neither is process activation, scenario
+promotion, or M1 PASS.
 
 Notification callbacks invalidate but never grant admission. Continuity registration is armed before authority reads.
 READY only permits bounded revalidation; a gap, ARMING, CLOSED, reassignment, client close, or unknown reconnect first

@@ -97,16 +97,16 @@ descendants and recently closed evidence input are:
 - **Promotion evidence is not a prose OPEN:** O1 binds the final Oxia client fork, JAR/source-JAR/POM, exact server
   image, and focused-test identities. Executable continuity/Registry conformance and trusted N3 receipts are represented
   only by the canonical evidence objects and scenario manifest, not by another design decision.
-- **Current re-promotion operational blocker:** the repository now defines the exact-source/Final workflow contract,
-  but as of 2026-08-13 the GitHub repository has no `v2-m1-promotion` Environment and reports zero self-hosted runners.
-  A protected environment, one `nereus-v2-m1` runner with the source-qualified Oxia image, and a successful workflow
-  run that regenerates and byte-compares all seven gate/report/receipt/Final files are required before refreshed N3
-  evidence may claim current M1 completion. This is not an allocator or runtime architecture OPEN and cannot be closed
-  by committing the workflow YAML alone.
+- **Current re-promotion execution state:** as of 2026-08-13 the repository has a `v2-m1-promotion` Environment with a
+  required reviewer and a `main`-only deployment policy. The dedicated macOS ARM64 runner is online with the
+  `nereus-v2-m1` label and the source-qualified Oxia image. A successful workflow run that regenerates and byte-compares
+  all seven gate/report/receipt/Final files is still required before refreshed N3 evidence may claim current M1
+  completion. Environment/runner configuration alone is not promotion evidence and this is not an allocator or runtime
+  architecture OPEN.
 
 O1, O2, R0, M1-2, N1, and focused K1/P1/R1 are governed by their accepted implementation designs and non-promotable
 receipts. K1 is exact-source complete at Kafka `8afbc42566`; P1 preserves its focused receipt at Pulsar `778862323d`
-and locks final N2 execution to pure-V2 Pulsar `d1cfd863b0`; R1 is focused-current complete at Nereus `8a213a85bf`;
+and locks final N2 execution to pure-V2 Pulsar `072aa1c440`; R1 is focused-current complete at Nereus `8a213a85bf`;
 G1 parser/Final mechanics are focused-current complete at
 `ba11fe4a29`. None promotes a scenario or M1. The pure-V2 active graph and independent V1/KoP mechanical deletion are
 complete. N2/N3 completion is derived from their required gate, receipt, Final-index, and scenario evidence rather than

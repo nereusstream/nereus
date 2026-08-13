@@ -271,13 +271,13 @@ require_literal 'NPS1 selector encoding' "docs/v2/detailed_design/m1/p1-pulsar-s
 require_literal '84 + persistenceNameLength' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal 'P1_FOCUSED_ONLY' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal 'nereus/v2-m1-p1-selector-fence-pure-v2' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
-require_literal 'd1cfd863b0e0ffad9c141abf68beeb2350a1ea16' "docs/v2/source-locks.json"
+require_literal '072aa1c440f85b808f60e7ea59de8a73c4e2a202' "docs/v2/source-locks.json"
 require_literal '778862323d8a86e2f36064a12166e09918ed9429' "docs/v2/source-locks.json"
 require_literal 'NEREUS_V2_P1_FOCUSED_RECEIPT_V1' "docs/v2/evidence/v2-m1/p1/p1-focused.json"
 require_literal 'PASS_P1_FOCUSED_ONLY' "docs/v2/evidence/v2-m1/p1/p1-focused.json"
 require_literal 'v2M1P1FocusedCheck' "build.gradle.kts"
-require_literal '14 Nereus metadata suites with 94 tests' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
-require_literal 'seven Pulsar suites with 34 tests' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
+require_literal '14 Nereus metadata suites with 100 tests' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
+require_literal 'seven Pulsar suites with 36 tests' "docs/v2/detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md"
 require_literal 'does not own Produce/Fetch' "docs/v2/08-implementation-plan-and-gates.md"
 require_literal 'NEREUS_V2_R1_FOCUSED_RECEIPT_V1' "docs/v2/evidence/v2-m1/r1/r1-focused.json"
 require_literal 'PASS_R1_FOCUSED_ONLY' "docs/v2/evidence/v2-m1/r1/r1-focused.json"
@@ -300,6 +300,7 @@ require_literal 'complete seven-file N3 set' "docs/v2/detailed_design/m1/README.
 require_literal 'strict ancestor of HEAD' "docs/v2/detailed_design/m1/g1-receipt-validation-and-gates.md"
 require_literal 'environment: v2-m1-promotion' ".github/workflows/v2-m1-promotion.yml"
 require_literal 'runs-on: [self-hosted, nereus-v2-m1]' ".github/workflows/v2-m1-promotion.yml"
+require_literal 'dedicated macOS ARM64 runner is online' "docs/v2/open-questions.md"
 require_literal '$RUNNER_TEMP/nereus-v2-m1-trusted' ".github/workflows/v2-m1-promotion.yml"
 require_literal 'v2M1FastGateResult v2M1ExactSourceGateResult' ".github/workflows/v2-m1-promotion.yml"
 require_literal 'v2M1FinalCheck' ".github/workflows/v2-m1-promotion.yml"
@@ -1201,16 +1202,20 @@ expected_p1 = {
     "implementationBaseCommit": "8dae0236c0a0d405ed7f8303081080520fe91551",
     "repository": "https://github.com/nereusstream/pulsar.git",
     "branch": "nereus/v2-m1-p1-selector-fence-pure-v2",
-    "finalForkCommit": "d1cfd863b0e0ffad9c141abf68beeb2350a1ea16",
+    "finalForkCommit": "072aa1c440f85b808f60e7ea59de8a73c4e2a202",
     "focusedImplementationBaseId": "pulsar-v2-development-base",
     "focusedImplementationBaseCommit": "11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9",
     "focusedBranch": "nereus/v2-m1-p1-selector-fence",
     "focusedForkCommit": "778862323d8a86e2f36064a12166e09918ed9429",
     "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
-    "p1MetadataSourceCommit": "23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
-    "p1CoordinateVersion": "0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
-    "p1JarSha256": "71502aa8895df44e95fbf2d2b7205fb7c6aed870babb5c6cfa4731a0a9b91e84",
-    "p1ManifestSha256": "a46dbbec8a3a7f01b08cbcf189f3a02dc9bb360f96d55d1e0c15f036f748fd37",
+    "p1MetadataSourceCommit": "17497c37901288d60d5d221e73f672a314371a45",
+    "p1CoordinateVersion": "0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45",
+    "p1JarSha256": "157250f3a2a9a002c6d49490def4182761287dabe6a0c2098b999fd90960d963",
+    "p1ManifestSha256": "fe3884364c45ff0ed5bd824036e4cdf89abbb95dbbe8ea57b198328e1ef8eb7a",
+    "focusedP1MetadataSourceCommit": "23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+    "focusedP1CoordinateVersion": "0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+    "focusedP1JarSha256": "71502aa8895df44e95fbf2d2b7205fb7c6aed870babb5c6cfa4731a0a9b91e84",
+    "focusedP1ManifestSha256": "a46dbbec8a3a7f01b08cbcf189f3a02dc9bb360f96d55d1e0c15f036f748fd37",
     "oxiaClientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
     "oxiaServerSourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
     "oxiaServerImageDigest": "sha256:5aa715e4f19091931743e5af489af5f8d6ee15efcce6430a908c6f65cc6d6516",

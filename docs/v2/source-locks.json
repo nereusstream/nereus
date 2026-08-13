@@ -237,46 +237,46 @@
     "evidenceStatus": "IMMUTABLE_INPUT_ONLY"
   },
   "p1MetadataCapabilityBinding": {
-    "sourceCommit": "23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
-    "coordinateVersion": "0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
-    "bundleRoot": "gradle/locked-artifacts/nereus-p1/23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+    "sourceCommit": "17497c37901288d60d5d221e73f672a314371a45",
+    "coordinateVersion": "0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45",
+    "bundleRoot": "gradle/locked-artifacts/nereus-p1/17497c37901288d60d5d221e73f672a314371a45",
     "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
     "n1CoordinateVersion": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
     "oxiaClientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
     "oxiaClientVersion": "0.9.4",
     "requiredModules": [
-      "com.nereusstream:nereus-metadata-oxia-p1:0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5"
+      "com.nereusstream:nereus-metadata-oxia-p1:0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45"
     ],
     "artifacts": {
       "p1Jar": {
-        "relativePath": "m2/com/nereusstream/nereus-metadata-oxia-p1/0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5/nereus-metadata-oxia-p1-0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5.jar",
-        "bytes": 85254,
-        "sha256": "71502aa8895df44e95fbf2d2b7205fb7c6aed870babb5c6cfa4731a0a9b91e84"
+        "relativePath": "m2/com/nereusstream/nereus-metadata-oxia-p1/0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45/nereus-metadata-oxia-p1-0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45.jar",
+        "bytes": 102270,
+        "sha256": "157250f3a2a9a002c6d49490def4182761287dabe6a0c2098b999fd90960d963"
       },
       "p1SourceJar": {
-        "relativePath": "m2/com/nereusstream/nereus-metadata-oxia-p1/0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5/nereus-metadata-oxia-p1-0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5-sources.jar",
-        "bytes": 51353,
-        "sha256": "42d343cba033bd56f92f443d544c011377df54f66a57acccd09cd4e832ce038b"
+        "relativePath": "m2/com/nereusstream/nereus-metadata-oxia-p1/0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45/nereus-metadata-oxia-p1-0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45-sources.jar",
+        "bytes": 61967,
+        "sha256": "8123145bb249545ed6bab22f1d1a51b4c4589ea0b84b09c24bd9b475dc684334"
       },
       "p1Pom": {
-        "relativePath": "m2/com/nereusstream/nereus-metadata-oxia-p1/0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5/nereus-metadata-oxia-p1-0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5.pom",
+        "relativePath": "m2/com/nereusstream/nereus-metadata-oxia-p1/0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45/nereus-metadata-oxia-p1-0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45.pom",
         "bytes": 1668,
-        "sha256": "be2556b4c7b0472831122343f740212ca4c9939a06366157bc0dc623cb436f88"
+        "sha256": "ef4ba68e231e0cfd1b1038d85d4529ba9a89805e0128de29bded73513e6d8f6d"
       },
       "p1GradleMetadata": {
-        "relativePath": "m2/com/nereusstream/nereus-metadata-oxia-p1/0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5/nereus-metadata-oxia-p1-0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5.module",
-        "bytes": 3859,
-        "sha256": "7a00cebfbd17eaa4889cc2b9ba596de20224fc46b4983e6391923a13aeb30757"
+        "relativePath": "m2/com/nereusstream/nereus-metadata-oxia-p1/0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45/nereus-metadata-oxia-p1-0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45.module",
+        "bytes": 3861,
+        "sha256": "0ade336b0a2729f77cb12fa82d4cf644bd4cf6cd1e35ce260da7a240d1d39b72"
       },
       "sourceCommitFile": {
         "relativePath": "source-commit.txt",
         "bytes": 41,
-        "sha256": "e9518077fb7ba8925b964cc1bd60071297fde7f692207438a7515e6651ccc60c"
+        "sha256": "06b397316754b79a995710dee0c073860beaccc54ae459ada070191401debf87"
       },
       "coordinateVersionFile": {
         "relativePath": "coordinate-version.txt",
         "bytes": 50,
-        "sha256": "ff6c9b74e4f8eec37ab33241bf40b35eb3fed8e8fb71ea949b0a9ea6c856c750"
+        "sha256": "33a8533acb706f0c1dee815bc426d181c49d14ba412d0b099ca7c8b1a2946818"
       },
       "n1SourceCommitFile": {
         "relativePath": "n1-source-commit.txt",
@@ -297,7 +297,7 @@
     "manifest": {
       "relativePath": "manifest.sha256",
       "bytes": 1411,
-      "sha256": "a46dbbec8a3a7f01b08cbcf189f3a02dc9bb360f96d55d1e0c15f036f748fd37"
+      "sha256": "fe3884364c45ff0ed5bd824036e4cdf89abbb95dbbe8ea57b198328e1ef8eb7a"
     },
     "receipt": "docs/v2/evidence/v2-m1/p1/p1-artifact.json",
     "result": "PASS_P1_ARTIFACT_INPUT_ONLY",
@@ -309,16 +309,20 @@
     "implementationBaseCommit": "8dae0236c0a0d405ed7f8303081080520fe91551",
     "repository": "https://github.com/nereusstream/pulsar.git",
     "branch": "nereus/v2-m1-p1-selector-fence-pure-v2",
-    "finalForkCommit": "d1cfd863b0e0ffad9c141abf68beeb2350a1ea16",
+    "finalForkCommit": "072aa1c440f85b808f60e7ea59de8a73c4e2a202",
     "focusedImplementationBaseId": "pulsar-v2-development-base",
     "focusedImplementationBaseCommit": "11d7ab15291ca4bbc9cc29dedd7878c4e1311ec9",
     "focusedBranch": "nereus/v2-m1-p1-selector-fence",
     "focusedForkCommit": "778862323d8a86e2f36064a12166e09918ed9429",
     "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
-    "p1MetadataSourceCommit": "23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
-    "p1CoordinateVersion": "0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
-    "p1JarSha256": "71502aa8895df44e95fbf2d2b7205fb7c6aed870babb5c6cfa4731a0a9b91e84",
-    "p1ManifestSha256": "a46dbbec8a3a7f01b08cbcf189f3a02dc9bb360f96d55d1e0c15f036f748fd37",
+    "p1MetadataSourceCommit": "17497c37901288d60d5d221e73f672a314371a45",
+    "p1CoordinateVersion": "0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45",
+    "p1JarSha256": "157250f3a2a9a002c6d49490def4182761287dabe6a0c2098b999fd90960d963",
+    "p1ManifestSha256": "fe3884364c45ff0ed5bd824036e4cdf89abbb95dbbe8ea57b198328e1ef8eb7a",
+    "focusedP1MetadataSourceCommit": "23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+    "focusedP1CoordinateVersion": "0.2.0-p1.23064b3be10169d0fe1bb6f23abd7f2bded4bbd5",
+    "focusedP1JarSha256": "71502aa8895df44e95fbf2d2b7205fb7c6aed870babb5c6cfa4731a0a9b91e84",
+    "focusedP1ManifestSha256": "a46dbbec8a3a7f01b08cbcf189f3a02dc9bb360f96d55d1e0c15f036f748fd37",
     "oxiaClientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
     "oxiaServerSourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
     "oxiaServerImageDigest": "sha256:5aa715e4f19091931743e5af489af5f8d6ee15efcce6430a908c6f65cc6d6516",

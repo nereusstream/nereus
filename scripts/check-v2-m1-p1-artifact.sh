@@ -194,6 +194,11 @@ for report in reports:
     current_skipped += int(suite.attrib.get("skipped", 0))
 if current_tests <= 0 or current_failures or current_errors or current_skipped:
     raise SystemExit("P1 current focused regression gate failed or skipped tests")
+if tests.get("discovered") != current_tests:
+    raise SystemExit(
+        f"P1 artifact receipt test count differs from current execution: "
+        f"{tests.get('discovered')} != {current_tests}"
+    )
 
 def git(*args: str) -> None:
     subprocess.run(["git", "-C", str(root), *args], check=True, stdout=subprocess.DEVNULL)

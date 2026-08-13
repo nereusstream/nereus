@@ -41,6 +41,10 @@ values = (
     p1.get("coordinateVersion"),
     p1.get("artifacts", {}).get("p1Jar", {}).get("sha256"),
     p1.get("manifest", {}).get("sha256"),
+    binding.get("focusedP1MetadataSourceCommit"),
+    binding.get("focusedP1CoordinateVersion"),
+    binding.get("focusedP1JarSha256"),
+    binding.get("focusedP1ManifestSha256"),
     client.get("forkOutputId"),
     source.get("dependencyForkOutputs", [{}])[0].get("finalForkCommit"),
     client.get("manifest", {}).get("sha256"),
@@ -76,13 +80,17 @@ p1_source_commit="${lock_values[11]}"
 p1_coordinate="${lock_values[12]}"
 p1_jar_sha="${lock_values[13]}"
 p1_manifest_sha="${lock_values[14]}"
-oxia_output_id="${lock_values[15]}"
-oxia_client_commit="${lock_values[16]}"
-oxia_client_manifest_sha="${lock_values[17]}"
-oxia_server_commit="${lock_values[18]}"
-oxia_server_image_digest="${lock_values[19]}"
-receipt_bytes="${lock_values[20]}"
-receipt_sha="${lock_values[21]}"
+focused_p1_source_commit="${lock_values[15]}"
+focused_p1_coordinate="${lock_values[16]}"
+focused_p1_jar_sha="${lock_values[17]}"
+focused_p1_manifest_sha="${lock_values[18]}"
+oxia_output_id="${lock_values[19]}"
+oxia_client_commit="${lock_values[20]}"
+oxia_client_manifest_sha="${lock_values[21]}"
+oxia_server_commit="${lock_values[22]}"
+oxia_server_image_digest="${lock_values[23]}"
+receipt_bytes="${lock_values[24]}"
+receipt_sha="${lock_values[25]}"
 receipt_path="$repo_root/$receipt_relative"
 
 [[ -f "$receipt_path" && ! -L "$receipt_path" ]] || { echo "P1 receipt is missing or unsafe" >&2; exit 1; }
@@ -203,8 +211,9 @@ run_gradle :pulsar-broker:cleanTest :pulsar-broker:test \
     --tests 'org.apache.pulsar.broker.storage.nereus.v2.OxiaNereusPulsarBindingAuthorityProviderTest'
 
 python3 - "$repo_root" "$pulsar_checkout" "$receipt_relative" "$source_tuple" "$focused_base_commit" \
-    "$focused_final_commit" "$focused_branch" "$n1_source_commit" "$p1_source_commit" "$p1_coordinate" "$p1_jar_sha" \
-    "$p1_manifest_sha" "$oxia_client_commit" "$oxia_server_commit" "$oxia_server_image_digest" <<'PY'
+    "$focused_final_commit" "$focused_branch" "$n1_source_commit" "$focused_p1_source_commit" \
+    "$focused_p1_coordinate" "$focused_p1_jar_sha" "$focused_p1_manifest_sha" "$oxia_client_commit" \
+    "$oxia_server_commit" "$oxia_server_image_digest" <<'PY'
 import json
 import pathlib
 import sys
@@ -221,7 +230,7 @@ expected_pulsar = {
     "org.apache.pulsar.broker.storage.nereus.v2.MetadataStoreNereusOwnershipWitnessProviderTest": 2,
     "org.apache.pulsar.broker.storage.nereus.v2.NereusOwnershipIdentityTest": 3,
     "org.apache.pulsar.broker.storage.nereus.v2.NereusP1OwnershipCapabilityGateTest": 4,
-    "org.apache.pulsar.broker.storage.nereus.v2.NereusPulsarAuthorityInstallerTest": 8,
+    "org.apache.pulsar.broker.storage.nereus.v2.NereusPulsarAuthorityInstallerTest": 10,
     "org.apache.pulsar.broker.storage.nereus.v2.OxiaNereusPulsarBindingAuthorityProviderTest": 4,
 }
 
@@ -244,7 +253,7 @@ def report(path, expected_suites=None):
 pulsar_suites, pulsar_totals = report(pulsar / "pulsar-broker/build/test-results/test", expected_pulsar)
 nereus_suites, nereus_totals = report(root / "nereus-metadata-oxia/build/test-results/p1MetadataTest")
 real_suites, real_totals = report(root / "nereus-metadata-oxia/build/test-results/p1OxiaIntegrationTest")
-if (pulsar_suites, pulsar_totals["tests"], nereus_suites, nereus_totals["tests"], real_suites, real_totals["tests"]) != (7, 34, 14, 94, 1, 2):
+if (pulsar_suites, pulsar_totals["tests"], nereus_suites, nereus_totals["tests"], real_suites, real_totals["tests"]) != (7, 36, 14, 100, 1, 2):
     raise SystemExit("P1 suite/test totals drifted")
 real_names = set()
 for xml in (root / "nereus-metadata-oxia/build/test-results/p1OxiaIntegrationTest").glob("TEST-*.xml"):
@@ -299,4 +308,4 @@ PY
 [[ "$(git -C "$pulsar_checkout" rev-parse HEAD)" == "$final_commit" ]] || {
     echo "P1 Pulsar HEAD changed during execution" >&2; exit 1;
 }
-echo "P1 focused selector/ownership evidence verified: 14/94 Nereus metadata, 1/2 real Oxia, 7/34 Pulsar; no runtime activation or M1 PASS"
+echo "P1 exact-source selector/ownership evidence verified: current 14/100 Nereus metadata, 1/2 real Oxia, 7/36 Pulsar; historical focused receipt remains 14/94 and 7/34; no runtime activation or M1 PASS"

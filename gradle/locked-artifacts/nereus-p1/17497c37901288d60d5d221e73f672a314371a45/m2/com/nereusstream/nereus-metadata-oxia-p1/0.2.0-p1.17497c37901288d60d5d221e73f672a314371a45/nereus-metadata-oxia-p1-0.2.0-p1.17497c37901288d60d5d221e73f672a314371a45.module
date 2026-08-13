@@ -1,0 +1,85 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.nereusstream",
+    "module": "nereus-metadata-oxia-p1",
+    "version": "0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {"group": "com.nereusstream", "module": "nereus-domain", "version": {"requires": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e"}},
+        {"group": "com.nereusstream", "module": "nereus-metadata-spi", "version": {"requires": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e"}},
+        {"group": "io.github.oxia-db", "module": "oxia-client", "version": {"requires": "0.9.4"}}
+      ],
+      "files": [
+        {
+          "name": "nereus-metadata-oxia-p1-0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45.jar",
+          "url": "nereus-metadata-oxia-p1-0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45.jar",
+          "size": 102270,
+          "sha512": "af339f01e66b6f1363c5210b92939f53e0301c61a061992dcb290426d4d573b3c1ce03ba5390d700cd0f8f78dfe54aae7c5bbb7d2b2771ab4936f96110ec5644",
+          "sha256": "157250f3a2a9a002c6d49490def4182761287dabe6a0c2098b999fd90960d963",
+          "sha1": "c3e7de635a4834968511ccef740a5231467587f2",
+          "md5": "bdc23c33225ad35ea81b0fcc12c8a1ea"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {"group": "com.nereusstream", "module": "nereus-domain", "version": {"requires": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e"}},
+        {"group": "com.nereusstream", "module": "nereus-metadata-spi", "version": {"requires": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e"}},
+        {"group": "io.github.oxia-db", "module": "oxia-client", "version": {"requires": "0.9.4"}}
+      ],
+      "files": [
+        {
+          "name": "nereus-metadata-oxia-p1-0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45.jar",
+          "url": "nereus-metadata-oxia-p1-0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45.jar",
+          "size": 102270,
+          "sha512": "af339f01e66b6f1363c5210b92939f53e0301c61a061992dcb290426d4d573b3c1ce03ba5390d700cd0f8f78dfe54aae7c5bbb7d2b2771ab4936f96110ec5644",
+          "sha256": "157250f3a2a9a002c6d49490def4182761287dabe6a0c2098b999fd90960d963",
+          "sha1": "c3e7de635a4834968511ccef740a5231467587f2",
+          "md5": "bdc23c33225ad35ea81b0fcc12c8a1ea"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "nereus-metadata-oxia-p1-0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45-sources.jar",
+          "url": "nereus-metadata-oxia-p1-0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45-sources.jar",
+          "size": 61967,
+          "sha512": "7faf314b35f48df84f9a603c35edd2c30bc877125d3af3d63ebcd9af5748c9a51500bf47882ad06d33ec664f8dbbd2035f76e9c8fe4bdff033a7f1c6ad86dc5f",
+          "sha256": "8123145bb249545ed6bab22f1d1a51b4c4589ea0b84b09c24bd9b475dc684334",
+          "sha1": "e39da272ee4c38b7fb0557c7e86fe01fde943a34",
+          "md5": "e84de60eec1ba68bbec377f3bdf15d3d"
+        }
+      ]
+    }
+  ]
+}
