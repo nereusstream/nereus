@@ -36,59 +36,43 @@ jobs:
               "kafka_branch": locks["k1KafkaAuthorityBinding"]["branch"],
               "pulsar_commit": locks["p1PulsarAuthorityBinding"]["finalForkCommit"],
               "pulsar_branch": locks["p1PulsarAuthorityBinding"]["branch"],
-              "oxia_client_commit": next(
-                  row["finalForkCommit"]
-                  for row in locks["dependencyForkOutputs"]
-                  if row["id"] == "oxia-client-notification-continuity"
-              ),
+              "oxia_client_commit": next(row["finalForkCommit"] for row in locks["dependencyForkOutputs"]
+                                         if row["id"] == "oxia-client-notification-continuity"),
+              "oxia_client_branch": next(row["branch"] for row in locks["dependencyForkOutputs"]
+                                         if row["id"] == "oxia-client-notification-continuity"),
               "oxia_server_commit": locks["dependencyEvidenceBindings"]["oxiaServerRuntime"]["sourceCommit"],
+              "oxia_server_branch": next(row["branch"] for row in locks["dependencyImplementationBases"]
+                                         if row["id"] == "oxia-server-v2-conformance-base"),
           }
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               for name, value in values.items():
                   output.write(f"{name}={value}\n")
           PY
 
-      - name: Check out source-locked Kafka
-        uses: actions/checkout@v4
-        with:
-          repository: nereusstream/kafka
-          ref: ${{ steps.locks.outputs.kafka_commit }}
-          path: trusted/kafka
-          fetch-depth: 0
-
-      - name: Check out source-locked Pulsar
-        uses: actions/checkout@v4
-        with:
-          repository: nereusstream/pulsar
-          ref: ${{ steps.locks.outputs.pulsar_commit }}
-          path: trusted/pulsar
-          fetch-depth: 0
-
-      - name: Check out source-locked Oxia client
-        uses: actions/checkout@v4
-        with:
-          repository: nereusstream/oxia-client-java
-          ref: ${{ steps.locks.outputs.oxia_client_commit }}
-          path: trusted/oxia-client-java
-          fetch-depth: 0
-
-      - name: Check out source-locked Oxia server
-        uses: actions/checkout@v4
-        with:
-          repository: nereusstream/oxia
-          ref: ${{ steps.locks.outputs.oxia_server_commit }}
-          path: trusted/oxia
-          fetch-depth: 0
-
-      - name: Materialize locked remote-tracking branches
+      - name: Check out source-locked external repositories outside the Nereus worktree
         shell: bash
         run: |
-          git -C trusted/kafka fetch --no-tags origin \
-            "+refs/heads/${{ steps.locks.outputs.kafka_branch }}:refs/remotes/origin/${{ steps.locks.outputs.kafka_branch }}"
-          git -C trusted/kafka checkout --detach "${{ steps.locks.outputs.kafka_commit }}"
-          git -C trusted/pulsar fetch --no-tags origin \
-            "+refs/heads/${{ steps.locks.outputs.pulsar_branch }}:refs/remotes/origin/${{ steps.locks.outputs.pulsar_branch }}"
-          git -C trusted/pulsar checkout --detach "${{ steps.locks.outputs.pulsar_commit }}"
+          trusted_root="$RUNNER_TEMP/nereus-v2-m1-trusted"
+          mkdir -p "$trusted_root"
+          clone_locked() {
+            local repository="$1"
+            local branch="$2"
+            local commit="$3"
+            local destination="$4"
+            git init --quiet "$destination"
+            git -C "$destination" remote add origin "https://github.com/nereusstream/$repository.git"
+            git -C "$destination" fetch --quiet --no-tags origin \
+              "+refs/heads/$branch:refs/remotes/origin/$branch"
+            git -C "$destination" checkout --quiet --detach "$commit"
+          }
+          clone_locked kafka "${{ steps.locks.outputs.kafka_branch }}" \
+            "${{ steps.locks.outputs.kafka_commit }}" "$trusted_root/kafka"
+          clone_locked pulsar "${{ steps.locks.outputs.pulsar_branch }}" \
+            "${{ steps.locks.outputs.pulsar_commit }}" "$trusted_root/pulsar"
+          clone_locked oxia-client-java "${{ steps.locks.outputs.oxia_client_branch }}" \
+            "${{ steps.locks.outputs.oxia_client_commit }}" "$trusted_root/oxia-client-java"
+          clone_locked oxia "${{ steps.locks.outputs.oxia_server_branch }}" \
+            "${{ steps.locks.outputs.oxia_server_commit }}" "$trusted_root/oxia"
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -112,10 +96,10 @@ jobs:
             -Pv2M1SourceTupleSha="$source_tuple_sha" \
             -Pv2M1FastGateResult="$RUNNER_TEMP/fast.json" \
             -Pv2M1ExactGateResult="$RUNNER_TEMP/exact-source.json" \
-            -PkafkaForkCheckout="$GITHUB_WORKSPACE/trusted/kafka" \
-            -PpulsarCheckout="$GITHUB_WORKSPACE/trusted/pulsar" \
-            -PoxiaClientCheckout="$GITHUB_WORKSPACE/trusted/oxia-client-java" \
-            -PoxiaServerCheckout="$GITHUB_WORKSPACE/trusted/oxia" \
+            -PkafkaForkCheckout="$RUNNER_TEMP/nereus-v2-m1-trusted/kafka" \
+            -PpulsarCheckout="$RUNNER_TEMP/nereus-v2-m1-trusted/pulsar" \
+            -PoxiaClientCheckout="$RUNNER_TEMP/nereus-v2-m1-trusted/oxia-client-java" \
+            -PoxiaServerCheckout="$RUNNER_TEMP/nereus-v2-m1-trusted/oxia" \
             --no-build-cache --rerun-tasks
           cmp "$RUNNER_TEMP/fast.json" docs/v2/evidence/v2-m1/n3/gates/fast.json
           cmp "$RUNNER_TEMP/exact-source.json" docs/v2/evidence/v2-m1/n3/gates/exact-source.json

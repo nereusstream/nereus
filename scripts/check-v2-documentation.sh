@@ -297,6 +297,7 @@ require_literal 'docs/v2/evidence/v2-m1/n3/' "scripts/check-v2-m1-evidence-fresh
 require_literal 'strict ancestor of HEAD' "docs/v2/detailed_design/m1/g1-receipt-validation-and-gates.md"
 require_literal 'environment: v2-m1-promotion' ".github/workflows/v2-m1-promotion.yml"
 require_literal 'runs-on: [self-hosted, nereus-v2-m1]' ".github/workflows/v2-m1-promotion.yml"
+require_literal '$RUNNER_TEMP/nereus-v2-m1-trusted' ".github/workflows/v2-m1-promotion.yml"
 require_literal 'v2M1FastGateResult v2M1ExactSourceGateResult' ".github/workflows/v2-m1-promotion.yml"
 require_literal 'v2M1FinalCheck' ".github/workflows/v2-m1-promotion.yml"
 require_literal 'NEREUS_V2_G1_FOCUSED_RECEIPT_V1' "docs/v2/evidence/v2-m1/g1/g1-focused.json"
