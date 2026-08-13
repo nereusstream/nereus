@@ -35,6 +35,8 @@ public final class FakeO1ContinuityClient {
     private boolean registrationClosed;
     private boolean clientClosed;
     private boolean callbackBeforeRegistrationReturns;
+    private RuntimeException registrationCloseFailure;
+    private Exception clientCloseFailure;
     private int unsupportedOperationCount;
 
     public FakeO1ContinuityClient(long generation, NotificationContinuityState state) {
@@ -68,6 +70,9 @@ public final class FakeO1ContinuityClient {
                     if (method.getName().equals("close")) {
                         clientClosed = true;
                         lifecycleEvents.add("client-close");
+                        if (clientCloseFailure != null) {
+                            throw clientCloseFailure;
+                        }
                         return null;
                     }
                     if (method.getName().equals("toString")) {
@@ -84,6 +89,14 @@ public final class FakeO1ContinuityClient {
 
     public void callbackBeforeRegistrationReturns() {
         callbackBeforeRegistrationReturns = true;
+    }
+
+    public void failRegistrationClose(RuntimeException failure) {
+        registrationCloseFailure = failure;
+    }
+
+    public void failClientClose(Exception failure) {
+        clientCloseFailure = failure;
     }
 
     public void emit(long generation, NotificationContinuityState state) {
@@ -125,6 +138,9 @@ public final class FakeO1ContinuityClient {
                 if (!registrationClosed) {
                     registrationClosed = true;
                     lifecycleEvents.add("registration-close");
+                    if (registrationCloseFailure != null) {
+                        throw registrationCloseFailure;
+                    }
                 }
             }
         };

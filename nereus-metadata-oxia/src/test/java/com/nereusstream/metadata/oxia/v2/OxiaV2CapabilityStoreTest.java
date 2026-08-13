@@ -28,6 +28,8 @@ import com.nereusstream.metadata.spi.capability.TopicBindingAggregateReader;
 import io.oxia.client.api.NotificationContinuityState;
 import java.util.ArrayList;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 class OxiaV2CapabilityStoreTest {
@@ -119,6 +121,46 @@ class OxiaV2CapabilityStoreTest {
 
         assertThat(store.capturePulsarInstallPermit()).isEmpty();
         store.close();
+    }
+
+    @Test
+    void closingStoreInvalidatesAnArmedP1AuthorityWithoutReadingClosedStoreState() throws Exception {
+        FakeO1ContinuityClient client = new FakeO1ContinuityClient(1, NotificationContinuityState.READY);
+        OxiaV2CapabilityStore store = attachP1(client, new RecordingRevalidationScheduler());
+        AtomicBoolean valid = new AtomicBoolean(true);
+        AtomicLong invalidationEpoch = new AtomicLong();
+        store.registerPulsarAuthorityInvalidation(O2TestValues.incarnation(1), epoch -> {
+            invalidationEpoch.set(epoch);
+            valid.set(false);
+        });
+
+        store.close();
+
+        assertThat(valid).isFalse();
+        assertThat(invalidationEpoch).hasPositiveValue();
+    }
+
+    @Test
+    void closePreservesTheFirstFailureAndSuppressesEveryLaterFailure() {
+        FakeO1ContinuityClient client = new FakeO1ContinuityClient(1, NotificationContinuityState.READY);
+        RecordingRevalidationScheduler scheduler = new RecordingRevalidationScheduler();
+        OxiaV2CapabilityStore store = attachP1(client, scheduler);
+        store.registerPulsarAuthorityInvalidation(O2TestValues.incarnation(1), ignored -> {
+            throw new IllegalStateException("invalidation close failed");
+        });
+        client.failRegistrationClose(new IllegalStateException("continuity close failed"));
+        scheduler.failClose(new IllegalStateException("scheduler close failed"));
+        client.failClientClose(new IllegalStateException("client close failed"));
+
+        assertThatThrownBy(store::close)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("invalidation close failed")
+                .satisfies(failure -> assertThat(failure.getSuppressed())
+                        .extracting(Throwable::getMessage)
+                        .containsExactly("continuity close failed", "scheduler close failed", "client close failed"));
+        assertThat(client.registrationClosed()).isTrue();
+        assertThat(scheduler.closed()).isTrue();
+        assertThat(client.clientClosed()).isTrue();
     }
 
     private static OxiaV2CapabilityStore attach(

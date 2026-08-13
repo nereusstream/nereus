@@ -26,6 +26,7 @@ public final class RecordingRevalidationScheduler implements RevalidationSchedul
     private final List<String> lifecycleEvents;
     private boolean accept = true;
     private boolean closed;
+    private RuntimeException closeFailure;
 
     public RecordingRevalidationScheduler() {
         this(new ArrayList<>());
@@ -47,6 +48,10 @@ public final class RecordingRevalidationScheduler implements RevalidationSchedul
         return closed;
     }
 
+    public void failClose(RuntimeException failure) {
+        closeFailure = failure;
+    }
+
     @Override
     public boolean request(long clientGeneration, long invalidationEpoch) {
         requests.add(new Request(clientGeneration, invalidationEpoch));
@@ -58,6 +63,9 @@ public final class RecordingRevalidationScheduler implements RevalidationSchedul
         if (!closed) {
             closed = true;
             lifecycleEvents.add("scheduler-close");
+            if (closeFailure != null) {
+                throw closeFailure;
+            }
         }
     }
 }

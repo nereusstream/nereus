@@ -44,6 +44,7 @@ import io.oxia.client.api.AsyncOxiaClient;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.LongConsumer;
 
 /** Owns the shared client and store-wide O2 lifecycle; selector/Registry and activation remain fail closed. */
 public final class OxiaV2CapabilityStore implements AutoCloseable {
@@ -141,7 +142,7 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
 
     /** Arms exact P1 key and store-wide continuity invalidation before authority reads. */
     public AuthorityInvalidationRegistration registerPulsarAuthorityInvalidation(
-            PulsarTopicIncarnationIdentity incarnation, Runnable invalidation) {
+            PulsarTopicIncarnationIdentity incarnation, LongConsumer invalidation) {
         requireOpen();
         if (!pulsarSelectorReady || invalidationRegistry == null) {
             throw new IllegalStateException("P1 selector invalidation capability is unavailable");
@@ -200,13 +201,13 @@ public final class OxiaV2CapabilityStore implements AutoCloseable {
             try {
                 invalidationRegistry.close();
             } catch (RuntimeException closeFailure) {
-                failure = closeFailure;
+                failure = accumulate(failure, closeFailure);
             }
         }
         try {
             continuity.close();
         } catch (RuntimeException closeFailure) {
-            failure = closeFailure;
+            failure = accumulate(failure, closeFailure);
         }
         try {
             scheduler.close();

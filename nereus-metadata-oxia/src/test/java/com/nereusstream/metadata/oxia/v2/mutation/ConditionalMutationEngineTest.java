@@ -82,6 +82,21 @@ class ConditionalMutationEngineTest {
     }
 
     @Test
+    void createResponseLossFollowedBySuccessorIsIndeterminate() {
+        client.nextMutation(MutationMode.APPLY_THEN_RESPONSE_LOSS);
+        client.beforeNextRead(() -> client.seed(KEY, DIFFERENT, 1));
+
+        var result =
+                engine.create(KEY, CANDIDATE, resolver()).toCompletableFuture().join();
+
+        assertThat(result.outcome()).isEqualTo(CreateMutationOutcome.INDETERMINATE);
+        assertThat(client.stored(KEY))
+                .get()
+                .extracting(AuthorityRecord::storedBytes)
+                .isEqualTo(DIFFERENT);
+    }
+
+    @Test
     void createResponseLossWithoutApplyIsIndeterminate() {
         client.nextMutation(MutationMode.RESPONSE_LOSS_WITHOUT_APPLY);
 
@@ -134,6 +149,23 @@ class ConditionalMutationEngineTest {
                 .join();
 
         assertThat(result.outcome()).isEqualTo(ConditionalCasOutcome.APPLIED_EXACT);
+    }
+
+    @Test
+    void casResponseLossFollowedBySuccessorIsIndeterminate() {
+        client.seed(KEY, PREDECESSOR, 7);
+        client.nextMutation(MutationMode.APPLY_THEN_RESPONSE_LOSS);
+        client.beforeNextRead(() -> client.seed(KEY, DIFFERENT, 9));
+
+        var result = engine.compareAndSet(KEY, CANDIDATE, 7, resolver())
+                .toCompletableFuture()
+                .join();
+
+        assertThat(result.outcome()).isEqualTo(ConditionalCasOutcome.INDETERMINATE);
+        assertThat(client.stored(KEY))
+                .get()
+                .extracting(AuthorityRecord::storedBytes)
+                .isEqualTo(DIFFERENT);
     }
 
     @Test

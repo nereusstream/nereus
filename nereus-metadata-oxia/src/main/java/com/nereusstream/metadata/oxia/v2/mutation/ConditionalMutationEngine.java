@@ -86,6 +86,9 @@ public final class ConditionalMutationEngine {
         if (mutation.succeeded()) {
             return CreateMutationResult.indeterminate();
         }
+        if (mutation.failureKind() == MutationFailureClassifier.Kind.RESPONSE_UNKNOWN) {
+            return CreateMutationResult.indeterminate();
+        }
         return CreateMutationResult.definitiveConflict();
     }
 
@@ -102,8 +105,11 @@ public final class ConditionalMutationEngine {
         if (mutation.succeeded()) {
             return ConditionalCasResult.indeterminate();
         }
-        if (!mutation.succeeded() && resolver.isPredecessorExact(snapshot)) {
+        if (resolver.isPredecessorExact(snapshot)) {
             return ConditionalCasResult.predecessorUnchanged(snapshot);
+        }
+        if (mutation.failureKind() == MutationFailureClassifier.Kind.RESPONSE_UNKNOWN) {
+            return ConditionalCasResult.indeterminate();
         }
         return ConditionalCasResult.definitiveConflict();
     }

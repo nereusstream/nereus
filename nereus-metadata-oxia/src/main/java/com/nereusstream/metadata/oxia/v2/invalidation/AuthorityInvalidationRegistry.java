@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.LongConsumer;
 
 /** Exact selector/aggregate plus store-wide continuity invalidation fan-out. */
 public final class AuthorityInvalidationRegistry implements AutoCloseable {
@@ -41,12 +42,12 @@ public final class AuthorityInvalidationRegistry implements AutoCloseable {
         this.keys = Objects.requireNonNull(keys, "keys");
         this.continuity = Objects.requireNonNull(continuity, "continuity");
         client.notifications(this::onNotification);
-        continuityRegistration = continuity.onInvalidation(this::invalidateAll);
+        continuityRegistration = continuity.onInvalidation(() -> invalidateAll(currentEpoch()));
     }
 
     /** Arms exact selector and aggregate invalidation before the caller performs authority reads. */
     public AuthorityInvalidationRegistration register(
-            PulsarTopicIncarnationIdentity incarnation, Runnable invalidation) {
+            PulsarTopicIncarnationIdentity incarnation, LongConsumer invalidation) {
         Objects.requireNonNull(incarnation, "incarnation");
         Objects.requireNonNull(invalidation, "invalidation");
         if (closed.get()) {
@@ -55,8 +56,13 @@ public final class AuthorityInvalidationRegistry implements AutoCloseable {
         OwnedRegistration owned = new OwnedRegistration(invalidation);
         add(keys.selectorKey(incarnation.persistenceName()), owned);
         add(keys.aggregateKey(incarnation), owned);
-        if (continuity.current().state() != StoreContinuityState.READY) {
-            owned.invalidate();
+        try {
+            if (continuity.current().state() != StoreContinuityState.READY) {
+                owned.invalidate(currentEpoch());
+            }
+        } catch (RuntimeException callbackFailure) {
+            owned.close();
+            throw callbackFailure;
         }
         if (closed.get()) {
             owned.close();
@@ -83,19 +89,41 @@ public final class AuthorityInvalidationRegistry implements AutoCloseable {
                     affected.addAll(listeners);
                 }
             });
-            affected.forEach(OwnedRegistration::invalidate);
+            invalidate(affected, currentEpoch());
             return;
         }
         CopyOnWriteArrayList<OwnedRegistration> listeners = registrations.get(notification.key());
         if (listeners != null) {
-            listeners.forEach(OwnedRegistration::invalidate);
+            invalidate(listeners, currentEpoch());
         }
     }
 
-    private void invalidateAll() {
+    private void invalidateAll(long invalidationEpoch) {
         HashSet<OwnedRegistration> affected = new HashSet<>();
         registrations.values().forEach(affected::addAll);
-        affected.forEach(OwnedRegistration::invalidate);
+        invalidate(affected, invalidationEpoch);
+    }
+
+    private static void invalidate(Iterable<OwnedRegistration> affected, long invalidationEpoch) {
+        RuntimeException failure = null;
+        for (OwnedRegistration registration : affected) {
+            try {
+                registration.invalidate(invalidationEpoch);
+            } catch (RuntimeException callbackFailure) {
+                if (failure == null) {
+                    failure = callbackFailure;
+                } else {
+                    failure.addSuppressed(callbackFailure);
+                }
+            }
+        }
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    private long currentEpoch() {
+        return continuity.current().invalidationEpoch();
     }
 
     @Override
@@ -103,29 +131,42 @@ public final class AuthorityInvalidationRegistry implements AutoCloseable {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        invalidateAll();
-        continuityRegistration.close();
-        registrations.clear();
+        RuntimeException failure = null;
+        try {
+            invalidateAll(currentEpoch());
+        } catch (RuntimeException callbackFailure) {
+            failure = callbackFailure;
+        }
+        try {
+            continuityRegistration.close();
+        } catch (RuntimeException closeFailure) {
+            if (failure == null) {
+                failure = closeFailure;
+            } else {
+                failure.addSuppressed(closeFailure);
+            }
+        } finally {
+            registrations.clear();
+        }
+        if (failure != null) {
+            throw failure;
+        }
     }
 
     private final class OwnedRegistration implements AuthorityInvalidationRegistration {
         private final CopyOnWriteArrayList<String> keys = new CopyOnWriteArrayList<>();
-        private final Runnable invalidation;
+        private final LongConsumer invalidation;
         private final AtomicBoolean active = new AtomicBoolean(true);
 
-        private OwnedRegistration(Runnable invalidation) {
+        private OwnedRegistration(LongConsumer invalidation) {
             this.invalidation = invalidation;
         }
 
-        private void invalidate() {
+        private void invalidate(long invalidationEpoch) {
             if (!active.get()) {
                 return;
             }
-            try {
-                invalidation.run();
-            } catch (RuntimeException ignored) {
-                // A notification callback is an invalidation hint and must not break client dispatch.
-            }
+            invalidation.accept(invalidationEpoch);
         }
 
         @Override

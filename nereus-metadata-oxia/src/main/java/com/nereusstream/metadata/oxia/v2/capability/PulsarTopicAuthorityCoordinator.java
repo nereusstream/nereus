@@ -94,13 +94,9 @@ public final class PulsarTopicAuthorityCoordinator {
                     case CREATED, EXISTING_EXACT ->
                         completed(result.exactSnapshot().orElseThrow());
                     case DEFINITIVE_CONFLICT ->
-                        failed(
-                                PulsarTopicAuthorityException.Kind.DEFINITIVE_CONFLICT,
-                                "selector first-create conflict");
+                        reconcileFirstCreate(reserved, PulsarTopicAuthorityException.Kind.DEFINITIVE_CONFLICT);
                     case INDETERMINATE ->
-                        failed(
-                                PulsarTopicAuthorityException.Kind.INDETERMINATE,
-                                "selector first-create outcome is indeterminate");
+                        reconcileFirstCreate(reserved, PulsarTopicAuthorityException.Kind.INDETERMINATE);
                 });
             }
 
@@ -121,6 +117,25 @@ public final class PulsarTopicAuthorityCoordinator {
                     PulsarTopicAuthorityException.Kind.INVALID_STATE,
                     "selector cannot reserve requested incarnation from "
                             + snapshot.value().state());
+        });
+    }
+
+    private CompletionStage<VersionedSelectorSnapshot> reconcileFirstCreate(
+            PulsarTopicGenerationSelectorValueV1 reserved, PulsarTopicAuthorityException.Kind unresolvedKind) {
+        return selectorStore.readSelector(reserved.persistenceName()).thenCompose(current -> {
+            if (current.isPresent()) {
+                VersionedSelectorSnapshot snapshot = current.orElseThrow();
+                if (snapshot.value().equals(reserved)
+                        || (snapshot.value().state() == PulsarTopicGenerationSelectorStateV1.ACTIVE
+                                && sameSelectedAggregate(snapshot.value(), reserved))) {
+                    return completed(snapshot);
+                }
+            }
+            return failed(
+                    unresolvedKind,
+                    unresolvedKind == PulsarTopicAuthorityException.Kind.DEFINITIVE_CONFLICT
+                            ? "selector first-create conflict"
+                            : "selector first-create outcome is indeterminate");
         });
     }
 

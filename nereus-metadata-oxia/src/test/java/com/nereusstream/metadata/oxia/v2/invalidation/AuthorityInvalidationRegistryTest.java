@@ -24,6 +24,7 @@ import com.nereusstream.metadata.oxia.v2.testing.RecordingRevalidationScheduler;
 import io.oxia.client.api.Notification;
 import io.oxia.client.api.NotificationContinuityState;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 class AuthorityInvalidationRegistryTest {
@@ -34,8 +35,12 @@ class AuthorityInvalidationRegistryTest {
         OxiaV2AuthorityKeys keys = new OxiaV2AuthorityKeys("/nereus/test");
         AuthorityInvalidationRegistry registry = new AuthorityInvalidationRegistry(client.client(), continuity, keys);
         AtomicInteger invalidations = new AtomicInteger();
+        AtomicLong lastEpoch = new AtomicLong();
         var incarnation = O2TestValues.incarnation(1);
-        var registration = registry.register(incarnation, invalidations::incrementAndGet);
+        var registration = registry.register(incarnation, epoch -> {
+            lastEpoch.set(epoch);
+            invalidations.incrementAndGet();
+        });
 
         client.emit(new Notification.KeyModified("/unrelated", 1));
         client.emit(new Notification.KeyModified(keys.selectorKey(incarnation.persistenceName()), 2));
@@ -44,6 +49,7 @@ class AuthorityInvalidationRegistryTest {
         client.emit(2, NotificationContinuityState.READY);
 
         assertThat(invalidations).hasValue(3);
+        assertThat(lastEpoch).hasValue(continuity.current().invalidationEpoch());
         registration.close();
         client.emit(new Notification.KeyModified(keys.selectorKey(incarnation.persistenceName()), 3));
         assertThat(invalidations).hasValue(3);
@@ -56,13 +62,13 @@ class AuthorityInvalidationRegistryTest {
         OxiaV2AuthorityKeys keys = new OxiaV2AuthorityKeys("/nereus/test");
         AuthorityInvalidationRegistry registry = new AuthorityInvalidationRegistry(client.client(), continuity, keys);
         AtomicInteger invalidations = new AtomicInteger();
-        registry.register(O2TestValues.incarnation(1), invalidations::incrementAndGet);
+        registry.register(O2TestValues.incarnation(1), ignored -> invalidations.incrementAndGet());
 
         client.emit(new Notification.KeyRangeDelete("/nereus/test/", "/nereus/test0"));
         registry.close();
 
         assertThat(invalidations.get()).isGreaterThanOrEqualTo(2);
-        assertThatThrownBy(() -> registry.register(O2TestValues.incarnation(1), () -> {}))
+        assertThatThrownBy(() -> registry.register(O2TestValues.incarnation(1), ignored -> {}))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -74,8 +80,25 @@ class AuthorityInvalidationRegistryTest {
                 new AuthorityInvalidationRegistry(client.client(), continuity, new OxiaV2AuthorityKeys("/nereus/test"));
         AtomicInteger invalidations = new AtomicInteger();
 
-        registry.register(O2TestValues.incarnation(1), invalidations::incrementAndGet);
+        registry.register(O2TestValues.incarnation(1), ignored -> invalidations.incrementAndGet());
 
         assertThat(invalidations).hasValue(1);
+    }
+
+    @Test
+    void callbackFailureIsObservableInsteadOfLeavingSilentValidAuthority() {
+        FakeO1ContinuityClient client = new FakeO1ContinuityClient(1, NotificationContinuityState.READY);
+        StoreContinuity continuity = StoreContinuity.attach(client.client(), new RecordingRevalidationScheduler());
+        OxiaV2AuthorityKeys keys = new OxiaV2AuthorityKeys("/nereus/test");
+        AuthorityInvalidationRegistry registry = new AuthorityInvalidationRegistry(client.client(), continuity, keys);
+        var incarnation = O2TestValues.incarnation(1);
+        registry.register(incarnation, ignored -> {
+            throw new IllegalStateException("scripted safety callback failure");
+        });
+
+        assertThatThrownBy(() ->
+                        client.emit(new Notification.KeyModified(keys.selectorKey(incarnation.persistenceName()), 2)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("scripted safety callback failure");
     }
 }

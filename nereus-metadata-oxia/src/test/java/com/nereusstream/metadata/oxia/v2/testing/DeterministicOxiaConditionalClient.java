@@ -21,6 +21,7 @@ import io.oxia.client.api.exceptions.KeyAlreadyExistsException;
 import io.oxia.client.api.exceptions.UnexpectedVersionIdException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -37,6 +38,7 @@ public final class DeterministicOxiaConditionalClient implements OxiaConditional
     private final Map<String, AuthorityRecord> records = new HashMap<>();
     private MutationMode nextMutationMode = MutationMode.NORMAL;
     private CanonicalBytes differentSuccessBytes = CanonicalBytes.empty();
+    private Runnable beforeNextRead;
     private boolean nextReadFails;
     private int readCount;
     private int createCount;
@@ -63,6 +65,10 @@ public final class DeterministicOxiaConditionalClient implements OxiaConditional
         nextReadFails = true;
     }
 
+    public void beforeNextRead(Runnable action) {
+        beforeNextRead = Objects.requireNonNull(action, "action");
+    }
+
     public int readCount() {
         return readCount;
     }
@@ -78,6 +84,11 @@ public final class DeterministicOxiaConditionalClient implements OxiaConditional
     @Override
     public CompletionStage<Optional<AuthorityRecord>> read(String key) {
         readCount++;
+        Runnable action = beforeNextRead;
+        beforeNextRead = null;
+        if (action != null) {
+            action.run();
+        }
         if (nextReadFails) {
             nextReadFails = false;
             return CompletableFuture.failedFuture(new IllegalStateException("scripted reread failure"));

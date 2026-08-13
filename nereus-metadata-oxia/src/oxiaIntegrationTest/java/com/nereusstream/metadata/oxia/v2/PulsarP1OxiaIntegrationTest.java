@@ -79,8 +79,8 @@ class PulsarP1OxiaIntegrationTest {
             assertThat(coordinator.activate(generationOne).toCompletableFuture().join())
                     .isEqualTo(active);
 
-            try (var registration =
-                    store.registerPulsarAuthorityInvalidation(incarnation(generationOne), invalidated::countDown)) {
+            try (var registration = store.registerPulsarAuthorityInvalidation(
+                    incarnation(generationOne), ignored -> invalidated.countDown())) {
                 var deleting = coordinator
                         .beginDeletion(incarnation(generationOne).persistenceName())
                         .toCompletableFuture()

@@ -21,12 +21,21 @@ import com.nereusstream.metadata.oxia.v2.codec.Nps1SelectorAuthorityCodec;
 import com.nereusstream.metadata.oxia.v2.codec.OxiaV2CodecSet;
 import com.nereusstream.metadata.oxia.v2.key.OxiaV2AuthorityKeys;
 import com.nereusstream.metadata.oxia.v2.mutation.ConditionalMutationEngine;
+import com.nereusstream.metadata.oxia.v2.mutation.MetadataVersionMapper;
 import com.nereusstream.metadata.oxia.v2.mutation.MutationFailureClassifier;
 import com.nereusstream.metadata.oxia.v2.testing.DeterministicOxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.testing.DeterministicOxiaConditionalClient.MutationMode;
 import com.nereusstream.metadata.oxia.v2.testing.O2TestValues;
+import com.nereusstream.metadata.spi.capability.PulsarTopicGenerationSelectorStore;
+import com.nereusstream.metadata.spi.model.ConditionalCasResult;
+import com.nereusstream.metadata.spi.model.CreateMutationResult;
 import com.nereusstream.metadata.spi.model.PulsarTopicGenerationSelectorStateV1;
+import com.nereusstream.metadata.spi.model.PulsarTopicGenerationSelectorValueV1;
+import com.nereusstream.metadata.spi.model.VersionedSelectorSnapshot;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -72,6 +81,32 @@ class PulsarTopicAuthorityCoordinatorTest {
 
         assertThat(authority.selector().value().state()).isEqualTo(PulsarTopicGenerationSelectorStateV1.ACTIVE);
         assertThat(client.createCount()).isEqualTo(2);
+    }
+
+    @Test
+    void concurrentExactCreatorAcceptsWinnerAlreadyAdvancedToActive() {
+        var candidate = O2TestValues.productionAggregateCandidate();
+        var incarnation = O2TestValues.incarnation(1);
+        var active = Nps1SelectorAuthorityCodec.createValue(
+                incarnation.persistenceName(),
+                incarnation.bindingGeneration(),
+                PulsarTopicGenerationSelectorStateV1.ACTIVE,
+                candidate.aggregate().binding().bindingId(),
+                candidate.canonicalStoredDigest());
+        var activeSnapshot = new VersionedSelectorSnapshot(active, MetadataVersionMapper.fromOxia(2));
+        var selector = new ConflictThenActiveSelectorStore(activeSnapshot);
+        OxiaV2CodecSet codecs = OxiaV2CodecSet.productionP1();
+        ConditionalMutationEngine engine = new ConditionalMutationEngine(client, new MutationFailureClassifier());
+        var raceCoordinator = new PulsarTopicAuthorityCoordinator(
+                new OxiaTopicBindingAggregatePublisher(() -> {}, keys, codecs.aggregate(), engine),
+                new OxiaTopicBindingAggregateReader(() -> {}, keys, codecs.aggregate(), client),
+                selector);
+
+        var authority =
+                raceCoordinator.activate(candidate).toCompletableFuture().join();
+
+        assertThat(authority.selector()).isEqualTo(activeSnapshot);
+        assertThat(selector.readCount).isEqualTo(2);
     }
 
     @Test
@@ -130,5 +165,33 @@ class PulsarTopicAuthorityCoordinatorTest {
                         .toCompletableFuture()
                         .join())
                 .hasRootCauseInstanceOf(PulsarTopicAuthorityException.class);
+    }
+
+    private static final class ConflictThenActiveSelectorStore implements PulsarTopicGenerationSelectorStore {
+        private final VersionedSelectorSnapshot active;
+        private int readCount;
+
+        private ConflictThenActiveSelectorStore(VersionedSelectorSnapshot active) {
+            this.active = active;
+        }
+
+        @Override
+        public CompletionStage<Optional<VersionedSelectorSnapshot>> readSelector(
+                com.nereusstream.domain.protocol.PulsarPersistenceName persistenceName) {
+            readCount++;
+            return CompletableFuture.completedFuture(readCount == 1 ? Optional.empty() : Optional.of(active));
+        }
+
+        @Override
+        public CompletionStage<CreateMutationResult<VersionedSelectorSnapshot>> createSelector(
+                PulsarTopicGenerationSelectorValueV1 candidate) {
+            return CompletableFuture.completedFuture(CreateMutationResult.definitiveConflict());
+        }
+
+        @Override
+        public CompletionStage<ConditionalCasResult<VersionedSelectorSnapshot>> compareAndSetSelector(
+                VersionedSelectorSnapshot exactPredecessor, PulsarTopicGenerationSelectorValueV1 candidate) {
+            return CompletableFuture.failedFuture(new AssertionError("exact ACTIVE successor must not be mutated"));
+        }
     }
 }
