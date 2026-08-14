@@ -12,6 +12,13 @@ sourceTuple: v2-m1
 The machine-readable owner is [v2-scenarios.json](v2-scenarios.json). M0 started with every runtime scenario `PLANNED`;
 the documentation gate proves synchronization only and does not promote runtime evidence.
 
+Acceptance of the
+[M2-K0 Kafka implementation-input closure](detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) changes no
+scenario status: production constants/codecs, gates, and receipts do not exist yet. A future Kafka M2 receipt may
+promote only a claim whose milestone is exactly M2. A row shared with M3/M4/M5/M6 remains `PLANNED` until every named
+milestone supplies its evidence. `v2M2KafkaFinalCheck` is a Kafka BookKeeper-engine sub-aggregate and never substitutes
+for the global Kafka-plus-Pulsar `v2M2Check`.
+
 M1.1b-Q1 remains historical `READINESS_EVIDENCE_ONLY` for NTA1 candidate bounds and legality. The subsequent accepted
 design and exact-local implementation still leave `V2-META-003` at `IMPLEMENTED_NOT_RUN` and `V2-META-004` at
 `PLANNED`: 55 domain/73 focused O2/303 whole metadata-oxia tests are not runtime equality, and no real backend or Kafka mapping receipt has

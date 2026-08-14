@@ -14,11 +14,16 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 
 | Slice | Design | Status |
 | --- | --- | --- |
+| M2-K0 | [Kafka implementation-input closure](kafka-m2-k0-implementation-input-closure.md) | design accepted; production constants/codecs/provider/gates and evidence not started |
 | M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | semantic direction accepted; exact NBKE2 bytes/numeric bounds/evidence not started |
 | M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | protocol semantics accepted; exact Java/wire/integration/evidence not started |
 
-M1 remains the active implementation milestone. This index does not authorize starting M2 before M1 promotion or
-claim `v2M2Check` exists.
+M1 Final is complete for the current trusted source tuple. M2 remains `NotStarted`: accepting M2-K0 closes the Kafka
+implementation inputs, but does not register a gate, create a PASS-shaped task, promote a scenario, or claim
+`v2M2Check` exists.
+
+Kafka M2 uses its own planned sub-aggregate through `v2M2KafkaFinalCheck`. Global `v2M2Check` is a separate aggregate
+that also requires the Pulsar-owned M2 work. A Kafka sub-aggregate cannot be reported as global M2 Final.
 
 ## Planned Kafka delivery sequence
 
@@ -27,6 +32,7 @@ production `OBJECT_WAL` carrier. The implementation order is:
 
 | Slice | Deliverable | Exit boundary |
 | --- | --- | --- |
+| `M2-K0` | exact wire/cap tables, checked numeric model, minimum module graph, Cell-scoped provider contract, and source-qualified evidence/gate schema | production inputs aggregate under non-promotable `v2M2KafkaInputsCheck`; no writer/runtime/scenario PASS |
 | `M2-K1` | pure partition frontier state, commit slots, read snapshot, deterministic scheduler, and fenced coherent publication | no BookKeeper dependency; publication/fence interleavings and waiter non-wakeup proven |
 | `M2-K2` | exact `NBKE2` header/DATA/control/footer codecs | golden/corruption/checked-length matrix before appender work |
 | `M2-K3` | one-partition leader-epoch-bound BookKeeper run lifecycle and sequencer | fake-BK open/drain/checkpoint/seal/successor/retire cuts |
@@ -36,7 +42,7 @@ production `OBJECT_WAL` carrier. The implementation order is:
 | `M2-K7` | profile-neutral checkpoint kernel, BookKeeper control-entry implementation, and election-bounded recovery | bounded suffix scan and complete crash/response-loss/old-owner cut matrix |
 | `M2-K8` | compact descriptor codec, observation journal, Observed/Applied apply kernel, ISR eligibility, and election validator | hard journal/source/apply-lag bounds, corruption recovery, and no Kafka-wire activation |
 | `M2-K9` | real BookKeeper fault, recovery, resource, and 10k/100k evidence | evidence selects cadence, index, pipeline, tail, rollover, and handle-cache values |
-| `M2-K10` | `v2M2Check` and scenario receipts | `V2-BK-001..017`, `V2-KAF-DATA-001..022`, zero normal metadata I/O, targeted reads, bounded recovery |
+| `M2-K10` | `v2M2KafkaFinalCheck` and Kafka-owned scenario receipts | only complete claims owned exactly by M2 may promote; mixed M2/M3/M4/M5/M6 rows remain `PLANNED` |
 
 Exact queue depths, checkpoint cadence, index size, recovery-tail limits, rollover thresholds, handle-cache policy, and
-latency/scale thresholds are evidence outputs. No slice silently activates M2 on main before M1 Final.
+latency/scale thresholds are evidence outputs. Accepted design text alone does not activate any M2 slice on `main`.

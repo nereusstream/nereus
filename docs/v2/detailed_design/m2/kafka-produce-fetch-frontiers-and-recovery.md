@@ -12,8 +12,9 @@ sourceTuple: v2-m1
 ## Delivery boundary
 
 This design implements [ADR 0087](../../../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md) on
-top of [the ADR 0086 run/range-index design](kafka-bookkeeper-offset-range-index.md). M2 owns the engine primitives and
-fault harness; M6 connects them to Kafka leadership, replicas, purgatory, errors, transactions, and broker lifecycle.
+top of [the ADR 0086 run/range-index design](kafka-bookkeeper-offset-range-index.md), under
+[the M2-K0 implementation-input closure](kafka-m2-k0-implementation-input-closure.md). M2 owns the engine primitives
+and fault harness; M6 connects them to Kafka leadership, replicas, purgatory, errors, transactions, and broker lifecycle.
 M3 implements the Object-WAL `NWKCP1` carrier while keeping physical checkpoint/Seal unchanged. M4/M5 connect
 immutable read generations and source retirement. Existing V1 partition storage, reservation,
 producer-recovery, and leader-epoch code is evidence only and is replaced rather than wrapped or dual-written.
@@ -434,7 +435,7 @@ evidence.
 
 ## Implementation cuts
 
-Recommended reviewable cuts are:
+These cuts start only after non-promotable `v2M2KafkaInputsCheck` proves the K0 inputs. Recommended reviewable cuts are:
 
 1. frontier/value validators and coherent publication cell;
 2. producer identity, speculative delta queue, duplicate joining, and deterministic unit cuts;
@@ -458,6 +459,10 @@ calls. M6 receipts add native Kafka error
 codes, ISR/minISR/HW behavior, transaction coordinator/control-marker flows, full client retries, broker restart,
 leader transfer, Fetch purgatory, and comparison with the pinned Kafka baseline.
 
-Exact queue/checkpoint/cursor sizes, compact encodings, and thresholds stay evidence-derived. Topic policy cannot enlarge
-hard correctness/recovery bounds; Cell/host pressure may backpressure or seal early without changing persisted bytes or
-Kafka visibility semantics.
+An M2 receipt may promote only rows whose milestone is exactly M2. Mixed M2/M3/M4/M5/M6 rows remain `PLANNED` until
+every named owner supplies evidence; `v2M2KafkaFinalCheck` is not the global `v2M2Check`.
+
+Persisted encodings and parser caps freeze through the K0 process before their first durable use. Operational queue,
+checkpoint, cursor, lag, and performance defaults stay evidence-derived. Topic policy cannot enlarge hard correctness/
+recovery bounds; Cell/host pressure may backpressure or seal early without changing persisted bytes or Kafka visibility
+semantics.

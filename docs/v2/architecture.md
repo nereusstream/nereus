@@ -294,8 +294,11 @@ Kafka BookKeeper profiles use one logical ledger chain per partition, low-freque
 in-ledger RecordBatch range-index checkpoints, and an owner-local active-tail locator. One partition append remains the
 atomic commit set; one RecordBatch is the read-index unit; one sealed run is the lifecycle unit. Bounded BookKeeper I/O
 may complete out of order, but publication/ACK advances only through the contiguous Kafka Offset prefix. Fetch uses
-run/block floor lookup and targeted entry reads rather than remote metadata or whole-extent checksum reads. M2 still
-owns exact `NBKE2` bytes, numeric bounds, and 10k/100k dedicated-ledger evidence; pooled ledgers require a future ADR.
+run/block floor lookup and targeted entry reads rather than remote metadata or whole-extent checksum reads. The
+[M2-K0 closure](detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) fixes the implementation process for
+exact `NBKE2` bytes/hard caps, modules, Cell-scoped provider sessions, and gates. Their production implementation and
+the K9-selected operational defaults/10k/100k dedicated-ledger evidence have not started; pooled ledgers require a
+future ADR.
 
 Pulsar async Object offload processes sealed non-current ledgers only; one native attempt publishes one bounded data
 Object followed by one deterministic sparse-index/root Object. It does not stream the current append ledger in 0.2.

@@ -43,6 +43,10 @@ required_v2_docs=(
     detailed_design/m1/n1-immutable-domain-artifact.md
     detailed_design/m1/k1-kafka-kraft-metadata-authority.md
     detailed_design/m1/p1-pulsar-selector-and-ownership-fence.md
+    detailed_design/m2/README.md
+    detailed_design/m2/kafka-m2-k0-implementation-input-closure.md
+    detailed_design/m2/kafka-bookkeeper-offset-range-index.md
+    detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md
     open-questions.md
     tradeoffs.md
 )
@@ -319,6 +323,9 @@ require_literal 'coverage comes from the assigned RecordBatch header' "docs/deci
 require_literal 'does not implement this data layout' "docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
 require_literal 'M2 Kafka BookKeeper offset, run, and range-index design' "docs/v2/detailed_design/m2/kafka-bookkeeper-offset-range-index.md"
 require_literal 'No cut introduces a dual-write compatibility mode' "docs/v2/detailed_design/m2/kafka-bookkeeper-offset-range-index.md"
+require_literal 'M2-K0 Kafka implementation-input closure' "docs/v2/detailed_design/m2/kafka-m2-k0-implementation-input-closure.md"
+require_literal 'v2M2KafkaInputsCheck' "docs/v2/detailed_design/m2/kafka-m2-k0-implementation-input-closure.md"
+require_literal 'Global `v2M2Check` remains the aggregate' "docs/v2/detailed_design/m2/kafka-m2-k0-implementation-input-closure.md"
 require_literal 'trimStartOffset <= lastStableOffset <= highWatermark' "docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
 require_literal 'BookKeeper quorum durable == Kafka HW' "docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
 require_literal 'floor + coverage check + successor' "docs/v2/grill-notes/28-kafka-produce-fetch-frontiers-isr-transactions.md"

@@ -3,10 +3,12 @@
 ## Status
 
 Accepted for the 0.2 Kafka Position Domain and BookKeeper-primary profiles. This ADR freezes the semantic authority,
-index granularity, ACK/publication order, and recovery shape. Exact `NBKE2`/run/index wire bytes, numeric checkpoint
-cadence, memory limits, pipeline depth, ledger rollover policy, and 10k/100k resource admission remain M2 evidence
-outputs. ADR 0087 refines Kafka protocol frontiers, producer/transaction state, ISR/HW, and Fetch semantics on this
-physical layout. Implementation and executable evidence have not started.
+index granularity, ACK/publication order, and recovery shape. The accepted
+[M2-K0 input closure](../v2/detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) fixes how exact
+`NBKE2`/run/index wire and hard parser/admission caps must land before a writer. Their production constants/codecs are
+M2 implementation; checkpoint cadence, memory, pipeline, rollover, and 10k/100k admission defaults remain M2-K9
+evidence outputs. ADR 0087 refines Kafka protocol frontiers, producer/transaction state, ISR/HW, and Fetch semantics
+on this physical layout. Implementation and executable evidence have not started.
 
 ## Context
 
@@ -205,7 +207,11 @@ compatible logical cut; materialization never advances Kafka LEO, HW, or LSO.
 
 M1/K1 owns Kafka KRaft Topic/Aggregate authority and does not implement this data layout. M2 owns the code-level
 `NBKE2`, run/index/footer, targeted reader, ordered pipeline, recovery harness, and scale evidence. Exact implementation
-is specified by `docs/v2/detailed_design/m2/kafka-bookkeeper-offset-range-index.md`.
+is split between the
+[M2-K0 input closure](../v2/detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) and the
+[BookKeeper run/index design](../v2/detailed_design/m2/kafka-bookkeeper-offset-range-index.md). K0's planned
+`v2M2KafkaInputsCheck` is non-promotable and must include production wire/cap/provider/module surfaces plus non-zero
+tests; K9 selects operational defaults from real fault/scale evidence without rewriting persisted v1 bytes.
 
 Required evidence covers at least:
 
@@ -218,5 +224,5 @@ Required evidence covers at least:
 - 10k/100k partition handle/memory/metadata/rollover/recovery evidence.
 
 This ADR refines ADRs 0011, 0031, 0066, and 0067 and is further refined by ADR 0087. It resolves the Kafka ledger-layout
-semantic choice; the numeric and scale gate formerly called `V2-OPEN-BK-02` remains executable M2 evidence rather than
-an open architecture choice.
+semantic choice; `V2-OPEN-BK-02` now tracks executable M2 production inputs and evidence rather than an open
+architecture choice.

@@ -10,9 +10,10 @@ sourceTuple: v2-m1
 # BookKeeper and Pulsar
 
 The profile and ACK boundaries, protocol-native position model, Kafka BookKeeper run/range-index direction, and Pulsar
-ManagedLedger offload authority are accepted. Exact Kafka `NBKE2` wire, numeric index/pipeline bounds, and dedicated-
-ledger capacity remain M2 evidence gates under `V2-OPEN-BK-02`. Pulsar 0.2 offload execution and its one-data-plus-root
-Object pair are accepted.
+ManagedLedger offload authority are accepted. The M2-K0 contract fixes how exact Kafka `NBKE2` wire/hard caps,
+modules, provider sessions, and evidence surfaces must land; their production implementation has not started.
+Operational index/pipeline/default bounds and dedicated-ledger capacity remain M2-K9 evidence under
+`V2-OPEN-BK-02`. Pulsar 0.2 offload execution and its one-data-plus-root Object pair are accepted.
 
 ## Shared BookKeeper contract
 
@@ -57,12 +58,14 @@ seal, scrub, recovery, and materialization rather than forcing a full append-ran
 
 Takeover starts at the last valid index checkpoint, scans only a bounded entry/byte/time tail, reconstructs the greatest
 gap-free committed offset, seals the old run, publishes its footer/root, and opens a new run. Candidate checkpoint,
-index, locator, recovery-tail, pipeline, and rollover values remain evidence inputs. M2 must also cover 10k/100k
+index, locator, recovery-tail, pipeline, and rollover operational defaults remain evidence inputs; persisted parser
+caps and checked allocation/admission formulas must already be fixed by K0. M2 must also cover 10k/100k
 partitions, open-handle memory, metadata operations, recovery time, bookie pressure, and rollover rate. Failure of that
 gate blocks the profile or triggers a new layout decision; it does not silently weaken the accepted authority.
 
 Normal append never writes one remote metadata reservation/mapping per Produce. The V1 reservation/protection and
-extent-wide `rangeChecksum` path is not retained or dual-written. Exact design and implementation cuts are in
+extent-wide `rangeChecksum` path is not retained or dual-written. Exact implementation-input and data-path cuts are in
+[the M2-K0 closure](detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) and
 [the M2 Kafka BookKeeper detailed design](detailed_design/m2/kafka-bookkeeper-offset-range-index.md).
 
 ### Kafka protocol frontiers on shared BookKeeper

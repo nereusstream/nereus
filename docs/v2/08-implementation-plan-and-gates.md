@@ -26,6 +26,16 @@ sourceTuple: v2-m1
 M0 and M1 Fast/Exact/Final gates are registered, and the current M1 Final evidence is complete. The intermediate
 `v2M1FoundationCheck` remains explicitly non-promotable; M2-M8 task names remain future contracts until implemented.
 
+The accepted
+[M2-K0 Kafka implementation-input closure](detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) now fixes
+the execution boundary for exact `NBKE2` wire/caps, the checked numeric model, the minimum module graph, the
+Cell-scoped BookKeeper provider contract, and the Kafka evidence hierarchy. It is a design input, not implementation:
+M2 remains Planned/`NotStarted`, and no M2 task may be registered as an empty or zero-test success. The first planned
+aggregate, `v2M2KafkaInputsCheck`, is explicitly non-promotable. The later `v2M2KafkaFinalCheck` is only the Kafka
+BookKeeper-engine sub-aggregate; global `v2M2Check` additionally requires the Pulsar-owned M2 slices. A Kafka receipt
+may promote only scenario claims whose milestone is exactly M2. Rows shared with M3/M4/M5/M6 remain `PLANNED` until
+every named milestone supplies its evidence.
+
 ADR 0015 limits 0.2 to one initial Storage Epoch per Topic Incarnation and no online profile-transition runtime. ADR 0016
 excludes Kafka/Pulsar Access Projection and Migration Link runtime. Their future state machines, Pulsar
 BookKeeper/Object profile transition, and KoP therefore remain outside the 0.2 implementation plan; their deferred

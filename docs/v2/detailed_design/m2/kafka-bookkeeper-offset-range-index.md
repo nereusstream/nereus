@@ -12,7 +12,8 @@ sourceTuple: v2-m1
 ## Delivery boundary
 
 This design implements [ADR 0086](../../../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md)
-and is refined by [the Kafka protocol-frontier design](kafka-produce-fetch-frontiers-and-recovery.md).
+under [the M2-K0 implementation-input closure](kafka-m2-k0-implementation-input-closure.md) and is refined by
+[the Kafka protocol-frontier design](kafka-produce-fetch-frontiers-and-recovery.md).
 It is not part of M1/K1. M1 establishes topic metadata authority; M2 establishes the Kafka BookKeeper data path.
 Existing V1 appender/reader/reservation code is evidence only and is replaced rather than wrapped, dual-written, or
 retained as a compatibility path.
@@ -20,7 +21,7 @@ retained as a compatibility path.
 M2 completes one coherent vertical slice:
 
 1. typed Kafka-partition BookKeeper run domain and lifecycle;
-2. `NBKE2` discriminated `RUN_HEADER`, `DATA`, `RANGE_INDEX_BLOCK`, and `RUN_FOOTER` frames;
+2. `NBKE2` discriminated `RUN_HEADER`, `DATA`, `RANGE_INDEX_BLOCK`, `PROTOCOL_CHECKPOINT`, and `RUN_FOOTER` frames;
 3. one-RecordBatch-per-DATA-entry mapping and packed immutable index blocks;
 4. pre-position locator/tracker reservation, local offset admission, bounded async writes, and ordered commit;
 5. targeted Fetch plus active/sealed floor indexes;
@@ -106,9 +107,10 @@ KafkaBookKeeperBatchLocator
   payloadLength?                  // optional optimization, not authority without DATA validation
 ```
 
-Exact fixed/varint representation and block caps are evidence-driven. Decoder allocation follows actual validated
-locator count. Runtime uses primitive arrays or direct packed views, not one long-lived Java object per locator and not
-a general `TreeMap`.
+Exact fixed/varint representation and persisted block/locator parser caps are K0 production inputs and freeze before
+the first write. K9 evidence may select lower operational target bytes/counts without changing the accepted v1 domain.
+Decoder allocation follows actual validated locator count. Runtime uses primitive arrays or direct packed views, not
+one long-lived Java object per locator and not a general `TreeMap`.
 
 ## Write pipeline
 
@@ -174,7 +176,8 @@ fresh run admits with the new Owner Epoch. Provider entries beyond the recovered
 
 ## Implementation cuts
 
-Recommended commits are reviewable and independently gated:
+These data-path cuts start only after non-promotable `v2M2KafkaInputsCheck` proves the K0 module/provider/wire/numeric/
+evidence inputs. Recommended commits are reviewable and independently gated:
 
 1. domain/state/validator plus wire design and goldens;
 2. `NBKE2` codecs and corruption tests;
@@ -183,18 +186,18 @@ Recommended commits are reviewable and independently gated:
 5. index builder/checkpointer, active-tail locator, and targeted reader;
 6. takeover/tail recovery and response-loss matrix;
 7. real BookKeeper, 10k/100k scale, read-amplification and throughput evidence;
-8. remove the replaced V1 path and close the M2 gate in a separate mechanical change.
+8. remove the replaced V1 path and close the Kafka M2 sub-aggregate in a separate mechanical change.
 
 No cut introduces a dual-write compatibility mode.
 
-## Open evidence-derived values
+## Open evidence-derived operational values
 
 The following are candidates only until M2 receipts select them:
 
 - index checkpoint batch/byte cadence;
-- block encoded bytes and locators per block;
-- active-tail locator count/bytes/age;
-- recovery-tail entries/bytes/time;
+- operational block target bytes/locators at or below the K0 persisted caps;
+- active-tail locator count/bytes/age defaults;
+- recovery-tail entries/bytes/time defaults across K0's three mandatory dimensions;
 - per-partition in-flight groups and global in-flight bytes;
 - run rollover size/entry/age thresholds;
 - handle-cache and open-ledger admission at 10k/100k partitions.

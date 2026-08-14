@@ -6,9 +6,12 @@ Accepted for the 0.2 Kafka data path. This ADR freezes protocol-visible frontier
 shared-storage ISR/HW behavior, producer/transaction recovery, Fetch isolation, and compaction-gap lookup. It is
 refined by the implementation-readiness corrections in this revision: fenced publication, election-bounded tail
 adoption, Observed/Applied replica progress, native duplicate semantics, persisted Kafka leader epoch, and a
-profile-neutral protocol-checkpoint contract. Exact Java types, `NBKE2`/`NWKCP1` field layout, queue sizes, waiter
-implementation, and performance thresholds remain M2/M3/M6 implementation and evidence outputs. Implementation and
-executable evidence have not started.
+profile-neutral protocol-checkpoint contract. The accepted
+[M2-K0 input closure](../v2/detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) fixes the M2 structure for
+Java/module/provider boundaries, `NBKE2` carriage, hard numeric caps, and evidence gates. Exact Object `NWKCP1`
+bytes/Head/key caps remain M3; native replica-Fetch framing and broker/process activation remain M6; operational queue,
+waiter, lag, and performance defaults remain evidence-selected. Implementation and executable evidence have not
+started.
 
 ## Context
 
@@ -495,13 +498,17 @@ M2 owns the storage-engine/frontier/producer/transaction/index/checkpoint/read p
 harness. M6 owns native Kafka broker/replica/purgatory/controller integration, exact error mapping, client-compatible
 Produce/Fetch/transaction/leader-failover behavior, and full-process restart evidence. M4/M5 own materialized read-view
 handoff and source retirement integration. No milestone may claim Kafka parity or superiority from document status.
-The code-level cut is [the M2 Kafka Produce/Fetch detailed design](../v2/detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md).
+The code-level cuts are the
+[M2-K0 input closure](../v2/detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) and the
+[M2 Kafka Produce/Fetch detailed design](../v2/detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md).
 
 Required scenarios are `V2-KAF-DATA-001..022`. They cover out-of-order durability, predecessor failure, response-loss
 retry, speculative producer state, checkpoint crash recovery, LEO/HW/LSO isolation, abort filtering, ISR shrink,
 delayed Fetch, compaction gaps, pinned source generation, Object/BK fallback and GC, pre-admission rejection,
 leader-epoch recovery, random/sequential full-batch reads, fence/publication races, election-bounded tail adoption,
 Observed/Applied progress, native duplicate identity, Object protocol checkpoints, and partial-batch compaction.
+An M2 receipt may promote only scenario claims owned exactly by M2; rows shared with M3/M4/M5/M6 remain `PLANNED`
+until every named milestone supplies its evidence. Kafka `v2M2KafkaFinalCheck` is not global `v2M2Check`.
 
-This ADR refines ADRs 0009, 0011, 0031, 0067, 0069, and 0086. Exact wire and evidence-derived numeric bounds remain
-under `V2-OPEN-BK-02`; they are not reopened as protocol semantic choices.
+This ADR refines ADRs 0009, 0011, 0031, 0067, 0069, and 0086. M2 production inputs and evidence-derived numeric
+defaults remain under `V2-OPEN-BK-02`; exact `NWKCP1` is M3. None is reopened as a protocol semantic choice.

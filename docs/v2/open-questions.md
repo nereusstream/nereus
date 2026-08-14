@@ -538,7 +538,7 @@ The local Pulsar checkout already records an attempt UUID before calling the off
 opens offloaded reads from ledger metadata, and consults the offload context before BookKeeper deletion. Reusing that
 state machine best preserves the “not weaker than native Pulsar” requirement.
 
-### `V2-OPEN-BK-02`: resolved semantic layout; M2 numeric and scale evidence remains
+### `V2-OPEN-BK-02`: resolved semantics and inputs; M2 implementation and evidence remain
 
 Resolved by [ADR 0086](../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md): Kafka uses one
 Position Domain across profiles; BookKeeper-primary paths use one logical ledger chain per partition, low-frequency
@@ -555,11 +555,18 @@ snapshots, native aborted metadata, delayed local wakeup, and floor-plus-success
 checkpoints while physical Object checkpoint pages/Seal remain physical-only. A storage-native ISR shortcut is not an
 open implementation option.
 
-The remaining M2 gate is executable rather than an architecture choice: freeze exact `NBKE2`/index/footer/checkpoint
-bytes, exact NWKCP1 Head/vector/key caps, and evidence-derived apply-lag/pipeline/recovery/waiter/cursor/rollover
-bounds, then prove dedicated-ledger viability and the ADR-0087 protocol state machine and
-`V2-KAF-DATA-001..022` at 10k/100k partitions. Failure blocks the profile or requires a new pooled-lane ADR; it cannot
-silently select a global mixed-partition ledger or restore V1 reservation dual writes.
+The accepted
+[M2-K0 implementation-input closure](detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) fixes the
+remaining implementation structure: exact `NBKE2` tables and hard parser/admission caps land with production codecs,
+the minimum module graph, a Cell-scoped BookKeeper session/capability contract, immutable vectors, source locks, and a
+non-promotable `v2M2KafkaInputsCheck`. M2-K9 evidence then selects apply-lag/pipeline/recovery/waiter/cursor/rollover
+defaults and proves dedicated-ledger viability at 10k/100k partitions. Exact Object `NWKCP1` bytes and Head/vector/key
+caps are M3 outputs, not M2 inputs.
+
+This document acceptance creates no gate or scenario PASS. Kafka M2 evidence may promote only rows owned exactly by
+M2; shared M2/M3/M4/M5/M6 rows remain `PLANNED`, and global `v2M2Check` still requires the Pulsar-owned M2 work.
+Failure blocks the profile or requires a new pooled-lane ADR; it cannot silently select a global mixed-partition ledger
+or restore V1 reservation dual writes.
 
 ### `V2-OPEN-KAF-DATA-01`: `__share_group_state` initial profile remains OPEN
 
