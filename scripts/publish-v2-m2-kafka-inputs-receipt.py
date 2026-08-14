@@ -30,16 +30,28 @@ def suite(module, name, expected_tests):
         fail(f"suite is not exact PASS {module}:{name}")
     return actual
 
-if len(sys.argv) != 2:
-    fail("usage: publish-v2-m2-kafka-inputs-receipt.py <new-output-path>")
-output = Path(sys.argv[1]).resolve()
+replace_existing = len(sys.argv) == 3 and sys.argv[1] == "--replace-existing"
+if len(sys.argv) != 2 and not replace_existing:
+    fail("usage: publish-v2-m2-kafka-inputs-receipt.py [--replace-existing] <canonical-output-path>")
+output = Path(sys.argv[-1]).resolve()
 canonical_output = (ROOT / "docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json").resolve()
 if output != canonical_output:
     fail("output is outside the one canonical repository path")
-if output.exists():
-    fail(f"refusing existing output: {output}")
 if git("status", "--porcelain"):
     fail("Nereus worktree is not clean")
+if output.exists() and not replace_existing:
+    fail(f"refusing existing output without --replace-existing: {output}")
+if replace_existing:
+    if not output.is_file() or output.is_symlink():
+        fail("replace target is not one regular non-symlink file")
+    tracked = subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files", "--error-unmatch", "--", str(output.relative_to(ROOT))],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if tracked.returncode != 0:
+        fail("replace target is not the tracked canonical receipt")
 head = git("rev-parse", "HEAD")
 if head != git("rev-parse", "origin/main"):
     fail("HEAD differs from origin/main")
@@ -106,5 +118,9 @@ receipt = {
 }
 encoded = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
 output.parent.mkdir(parents=True, exist_ok=True)
-output.write_bytes(encoded)
+temporary_output = output.with_name(f".{output.name}.tmp")
+if temporary_output.exists():
+    fail(f"refusing existing temporary output: {temporary_output}")
+temporary_output.write_bytes(encoded)
+temporary_output.replace(output)
 print(f"V2 M2 Kafka Inputs canonical receipt written: path={output} bytes={len(encoded)} sha256={hashlib.sha256(encoded).hexdigest()} source={head}")

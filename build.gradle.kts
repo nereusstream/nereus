@@ -764,9 +764,7 @@ tasks.register<Exec>("v2M2KafkaInputsLiveSourceCheck") {
         "v2M2KafkaInputsReceiptCheck",
     )
     workingDir = layout.projectDirectory.asFile
-    doFirst {
-        commandLine("bash", "scripts/check-v2-m2-kafka-inputs-source.sh", v2M2KafkaInputsReceiptPath.get())
-    }
+    commandLine("bash", "scripts/check-v2-m2-kafka-inputs-source.sh", v2M2KafkaInputsReceiptPath.get())
 }
 
 tasks.register("v2M2KafkaInputsCheck") {
