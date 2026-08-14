@@ -789,6 +789,23 @@ tasks.register("v2M2KafkaK1Check") {
     dependsOn("v2M2KafkaK1SourceCheck", "v2DocumentationCheck")
 }
 
+val v2M2KafkaK2Test = project(":nereus-kafka-bookkeeper").tasks.named<Test>("test")
+
+tasks.register<Exec>("v2M2KafkaK2SourceCheck") {
+    group = "verification"
+    description = "Verify exact Kafka 4.3 assigned-RecordBatch facts, K2 cross-checks, and unchanged NBKE2 bytes."
+    dependsOn(v2M2KafkaK2Test)
+    usesService(kafkaCheckoutGate)
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-kafka-k2.sh", kafkaForkCheckoutPath.get())
+}
+
+tasks.register("v2M2KafkaK2Check") {
+    group = "verification"
+    description = "Run the non-zero K2 native-batch adapter gate; no appender, runtime activation, or M2 PASS."
+    dependsOn("v2M2KafkaK2SourceCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)

@@ -21,12 +21,14 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | M2-K0-N | [Checked numeric admission and recovery envelope](kafka-m2-k0-numeric-admission.md) | verified admission/envelope; covered by current Kafka Inputs receipt |
 | M2-K0-E | [Exact source, receipt, and Kafka Inputs gate](kafka-m2-k0-evidence-and-input-gate.md) | current canonical input receipt: 5 gates, 16 suites, 54 tests, zero skip |
 | M2-K1 | [Coherent frontier and fenced publication cell](kafka-m2-k1-frontier-publication.md) | pure production state/CAS cut and 26-test local gate; Kafka Fast receipt pending |
+| M2-K2 | [Kafka-native assigned RecordBatch adapter](kafka-m2-k2-assigned-record-batch-adapter.md) | exact 4.3 native plus local header/CRC/coverage matrix; appender/runtime excluded |
 | M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | implementation started at K0 module/provider/wire/numeric inputs; runtime/evidence pending |
 | M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | implementation started at K1 pure coherent state; storage/runtime/evidence pending |
 
 M1 Final is complete at the trusted predecessor source tuple. M2 remains `InProgress`, while K0-M/P/W/N/E and the
-current-source, fail-closed `v2M2KafkaInputsCheck` input aggregate are verified. K1 adds pure coherent partition state
-and a non-promotable local gate without claiming a Kafka Fast receipt. No writer or Kafka runtime is proven, no
+current-source, fail-closed `v2M2KafkaInputsCheck` input aggregate are verified. K1 adds pure coherent partition state;
+K2 adds the exact-source assigned-batch and unchanged-NBKE2 adapter boundary. Both gates are non-promotable and do not
+claim a Kafka Fast receipt. No writer or Kafka runtime is proven, no
 scenario is promoted, and global `v2M2Check` remains absent.
 
 Kafka M2 uses its own planned sub-aggregate through `v2M2KafkaFinalCheck`. Global `v2M2Check` is a separate aggregate
