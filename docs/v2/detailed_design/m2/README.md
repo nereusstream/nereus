@@ -32,6 +32,7 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | M2-K10 | [Kafka Final evidence](kafka-m2-k10-final-evidence.md) | current-source canonical Kafka Final receipt; 10 exact-M2 scenarios, 40 named suite references, and 7 bound attachments |
 | M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | implementation started at K0 module/provider/wire/numeric inputs; runtime/evidence pending |
 | M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | implementation started at K1 pure coherent state; storage/runtime/evidence pending |
+| M2-P0 | [Pulsar offload input closure](pulsar-m2-p0-input-closure.md) | sealed-ledger attempt, deterministic keys, provider capability, candidate-limit, retention, and delete-state inputs; non-promotable |
 
 M1 Final is complete at the trusted predecessor source tuple. M2 remains `InProgress`. K0 through K9 have focused
 implementation gates, and K10 now has a production closed receipt/resolver plus a current-source Kafka Final receipt.

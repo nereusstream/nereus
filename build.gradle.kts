@@ -1013,6 +1013,20 @@ tasks.register("v2M2KafkaFinalCheck") {
     )
 }
 
+tasks.register<Exec>("v2M2PulsarP0SourceCheck") {
+    group = "verification"
+    description = "Verify the non-promotable Pulsar M2-P0 attempt/key/provider/candidate input closure."
+    dependsOn(":nereus-pulsar-offload:test")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-pulsar-p0.sh")
+}
+
+tasks.register("v2M2PulsarP0Check") {
+    group = "verification"
+    description = "Run Pulsar M2-P0 inputs only; wire, runtime, evidence, scenarios, and M2 PASS remain pending."
+    dependsOn("v2M2PulsarP0SourceCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
