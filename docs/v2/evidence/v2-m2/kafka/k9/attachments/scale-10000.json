@@ -1,8 +1,8 @@
 {
   "schema": "NEREUS_V2_M2_KAFKA_K9_SCALE_RESULT_V1",
   "result": "PASS",
-  "generatedAt": "2026-08-14T07:01:41.204806Z",
-  "testedSourceCommit": "a7f82d7b2ac6adc6886336bb233bf3e7dddfc90d",
+  "generatedAt": "2026-08-14T07:26:56.360585Z",
+  "testedSourceCommit": "2b5d3be9605943c2217daa6d45740ddf832d6d0a",
   "tierPartitions": 10000,
   "planSha256": "37d3d0c51f1b9e4dddc0ce8b6937b628c3e46ecf3dea1353faa2b635ac92116a",
   "conformanceConfigurationSha256": "eaf41c4b42b767b8ea6e86023a784425b8073f174dbade92b4249c8f3d301dbd",
@@ -24,19 +24,44 @@
     "metadataMutations": 19232,
     "maximumOwnedHandles": 1024
   },
-  "handleSequenceSha256": "7d9a4aaf8fabd669df638b5477b41a3be17ad4df1fc97b7967aea3ac488a1647",
-  "elapsedNanos": 11103093333,
-  "partitionOperationsPerSecond": 900,
+  "handleSequenceSha256": "87a34a86b7f9a75abda9f0ec5c18d8a58b6ee11b55925adfbfcd3ab67574d257",
+  "elapsedNanos": 11171659708,
+  "partitionOperationsPerSecond": 895,
   "resources": {
-    "maximumHeapBytes": 43513688,
+    "maximumHeapBytes": 42934304,
     "maximumDirectBytes": 12616067,
     "maximumOpenFileDescriptors": 144
   },
   "latencies": {
-    "create": {"samples":10128,"p50Nanos":19540417,"p99Nanos":94380500,"maximumNanos":258865500},
-    "append": {"samples":14096,"p50Nanos":5956000,"p99Nanos":49643500,"maximumNanos":230227709},
-    "close": {"samples":9104,"p50Nanos":8760791,"p99Nanos":51293250,"maximumNanos":65100291},
-    "read": {"samples":256,"p50Nanos":31065000,"p99Nanos":466972875,"maximumNanos":467054542},
-    "recovery": {"samples":128,"p50Nanos":391430333,"p99Nanos":607693583,"maximumNanos":607924833}
+    "create": {
+      "samples": 10128,
+      "p50Nanos": 20016750,
+      "p99Nanos": 102709916,
+      "maximumNanos": 265325084
+    },
+    "append": {
+      "samples": 14096,
+      "p50Nanos": 5542209,
+      "p99Nanos": 54338834,
+      "maximumNanos": 219503708
+    },
+    "close": {
+      "samples": 9104,
+      "p50Nanos": 9855625,
+      "p99Nanos": 37935250,
+      "maximumNanos": 58437834
+    },
+    "read": {
+      "samples": 256,
+      "p50Nanos": 18830042,
+      "p99Nanos": 620953583,
+      "maximumNanos": 621126333
+    },
+    "recovery": {
+      "samples": 128,
+      "p50Nanos": 410249792,
+      "p99Nanos": 632822042,
+      "maximumNanos": 634459750
+    }
   }
 }

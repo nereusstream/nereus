@@ -1,7 +1,7 @@
 {
   "schema": "NEREUS_V2_M2_KAFKA_K9_LOG_AUDIT_V1",
   "result": "PASS_ALLOWLISTED_FRESH_START_ONLY",
-  "testedSourceCommit": "a7f82d7b2ac6adc6886336bb233bf3e7dddfc90d",
+  "testedSourceCommit": "2b5d3be9605943c2217daa6d45740ddf832d6d0a",
   "runtimeErrorOrFatalCount": 0,
   "allowedFreshStartMessages": [
     {
@@ -16,13 +16,13 @@
     }
   ],
   "rawLogDigests": [
-    {"name":"metadata-service-10000.log","bytes":32972,"sha256":"092cc497b074e62ca4a4f27b443c816d900b59bd2ed39a5aee98ff6f6742a2c5"},
-    {"name":"bookie-0-10000.log","bytes":77644,"sha256":"09f72452471c1bbd0525fbe02ecbc00b4594dd725dfdfe02b478aba7bd764793"},
-    {"name":"bookie-1-10000.log","bytes":88865,"sha256":"10ab6940e82f23c9abc933f45542151c5c8684f41796e81ee2454591ccb0c5c4"},
-    {"name":"bookie-2-10000.log","bytes":77642,"sha256":"ec5a87a5add830b22a98630696046533aee409875325cc1ab6dd9f198efe9372"},
-    {"name":"metadata-service-100000.log","bytes":39275,"sha256":"c2a92bc988ee31398bc4e42f9bde7afadb18a5b5737bc89096ed388a12beb8b1"},
-    {"name":"bookie-0-100000.log","bytes":89045,"sha256":"80fc55de3e32d3104811d0f9f2f7f87144837e8e646e56ae9e32d0dfc7107b30"},
-    {"name":"bookie-1-100000.log","bytes":100254,"sha256":"390af51d094aed69a32598b67a1c011b402e0f307c674bea76f3c87b92cfcca2"},
-    {"name":"bookie-2-100000.log","bytes":89045,"sha256":"bdb16e92423c57780f05b87a82b097c00f13fc7c84827876b6d328d9ad59846d"}
+    {"name":"metadata-service-10000.log","bytes":32972,"sha256":"1b7c01c01c5d8a2302cfd1d4dde437760d3a766f10446abd821cfdee661b07a7"},
+    {"name":"bookie-0-10000.log","bytes":77644,"sha256":"12dcb555ab217c5e9234e258c53cb05da88bcfabfa62d95596b0dce0104bf35d"},
+    {"name":"bookie-1-10000.log","bytes":88867,"sha256":"9a14c0331c9f5c921a31d8c7f1237a989aeb4c95fa148d75696cb3cc3055394e"},
+    {"name":"bookie-2-10000.log","bytes":77643,"sha256":"b71efd496ac1f6311c7fb3a23763558ad694bda29f2437bf7491673cf35d1fea"},
+    {"name":"metadata-service-100000.log","bytes":39077,"sha256":"7637aaebd8e406fe250e75118e1e2dd4562ce23b2971310daeedf15c6fa8685b"},
+    {"name":"bookie-0-100000.log","bytes":100255,"sha256":"23ba9e696feda66439804cf42cb51e1915dba851374284e5dddfa7a3a6341098"},
+    {"name":"bookie-1-100000.log","bytes":89044,"sha256":"3c290335896072c9ae070f0c4b7816082d03ed5b7ffd7977206adc06d50504f9"},
+    {"name":"bookie-2-100000.log","bytes":89044,"sha256":"80086daebdfb63ef808d5b0a35ce41c5f10cb3dd20a9dd3f092893e656b18e4f"}
   ]
 }

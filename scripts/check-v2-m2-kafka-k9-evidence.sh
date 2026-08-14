@@ -36,15 +36,18 @@ def properties(path: Path) -> dict[str, str]:
 
 tested = receipt["testedSourceCommit"]
 predeclared = receipt["prerequisite"]["predeclaredPlanCommit"]
-if receipt["prerequisite"].get("selectedDefaultsCommit") != tested:
-    raise SystemExit("K9 selected-defaults commit differs from the tested source")
-for commit in (predeclared, tested):
+selected_defaults = receipt["prerequisite"].get("selectedDefaultsCommit")
+for commit in (predeclared, selected_defaults, tested):
     if not isinstance(commit, str) or len(commit) != 40:
         raise SystemExit("K9 receipt commit is not canonical")
 if subprocess.run(
     ["git", "merge-base", "--is-ancestor", predeclared, tested], cwd=root, check=False
 ).returncode != 0:
     raise SystemExit("K9 tested source does not descend from the predeclared plan")
+if subprocess.run(
+    ["git", "merge-base", "--is-ancestor", selected_defaults, tested], cwd=root, check=False
+).returncode != 0:
+    raise SystemExit("K9 tested source does not descend from the selected defaults")
 if subprocess.run(
     ["git", "merge-base", "--is-ancestor", tested, "HEAD"], cwd=root, check=False
 ).returncode != 0:
@@ -217,7 +220,7 @@ artifact = json.loads(
 if artifact.get("result") != "PASS" or artifact.get("testedSourceCommit") != tested:
     raise SystemExit("K9 artifact report result/source differs")
 if artifact.get("localTests") != {
-    "suites": 41, "tests": 230, "failures": 0, "errors": 0, "skipped": 0
+    "suites": 42, "tests": 239, "failures": 0, "errors": 0, "skipped": 0
 } or artifact.get("realBookKeeperTests") != {
     "suites": 2, "tests": 9, "failures": 0, "errors": 0, "skipped": 0
 }:
@@ -248,11 +251,11 @@ for module in ("nereus-storage-bookkeeper", "nereus-kafka-bookkeeper"):
         failures += int(attributes["failures"])
         errors += int(attributes["errors"])
         skipped += int(attributes["skipped"])
-if (suite_count, test_count, failures, errors, skipped) != (41, 230, 0, 0, 0):
+if (suite_count, test_count, failures, errors, skipped) != (42, 239, 0, 0, 0):
     raise SystemExit("K9 current local test accounting differs")
 tests = receipt["tests"]
 if (tests["localSuites"], tests["localTests"], tests["realBookKeeperSuites"], tests["realBookKeeperTests"]) != (
-    41, 230, 2, 9
+    42, 239, 2, 9
 ):
     raise SystemExit("K9 receipt test accounting differs")
 
@@ -306,7 +309,7 @@ if receipt.get("selectedDefaults") != {
     raise SystemExit("K9 selected-defaults receipt boundary differs")
 
 print(
-    "K9 current-source real BookKeeper evidence verified: local=41/230, real=2/9, "
+    "K9 current-source real BookKeeper evidence verified: local=42/239, real=2/9, "
     "actual partitions=110000, ledgers=110256, zero failure/error/skip, promotionEligible=false"
 )
 PY

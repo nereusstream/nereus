@@ -3,7 +3,7 @@
   "kind": "KAFKA_M2_K9_REAL_BOOKKEEPER_EVIDENCE",
   "result": "PASS_KAFKA_M2_K9_REAL_BOOKKEEPER_EVIDENCE",
   "promotionEligible": false,
-  "testedSourceCommit": "a7f82d7b2ac6adc6886336bb233bf3e7dddfc90d",
+  "testedSourceCommit": "2b5d3be9605943c2217daa6d45740ddf832d6d0a",
   "sourceTuple": {
     "sourceLocksSha256": "d89ff725e2ac797fb2e4985629f8b0e328d063ededabec5244df1a436e2c2705",
     "m1FinalIndexSha256": "12fbd2be8c938c1de10f1ae86b8eb106aed199f471743b71ac09d3bca6ffb835",
@@ -26,8 +26,8 @@
     "selectedDefaultsCommit": "a7f82d7b2ac6adc6886336bb233bf3e7dddfc90d"
   },
   "tests": {
-    "localSuites": 41,
-    "localTests": 230,
+    "localSuites": 42,
+    "localTests": 239,
     "realBookKeeperSuites": 2,
     "realBookKeeperTests": 9,
     "failed": 0,
@@ -42,13 +42,13 @@
     "actualBytesAppended": 60514304,
     "actualMetadataMutations": 218464,
     "maximumOwnedHandles": 1024,
-    "minimumObservedPartitionOperationsPerSecond": 900,
-    "maximumObservedRecoveryP99Nanos": 632344917,
-    "maximumObservedHarnessHeapBytes": 200437512,
+    "minimumObservedPartitionOperationsPerSecond": 895,
+    "maximumObservedRecoveryP99Nanos": 632822042,
+    "maximumObservedHarnessHeapBytes": 200412456,
     "maximumObservedHarnessDirectBytes": 12616067,
     "maximumObservedOpenFileDescriptors": 144,
-    "maximumObservedAggregateContainerMemoryBytes": 3493750372,
-    "maximumObservedMetadataVolumeBytes": 506903463,
+    "maximumObservedAggregateContainerMemoryBytes": 3379665304,
+    "maximumObservedMetadataVolumeBytes": 502580963,
     "maximumObservedBookieVolumeBytesEach": 375969272
   },
   "selectedDefaults": {
@@ -58,12 +58,12 @@
     "cellOrHostMayOnlyLower": true
   },
   "attachments": [
-    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/artifact-report.json","bytes":1257,"sha256":"79e66da1f684678787216ad30317cf187b723930bb9f6246ae0c32cdfa575298"},
-    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/environment-summary.json","bytes":1480,"sha256":"a1b6a21f33af6793ce8d376972a787832c5696bf633d49a692a5226ffe40b4f7"},
-    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/fault-tests.json","bytes":1560,"sha256":"cffa4a33bef0830791dd7bdc8106d40ed8acc659e19291a28538dc99ba8ceb78"},
-    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/log-audit.json","bytes":1638,"sha256":"1da6c076f5d9120724a3ef4a86c0794e1ca62165aa013d35ead673c7dedbc553"},
-    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/scale-10000.json","bytes":1663,"sha256":"e4ed1cc162d5e95807fba55212020f13542cf34dedfa49565f62b94e441429a5"},
-    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/scale-100000.json","bytes":1674,"sha256":"322d88bf9796b7f359d5541929b1b3ea96441f816a13d0c9d901fe0395d2bf5c"}
+    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/artifact-report.json","bytes":1405,"sha256":"035728a8606368e14cc836dde77b02badbd103ead3d9417d5e97fdbd4aea2bfb"},
+    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/environment-summary.json","bytes":1479,"sha256":"03e567b232cb3e44f3ff21a4a63292b281ac3be6f5467f1848ece718ff625529"},
+    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/fault-tests.json","bytes":1560,"sha256":"d3761debfb6c3c59374df9e97d6b298be5d4e1ac2c4a9e15e1c669787664df8f"},
+    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/log-audit.json","bytes":1638,"sha256":"90141a88c538a41794aed8022437f4c29e70d29a1b621ef8139b8e256208feac"},
+    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/scale-10000.json","bytes":1849,"sha256":"1e5d5c90b39ac75a13c6787fe3ca5b1a7233a0052f80260755ab8d1857b7c716"},
+    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/scale-100000.json","bytes":1860,"sha256":"972e7771e86252b02ed05a9949d5cc1592a9fff529ccde9843fefb3b374b2b79"}
   ],
   "boundary": "K9 selects Kafka BookKeeper engine operational defaults from exact-image real fault and actual 10k/100k scale evidence. It does not promote scenarios, activate Kafka runtime, prove native ISR/HW/election behavior, complete Pulsar M2, or claim global M2 PASS."
 }

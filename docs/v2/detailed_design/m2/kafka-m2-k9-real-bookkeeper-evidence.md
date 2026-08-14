@@ -38,7 +38,7 @@ outcome, count mismatch, unexpected source/configuration digest, or predeclared 
 The source-only `v2M2KafkaK9PlanCheck` compiles the harness and verifies these preconditions. It intentionally infers no
 formal result, selected default, scenario promotion, Kafka Final, or global M2 PASS. The current
 [`k9-evidence.json`](../../evidence/v2-m2/kafka/k9/k9-evidence.json) is an evidence-only descendant of tested source
-`a7f82d7b2ac6adc6886336bb233bf3e7dddfc90d`; the thresholds were already fixed at ancestor
+`2b5d3be9605943c2217daa6d45740ddf832d6d0a`; the thresholds were already fixed at ancestor
 `bd7746850e5c8aa15ca5f01da0118e50186999c7`.
 
 ## Candidate defaults and promotion boundary
@@ -61,10 +61,10 @@ enlargement by a Topic, Cell, or host override. The implementation and its six-t
 the still-required current-source real-fault and two-tier scale receipt.
 
 `v2M2KafkaK9Check` now verifies that receipt. Across the two actual tiers it accounts for 110,000 partitions, 110,256
-real ledgers, 118,192 appended entries, and 60,514,304 payload bytes. The 100k tier sustained 1,756 partition
-operations/second; its recovery p99 was 632,344,917 ns, harness heap peak 200,437,512 bytes, direct-memory peak
-12,616,067 bytes, and maximum FD count 144. The largest measured metadata volume was 506,903,463 bytes and each largest
-bookie volume was 375,969,272 bytes. The source also passes 41 local suites / 230 tests and 2 exact-image suites / 9
+real ledgers, 118,192 appended entries, and 60,514,304 payload bytes. The slower tier sustained 895 partition
+operations/second; the largest recovery p99 was 632,822,042 ns, harness heap peak 200,412,456 bytes, direct-memory peak
+12,616,067 bytes, and maximum FD count 144. The largest measured metadata volume was 502,580,963 bytes and each largest
+bookie volume was 375,969,272 bytes. The source also passes 42 local suites / 239 tests and 2 exact-image suites / 9
 tests with zero failure, error, or skip.
 
 The receipt remains deliberately non-promotable. K10 must consume it with the complete K1-K8 matrices and publish the
