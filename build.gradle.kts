@@ -744,21 +744,13 @@ tasks.register("v2M2KafkaK0EvidenceCheck") {
     dependsOn("v2M2KafkaK0EvidenceSourceCheck", "v2DocumentationCheck")
 }
 
-val v2M2KafkaInputsReceiptPath = providers.gradleProperty("v2M2KafkaInputsReceipt")
-val v2M2KafkaMainSourceSet = project(":nereus-kafka-bookkeeper")
-    .extensions.getByType<SourceSetContainer>()
-    .named("main")
-
-tasks.register<JavaExec>("v2M2KafkaInputsReceiptCheck") {
+tasks.register("v2M2KafkaInputsReceiptCheck") {
     group = "verification"
     description = "Parse one canonical Kafka Inputs receipt through the production closed-model validator."
-    dependsOn(":nereus-kafka-bookkeeper:classes")
-    classpath = v2M2KafkaMainSourceSet.get().runtimeClasspath
-    mainClass.set("com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptCli")
-    doFirst {
-        setArgs(listOf("validate", v2M2KafkaInputsReceiptPath.get()))
-    }
+    dependsOn(":nereus-kafka-bookkeeper:v2M2KafkaInputsReceiptCheck")
 }
+
+val v2M2KafkaInputsReceiptPath = providers.gradleProperty("v2M2KafkaInputsReceipt")
 
 tasks.register<Exec>("v2M2KafkaInputsLiveSourceCheck") {
     group = "verification"

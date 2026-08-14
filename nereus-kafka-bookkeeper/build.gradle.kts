@@ -25,3 +25,12 @@ tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
 }
+
+tasks.register<JavaExec>("v2M2KafkaInputsReceiptCheck") {
+    group = "verification"
+    description = "Parse one canonical Kafka Inputs receipt through the production closed-model validator."
+    dependsOn(tasks.named("classes"))
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptCli")
+    args("validate", providers.gradleProperty("v2M2KafkaInputsReceipt").get())
+}
