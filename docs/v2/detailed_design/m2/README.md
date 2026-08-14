@@ -29,14 +29,15 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | M2-K7 | [Checkpoint kernel and election-bounded recovery](kafka-m2-k7-checkpoint-recovery.md) | aligned KPC1/NBKE2 state, cumulative suffix envelope, and native adoption cut; HW/runtime/real BK excluded |
 | M2-K8 | [Replica descriptor, journal, and eligibility kernel](kafka-m2-k8-replica-observation.md) | fixed KRD1/KRO1, exact sync seam, Observed/Applied bounds, source replacement, and election harness; runtime excluded |
 | M2-K9 | [Real BookKeeper fault and scale evidence](kafka-m2-k9-real-bookkeeper-evidence.md) | current-source exact-image receipt: 110k actual partitions, 110,256 ledgers, 230 local plus 9 real tests, selected defaults; non-promotable until K10 |
+| M2-K10 | [Kafka Final evidence](kafka-m2-k10-final-evidence.md) | production closed receipt/resolver and exact ten-scenario policy implemented; current-source K9 refresh and Final evidence pending |
 | M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | implementation started at K0 module/provider/wire/numeric inputs; runtime/evidence pending |
 | M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | implementation started at K1 pure coherent state; storage/runtime/evidence pending |
 
-M1 Final is complete at the trusted predecessor source tuple. M2 remains `InProgress`, while K0-M/P/W/N/E and the
-current-source, fail-closed `v2M2KafkaInputsCheck` input aggregate are verified. K1 adds pure coherent partition state;
-K2 adds the exact-source assigned-batch and unchanged-NBKE2 adapter boundary. Both gates are non-promotable and do not
-claim a Kafka Fast receipt. No writer or Kafka runtime is proven, no
-scenario is promoted, and global `v2M2Check` remains absent.
+M1 Final is complete at the trusted predecessor source tuple. M2 remains `InProgress`. K0 through K9 have focused
+implementation gates, and K10 now has a production closed receipt/resolver plus the exact ten-scenario allowlist. K10
+policy readiness is non-promotable: its production change requires a fresh source-bound K9 execution before a Kafka
+Final receipt may be published. No Kafka runtime is proven, no scenario is promoted by the readiness gate, and global
+`v2M2Check` remains absent.
 
 Kafka M2 uses its own planned sub-aggregate through `v2M2KafkaFinalCheck`. Global `v2M2Check` is a separate aggregate
 that also requires the Pulsar-owned M2 work. A Kafka sub-aggregate cannot be reported as global M2 Final.

@@ -959,6 +959,22 @@ tasks.register("v2M2KafkaK9Check") {
     )
 }
 
+val v2M2KafkaK10PolicyTest = project(":nereus-kafka-bookkeeper").tasks.named<Test>("test")
+
+tasks.register<Exec>("v2M2KafkaK10PolicySourceCheck") {
+    group = "verification"
+    description = "Verify K10 production Final mechanics and the exact ten-scenario policy without publishing evidence."
+    dependsOn(v2M2KafkaK10PolicyTest)
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-kafka-k10-policy.sh")
+}
+
+tasks.register("v2M2KafkaK10PolicyCheck") {
+    group = "verification"
+    description = "Run the K10 readiness gate; no scenario receipt, Kafka Final, or global M2 PASS is claimed."
+    dependsOn("v2M2KafkaK10PolicySourceCheck", "v2M2KafkaK9PlanCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)

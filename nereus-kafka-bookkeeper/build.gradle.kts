@@ -86,3 +86,17 @@ tasks.register<JavaExec>("v2M2KafkaInputsReceiptCheck") {
     mainClass.set("com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptCli")
     args("validate", providers.gradleProperty("v2M2KafkaInputsReceipt").get())
 }
+
+tasks.register<JavaExec>("v2M2KafkaFinalReceiptCheck") {
+    group = "verification"
+    description = "Resolve one canonical Kafka M2 Final receipt through the production fail-closed validator."
+    dependsOn(tasks.named("classes"))
+    classpath = sourceSets.main.get().runtimeClasspath
+    workingDir(rootProject.projectDir)
+    mainClass.set("com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalReceiptCli")
+    args(
+        "validate",
+        rootProject.projectDir.absolutePath,
+        providers.gradleProperty("v2M2KafkaFinalReceipt").get(),
+    )
+}
