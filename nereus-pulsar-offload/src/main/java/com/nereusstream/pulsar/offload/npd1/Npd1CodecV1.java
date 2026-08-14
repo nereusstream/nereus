@@ -112,6 +112,10 @@ public final class Npd1CodecV1 {
         public byte[] payload() {
             return payload.clone();
         }
+
+        public int payloadBytes() {
+            return payload.length;
+        }
     }
 
     public record SparseBlock(

@@ -21,6 +21,34 @@ import java.util.concurrent.CompletionStage;
 
 /** Cell-scoped immutable Object provider seam for one sealed-ledger attempt. */
 public interface PulsarOffloadObjectStoreV1 {
+    enum FailureKind {
+        NOT_FOUND,
+        TIMEOUT,
+        UNAVAILABLE,
+        SHORT_READ,
+        CONFLICT,
+        INTEGRITY,
+        CANCELLED
+    }
+
+    final class ObjectStoreException extends IOException {
+        private final FailureKind kind;
+
+        public ObjectStoreException(FailureKind kind, String message) {
+            super(message);
+            this.kind = Objects.requireNonNull(kind, "kind");
+        }
+
+        public ObjectStoreException(FailureKind kind, String message, Throwable cause) {
+            super(message, cause);
+            this.kind = Objects.requireNonNull(kind, "kind");
+        }
+
+        public FailureKind kind() {
+            return kind;
+        }
+    }
+
     record Capabilities(
             long maximumObjectBytes,
             long minimumPartBytes,

@@ -1069,6 +1069,20 @@ tasks.register("v2M2PulsarP3Check") {
     dependsOn("v2M2PulsarP3SourceCheck", "v2M2PulsarP2Check", "v2DocumentationCheck")
 }
 
+tasks.register<Exec>("v2M2PulsarP4ObjectSourceCheck") {
+    group = "verification"
+    description = "Verify bounded NPO1 open, immutable data proof, targeted NPD1 reads, and streaming full revalidation."
+    dependsOn(":nereus-pulsar-offload:test")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-pulsar-p4-object.sh")
+}
+
+tasks.register("v2M2PulsarP4ObjectCheck") {
+    group = "verification"
+    description = "Run the Pulsar M2-P4 Object child only; dual-source pins, native integration, evidence, and M2 PASS remain pending."
+    dependsOn("v2M2PulsarP4ObjectSourceCheck", "v2M2PulsarP3Check", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
