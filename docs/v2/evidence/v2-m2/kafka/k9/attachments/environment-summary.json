@@ -1,0 +1,50 @@
+{
+  "schema": "NEREUS_V2_M2_KAFKA_K9_ENVIRONMENT_SUMMARY_V1",
+  "result": "PASS",
+  "testedSourceCommit": "a7f82d7b2ac6adc6886336bb233bf3e7dddfc90d",
+  "imageReference": "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
+  "imageId": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+  "platform": "linux/amd64",
+  "freshVolumePerTier": true,
+  "journalSyncData": true,
+  "tiers": [
+    {
+      "partitions": 10000,
+      "dockerStatsSamples": 16,
+      "aggregatePeakContainerMemoryBytes": 1913546341,
+      "peakContainerMemoryBytes": {
+        "metadata-service": 372349337,
+        "bookie-0": 438619340,
+        "bookie-1": 524288000,
+        "bookie-2": 578289664
+      },
+      "volumeBytes": {
+        "metadata-service": 67133936,
+        "bookie-0": 16811512,
+        "bookie-1": 16811512,
+        "bookie-2": 16811512
+      }
+    },
+    {
+      "partitions": 100000,
+      "dockerStatsSamples": 60,
+      "aggregatePeakContainerMemoryBytes": 3493750372,
+      "peakContainerMemoryBytes": {
+        "metadata-service": 1009568972,
+        "bookie-0": 834771353,
+        "bookie-1": 802580070,
+        "bookie-2": 846829977
+      },
+      "volumeBytes": {
+        "metadata-service": 506903463,
+        "bookie-0": 375969272,
+        "bookie-1": 375969272,
+        "bookie-2": 375969272
+      }
+    }
+  ],
+  "cleanupProof": {
+    "matchingContainersRemaining": 0,
+    "matchingVolumesRemaining": 0
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "schema": "NEREUS_V2_M2_KAFKA_K9_SCALE_RESULT_V1",
+  "result": "PASS",
+  "generatedAt": "2026-08-14T07:03:28.953985Z",
+  "testedSourceCommit": "a7f82d7b2ac6adc6886336bb233bf3e7dddfc90d",
+  "tierPartitions": 100000,
+  "planSha256": "37d3d0c51f1b9e4dddc0ce8b6937b628c3e46ecf3dea1353faa2b635ac92116a",
+  "conformanceConfigurationSha256": "eaf41c4b42b767b8ea6e86023a784425b8073f174dbade92b4249c8f3d301dbd",
+  "metadataServiceUri": "zk://127.0.0.1:2181/ledgers",
+  "workload": {
+    "ioConcurrency": 64,
+    "hotLedgerAdmission": 1024,
+    "payloadBytes": 512,
+    "tailEntries": 32,
+    "readSamples": 256,
+    "recoverySamples": 128,
+    "rolloverSamples": 128
+  },
+  "counts": {
+    "partitions": 100000,
+    "ledgersCreated": 100128,
+    "entriesAppended": 104096,
+    "bytesAppended": 53297152,
+    "metadataMutations": 199232,
+    "maximumOwnedHandles": 1024
+  },
+  "handleSequenceSha256": "e6c227cef410a70a4de6830025ddc0c7224e860e2394ea25be7efdb08d84501a",
+  "elapsedNanos": 56936010208,
+  "partitionOperationsPerSecond": 1756,
+  "resources": {
+    "maximumHeapBytes": 200437512,
+    "maximumDirectBytes": 12616067,
+    "maximumOpenFileDescriptors": 144
+  },
+  "latencies": {
+    "create": {"samples":100128,"p50Nanos":15992291,"p99Nanos":47991875,"maximumNanos":249152041},
+    "append": {"samples":104096,"p50Nanos":5149333,"p99Nanos":25256000,"maximumNanos":221781584},
+    "close": {"samples":99104,"p50Nanos":5265250,"p99Nanos":22662375,"maximumNanos":69044667},
+    "read": {"samples":256,"p50Nanos":17528333,"p99Nanos":595767291,"maximumNanos":595878458},
+    "recovery": {"samples":128,"p50Nanos":370776041,"p99Nanos":632344917,"maximumNanos":632457708}
+  }
+}

@@ -932,6 +932,33 @@ tasks.register("v2M2KafkaK9DefaultsCheck") {
     dependsOn("v2M2KafkaK9DefaultsSourceCheck", "v2M2KafkaK9PlanCheck", "v2DocumentationCheck")
 }
 
+tasks.register<Exec>("v2M2KafkaK9EvidenceSourceCheck") {
+    group = "verification"
+    description = "Verify the current-source K9 real-fault, 10k/100k, artifact, and selected-default receipt."
+    dependsOn(
+        ":nereus-storage-bookkeeper:test",
+        ":nereus-storage-bookkeeper:jar",
+        ":nereus-storage-bookkeeper:sourcesJar",
+        ":nereus-kafka-bookkeeper:test",
+        ":nereus-kafka-bookkeeper:jar",
+        ":nereus-kafka-bookkeeper:sourcesJar",
+    )
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-kafka-k9-evidence.sh")
+}
+
+tasks.register("v2M2KafkaK9Check") {
+    group = "verification"
+    description = "Run the complete Kafka K9 evidence gate; K10 scenario promotion and Kafka Final remain separate."
+    dependsOn(
+        "v2M2KafkaK9EvidenceSourceCheck",
+        "v2M2KafkaK9DefaultsCheck",
+        "v2M2KafkaK2Check",
+        "v2M2KafkaK3Check",
+        "v2DocumentationCheck",
+    )
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)

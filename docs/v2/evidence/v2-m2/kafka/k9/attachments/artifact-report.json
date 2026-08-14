@@ -1,0 +1,26 @@
+{
+  "schema": "NEREUS_V2_M2_KAFKA_K9_ARTIFACT_REPORT_V1",
+  "result": "PASS",
+  "testedSourceCommit": "a7f82d7b2ac6adc6886336bb233bf3e7dddfc90d",
+  "sourceLocksSha256": "d89ff725e2ac797fb2e4985629f8b0e328d063ededabec5244df1a436e2c2705",
+  "artifacts": [
+    {"coordinate":"com.nereusstream:nereus-storage-bookkeeper:0.2.0-SNAPSHOT","classifier":"binary","bytes":27341,"sha256":"542e4d5ce2bbee05e5005b97f47fa0de5687ed4bd525ce00990a6742864dbaad"},
+    {"coordinate":"com.nereusstream:nereus-storage-bookkeeper:0.2.0-SNAPSHOT","classifier":"sources","bytes":12440,"sha256":"72006a96a5729db90cfbb01ab200302f88b4fbdbe06f539ed61547623971568e"},
+    {"coordinate":"com.nereusstream:nereus-kafka-bookkeeper:0.2.0-SNAPSHOT","classifier":"binary","bytes":363875,"sha256":"bcfe47dec42dd6499554c60646bd2e6af75f3143835b6c166c36336ad29a9e1b"},
+    {"coordinate":"com.nereusstream:nereus-kafka-bookkeeper:0.2.0-SNAPSHOT","classifier":"sources","bytes":191337,"sha256":"40fe8c98e821802da92aa1ec42d638ee583aa92502c42e7180cf16c03365fb52"}
+  ],
+  "localTests": {
+    "suites": 41,
+    "tests": 230,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "realBookKeeperTests": {
+    "suites": 2,
+    "tests": 9,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+}

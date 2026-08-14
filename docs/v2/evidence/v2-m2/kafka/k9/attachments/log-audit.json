@@ -1,0 +1,28 @@
+{
+  "schema": "NEREUS_V2_M2_KAFKA_K9_LOG_AUDIT_V1",
+  "result": "PASS_ALLOWLISTED_FRESH_START_ONLY",
+  "testedSourceCommit": "a7f82d7b2ac6adc6886336bb233bf3e7dddfc90d",
+  "runtimeErrorOrFatalCount": 0,
+  "allowedFreshStartMessages": [
+    {
+      "service": "metadata-service",
+      "perTierCount": 2,
+      "classification": "standalone ZooKeeper ignores one-server quorum configuration"
+    },
+    {
+      "service": "bookie-*",
+      "perBookiePerTierCount": 1,
+      "classification": "fresh empty volume has no prior lastMark; upstream message explicitly says this is okay"
+    }
+  ],
+  "rawLogDigests": [
+    {"name":"metadata-service-10000.log","bytes":32972,"sha256":"092cc497b074e62ca4a4f27b443c816d900b59bd2ed39a5aee98ff6f6742a2c5"},
+    {"name":"bookie-0-10000.log","bytes":77644,"sha256":"09f72452471c1bbd0525fbe02ecbc00b4594dd725dfdfe02b478aba7bd764793"},
+    {"name":"bookie-1-10000.log","bytes":88865,"sha256":"10ab6940e82f23c9abc933f45542151c5c8684f41796e81ee2454591ccb0c5c4"},
+    {"name":"bookie-2-10000.log","bytes":77642,"sha256":"ec5a87a5add830b22a98630696046533aee409875325cc1ab6dd9f198efe9372"},
+    {"name":"metadata-service-100000.log","bytes":39275,"sha256":"c2a92bc988ee31398bc4e42f9bde7afadb18a5b5737bc89096ed388a12beb8b1"},
+    {"name":"bookie-0-100000.log","bytes":89045,"sha256":"80fc55de3e32d3104811d0f9f2f7f87144837e8e646e56ae9e32d0dfc7107b30"},
+    {"name":"bookie-1-100000.log","bytes":100254,"sha256":"390af51d094aed69a32598b67a1c011b402e0f307c674bea76f3c87b92cfcca2"},
+    {"name":"bookie-2-100000.log","bytes":89045,"sha256":"bdb16e92423c57780f05b87a82b097c00f13fc7c84827876b6d328d9ad59846d"}
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "schema": "NEREUS_V2_M2_KAFKA_K9_REAL_FAULT_TESTS_V1",
+  "result": "PASS",
+  "testedSourceCommit": "a7f82d7b2ac6adc6886336bb233bf3e7dddfc90d",
+  "imageReference": "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
+  "configurationSha256": "eaf41c4b42b767b8ea6e86023a784425b8073f174dbade92b4249c8f3d301dbd",
+  "suites": 2,
+  "tests": 9,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "suiteResults": [
+    {
+      "name": "com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1RealTest",
+      "tests": 6,
+      "junitXmlBytes": 28597,
+      "junitXmlSha256": "1c074ed9c3c46a851a92c163f26b37fb8b5504e1d885feb4e6d11973b5de05f8",
+      "cases": [
+        "discardedAppendResponseReconcilesFromRealRecoveredBytes",
+        "freshCellOpensReadsAndRecoversTheExactSealedLedger",
+        "realReadDistinguishesAnEntryThatWasNeverWritten",
+        "createAppendReadAndCloseCarryExactRealQuorumProofs",
+        "recoveryFencesTheOldWriterBeforeASecondEntryCanApply",
+        "realOpenRejectsAReboundRunIdentityOnTheSameLedger"
+      ]
+    },
+    {
+      "name": "com.nereusstream.kafka.bookkeeper.RealBookKeeperKafkaEngineV1Test",
+      "tests": 3,
+      "junitXmlBytes": 26048,
+      "junitXmlSha256": "5a81cc7f1b15fd3aa26b23484a16abdb89633df13b9b9d76ead00d73512c2a23",
+      "cases": [
+        "realTakeoverFencesAndRecoversTheGreatestCompleteKafkaPrefix",
+        "realCheckpointFooterAndCloseSealOneExactNbke2Run",
+        "orderedRealDataIsCoherentlyPublishedAndTargetReadByExactEntry"
+      ]
+    }
+  ]
+}

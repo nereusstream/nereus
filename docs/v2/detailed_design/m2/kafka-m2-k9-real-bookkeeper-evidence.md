@@ -1,8 +1,8 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
 ---
@@ -35,9 +35,11 @@ BookKeeper/ZooKeeper volume bytes, container identities, and logs. Create/append
 overall elapsed time, throughput, entry/byte totals, and an ordered handle digest are emitted. Any non-exact provider
 outcome, count mismatch, unexpected source/configuration digest, or predeclared threshold breach fails the run.
 
-The source-only `v2M2KafkaK9PlanCheck` compiles the harness and verifies these preconditions. It intentionally contains
-no formal scale output, selected default, scenario promotion, Kafka Final, or global M2 PASS. Formal evidence must be a
-later evidence-only descendant of the clean tested commit so thresholds cannot be adjusted after observing results.
+The source-only `v2M2KafkaK9PlanCheck` compiles the harness and verifies these preconditions. It intentionally infers no
+formal result, selected default, scenario promotion, Kafka Final, or global M2 PASS. The current
+[`k9-evidence.json`](../../evidence/v2-m2/kafka/k9/k9-evidence.json) is an evidence-only descendant of tested source
+`a7f82d7b2ac6adc6886336bb233bf3e7dddfc90d`; the thresholds were already fixed at ancestor
+`bd7746850e5c8aa15ca5f01da0118e50186999c7`.
 
 ## Candidate defaults and promotion boundary
 
@@ -57,3 +59,13 @@ It projects directly to the K0 recovery envelope, partition/global pipeline budg
 bounds. The complete record constructor enforces cross-budget coverage, and `loweredBy` rejects any component-wise
 enlargement by a Topic, Cell, or host override. The implementation and its six-test gate do not by themselves replace
 the still-required current-source real-fault and two-tier scale receipt.
+
+`v2M2KafkaK9Check` now verifies that receipt. Across the two actual tiers it accounts for 110,000 partitions, 110,256
+real ledgers, 118,192 appended entries, and 60,514,304 payload bytes. The 100k tier sustained 1,756 partition
+operations/second; its recovery p99 was 632,344,917 ns, harness heap peak 200,437,512 bytes, direct-memory peak
+12,616,067 bytes, and maximum FD count 144. The largest measured metadata volume was 506,903,463 bytes and each largest
+bookie volume was 375,969,272 bytes. The source also passes 41 local suites / 230 tests and 2 exact-image suites / 9
+tests with zero failure, error, or skip.
+
+The receipt remains deliberately non-promotable. K10 must consume it with the complete K1-K8 matrices and publish the
+separate Kafka-owned scenario receipts; K9 alone is not Kafka Final or global M2 PASS.
