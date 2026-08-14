@@ -18,7 +18,9 @@ package com.nereusstream.kafka.bookkeeper.pipeline;
 public enum KafkaOrderedAppendOutcomeV1 {
     COMMITTED_ORDERED,
     CAPACITY_REJECTED,
+    PROTOCOL_VALIDATION_FAILED,
     OFFSET_ASSIGNMENT_FAILED,
+    PROTOCOL_PREPARATION_FAILED,
     INVALID_ASSIGNMENT,
     DEFINITIVELY_FAILED,
     OUTCOME_UNKNOWN,

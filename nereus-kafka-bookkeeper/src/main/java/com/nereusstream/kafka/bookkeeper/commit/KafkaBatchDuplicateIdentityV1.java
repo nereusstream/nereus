@@ -12,17 +12,13 @@
  * limitations under the License.
  */
 
-package com.nereusstream.kafka.bookkeeper.protocol;
+package com.nereusstream.kafka.bookkeeper.commit;
 
-/** Closed publication result; notification failure never disguises that the state already published. */
-public enum KafkaPartitionPublicationOutcomeV1 {
-    PUBLISHED,
-    PUBLISHED_NOTIFICATION_FAILED,
-    FENCE_MISMATCH,
-    STATE_VERSION_MISMATCH,
-    NON_CONTIGUOUS_ALLOCATION,
-    INVALID_SPECULATIVE_REPLACEMENT,
-    NON_CONTIGUOUS_COMMIT,
-    INVALID_COMMIT_REPLACEMENT,
-    INVALID_FENCE_TRANSITION
+/** Kafka-native per-RecordBatch duplicate identity; storage digests are deliberately absent. */
+public record KafkaBatchDuplicateIdentityV1(long producerId, short producerEpoch, int baseSequence, int lastSequence) {
+    public KafkaBatchDuplicateIdentityV1 {
+        if (producerId < 0 || producerEpoch < 0 || baseSequence < 0 || lastSequence < 0) {
+            throw new IllegalArgumentException("Kafka producer identity fields must be non-negative");
+        }
+    }
 }

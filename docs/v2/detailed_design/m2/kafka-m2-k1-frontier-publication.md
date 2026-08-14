@@ -33,6 +33,11 @@ must name the exact predecessor fence/version, begin at the current readable end
 end, carry durability through that end, preserve HW/LSO/trim, advance the active-tail reference, and regress no frontier
 or immutable reference generation. A later durable slot cannot publish around an earlier gap.
 
+K5 extends the same cell with `KafkaPartitionSpeculativeSlotV1`. This replacement advances only Allocated and the
+speculative producer-queue reference, changes no other component/frontier, and emits no reader/replica notification.
+Its fence/version/contiguity and reference-isolation matrix is owned by `v2M2KafkaK5Check`; the original K1 gate count
+below remains the frozen K1-only matrix.
+
 Fence/leadership/Storage-Epoch transitions use the same CAS cell. They may install an election-bounded truncated
 frontier, but cannot change partition identity, regress ordered numeric fences, or roll back immutable reference
 generations. Exactly one competing replacement wins. Notifications carry the exact before/after roots and run only

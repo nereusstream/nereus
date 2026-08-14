@@ -101,7 +101,7 @@ class KafkaBookKeeperPipelineAdmissionV1Test {
     }
 
     @Test
-    void encodedByteSubstitutionFencesBeforeAnyDataSubmission() {
+    void byteOrTerminalDescriptorSubstitutionFencesBeforeAnyDataSubmission() {
         Context context = context(2, 10, 10_000);
         KafkaPipelineTestFixtures.Plan plan = KafkaPipelineTestFixtures.plan(context.lifecycle, 1, 100);
         KafkaAppendAdmissionRequestV1 wrong =
@@ -116,6 +116,43 @@ class KafkaBookKeeperPipelineAdmissionV1Test {
         assertThat(context.pipeline.fenced()).isTrue();
         assertThat(context.session.entries).containsOnlyKeys(0L);
         assertThat(context.partition.snapshot().groups()).isZero();
+
+        Context descriptorContext = context(2, 10, 10_000);
+        KafkaPipelineTestFixtures.Plan two = KafkaPipelineTestFixtures.plan(descriptorContext.lifecycle, 2, 100);
+        KafkaOffsetAssignedAppendV1 tampered = new KafkaOffsetAssignedAppendV1(100, 102, firstEntryId -> {
+            var exact = two.assignment().physicalGroupFactory().apply(firstEntryId);
+            var frames = new ArrayList<>(exact.dataFrames());
+            var terminal = frames.get(1);
+            var descriptor = terminal.terminalDescriptor().orElseThrow();
+            var substituted = new com.nereusstream.kafka.bookkeeper.nbke2.Nbke2AppendGroupDescriptorV1(
+                    descriptor.groupStartOffset(),
+                    descriptor.groupEndOffsetExclusive(),
+                    descriptor.firstDataEntryId(),
+                    descriptor.lastDataEntryId(),
+                    KafkaRunTestFixtures.digest(88));
+            frames.set(
+                    1,
+                    new com.nereusstream.kafka.bookkeeper.nbke2.Nbke2DataV1(
+                            terminal.runBinding(),
+                            terminal.baseOffset(),
+                            terminal.lastOffsetDelta(),
+                            terminal.memberOrdinal(),
+                            terminal.memberCount(),
+                            terminal.appendGroupId(),
+                            terminal.storageAttemptId(),
+                            java.util.Optional.of(substituted),
+                            terminal.rawAssignedRecordBatch()));
+            return new com.nereusstream.kafka.bookkeeper.adapter.KafkaNbke2AssignedAppendGroupV1(firstEntryId, frames);
+        });
+
+        KafkaOrderedAppendResultV1 descriptorResult = descriptorContext
+                .pipeline
+                .submit(two.request(), () -> tampered)
+                .toCompletableFuture()
+                .join();
+
+        assertThat(descriptorResult.outcome()).isEqualTo(KafkaOrderedAppendOutcomeV1.INVALID_ASSIGNMENT);
+        assertThat(descriptorContext.session.entries).containsOnlyKeys(0L);
     }
 
     @Test
@@ -141,7 +178,7 @@ class KafkaBookKeeperPipelineAdmissionV1Test {
         KafkaAppendCapacityControllerV1 partition = controller(2, 10, 10_000);
         KafkaAppendCapacityControllerV1 global = controller(1, 1, 1);
         KafkaBookKeeperOrderedPipelineV1 pipeline =
-                new KafkaBookKeeperOrderedPipelineV1(session, lifecycle, partition, global, (start, end) -> {});
+                new KafkaBookKeeperOrderedPipelineV1(session, lifecycle, partition, global, commit -> {});
         KafkaPipelineTestFixtures.Plan plan = KafkaPipelineTestFixtures.plan(lifecycle, 1, 100);
 
         KafkaOrderedAppendResultV1 result = pipeline.submit(plan.request(), plan::assignment)
@@ -206,7 +243,11 @@ class KafkaBookKeeperPipelineAdmissionV1Test {
         KafkaAppendCapacityControllerV1 global = controller(groups, entries, bytes);
         List<String> commits = new ArrayList<>();
         KafkaBookKeeperOrderedPipelineV1 pipeline = new KafkaBookKeeperOrderedPipelineV1(
-                session, lifecycle, partition, global, (start, end) -> commits.add(start + ":" + end));
+                session,
+                lifecycle,
+                partition,
+                global,
+                commit -> commits.add(commit.startOffset() + ":" + commit.endOffsetExclusive()));
         return new Context(session, lifecycle, partition, global, commits, pipeline);
     }
 

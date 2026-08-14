@@ -58,6 +58,38 @@ public final class KafkaPartitionPublicationCellV1 {
         return replace(current, replacement, KafkaPartitionPublicationKindV1.COMMIT);
     }
 
+    public KafkaPartitionPublicationResultV1 stageSpeculative(KafkaPartitionSpeculativeSlotV1 slot) {
+        Objects.requireNonNull(slot, "slot");
+        KafkaPartitionProtocolStateV1 current = state.get();
+        KafkaPartitionPublicationResultV1 mismatch =
+                exactPredecessor(current, slot.expectedFence(), slot.predecessorStateVersion());
+        if (mismatch != null) {
+            return mismatch;
+        }
+        if (slot.allocationStartOffset() != current.frontiers().allocatedEndOffset()) {
+            return result(KafkaPartitionPublicationOutcomeV1.NON_CONTIGUOUS_ALLOCATION, current);
+        }
+        if (!validSpeculativeReplacement(current.references(), slot.replacementReferences())) {
+            return result(KafkaPartitionPublicationOutcomeV1.INVALID_SPECULATIVE_REPLACEMENT, current);
+        }
+        KafkaPartitionFrontiersV1 before = current.frontiers();
+        KafkaPartitionProtocolStateV1 replacement = new KafkaPartitionProtocolStateV1(
+                current.fence(),
+                Math.addExact(current.stateVersion(), 1),
+                new KafkaPartitionFrontiersV1(
+                        before.trimStartOffset(),
+                        slot.allocationEndOffset(),
+                        before.durableEndOffset(),
+                        before.readableEndOffset(),
+                        before.highWatermark(),
+                        before.lastStableOffset()),
+                slot.replacementReferences());
+        if (!state.compareAndSet(current, replacement)) {
+            return result(KafkaPartitionPublicationOutcomeV1.STATE_VERSION_MISMATCH, state.get());
+        }
+        return result(KafkaPartitionPublicationOutcomeV1.PUBLISHED, replacement);
+    }
+
     public KafkaPartitionPublicationResultV1 transition(KafkaPartitionFenceTransitionV1 transition) {
         Objects.requireNonNull(transition, "transition");
         KafkaPartitionProtocolStateV1 current = state.get();
@@ -115,6 +147,21 @@ public final class KafkaPartitionPublicationCellV1 {
                 && slot.replacementReferences().doesNotRegress(current.references())
                 && slot.replacementReferences().activeTail().generation()
                         > current.references().activeTail().generation();
+    }
+
+    private static boolean validSpeculativeReplacement(
+            KafkaPartitionStateReferencesV1 before, KafkaPartitionStateReferencesV1 after) {
+        return after.doesNotRegress(before)
+                && after.runTable().equals(before.runTable())
+                && after.activeTail().equals(before.activeTail())
+                && after.sourceMap().equals(before.sourceMap())
+                && after.committedProducerState().equals(before.committedProducerState())
+                && after.speculativeProducerQueue().generation()
+                        > before.speculativeProducerQueue().generation()
+                && after.transactionIndex().equals(before.transactionIndex())
+                && after.leaderEpochIndex().equals(before.leaderEpochIndex())
+                && after.checkpointVector().equals(before.checkpointVector())
+                && after.sourceProtection().equals(before.sourceProtection());
     }
 
     private static KafkaPartitionPublicationResultV1 result(

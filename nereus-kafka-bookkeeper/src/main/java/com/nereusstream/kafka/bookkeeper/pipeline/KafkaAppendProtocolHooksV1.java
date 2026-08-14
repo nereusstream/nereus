@@ -14,8 +14,19 @@
 
 package com.nereusstream.kafka.bookkeeper.pipeline;
 
-/** K4 ordered durable callback; K5 replaces this seam with one coherent protocol publication cut. */
-@FunctionalInterface
-public interface KafkaOrderedDurableCommitObserver {
-    void onOrderedDurable(KafkaOrderedDurableCommitV1 commit);
+/** Two-stage protocol hook: validate without offsets, then install the exact assigned speculative delta. */
+public interface KafkaAppendProtocolHooksV1 {
+    void validateBeforeOffsetAssignment();
+
+    void prepareAfterOffsetAssignment(KafkaOffsetAssignedAppendV1 assigned);
+
+    static KafkaAppendProtocolHooksV1 none() {
+        return new KafkaAppendProtocolHooksV1() {
+            @Override
+            public void validateBeforeOffsetAssignment() {}
+
+            @Override
+            public void prepareAfterOffsetAssignment(KafkaOffsetAssignedAppendV1 assigned) {}
+        };
+    }
 }

@@ -23,7 +23,8 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | M2-K1 | [Coherent frontier and fenced publication cell](kafka-m2-k1-frontier-publication.md) | pure production state/CAS cut and 26-test local gate; Kafka Fast receipt pending |
 | M2-K2 | [Kafka-native assigned RecordBatch adapter](kafka-m2-k2-assigned-record-batch-adapter.md) | exact 4.3 native plus local header/CRC/coverage matrix; appender/runtime excluded |
 | M2-K3 | [Leader-epoch run lifecycle and entry sequencer](kafka-m2-k3-run-lifecycle.md) | fake-provider header/drain/checkpoint/seal/successor/retire gate; real BK pending |
-| M2-K4 | [Capacity-first ordered DATA pipeline](kafka-m2-k4-ordered-pipeline.md) | partition/global entries+bytes admission and B-before-A completion gate; K5 publication pending |
+| M2-K4 | [Capacity-first ordered DATA pipeline](kafka-m2-k4-ordered-pipeline.md) | partition/global entries+bytes admission and B-before-A completion gate; connected to K5 publication |
+| M2-K5 | [Coherent producer/transaction/locator publication](kafka-m2-k5-coherent-protocol-publication.md) | pre-offset protocol validation plus one fenced K1 root replacement; ACK/HW/runtime excluded |
 | M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | implementation started at K0 module/provider/wire/numeric inputs; runtime/evidence pending |
 | M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | implementation started at K1 pure coherent state; storage/runtime/evidence pending |
 

@@ -16,6 +16,9 @@ package com.nereusstream.kafka.bookkeeper.pipeline;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.kafka.bookkeeper.adapter.KafkaNbke2AssignedAppendGroupV1;
+import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2AppendGroupDescriptorV1;
+import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2DataV1;
+import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperEntryReservationV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunLifecycleV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunStateV1;
@@ -26,6 +29,8 @@ import com.nereusstream.storage.api.bookkeeper.ProviderMutationResultV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerAppendRequestV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
 import com.nereusstream.storage.bookkeeper.ImmutableRetainedStoragePayload;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -88,8 +93,16 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
 
     public CompletionStage<KafkaOrderedAppendResultV1> submit(
             KafkaAppendAdmissionRequestV1 request, KafkaOffsetAssignmentV1 offsetAssignment) {
+        return submit(request, offsetAssignment, KafkaAppendProtocolHooksV1.none());
+    }
+
+    public CompletionStage<KafkaOrderedAppendResultV1> submit(
+            KafkaAppendAdmissionRequestV1 request,
+            KafkaOffsetAssignmentV1 offsetAssignment,
+            KafkaAppendProtocolHooksV1 protocolHooks) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(offsetAssignment, "offsetAssignment");
+        Objects.requireNonNull(protocolHooks, "protocolHooks");
         Optional<CapacityPair> capacity = reserveCapacity(request);
         if (capacity.isEmpty()) {
             return CompletableFuture.completedFuture(
@@ -108,6 +121,13 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
                         KafkaOrderedAppendResultV1.beforeAssignment(KafkaOrderedAppendOutcomeV1.FENCED_BY_PREDECESSOR));
             }
             try {
+                protocolHooks.validateBeforeOffsetAssignment();
+            } catch (RuntimeException failure) {
+                capacity.orElseThrow().close();
+                return CompletableFuture.completedFuture(KafkaOrderedAppendResultV1.beforeAssignment(
+                        KafkaOrderedAppendOutcomeV1.PROTOCOL_VALIDATION_FAILED));
+            }
+            try {
                 assigned = Objects.requireNonNull(offsetAssignment.assign(), "assigned append");
             } catch (RuntimeException failure) {
                 capacity.orElseThrow().close();
@@ -124,6 +144,16 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
             }
             speculativeEndOffset = assigned.endOffsetExclusive();
             try {
+                protocolHooks.prepareAfterOffsetAssignment(assigned);
+            } catch (RuntimeException failure) {
+                capacity.orElseThrow().close();
+                fencePending();
+                return CompletableFuture.completedFuture(KafkaOrderedAppendResultV1.assigned(
+                        KafkaOrderedAppendOutcomeV1.PROTOCOL_PREPARATION_FAILED,
+                        assigned.startOffset(),
+                        assigned.endOffsetExclusive()));
+            }
+            try {
                 reservation = lifecycle.reserveDataGroup(request.memberCount());
             } catch (RuntimeException failure) {
                 capacity.orElseThrow().close();
@@ -138,7 +168,13 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
                         assigned.physicalGroupFactory().apply(reservation.firstEntryId()), "physical append group");
                 encodedEntries = physicalGroup.encode(
                         lifecycle.snapshot().handle().ledgerIdentity().ledgerId());
-                validatePhysicalGroup(request, assigned, reservation, physicalGroup, encodedEntries);
+                validatePhysicalGroup(
+                        request,
+                        assigned,
+                        reservation,
+                        lifecycle.snapshot().runBinding(),
+                        physicalGroup,
+                        encodedEntries);
             } catch (RuntimeException failure) {
                 lifecycle.completeDataGroup(reservation);
                 capacity.orElseThrow().close();
@@ -148,7 +184,21 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
                         assigned.startOffset(),
                         assigned.endOffsetExclusive()));
             }
-            slot = new Slot(assigned.startOffset(), assigned.endOffsetExclusive(), capacity.orElseThrow());
+            var descriptor = physicalGroup
+                    .dataFrames()
+                    .get(physicalGroup.dataFrames().size() - 1)
+                    .terminalDescriptor()
+                    .orElseThrow();
+            KafkaOrderedDurableCommitV1 durableCommit = new KafkaOrderedDurableCommitV1(
+                    assigned.startOffset(),
+                    assigned.endOffsetExclusive(),
+                    lifecycle.snapshot().handle(),
+                    descriptor.firstDataEntryId(),
+                    descriptor.lastDataEntryId(),
+                    request.memberCount(),
+                    request.encodedDataBytes(),
+                    descriptor.aggregateAssignedPayloadSha256());
+            slot = new Slot(durableCommit, capacity.orElseThrow());
             orderedSlots.addLast(slot);
             try {
                 for (int index = 0; index < encodedEntries.size(); index++) {
@@ -243,6 +293,7 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
             KafkaAppendAdmissionRequestV1 request,
             KafkaOffsetAssignedAppendV1 assigned,
             KafkaBookKeeperEntryReservationV1 reservation,
+            Nbke2RunBindingV1 expectedRunBinding,
             KafkaNbke2AssignedAppendGroupV1 physicalGroup,
             List<CanonicalBytes> encodedEntries) {
         if (physicalGroup.firstDataEntryId() != reservation.firstEntryId()
@@ -256,12 +307,51 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
                         != assigned.endOffsetExclusive()) {
             throw new IllegalArgumentException("physical append group differs from its admission/assignment");
         }
+        long nextOffset = assigned.startOffset();
+        MessageDigest aggregate = sha256();
+        Nbke2DataV1 first = physicalGroup.dataFrames().get(0);
+        for (int index = 0; index < physicalGroup.dataFrames().size(); index++) {
+            Nbke2DataV1 frame = physicalGroup.dataFrames().get(index);
+            if (!frame.runBinding().equals(expectedRunBinding)
+                    || frame.memberOrdinal() != index
+                    || frame.memberCount() != request.memberCount()
+                    || !frame.appendGroupId().equals(first.appendGroupId())
+                    || !frame.storageAttemptId().equals(first.storageAttemptId())
+                    || frame.baseOffset() != nextOffset) {
+                throw new IllegalArgumentException("physical DATA members change run/group identity or offset order");
+            }
+            aggregate.update(frame.rawAssignedRecordBatch().toByteArray());
+            nextOffset = frame.endOffsetExclusive();
+        }
+        Nbke2AppendGroupDescriptorV1 descriptor = physicalGroup
+                .dataFrames()
+                .get(physicalGroup.dataFrames().size() - 1)
+                .terminalDescriptor()
+                .orElseThrow();
+        if (nextOffset != assigned.endOffsetExclusive()
+                || descriptor.groupStartOffset() != assigned.startOffset()
+                || descriptor.groupEndOffsetExclusive() != assigned.endOffsetExclusive()
+                || descriptor.firstDataEntryId() != reservation.firstEntryId()
+                || descriptor.lastDataEntryId() != reservation.lastEntryId()
+                || !descriptor
+                        .aggregateAssignedPayloadSha256()
+                        .equals(com.nereusstream.domain.bytes.Sha256Digest.copyOf(aggregate.digest()))) {
+            throw new IllegalArgumentException("terminal descriptor differs from the exact assigned DATA group");
+        }
         long encodedBytes = 0;
         for (CanonicalBytes encodedEntry : encodedEntries) {
             encodedBytes = Math.addExact(encodedBytes, encodedEntry.length());
         }
         if (encodedBytes != request.encodedDataBytes()) {
             throw new IllegalArgumentException("encoded DATA bytes differ from the pre-offset reservation");
+        }
+    }
+
+    private static MessageDigest sha256() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IllegalStateException("JDK has no SHA-256 provider", failure);
         }
     }
 
@@ -302,7 +392,7 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
             }
             if (head.state == SlotState.DURABLE) {
                 try {
-                    commitObserver.onOrderedDurable(head.startOffset, head.endOffsetExclusive);
+                    commitObserver.onOrderedDurable(head.durableCommit);
                 } catch (RuntimeException failure) {
                     head.state = SlotState.OUTCOME_UNKNOWN;
                     failHeadAndFenceSuccessors(head);
@@ -371,14 +461,16 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
     private static final class Slot {
         private final long startOffset;
         private final long endOffsetExclusive;
+        private final KafkaOrderedDurableCommitV1 durableCommit;
         private final CapacityPair capacity;
         private final CompletableFuture<KafkaOrderedAppendResultV1> result = new CompletableFuture<>();
         private SlotState state = SlotState.PENDING;
         private boolean fencedByPredecessor;
 
-        private Slot(long startOffset, long endOffsetExclusive, CapacityPair capacity) {
-            this.startOffset = startOffset;
-            this.endOffsetExclusive = endOffsetExclusive;
+        private Slot(KafkaOrderedDurableCommitV1 durableCommit, CapacityPair capacity) {
+            this.durableCommit = durableCommit;
+            this.startOffset = durableCommit.startOffset();
+            this.endOffsetExclusive = durableCommit.endOffsetExclusive();
             this.capacity = capacity;
         }
     }

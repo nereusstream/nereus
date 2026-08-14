@@ -25,14 +25,16 @@ fences the pipeline and cannot submit DATA.
 Every DATA member is submitted in entry-ID order while BookKeeper stages may overlap. The K3 group reservation closes
 only after every accepted submission call has been made, so a control entry cannot split the group. Quorum proofs must
 match handle, entry ID, byte count, payload SHA-256, and admitted ACK quorum. Capacity remains owned until the group
-reaches its ordered terminal result.
+reaches its ordered terminal result. K5 additionally consumes the exact ordered run handle, entry range, encoded-byte
+count, logical range, and terminal raw-payload aggregate only after K4 revalidates every member and descriptor field.
 
 Completion may be out of order but commit order may not. A durable B waits behind pending A. When A becomes exactly
 durable, the queue emits A then B and releases their permits. A definitive failure, response-unknown result, substituted
 proof, or ordered-observer failure fences the pipeline; already durable successors receive `FENCED_BY_PREDECESSOR` and
 cannot cross the gap. A still-pending fenced successor retains both capacity leases until its own provider operation is
-terminal, even though it can no longer publish. `COMMITTED_ORDERED` is only the K4 engine seam and is not K5 coherent
-protocol publication or a Kafka success ACK.
+terminal, even though it can no longer publish. With the no-op K4 observer, `COMMITTED_ORDERED` is only the engine seam;
+with the K5 coordinator installed, the observer must complete the coherent K1 root publication first. Neither form is
+itself a Kafka success ACK.
 
 The K2 validated-batch type is now a private-constructor final value class. Production callers can obtain it only
 through `validate(KafkaNativeRecordBatchFactsV1)`; the former public record-constructor bypass is regression-tested.

@@ -117,7 +117,7 @@ class KafkaBookKeeperOrderedCompletionV1Test {
         KafkaAppendCapacityControllerV1 partition = controller();
         KafkaAppendCapacityControllerV1 global = controller();
         KafkaBookKeeperOrderedPipelineV1 pipeline =
-                new KafkaBookKeeperOrderedPipelineV1(session, lifecycle, partition, global, (start, end) -> {
+                new KafkaBookKeeperOrderedPipelineV1(session, lifecycle, partition, global, commit -> {
                     throw new IllegalStateException("publication seam failed");
                 });
         KafkaPipelineTestFixtures.Plan plan = KafkaPipelineTestFixtures.plan(lifecycle, 1, 100);

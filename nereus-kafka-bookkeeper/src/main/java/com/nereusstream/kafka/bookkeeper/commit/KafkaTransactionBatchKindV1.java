@@ -12,17 +12,12 @@
  * limitations under the License.
  */
 
-package com.nereusstream.kafka.bookkeeper.protocol;
+package com.nereusstream.kafka.bookkeeper.commit;
 
-/** Closed publication result; notification failure never disguises that the state already published. */
-public enum KafkaPartitionPublicationOutcomeV1 {
-    PUBLISHED,
-    PUBLISHED_NOTIFICATION_FAILED,
-    FENCE_MISMATCH,
-    STATE_VERSION_MISMATCH,
-    NON_CONTIGUOUS_ALLOCATION,
-    INVALID_SPECULATIVE_REPLACEMENT,
-    NON_CONTIGUOUS_COMMIT,
-    INVALID_COMMIT_REPLACEMENT,
-    INVALID_FENCE_TRANSITION
+/** Partition-local transactional meaning already established by the native Kafka batch validator. */
+public enum KafkaTransactionBatchKindV1 {
+    NONE,
+    TRANSACTIONAL_DATA,
+    COMMIT_MARKER,
+    ABORT_MARKER
 }
