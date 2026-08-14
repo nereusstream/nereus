@@ -248,6 +248,6 @@ print(
     f"source={source_commit} artifacts={len(manifest)} bytes={artifact_bytes} manifest={manifest_descriptor['sha256']}"
 )
 print(
-    "K0-M remains an immutable module/input receipt only; provider evidence is separate, while wire, scenarios, "
-    "Kafka Inputs, and M2 Final remain absent."
+    "K0-M remains an immutable module/input receipt only; provider, wire, scenarios, Kafka Inputs, and M2 Final "
+    "are outside this receipt."
 )

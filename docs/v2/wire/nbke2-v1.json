@@ -1,0 +1,131 @@
+{
+  "schema": "NEREUS_NBKE2_WIRE_PROJECTION_V1",
+  "magicAscii": "NBKE2",
+  "byteOrder": "BIG_ENDIAN",
+  "majorVersion": 1,
+  "minorVersion": 0,
+  "unknownMinorPolicy": "REJECT",
+  "strictEof": true,
+  "commonHeaderBytes": 32,
+  "commonHeader": [
+    {"name": "magic", "offset": 0, "bytes": 5},
+    {"name": "majorVersion", "offset": 5, "bytes": 1},
+    {"name": "minorVersion", "offset": 6, "bytes": 1},
+    {"name": "frameType", "offset": 7, "bytes": 1},
+    {"name": "flags", "offset": 8, "bytes": 1},
+    {"name": "reservedZero", "offset": 9, "bytes": 1},
+    {"name": "headerLength", "offset": 10, "bytes": 2, "domain": "u16"},
+    {"name": "totalLength", "offset": 12, "bytes": 4, "domain": "u32_checked_to_format_cap"},
+    {"name": "ledgerId", "offset": 16, "bytes": 8, "domain": "i64_non_negative_cross_checked"},
+    {"name": "entryId", "offset": 24, "bytes": 8, "domain": "i64_non_negative_cross_checked"}
+  ],
+  "runBinding": {
+    "offset": 32,
+    "fixedBytesExcludingTopicName": 146,
+    "fields": [
+      {"name": "bindingIdSha256", "relativeOffset": 0, "bytes": 32},
+      {"name": "kafkaTopicId", "relativeOffset": 32, "bytes": 16},
+      {"name": "topicNameLength", "relativeOffset": 48, "bytes": 2, "domain": "u16_1_to_249"},
+      {"name": "topicNameAscii", "relativeOffset": 50, "bytes": "topicNameLength"},
+      {"name": "partitionId", "relativeOffset": "50+topicNameLength", "bytes": 4, "domain": "i32_non_negative"},
+      {"name": "storageEpochIdSha256", "relativeOffset": "54+topicNameLength", "bytes": 32},
+      {"name": "creatorOwnerEpoch", "relativeOffset": "86+topicNameLength", "bytes": 8, "domain": "i64_positive"},
+      {"name": "kafkaLeaderEpoch", "relativeOffset": "94+topicNameLength", "bytes": 4, "domain": "i32_non_negative"},
+      {"name": "providerScopeIdSha256", "relativeOffset": "98+topicNameLength", "bytes": 32},
+      {"name": "runId", "relativeOffset": "130+topicNameLength", "bytes": 16}
+    ]
+  },
+  "frameTypes": [
+    {"name": "RUN_HEADER", "code": 1, "legalFlags": 0},
+    {"name": "DATA", "code": 2, "legalFlags": 1, "flag1": "TERMINAL_APPEND_GROUP_DESCRIPTOR_PRESENT"},
+    {"name": "RANGE_INDEX_BLOCK", "code": 3, "legalFlags": 0},
+    {"name": "PROTOCOL_CHECKPOINT", "code": 4, "legalFlags": 0},
+    {"name": "RUN_FOOTER", "code": 5, "legalFlags": 0}
+  ],
+  "semanticPayloads": {
+    "RUN_HEADER": [
+      {"name": "kafkaStartOffset", "bytes": 8},
+      {"name": "firstDataEntryId", "bytes": 8},
+      {"name": "ledgerConfigurationSha256", "bytes": 32}
+    ],
+    "DATA": [
+      {"name": "baseOffset", "bytes": 8},
+      {"name": "lastOffsetDelta", "bytes": 4},
+      {"name": "rawAssignedRecordBatchLength", "bytes": 4, "domain": "u32_checked_to_data_cap"},
+      {"name": "memberOrdinal", "bytes": 4, "domain": "u32_checked_to_i32"},
+      {"name": "memberCount", "bytes": 4, "domain": "u32_positive_checked_to_i32"},
+      {"name": "appendGroupId", "bytes": 16},
+      {"name": "storageAttemptId", "bytes": 16},
+      {"name": "terminalDescriptor", "bytes": 64, "presence": "flags.bit0"},
+      {"name": "rawAssignedRecordBatch", "bytes": "rawAssignedRecordBatchLength"}
+    ],
+    "RANGE_INDEX_BLOCK": [
+      {"name": "anchorOffset", "bytes": 8},
+      {"name": "anchorEntryId", "bytes": 8},
+      {"name": "coveredThroughOffset", "bytes": 8},
+      {"name": "firstDataEntryId", "bytes": 8},
+      {"name": "lastDataEntryId", "bytes": 8},
+      {"name": "predecessorBlockEntryId", "bytes": 8, "domain": "i64_minus_one_or_non_negative"},
+      {"name": "successorDataEntryId", "bytes": 8},
+      {"name": "locatorCount", "bytes": 4, "domain": "u32_1_to_65536"},
+      {"name": "locators", "bytes": "locatorCount*32"},
+      {"name": "authenticatedSha256", "bytes": 32}
+    ],
+    "PROTOCOL_CHECKPOINT": [
+      {"name": "rangeIndexCoveredThrough", "bytes": 8},
+      {"name": "producerStateCoveredThrough", "bytes": 8},
+      {"name": "transactionIndexCoveredThrough", "bytes": 8},
+      {"name": "leaderEpochCoveredThrough", "bytes": 8},
+      {"name": "producerStateLength", "bytes": 4},
+      {"name": "transactionIndexLength", "bytes": 4},
+      {"name": "leaderEpochIndexLength", "bytes": 4},
+      {"name": "producerState", "bytes": "producerStateLength"},
+      {"name": "transactionIndex", "bytes": "transactionIndexLength"},
+      {"name": "leaderEpochIndex", "bytes": "leaderEpochIndexLength"},
+      {"name": "authenticatedSha256", "bytes": 32}
+    ],
+    "RUN_FOOTER": [
+      {"name": "kafkaEndOffsetExclusive", "bytes": 8},
+      {"name": "lastPhysicalEntryIdExclusive", "bytes": 8},
+      {"name": "latestIndexBlockEntryId", "bytes": 8, "domain": "i64_minus_one_or_non_negative"},
+      {"name": "protocolCheckpointEntryId", "bytes": 8, "domain": "i64_minus_one_or_non_negative"},
+      {"name": "sealOwnerEpoch", "bytes": 8, "domain": "i64_positive"},
+      {"name": "indexDirectoryCount", "bytes": 4, "domain": "u32_0_to_65536"},
+      {"name": "indexDirectory", "bytes": "indexDirectoryCount*24"},
+      {"name": "authenticatedSha256", "bytes": 32}
+    ]
+  },
+  "physicalBindingRules": [
+    "RUN_HEADER header.entryId == 0 and firstDataEntryId > 0",
+    "terminal DATA descriptor.lastDataEntryId == header.entryId",
+    "RANGE_INDEX_BLOCK lastDataEntryId < header.entryId < successorDataEntryId",
+    "RUN_FOOTER lastPhysicalEntryIdExclusive == header.entryId + 1"
+  ],
+  "fixedRows": {
+    "appendGroupDescriptor": {
+      "bytes": 64,
+      "fields": ["groupStartOffset:i64", "groupEndOffsetExclusive:i64", "firstDataEntryId:i64", "lastDataEntryId:i64", "aggregateAssignedPayloadSha256:32"]
+    },
+    "locator": {
+      "bytes": 32,
+      "fields": ["baseOffsetDelta:i64_non_negative", "logicalOffsetCount:u32_positive", "entryIdDelta:u32", "appendGroupDelta:u32", "payloadOffset:u32_zero_v1", "payloadLength:u32_positive", "physicalChecksumGeneration:u32"]
+    },
+    "indexDirectoryEntry": {
+      "bytes": 24,
+      "fields": ["indexBlockEntryId:i64", "blockStartOffset:i64", "blockCoveredThroughOffset:i64"]
+    }
+  },
+  "caps": {
+    "formatMaxFrameBytes": 8388608,
+    "formatMaxDataPayloadBytes": 8387584,
+    "formatMaxTopicNameBytes": 249,
+    "formatMaxLocatorCount": 65536,
+    "formatMaxIndexDirectoryCount": 65536,
+    "formatMaxCheckpointSectionBytes": 2097152
+  },
+  "integrity": {
+    "crc32c": "bytes[0,totalLength-4); stored in final 4 bytes; CRC field excluded",
+    "controlSha256": "RANGE_INDEX_BLOCK, PROTOCOL_CHECKPOINT, and RUN_FOOTER bytes[0,shaFieldOffset); SHA field and CRC excluded",
+    "appendGroupSha256": "concatenation of exact raw broker-assigned RecordBatch bytes in member order; descriptor SHA field excluded"
+  }
+}

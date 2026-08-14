@@ -75,4 +75,4 @@ grep -Fq 'include("nereus-kafka-bookkeeper")' settings.gradle.kts || fail "Kafka
 grep -Fq 'source-qualified M2 coordinate is restricted to the three Kafka K0 production artifacts' \
     build.gradle.kts || fail "filtered M2 publication guard is missing"
 
-echo "V2 M2 Kafka K0-M module graph verified; provider evidence is separate, while NBKE2, Kafka runtime, scenario promotion, and M2 Final remain absent."
+echo "V2 M2 Kafka K0-M module graph verified; provider, NBKE2, Kafka runtime, scenario promotion, and M2 Final are outside this gate."

@@ -1,0 +1,44 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.nereusstream.kafka.bookkeeper.nbke2;
+
+import java.util.Arrays;
+
+/** Closed NBKE2 v1 frame type table. */
+public enum Nbke2FrameTypeV1 {
+    RUN_HEADER(1),
+    DATA(2),
+    RANGE_INDEX_BLOCK(3),
+    PROTOCOL_CHECKPOINT(4),
+    RUN_FOOTER(5);
+
+    private final int code;
+
+    Nbke2FrameTypeV1(int code) {
+        this.code = code;
+    }
+
+    public int code() {
+        return code;
+    }
+
+    public static Nbke2FrameTypeV1 fromCode(int code) {
+        return Arrays.stream(values())
+                .filter(value -> value.code == code)
+                .findFirst()
+                .orElseThrow(() -> new Nbke2DecodingException(
+                        Nbke2RejectionV1.UNKNOWN_FRAME_TYPE, "unknown NBKE2 frame type: " + code));
+    }
+}

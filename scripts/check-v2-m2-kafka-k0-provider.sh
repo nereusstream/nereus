@@ -109,4 +109,4 @@ if total <= 0 or failures or errors or skipped:
 print(f"V2 M2 Kafka K0-P tests: suites=4 tests={total} failures=0 errors=0 skipped=0")
 PY
 
-echo "V2 M2 Kafka K0-P provider contracts verified; real BookKeeper, NBKE2, Kafka runtime, scenarios, and M2 Final remain absent."
+echo "V2 M2 Kafka K0-P provider contracts verified; this gate does not validate real BookKeeper, NBKE2, Kafka runtime, scenarios, or M2 Final."

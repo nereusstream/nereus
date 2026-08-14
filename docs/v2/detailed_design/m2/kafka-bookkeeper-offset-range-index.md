@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: NormativeDetailedDesignWithOpenEvidence
 sourceTuple: v2-m1
@@ -72,7 +72,9 @@ uses the owner-local tail view; SEALED lookup uses the final footer/index direct
 
 ## `NBKE2` framing obligations
 
-The exact wire table is a required implementation-readiness child, but it must preserve these semantics:
+The exact wire table, production codec, machine projection, and immutable minimum/representative/maximum matrix are now
+implemented by [K0-W](kafka-m2-k0-nbke2-wire.md). K0-N still owns provider-aware numeric admission and exhaustive
+boundary proofs; K0-E still owns source-qualified aggregation. The implemented wire preserves these semantics:
 
 - every entry starts with closed magic/version/type and checked total length;
 - DATA contains one exact raw broker-assigned Kafka RecordBatch in the first implementation;
@@ -107,8 +109,8 @@ KafkaBookKeeperBatchLocator
   payloadLength?                  // optional optimization, not authority without DATA validation
 ```
 
-Exact fixed/varint representation and persisted block/locator parser caps are K0 production inputs and freeze before
-the first write. K9 evidence may select lower operational target bytes/counts without changing the accepted v1 domain.
+The K0-W fixed representation and persisted block/locator parser caps are frozen before the first write. K9 evidence
+may select lower operational target bytes/counts without changing the accepted v1 domain.
 Decoder allocation follows actual validated locator count. Runtime uses primitive arrays or direct packed views, not
 one long-lived Java object per locator and not a general `TreeMap`.
 
@@ -179,8 +181,9 @@ fresh run admits with the new Owner Epoch. Provider entries beyond the recovered
 These data-path cuts start only after non-promotable `v2M2KafkaInputsCheck` proves the K0 module/provider/wire/numeric/
 evidence inputs. Recommended commits are reviewable and independently gated:
 
-1. domain/state/validator plus wire design and goldens;
-2. `NBKE2` codecs and corruption tests;
+1. K0-W's frozen wire design, production codec, projection, goldens, and corruption tests are the immutable input;
+2. add Kafka-native assigned-RecordBatch header/CRC/coverage cross-checks and run-facing adapters without changing
+   NBKE2 v1 bytes;
 3. run allocator/header/footer and fake BookKeeper cuts;
 4. offset sequencer, entry sequencer, bounded pipeline, and ordered commit queue;
 5. index builder/checkpointer, active-tail locator, and targeted reader;
