@@ -1,0 +1,93 @@
+# Licensed under the Apache License, Version 2.0.
+# Exact local-only K9 conformance topology; every BookKeeper service uses the K0-locked image digest.
+
+services:
+  metadata-service:
+    image: &bookkeeper-image apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d
+    platform: linux/amd64
+    command: ["zookeeper"]
+    environment:
+      ZK_dataDir: /opt/bookkeeper/data/zookeeper/data
+      ZK_dataLogDir: /opt/bookkeeper/data/zookeeper/txlog
+      ZK_standaloneEnabled: "true"
+    ports:
+      - "127.0.0.1:2181:2181"
+    volumes:
+      - metadata-data:/opt/bookkeeper/data
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/2181"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  bookie-0:
+    image: *bookkeeper-image
+    platform: linux/amd64
+    command: ["bookie"]
+    depends_on:
+      metadata-service:
+        condition: service_healthy
+    environment: &bookie-environment
+      BK_zkServers: metadata-service:2181
+      BK_zkLedgersRootPath: /ledgers
+      BK_metadataServiceUri: zk://metadata-service:2181/ledgers
+      BK_advertisedAddress: 127.0.0.1
+      BK_allowLoopback: "true"
+      BK_journalSyncData: "true"
+      BK_httpServerEnabled: "false"
+      BK_extraServerComponents: ""
+    ports:
+      - "127.0.0.1:3181:3181"
+    volumes:
+      - bookie-0-data:/opt/bookkeeper/data
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3181"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+  bookie-1:
+    image: *bookkeeper-image
+    platform: linux/amd64
+    command: ["bookie"]
+    depends_on:
+      metadata-service:
+        condition: service_healthy
+    environment:
+      <<: *bookie-environment
+      BK_bookiePort: "3182"
+    ports:
+      - "127.0.0.1:3182:3182"
+    volumes:
+      - bookie-1-data:/opt/bookkeeper/data
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3182"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+  bookie-2:
+    image: *bookkeeper-image
+    platform: linux/amd64
+    command: ["bookie"]
+    depends_on:
+      metadata-service:
+        condition: service_healthy
+    environment:
+      <<: *bookie-environment
+      BK_bookiePort: "3183"
+    ports:
+      - "127.0.0.1:3183:3183"
+    volumes:
+      - bookie-2-data:/opt/bookkeeper/data
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3183"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+volumes:
+  metadata-data:
+  bookie-0-data:
+  bookie-1-data:
+  bookie-2-data:
