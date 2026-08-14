@@ -180,6 +180,20 @@ public final class Nbke2CodecV1 {
         }
     }
 
+    /** Exact encoded DATA frame bytes other than the raw assigned RecordBatch. */
+    public static int dataFrameOverheadBytes(Nbke2RunBindingV1 binding, boolean terminalDescriptorPresent) {
+        try {
+            int length = Math.addExact(Nbke2ConstantsV1.FIXED_HEADER_BYTES, runBindingLength(binding));
+            length = Math.addExact(length, 56);
+            if (terminalDescriptorPresent) {
+                length = Math.addExact(length, Nbke2ConstantsV1.APPEND_GROUP_DESCRIPTOR_BYTES);
+            }
+            return Math.addExact(length, Nbke2ConstantsV1.CRC32C_BYTES);
+        } catch (ArithmeticException failure) {
+            throw new IllegalArgumentException("NBKE2 DATA overhead overflows", failure);
+        }
+    }
+
     private static int semanticPayloadLength(Nbke2FrameV1 frame) {
         if (frame instanceof Nbke2RunHeaderV1) {
             return 48;

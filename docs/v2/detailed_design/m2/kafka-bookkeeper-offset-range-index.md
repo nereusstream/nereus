@@ -73,8 +73,9 @@ uses the owner-local tail view; SEALED lookup uses the final footer/index direct
 ## `NBKE2` framing obligations
 
 The exact wire table, production codec, machine projection, and immutable minimum/representative/maximum matrix are now
-implemented by [K0-W](kafka-m2-k0-nbke2-wire.md). K0-N still owns provider-aware numeric admission and exhaustive
-boundary proofs; K0-E still owns source-qualified aggregation. The implemented wire preserves these semantics:
+implemented by [K0-W](kafka-m2-k0-nbke2-wire.md). [K0-N](kafka-m2-k0-numeric-admission.md) implements provider-aware
+numeric admission and boundary proofs; K0-E still owns source-qualified aggregation. The implemented wire preserves
+these semantics:
 
 - every entry starts with closed magic/version/type and checked total length;
 - DATA contains one exact raw broker-assigned Kafka RecordBatch in the first implementation;

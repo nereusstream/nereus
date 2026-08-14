@@ -711,6 +711,22 @@ tasks.register("v2M2KafkaK0WireCheck") {
     dependsOn("v2M2KafkaK0WireSourceCheck", "v2DocumentationCheck")
 }
 
+val v2M2KafkaK0NumericTest = project(":nereus-kafka-bookkeeper").tasks.named<Test>("test")
+
+tasks.register<Exec>("v2M2KafkaK0NumericSourceCheck") {
+    group = "verification"
+    description = "Verify checked DATA admission and the mandatory three-dimensional recovery envelope."
+    dependsOn(v2M2KafkaK0NumericTest)
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-kafka-k0-numeric.sh")
+}
+
+tasks.register("v2M2KafkaK0NumericCheck") {
+    group = "verification"
+    description = "Run the non-promotable, non-zero K0-N numeric gate; no offset allocation, K0-E receipt, or M2 PASS."
+    dependsOn("v2M2KafkaK0NumericSourceCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
@@ -816,4 +832,5 @@ tasks.named("check") {
     dependsOn("v2M2KafkaK0ModuleCheck")
     dependsOn("v2M2KafkaK0ProviderCheck")
     dependsOn("v2M2KafkaK0WireCheck")
+    dependsOn("v2M2KafkaK0NumericCheck")
 }

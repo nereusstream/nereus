@@ -1,0 +1,37 @@
+{
+  "schema": "NEREUS_V2_M2_KAFKA_K0_NUMERIC_V1",
+  "numericClasses": [
+    "PERSISTED_FORMAT_HARD_CAP",
+    "IMMUTABLE_PROVIDER_CAPABILITY",
+    "NEW_WRITE_ADMISSION_CAP",
+    "OPERATIONAL_BUDGET",
+    "EVIDENCE_SELECTED_THRESHOLD_OR_DEFAULT"
+  ],
+  "persistedNbke2V1Caps": {
+    "formatMaxFrameBytes": 8388608,
+    "formatMaxDataPayloadBytes": 8387584,
+    "formatMaxTopicNameBytes": 249,
+    "formatMaxLocatorCount": 65536,
+    "formatMaxIndexDirectoryCount": 65536,
+    "formatMaxCheckpointSectionBytes": 2097152
+  },
+  "dataAdmission": {
+    "order": "BEFORE_OFFSET_OR_ENTRY_ALLOCATION",
+    "terminalOverheadFormula": "32 + (146 + topicNameBytes) + 56 + 64 + 4",
+    "effectiveMaxDataFrameBytes": "min(8388608, admittedBookKeeperMaximumAddPayloadBytes, admittedKafkaCompleteRecordBatchBytes + exactTerminalDataOverheadBytes)",
+    "maximumAdmittedRawRecordBatchBytes": "min(8387584, effectiveMaxDataFrameBytes - exactTerminalDataOverheadBytes)",
+    "successProof": "KafkaBookKeeperDataAdmissionTicketV1"
+  },
+  "recoveryEnvelope": {
+    "dimensions": ["ENTRY_COUNT", "ENCODED_BYTES", "ELAPSED_NANOS"],
+    "boundary": "INCLUSIVE",
+    "allDimensionsMandatory": true,
+    "lowerAuthorityMayEnlarge": false,
+    "accumulation": "NON_NEGATIVE_CHECKED_ADD"
+  },
+  "evidenceBoundary": {
+    "exactOperationalDefaultsSelectedBy": "M2_K9_SOURCE_QUALIFIED_EVIDENCE",
+    "topicMayEnlargeHardOrEvidenceSelectedBound": false,
+    "cellOrHostPressureMayOnlyLower": true
+  }
+}

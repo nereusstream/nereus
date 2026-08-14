@@ -38,9 +38,9 @@ identity bytes precede one of five closed semantic payloads:
   directory rows. Its physical exclusive bound equals its own BookKeeper entry ID plus one.
 
 The persisted format cap is 8 MiB per frame. DATA raw bytes are capped at 8 MiB minus 1024 bytes; locator and footer
-directory counts are each capped at 65,536; each checkpoint section is capped at 2 MiB. K0-N separately owns the
-provider/Kafka-aware new-write admission formula and all one-before/at/one-after numeric proofs. K0-W does not treat a
-format maximum as a provider capability or operational default.
+directory counts are each capped at 65,536; each checkpoint section is capped at 2 MiB. The implemented
+[K0-N numeric child](kafka-m2-k0-numeric-admission.md) separately owns the provider/Kafka-aware new-write formula and
+one-before/at/one-after proofs. K0-W does not treat a format maximum as a provider capability or operational default.
 
 Every frame ends with CRC32C/v1 over bytes `[0,totalLength-4)`. Range-index, checkpoint, and footer frames additionally
 store SHA-256/v1 over `[0,shaFieldOffset)`. The terminal append-group digest covers the concatenation of exact assigned
