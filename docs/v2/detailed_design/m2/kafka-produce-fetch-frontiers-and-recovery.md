@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: NormativeDetailedDesignWithOpenEvidence
 sourceTuple: v2-m1
@@ -19,7 +19,8 @@ M3 implements the Object-WAL `NWKCP1` carrier while keeping physical checkpoint/
 immutable read generations and source retirement. Existing V1 partition storage, reservation,
 producer-recovery, and leader-epoch code is evidence only and is replaced rather than wrapped or dual-written.
 
-The first coherent slice includes:
+Implementation has started with the pure K1 frontier/reference root, read snapshot, commit slot, and fenced coherent
+publication cell. The remaining coherent slices include:
 
 1. partition frontier state and one coherent publication cell;
 2. pre-offset admission plus speculative producer/transaction deltas;

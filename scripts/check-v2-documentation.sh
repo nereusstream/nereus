@@ -50,6 +50,7 @@ required_v2_docs=(
     detailed_design/m2/kafka-m2-k0-nbke2-wire.md
     detailed_design/m2/kafka-m2-k0-numeric-admission.md
     detailed_design/m2/kafka-m2-k0-evidence-and-input-gate.md
+    detailed_design/m2/kafka-m2-k1-frontier-publication.md
     detailed_design/m2/kafka-bookkeeper-offset-range-index.md
     detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md
     open-questions.md
@@ -366,6 +367,11 @@ require_literal 'NEREUS_V2_M2_KAFKA_BOOKKEEPER_CAPABILITY_INPUT_V1' "docs/v2/wir
 require_literal 'NEREUS_V2_M2_KAFKA_INPUTS_RECEIPT_V1' "nereus-kafka-bookkeeper/src/main/java/com/nereusstream/kafka/bookkeeper/evidence/KafkaM2InputsReceiptV1.java"
 require_literal 'v2M2KafkaK0EvidenceCheck' "build.gradle.kts"
 require_literal 'v2M2KafkaInputsCheck' "build.gradle.kts"
+require_literal 'M2-K1 coherent frontier and fenced publication cell' "docs/v2/detailed_design/m2/kafka-m2-k1-frontier-publication.md"
+require_literal 'v2M2KafkaK1Check' "docs/v2/detailed_design/m2/kafka-m2-k1-frontier-publication.md"
+require_literal '26 zero-skip tests in five suites' "docs/v2/detailed_design/m2/kafka-m2-k1-frontier-publication.md"
+require_literal 'implementationStatus: InProgress' "docs/v2/detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md"
+require_literal 'v2M2KafkaK1Check' "build.gradle.kts"
 require_literal 'include("nereus-storage-api")' "settings.gradle.kts"
 require_literal 'include("nereus-storage-bookkeeper")' "settings.gradle.kts"
 require_literal 'include("nereus-kafka-bookkeeper")' "settings.gradle.kts"

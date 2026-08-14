@@ -773,6 +773,22 @@ tasks.register("v2M2KafkaInputsCheck") {
     dependsOn("v2M2KafkaInputsLiveSourceCheck", "v2DocumentationCheck")
 }
 
+val v2M2KafkaK1Test = project(":nereus-kafka-bookkeeper").tasks.named<Test>("test")
+
+tasks.register<Exec>("v2M2KafkaK1SourceCheck") {
+    group = "verification"
+    description = "Verify the pure K1 frontier/snapshot/commit-slot/fenced-publication implementation and tests."
+    dependsOn(v2M2KafkaK1Test)
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-kafka-k1.sh")
+}
+
+tasks.register("v2M2KafkaK1Check") {
+    group = "verification"
+    description = "Run the non-zero non-promotable K1 publication gate; no writer, real BookKeeper, or M2 PASS."
+    dependsOn("v2M2KafkaK1SourceCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
@@ -880,4 +896,5 @@ tasks.named("check") {
     dependsOn("v2M2KafkaK0WireCheck")
     dependsOn("v2M2KafkaK0NumericCheck")
     dependsOn("v2M2KafkaK0EvidenceCheck")
+    dependsOn("v2M2KafkaK1Check")
 }
