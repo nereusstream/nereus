@@ -1,7 +1,7 @@
 {
   "schema": "NEREUS_V2_M2_PULSAR_P6_REAL_PROVIDER_V1",
-  "generatedAt": "2026-08-14T10:24:45.027964Z",
-  "testedSourceCommit": "38640b27eeb0d850a8391c2d1799245b19ea205b",
+  "generatedAt": "2026-08-14T11:01:55.332995Z",
+  "testedSourceCommit": "4af3278234d84df7a2fdce4fc6b3e4e227916d56",
   "provider": "MINIO_S3_COMPATIBLE",
   "imageReference": "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z",
   "imageDigest": "sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",

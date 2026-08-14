@@ -1,7 +1,7 @@
 # Pulsar M2-P6 provider and block-policy evidence
 
 This directory binds the P6 selection to Nereus source
-`38640b27eeb0d850a8391c2d1799245b19ea205b` and Pulsar source
+`4af3278234d84df7a2fdce4fc6b3e4e227916d56` and Pulsar source
 `a14e0e6f4e49be0677318b4ceefc7b85b445823b`.
 
 `candidate-matrix.json` is the production NPD1/NPO1 path on the AWS SDK v2 adapter against

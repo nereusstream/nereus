@@ -1,6 +1,6 @@
 {
   "schema": "NEREUS_V2_M2_PULSAR_P6_EXECUTION_V1",
-  "nereusSourceCommit": "38640b27eeb0d850a8391c2d1799245b19ea205b",
+  "nereusSourceCommit": "4af3278234d84df7a2fdce4fc6b3e4e227916d56",
   "pulsarSourceCommit": "a14e0e6f4e49be0677318b4ceefc7b85b445823b",
   "localStack": {
     "reference": "localstack/localstack:4.14.0",

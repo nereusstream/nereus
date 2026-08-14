@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/pulsar/p6/execution.json
 ---
 
 # M2-P6 provider and block-policy evidence

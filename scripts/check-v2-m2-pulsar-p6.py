@@ -189,8 +189,9 @@ def main() -> None:
 
     design = (root / "docs/v2/detailed_design/m2/pulsar-m2-p6-provider-and-block-policy.md").read_text()
     for literal in (
-        "implementationStatus: Complete",
-        "evidenceStatus: Passed",
+        "implementationStatus: Verified",
+        "evidenceStatus: CurrentSourceReceipt",
+        "receipt: docs/v2/evidence/v2-m2/pulsar/p6/execution.json",
         "P6 does not wire a broker process or NAR",
         "scan-8mib",
     ):
