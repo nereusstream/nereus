@@ -41,6 +41,10 @@ class KafkaNativeAssignedRecordBatchV1Test {
         raw[0] ^= 1;
 
         assertThat(assigned.rawAssignedRecordBatch().toByteArray()).isEqualTo(KafkaK2AdapterFixtures.batch(100, 0, 5));
+        assertThat(KafkaNativeAssignedRecordBatchV1.class.getConstructors()).isEmpty();
+        assertThat(assigned)
+                .isEqualTo(KafkaK2AdapterFixtures.assigned(100, 0))
+                .hasSameHashCodeAs(KafkaK2AdapterFixtures.assigned(100, 0));
     }
 
     @Test

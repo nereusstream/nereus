@@ -51,13 +51,14 @@ import java.nio.ByteBuffer;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
-final class KafkaRunTestFixtures {
+public final class KafkaRunTestFixtures {
     private KafkaRunTestFixtures() {}
 
-    static Nbke2RunBindingV1 binding(long runId, long ownerEpoch, int leaderEpoch) {
+    public static Nbke2RunBindingV1 binding(long runId, long ownerEpoch, int leaderEpoch) {
         return new Nbke2RunBindingV1(
                 new TopicBindingId(digest(1)),
                 new KafkaTopicIncarnationIdentity(new KafkaTopicId(new Id128(0, 2)), new KafkaTopicName("orders")),
@@ -69,7 +70,7 @@ final class KafkaRunTestFixtures {
                 new StorageRunId(new Id128(0, runId)));
     }
 
-    static Nbke2ProtocolCheckpointV1 checkpoint(Nbke2RunBindingV1 binding, long coveredThrough) {
+    public static Nbke2ProtocolCheckpointV1 checkpoint(Nbke2RunBindingV1 binding, long coveredThrough) {
         return new Nbke2ProtocolCheckpointV1(
                 binding,
                 coveredThrough,
@@ -81,7 +82,7 @@ final class KafkaRunTestFixtures {
                 CanonicalBytes.copyOf(new byte[] {3}));
     }
 
-    static Nbke2RunFooterV1 footer(KafkaBookKeeperRunSnapshotV1 snapshot, long endOffset) {
+    public static Nbke2RunFooterV1 footer(KafkaBookKeeperRunSnapshotV1 snapshot, long endOffset) {
         long footerEntryId = snapshot.nextEntryId();
         return new Nbke2RunFooterV1(
                 snapshot.runBinding(),
@@ -93,25 +94,28 @@ final class KafkaRunTestFixtures {
                 java.util.List.of());
     }
 
-    static Sha256Digest digest(int lastByte) {
+    public static Sha256Digest digest(int lastByte) {
         byte[] bytes = new byte[Sha256Digest.LENGTH];
         bytes[bytes.length - 1] = (byte) lastByte;
         return Sha256Digest.copyOf(bytes);
     }
 
-    static final class FakeSession implements BookKeeperCellSession {
-        final BookKeeperCapabilitySnapshotV1 capability;
-        final Map<Long, CanonicalBytes> entries = new LinkedHashMap<>();
-        ProviderMutationResultV1<RunLedgerHandleV1> createOverride;
-        ProviderMutationResultV1<AppendQuorumProofV1> nextAppendOverride;
-        ProviderMutationResultV1<RunLedgerCloseProofV1> closeOverride;
-        long delayedEntryId = -1;
-        CompletableFuture<ProviderMutationResultV1<AppendQuorumProofV1>> delayedAppend;
-        RunLedgerHandleV1 handle;
-        int drainCalls;
-        int closeCalls;
+    public static final class FakeSession implements BookKeeperCellSession {
+        public final BookKeeperCapabilitySnapshotV1 capability;
+        public final Map<Long, CanonicalBytes> entries = new LinkedHashMap<>();
+        public ProviderMutationResultV1<RunLedgerHandleV1> createOverride;
+        public ProviderMutationResultV1<AppendQuorumProofV1> nextAppendOverride;
+        public ProviderMutationResultV1<RunLedgerCloseProofV1> closeOverride;
+        public long delayedEntryId = -1;
+        public CompletableFuture<ProviderMutationResultV1<AppendQuorumProofV1>> delayedAppend;
+        public final Set<Long> delayedEntryIds = new java.util.HashSet<>();
+        public final Map<Long, CompletableFuture<ProviderMutationResultV1<AppendQuorumProofV1>>> delayedAppends =
+                new LinkedHashMap<>();
+        public RunLedgerHandleV1 handle;
+        public int drainCalls;
+        public int closeCalls;
 
-        FakeSession() {
+        public FakeSession() {
             capability = new BookKeeperCapabilitySnapshotV1(
                     binding(6, 11, 5).providerScopeId(),
                     "cd06340851d6d657b7c7546df01df365c18980de",
@@ -178,11 +182,15 @@ final class KafkaRunTestFixtures {
                         retained.sha256(),
                         capability.ackQuorumSize()));
             }
-            if (request.expectedEntryId() == delayedEntryId) {
-                delayedAppend = new CompletableFuture<>();
+            if (request.expectedEntryId() == delayedEntryId || delayedEntryIds.contains(request.expectedEntryId())) {
+                CompletableFuture<ProviderMutationResultV1<AppendQuorumProofV1>> pending = new CompletableFuture<>();
+                delayedAppends.put(request.expectedEntryId(), pending);
+                if (request.expectedEntryId() == delayedEntryId) {
+                    delayedAppend = pending;
+                }
                 ProviderMutationResultV1<AppendQuorumProofV1> delayedResult = result;
-                delayedAppend.whenComplete((ignored, failure) -> retained.release());
-                return delayedAppend.thenApply(ignored -> delayedResult);
+                pending.whenComplete((ignored, failure) -> retained.release());
+                return pending.thenApply(ignored -> delayedResult);
             }
             retained.release();
             return CompletableFuture.completedFuture(result);
@@ -234,8 +242,12 @@ final class KafkaRunTestFixtures {
             return CompletableFuture.completedFuture(null);
         }
 
-        void completeDelayedAppend() {
+        public void completeDelayedAppend() {
             delayedAppend.complete(ProviderMutationResultV1.outcomeUnknown());
+        }
+
+        public void completeDelayedEntry(long entryId) {
+            delayedAppends.get(entryId).complete(ProviderMutationResultV1.outcomeUnknown());
         }
 
         private static CanonicalBytes bytes(ByteBuffer buffer) {
@@ -245,9 +257,9 @@ final class KafkaRunTestFixtures {
         }
     }
 
-    static final class FakeRootAuthority implements KafkaRunRootAuthority {
-        final Map<StorageRunId, KafkaRunRootSnapshotV1> roots = new LinkedHashMap<>();
-        ProviderMutationResultV1<KafkaRunRootSnapshotV1> nextOverride;
+    public static final class FakeRootAuthority implements KafkaRunRootAuthority {
+        public final Map<StorageRunId, KafkaRunRootSnapshotV1> roots = new LinkedHashMap<>();
+        public ProviderMutationResultV1<KafkaRunRootSnapshotV1> nextOverride;
 
         @Override
         public CompletionStage<ProviderMutationResultV1<KafkaRunRootSnapshotV1>> createRoot(

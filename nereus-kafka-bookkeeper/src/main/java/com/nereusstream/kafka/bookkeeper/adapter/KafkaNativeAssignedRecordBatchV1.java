@@ -21,12 +21,7 @@ import java.util.Objects;
 import java.util.zip.CRC32C;
 
 /** One complete broker-assigned magic-v2 RecordBatch after native and independent K2 cross-checks. */
-public record KafkaNativeAssignedRecordBatchV1(
-        CanonicalBytes rawAssignedRecordBatch,
-        long baseOffset,
-        int lastOffsetDelta,
-        int partitionLeaderEpoch,
-        long storedCrc32c) {
+public final class KafkaNativeAssignedRecordBatchV1 {
     static final int LOG_OVERHEAD_BYTES = 12;
     static final int PARTITION_LEADER_EPOCH_OFFSET = 12;
     static final int MAGIC_OFFSET = 16;
@@ -36,9 +31,23 @@ public record KafkaNativeAssignedRecordBatchV1(
     static final int RECORD_BATCH_OVERHEAD_BYTES = 61;
     static final int MAGIC_V2 = 2;
     private static final long MAX_UNSIGNED_INT = 0xffff_ffffL;
+    private final CanonicalBytes rawAssignedRecordBatch;
+    private final long baseOffset;
+    private final int lastOffsetDelta;
+    private final int partitionLeaderEpoch;
+    private final long storedCrc32c;
 
-    public KafkaNativeAssignedRecordBatchV1 {
-        Objects.requireNonNull(rawAssignedRecordBatch, "rawAssignedRecordBatch");
+    private KafkaNativeAssignedRecordBatchV1(
+            CanonicalBytes rawAssignedRecordBatch,
+            long baseOffset,
+            int lastOffsetDelta,
+            int partitionLeaderEpoch,
+            long storedCrc32c) {
+        this.rawAssignedRecordBatch = Objects.requireNonNull(rawAssignedRecordBatch, "rawAssignedRecordBatch");
+        this.baseOffset = baseOffset;
+        this.lastOffsetDelta = lastOffsetDelta;
+        this.partitionLeaderEpoch = partitionLeaderEpoch;
+        this.storedCrc32c = storedCrc32c;
         if (baseOffset < 0 || lastOffsetDelta < 0 || partitionLeaderEpoch < 0) {
             throw reject(
                     KafkaAssignedRecordBatchRejectionV1.INVALID_OFFSET_COVERAGE,
@@ -155,6 +164,61 @@ public record KafkaNativeAssignedRecordBatchV1(
 
     public long endOffsetExclusive() {
         return Math.addExact(baseOffset, (long) lastOffsetDelta + 1L);
+    }
+
+    public CanonicalBytes rawAssignedRecordBatch() {
+        return rawAssignedRecordBatch;
+    }
+
+    public long baseOffset() {
+        return baseOffset;
+    }
+
+    public int lastOffsetDelta() {
+        return lastOffsetDelta;
+    }
+
+    public int partitionLeaderEpoch() {
+        return partitionLeaderEpoch;
+    }
+
+    public long storedCrc32c() {
+        return storedCrc32c;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof KafkaNativeAssignedRecordBatchV1 that)) {
+            return false;
+        }
+        return baseOffset == that.baseOffset
+                && lastOffsetDelta == that.lastOffsetDelta
+                && partitionLeaderEpoch == that.partitionLeaderEpoch
+                && storedCrc32c == that.storedCrc32c
+                && rawAssignedRecordBatch.equals(that.rawAssignedRecordBatch);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(rawAssignedRecordBatch, baseOffset, lastOffsetDelta, partitionLeaderEpoch, storedCrc32c);
+    }
+
+    @Override
+    public String toString() {
+        return "KafkaNativeAssignedRecordBatchV1[rawAssignedRecordBatch="
+                + rawAssignedRecordBatch
+                + ", baseOffset="
+                + baseOffset
+                + ", lastOffsetDelta="
+                + lastOffsetDelta
+                + ", partitionLeaderEpoch="
+                + partitionLeaderEpoch
+                + ", storedCrc32c="
+                + storedCrc32c
+                + ']';
     }
 
     private static long crc32c(byte[] raw) {

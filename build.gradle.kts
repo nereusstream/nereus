@@ -822,6 +822,22 @@ tasks.register("v2M2KafkaK3Check") {
     dependsOn("v2M2KafkaK3SourceCheck", "v2DocumentationCheck")
 }
 
+val v2M2KafkaK4Test = project(":nereus-kafka-bookkeeper").tasks.named<Test>("test")
+
+tasks.register<Exec>("v2M2KafkaK4SourceCheck") {
+    group = "verification"
+    description = "Verify K4 capacity-first admission, speculative deltas, bounded DATA I/O, and ordered completion."
+    dependsOn(v2M2KafkaK4Test)
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-kafka-k4.sh")
+}
+
+tasks.register("v2M2KafkaK4Check") {
+    group = "verification"
+    description = "Run the non-zero K4 bounded-pipeline gate; no K5 publication, ACK, real BK, or M2 PASS."
+    dependsOn("v2M2KafkaK4SourceCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
