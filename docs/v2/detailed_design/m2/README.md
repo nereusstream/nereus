@@ -14,17 +14,19 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 
 | Slice | Design | Status |
 | --- | --- | --- |
-| M2-K0 | [Kafka implementation-input closure](kafka-m2-k0-implementation-input-closure.md) | aggregate in progress through K0-M/K0-P/K0-W/K0-N; K0-E absent |
+| M2-K0 | [Kafka implementation-input closure](kafka-m2-k0-implementation-input-closure.md) | all five child implementations present; canonical aggregate receipt pending |
 | M2-K0-M | [Module graph and immutable N1 input](kafka-m2-k0-module-graph.md) | current immutable-input receipt; provider/wire/runtime/scenarios excluded |
 | M2-K0-P | [Cell-scoped BookKeeper provider contract](kafka-m2-k0-provider-contract.md) | production API/lifecycle and non-zero local gate; K0-E receipt pending |
 | M2-K0-W | [Closed NBKE2 v1 wire contract](kafka-m2-k0-nbke2-wire.md) | production codec/projection/goldens and non-zero local gate; K0-E receipt pending |
 | M2-K0-N | [Checked numeric admission and recovery envelope](kafka-m2-k0-numeric-admission.md) | production admission/envelope and non-zero local gate; K0-E receipt pending |
+| M2-K0-E | [Exact source, receipt, and Kafka Inputs gate](kafka-m2-k0-evidence-and-input-gate.md) | exact source/image/config lock and production parser; canonical receipt not yet published |
 | M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | implementation started at K0 module/provider/wire/numeric inputs; runtime/evidence pending |
 | M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | protocol semantics accepted; exact Java/wire/integration/evidence not started |
 
 M1 Final is complete at the trusted predecessor source tuple. M2 is `InProgress` for the current K0-M immutable module
-input, K0-P production provider/lifecycle contract, K0-W closed NBKE2 v1 codec, and K0-N checked numeric admission.
-K0-E is not implemented, no scenario is promoted, and `v2M2KafkaInputsCheck` plus global `v2M2Check` remain absent.
+input, K0-P production provider/lifecycle contract, K0-W closed NBKE2 v1 codec, K0-N checked numeric admission, and
+K0-E exact-source/receipt validation. `v2M2KafkaInputsCheck` is registered fail-closed but has no canonical aggregate
+receipt yet; no scenario is promoted and global `v2M2Check` remains absent.
 
 Kafka M2 uses its own planned sub-aggregate through `v2M2KafkaFinalCheck`. Global `v2M2Check` is a separate aggregate
 that also requires the Pulsar-owned M2 work. A Kafka sub-aggregate cannot be reported as global M2 Final.

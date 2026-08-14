@@ -1,0 +1,54 @@
+{
+  "schema": "NEREUS_V2_M2_KAFKA_BOOKKEEPER_CAPABILITY_INPUT_V1",
+  "bookKeeper": {
+    "repository": "https://github.com/apache/bookkeeper.git",
+    "tag": "release-4.18.0",
+    "tagObject": "bb51381cfb1126a79000cd3211f6293dbd982554",
+    "sourceCommit": "cd06340851d6d657b7c7546df01df365c18980de",
+    "mavenCoordinate": "org.apache.bookkeeper:bookkeeper-server:4.18.0",
+    "clientArtifactSha256": "8e64f2b7436bb814705f611eb0ac48d64d90de7a50d295905c459d89bc3f9d8f"
+  },
+  "serverImage": {
+    "reference": "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
+    "manifestDigest": "sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
+    "configDigest": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+    "platform": "linux/amd64",
+    "embeddedServerJarBytes": 2760614,
+    "embeddedServerJarSha256": "8e64f2b7436bb814705f611eb0ac48d64d90de7a50d295905c459d89bc3f9d8f"
+  },
+  "normalAddProtocol": {
+    "mode": "V3",
+    "digestType": "CRC32C",
+    "preserveMdcForTaskExecution": false,
+    "requestContext": "EMPTY",
+    "recoveryAddFlag": false,
+    "writeFlags": "NONE",
+    "priority": "NORMAL",
+    "explicitEntryIdsSupported": true,
+    "fencingSupported": true,
+    "recoverySupported": true
+  },
+  "limits": {
+    "clientFrameLimitBytes": 5242880,
+    "serverFrameLimitBytes": 5242880,
+    "entryMetadataBytes": 32,
+    "crc32cBytes": 4,
+    "maximumAddPayloadBytes": 5242771,
+    "derivation": "BookKeeperV3Crc32cAddPayloadLimitV1"
+  },
+  "ledgerConfiguration": {
+    "ensembleSize": 3,
+    "writeQuorumSize": 3,
+    "ackQuorumSize": 2,
+    "journalSyncData": true
+  },
+  "timeoutsMillis": {
+    "connect": 10000,
+    "add": 5000,
+    "read": 5000,
+    "recovery": 30000
+  },
+  "credentialIdentityVersion": "bk-k0-no-auth:v1",
+  "scope": "K0_INPUT_AND_LATER_LOCAL_CONFORMANCE_ONLY",
+  "promotionEligible": false
+}

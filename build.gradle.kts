@@ -727,6 +727,62 @@ tasks.register("v2M2KafkaK0NumericCheck") {
     dependsOn("v2M2KafkaK0NumericSourceCheck", "v2DocumentationCheck")
 }
 
+val v2M2KafkaK0EvidenceBookKeeperTest = project(":nereus-storage-bookkeeper").tasks.named<Test>("test")
+val v2M2KafkaK0EvidenceReceiptTest = project(":nereus-kafka-bookkeeper").tasks.named<Test>("test")
+
+tasks.register<Exec>("v2M2KafkaK0EvidenceSourceCheck") {
+    group = "verification"
+    description = "Verify the exact Kafka/BookKeeper/image/config source tuple and closed non-promotable receipt parser."
+    dependsOn(v2M2KafkaK0EvidenceBookKeeperTest, v2M2KafkaK0EvidenceReceiptTest)
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-kafka-k0-evidence.sh")
+}
+
+tasks.register("v2M2KafkaK0EvidenceCheck") {
+    group = "verification"
+    description = "Run the non-zero K0-E source/parser gate; no canonical aggregate receipt or M2 PASS is claimed."
+    dependsOn("v2M2KafkaK0EvidenceSourceCheck", "v2DocumentationCheck")
+}
+
+val v2M2KafkaInputsReceiptPath = providers.gradleProperty("v2M2KafkaInputsReceipt")
+val v2M2KafkaMainSourceSet = project(":nereus-kafka-bookkeeper")
+    .extensions.getByType<SourceSetContainer>()
+    .named("main")
+
+tasks.register<JavaExec>("v2M2KafkaInputsReceiptCheck") {
+    group = "verification"
+    description = "Parse one canonical Kafka Inputs receipt through the production closed-model validator."
+    dependsOn(":nereus-kafka-bookkeeper:classes")
+    classpath = v2M2KafkaMainSourceSet.get().runtimeClasspath
+    mainClass.set("com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptCli")
+    doFirst {
+        setArgs(listOf("validate", v2M2KafkaInputsReceiptPath.get()))
+    }
+}
+
+tasks.register<Exec>("v2M2KafkaInputsLiveSourceCheck") {
+    group = "verification"
+    description = "Bind the canonical Kafka Inputs receipt to the live clean evidence-only source descendant."
+    dependsOn(
+        "v2M2KafkaK0ModuleCheck",
+        "v2M2KafkaK0ProviderCheck",
+        "v2M2KafkaK0WireCheck",
+        "v2M2KafkaK0NumericCheck",
+        "v2M2KafkaK0EvidenceCheck",
+        "v2M2KafkaInputsReceiptCheck",
+    )
+    workingDir = layout.projectDirectory.asFile
+    doFirst {
+        commandLine("bash", "scripts/check-v2-m2-kafka-inputs-source.sh", v2M2KafkaInputsReceiptPath.get())
+    }
+}
+
+tasks.register("v2M2KafkaInputsCheck") {
+    group = "verification"
+    description = "Aggregate the five non-empty Kafka K0 input gates; non-promotable and no writer/runtime/M2 PASS."
+    dependsOn("v2M2KafkaInputsLiveSourceCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
@@ -833,4 +889,5 @@ tasks.named("check") {
     dependsOn("v2M2KafkaK0ProviderCheck")
     dependsOn("v2M2KafkaK0WireCheck")
     dependsOn("v2M2KafkaK0NumericCheck")
+    dependsOn("v2M2KafkaK0EvidenceCheck")
 }

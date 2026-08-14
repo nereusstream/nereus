@@ -1,0 +1,15 @@
+{
+  "schema": "NEREUS_V2_M2_KAFKA_BOOKKEEPER_IMAGE_INPUT_V1",
+  "reference": "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
+  "manifestMediaType": "application/vnd.docker.distribution.manifest.v2+json",
+  "manifestDigest": "sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
+  "imageConfigDigest": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+  "platform": "linux/amd64",
+  "embeddedServerJar": "/opt/bookkeeper/lib/org.apache.bookkeeper-bookkeeper-server-4.18.0.jar",
+  "embeddedServerJarBytes": 2760614,
+  "embeddedServerJarSha256": "8e64f2b7436bb814705f611eb0ac48d64d90de7a50d295905c459d89bc3f9d8f",
+  "mavenServerJarSha256": "8e64f2b7436bb814705f611eb0ac48d64d90de7a50d295905c459d89bc3f9d8f",
+  "sourceCommit": "cd06340851d6d657b7c7546df01df365c18980de",
+  "promotionEligible": false,
+  "scope": "EXACT_K0_SERVER_IMAGE_INPUT_ONLY_NO_RUNTIME_CONFORMANCE"
+}
