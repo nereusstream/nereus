@@ -1,7 +1,7 @@
 {
   "schema": "NEREUS_V2_M2_KAFKA_K9_REAL_FAULT_TESTS_V1",
   "result": "PASS",
-  "testedSourceCommit": "2b5d3be9605943c2217daa6d45740ddf832d6d0a",
+  "testedSourceCommit": "4af3278234d84df7a2fdce4fc6b3e4e227916d56",
   "imageReference": "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
   "configurationSha256": "eaf41c4b42b767b8ea6e86023a784425b8073f174dbade92b4249c8f3d301dbd",
   "suites": 2,
@@ -13,8 +13,8 @@
     {
       "name": "com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1RealTest",
       "tests": 6,
-      "junitXmlBytes": 28596,
-      "junitXmlSha256": "7c8bf8931bc7f69f06a4e2a69dc8028ad1d6901a6c523c3eadd6acc6e7e0121b",
+      "junitXmlBytes": 28595,
+      "junitXmlSha256": "eabb0e34598b838a3a41ad5fd93ed502ff90b6bf2328748e70529a1b3fa9b69e",
       "cases": [
         "discardedAppendResponseReconcilesFromRealRecoveredBytes",
         "freshCellOpensReadsAndRecoversTheExactSealedLedger",
@@ -28,7 +28,7 @@
       "name": "com.nereusstream.kafka.bookkeeper.RealBookKeeperKafkaEngineV1Test",
       "tests": 3,
       "junitXmlBytes": 26048,
-      "junitXmlSha256": "025a735391e81434b75842012135815cc16eff89ef99f020624d920afa59dbb2",
+      "junitXmlSha256": "68205909d6e855c289ee8e8c385ba1b498aab58d0c4347455c627f09b15ed6f1",
       "cases": [
         "realTakeoverFencesAndRecoversTheGreatestCompleteKafkaPrefix",
         "realCheckpointFooterAndCloseSealOneExactNbke2Run",

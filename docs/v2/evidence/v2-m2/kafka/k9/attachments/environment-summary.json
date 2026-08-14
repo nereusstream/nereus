@@ -1,7 +1,7 @@
 {
   "schema": "NEREUS_V2_M2_KAFKA_K9_ENVIRONMENT_SUMMARY_V1",
   "result": "PASS",
-  "testedSourceCommit": "2b5d3be9605943c2217daa6d45740ddf832d6d0a",
+  "testedSourceCommit": "4af3278234d84df7a2fdce4fc6b3e4e227916d56",
   "imageReference": "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
   "imageId": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
   "platform": "linux/amd64",
@@ -10,13 +10,13 @@
   "tiers": [
     {
       "partitions": 10000,
-      "dockerStatsSamples": 16,
-      "aggregatePeakContainerMemoryBytes": 1814560766,
+      "dockerStatsSamples": 20,
+      "aggregatePeakContainerMemoryBytes": 1723020084,
       "peakContainerMemoryBytes": {
-        "metadata-service": 362807296,
-        "bookie-0": 467455180,
-        "bookie-1": 492725862,
-        "bookie-2": 491572428
+        "metadata-service": 362073293,
+        "bookie-0": 453299405,
+        "bookie-1": 448056525,
+        "bookie-2": 459590861
       },
       "volumeBytes": {
         "metadata-service": 67133936,
@@ -27,16 +27,16 @@
     },
     {
       "partitions": 100000,
-      "dockerStatsSamples": 60,
-      "aggregatePeakContainerMemoryBytes": 3379665304,
+      "dockerStatsSamples": 64,
+      "aggregatePeakContainerMemoryBytes": 3466697114,
       "peakContainerMemoryBytes": {
-        "metadata-service": 891709030,
-        "bookie-0": 835924787,
-        "bookie-1": 830577049,
-        "bookie-2": 821454438
+        "metadata-service": 999607501,
+        "bookie-0": 845152256,
+        "bookie-1": 811178394,
+        "bookie-2": 810758963
       },
       "volumeBytes": {
-        "metadata-service": 502580963,
+        "metadata-service": 502816218,
         "bookie-0": 375969272,
         "bookie-1": 375969272,
         "bookie-2": 375969272

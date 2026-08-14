@@ -3,9 +3,9 @@
   "kind": "KAFKA_M2_K9_REAL_BOOKKEEPER_EVIDENCE",
   "result": "PASS_KAFKA_M2_K9_REAL_BOOKKEEPER_EVIDENCE",
   "promotionEligible": false,
-  "testedSourceCommit": "2b5d3be9605943c2217daa6d45740ddf832d6d0a",
+  "testedSourceCommit": "4af3278234d84df7a2fdce4fc6b3e4e227916d56",
   "sourceTuple": {
-    "sourceLocksSha256": "d89ff725e2ac797fb2e4985629f8b0e328d063ededabec5244df1a436e2c2705",
+    "sourceLocksSha256": "35003df5974902d2d92c2f0b18b830b89809f81517e87462c9b548aab012573e",
     "m1FinalIndexSha256": "12fbd2be8c938c1de10f1ae86b8eb106aed199f471743b71ac09d3bca6ffb835",
     "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
     "n1ManifestSha256": "9058ff01f9029f12d9fd2d0a7bc0456322bd5b2d19223a3961ee2201a07b91bb",
@@ -20,7 +20,7 @@
     "selectedDefaultsSha256": "b49e749824b3aadc958707172131d9740bc02b0e9198796a21ed70030086b1db"
   },
   "prerequisite": {
-    "kafkaInputsReceiptSha256": "19bedd083ab29f24e8da9b8f20a334bfa11ac807434c21670294716dd8ccf952",
+    "kafkaInputsReceiptSha256": "648f62a583406678f9c90c43924734afc459b05e5743e4a58f902cada2dfd4f2",
     "kafkaInputsResult": "PASS_KAFKA_M2_INPUTS_ONLY",
     "predeclaredPlanCommit": "bd7746850e5c8aa15ca5f01da0118e50186999c7",
     "selectedDefaultsCommit": "a7f82d7b2ac6adc6886336bb233bf3e7dddfc90d"
@@ -35,20 +35,23 @@
     "skipped": 0
   },
   "scale": {
-    "tiers": [10000, 100000],
+    "tiers": [
+      10000,
+      100000
+    ],
     "actualPartitions": 110000,
     "actualLedgersCreated": 110256,
     "actualEntriesAppended": 118192,
     "actualBytesAppended": 60514304,
     "actualMetadataMutations": 218464,
     "maximumOwnedHandles": 1024,
-    "minimumObservedPartitionOperationsPerSecond": 895,
-    "maximumObservedRecoveryP99Nanos": 632822042,
-    "maximumObservedHarnessHeapBytes": 200412456,
+    "minimumObservedPartitionOperationsPerSecond": 904,
+    "maximumObservedRecoveryP99Nanos": 616272291,
+    "maximumObservedHarnessHeapBytes": 198547704,
     "maximumObservedHarnessDirectBytes": 12616067,
     "maximumObservedOpenFileDescriptors": 144,
-    "maximumObservedAggregateContainerMemoryBytes": 3379665304,
-    "maximumObservedMetadataVolumeBytes": 502580963,
+    "maximumObservedAggregateContainerMemoryBytes": 3466697114,
+    "maximumObservedMetadataVolumeBytes": 502816218,
     "maximumObservedBookieVolumeBytesEach": 375969272
   },
   "selectedDefaults": {
@@ -58,12 +61,36 @@
     "cellOrHostMayOnlyLower": true
   },
   "attachments": [
-    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/artifact-report.json","bytes":1405,"sha256":"035728a8606368e14cc836dde77b02badbd103ead3d9417d5e97fdbd4aea2bfb"},
-    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/environment-summary.json","bytes":1479,"sha256":"03e567b232cb3e44f3ff21a4a63292b281ac3be6f5467f1848ece718ff625529"},
-    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/fault-tests.json","bytes":1560,"sha256":"d3761debfb6c3c59374df9e97d6b298be5d4e1ac2c4a9e15e1c669787664df8f"},
-    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/log-audit.json","bytes":1638,"sha256":"90141a88c538a41794aed8022437f4c29e70d29a1b621ef8139b8e256208feac"},
-    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/scale-10000.json","bytes":1849,"sha256":"1e5d5c90b39ac75a13c6787fe3ca5b1a7233a0052f80260755ab8d1857b7c716"},
-    {"path":"docs/v2/evidence/v2-m2/kafka/k9/attachments/scale-100000.json","bytes":1860,"sha256":"972e7771e86252b02ed05a9949d5cc1592a9fff529ccde9843fefb3b374b2b79"}
+    {
+      "path": "docs/v2/evidence/v2-m2/kafka/k9/attachments/artifact-report.json",
+      "bytes": 1405,
+      "sha256": "d716304dce1835e09c4a4df07967a6236017b3683a4b5d88cd653616bd3b063d"
+    },
+    {
+      "path": "docs/v2/evidence/v2-m2/kafka/k9/attachments/environment-summary.json",
+      "bytes": 1479,
+      "sha256": "6268fb7c5f802aaf56888ce6a1c367d88f0838196d9a3e2a7a3e46cfadad96d6"
+    },
+    {
+      "path": "docs/v2/evidence/v2-m2/kafka/k9/attachments/fault-tests.json",
+      "bytes": 1560,
+      "sha256": "7f8b8b74cabaf304e6fed2fe0ffa078e3a41f582d591b227454b1cfd208efc63"
+    },
+    {
+      "path": "docs/v2/evidence/v2-m2/kafka/k9/attachments/log-audit.json",
+      "bytes": 2093,
+      "sha256": "d8f792d41f1e817a04177e9cb12d2103227f63dd0d36de4498e54c00d42cf337"
+    },
+    {
+      "path": "docs/v2/evidence/v2-m2/kafka/k9/attachments/scale-10000.json",
+      "bytes": 1849,
+      "sha256": "c4c8da22251432257cd0371b2d291f2781476d76cd8f9303a9f4ad1d3c14cddb"
+    },
+    {
+      "path": "docs/v2/evidence/v2-m2/kafka/k9/attachments/scale-100000.json",
+      "bytes": 1859,
+      "sha256": "205a3b5c86f154616e7bd28fa56225d56d1a5c525de1466b31651029ccb6c84a"
+    }
   ],
   "boundary": "K9 selects Kafka BookKeeper engine operational defaults from exact-image real fault and actual 10k/100k scale evidence. It does not promote scenarios, activate Kafka runtime, prove native ISR/HW/election behavior, complete Pulsar M2, or claim global M2 PASS."
 }

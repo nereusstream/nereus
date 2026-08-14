@@ -38,7 +38,7 @@ outcome, count mismatch, unexpected source/configuration digest, or predeclared 
 The source-only `v2M2KafkaK9PlanCheck` compiles the harness and verifies these preconditions. It intentionally infers no
 formal result, selected default, scenario promotion, Kafka Final, or global M2 PASS. The current
 [`k9-evidence.json`](../../evidence/v2-m2/kafka/k9/k9-evidence.json) is an evidence-only descendant of tested source
-`2b5d3be9605943c2217daa6d45740ddf832d6d0a`; the thresholds were already fixed at ancestor
+`4af3278234d84df7a2fdce4fc6b3e4e227916d56`; the thresholds were already fixed at ancestor
 `bd7746850e5c8aa15ca5f01da0118e50186999c7`.
 
 ## Candidate defaults and promotion boundary

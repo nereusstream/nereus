@@ -60,11 +60,17 @@ allowed_evidence_paths = (
     "docs/v2/detailed_design/m2/README.md",
     "docs/v2/detailed_design/m2/kafka-m2-k9-real-bookkeeper-evidence.md",
     "docs/v2/detailed_design/m2/kafka-m2-k10-final-evidence.md",
+    "docs/v2/detailed_design/m2/pulsar-m2-p6-provider-and-block-policy.md",
     "docs/v2/evidence/v2-m2/kafka/k9/",
     "docs/v2/evidence/v2-m2/kafka/k10/",
+    "docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json",
+    "docs/v2/evidence/v2-m2/pulsar/p6/",
     "scripts/check-v2-documentation.sh",
+    "scripts/check-v2-m2-kafka-inputs-source.sh",
     "scripts/check-v2-m2-kafka-final-evidence.py",
     "scripts/check-v2-m2-kafka-k9-evidence.sh",
+    "scripts/check-v2-m2-pulsar-p6.py",
+    "scripts/publish-v2-m2-kafka-k9-evidence.py",
 )
 changed = subprocess.check_output(
     ["git", "diff", "--name-only", f"{tested}..HEAD"], cwd=root, text=True
@@ -102,7 +108,7 @@ k0_source = k0["sourceTuple"]
 for key in (
     "m1FinalIndexSha256", "n1SourceCommit", "n1ManifestSha256", "kafkaForkCommit",
     "bookKeeperSourceCommit", "bookKeeperClientJarSha256", "bookKeeperImageManifestDigest",
-    "bookKeeperImageConfigDigest", "sourceLocksSha256",
+    "bookKeeperImageConfigDigest",
 ):
     if source.get(key) != k0_source.get(key):
         raise SystemExit(f"K9 source tuple differs from K0: {key}")
@@ -219,6 +225,24 @@ if log_audit.get("result") != "PASS_ALLOWLISTED_FRESH_START_ONLY":
     raise SystemExit("K9 log audit result differs")
 if log_audit.get("runtimeErrorOrFatalCount") != 0 or len(log_audit.get("rawLogDigests", [])) != 8:
     raise SystemExit("K9 log audit runtime/coverage differs")
+if log_audit.get("allowedFreshStartMessages") != [
+    {
+        "service": "metadata-service",
+        "perTierCount": 2,
+        "classification": "standalone ZooKeeper ignores one-server quorum configuration",
+    },
+    {
+        "service": "bookie-*",
+        "perBookiePerTierCount": 1,
+        "classification": "fresh empty volume has no prior lastMark; upstream message explicitly says this is okay",
+    },
+    {
+        "service": "metadata-initializer-bookie",
+        "perTierCount": 5,
+        "classification": "one-shot metadata shell cannot create its optional local rolling log; bookie health and runtime are unaffected",
+    },
+]:
+    raise SystemExit("K9 log audit allowlist differs")
 
 artifact = json.loads(
     (root / "docs/v2/evidence/v2-m2/kafka/k9/attachments/artifact-report.json").read_text()

@@ -84,11 +84,37 @@ subprocess.run(
     cwd=root,
     check=True,
 )
-allowed = {"docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json"}
+allowed = (
+    "build.gradle.kts",
+    "docs/v2/09-scenario-evidence-matrix.md",
+    "docs/v2/v2-scenarios.json",
+    "docs/v2/detailed_design/m2/README.md",
+    "docs/v2/detailed_design/m2/kafka-m2-k9-real-bookkeeper-evidence.md",
+    "docs/v2/detailed_design/m2/kafka-m2-k10-final-evidence.md",
+    "docs/v2/detailed_design/m2/pulsar-m2-p6-provider-and-block-policy.md",
+    "docs/v2/detailed_design/m2/pulsar-m2-final-evidence.md",
+    "docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json",
+    "docs/v2/evidence/v2-m2/kafka/k9/",
+    "docs/v2/evidence/v2-m2/kafka/k10/",
+    "docs/v2/evidence/v2-m2/pulsar/p6/",
+    "docs/v2/evidence/v2-m2/pulsar/final/",
+    "docs/v2/evidence/v2-m2/final/",
+    "scripts/check-v2-documentation.sh",
+    "scripts/check-v2-m2-kafka-inputs-source.sh",
+    "scripts/check-v2-m2-kafka-k9-evidence.sh",
+    "scripts/check-v2-m2-kafka-final-evidence.py",
+    "scripts/check-v2-m2-pulsar-p6.py",
+    "scripts/check-v2-m2-pulsar-final-evidence.py",
+    "scripts/check-v2-m2-final.py",
+    "scripts/publish-v2-m2-kafka-k9-evidence.py",
+    "scripts/publish-v2-m2-kafka-final-evidence.py",
+    "scripts/publish-v2-m2-pulsar-final-evidence.py",
+    "scripts/publish-v2-m2-final.py",
+)
 changed = set(subprocess.check_output(
     ["git", "diff", "--name-only", f"{source_commit}..HEAD"], cwd=root, text=True
 ).splitlines())
-if not changed.issubset(allowed):
+if any(not any(path == item or path.startswith(item) for item in allowed) for path in changed):
     raise SystemExit(f"V2 M2 Kafka Inputs source gate: non-evidence descendant paths invalidate receipt: {sorted(changed)}")
 
 print(

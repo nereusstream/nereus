@@ -1,7 +1,7 @@
 {
   "schema": "NEREUS_V2_M2_KAFKA_K9_LOG_AUDIT_V1",
   "result": "PASS_ALLOWLISTED_FRESH_START_ONLY",
-  "testedSourceCommit": "2b5d3be9605943c2217daa6d45740ddf832d6d0a",
+  "testedSourceCommit": "4af3278234d84df7a2fdce4fc6b3e4e227916d56",
   "runtimeErrorOrFatalCount": 0,
   "allowedFreshStartMessages": [
     {
@@ -13,16 +13,53 @@
       "service": "bookie-*",
       "perBookiePerTierCount": 1,
       "classification": "fresh empty volume has no prior lastMark; upstream message explicitly says this is okay"
+    },
+    {
+      "service": "metadata-initializer-bookie",
+      "perTierCount": 5,
+      "classification": "one-shot metadata shell cannot create its optional local rolling log; bookie health and runtime are unaffected"
     }
   ],
   "rawLogDigests": [
-    {"name":"metadata-service-10000.log","bytes":32972,"sha256":"1b7c01c01c5d8a2302cfd1d4dde437760d3a766f10446abd821cfdee661b07a7"},
-    {"name":"bookie-0-10000.log","bytes":77644,"sha256":"12dcb555ab217c5e9234e258c53cb05da88bcfabfa62d95596b0dce0104bf35d"},
-    {"name":"bookie-1-10000.log","bytes":88867,"sha256":"9a14c0331c9f5c921a31d8c7f1237a989aeb4c95fa148d75696cb3cc3055394e"},
-    {"name":"bookie-2-10000.log","bytes":77643,"sha256":"b71efd496ac1f6311c7fb3a23763558ad694bda29f2437bf7491673cf35d1fea"},
-    {"name":"metadata-service-100000.log","bytes":39077,"sha256":"7637aaebd8e406fe250e75118e1e2dd4562ce23b2971310daeedf15c6fa8685b"},
-    {"name":"bookie-0-100000.log","bytes":100255,"sha256":"23ba9e696feda66439804cf42cb51e1915dba851374284e5dddfa7a3a6341098"},
-    {"name":"bookie-1-100000.log","bytes":89044,"sha256":"3c290335896072c9ae070f0c4b7816082d03ed5b7ffd7977206adc06d50504f9"},
-    {"name":"bookie-2-100000.log","bytes":89044,"sha256":"80086daebdfb63ef808d5b0a35ce41c5f10cb3dd20a9dd3f092893e656b18e4f"}
+    {
+      "name": "metadata-service-10000.log",
+      "bytes": 33362,
+      "sha256": "2815728fd06feebcbfd04509f21290bc029195664557bd847aa5e2465f0b46d1"
+    },
+    {
+      "name": "bookie-0-10000.log",
+      "bytes": 78615,
+      "sha256": "27377f7a483c79890cb9e48084e9cd1ebfbcdb1a8e40f22621d42344ec556385"
+    },
+    {
+      "name": "bookie-1-10000.log",
+      "bytes": 78616,
+      "sha256": "451649434fe03af7074564b7ab7864ab7ae1820171214dca4f498d45cdd12231"
+    },
+    {
+      "name": "bookie-2-10000.log",
+      "bytes": 89836,
+      "sha256": "75872c7697215502fccac3a1b614cbaf4ac450dffc21e58a4e97f7cf3da987f0"
+    },
+    {
+      "name": "metadata-service-100000.log",
+      "bytes": 39664,
+      "sha256": "6bec2be66129de8981a22d2ca6b70b8d8f575bb29ae2c7cf903fddcb57c260c1"
+    },
+    {
+      "name": "bookie-0-100000.log",
+      "bytes": 90011,
+      "sha256": "9f2b93a5f8fddee0c5466c52bf602ef177701b13e76a13d47542c86e4853d0ad"
+    },
+    {
+      "name": "bookie-1-100000.log",
+      "bytes": 90011,
+      "sha256": "26b3246908918eaf2e6551d4a86d0b08f62d027fba5186228cc2a5bfa755084a"
+    },
+    {
+      "name": "bookie-2-100000.log",
+      "bytes": 101705,
+      "sha256": "e07c257c9d2a19a85516215b0929dbead8b350866e8b921f34c0fca9dd05df06"
+    }
   ]
 }

@@ -1,8 +1,8 @@
 {
   "schema": "NEREUS_V2_M2_KAFKA_K9_ARTIFACT_REPORT_V1",
   "result": "PASS",
-  "testedSourceCommit": "2b5d3be9605943c2217daa6d45740ddf832d6d0a",
-  "sourceLocksSha256": "d89ff725e2ac797fb2e4985629f8b0e328d063ededabec5244df1a436e2c2705",
+  "testedSourceCommit": "4af3278234d84df7a2fdce4fc6b3e4e227916d56",
+  "sourceLocksSha256": "35003df5974902d2d92c2f0b18b830b89809f81517e87462c9b548aab012573e",
   "artifacts": [
     {
       "coordinate": "com.nereusstream:nereus-storage-bookkeeper:0.2.0-SNAPSHOT",

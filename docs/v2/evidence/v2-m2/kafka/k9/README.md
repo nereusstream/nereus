@@ -1,7 +1,7 @@
 # Kafka M2-K9 real BookKeeper evidence
 
 This directory contains the current-source K9 evidence for tested Nereus commit
-`2b5d3be9605943c2217daa6d45740ddf832d6d0a`. Both scale tiers used a fresh three-bookie cluster from the exact K0 image
+`4af3278234d84df7a2fdce4fc6b3e4e227916d56`. Both scale tiers used a fresh three-bookie cluster from the exact K0 image
 and configuration, created and wrote one real ledger per logical partition, retained a bounded hot set, and exercised
 targeted reads, fence/recovery, and rollover. The 100k tier is an actual 100,000-partition execution, not an
 extrapolation from 10k.
