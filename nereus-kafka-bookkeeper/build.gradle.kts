@@ -21,6 +21,31 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
+val realBookKeeperTest by sourceSets.creating {
+    java.srcDir("src/realBookKeeperTest/java")
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
+configurations[realBookKeeperTest.implementationConfigurationName]
+    .extendsFrom(configurations.testImplementation.get())
+configurations[realBookKeeperTest.runtimeOnlyConfigurationName]
+    .extendsFrom(configurations.testRuntimeOnly.get())
+
+tasks.register<Test>("realBookKeeperTest") {
+    group = "verification"
+    description = "Run K3-K7 Kafka engine paths against the exact-image real BookKeeper provider."
+    testClassesDirs = realBookKeeperTest.output.classesDirs
+    classpath = realBookKeeperTest.runtimeClasspath
+    useJUnitPlatform()
+    maxParallelForks = 1
+    outputs.upToDateWhen { false }
+    systemProperty(
+        "nereus.bookkeeper.metadataServiceUri",
+        providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").get(),
+    )
+}
+
 tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
