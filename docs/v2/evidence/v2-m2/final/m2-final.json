@@ -1,0 +1,67 @@
+{
+  "schema": "NEREUS_V2_M2_FINAL_V1",
+  "kind": "V2_M2_FINAL",
+  "result": "PASS_V2_M2_FINAL",
+  "promotionEligible": true,
+  "sourceTuple": {
+    "bookKeeperSourceCommit": "cd06340851d6d657b7c7546df01df365c18980de",
+    "kafkaFinalReceiptSha256": "1f8af32b548c71f2f389d18160fba534fea1e3e333459fbeb5c9b2667df66ac5",
+    "kafkaForkCommit": "8afbc425660f3466bdc3255e3dd4eb43f8685af1",
+    "nereusCommit": "4af3278234d84df7a2fdce4fc6b3e4e227916d56",
+    "pulsarFinalReceiptSha256": "e89dfbb247dc97f0655043c95d38eebf1daf9756ca2394628090a16c7fd4fcd5",
+    "pulsarForkCommit": "a14e0e6f4e49be0677318b4ceefc7b85b445823b",
+    "sourceLocksSha256": "35003df5974902d2d92c2f0b18b830b89809f81517e87462c9b548aab012573e"
+  },
+  "childReceipts": [
+    {
+      "bytes": 11215,
+      "kind": "KAFKA_M2_FINAL",
+      "path": "docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json",
+      "result": "PASS_KAFKA_M2_FINAL",
+      "scenarios": 10,
+      "sha256": "1f8af32b548c71f2f389d18160fba534fea1e3e333459fbeb5c9b2667df66ac5"
+    },
+    {
+      "bytes": 9130,
+      "kind": "PULSAR_M2_FINAL",
+      "path": "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json",
+      "result": "PASS_PULSAR_M2_FINAL",
+      "scenarios": 11,
+      "sha256": "e89dfbb247dc97f0655043c95d38eebf1daf9756ca2394628090a16c7fd4fcd5"
+    }
+  ],
+  "promotedScenarios": [
+    "V2-BK-001",
+    "V2-BK-002",
+    "V2-BK-003",
+    "V2-BK-004",
+    "V2-BK-005",
+    "V2-BK-006",
+    "V2-BK-007",
+    "V2-BK-008",
+    "V2-BK-009",
+    "V2-BK-010",
+    "V2-BK-012",
+    "V2-BK-013",
+    "V2-BK-014",
+    "V2-BK-015",
+    "V2-BK-016",
+    "V2-BK-017",
+    "V2-KAF-DATA-001",
+    "V2-KAF-DATA-002",
+    "V2-KAF-DATA-004",
+    "V2-KAF-DATA-005",
+    "V2-KAF-DATA-014"
+  ],
+  "boundaries": {
+    "excludedMilestones": [
+      "M3_OBJECT_WAL",
+      "M6_PROCESS_ACTIVATION",
+      "M8_NATIVE_PARITY"
+    ],
+    "plannedScenarioIds": [
+      "V2-BK-011",
+      "V2-PUL-001"
+    ]
+  }
+}

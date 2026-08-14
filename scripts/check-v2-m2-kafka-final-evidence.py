@@ -77,7 +77,9 @@ if subprocess.run(
 
 allowed_evidence_paths = (
     "build.gradle.kts",
+    "docs/v2/08-implementation-plan-and-gates.md",
     "docs/v2/09-scenario-evidence-matrix.md",
+    "docs/v2/open-questions.md",
     "docs/v2/v2-scenarios.json",
     "docs/v2/detailed_design/m2/README.md",
     "docs/v2/detailed_design/m2/kafka-m2-k9-real-bookkeeper-evidence.md",

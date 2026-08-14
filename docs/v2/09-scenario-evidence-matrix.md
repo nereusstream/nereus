@@ -14,10 +14,10 @@ the documentation gate proves synchronization only and does not promote runtime 
 
 Acceptance of the
 [M2-K0 Kafka implementation-input closure](detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) changes no
-scenario status by itself. The later current-source K10 Kafka Final receipt promotes only the ten complete claims owned
-exactly by M2. A row shared with M3/M4/M5/M6 remains `PLANNED` until every named milestone supplies its evidence.
-`v2M2KafkaFinalCheck` is a Kafka BookKeeper-engine sub-aggregate and never substitutes for the global
-Kafka-plus-Pulsar `v2M2Check`.
+scenario status by itself. The current Kafka Final and Pulsar Final child receipts promote disjoint sets of ten and
+eleven complete claims owned exactly by M2. The global `v2M2Check` binds those child roots and their exact 21-row union.
+A row shared with M3/M4/M5/M6 remains `PLANNED` until every named milestone supplies its evidence; the aggregate does
+not reinterpret a focused or partial result as proof of a complete row.
 
 M1.1b-Q1 remains historical `READINESS_EVIDENCE_ONLY` for NTA1 candidate bounds and legality. The subsequent accepted
 design and exact-local implementation still leave `V2-META-003` at `IMPLEMENTED_NOT_RUN` and `V2-META-004` at

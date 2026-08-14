@@ -53,4 +53,6 @@ references, and seven typed attachments. `v2M2KafkaFinalCheck` revalidates that 
 reexecutes K2 and the complete K9 aggregate, checks the live local-suite publication and both synchronized scenario
 registries, and rejects any source/configuration change after the tested commit.
 
-This is Kafka Final only. Pulsar M2 and the separate global `v2M2Check` remain pending.
+This receipt remains Kafka Final only. The separate global
+[`m2-final.json`](../../evidence/v2-m2/final/m2-final.json) now binds it with Pulsar Final and is the sole
+`PASS_V2_M2_FINAL` root; this child receipt alone never makes that claim.

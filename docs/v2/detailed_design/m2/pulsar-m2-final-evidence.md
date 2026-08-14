@@ -35,9 +35,11 @@ JUnit summary, native-fork P5 summary, P6 provider JUnit summary, candidate matr
 provider result, P6 execution receipt, and current Kafka Final receipt. Its source tuple binds the exact Nereus commit,
 Pulsar fork commit, source-lock digest, and the P6/Kafka prerequisite receipt digests.
 
-`v2M2PulsarFinalPolicyCheck` proves only the production parser/resolver/policy mechanics. A later evidence-only commit
-may publish the canonical attachment summaries, Final receipt, and synchronized scenario registry after P6 and Kafka
-Final have both been regenerated against the frozen source. Only `v2M2PulsarFinalCheck` may validate that receipt.
+`v2M2PulsarFinalPolicyCheck` proves only the production parser/resolver/policy mechanics. The published evidence-only
+receipt and synchronized scenario registry bind regenerated P6 and Kafka Final roots to the frozen source. Only
+`v2M2PulsarFinalCheck` validates that child receipt.
 
 Pulsar Final is not broker-process/NAR activation, Amazon S3 endorsement or performance evidence, M8 native
-performance parity, promotion of `V2-BK-011`, or global `v2M2Check` PASS.
+performance parity, or promotion of `V2-BK-011`. The separate global
+[`m2-final.json`](../../evidence/v2-m2/final/m2-final.json) now binds this child with Kafka Final; this receipt alone
+never claims `PASS_V2_M2_FINAL`.

@@ -563,8 +563,8 @@ non-promotable `v2M2KafkaInputsCheck`. M2-K9 evidence then selects apply-lag/pip
 defaults and proves dedicated-ledger viability at 10k/100k partitions. Exact Object `NWKCP1` bytes and Head/vector/key
 caps are M3 outputs, not M2 inputs.
 
-This document acceptance creates no gate or scenario PASS. Kafka M2 evidence may promote only rows owned exactly by
-M2; shared M2/M3/M4/M5/M6 rows remain `PLANNED`, and global `v2M2Check` still requires the Pulsar-owned M2 work.
+This document acceptance created no gate or scenario PASS by itself. The later global M2 receipt now binds the exact
+Kafka and Pulsar Final child roots and their 21 complete M2 rows; shared M2/M3/M4/M5/M6 rows remain `PLANNED`.
 Failure blocks the profile or requires a new pooled-lane ADR; it cannot silently select a global mixed-partition ledger
 or restore V1 reservation dual writes.
 

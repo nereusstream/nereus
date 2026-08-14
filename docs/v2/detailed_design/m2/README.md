@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
+implementationStatus: Verified
 evidenceStatus: CurrentSourceReceipt
 authority: NormativeExecutionIndex
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/final/m2-final.json
 ---
 
 # M2 detailed-design index
@@ -40,15 +41,22 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | M2-P4-DUAL | [Dual-source reads and BK deletion](pulsar-m2-p4-dual-source-and-delete.md) | whole-range one-shot fallback, exact-version pins, quarantine signal, bounded drain, final revalidation, INTENT/DONE CAS, and restart reconciliation |
 | M2-P5 | [Exact-source native offload provider](pulsar-m2-p5-native-provider.md) | source-composite `SourceSafeLedgerOffloader`, bounded native batches, restart-readable driver metadata, native read adapter, and exact fork binding; policy/provider evidence remains P6 |
 | M2-P6 | [Provider and block-policy evidence](pulsar-m2-p6-provider-and-block-policy.md) | exact LocalStack/MinIO/native evidence selects the 1/4/8-MiB class catalog, 4-MiB default, and lower 0.2 provider caps; non-promotable alone |
-| M2-PFINAL | [Pulsar Final evidence](pulsar-m2-final-evidence.md) | production canonical receipt/resolver and exact eleven-scenario allowlist; current-source receipt pending |
+| M2-PFINAL | [Pulsar Final evidence](pulsar-m2-final-evidence.md) | current-source production canonical receipt/resolver; exact eleven-scenario allowlist, 32 suite references, and eight attachments |
+| M2-FINAL | [Global M2 Final aggregate](#global-m2-final-aggregate) | current-source `PASS_V2_M2_FINAL`; exact Kafka/Pulsar child roots and 21-scenario union |
 
-M1 Final is complete at the trusted predecessor source tuple. M2 remains `InProgress`. K0 through K9 have focused
-implementation gates, and K10 now has a production closed receipt/resolver plus a current-source Kafka Final receipt.
-The receipt binds the refreshed K9 evidence and promotes only the exact ten-scenario allowlist. No Kafka broker runtime,
-native ISR/HW/election behavior, mixed downstream scenario, Pulsar M2 result, or global `v2M2Check` PASS is claimed.
+M1 Final is complete at the trusted predecessor source tuple. M2 is now `Verified` at tested Nereus source
+`4af3278234d84df7a2fdce4fc6b3e4e227916d56`. Kafka Final binds the refreshed K9 evidence and promotes its exact ten
+scenarios; Pulsar Final binds the exact native fork and P6 evidence and promotes its disjoint eleven scenarios.
 
-Kafka M2 uses its own planned sub-aggregate through `v2M2KafkaFinalCheck`. Global `v2M2Check` is a separate aggregate
-that also requires the Pulsar-owned M2 work. A Kafka sub-aggregate cannot be reported as global M2 Final.
+## Global M2 Final aggregate
+
+[`m2-final.json`](../../evidence/v2-m2/final/m2-final.json) is the global source-bound root. It binds the byte length and
+SHA-256 of both child receipts, proves their common Nereus/source-lock tuple, rejects overlap, and requires the exact
+sorted 21-scenario union. `v2M2Check` reexecutes both child aggregates before accepting `PASS_V2_M2_FINAL`.
+
+This completion is deliberately narrower than process or release readiness. It does not activate Kafka broker wire
+paths or Pulsar NARs, prove native ISR/HW/election process behavior, complete M3 Object WAL, establish M8 native parity,
+or promote mixed/downstream `V2-BK-011` or `V2-PUL-001`. Those boundaries remain `PLANNED` in the scenario registry.
 
 ## Planned Kafka delivery sequence
 

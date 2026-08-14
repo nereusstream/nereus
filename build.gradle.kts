@@ -1200,6 +1200,20 @@ tasks.register("v2M2PulsarFinalCheck") {
     )
 }
 
+tasks.register<Exec>("v2M2FinalSourceCheck") {
+    group = "verification"
+    description = "Verify the global M2 child roots, exact 21-scenario union, and downstream boundaries."
+    dependsOn("v2M2KafkaFinalCheck", "v2M2PulsarFinalCheck")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m2-final.py")
+}
+
+tasks.register("v2M2Check") {
+    group = "verification"
+    description = "Run the global current-source V2 M2 aggregate; M3 Object WAL, M6 activation, and M8 parity remain separate."
+    dependsOn("v2M2FinalSourceCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
