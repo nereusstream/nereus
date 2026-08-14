@@ -16,6 +16,8 @@ package com.nereusstream.kafka.bookkeeper.commit;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointCodecV1;
+import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1;
 import com.nereusstream.kafka.bookkeeper.protocol.KafkaPartitionFenceV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
 import java.io.ByteArrayOutputStream;
@@ -132,6 +134,24 @@ final class KafkaProtocolStateCodecV1 {
                 out.writeInt(entry.getKey());
                 out.writeLong(entry.getValue());
             }
+        });
+    }
+
+    static CanonicalBytes checkpoint(KafkaProtocolCheckpointStateV1 checkpoint) {
+        var sections = KafkaProtocolCheckpointCodecV1.encode(checkpoint);
+        return encode(out -> {
+            tag(out, "K7-CHECKPOINT-V1");
+            runBinding(out, checkpoint.vector().runBinding());
+            out.writeLong(checkpoint.vector().rangeIndexCoveredThrough());
+            out.writeLong(checkpoint.vector().producerStateCoveredThrough());
+            out.writeLong(checkpoint.vector().transactionIndexCoveredThrough());
+            out.writeLong(checkpoint.vector().leaderEpochCoveredThrough());
+            out.writeInt(sections.producerState().length());
+            out.write(sections.producerState().toByteArray());
+            out.writeInt(sections.transactionIndex().length());
+            out.write(sections.transactionIndex().toByteArray());
+            out.writeInt(sections.leaderEpochIndex().length());
+            out.write(sections.leaderEpochIndex().toByteArray());
         });
     }
 

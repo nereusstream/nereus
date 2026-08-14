@@ -41,19 +41,32 @@ class KafkaBookKeeperRunFailureCutsV1Test {
     }
 
     @Test
-    void createFailsClosedWhenHeaderAppendIsNotEstablished() {
+    void createReconcilesHeaderAppendResponseLossByExactStoredBytes() {
         KafkaRunTestFixtures.FakeSession session = new KafkaRunTestFixtures.FakeSession();
         session.nextAppendOverride = ProviderMutationResultV1.outcomeUnknown();
 
-        assertThatThrownBy(() -> KafkaBookKeeperRunLifecycleV1.createActive(
-                                session,
-                                new KafkaRunTestFixtures.FakeRootAuthority(),
-                                KafkaRunTestFixtures.binding(6, 11, 5),
-                                100)
-                        .toCompletableFuture()
-                        .join())
+        KafkaBookKeeperRunLifecycleV1 lifecycle = KafkaBookKeeperRunLifecycleV1.createActive(
+                        session,
+                        new KafkaRunTestFixtures.FakeRootAuthority(),
+                        KafkaRunTestFixtures.binding(6, 11, 5),
+                        100)
+                .toCompletableFuture()
+                .join();
+
+        assertThat(lifecycle.snapshot().state()).isEqualTo(KafkaBookKeeperRunStateV1.ACTIVE);
+        assertThat(session.readEntryIds).containsExactly(0L);
+
+        KafkaRunTestFixtures.FakeSession substituted = new KafkaRunTestFixtures.FakeSession();
+        substituted.nextAppendOverride = ProviderMutationResultV1.outcomeUnknown();
+        substituted.delayedEntryId = 0;
+        var unresolved = KafkaBookKeeperRunLifecycleV1.createActive(
+                substituted, new KafkaRunTestFixtures.FakeRootAuthority(), KafkaRunTestFixtures.binding(6, 11, 5), 100);
+        substituted.entries.put(0L, com.nereusstream.domain.bytes.CanonicalBytes.copyOf(new byte[] {1}));
+        substituted.completeDelayedAppend();
+
+        assertThatThrownBy(() -> unresolved.toCompletableFuture().join())
                 .isInstanceOf(CompletionException.class)
-                .hasRootCauseMessage("ledger append was not established exactly");
+                .hasRootCauseMessage("append reconciliation differs from the submitted identity or bytes");
     }
 
     @Test

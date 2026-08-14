@@ -22,21 +22,24 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunFooterV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunHeaderV1;
 import com.nereusstream.storage.api.bookkeeper.AppendQuorumProofV1;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperCellSession;
+import com.nereusstream.storage.api.bookkeeper.ExactLedgerEntryV1;
 import com.nereusstream.storage.api.bookkeeper.ProviderMutationOutcomeV1;
 import com.nereusstream.storage.api.bookkeeper.ProviderMutationResultV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerAppendRequestV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerCloseProofV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerConfigurationV1;
 import com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerReadOutcomeV1;
+import com.nereusstream.storage.api.bookkeeper.RunLedgerReadResultV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootAuthority;
 import com.nereusstream.storage.api.kafka.KafkaRunRootSnapshotV1;
 import com.nereusstream.storage.api.kafka.KafkaRunRootStateV1;
 import com.nereusstream.storage.bookkeeper.ImmutableRetainedStoragePayload;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
@@ -266,23 +269,56 @@ public final class KafkaBookKeeperRunLifecycleV1 {
             payload.release();
             throw new IllegalStateException("provider returned a null append stage");
         }
-        return accepted.handle((result, failure) -> {
-            try {
-                if (failure != null) {
-                    throw new CompletionException(failure);
-                }
-                requireExactAppend(
-                        result,
-                        handle,
-                        entryId,
-                        payload.sha256(),
-                        payload.readableBytes(),
-                        session.capabilitySnapshot().ackQuorumSize());
-                return null;
-            } finally {
-                payload.release();
-            }
-        });
+        CompletionStage<Void> resolved = accepted.handle((result, failure) -> {
+                    if (failure != null
+                            || result == null
+                            || result.outcome() == ProviderMutationOutcomeV1.OUTCOME_UNKNOWN) {
+                        return false;
+                    }
+                    if (result.outcome() == ProviderMutationOutcomeV1.APPLIED_EXACT) {
+                        requireExactAppend(
+                                result,
+                                handle,
+                                entryId,
+                                payload.sha256(),
+                                payload.readableBytes(),
+                                session.capabilitySnapshot().ackQuorumSize());
+                        return true;
+                    }
+                    throw new IllegalStateException("ledger append was definitively rejected or fenced");
+                })
+                .thenCompose(exact -> {
+                    if (exact) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    CompletionStage<RunLedgerReadResultV1> reread = session.readExactEntry(handle, entryId);
+                    if (reread == null) {
+                        throw new IllegalStateException("provider returned a null reconciliation read stage");
+                    }
+                    return reread.thenApply(result -> {
+                        requireExactReread(result, handle, entryId, payload.sha256(), bytes);
+                        return null;
+                    });
+                });
+        return resolved.whenComplete((ignored, failure) -> payload.release());
+    }
+
+    private static void requireExactReread(
+            RunLedgerReadResultV1 result,
+            RunLedgerHandleV1 handle,
+            long entryId,
+            Sha256Digest payloadDigest,
+            byte[] expectedBytes) {
+        if (result == null || result.outcome() != RunLedgerReadOutcomeV1.FOUND_EXACT) {
+            throw new IllegalStateException("append response loss did not reconcile to exact stored bytes");
+        }
+        ExactLedgerEntryV1 entry = result.exactEntry().orElseThrow();
+        if (!entry.handle().equals(handle)
+                || entry.entryId() != entryId
+                || !entry.payloadSha256().equals(payloadDigest)
+                || !Arrays.equals(entry.payload().toByteArray(), expectedBytes)) {
+            throw new IllegalStateException("append reconciliation differs from the submitted identity or bytes");
+        }
     }
 
     private static RunLedgerHandleV1 requireExactHandle(

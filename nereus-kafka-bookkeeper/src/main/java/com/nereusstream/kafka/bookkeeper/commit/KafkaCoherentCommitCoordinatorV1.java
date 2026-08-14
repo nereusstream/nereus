@@ -15,6 +15,7 @@
 package com.nereusstream.kafka.bookkeeper.commit;
 
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.kafka.bookkeeper.checkpoint.KafkaProtocolCheckpointStateV1;
 import com.nereusstream.kafka.bookkeeper.pipeline.KafkaAppendProtocolHooksV1;
 import com.nereusstream.kafka.bookkeeper.pipeline.KafkaOffsetAssignedAppendV1;
 import com.nereusstream.kafka.bookkeeper.pipeline.KafkaOrderedDurableCommitObserver;
@@ -79,6 +80,69 @@ public final class KafkaCoherentCommitCoordinatorV1 implements KafkaOrderedDurab
         KafkaPartitionProtocolStateV1 initial = new KafkaPartitionProtocolStateV1(fence, 0, frontiers, references);
         return new KafkaCoherentCommitCoordinatorV1(
                 new KafkaPartitionPublicationCellV1(initial, observer), repository, expectedHandle);
+    }
+
+    public static KafkaCoherentCommitCoordinatorV1 bootstrapRecovered(
+            KafkaPartitionFenceV1 fence,
+            long trimStartOffset,
+            long newLeaderLeo,
+            long nativeHighWatermark,
+            KafkaProtocolCheckpointStateV1 recovered,
+            RunLedgerHandleV1 expectedNewRunHandle,
+            KafkaPartitionPublicationObserver observer) {
+        Objects.requireNonNull(fence, "fence");
+        Objects.requireNonNull(recovered, "recovered");
+        Objects.requireNonNull(expectedNewRunHandle, "expectedNewRunHandle");
+        Objects.requireNonNull(observer, "observer");
+        var oldRun = recovered.vector().runBinding();
+        if (trimStartOffset < 0
+                || trimStartOffset > nativeHighWatermark
+                || nativeHighWatermark > newLeaderLeo
+                || recovered.vector().recoveryCoveredThrough() != newLeaderLeo
+                || !recovered.vector().isAlignedCompoundCheckpoint()
+                || !oldRun.bindingId().equals(fence.bindingId())
+                || !oldRun.topicIncarnation().equals(fence.topicIncarnation())
+                || oldRun.partitionId() != fence.partitionId()
+                || !oldRun.storageEpochId().equals(fence.storageEpochId())
+                || oldRun.creatorOwnerEpoch() > fence.ownerEpoch()
+                || oldRun.kafkaLeaderEpoch() > fence.kafkaLeaderEpoch()
+                || !expectedNewRunHandle.providerScopeId().equals(oldRun.providerScopeId())
+                || expectedNewRunHandle.runId().equals(oldRun.runId())) {
+            throw new IllegalArgumentException("recovered protocol state differs from the new leader/run boundary");
+        }
+        long firstUnstable = recovered
+                .transactionState()
+                .firstUnstableOffset(nativeHighWatermark)
+                .orElse(nativeHighWatermark);
+        long lastStableOffset = Math.min(nativeHighWatermark, firstUnstable);
+        if (lastStableOffset < trimStartOffset) {
+            throw new IllegalArgumentException("native HW leaves an unstable transaction before Log Start");
+        }
+        KafkaProtocolStateRepositoryV1 repository = new KafkaProtocolStateRepositoryV1();
+        KafkaActiveTailStateV1 activeTail = KafkaActiveTailStateV1.empty(newLeaderLeo);
+        KafkaSpeculativeQueueV1 speculative = KafkaSpeculativeQueueV1.empty();
+        KafkaPartitionStateReferencesV1 references = new KafkaPartitionStateReferencesV1(
+                seed("K7-RECOVERED-RUN-TABLE-SEED-V1"),
+                repository.store(0, KafkaProtocolStateCodecV1.activeTail(activeTail), activeTail),
+                seed("K7-RECOVERED-SOURCE-MAP-SEED-V1"),
+                repository.store(
+                        0, KafkaProtocolStateCodecV1.producers(recovered.producerState()), recovered.producerState()),
+                repository.store(0, KafkaProtocolStateCodecV1.speculative(speculative), speculative),
+                repository.store(
+                        0,
+                        KafkaProtocolStateCodecV1.transactions(recovered.transactionState()),
+                        recovered.transactionState()),
+                repository.store(
+                        0,
+                        KafkaProtocolStateCodecV1.leaderEpochs(recovered.leaderEpochIndex()),
+                        recovered.leaderEpochIndex()),
+                repository.store(0, KafkaProtocolStateCodecV1.checkpoint(recovered), recovered),
+                seed("K7-RECOVERED-SOURCE-PROTECTION-SEED-V1"));
+        KafkaPartitionFrontiersV1 frontiers = new KafkaPartitionFrontiersV1(
+                trimStartOffset, newLeaderLeo, newLeaderLeo, newLeaderLeo, nativeHighWatermark, lastStableOffset);
+        KafkaPartitionProtocolStateV1 initial = new KafkaPartitionProtocolStateV1(fence, 0, frontiers, references);
+        return new KafkaCoherentCommitCoordinatorV1(
+                new KafkaPartitionPublicationCellV1(initial, observer), repository, expectedNewRunHandle);
     }
 
     public KafkaPartitionPublicationCellV1 publicationCell() {

@@ -107,7 +107,10 @@ public final class KafkaRunTestFixtures {
         public final Map<Long, RunLedgerReadResultV1> readOverrides = new LinkedHashMap<>();
         public ProviderMutationResultV1<RunLedgerHandleV1> createOverride;
         public ProviderMutationResultV1<AppendQuorumProofV1> nextAppendOverride;
+        public RuntimeException nextAppendFailure;
         public ProviderMutationResultV1<RunLedgerCloseProofV1> closeOverride;
+        public RunLedgerOpenResultV1 openOverride;
+        public ProviderMutationResultV1<RunLedgerRecoveryProofV1> recoveryOverride;
         public long delayedEntryId = -1;
         public CompletableFuture<ProviderMutationResultV1<AppendQuorumProofV1>> delayedAppend;
         public final Set<Long> delayedEntryIds = new java.util.HashSet<>();
@@ -165,7 +168,8 @@ public final class KafkaRunTestFixtures {
 
         @Override
         public CompletionStage<RunLedgerOpenResultV1> openRunLedger(RunLedgerHandleV1 expectedHandle) {
-            return CompletableFuture.completedFuture(RunLedgerOpenResultV1.openedExact(expectedHandle));
+            return CompletableFuture.completedFuture(
+                    openOverride == null ? RunLedgerOpenResultV1.openedExact(expectedHandle) : openOverride);
         }
 
         @Override
@@ -176,6 +180,12 @@ public final class KafkaRunTestFixtures {
             entries.put(request.expectedEntryId(), bytes);
             ProviderMutationResultV1<AppendQuorumProofV1> result = nextAppendOverride;
             nextAppendOverride = null;
+            RuntimeException appendFailure = nextAppendFailure;
+            nextAppendFailure = null;
+            if (appendFailure != null) {
+                retained.release();
+                return CompletableFuture.failedFuture(appendFailure);
+            }
             if (result == null) {
                 result = ProviderMutationResultV1.appliedExact(new AppendQuorumProofV1(
                         request.handle(),
@@ -217,8 +227,18 @@ public final class KafkaRunTestFixtures {
         @Override
         public CompletionStage<ProviderMutationResultV1<RunLedgerRecoveryProofV1>> fenceAndRecoverRunLedger(
                 RunLedgerHandleV1 requested) {
-            return CompletableFuture.completedFuture(ProviderMutationResultV1.appliedExact(
-                    new RunLedgerRecoveryProofV1(requested, entries.isEmpty() ? -1 : entries.size() - 1, true, true)));
+            ProviderMutationResultV1<RunLedgerRecoveryProofV1> result = recoveryOverride;
+            if (result == null) {
+                result = ProviderMutationResultV1.appliedExact(new RunLedgerRecoveryProofV1(
+                        requested,
+                        entries.keySet().stream()
+                                .mapToLong(Long::longValue)
+                                .max()
+                                .orElse(-1),
+                        true,
+                        true));
+            }
+            return CompletableFuture.completedFuture(result);
         }
 
         @Override
