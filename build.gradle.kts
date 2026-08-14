@@ -1083,6 +1083,20 @@ tasks.register("v2M2PulsarP4ObjectCheck") {
     dependsOn("v2M2PulsarP4ObjectSourceCheck", "v2M2PulsarP3Check", "v2DocumentationCheck")
 }
 
+tasks.register<Exec>("v2M2PulsarP4DualSourceCheck") {
+    group = "verification"
+    description = "Verify whole-range fallback, exact-version pins, bounded drain, final revalidation, and irreversible BK deletion."
+    dependsOn(":nereus-pulsar-offload:test")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-pulsar-p4-dual.sh")
+}
+
+tasks.register("v2M2PulsarP4Check") {
+    group = "verification"
+    description = "Run Pulsar M2-P4 Object plus dual-source/delete semantics; native integration, evidence, and M2 PASS remain pending."
+    dependsOn("v2M2PulsarP4DualSourceCheck", "v2M2PulsarP4ObjectCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
