@@ -78,6 +78,35 @@ tasks.register<Test>("p6EvidenceTest") {
     )
 }
 
+tasks.register<Test>("p6RealProviderTest") {
+    group = "verification"
+    description = "Run M2-P6 against the fixed external MinIO S3-compatible provider."
+    testClassesDirs = p6ProviderTest.output.classesDirs
+    classpath = p6ProviderTest.runtimeClasspath
+    useJUnitPlatform()
+    include("**/P6MinioProviderEvidenceTest.class")
+    maxParallelForks = 1
+    maxHeapSize = "1024m"
+    outputs.upToDateWhen { false }
+    systemProperty(
+        "nereus.p6.realProviderOutput",
+        providers.gradleProperty("v2M2PulsarP6RealProviderOutput")
+            .getOrElse(layout.buildDirectory.file("p6-evidence/minio-provider.json").get().asFile.absolutePath),
+    )
+    systemProperty(
+        "nereus.p6.testedSourceCommit",
+        providers.gradleProperty("v2M2PulsarP6TestedSourceCommit").getOrElse("UNSET"),
+    )
+    systemProperty(
+        "nereus.p6.minioImageReference",
+        providers.gradleProperty("v2M2PulsarP6MinioImageReference").getOrElse("UNSET"),
+    )
+    systemProperty(
+        "nereus.p6.minioImageDigest",
+        providers.gradleProperty("v2M2PulsarP6MinioImageDigest").getOrElse("UNSET"),
+    )
+}
+
 tasks.named<Test>("test") {
     maxHeapSize = "1024m"
 }
