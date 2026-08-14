@@ -1,0 +1,41 @@
+{
+  "schema": "NEREUS_V2_M2_PULSAR_P6_EXECUTION_V1",
+  "nereusSourceCommit": "38640b27eeb0d850a8391c2d1799245b19ea205b",
+  "pulsarSourceCommit": "a14e0e6f4e49be0677318b4ceefc7b85b445823b",
+  "localStack": {
+    "reference": "localstack/localstack:4.14.0",
+    "imageId": "sha256:ad76d8f93de9cb765653983d32f4b2994ca981b8f6ccfcf7b52b2d1800b18581",
+    "repoDigest": "localstack/localstack@sha256:3ebc37595918b8accb852f8048fef2aff047d465167edd655528065b07bc364a"
+  },
+  "minio": {
+    "reference": "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z",
+    "imageId": "sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253",
+    "repoDigest": "quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"
+  },
+  "runtime": {
+    "jdk": "Corretto 21.0.10.7.1",
+    "dockerClient": "28.5.2",
+    "dockerServer": "28.5.2",
+    "hostMemoryBytes": 34359738368,
+    "hostLogicalCpu": 10,
+    "candidateJvmMaxHeapBytes": 2147483648
+  },
+  "results": {
+    "s3Adapter": {"tests": 3, "failures": 0, "errors": 0, "skipped": 0},
+    "candidateMatrix": {"tests": 1, "failures": 0, "errors": 0, "skipped": 0},
+    "minioProvider": {"tests": 1, "failures": 0, "errors": 0, "skipped": 0},
+    "nativeBaseline": {"tests": 1, "failures": 0, "errors": 0, "skipped": 0}
+  },
+  "nativeContainerOperations": {
+    "CreateBucket": 1,
+    "HeadBucket": 1,
+    "CreateMultipartUpload": 1,
+    "UploadPart": 1,
+    "CompleteMultipartUpload": 1,
+    "PutObject": 1,
+    "GetObject": 57
+  },
+  "ephemeralContainerRemoved": true,
+  "result": "PASS_P6_PROVIDER_AND_BLOCK_POLICY_ONLY",
+  "promotionEligible": false
+}

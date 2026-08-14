@@ -1,0 +1,15 @@
+{
+  "schema": "NEREUS_V2_M2_PULSAR_P6_REAL_PROVIDER_V1",
+  "generatedAt": "2026-08-14T10:24:45.027964Z",
+  "testedSourceCommit": "38640b27eeb0d850a8391c2d1799245b19ea205b",
+  "provider": "MINIO_S3_COMPATIBLE",
+  "imageReference": "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z",
+  "imageDigest": "sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+  "conditionalCreate": true,
+  "boundedRangeRead": true,
+  "deleteAndProveAbsent": true,
+  "multipartCleanupAndRelist": true,
+  "canonicalNpd1Npo1RoundTrip": true,
+  "result": "PASS_MINIO_PROVIDER_ONLY",
+  "claimBoundary": "Admits this MinIO release only; no Amazon S3 endorsement or performance claim"
+}

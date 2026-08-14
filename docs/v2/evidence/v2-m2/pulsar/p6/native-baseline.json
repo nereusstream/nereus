@@ -1,0 +1,16 @@
+{
+  "schema": "NEREUS_V2_M2_PULSAR_P6_NATIVE_BASELINE_V1",
+  "generatedAt": "2026-08-14T10:17:04.002068Z",
+  "pulsarSourceCommit": "a14e0e6f4e49be0677318b4ceefc7b85b445823b",
+  "provider": "S3_COMPATIBLE_LOCALSTACK",
+  "entryCount": 50000,
+  "entryBytes": 100,
+  "sourceDeclaredReadBufferBytes": 1048576,
+  "offloadMicros": 5221197,
+  "openMicros": 556400,
+  "randomP50Micros": 3740950,
+  "randomP99Micros": 7089825,
+  "sequential1000Micros": 15371,
+  "randomSamples": 20,
+  "claimBoundary": "Pinned Pulsar jcloud path on LocalStack; request bytes are source-declared, not wire-observed"
+}

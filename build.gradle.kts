@@ -1128,6 +1128,21 @@ tasks.register("v2M2PulsarP5Check") {
     dependsOn("v2M2PulsarP5SourceCheck", "v2M2PulsarP4Check", "v2DocumentationCheck")
 }
 
+tasks.register<Exec>("v2M2PulsarP6SourceCheck") {
+    group = "verification"
+    description = "Validate the source-bound P6 provider, candidate, native, and selected-policy receipts."
+    dependsOn(":nereus-pulsar-offload:test", ":nereus-pulsar-offload:p6ProviderTest")
+    usesService(pulsarCheckoutGate)
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m2-pulsar-p6.py", pulsarCheckoutPath.get())
+}
+
+tasks.register("v2M2PulsarP6Check") {
+    group = "verification"
+    description = "Run Pulsar M2-P6 provider/block evidence; Pulsar Final and global M2 PASS remain pending."
+    dependsOn("v2M2PulsarP6SourceCheck", "v2M2PulsarP5Check", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)

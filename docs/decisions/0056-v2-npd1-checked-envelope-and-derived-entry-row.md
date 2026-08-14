@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted as a partial 0.2 NPD1 wire refinement for Pulsar `BOOKKEEPER_WAL_ASYNC_OBJECT`. Exact block/Object/part
-numeric maxima and real-provider evidence remain open; implementation and runtime evidence have not started at M0.
+Accepted for the 0.2 NPD1 checked wire, numeric hard envelope, and provider admission for Pulsar
+`BOOKKEEPER_WAL_ASYNC_OBJECT`. The M2-P6 source-qualified evidence closes the remaining numeric/provider decision.
 
 ## Context
 
@@ -43,7 +43,9 @@ use or allocation. Persisted lengths and format/admission maxima use unsigned-64
 validated Java `long` values; negative values and values above `Long.MAX_VALUE` are rejected. A parser allocates only
 from validated actual counts and lengths, never from an absolute format maximum.
 
-NPD1 must define one finite `maxDataObjectBytes`, but its exact 0.2 value remains evidence-driven. That hard cap is not
+NPD1 defines `maxDataObjectBytes = 4 GiB`, `maxEntryBytes = 64 MiB`, `maxDecodedBlockBytes = 64 MiB`, and
+`maxEntriesPerBlock = 65,536` for 0.2. The adapter admits at most 1,024 multipart parts. These are deployment/Cell hard
+ceilings that a Namespace or Topic cannot raise. The data-Object hard cap is not
 an in-memory buffer size, one-GET requirement, upload target, or normal Object size. Upload, SHA-256 calculation, and
 response-loss full-body verification are streaming or bounded-segment operations; constructing a data-Object-sized
 `ByteBuffer` is forbidden.
@@ -56,14 +58,14 @@ or bounded range/full read, and deterministic multipart-residue discovery/cleanu
 
 ## Consequences
 
-- `V2-OPEN-BK-11` remains open only for exact numeric hard caps, lower derived admission, provider evidence, remaining
-  field IDs, and golden vectors; the checked formulas and 16-byte derived-ID row are no longer open.
-- Four GiB remains a possible 0.2 format/admission candidate and 1,024 remains a possible adapter part-count candidate;
-  neither number is accepted by this ADR.
+- `V2-OPEN-BK-11` is resolved by the M2-P6 candidate matrix, exact LocalStack protocol execution, fixed MinIO provider
+  execution, published S3 capability sources, codec goldens, and fail-closed admission tests.
+- Four GiB and 1,024 parts are accepted lower Nereus limits; they do not advertise a provider's larger limits or make a
+  4-GiB allocation legal.
 - Small entries avoid an eight-byte repeated-ID cost, while random access still derives an exact native entry ID from
   authenticated NPO1/block facts.
 - M2 must prove overflow rejection at every term, row/entry-ID derivation, actual-count allocation, streaming upload /
   digest/full verification, provider-capability rejection, and multipart-residue cleanup.
 
-This decision refines ADRs 0024, 0029, 0035, 0044, and 0049 and is tracked by `T-BK-01`, `T-POLICY-01`,
-`V2-BK-009/012`, and `V2-OPEN-BK-11`.
+This decision refines ADRs 0024, 0029, 0035, 0044, and 0049 and is tracked by `T-BK-01`, `T-POLICY-01`, and
+`V2-BK-009/012`.

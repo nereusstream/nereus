@@ -131,7 +131,7 @@ The pure-document M0 decision frontier for this branch is exhausted. The remaini
 The adjusted response is preserved in
 [round 18](grill-notes/20-restarted-grill-2-anchor-terminal-and-batch-metadata-retirement.md); the no-question evidence
 handoff is recorded in [round 19](grill-notes/21-restarted-grill-2-round-19-evidence-frontier.md). The grill must not
-invent another prose-only authority while these facts are absent. `V2-OPEN-OBJ-22/24`, `V2-OPEN-BK-11/13`, remaining
+invent another prose-only authority while these facts are absent. `V2-OPEN-OBJ-22/24`, remaining
 `V2-OPEN-OBJ-17/19`, and `V2-OPEN-PUL-OBJ-09` are likewise evidence-blocked.
 
 ## Configuration scope
@@ -625,12 +625,12 @@ Resolved by [ADR 0045](../decisions/0045-v2-pulsar-dual-source-read-handle-and-p
 composite handle with lazy children and exact source pins; deletion fences/drains BK pins before final Object
 revalidation and native CAS, and close drains both sources.
 
-### `V2-OPEN-BK-11`: NPD1 block wire, limits, codec, and crypto
+### `V2-OPEN-BK-11`: resolved NPD1 block wire, limits, codec, and provider evidence
 
-ADR 0056 resolves the checked decoded/directory/compressed/AEAD/encoded/Object formulas, 32-byte NPD1 and 64-byte NPB1
-headers, 16-byte derived-entry-ID row, actual-count allocation, streaming processing, and required provider-capability
-categories. The remaining gate must select exact block/Object/adapter numeric maxima, lower derived admission, and
-provider evidence. Four GiB and 1,024 parts remain candidates only; multipart count is never NPD1 wire identity.
+Resolved by [ADR 0056](../decisions/0056-v2-npd1-checked-envelope-and-derived-entry-row.md) and the M2-P6 receipt.
+The 0.2 hard envelope is 4 GiB per data Object, 1,024 multipart parts, 64 MiB per entry/decoded block, and 65,536
+entries per block. LocalStack covers exact S3 protocol behavior; fixed MinIO provider execution and published S3
+capability sources close concrete provider admission without claiming Amazon S3 performance or endorsement.
 
 ### `V2-OPEN-BK-12`: resolved persisted BookKeeper physical-delete intent and fact
 
@@ -639,12 +639,12 @@ Resolved by [ADR 0052](../decisions/0052-v2-pulsar-bookkeeper-delete-state-and-r
 `BK_DELETE_NONE -> BK_DELETE_INTENT -> BK_DELETE_DONE`; the compatibility boolean is only a read fence and retirement,
 audit, and physical capacity require the three-state fact.
 
-### `V2-OPEN-BK-13`: NPD1 typed block policy and default evidence
+### `V2-OPEN-BK-13`: resolved NPD1 typed block policy and default evidence
 
-ADR 0057 accepts the 1/4/8/16-MiB native-relative evidence candidates without wire enums and a later maximum of three
-classes. Product/Deployment owns the base default, Namespace inherits/overrides it, Topic is an explicit typed
-override, Protocol Cell performs admission/budgets only, and host is a ceiling. The resolved class is persisted in the
-offload attempt. The remaining gate is evidence execution plus exact class/default selection.
+Resolved by [ADR 0057](../decisions/0057-v2-npd1-policy-default-authority-and-evidence.md) and the M2-P6 receipt. The
+selected classes are `latency-1mib`, `balanced-4mib`, and `scan-8mib`; 4 MiB is the Deployment base default and 16 MiB
+is rejected. Namespace/Topic precedence, Cell/host non-reinterpretation, and failover-stable persisted class identity
+are executable contracts.
 
 ## Pulsar Object WAL
 

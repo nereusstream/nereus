@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted as the NPD1 block-policy resolution and evidence protocol for 0.2. No block class, target, codec threshold, or
-default value is accepted, and implementation/runtime evidence has not started at M0.
+Accepted as the NPD1 block-policy resolution, selected class catalog, and Deployment default for 0.2. M2-P6 completes
+the source-qualified candidate and pinned-native evidence required by the original protocol.
 
 ## Context
 
@@ -21,8 +21,11 @@ maximum-entry and maximum-entries-per-ledger settings, the stock 5-MiB message c
 entries. It exercises codec `NONE` and eligible ZSTD behavior without a redundant RAW class and compares the pinned
 native Pulsar path, including its approximately 1-MiB read buffer.
 
-After source-qualified evidence, 0.2 may admit at most three common typed classes. Until then there is no durable class
-enum and no implicit target.
+The source-qualified P6 evidence selects exactly three common typed classes: `latency-1mib` at 1 MiB,
+`balanced-4mib` at 4 MiB, and `scan-8mib` at 8 MiB. `balanced-4mib` is the Product/Deployment base default. The 16-MiB
+candidate is rejected: on the 20-MiB scan ledger it saved only one provider request relative to 8 MiB while materially
+increasing exact-entry read amplification and did not improve the measured sequential result. Eligible ZSTD is
+`ZSTD_IF_SMALLER`; each sparse row persists the actual `NONE` or `ZSTD` family.
 
 Semantic default authority is one-way:
 
@@ -39,12 +42,12 @@ or reinterpret already generated NPD1. A default or override change affects only
 
 ## Consequences
 
-- `V2-OPEN-BK-13` remains open until the benchmark receipt selects no more than three classes and their exact values.
+- `V2-OPEN-BK-13` is resolved by the P6 receipt and the exact 1/4/8-MiB class catalog/default above.
 - Placement cannot create a second default authority, and normal Topics need not carry bespoke manual configuration.
 - Earlier close may produce blocks below the class target; target size is operational intent, not a minimum byte
   promise or decoder rule.
 - M2 must prove resolution precedence, failover stability, unsupported override rejection, Cell/host non-reinterpretation,
   every evidence candidate, and native-relative cold-read cost.
 
-This decision refines ADRs 0020, 0044, 0049, and 0056 and is tracked by `T-BK-01`, `T-POLICY-01`, `V2-BK-012/013`,
-and `V2-OPEN-BK-13`.
+This decision refines ADRs 0020, 0044, 0049, and 0056 and is tracked by `T-BK-01`, `T-POLICY-01`, and
+`V2-BK-012/013`.

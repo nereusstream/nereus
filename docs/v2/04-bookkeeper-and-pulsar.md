@@ -220,13 +220,14 @@ oversize entry gets a dedicated bounded block. Compression, AEAD, and integrity 
 cross-block state. Every operation uses checked arithmetic/actual-count allocation, while upload, SHA-256, and full
 verification stream or use bounded segments rather than a data-Object-sized `ByteBuffer`.
 
-One finite data-Object hard cap is mandatory but its numeric value remains open; 4 GiB is only a candidate. Multipart
-part count is an adapter/Cell operational ceiling, not wire identity; 1,024 is only a candidate. Admission checks
+The selected hard envelope is 4 GiB per data Object, 1,024 multipart parts, 64 MiB per entry and decoded block, and
+65,536 entries per block. Multipart part count is an adapter/Cell operational ceiling, not wire identity. Admission checks
 provider max Object size, min/max part size, max parts, streaming upload/read, and deterministic multipart-residue
 cleanup. Missing capability rejects the profile.
 
-NPD1 block-policy evidence compares 1/4/8/16-MiB candidates without creating wire enums and will select at most three
-classes. Product/Deployment owns the validated base default, Namespace inherits/overrides it, Topic may explicitly
+NPD1 block-policy evidence compared every 1/4/8/16-MiB candidate and selected `latency-1mib`, `balanced-4mib`, and
+`scan-8mib`; 4 MiB is the Deployment base default and 16 MiB is rejected. Product/Deployment owns the validated base
+default, Namespace inherits/overrides it, Topic may explicitly
 override, Cell admits/caps, and host ceilings resources. The resolved class is fixed in the offload attempt. Resource
 pressure may early-close/backpressure/reject but never reinterprets existing NPD1.
 

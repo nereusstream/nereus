@@ -373,14 +373,15 @@ ADR 0087 closes the protocol-frontier/ISR/idempotency/transaction/Fetch semantic
 native election adoption, compact descriptor transport, hard-bounded Observed/Applied eligibility, and distinct
 BK/Object protocol checkpoint carriers with a terminal selection Head, without selecting Java structures or numeric
 queue/checkpoint/waiter bounds. M2 owns the BK carrier; M3 owns exact `NWKCP1`; M6 owns native Kafka integration.
+M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
+block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
+fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.
 Partial recovery omission, numeric caps,
 physical proof-fold/capability encodings, and any tombstone-deletion authority remain evidence gates. The rows below
 are the remaining active 0.2 evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
-| `V2-OPEN-BK-11` | select exact NPD1 block/Object/adapter numeric maxima, lower admission, and provider evidence after ADR 0056's checked wire/streaming contract | M2 Object format freeze |
-| `V2-OPEN-BK-13` | execute ADR 0057's 1/4/8/16-MiB native-relative evidence, then select at most three classes and the Deployment base default | M2 offload policy freeze |
 | `V2-OPEN-OBJ-17` | freeze exact NWG1 header/directory/row numeric caps after ADRs 0059/0062 fixed the complete leaf grammar | M3 Object WAL format freeze |
 | `V2-OPEN-OBJ-19` | execute evidence and select target/linger/quantized values and numeric budgets without changing ADR-0062 class semantics | M3 Object WAL policy freeze |
 | `V2-OPEN-PUL-OBJ-09` | choose an allocator only after evidence plus exact reservation/head/node wire, range size, Cell reservation concurrency, and ADR 0061 conformance | M1/M3 virtual-ledger allocator freeze |

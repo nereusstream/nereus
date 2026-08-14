@@ -728,6 +728,8 @@ for resolved_gate in \
     V2-OPEN-KAF-META-03 \
     V2-OPEN-PUL-META-02 \
     V2-OPEN-BK-12 \
+    V2-OPEN-BK-11 \
+    V2-OPEN-BK-13 \
     V2-OPEN-OBJ-18 \
     V2-OPEN-PUL-OBJ-08 \
     V2-OPEN-OBJ-01 \
@@ -753,8 +755,6 @@ for resolved_gate in \
 done
 
 for active_gate in \
-    V2-OPEN-BK-11 \
-    V2-OPEN-BK-13 \
     V2-OPEN-OBJ-17 \
     V2-OPEN-OBJ-19 \
     V2-OPEN-PUL-OBJ-09 \
