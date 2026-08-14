@@ -48,7 +48,7 @@ publish the canonical K10 receipt and scenario-matrix changes without changing t
 `v2M2KafkaK10PolicyCheck` compiles the production codec/resolver/policy and runs its rejection matrix. It is a readiness
 gate only and cannot promote a scenario. The published
 [`kafka-final.json`](../../evidence/v2-m2/kafka/k10/kafka-final.json) binds tested source
-`2b5d3be9605943c2217daa6d45740ddf832d6d0a`, the refreshed current-source K9 receipt, 40 exact named-suite
+`4af3278234d84df7a2fdce4fc6b3e4e227916d56`, the refreshed current-source K9 receipt, 40 exact named-suite
 references, and seven typed attachments. `v2M2KafkaFinalCheck` revalidates that receipt through the production resolver,
 reexecutes K2 and the complete K9 aggregate, checks the live local-suite publication and both synchronized scenario
 registries, and rejects any source/configuration change after the tested commit.

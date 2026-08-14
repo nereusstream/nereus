@@ -82,11 +82,18 @@ allowed_evidence_paths = (
     "docs/v2/detailed_design/m2/README.md",
     "docs/v2/detailed_design/m2/kafka-m2-k9-real-bookkeeper-evidence.md",
     "docs/v2/detailed_design/m2/kafka-m2-k10-final-evidence.md",
+    "docs/v2/detailed_design/m2/pulsar-m2-p6-provider-and-block-policy.md",
+    "docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json",
     "docs/v2/evidence/v2-m2/kafka/k9/",
     "docs/v2/evidence/v2-m2/kafka/k10/",
+    "docs/v2/evidence/v2-m2/pulsar/p6/",
     "scripts/check-v2-documentation.sh",
+    "scripts/check-v2-m2-kafka-inputs-source.sh",
     "scripts/check-v2-m2-kafka-k9-evidence.sh",
     "scripts/check-v2-m2-kafka-final-evidence.py",
+    "scripts/check-v2-m2-pulsar-p6.py",
+    "scripts/publish-v2-m2-kafka-k9-evidence.py",
+    "scripts/publish-v2-m2-kafka-final-evidence.py",
 )
 changed = set(git_lines("diff", "--name-only", f"{tested}..HEAD"))
 changed.update(git_lines("diff", "--name-only"))

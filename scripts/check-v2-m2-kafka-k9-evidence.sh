@@ -71,6 +71,7 @@ allowed_evidence_paths = (
     "scripts/check-v2-m2-kafka-k9-evidence.sh",
     "scripts/check-v2-m2-pulsar-p6.py",
     "scripts/publish-v2-m2-kafka-k9-evidence.py",
+    "scripts/publish-v2-m2-kafka-final-evidence.py",
 )
 changed = subprocess.check_output(
     ["git", "diff", "--name-only", f"{tested}..HEAD"], cwd=root, text=True
