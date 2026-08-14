@@ -12,7 +12,7 @@ sourceTuple: v2-m1
 P5 connects the P1-P4 production components to the exact Pulsar fork through its native
 `SourceSafeLedgerOffloader` SPI. The Nereus build consumes the Pulsar checkout as a Gradle source composite; it does not
 fall back to a published `managed-ledger` artifact that lacks the source-safe interface. The external source binding is
-`nereus/v2-m2-pulsar-native-offload@1c7694296e69383b6ef1bfb67345ce4069cffd2d` from the immutable P1 base
+`nereus/v2-m2-pulsar-native-offload@a14e0e6f4e49be0677318b4ceefc7b85b445823b` from the immutable P1 base
 `072aa1c440f85b808f60e7ea59de8a73c4e2a202`.
 
 ## Native provider boundary

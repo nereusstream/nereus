@@ -433,7 +433,7 @@ require_literal 'hard journal/source/apply-lag bounds' "docs/v2/detailed_design/
 require_literal 'M2-P5 exact-source native offload provider' "docs/v2/detailed_design/m2/pulsar-m2-p5-native-provider.md"
 require_literal 'v2M2PulsarP5Check' "docs/v2/detailed_design/m2/pulsar-m2-p5-native-provider.md"
 require_literal 'm2PulsarNativeBinding' "docs/v2/source-locks.json"
-require_literal '1c7694296e69383b6ef1bfb67345ce4069cffd2d' "docs/v2/source-locks.json"
+require_literal 'a14e0e6f4e49be0677318b4ceefc7b85b445823b' "docs/v2/source-locks.json"
 require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal "V2 documentation baseline" ".github/workflows/build.yml"
 require_literal "Superseded by ADR 0012." "docs/decisions/0010-v2-topic-profile-binding.md"
