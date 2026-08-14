@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
+implementationStatus: Verified
 evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
@@ -22,5 +22,6 @@ publication guard. The source-qualified bundle was produced only from clean push
 two builds were byte-identical. The [current receipt](../../evidence/v2-m2/kafka/k0-module/README.md) binds the closed
 16-file manifest and exact Apache BookKeeper `release-4.18.0` source/Maven input.
 
-This slice does not implement a provider session, buffer ownership, `NBKE2`, checked admission, a run writer, native
-Kafka transport, a scenario PASS, `v2M2KafkaInputsCheck`, or global M2 Final. Those absent gates remain absent.
+This child does not itself implement the sibling provider, `NBKE2`, or numeric cuts, and it still does not implement a
+run writer, native Kafka transport, a scenario PASS, or global M2 Final. Its three non-empty module checks are now also
+covered by the current non-promotable `v2M2KafkaInputsCheck` receipt.

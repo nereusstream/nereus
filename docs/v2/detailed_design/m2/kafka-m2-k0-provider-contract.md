@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json
 ---
 
 # M2-K0-P Cell-scoped BookKeeper provider contract
@@ -27,6 +28,6 @@ releases the reference and permits. Drain/close stop admission and complete only
 reach zero. Each registry is Cell-local, so closing one does not mutate another.
 
 `v2M2KafkaK0ProviderCheck` executes 22 focused production-contract tests across four suites with zero skip and checks
-the dependency/API boundary. It remains non-promotable local implementation readiness. This cut has no real
-BookKeeper client/server execution, `NBKE2`, numeric admission, writer, Kafka runtime, scenario promotion,
-`v2M2KafkaInputsCheck`, or global M2 PASS. K0-E owns source-qualified receipt aggregation after K0-W and K0-N exist.
+the dependency/API boundary. Those results are covered by the current non-promotable `v2M2KafkaInputsCheck` receipt.
+This cut still has no real BookKeeper client/server execution, writer, Kafka runtime, scenario promotion, or global M2
+PASS; the aggregate proves implementation inputs only.

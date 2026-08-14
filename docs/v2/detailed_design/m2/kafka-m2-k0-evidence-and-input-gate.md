@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
-sourceTuple: v2-m2-kafka-k0
+sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json
 ---
 
 # M2-K0-E exact source, receipt, and Kafka Inputs gate
@@ -39,6 +40,7 @@ all locked bytes/hashes. `v2M2KafkaInputsCheck` is registered as a distinct aggr
 production validator, requires a clean `HEAD == origin/main`, checks current source-lock and child-input hashes, and
 permits only the canonical receipt path after its tested source commit.
 
-The canonical aggregate receipt has not yet been published in this implementation cut, so evidence remains `NotRun`
-and the aggregate is not reported PASS. K0-E and the later receipt cannot promote a scenario, prove a run writer or
-real BookKeeper behavior, activate Kafka runtime, or claim Kafka/global M2 Final.
+The [canonical aggregate receipt](../../evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json) is current-source evidence
+for all five K0 children. `v2M2KafkaInputsCheck` reports five gates, 16 suites, and 54 tests with zero failure, error, or
+skip. It remains non-promotable: K0-E and the aggregate cannot prove a run writer or real BookKeeper behavior, activate
+Kafka runtime, promote a scenario, or claim Kafka/global M2 Final.

@@ -326,7 +326,7 @@
     },
     "receiptKind": "KAFKA_M2_INPUTS_ONLY",
     "promotionEligible": false,
-    "evidenceStatus": "EXACT_IMPLEMENTATION_INPUT"
+    "evidenceStatus": "CURRENT_SOURCE_RECEIPT"
   },
   "p1MetadataCapabilityBinding": {
     "sourceCommit": "17497c37901288d60d5d221e73f672a314371a45",

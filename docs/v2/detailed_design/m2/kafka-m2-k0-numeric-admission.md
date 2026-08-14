@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json
 ---
 
 # M2-K0-N checked numeric admission and recovery envelope
@@ -51,6 +52,6 @@ for the persisted raw DATA cap, Provider add-payload cap, Kafka-native RecordBat
 it also covers exact terminal/non-terminal overhead, scope/profile/member rejection, checked progress overflow,
 lower-only hierarchy, and independent projection parity.
 
-This is non-promotable local implementation readiness. It does not select K9 operational defaults, allocate offsets or
-entries, execute a BookKeeper writer or Kafka runtime, create the K0-E source-qualified receipt, register
-`v2M2KafkaInputsCheck`, promote a scenario, or claim global M2 PASS.
+The three suites and 10 tests are now covered by the current non-promotable `v2M2KafkaInputsCheck` receipt. This
+numeric child still does not select K9 operational defaults, allocate offsets or entries, execute a BookKeeper writer
+or Kafka runtime, promote a scenario, or claim global M2 PASS.

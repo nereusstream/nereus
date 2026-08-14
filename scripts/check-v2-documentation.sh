@@ -47,6 +47,9 @@ required_v2_docs=(
     detailed_design/m2/kafka-m2-k0-implementation-input-closure.md
     detailed_design/m2/kafka-m2-k0-module-graph.md
     detailed_design/m2/kafka-m2-k0-provider-contract.md
+    detailed_design/m2/kafka-m2-k0-nbke2-wire.md
+    detailed_design/m2/kafka-m2-k0-numeric-admission.md
+    detailed_design/m2/kafka-m2-k0-evidence-and-input-gate.md
     detailed_design/m2/kafka-bookkeeper-offset-range-index.md
     detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md
     open-questions.md
@@ -355,7 +358,9 @@ require_literal 'v2M2KafkaK0NumericCheck' "build.gradle.kts"
 require_literal 'M2-K0-E exact source, receipt, and Kafka Inputs gate' "docs/v2/detailed_design/m2/kafka-m2-k0-evidence-and-input-gate.md"
 require_literal 'v2M2KafkaK0EvidenceCheck' "docs/v2/detailed_design/m2/kafka-m2-k0-evidence-and-input-gate.md"
 require_literal 'v2M2KafkaInputsCheck' "docs/v2/detailed_design/m2/kafka-m2-k0-evidence-and-input-gate.md"
-require_literal 'evidenceStatus: NotRun' "docs/v2/detailed_design/m2/kafka-m2-k0-evidence-and-input-gate.md"
+require_literal 'implementationStatus: Verified' "docs/v2/detailed_design/m2/kafka-m2-k0-evidence-and-input-gate.md"
+require_literal 'evidenceStatus: CurrentSourceReceipt' "docs/v2/detailed_design/m2/kafka-m2-k0-evidence-and-input-gate.md"
+require_literal 'docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json' "docs/v2/detailed_design/m2/kafka-m2-k0-evidence-and-input-gate.md"
 require_literal 'm2KafkaK0InputSourceBinding' "docs/v2/source-locks.json"
 require_literal 'NEREUS_V2_M2_KAFKA_BOOKKEEPER_CAPABILITY_INPUT_V1' "docs/v2/wire/bookkeeper-kafka-m2-k0-capability-v1.json"
 require_literal 'NEREUS_V2_M2_KAFKA_INPUTS_RECEIPT_V1' "nereus-kafka-bookkeeper/src/main/java/com/nereusstream/kafka/bookkeeper/evidence/KafkaM2InputsReceiptV1.java"

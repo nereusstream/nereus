@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json
 ---
 
 # M2-K0-W closed NBKE2 v1 wire contract
@@ -54,6 +55,6 @@ length/count/ordinal/overflow/order/truncation/strict-EOF rejection, independent
 minimum/representative/maximum vectors. Maximum vectors retain length and SHA-256 without checking multi-megabyte hex
 into the repository.
 
-This is non-promotable local implementation readiness. It does not execute a BookKeeper writer, parse Kafka
-RecordBatch semantics, open a run, publish a Kafka frontier, promote a scenario, create the K0-E source-qualified
-receipt, register `v2M2KafkaInputsCheck`, or claim global M2 PASS.
+The four suites and 10 tests are now covered by the current non-promotable `v2M2KafkaInputsCheck` receipt. This wire
+child still does not execute a BookKeeper writer, parse Kafka RecordBatch semantics, open a run, publish a Kafka
+frontier, promote a scenario, or claim global M2 PASS.
