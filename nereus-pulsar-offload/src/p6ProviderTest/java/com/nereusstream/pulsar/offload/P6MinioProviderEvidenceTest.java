@@ -25,6 +25,7 @@ import com.nereusstream.pulsar.offload.PulsarSealedLedgerPublisherV1.PreparedAtt
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionPolicy;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.EntryPayload;
+import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptKeyEnvelope;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.CustomMetadataValue;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.DigestType;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.EnsembleSegment;
@@ -63,6 +64,8 @@ class P6MinioProviderEvidenceTest {
     private static final PulsarOffloadLimitCandidateV1 LIMITS =
             PulsarOffloadLimitCandidateV1.adr0056EvidenceCandidate();
     private static final SecretKey KEY = new SecretKeySpec(new byte[32], "AES");
+    private static final AttemptKeyEnvelope KEY_ENVELOPE = new AttemptKeyEnvelope(
+            1, "test-kms", "cells/pulsar-a/kms", "version-7", "aes-kwp", new byte[] {1, 2, 3, 4});
     private static final UUID ATTEMPT = UUID.fromString("3a31bc29-9d41-45f5-b481-ff03228fa538");
 
     @TempDir
@@ -169,8 +172,10 @@ class P6MinioProviderEvidenceTest {
                 DigestType.CRC32C,
                 Map.of("provider", new CustomMetadataValue(new byte[] {1})),
                 List.of(new EnsembleSegment(0, List.of("bookie-1", "bookie-2", "bookie-3"))));
-        PreparedAttempt prepared = new PreparedAttempt(attempt, sealed, data, PulsarOffloadLimitCandidateV1.MIB);
-        PulsarPublishedAttemptVerifierV1 verifier = new PulsarPublishedAttemptVerifierV1(store, LIMITS, ignored -> KEY);
+        PreparedAttempt prepared =
+                new PreparedAttempt(attempt, sealed, data, PulsarOffloadLimitCandidateV1.MIB, KEY_ENVELOPE);
+        PulsarPublishedAttemptVerifierV1 verifier =
+                new PulsarPublishedAttemptVerifierV1(store, LIMITS, (ignored, envelope) -> KEY);
         new PulsarSealedLedgerPublisherV1(store, LIMITS, verifier, Runnable::run)
                 .publish(prepared)
                 .toCompletableFuture()

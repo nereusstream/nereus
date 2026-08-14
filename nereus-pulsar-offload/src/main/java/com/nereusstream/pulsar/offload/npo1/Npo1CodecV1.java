@@ -52,6 +52,9 @@ public final class Npo1CodecV1 {
     public static final int MAX_LEDGER_METADATA_BYTES = 1 * 1_024 * 1_024;
     public static final int MAX_DATA_DESCRIPTOR_BYTES = 256 * 1_024;
     public static final int MAX_DATA_KEY_BYTES = 1_024;
+    public static final int MAX_WRAPPING_KEY_ID_BYTES = 4 * 1_024;
+    public static final int MAX_WRAPPING_KEY_VERSION_BYTES = 1_024;
+    public static final int MAX_WRAPPED_KEY_BYTES = 16 * 1_024;
     public static final int MAX_SPARSE_ROWS = 65_536;
     public static final int MAX_CUSTOM_METADATA_ENTRIES = 1_024;
     public static final int MAX_CUSTOM_METADATA_BYTES = 1 * 1_024 * 1_024;
@@ -122,19 +125,69 @@ public final class Npo1CodecV1 {
         }
     }
 
+    /** Opaque KMS/provider envelope for the random AES-256 attempt key. */
+    public record AttemptKeyEnvelope(
+            int formatVersion,
+            String providerId,
+            String wrappingKeyId,
+            String wrappingKeyVersion,
+            String wrappingAlgorithm,
+            byte[] wrappedKey) {
+        public AttemptKeyEnvelope {
+            requireIdentifier(providerId, "key-envelope provider");
+            requireString(wrappingKeyId, MAX_WRAPPING_KEY_ID_BYTES, "wrapping key ID");
+            requireString(wrappingKeyVersion, MAX_WRAPPING_KEY_VERSION_BYTES, "wrapping key version");
+            requireIdentifier(wrappingAlgorithm, "key-wrap algorithm");
+            Objects.requireNonNull(wrappedKey, "wrappedKey");
+            wrappedKey = wrappedKey.clone();
+            if (formatVersion != VERSION || wrappedKey.length == 0 || wrappedKey.length > MAX_WRAPPED_KEY_BYTES) {
+                throw rejected("attempt key envelope version or wrapped bytes are outside hard bounds");
+            }
+        }
+
+        @Override
+        public byte[] wrappedKey() {
+            return wrappedKey.clone();
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof AttemptKeyEnvelope envelope
+                    && formatVersion == envelope.formatVersion
+                    && providerId.equals(envelope.providerId)
+                    && wrappingKeyId.equals(envelope.wrappingKeyId)
+                    && wrappingKeyVersion.equals(envelope.wrappingKeyVersion)
+                    && wrappingAlgorithm.equals(envelope.wrappingAlgorithm)
+                    && Arrays.equals(wrappedKey, envelope.wrappedKey);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(
+                    formatVersion,
+                    providerId,
+                    wrappingKeyId,
+                    wrappingKeyVersion,
+                    wrappingAlgorithm,
+                    Arrays.hashCode(wrappedKey));
+        }
+    }
+
     public record AttemptSection(
             long ledgerId,
             UUID attemptUuid,
             String providerScopePrefix,
             int keyDerivationVersion,
             RetentionClass retentionClass,
-            int blockTargetBytes) {
+            int blockTargetBytes,
+            AttemptKeyEnvelope keyEnvelope) {
         public AttemptSection {
             Objects.requireNonNull(attemptUuid, "attemptUuid");
             Objects.requireNonNull(retentionClass, "retentionClass");
+            Objects.requireNonNull(keyEnvelope, "keyEnvelope");
             PulsarOffloadKeysV1.derive(providerScopePrefix, ledgerId, attemptUuid);
             if (keyDerivationVersion != PulsarOffloadKeysV1.KEY_DERIVATION_VERSION || blockTargetBytes <= 0) {
-                throw rejected("attempt key version or block target is invalid");
+                throw rejected("Object-key derivation version or block target is invalid");
             }
         }
 
@@ -338,6 +391,12 @@ public final class Npo1CodecV1 {
             output.writeInt(retentionId(section.retentionClass()));
             output.writeInt(section.blockTargetBytes());
             string(output, section.providerScopePrefix());
+            output.writeInt(section.keyEnvelope().formatVersion());
+            string(output, section.keyEnvelope().providerId());
+            string(output, section.keyEnvelope().wrappingKeyId());
+            string(output, section.keyEnvelope().wrappingKeyVersion());
+            string(output, section.keyEnvelope().wrappingAlgorithm());
+            blob(output, section.keyEnvelope().wrappedKey());
         });
     }
 
@@ -349,8 +408,27 @@ public final class Npo1CodecV1 {
         int retention = input.intValue();
         int blockTarget = input.intValue();
         String scope = input.string(MAX_STRING_BYTES);
+        int envelopeVersion = input.intValue();
+        String envelopeProvider = input.string(64);
+        String wrappingKeyId = input.string(MAX_WRAPPING_KEY_ID_BYTES);
+        String wrappingKeyVersion = input.string(MAX_WRAPPING_KEY_VERSION_BYTES);
+        String wrappingAlgorithm = input.string(64);
+        byte[] wrappedKey = input.blob(MAX_WRAPPED_KEY_BYTES);
         input.end();
-        return new AttemptSection(ledgerId, uuid, scope, keyVersion, retentionClass(retention), blockTarget);
+        return new AttemptSection(
+                ledgerId,
+                uuid,
+                scope,
+                keyVersion,
+                retentionClass(retention),
+                blockTarget,
+                new AttemptKeyEnvelope(
+                        envelopeVersion,
+                        envelopeProvider,
+                        wrappingKeyId,
+                        wrappingKeyVersion,
+                        wrappingAlgorithm,
+                        wrappedKey));
     }
 
     private static byte[] sealedLedgerBody(SealedLedgerSection section) {
@@ -653,6 +731,13 @@ public final class Npo1CodecV1 {
             throw rejected(field + " bytes are outside hard bounds");
         }
         return bytes;
+    }
+
+    private static void requireIdentifier(String value, String field) {
+        requireString(value, 64, field);
+        if (!value.matches("[a-z0-9][a-z0-9._-]{0,63}")) {
+            throw rejected(field + " is not a canonical identifier");
+        }
     }
 
     private static String decode(byte[] bytes) {

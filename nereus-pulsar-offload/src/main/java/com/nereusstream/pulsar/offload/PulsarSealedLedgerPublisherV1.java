@@ -19,6 +19,7 @@ import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.ImmutableObjec
 import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.DeleteState;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.DataObject;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1;
+import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptKeyEnvelope;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptSection;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.DataExtentSection;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.Root;
@@ -44,11 +45,13 @@ public final class PulsarSealedLedgerPublisherV1 {
             PulsarSealedLedgerAttemptV1 attempt,
             SealedLedgerSection sealedLedger,
             DataObject dataObject,
-            int blockTargetBytes) {
+            int blockTargetBytes,
+            AttemptKeyEnvelope keyEnvelope) {
         public PreparedAttempt {
             Objects.requireNonNull(attempt, "attempt");
             Objects.requireNonNull(sealedLedger, "sealedLedger");
             Objects.requireNonNull(dataObject, "dataObject");
+            Objects.requireNonNull(keyEnvelope, "keyEnvelope");
             if (attempt.deleteState() != DeleteState.BK_DELETE_NONE
                     || attempt.bookkeeperDeleted()
                     || sealedLedger.lastAddConfirmed() != attempt.lastAddConfirmed()
@@ -135,7 +138,8 @@ public final class PulsarSealedLedgerPublisherV1 {
                 attempt.providerScopePrefix(),
                 PulsarOffloadKeysV1.KEY_DERIVATION_VERSION,
                 attempt.retentionClass(),
-                prepared.blockTargetBytes());
+                prepared.blockTargetBytes(),
+                prepared.keyEnvelope());
         DataObject data = prepared.dataObject();
         DataExtentSection extent = new DataExtentSection(
                 1, attempt.keys().dataKey(), data.bytes(), data.sha256(), dataProof.immutableVersion());

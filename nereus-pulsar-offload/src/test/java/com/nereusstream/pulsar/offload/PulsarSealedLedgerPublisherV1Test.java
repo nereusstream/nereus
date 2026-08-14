@@ -27,6 +27,7 @@ import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionFamily;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.EntryPayload;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1;
+import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptKeyEnvelope;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.CustomMetadataValue;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.DigestType;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.EnsembleSegment;
@@ -57,6 +58,8 @@ class PulsarSealedLedgerPublisherV1Test {
     private static final PulsarOffloadLimitCandidateV1 LIMITS =
             PulsarOffloadLimitCandidateV1.adr0056EvidenceCandidate();
     private static final UUID ATTEMPT = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+    private static final AttemptKeyEnvelope KEY_ENVELOPE = new AttemptKeyEnvelope(
+            1, "test-kms", "cells/pulsar-a/kms", "version-7", "aes-kwp", new byte[] {1, 2, 3, 4});
 
     @TempDir
     Path temporaryDirectory;
@@ -270,7 +273,7 @@ class PulsarSealedLedgerPublisherV1Test {
                 DigestType.CRC32C,
                 metadata,
                 List.of(new EnsembleSegment(0, List.of("bookie-1", "bookie-2", "bookie-3"))));
-        return new PreparedAttempt(attempt, sealed, data, PulsarOffloadLimitCandidateV1.MIB);
+        return new PreparedAttempt(attempt, sealed, data, PulsarOffloadLimitCandidateV1.MIB, KEY_ENVELOPE);
     }
 
     private static final class InMemoryStore implements PulsarOffloadObjectStoreV1 {

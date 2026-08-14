@@ -17,8 +17,11 @@ and SHA-256 family 1. Each section uses one 16-byte kind/version/flags/body-leng
 all preceding bytes. Decode rejects a provider/root length above 8 MiB or an exact-length mismatch and verifies the
 self-digest before parsing section lengths, strings, counts, or sparse offsets.
 
-The attempt binds ledger ID, canonical UUID, persisted provider scope, key derivation v1, retention class, and the
-candidate block target. Sealed-ledger facts bind LAC/count/logical length, creation and fence facts, ensemble/write/ack
+The attempt binds ledger ID, canonical UUID, persisted provider scope, Object-key derivation v1, retention class, the
+candidate block target, and a bounded wrapped attempt-key envelope. The envelope carries canonical provider and
+wrapping-algorithm IDs, exact wrapping-key ID/version, and at most 16 KiB of opaque wrapped bytes; the two key-identity
+strings are capped at 4 KiB and 1 KiB. It never carries the plaintext AES-256 key. Sealed-ledger facts bind
+LAC/count/logical length, creation and fence facts, ensemble/write/ack
 quorums, digest type, canonical custom metadata, and ordered ensemble segments without a password. Custom-metadata keys
 are strict UTF-8 while values preserve the native bounded binary bytes. The data section binds the derived key, exact
 NPD1 bytes/SHA, immutable provider version, and format version. Sparse rows bind each P1 block's entry range, byte range,
@@ -32,5 +35,6 @@ Validation requires `entryCount=LAC+1`, entry coverage exactly `0..LAC`, block o
 from the 32-byte NPD1 header through the data length, strict UTF-8, unsigned-UTF-8 map ordering, unique fields, checked
 arithmetic, and the accepted hard caps. Empty ledgers never form an attempt.
 
-`v2M2PulsarP2Check` proves only NPO1 bytes and rejection behavior. Publication/read/delete execution, native Pulsar
+`v2M2PulsarP2Check` proves NPO1 bytes, wrapped-key-envelope bounds/defensive copying, and rejection behavior.
+Publication/read/delete execution, native Pulsar
 integration, selected defaults/provider evidence, scenario receipts, and M2 PASS remain pending.

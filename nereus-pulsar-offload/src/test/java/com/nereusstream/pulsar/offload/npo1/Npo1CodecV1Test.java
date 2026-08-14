@@ -21,6 +21,7 @@ import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.RetentionClas
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionFamily;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.EncryptionFamily;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.SparseBlock;
+import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptKeyEnvelope;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptSection;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.CustomMetadataValue;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.DataExtentSection;
@@ -44,6 +45,8 @@ class Npo1CodecV1Test {
     private static final PulsarOffloadLimitCandidateV1 LIMITS =
             PulsarOffloadLimitCandidateV1.adr0056EvidenceCandidate();
     private static final UUID ATTEMPT = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+    private static final AttemptKeyEnvelope KEY_ENVELOPE = new AttemptKeyEnvelope(
+            1, "test-kms", "cells/pulsar-a/kms", "version-7", "aes-kwp", new byte[] {1, 2, 3, 4});
 
     @Test
     void roundTripsExactlyFourCanonicalSectionsAndCompleteFacts() {
@@ -61,7 +64,7 @@ class Npo1CodecV1Test {
         byte[] bytes = Npo1CodecV1.canonicalBytes(fixture(), LIMITS);
 
         assertThat(Npo1CodecV1.rootSha256(bytes))
-                .isEqualTo("a73794af0ffc13ecc07d29d6925d9cda11681995a2aa0b5f4cbc22de924a412c");
+                .isEqualTo("7f3c3cb8924b4cc09a9682f51efdffa77adf7c583eff30955b66e8ce724a4955");
     }
 
     @Test
@@ -140,6 +143,27 @@ class Npo1CodecV1Test {
         assertThatThrownBy(() -> Npo1CodecV1.parseCanonical(bytes, LIMITS))
                 .isInstanceOf(Npo1RejectedException.class)
                 .hasMessageContaining("UTF-8");
+    }
+
+    @Test
+    void persistsOneBoundedCanonicalWrappedAttemptKeyEnvelope() {
+        byte[] wrapped = KEY_ENVELOPE.wrappedKey();
+        wrapped[0] ^= 1;
+
+        assertThat(fixture().attempt().keyEnvelope()).isEqualTo(KEY_ENVELOPE);
+        assertThat(fixture().attempt().keyEnvelope().wrappedKey()).containsExactly(1, 2, 3, 4);
+        assertThatThrownBy(() -> new AttemptKeyEnvelope(
+                        1, "test-kms", "cells/pulsar-a/kms", "version-7", "aes-kwp", new byte[0]))
+                .isInstanceOf(Npo1RejectedException.class)
+                .hasMessageContaining("wrapped bytes");
+        assertThatThrownBy(() -> new AttemptKeyEnvelope(
+                        1, "TEST-KMS", "cells/pulsar-a/kms", "version-7", "aes-kwp", new byte[] {1}))
+                .isInstanceOf(Npo1RejectedException.class)
+                .hasMessageContaining("canonical identifier");
+        assertThatThrownBy(() -> new AttemptKeyEnvelope(
+                        2, "test-kms", "cells/pulsar-a/kms", "version-7", "aes-kwp", new byte[] {1}))
+                .isInstanceOf(Npo1RejectedException.class)
+                .hasMessageContaining("version");
     }
 
     @Test
@@ -229,7 +253,8 @@ class Npo1CodecV1Test {
                 "cells/pulsar-a",
                 1,
                 RetentionClass.DELETE_AFTER_VERIFIED,
-                2 * PulsarOffloadLimitCandidateV1.MIB);
+                2 * PulsarOffloadLimitCandidateV1.MIB,
+                KEY_ENVELOPE);
         assertThatThrownBy(() -> Npo1CodecV1.canonicalBytes(
                         new Root(changedAttempt, root.sealedLedger(), root.dataExtent(), root.sparseIndex()), LIMITS))
                 .isInstanceOf(Npo1RejectedException.class);
@@ -278,7 +303,8 @@ class Npo1CodecV1Test {
                 "cells/pulsar-a",
                 1,
                 RetentionClass.DELETE_AFTER_VERIFIED,
-                PulsarOffloadLimitCandidateV1.MIB);
+                PulsarOffloadLimitCandidateV1.MIB,
+                KEY_ENVELOPE);
         SealedLedgerSection ledger = ledger(
                 4,
                 5,

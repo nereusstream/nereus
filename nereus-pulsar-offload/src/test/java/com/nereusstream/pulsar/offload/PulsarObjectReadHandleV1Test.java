@@ -29,6 +29,7 @@ import com.nereusstream.pulsar.offload.PulsarSealedLedgerPublisherV1.Publication
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionFamily;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.EntryPayload;
+import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptKeyEnvelope;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.CustomMetadataValue;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.DigestType;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.EnsembleSegment;
@@ -54,6 +55,8 @@ import org.junit.jupiter.api.io.TempDir;
 class PulsarObjectReadHandleV1Test {
     private static final UUID ATTEMPT = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final SecretKey KEY = new SecretKeySpec(new byte[32], "AES");
+    private static final AttemptKeyEnvelope KEY_ENVELOPE = new AttemptKeyEnvelope(
+            1, "test-kms", "cells/pulsar-a/kms", "version-7", "aes-kwp", new byte[] {1, 2, 3, 4});
     private static final PulsarOffloadLimitCandidateV1 LIMITS = new PulsarOffloadLimitCandidateV1(
             PulsarOffloadLimitCandidateV1.FOUR_GIB,
             1_024,
@@ -102,7 +105,8 @@ class PulsarObjectReadHandleV1Test {
     void productionPublicationVerifierUsesTheRealObjectReadPath() {
         PreparedAttempt prepared = prepared(ATTEMPT);
         InMemoryStore store = new InMemoryStore();
-        PulsarPublishedAttemptVerifierV1 verifier = new PulsarPublishedAttemptVerifierV1(store, LIMITS, attempt -> KEY);
+        PulsarPublishedAttemptVerifierV1 verifier =
+                new PulsarPublishedAttemptVerifierV1(store, LIMITS, (attempt, envelope) -> KEY);
         PulsarSealedLedgerPublisherV1 publisher =
                 new PulsarSealedLedgerPublisherV1(store, LIMITS, verifier, Runnable::run);
 
@@ -235,7 +239,7 @@ class PulsarObjectReadHandleV1Test {
                 DigestType.CRC32C,
                 metadata,
                 List.of(new EnsembleSegment(0, List.of("bookie-1", "bookie-2", "bookie-3"))));
-        return new PreparedAttempt(attempt, sealed, data, PulsarOffloadLimitCandidateV1.MIB);
+        return new PreparedAttempt(attempt, sealed, data, PulsarOffloadLimitCandidateV1.MIB, KEY_ENVELOPE);
     }
 
     private static ObjectReadException failure(CompletionStage<?> stage) {

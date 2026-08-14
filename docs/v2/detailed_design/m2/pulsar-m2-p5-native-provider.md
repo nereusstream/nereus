@@ -24,8 +24,11 @@ completes only after the production Object reader verifies the immutable pair. A
 
 The persisted driver metadata fixes policy ID, Cell Provider Scope, key-derivation version, retention class, block
 class/target, and compression policy for the attempt. Each sparse row still binds its actual `NONE` or `ZSTD` family.
-Read, delete, and final source-deletion revalidation consume those persisted
-values rather than recomputing current configuration. The native `ReadHandle` adapter reconstructs the sealed metadata
+The key manager creates one random AES-256 attempt key plus a wrapped v1 envelope before staging NPD1. Publication
+writes the envelope into NPO1, completion verification unwraps the published envelope through the production read
+path, and restart reads validate NPO1 before asking the manager to unwrap that exact envelope. Driver metadata carries
+policy/location facts but neither plaintext nor wrapped key bytes. Read, delete, and final source-deletion revalidation
+consume the persisted values rather than recomputing current configuration. The native `ReadHandle` adapter reconstructs the sealed metadata
 without persisting the BookKeeper password and returns exact entry bytes from bounded NPD1 ranges. Cleanup proves root
 absence before data absence and multipart-residue cleanup.
 

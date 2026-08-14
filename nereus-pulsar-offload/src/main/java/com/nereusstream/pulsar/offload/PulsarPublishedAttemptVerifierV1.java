@@ -15,6 +15,7 @@
 package com.nereusstream.pulsar.offload;
 
 import com.nereusstream.pulsar.offload.PulsarSealedLedgerPublisherV1.Publication;
+import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptKeyEnvelope;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -24,7 +25,7 @@ import javax.crypto.SecretKey;
 public final class PulsarPublishedAttemptVerifierV1 implements PulsarSealedLedgerPublisherV1.PublishedAttemptVerifier {
     @FunctionalInterface
     public interface AttemptKeyResolver {
-        SecretKey resolve(PulsarSealedLedgerAttemptV1 attempt);
+        SecretKey unwrap(PulsarSealedLedgerAttemptV1 attempt, AttemptKeyEnvelope envelope);
     }
 
     private final PulsarOffloadObjectStoreV1 objectStore;
@@ -45,7 +46,10 @@ public final class PulsarPublishedAttemptVerifierV1 implements PulsarSealedLedge
         Objects.requireNonNull(publication, "publication");
         SecretKey attemptKey;
         try {
-            attemptKey = Objects.requireNonNull(keyResolver.resolve(publication.attempt()), "attemptKey");
+            attemptKey = Objects.requireNonNull(
+                    keyResolver.unwrap(
+                            publication.attempt(), publication.root().attempt().keyEnvelope()),
+                    "attemptKey");
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }

@@ -24,6 +24,7 @@ import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionPolicy;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.EntryPayload;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.SparseBlock;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1;
+import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptSection;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.Root;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -41,6 +42,11 @@ import javax.crypto.SecretKey;
 
 /** Bounded NPO1/NPD1 Object-side read handle for one immutable sealed-ledger attempt. */
 public final class PulsarObjectReadHandleV1 {
+    @FunctionalInterface
+    public interface NativeAttemptKeyResolver {
+        SecretKey unwrap(AttemptSection persistedAttempt);
+    }
+
     public enum ReadFailureKind {
         NOT_FOUND,
         TIMEOUT,
@@ -142,14 +148,14 @@ public final class PulsarObjectReadHandleV1 {
             RetentionClass retentionClass,
             int blockTargetBytes,
             CompressionPolicy compressionPolicy,
-            SecretKey attemptKey) {
+            NativeAttemptKeyResolver keyResolver) {
         Objects.requireNonNull(objectStore, "objectStore");
         Objects.requireNonNull(limits, "limits");
         Objects.requireNonNull(attemptUuid, "attemptUuid");
         Objects.requireNonNull(providerScopePrefix, "providerScopePrefix");
         Objects.requireNonNull(retentionClass, "retentionClass");
         Objects.requireNonNull(compressionPolicy, "compressionPolicy");
-        Objects.requireNonNull(attemptKey, "attemptKey");
+        Objects.requireNonNull(keyResolver, "keyResolver");
         if (!limits.blockTargetBytes().contains(blockTargetBytes)) {
             return failed(ReadFailureKind.FORMAT, "persisted NPD1 block target is not admitted");
         }
@@ -171,24 +177,37 @@ public final class PulsarObjectReadHandleV1 {
                                     blockTargetBytes,
                                     compressionPolicy));
                 })
-                .thenCompose(nativeRoot -> provider(() -> objectStore.head(keys.dataKey()), "data HEAD")
-                        .thenCompose(dataProof -> validateDataProof(nativeRoot.root(), dataProof)
-                                .thenCompose(ignored -> readExact(
-                                        objectStore,
-                                        keys.dataKey(),
-                                        0,
-                                        Npd1CodecV1.DATA_HEADER_BYTES,
-                                        "data header GET"))
-                                .thenApply(header -> {
-                                    validateDataHeader(nativeRoot.root(), header);
-                                    return new PulsarObjectReadHandleV1(
+                .thenCompose(nativeRoot -> {
+                    SecretKey attemptKey;
+                    try {
+                        attemptKey = Objects.requireNonNull(
+                                keyResolver.unwrap(nativeRoot.root().attempt()), "attemptKey");
+                    } catch (Throwable failure) {
+                        ReadFailureKind kind = failure instanceof IllegalArgumentException
+                                ? ReadFailureKind.INTEGRITY
+                                : ReadFailureKind.UNAVAILABLE;
+                        return CompletableFuture.failedFuture(
+                                new ObjectReadException(kind, "attempt key unwrap failed", failure));
+                    }
+                    return provider(() -> objectStore.head(keys.dataKey()), "data HEAD")
+                            .thenCompose(dataProof -> validateDataProof(nativeRoot.root(), dataProof)
+                                    .thenCompose(ignored -> readExact(
                                             objectStore,
-                                            limits,
-                                            nativeRoot.attempt(),
-                                            attemptKey,
-                                            nativeRoot.root(),
-                                            header);
-                                })));
+                                            keys.dataKey(),
+                                            0,
+                                            Npd1CodecV1.DATA_HEADER_BYTES,
+                                            "data header GET"))
+                                    .thenApply(header -> {
+                                        validateDataHeader(nativeRoot.root(), header);
+                                        return new PulsarObjectReadHandleV1(
+                                                objectStore,
+                                                limits,
+                                                nativeRoot.attempt(),
+                                                attemptKey,
+                                                nativeRoot.root(),
+                                                header);
+                                    }));
+                });
     }
 
     public PulsarSealedLedgerAttemptV1 attempt() {

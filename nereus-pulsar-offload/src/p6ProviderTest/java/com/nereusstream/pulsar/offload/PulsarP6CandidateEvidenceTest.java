@@ -27,6 +27,7 @@ import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionPolicy;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.DataObject;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.EntryPayload;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.StreamingEncoder;
+import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptKeyEnvelope;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.CustomMetadataValue;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.DigestType;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.EnsembleSegment;
@@ -78,6 +79,8 @@ class PulsarP6CandidateEvidenceTest {
     private static final PulsarOffloadLimitCandidateV1 LIMITS =
             PulsarOffloadLimitCandidateV1.adr0056EvidenceCandidate();
     private static final SecretKey KEY = new SecretKeySpec(new byte[32], "AES");
+    private static final AttemptKeyEnvelope KEY_ENVELOPE = new AttemptKeyEnvelope(
+            1, "test-kms", "cells/pulsar-a/kms", "version-7", "aes-kwp", new byte[] {1, 2, 3, 4});
 
     @Container
     private static final LocalStackContainer LOCALSTACK =
@@ -158,7 +161,8 @@ class PulsarP6CandidateEvidenceTest {
         DataObject data = encode(caseId, targetBytes, compressionPolicy, attemptUuid, workload.entries());
         CountingStore store = new CountingStore(provider);
         PreparedAttempt prepared = prepared(attemptUuid, data, targetBytes);
-        PulsarPublishedAttemptVerifierV1 verifier = new PulsarPublishedAttemptVerifierV1(store, LIMITS, attempt -> KEY);
+        PulsarPublishedAttemptVerifierV1 verifier =
+                new PulsarPublishedAttemptVerifierV1(store, LIMITS, (attempt, envelope) -> KEY);
         new PulsarSealedLedgerPublisherV1(store, LIMITS, verifier, Runnable::run)
                 .publish(prepared)
                 .toCompletableFuture()
@@ -229,7 +233,8 @@ class PulsarP6CandidateEvidenceTest {
                 List.of(new EntryPayload(0, payload)));
         CountingStore store = new CountingStore(provider);
         PreparedAttempt prepared = prepared(attemptUuid, data, PulsarOffloadLimitCandidateV1.MIB);
-        PulsarPublishedAttemptVerifierV1 verifier = new PulsarPublishedAttemptVerifierV1(store, LIMITS, attempt -> KEY);
+        PulsarPublishedAttemptVerifierV1 verifier =
+                new PulsarPublishedAttemptVerifierV1(store, LIMITS, (attempt, envelope) -> KEY);
         new PulsarSealedLedgerPublisherV1(store, LIMITS, verifier, Runnable::run)
                 .publish(prepared)
                 .toCompletableFuture()
@@ -291,7 +296,7 @@ class PulsarP6CandidateEvidenceTest {
                 DigestType.CRC32C,
                 Map.of("evidence", new CustomMetadataValue(new byte[] {1})),
                 List.of(new EnsembleSegment(0, List.of("bookie-1", "bookie-2", "bookie-3"))));
-        return new PreparedAttempt(attempt, sealed, data, targetBytes);
+        return new PreparedAttempt(attempt, sealed, data, targetBytes, KEY_ENVELOPE);
     }
 
     private static List<EntryPayload> smallEntries() {

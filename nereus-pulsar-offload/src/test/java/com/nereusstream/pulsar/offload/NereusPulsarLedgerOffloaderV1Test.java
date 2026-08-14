@@ -16,6 +16,8 @@ package com.nereusstream.pulsar.offload;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.nereusstream.pulsar.offload.NereusPulsarLedgerOffloaderV1.AttemptKeyManager;
+import com.nereusstream.pulsar.offload.NereusPulsarLedgerOffloaderV1.PreparedAttemptKey;
 import com.nereusstream.pulsar.offload.NereusPulsarLedgerOffloaderV1.RuntimePolicy;
 import com.nereusstream.pulsar.offload.PulsarOffloadBlockPolicyV1.BlockClass;
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.Body;
@@ -25,10 +27,13 @@ import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.ImmutableObjec
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.ObjectStoreException;
 import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.RetentionClass;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionPolicy;
+import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1;
+import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptKeyEnvelope;
 import io.netty.buffer.Unpooled;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,6 +46,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.apache.bookkeeper.client.LedgerMetadataBuilder;
@@ -62,6 +68,13 @@ class NereusPulsarLedgerOffloaderV1Test {
     private static final long LEDGER_ID = 42;
     private static final UUID ATTEMPT = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private static final SecretKey KEY = new SecretKeySpec(new byte[32], "AES");
+    private static final SecretKey WRAPPING_KEY = new SecretKeySpec(
+            new byte[] {
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
+            },
+            "AES");
+    private static final AttemptKeyEnvelope KEY_ENVELOPE = wrappedKeyEnvelope();
     private static final List<byte[]> PAYLOADS = List.of(
             new byte[] {0, 1, 2}, new byte[] {3, 4, 5}, new byte[] {6, 7, 8}, new byte[] {9, 10, 11}, new byte[] {
                 12, 13, 14
@@ -96,6 +109,13 @@ class NereusPulsarLedgerOffloaderV1Test {
         assertThat(source.maximumRequestedEntries).hasValue(LIMITS.maxEntriesPerBlock());
         assertThat(source.maximumRequestedBytes).hasValue(Math.toIntExact(LIMITS.maxDecodedBlockBytes()));
         assertThat(store.rangeReads).isPositive();
+        PulsarOffloadKeysV1 keys = PulsarOffloadKeysV1.derive("cells/pulsar-a", LEDGER_ID, ATTEMPT);
+        AttemptKeyEnvelope persistedEnvelope = Npo1CodecV1.parseCanonical(
+                        store.objects.get(keys.rootKey()).bytes, LIMITS)
+                .attempt()
+                .keyEnvelope();
+        assertThat(persistedEnvelope).isEqualTo(KEY_ENVELOPE);
+        assertThat(persistedEnvelope.wrappedKey()).isNotEqualTo(KEY.getEncoded());
         try (var staged = Files.list(temporaryDirectory)) {
             assertThat(staged).isEmpty();
         }
@@ -129,7 +149,6 @@ class NereusPulsarLedgerOffloaderV1Test {
 
         store.calls.clear();
         offloader.deleteOffloaded(LEDGER_ID, ATTEMPT, persisted).join();
-        PulsarOffloadKeysV1 keys = PulsarOffloadKeysV1.derive("cells/pulsar-a", LEDGER_ID, ATTEMPT);
         assertThat(store.calls)
                 .containsExactly(
                         "delete:" + keys.rootKey(), "delete:" + keys.dataKey(), "cleanup:" + keys.attemptPrefix());
@@ -194,11 +213,49 @@ class NereusPulsarLedgerOffloaderV1Test {
         return new NereusPulsarLedgerOffloaderV1(
                 store,
                 policy,
-                (ledgerId, attemptUuid, metadata) -> KEY,
+                new AttemptKeyManager() {
+                    @Override
+                    public PreparedAttemptKey create(
+                            long ledgerId, UUID attemptUuid, Map<String, String> persistedDriverMetadata) {
+                        return new PreparedAttemptKey(KEY, KEY_ENVELOPE);
+                    }
+
+                    @Override
+                    public SecretKey unwrap(
+                            long ledgerId,
+                            UUID attemptUuid,
+                            AttemptKeyEnvelope envelope,
+                            Map<String, String> persistedDriverMetadata) {
+                        if (!KEY_ENVELOPE.equals(envelope)) {
+                            throw new IllegalArgumentException("attempt key envelope differs");
+                        }
+                        return unwrapKey(envelope);
+                    }
+                },
                 (ledgerId, attemptUuid, failure) -> integritySignals.incrementAndGet(),
                 new OffloadPoliciesImpl(),
                 Runnable::run,
                 temporaryDirectory);
+    }
+
+    private static AttemptKeyEnvelope wrappedKeyEnvelope() {
+        try {
+            Cipher cipher = Cipher.getInstance("AESWrap");
+            cipher.init(Cipher.WRAP_MODE, WRAPPING_KEY);
+            return new AttemptKeyEnvelope(1, "test-kms", "cells/pulsar-a/kms", "version-7", "aes-kw", cipher.wrap(KEY));
+        } catch (GeneralSecurityException failure) {
+            throw new ExceptionInInitializerError(failure);
+        }
+    }
+
+    private static SecretKey unwrapKey(AttemptKeyEnvelope envelope) {
+        try {
+            Cipher cipher = Cipher.getInstance("AESWrap");
+            cipher.init(Cipher.UNWRAP_MODE, WRAPPING_KEY);
+            return (SecretKey) cipher.unwrap(envelope.wrappedKey(), "AES", Cipher.SECRET_KEY);
+        } catch (GeneralSecurityException failure) {
+            throw new IllegalArgumentException("cannot unwrap attempt key", failure);
+        }
     }
 
     private static List<byte[]> readPayloads(ReadHandle handle, long first, long last) throws Exception {

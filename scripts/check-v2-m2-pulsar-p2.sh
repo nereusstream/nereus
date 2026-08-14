@@ -26,6 +26,8 @@ for literal in (
     "SPARSE_ROW_BYTES = 80",
     "MAX_ROOT_BYTES = 8 * 1_024 * 1_024",
     "MAX_SPARSE_ROWS = 65_536",
+    "MAX_WRAPPED_KEY_BYTES = 16 * 1_024",
+    "record AttemptKeyEnvelope",
     "MAX_ENTRY_COUNT = Integer.MAX_VALUE",
     "MAGIC = 0x4e504f31",
 ):
@@ -40,9 +42,9 @@ if not report.is_file():
     raise SystemExit("Pulsar P2 gate: exact JUnit report is absent")
 attributes = ET.parse(report).getroot().attrib
 actual = tuple(int(attributes[key]) for key in ("tests", "failures", "errors", "skipped"))
-if actual != (16, 0, 0, 0):
+if actual != (17, 0, 0, 0):
     raise SystemExit(f"Pulsar P2 gate: exact test result differs: {actual}")
-print("Pulsar M2-P2 NPO1 root verified: suites=1 tests=16 failures=0 errors=0 skips=0")
+print("Pulsar M2-P2 NPO1 root verified: suites=1 tests=17 failures=0 errors=0 skips=0")
 PY
 
 echo "Pulsar P2 proves canonical root bytes only; publication/read/delete, native integration, evidence, and M2 PASS remain pending."

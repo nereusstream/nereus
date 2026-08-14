@@ -22,6 +22,7 @@ import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionPolicy;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.DataObject;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.EntryPayload;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.StreamingEncoder;
+import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.AttemptKeyEnvelope;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.CustomMetadataValue;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.DigestType;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1.EnsembleSegment;
@@ -59,9 +60,25 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
     public static final String METADATA_BLOCK_TARGET = "nereus.blockTargetBytes";
     public static final String METADATA_COMPRESSION_POLICY = "nereus.compressionPolicy";
 
-    @FunctionalInterface
-    public interface AttemptKeyResolver {
-        SecretKey resolve(long ledgerId, UUID attemptUuid, Map<String, String> persistedDriverMetadata);
+    public interface AttemptKeyManager {
+        PreparedAttemptKey create(long ledgerId, UUID attemptUuid, Map<String, String> persistedDriverMetadata);
+
+        SecretKey unwrap(
+                long ledgerId,
+                UUID attemptUuid,
+                AttemptKeyEnvelope envelope,
+                Map<String, String> persistedDriverMetadata);
+    }
+
+    public record PreparedAttemptKey(SecretKey plaintextKey, AttemptKeyEnvelope envelope) {
+        public PreparedAttemptKey {
+            Objects.requireNonNull(plaintextKey, "plaintextKey");
+            Objects.requireNonNull(envelope, "envelope");
+            byte[] encoded = plaintextKey.getEncoded();
+            if (!"AES".equals(plaintextKey.getAlgorithm()) || encoded == null || encoded.length != 32) {
+                throw new IllegalArgumentException("attempt key must be one encodable AES-256 key");
+            }
+        }
     }
 
     @FunctionalInterface
@@ -104,7 +121,7 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
 
     private final PulsarOffloadObjectStoreV1 objectStore;
     private final RuntimePolicy policy;
-    private final AttemptKeyResolver keyResolver;
+    private final AttemptKeyManager keyManager;
     private final IntegrityFailureObserver integrityObserver;
     private final OffloadPolicies offloadPolicies;
     private final Executor fileExecutor;
@@ -115,14 +132,14 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
     public NereusPulsarLedgerOffloaderV1(
             PulsarOffloadObjectStoreV1 objectStore,
             RuntimePolicy policy,
-            AttemptKeyResolver keyResolver,
+            AttemptKeyManager keyManager,
             IntegrityFailureObserver integrityObserver,
             OffloadPolicies offloadPolicies,
             Executor fileExecutor,
             Path stagingDirectory) {
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
         this.policy = Objects.requireNonNull(policy, "policy");
-        this.keyResolver = Objects.requireNonNull(keyResolver, "keyResolver");
+        this.keyManager = Objects.requireNonNull(keyManager, "keyManager");
         this.integrityObserver = Objects.requireNonNull(integrityObserver, "integrityObserver");
         this.offloadPolicies = Objects.requireNonNull(offloadPolicies, "offloadPolicies");
         this.fileExecutor = Objects.requireNonNull(fileExecutor, "fileExecutor");
@@ -134,8 +151,8 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
                 new PulsarPublishedAttemptVerifierV1(
                         objectStore,
                         policy.limits(),
-                        attempt -> keyResolver.resolve(
-                                attempt.ledgerId(), attempt.attemptUuid(), policy.driverMetadata())),
+                        (attempt, envelope) -> keyManager.unwrap(
+                                attempt.ledgerId(), attempt.attemptUuid(), envelope, policy.driverMetadata())),
                 fileExecutor);
     }
 
@@ -151,7 +168,7 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
 
     @Override
     public CompletableFuture<Void> offload(ReadHandle ledger, UUID attemptUuid, Map<String, String> extraMetadata) {
-        SecretKey attemptKey;
+        PreparedAttemptKey attemptKey;
         PulsarSealedLedgerAttemptV1 attempt;
         SealedLedgerSection sealedLedger;
         try {
@@ -167,7 +184,7 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
                 throw new IllegalArgumentException("offload input is not one exact sealed native ledger");
             }
             attemptKey = Objects.requireNonNull(
-                    keyResolver.resolve(ledger.getId(), attemptUuid, policy.driverMetadata()), "attemptKey");
+                    keyManager.create(ledger.getId(), attemptUuid, policy.driverMetadata()), "attemptKey");
             LedgerMetadata metadata = ledger.getLedgerMetadata();
             attempt = new PulsarSealedLedgerAttemptV1(
                     ledger.getId(),
@@ -187,9 +204,9 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
         }
 
         return createStagingFile(ledger.getId(), attemptUuid)
-                .thenCompose(target -> encodeLedger(ledger, attemptUuid, attemptKey, target)
+                .thenCompose(target -> encodeLedger(ledger, attemptUuid, attemptKey.plaintextKey(), target)
                         .thenCompose(data -> publisher.publish(new PreparedAttempt(
-                                attempt, sealedLedger, data, policy.blockClass().targetBytes())))
+                                attempt, sealedLedger, data, policy.blockClass().targetBytes(), attemptKey.envelope())))
                         .thenAccept(ignored -> {})
                         .whenComplete((ignored, failure) -> deleteStagingFile(target)))
                 .toCompletableFuture();
@@ -199,12 +216,9 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
     public CompletableFuture<ReadHandle> readOffloaded(
             long ledgerId, UUID attemptUuid, Map<String, String> persistedDriverMetadata) {
         NativePolicy nativePolicy;
-        SecretKey attemptKey;
         try {
             requireOpen();
             nativePolicy = nativePolicy(persistedDriverMetadata);
-            attemptKey = Objects.requireNonNull(
-                    keyResolver.resolve(ledgerId, attemptUuid, persistedDriverMetadata), "attemptKey");
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -217,7 +231,8 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
                         nativePolicy.retentionClass(),
                         nativePolicy.blockClass().targetBytes(),
                         nativePolicy.compressionPolicy(),
-                        attemptKey)
+                        persistedAttempt -> keyManager.unwrap(
+                                ledgerId, attemptUuid, persistedAttempt.keyEnvelope(), persistedDriverMetadata))
                 .thenApply(handle -> (ReadHandle) new NereusPulsarReadHandleV1(handle))
                 .toCompletableFuture();
     }
@@ -285,12 +300,9 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
             long entryCount,
             long logicalLength) {
         NativePolicy nativePolicy;
-        SecretKey attemptKey;
         try {
             requireOpen();
             nativePolicy = nativePolicy(persistedDriverMetadata);
-            attemptKey = Objects.requireNonNull(
-                    keyResolver.resolve(ledgerId, attemptUuid, persistedDriverMetadata), "attemptKey");
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -303,7 +315,8 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
                         nativePolicy.retentionClass(),
                         nativePolicy.blockClass().targetBytes(),
                         nativePolicy.compressionPolicy(),
-                        attemptKey)
+                        persistedAttempt -> keyManager.unwrap(
+                                ledgerId, attemptUuid, persistedAttempt.keyEnvelope(), persistedDriverMetadata))
                 .thenCompose(handle -> {
                     CompletableFuture<Void> result = new CompletableFuture<>();
                     PulsarSealedLedgerAttemptV1 attempt = handle.attempt();

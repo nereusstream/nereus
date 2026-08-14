@@ -210,6 +210,10 @@ sections (`ATTEMPT`, `SEALED_LEDGER`, `DATA_EXTENT`, `SPARSE_INDEX`), and a trai
 bytes. Strict UTF-8, canonical map ordering, duplicate/trailing/overflow rejection, and hard limits bound the complete
 root to 8 MiB, sparse rows to 65,536, metadata/strings/ensemble dimensions to their ADR 0035 caps, and entry count to
 `1..2^31-1`. HEAD enforces root size before a bounded full GET/self-digest; empty ledgers are not offload attempts.
+The ATTEMPT section also stores a bounded wrapped-key envelope with the exact provider, wrapping-key identity/version,
+and wrap-algorithm identity. Native restart validates NPO1 before unwrapping that persisted envelope; plaintext AES-256
+attempt-key bytes never enter NPO1 or native driver metadata, and current host configuration cannot replace the
+persisted wrapping identity.
 
 The data Object uses ordered, gap-free `NPD1` multi-entry blocks. Each NPO1 sparse row binds one block ordinal,
 contiguous entry range, offset, encoded/decoded lengths, codec/encryption family, and SHA-256 of the exact encoded

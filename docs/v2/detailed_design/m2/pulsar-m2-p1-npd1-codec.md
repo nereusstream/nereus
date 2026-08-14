@@ -10,8 +10,9 @@ sourceTuple: v2-m1
 # Pulsar M2-P1 NPD1/NPB1 codec
 
 P1 implements the ADR-0044/0056 data Object codec without selecting the P2/P6 operational defaults. The caller must
-supply one P0 candidate, one candidate block target, and an attempt key/UUID. A later evidence receipt must select the
-production limits and block classes before a native offloader may activate.
+supply one P0 candidate, one candidate block target, and a random AES-256 attempt key/UUID. P2 persists only the wrapped
+form of that key in the NPO1 attempt section; plaintext key bytes never enter NPO1 or native driver metadata. P6 selects
+the production limits and block classes before a native offloader may activate.
 
 ## Canonical bytes
 
