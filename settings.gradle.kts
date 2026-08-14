@@ -44,6 +44,27 @@ dependencyResolutionManagement {
                 includeModule("io.github.oxia-db", "oxia-client-api")
             }
         }
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = "lockedNereusN1"
+                    url = uri(
+                        rootDir.resolve(
+                            "gradle/locked-artifacts/nereus-n1/" +
+                                "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e/m2",
+                        ),
+                    )
+                    metadataSources {
+                        gradleMetadata()
+                        mavenPom()
+                        artifact()
+                    }
+                }
+            }
+            filter {
+                includeModule("com.nereusstream", "nereus-domain")
+            }
+        }
         mavenCentral()
     }
 }
@@ -54,3 +75,6 @@ include("nereus-bom")
 include("nereus-domain")
 include("nereus-metadata-spi")
 include("nereus-metadata-oxia")
+include("nereus-storage-api")
+include("nereus-storage-bookkeeper")
+include("nereus-kafka-bookkeeper")

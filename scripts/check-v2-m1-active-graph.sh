@@ -15,7 +15,15 @@ import sys
 
 settings = pathlib.Path(sys.argv[1]).read_text()
 actual = set(re.findall(r'^include\("([^\"]+)"\)', settings, re.MULTILINE))
-expected = {"nereus-bom", "nereus-domain", "nereus-metadata-spi", "nereus-metadata-oxia"}
+expected = {
+    "nereus-bom",
+    "nereus-domain",
+    "nereus-metadata-spi",
+    "nereus-metadata-oxia",
+    "nereus-storage-api",
+    "nereus-storage-bookkeeper",
+    "nereus-kafka-bookkeeper",
+}
 if actual != expected:
     raise SystemExit(f"V2 M1 active-graph check: active settings graph differs: {sorted(actual)}")
 PY
@@ -30,6 +38,9 @@ for required in \
     "$repo_root/nereus-domain" \
     "$repo_root/nereus-metadata-spi" \
     "$repo_root/nereus-metadata-oxia" \
+    "$repo_root/nereus-storage-api" \
+    "$repo_root/nereus-storage-bookkeeper" \
+    "$repo_root/nereus-kafka-bookkeeper" \
     "$repo_root/docs/v1" \
     "$repo_root/docs/v2/07-protocol-integrations.md"; do
     [[ -e "$required" ]] || fail "required V2/archive boundary is missing: ${required#"$repo_root/"}"
@@ -65,4 +76,4 @@ if rg -n 'tasks\.register[^\n]*\("(?:phase[0-9]|f9|bookKeeperPrimaryWal)' \
     fail "a Phase/F9/V1 executable task remains in the root build"
 fi
 
-echo "V2 M1 active graph contains only BOM/domain/SPI/Oxia; V1 runtime, Phase/F9 scripts, and KoP runtime are absent; archives and KoP design remain."
+echo "V2 active graph contains the M1 foundation plus the three K0-M modules; V1 runtime, Phase/F9 scripts, and KoP runtime are absent."

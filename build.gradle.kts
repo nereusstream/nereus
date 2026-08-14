@@ -163,10 +163,10 @@ val configuredNereusVersion = providers.gradleProperty("nereusVersion").get()
 require(
     Regex(
         "[0-9]+\\.[0-9]+\\.[0-9]+" +
-            "(?:-SNAPSHOT|-n1\\.[0-9a-f]{40}|-p1\\.[0-9a-f]{40})?",
+            "(?:-SNAPSHOT|-n1\\.[0-9a-f]{40}|-p1\\.[0-9a-f]{40}|-m2\\.[0-9a-f]{40})?",
     ).matches(configuredNereusVersion),
 ) {
-    "nereusVersion must be X.Y.Z, X.Y.Z-SNAPSHOT, or source-qualified X.Y.Z-n1/p1.<40-lowercase-hex>"
+    "nereusVersion must be X.Y.Z, X.Y.Z-SNAPSHOT, or source-qualified X.Y.Z-n1/p1/m2.<40-lowercase-hex>"
 }
 if ("-p1." in configuredNereusVersion) {
     val allowedP1ArtifactTasks = setOf("clean", "p1ArtifactJar", "p1ArtifactSourcesJar")
@@ -175,6 +175,28 @@ if ("-p1." in configuredNereusVersion) {
             gradle.startParameter.taskNames.all { it.substringAfterLast(':') in allowedP1ArtifactTasks },
     ) {
         "The source-qualified P1 coordinate is restricted to the filtered metadata capability artifact tasks"
+    }
+}
+if ("-m2." in configuredNereusVersion) {
+    val allowedM2Modules = setOf(
+        "nereus-storage-api",
+        "nereus-storage-bookkeeper",
+        "nereus-kafka-bookkeeper",
+    )
+    val allowedM2ArtifactTasks = setOf(
+        "clean",
+        "jar",
+        "sourcesJar",
+        "generatePomFileForMavenJavaPublication",
+        "generateMetadataFileForMavenJavaPublication",
+    )
+    check(
+        gradle.startParameter.taskNames.isNotEmpty() && gradle.startParameter.taskNames.all { requested ->
+            val components = requested.split(':').filter(String::isNotEmpty)
+            components.size == 2 && components[0] in allowedM2Modules && components[1] in allowedM2ArtifactTasks
+        },
+    ) {
+        "The source-qualified M2 coordinate is restricted to the three Kafka K0 production artifacts"
     }
 }
 version = configuredNereusVersion
@@ -630,6 +652,32 @@ tasks.register("v2M1Check") {
     dependsOn("v2M1FastSourceCheck", "v2DocumentationCheck")
 }
 
+val v2M2KafkaK0StorageApiTest = project(":nereus-storage-api").tasks.named<Test>("test")
+val v2M2KafkaK0BookKeeperTest = project(":nereus-storage-bookkeeper").tasks.named<Test>("test")
+val v2M2KafkaK0KafkaModuleTest = project(":nereus-kafka-bookkeeper").tasks.named<Test>("test")
+
+tasks.register<Exec>("v2M2KafkaK0ModuleSourceCheck") {
+    group = "verification"
+    description = "Verify the K0-M module graph, exact immutable N1 linkage, and filtered M2 publication boundary."
+    dependsOn(v2M2KafkaK0StorageApiTest, v2M2KafkaK0BookKeeperTest, v2M2KafkaK0KafkaModuleTest)
+    listOf("nereus-storage-api", "nereus-storage-bookkeeper", "nereus-kafka-bookkeeper").forEach { module ->
+        dependsOn(
+            project(":$module").tasks.named("jar"),
+            project(":$module").tasks.named("sourcesJar"),
+            project(":$module").tasks.named("generatePomFileForMavenJavaPublication"),
+            project(":$module").tasks.named("generateMetadataFileForMavenJavaPublication"),
+        )
+    }
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-kafka-k0-module.sh")
+}
+
+tasks.register("v2M2KafkaK0ModuleCheck") {
+    group = "verification"
+    description = "Run the non-promotable, non-zero K0-M production module gate; no provider, codec, or M2 PASS."
+    dependsOn("v2M2KafkaK0ModuleSourceCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
@@ -732,4 +780,5 @@ tasks.register<JavaExec>("v2M1FinalCheck") {
 
 tasks.named("check") {
     dependsOn("v2M1Check")
+    dependsOn("v2M2KafkaK0ModuleCheck")
 }

@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: NormativeExecutionIndex
 sourceTuple: v2-m1
@@ -15,12 +15,13 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | Slice | Design | Status |
 | --- | --- | --- |
 | M2-K0 | [Kafka implementation-input closure](kafka-m2-k0-implementation-input-closure.md) | design accepted; production constants/codecs/provider/gates and evidence not started |
+| M2-K0-M | [Module graph and immutable N1 input](kafka-m2-k0-module-graph.md) | implementation and non-zero local gate landed; source-qualified bundle/receipt pending |
 | M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | semantic direction accepted; exact NBKE2 bytes/numeric bounds/evidence not started |
 | M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | protocol semantics accepted; exact Java/wire/integration/evidence not started |
 
-M1 Final is complete for the current trusted source tuple. M2 remains `NotStarted`: accepting M2-K0 closes the Kafka
-implementation inputs, but does not register a gate, create a PASS-shaped task, promote a scenario, or claim
-`v2M2Check` exists.
+M1 Final is complete at the trusted predecessor source tuple. M2 is `InProgress` only because the K0-M production
+module graph and its non-zero local gate landed together. The remaining K0 provider/wire/numeric/evidence cuts are not
+implemented, no scenario is promoted, and `v2M2KafkaInputsCheck` plus global `v2M2Check` remain absent.
 
 Kafka M2 uses its own planned sub-aggregate through `v2M2KafkaFinalCheck`. Global `v2M2Check` is a separate aggregate
 that also requires the Pulsar-owned M2 work. A Kafka sub-aggregate cannot be reported as global M2 Final.
