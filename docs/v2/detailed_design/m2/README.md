@@ -14,14 +14,15 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 
 | Slice | Design | Status |
 | --- | --- | --- |
-| M2-K0 | [Kafka implementation-input closure](kafka-m2-k0-implementation-input-closure.md) | design accepted; production constants/codecs/provider/gates and evidence not started |
+| M2-K0 | [Kafka implementation-input closure](kafka-m2-k0-implementation-input-closure.md) | aggregate in progress through K0-M/K0-P; K0-W/K0-N/K0-E absent |
 | M2-K0-M | [Module graph and immutable N1 input](kafka-m2-k0-module-graph.md) | current immutable-input receipt; provider/wire/runtime/scenarios excluded |
+| M2-K0-P | [Cell-scoped BookKeeper provider contract](kafka-m2-k0-provider-contract.md) | production API/lifecycle and non-zero local gate; K0-E receipt pending |
 | M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | semantic direction accepted; exact NBKE2 bytes/numeric bounds/evidence not started |
 | M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | protocol semantics accepted; exact Java/wire/integration/evidence not started |
 
-M1 Final is complete at the trusted predecessor source tuple. M2 is `InProgress` only because the K0-M production
-module graph and its non-zero local gate landed together. The remaining K0 provider/wire/numeric/evidence cuts are not
-implemented, no scenario is promoted, and `v2M2KafkaInputsCheck` plus global `v2M2Check` remain absent.
+M1 Final is complete at the trusted predecessor source tuple. M2 is `InProgress` for the current K0-M immutable module
+input and the K0-P production provider/lifecycle contract. K0-W/K0-N/K0-E are not implemented, no scenario is promoted,
+and `v2M2KafkaInputsCheck` plus global `v2M2Check` remain absent.
 
 Kafka M2 uses its own planned sub-aggregate through `v2M2KafkaFinalCheck`. Global `v2M2Check` is a separate aggregate
 that also requires the Pulsar-owned M2 work. A Kafka sub-aggregate cannot be reported as global M2 Final.

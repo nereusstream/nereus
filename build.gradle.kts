@@ -678,6 +678,23 @@ tasks.register("v2M2KafkaK0ModuleCheck") {
     dependsOn("v2M2KafkaK0ModuleSourceCheck", "v2DocumentationCheck")
 }
 
+val v2M2KafkaK0ProviderApiTest = project(":nereus-storage-api").tasks.named<Test>("test")
+val v2M2KafkaK0ProviderLifecycleTest = project(":nereus-storage-bookkeeper").tasks.named<Test>("test")
+
+tasks.register<Exec>("v2M2KafkaK0ProviderSourceCheck") {
+    group = "verification"
+    description = "Verify the K0-P provider/session/capability/outcome/buffer-ownership production contracts."
+    dependsOn(v2M2KafkaK0ProviderApiTest, v2M2KafkaK0ProviderLifecycleTest)
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-kafka-k0-provider.sh")
+}
+
+tasks.register("v2M2KafkaK0ProviderCheck") {
+    group = "verification"
+    description = "Run the non-promotable, non-zero K0-P provider contract gate; no real provider or M2 PASS."
+    dependsOn("v2M2KafkaK0ProviderSourceCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
@@ -781,4 +798,5 @@ tasks.register<JavaExec>("v2M1FinalCheck") {
 tasks.named("check") {
     dependsOn("v2M1Check")
     dependsOn("v2M2KafkaK0ModuleCheck")
+    dependsOn("v2M2KafkaK0ProviderCheck")
 }

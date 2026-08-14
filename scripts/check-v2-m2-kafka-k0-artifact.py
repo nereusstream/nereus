@@ -247,4 +247,7 @@ print(
     "V2 M2 Kafka K0-M immutable bundle verified: "
     f"source={source_commit} artifacts={len(manifest)} bytes={artifact_bytes} manifest={manifest_descriptor['sha256']}"
 )
-print("K0-M is an immutable module/input receipt only; provider, wire, scenarios, Kafka Inputs, and M2 Final remain absent.")
+print(
+    "K0-M remains an immutable module/input receipt only; provider evidence is separate, while wire, scenarios, "
+    "Kafka Inputs, and M2 Final remain absent."
+)

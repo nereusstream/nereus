@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
@@ -23,9 +23,10 @@ Observed/Applied semantics. It closes five narrower subjects before the first st
 4. the Cell-scoped BookKeeper provider contract;
 5. source-qualified evidence, receipt, and gate structure.
 
-Acceptance of this design records the execution contract only. M2-K0 remains `NotStarted` until production constants,
-codecs/provider surfaces, immutable goldens, non-zero tests, source locks, and `v2M2KafkaInputsCheck` land together.
-Documentation alone does not create that task, switch M2 to `InProgress`, promote a scenario, or prove a Kafka runtime.
+Acceptance of this design originally recorded the execution contract only. M2-K0 is now `InProgress`: K0-M has a
+current immutable-input receipt and K0-P has its production provider/lifecycle surface plus non-zero local gate. The
+aggregate remains incomplete until production codecs, immutable wire goldens, numeric admission, receipt parsing, and
+`v2M2KafkaInputsCheck` land. No partial cut promotes a scenario or proves a Kafka runtime.
 
 M2-K0 is Kafka-only. Pulsar NPD1/NPO1, `LedgerOffloader`, `DualSourceReadHandle`, and `BK_DELETE_*` remain separate
 global-M2 work. Object-WAL `NWKCP1` bytes and its Head/key limits remain M3 work. Native Kafka transport and

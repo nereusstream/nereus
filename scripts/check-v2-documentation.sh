@@ -46,6 +46,7 @@ required_v2_docs=(
     detailed_design/m2/README.md
     detailed_design/m2/kafka-m2-k0-implementation-input-closure.md
     detailed_design/m2/kafka-m2-k0-module-graph.md
+    detailed_design/m2/kafka-m2-k0-provider-contract.md
     detailed_design/m2/kafka-bookkeeper-offset-range-index.md
     detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md
     open-questions.md
@@ -336,6 +337,10 @@ require_literal 'PASS_K0_M_INPUT_ONLY' "docs/v2/evidence/v2-m2/kafka/k0-module/k
 require_literal 'm2KafkaK0ModuleBinding' "docs/v2/source-locks.json"
 require_literal 'implementationStatus: InProgress' "docs/v2/detailed_design/m2/README.md"
 require_literal 'v2M2KafkaK0ModuleCheck' "build.gradle.kts"
+require_literal 'M2-K0-P Cell-scoped BookKeeper provider contract' "docs/v2/detailed_design/m2/kafka-m2-k0-provider-contract.md"
+require_literal 'v2M2KafkaK0ProviderCheck' "docs/v2/detailed_design/m2/kafka-m2-k0-provider-contract.md"
+require_literal 'ProviderMutationOutcomeV1' "docs/v2/detailed_design/m2/kafka-m2-k0-provider-contract.md"
+require_literal 'v2M2KafkaK0ProviderCheck' "build.gradle.kts"
 require_literal 'include("nereus-storage-api")' "settings.gradle.kts"
 require_literal 'include("nereus-storage-bookkeeper")' "settings.gradle.kts"
 require_literal 'include("nereus-kafka-bookkeeper")' "settings.gradle.kts"
