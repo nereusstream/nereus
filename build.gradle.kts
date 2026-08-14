@@ -854,6 +854,22 @@ tasks.register("v2M2KafkaK5Check") {
     dependsOn("v2M2KafkaK5SourceCheck", "v2M2KafkaK4Check", "v2DocumentationCheck")
 }
 
+val v2M2KafkaK6Test = project(":nereus-kafka-bookkeeper").tasks.named<Test>("test")
+
+tasks.register<Exec>("v2M2KafkaK6SourceCheck") {
+    group = "verification"
+    description = "Verify K6 packed lookup, targeted exact-entry reads, snapshot bounds, and disposable cursors."
+    dependsOn(v2M2KafkaK6Test)
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-kafka-k6.sh")
+}
+
+tasks.register("v2M2KafkaK6Check") {
+    group = "verification"
+    description = "Run the non-zero K6 targeted-reader gate; no runtime, recovery, real BK, or M2 PASS."
+    dependsOn("v2M2KafkaK6SourceCheck", "v2M2KafkaK5Check", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)

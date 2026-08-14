@@ -21,6 +21,7 @@ import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2DataV1;
 import com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperEntryReservationV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunLifecycleV1;
+import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunSnapshotV1;
 import com.nereusstream.kafka.bookkeeper.run.KafkaBookKeeperRunStateV1;
 import com.nereusstream.storage.api.bookkeeper.AppendQuorumProofV1;
 import com.nereusstream.storage.api.bookkeeper.BookKeeperCellSession;
@@ -110,6 +111,7 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
         }
         KafkaOffsetAssignedAppendV1 assigned;
         KafkaBookKeeperEntryReservationV1 reservation;
+        KafkaBookKeeperRunSnapshotV1 runSnapshot;
         KafkaNbke2AssignedAppendGroupV1 physicalGroup;
         List<CanonicalBytes> encodedEntries;
         List<CompletionStage<MemberOutcome>> memberStages = new ArrayList<>();
@@ -154,6 +156,7 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
                         assigned.endOffsetExclusive()));
             }
             try {
+                runSnapshot = lifecycle.snapshot();
                 reservation = lifecycle.reserveDataGroup(request.memberCount());
             } catch (RuntimeException failure) {
                 capacity.orElseThrow().close();
@@ -167,14 +170,9 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
                 physicalGroup = Objects.requireNonNull(
                         assigned.physicalGroupFactory().apply(reservation.firstEntryId()), "physical append group");
                 encodedEntries = physicalGroup.encode(
-                        lifecycle.snapshot().handle().ledgerIdentity().ledgerId());
+                        runSnapshot.handle().ledgerIdentity().ledgerId());
                 validatePhysicalGroup(
-                        request,
-                        assigned,
-                        reservation,
-                        lifecycle.snapshot().runBinding(),
-                        physicalGroup,
-                        encodedEntries);
+                        request, assigned, reservation, runSnapshot.runBinding(), physicalGroup, encodedEntries);
             } catch (RuntimeException failure) {
                 lifecycle.completeDataGroup(reservation);
                 capacity.orElseThrow().close();
@@ -189,21 +187,35 @@ public final class KafkaBookKeeperOrderedPipelineV1 {
                     .get(physicalGroup.dataFrames().size() - 1)
                     .terminalDescriptor()
                     .orElseThrow();
+            List<KafkaOrderedDurableDataMemberV1> durableMembers = new ArrayList<>(request.memberCount());
+            for (int index = 0; index < physicalGroup.dataFrames().size(); index++) {
+                Nbke2DataV1 frame = physicalGroup.dataFrames().get(index);
+                durableMembers.add(new KafkaOrderedDurableDataMemberV1(
+                        frame.baseOffset(),
+                        frame.endOffsetExclusive(),
+                        reservation.entryId(index),
+                        index,
+                        frame.rawAssignedRecordBatch().length()));
+            }
             KafkaOrderedDurableCommitV1 durableCommit = new KafkaOrderedDurableCommitV1(
                     assigned.startOffset(),
                     assigned.endOffsetExclusive(),
-                    lifecycle.snapshot().handle(),
+                    runSnapshot.runBinding(),
+                    runSnapshot.handle(),
                     descriptor.firstDataEntryId(),
                     descriptor.lastDataEntryId(),
                     request.memberCount(),
                     request.encodedDataBytes(),
-                    descriptor.aggregateAssignedPayloadSha256());
+                    descriptor.aggregateAssignedPayloadSha256(),
+                    physicalGroup.dataFrames().get(0).appendGroupId(),
+                    physicalGroup.dataFrames().get(0).storageAttemptId(),
+                    durableMembers);
             slot = new Slot(durableCommit, capacity.orElseThrow());
             orderedSlots.addLast(slot);
             try {
                 for (int index = 0; index < encodedEntries.size(); index++) {
-                    memberStages.add(submitMember(
-                            lifecycle.snapshot().handle(), reservation.entryId(index), encodedEntries.get(index)));
+                    memberStages.add(
+                            submitMember(runSnapshot.handle(), reservation.entryId(index), encodedEntries.get(index)));
                 }
             } catch (RuntimeException failure) {
                 memberStages.add(CompletableFuture.completedFuture(MemberOutcome.OUTCOME_UNKNOWN));

@@ -103,6 +103,8 @@ public final class KafkaRunTestFixtures {
     public static final class FakeSession implements BookKeeperCellSession {
         public final BookKeeperCapabilitySnapshotV1 capability;
         public final Map<Long, CanonicalBytes> entries = new LinkedHashMap<>();
+        public final java.util.List<Long> readEntryIds = new java.util.ArrayList<>();
+        public final Map<Long, RunLedgerReadResultV1> readOverrides = new LinkedHashMap<>();
         public ProviderMutationResultV1<RunLedgerHandleV1> createOverride;
         public ProviderMutationResultV1<AppendQuorumProofV1> nextAppendOverride;
         public ProviderMutationResultV1<RunLedgerCloseProofV1> closeOverride;
@@ -198,6 +200,11 @@ public final class KafkaRunTestFixtures {
 
         @Override
         public CompletionStage<RunLedgerReadResultV1> readExactEntry(RunLedgerHandleV1 requested, long entryId) {
+            readEntryIds.add(entryId);
+            RunLedgerReadResultV1 override = readOverrides.get(entryId);
+            if (override != null) {
+                return CompletableFuture.completedFuture(override);
+            }
             CanonicalBytes payload = entries.get(entryId);
             if (payload == null) {
                 return CompletableFuture.completedFuture(

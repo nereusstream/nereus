@@ -61,6 +61,9 @@ class KafkaCoherentCommitCoordinatorV1Test {
             assertThat(locator.firstDataEntryId()).isEqualTo(1);
             assertThat(locator.lastDataEntryId()).isEqualTo(2);
             assertThat(locator.memberCount()).isEqualTo(2);
+            assertThat(locator.members())
+                    .extracting(member -> member.startOffset() + ":" + member.entryId())
+                    .containsExactly("100:1", "101:2");
         });
         assertThat(snapshot.committedProducerState().producers()).containsOnlyKeys(7L, 8L);
         assertThat(snapshot.committedProducerState()

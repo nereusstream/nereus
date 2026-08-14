@@ -36,12 +36,25 @@ final class KafkaProtocolStateCodecV1 {
             for (KafkaBookKeeperActiveTailLocatorV1 locator : state.locators()) {
                 out.writeLong(locator.startOffset());
                 out.writeLong(locator.endOffsetExclusive());
+                runBinding(out, locator.runBinding());
                 handle(out, locator.handle());
                 out.writeLong(locator.firstDataEntryId());
                 out.writeLong(locator.lastDataEntryId());
                 out.writeInt(locator.memberCount());
                 out.writeLong(locator.encodedDataBytes());
                 digest(out, locator.aggregateAssignedPayloadSha256());
+                out.writeLong(locator.appendGroupId().highBits());
+                out.writeLong(locator.appendGroupId().lowBits());
+                out.writeLong(locator.storageAttemptId().highBits());
+                out.writeLong(locator.storageAttemptId().lowBits());
+                out.writeInt(locator.members().size());
+                for (KafkaBookKeeperDataLocatorV1 member : locator.members()) {
+                    out.writeLong(member.startOffset());
+                    out.writeLong(member.endOffsetExclusive());
+                    out.writeLong(member.entryId());
+                    out.writeInt(member.memberOrdinal());
+                    out.writeLong(member.rawAssignedRecordBatchBytes());
+                }
             }
         });
     }
@@ -151,6 +164,22 @@ final class KafkaProtocolStateCodecV1 {
         out.writeLong(handle.runId().value().lowBits());
         out.writeLong(handle.ledgerIdentity().ledgerId());
         digest(out, handle.configurationDigest());
+    }
+
+    private static void runBinding(
+            DataOutputStream out, com.nereusstream.kafka.bookkeeper.nbke2.Nbke2RunBindingV1 binding)
+            throws IOException {
+        digest(out, binding.bindingId().digest());
+        out.writeLong(binding.topicIncarnation().topicId().value().highBits());
+        out.writeLong(binding.topicIncarnation().topicId().value().lowBits());
+        tag(out, binding.topicIncarnation().topicName().value());
+        out.writeInt(binding.partitionId());
+        digest(out, binding.storageEpochId().digest());
+        out.writeLong(binding.creatorOwnerEpoch());
+        out.writeInt(binding.kafkaLeaderEpoch());
+        digest(out, binding.providerScopeId().digest());
+        out.writeLong(binding.runId().value().highBits());
+        out.writeLong(binding.runId().value().lowBits());
     }
 
     private static void digest(DataOutputStream out, Sha256Digest digest) throws IOException {
