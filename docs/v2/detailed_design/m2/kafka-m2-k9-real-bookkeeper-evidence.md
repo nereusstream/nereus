@@ -50,3 +50,10 @@ Cell/host pressure may backpressure, close handles, or roll earlier.
 K9 may support the Kafka-owned M2 scenario receipt but does not itself promote a scenario. K10 owns scenario promotion
 and `v2M2KafkaFinalCheck`. Kafka wire/runtime integration, native ISR/HW/election activation, Object WAL, and global M2
 remain outside K9.
+
+`KafkaBookKeeperOperationalDefaultsV1` is the production selection surface. Its independent canonical projection is
+[`kafka-bookkeeper-m2-k9-selected-defaults-v1.json`](../../wire/kafka-bookkeeper-m2-k9-selected-defaults-v1.json).
+It projects directly to the K0 recovery envelope, partition/global pipeline budgets, replica eligibility, and journal
+bounds. The complete record constructor enforces cross-budget coverage, and `loweredBy` rejects any component-wise
+enlargement by a Topic, Cell, or host override. The implementation and its six-test gate do not by themselves replace
+the still-required current-source real-fault and two-tier scale receipt.

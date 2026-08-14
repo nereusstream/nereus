@@ -1,0 +1,60 @@
+{
+  "activeTail": {
+    "maximumAgeNanos": 5000000000,
+    "maximumEncodedBytes": 4194304,
+    "maximumLocators": 4096
+  },
+  "checkpoint": {
+    "maximumEncodedBytes": 1048576,
+    "maximumRecordBatches": 1024
+  },
+  "cursor": {
+    "maximumCoalescedBytes": 4194304,
+    "maximumCoalescedEntries": 64
+  },
+  "handles": {
+    "maximumCachedLedgers": 1024,
+    "maximumConcurrentOpens": 64
+  },
+  "index": {
+    "maximumEncodedBytes": 32768,
+    "maximumLocators": 1024
+  },
+  "pipeline": {
+    "global": {
+      "maximumBytes": 268435456,
+      "maximumEntries": 4096,
+      "maximumGroups": 1024
+    },
+    "partition": {
+      "maximumBytes": 67108864,
+      "maximumEntries": 64,
+      "maximumGroups": 16
+    }
+  },
+  "recovery": {
+    "maximumElapsedNanos": 30000000000,
+    "maximumEncodedBytes": 8388608,
+    "maximumEntries": 4096
+  },
+  "replica": {
+    "journal": {
+      "maximumEncodedBytes": 67108864,
+      "maximumRecords": 8192
+    },
+    "maximumApplyLagOffsets": 4096,
+    "maximumUnappliedBytes": 33554432,
+    "maximumUnappliedNanos": 5000000000
+  },
+  "rollover": {
+    "maximumAgeNanos": 900000000000,
+    "maximumEncodedBytes": 268435456,
+    "maximumEntries": 262144
+  },
+  "schema": "NEREUS_V2_M2_KAFKA_K9_SELECTED_DEFAULTS_V1",
+  "selectionId": "KAFKA_BOOKKEEPER_M2_K9_2026_08_14_V1",
+  "waiters": {
+    "maximumCellWaiters": 65536,
+    "maximumPartitionWaiters": 1024
+  }
+}
