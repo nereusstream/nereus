@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <!-- This module was also published with a richer model, Gradle metadata,  -->
+  <!-- which should be used instead. Do not delete the following line which  -->
+  <!-- is to indicate to Gradle or any Gradle module metadata file consumer  -->
+  <!-- that they should prefer consuming it instead. -->
+  <!-- do_not_remove: published-with-gradle-metadata -->
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.nereusstream</groupId>
+  <artifactId>nereus-storage-bookkeeper</artifactId>
+  <version>0.2.0-m2.cf465a637b960642b08287c5178ad45f2c0a240c</version>
+  <name>nereus-storage-bookkeeper</name>
+  <description>Nereus V2 module nereus-storage-bookkeeper</description>
+  <url>https://nereusstream.com</url>
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+    </license>
+  </licenses>
+  <scm>
+    <connection>scm:git:https://github.com/nereusstream/nereus.git</connection>
+    <url>https://github.com/nereusstream/nereus</url>
+  </scm>
+  <dependencies>
+    <dependency>
+      <groupId>com.nereusstream</groupId>
+      <artifactId>nereus-storage-api</artifactId>
+      <version>0.2.0-m2.cf465a637b960642b08287c5178ad45f2c0a240c</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.bookkeeper</groupId>
+      <artifactId>bookkeeper-server</artifactId>
+      <version>4.18.0</version>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+</project>

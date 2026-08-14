@@ -236,6 +236,42 @@
     "receipt": "docs/v2/evidence/v2-m1/n1/n1-artifact.json",
     "evidenceStatus": "IMMUTABLE_INPUT_ONLY"
   },
+  "m2KafkaK0ModuleBinding": {
+    "sourceTupleId": "v2-m2",
+    "sourceCommit": "cf465a637b960642b08287c5178ad45f2c0a240c",
+    "coordinateVersion": "0.2.0-m2.cf465a637b960642b08287c5178ad45f2c0a240c",
+    "bundleRoot": "gradle/locked-artifacts/nereus-m2/cf465a637b960642b08287c5178ad45f2c0a240c",
+    "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+    "n1CoordinateVersion": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+    "requiredModules": [
+      "com.nereusstream:nereus-storage-api:0.2.0-m2.cf465a637b960642b08287c5178ad45f2c0a240c",
+      "com.nereusstream:nereus-storage-bookkeeper:0.2.0-m2.cf465a637b960642b08287c5178ad45f2c0a240c",
+      "com.nereusstream:nereus-kafka-bookkeeper:0.2.0-m2.cf465a637b960642b08287c5178ad45f2c0a240c"
+    ],
+    "artifactCount": 16,
+    "artifactBytes": 17839,
+    "manifest": {
+      "relativePath": "manifest.sha256",
+      "bytes": 3217,
+      "sha256": "6827a8f6e32698ba24aaa81582a69778f3457d80b5486b871611bec3dc4802d4"
+    },
+    "bookKeeperInput": {
+      "repository": "https://github.com/apache/bookkeeper.git",
+      "tag": "release-4.18.0",
+      "tagObject": "bb51381cfb1126a79000cd3211f6293dbd982554",
+      "sourceCommit": "cd06340851d6d657b7c7546df01df365c18980de",
+      "mavenCoordinate": "org.apache.bookkeeper:bookkeeper-server:4.18.0",
+      "jarBytes": 2760614,
+      "jarSha256": "8e64f2b7436bb814705f611eb0ac48d64d90de7a50d295905c459d89bc3f9d8f",
+      "pomBytes": 12981,
+      "pomSha256": "475960270066f0a03ae12b227ced2a2d9b019c7462fec8143a1ab6c92c09b730",
+      "evidenceStatus": "EXACT_DEVELOPMENT_INPUT"
+    },
+    "receipt": "docs/v2/evidence/v2-m2/kafka/k0-module/k0-module.json",
+    "result": "PASS_K0_M_INPUT_ONLY",
+    "promotionEligible": false,
+    "evidenceStatus": "IMMUTABLE_INPUT_ONLY"
+  },
   "p1MetadataCapabilityBinding": {
     "sourceCommit": "17497c37901288d60d5d221e73f672a314371a45",
     "coordinateVersion": "0.2.0-p1.17497c37901288d60d5d221e73f672a314371a45",

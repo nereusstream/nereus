@@ -15,7 +15,7 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | Slice | Design | Status |
 | --- | --- | --- |
 | M2-K0 | [Kafka implementation-input closure](kafka-m2-k0-implementation-input-closure.md) | design accepted; production constants/codecs/provider/gates and evidence not started |
-| M2-K0-M | [Module graph and immutable N1 input](kafka-m2-k0-module-graph.md) | implementation and non-zero local gate landed; source-qualified bundle/receipt pending |
+| M2-K0-M | [Module graph and immutable N1 input](kafka-m2-k0-module-graph.md) | current immutable-input receipt; provider/wire/runtime/scenarios excluded |
 | M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | semantic direction accepted; exact NBKE2 bytes/numeric bounds/evidence not started |
 | M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | protocol semantics accepted; exact Java/wire/integration/evidence not started |
 

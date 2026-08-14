@@ -2,9 +2,10 @@
 productLine: V2
 designStatus: Accepted
 implementationStatus: InProgress
-evidenceStatus: NotRun
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k0-module/k0-module.json
 ---
 
 # M2-K0-M module graph and immutable N1 input
@@ -17,8 +18,9 @@ and adapter but adds no Kafka runtime activation.
 
 `v2M2KafkaK0ModuleCheck` executes one non-zero boundary suite in every module, validates exact N1 and BookKeeper JAR
 linkage, generates all three binary/source JARs plus POM/Gradle metadata, and checks the filtered source-qualified M2
-publication guard. The source-qualified bundle is produced only from a clean pushed implementation commit and refuses
-an existing destination. Its receipt and source-lock binding land as evidence descendants of that tested source.
+publication guard. The source-qualified bundle was produced only from clean pushed commit `cf465a637b960642b08287c5178ad45f2c0a240c`;
+two builds were byte-identical. The [current receipt](../../evidence/v2-m2/kafka/k0-module/README.md) binds the closed
+16-file manifest and exact Apache BookKeeper `release-4.18.0` source/Maven input.
 
 This slice does not implement a provider session, buffer ownership, `NBKE2`, checked admission, a run writer, native
 Kafka transport, a scenario PASS, `v2M2KafkaInputsCheck`, or global M2 Final. Those absent gates remain absent.

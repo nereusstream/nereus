@@ -1,0 +1,43 @@
+{
+  "schema": "NEREUS_V2_M2_KAFKA_K0_MODULE_RECEIPT_V1",
+  "kind": "K0_M_IMMUTABLE_MODULE_INPUT",
+  "sourceTupleId": "v2-m2",
+  "result": "PASS_K0_M_INPUT_ONLY",
+  "promotionEligible": false,
+  "sourceCommit": "cf465a637b960642b08287c5178ad45f2c0a240c",
+  "coordinateVersion": "0.2.0-m2.cf465a637b960642b08287c5178ad45f2c0a240c",
+  "bundleRoot": "gradle/locked-artifacts/nereus-m2/cf465a637b960642b08287c5178ad45f2c0a240c",
+  "manifestSha256": "6827a8f6e32698ba24aaa81582a69778f3457d80b5486b871611bec3dc4802d4",
+  "bindingSha256": "7269bec76ab25124979764e342aed172313d8ec28d129297daf8dc2e676153ba",
+  "artifactCount": 16,
+  "artifactBytes": 17839,
+  "cleanBuilds": 2,
+  "byteIdentical": true,
+  "n1SourceCommit": "330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+  "n1CoordinateVersion": "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e",
+  "bookKeeper": {
+    "tag": "release-4.18.0",
+    "tagObject": "bb51381cfb1126a79000cd3211f6293dbd982554",
+    "sourceCommit": "cd06340851d6d657b7c7546df01df365c18980de",
+    "mavenCoordinate": "org.apache.bookkeeper:bookkeeper-server:4.18.0",
+    "jarSha256": "8e64f2b7436bb814705f611eb0ac48d64d90de7a50d295905c459d89bc3f9d8f",
+    "pomSha256": "475960270066f0a03ae12b227ced2a2d9b019c7462fec8143a1ab6c92c09b730"
+  },
+  "tests": {
+    "modules": 3,
+    "discovered": 3,
+    "executed": 3,
+    "passed": 3,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "requiredGate": "v2M2KafkaK0ModuleCheck",
+  "scope": [
+    "K0_M_MODULE_GRAPH_AND_IMMUTABLE_INPUT_ONLY",
+    "NO_PROVIDER_SESSION_OR_BUFFER_OWNERSHIP",
+    "NO_NBKE2_OR_CHECKED_NUMERIC_ADMISSION",
+    "NO_KAFKA_RUNTIME_OR_SCENARIO_PROMOTION",
+    "NO_KAFKA_INPUTS_OR_M2_FINAL_PASS"
+  ]
+}

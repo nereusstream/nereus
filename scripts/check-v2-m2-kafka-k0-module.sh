@@ -19,6 +19,8 @@ n1_manifest_sha="$(jq -er '.n1ArtifactBinding.manifest.sha256' docs/v2/source-lo
 [[ "$(shasum -a 256 "$n1_root/manifest.sha256" | awk '{print $1}')" == "$n1_manifest_sha" ]] ||
     fail "immutable N1 manifest digest mismatch"
 
+python3 scripts/check-v2-m2-kafka-k0-artifact.py
+
 for module in nereus-storage-api nereus-storage-bookkeeper nereus-kafka-bookkeeper; do
     [[ -f "$module/build/libs/$module-0.2.0-SNAPSHOT.jar" ]] || fail "$module binary JAR is missing"
     [[ -f "$module/build/libs/$module-0.2.0-SNAPSHOT-sources.jar" ]] || fail "$module sources JAR is missing"
