@@ -28,6 +28,7 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | M2-K6 | [Packed targeted and sequential reader](kafka-m2-k6-targeted-reader.md) | entry-local NBKE2/Kafka validation and captured isolation bounds; runtime/recovery/real BK excluded |
 | M2-K7 | [Checkpoint kernel and election-bounded recovery](kafka-m2-k7-checkpoint-recovery.md) | aligned KPC1/NBKE2 state, cumulative suffix envelope, and native adoption cut; HW/runtime/real BK excluded |
 | M2-K8 | [Replica descriptor, journal, and eligibility kernel](kafka-m2-k8-replica-observation.md) | fixed KRD1/KRO1, exact sync seam, Observed/Applied bounds, source replacement, and election harness; runtime excluded |
+| M2-K9 | [Real BookKeeper fault and scale evidence](kafka-m2-k9-real-bookkeeper-evidence.md) | exact-image provider/engine calibration complete; 10k/100k thresholds and harness predeclared, formal results pending |
 | M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | implementation started at K0 module/provider/wire/numeric inputs; runtime/evidence pending |
 | M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | implementation started at K1 pure coherent state; storage/runtime/evidence pending |
 

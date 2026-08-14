@@ -27,10 +27,19 @@ val realBookKeeperTest by sourceSets.creating {
     runtimeClasspath += output + compileClasspath
 }
 
+val bookKeeperScale by sourceSets.creating {
+    java.srcDir("src/bookKeeperScale/java")
+    compileClasspath += sourceSets.main.get().output + configurations.runtimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
 configurations[realBookKeeperTest.implementationConfigurationName]
     .extendsFrom(configurations.testImplementation.get())
 configurations[realBookKeeperTest.runtimeOnlyConfigurationName]
     .extendsFrom(configurations.testRuntimeOnly.get())
+
+configurations[bookKeeperScale.implementationConfigurationName]
+    .extendsFrom(configurations.implementation.get())
 
 tasks.register<Test>("realBookKeeperTest") {
     group = "verification"
@@ -44,6 +53,23 @@ tasks.register<Test>("realBookKeeperTest") {
         "nereus.bookkeeper.metadataServiceUri",
         providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").get(),
     )
+}
+
+tasks.register<JavaExec>("v2M2KafkaK9Scale") {
+    group = "verification"
+    description = "Run one predeclared K9 scale tier against the exact-image real BookKeeper cluster."
+    dependsOn(tasks.named(bookKeeperScale.classesTaskName))
+    classpath = bookKeeperScale.runtimeClasspath
+    workingDir(rootProject.projectDir)
+    mainClass.set("com.nereusstream.kafka.bookkeeper.evidence.KafkaBookKeeperScaleHarnessV1")
+    args(
+        providers.gradleProperty("v2M2KafkaK9ScalePlan").get(),
+        providers.gradleProperty("v2M2KafkaK9ConformanceConfig").get(),
+        providers.gradleProperty("v2M2KafkaK9ScaleTier").get(),
+        providers.gradleProperty("v2M2KafkaK9ScaleOutput").get(),
+        providers.gradleProperty("v2M2KafkaK9TestedSourceCommit").get(),
+    )
+    maxHeapSize = "1024m"
 }
 
 tasks.withType<Jar>().configureEach {

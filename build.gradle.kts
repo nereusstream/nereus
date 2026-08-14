@@ -902,6 +902,20 @@ tasks.register("v2M2KafkaK8Check") {
     dependsOn("v2M2KafkaK8SourceCheck", "v2M2KafkaK7Check", "v2DocumentationCheck")
 }
 
+tasks.register<Exec>("v2M2KafkaK9PlanSourceCheck") {
+    group = "verification"
+    description = "Verify the predeclared K9 exact-image 10k/100k scale plan before any result is admitted."
+    dependsOn(":nereus-kafka-bookkeeper:bookKeeperScaleClasses")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-kafka-k9-plan.sh")
+}
+
+tasks.register("v2M2KafkaK9PlanCheck") {
+    group = "verification"
+    description = "Compile and verify the K9 plan and harness; this gate contains no scale result or scenario PASS."
+    dependsOn("v2M2KafkaK9PlanSourceCheck", "v2M2KafkaK8Check", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
