@@ -1808,7 +1808,23 @@ if passed_kafka_m2:
         if item["id"] in promotable_kafka_m2 and item.get("evidenceReceipt") != expected_kafka_receipt:
             fail(f"{item['id']} does not bind the exact Kafka M2 Final receipt")
 
-recognized_current = promotable_m1 | promotable_kafka_m2
+promotable_pulsar_m2 = {
+    "V2-BK-001", "V2-BK-002", "V2-BK-004", "V2-BK-005", "V2-BK-006", "V2-BK-007",
+    "V2-BK-008", "V2-BK-009", "V2-BK-010", "V2-BK-012", "V2-BK-013",
+}
+passed_pulsar_m2 = passed_current & promotable_pulsar_m2
+if passed_pulsar_m2 not in (set(), promotable_pulsar_m2):
+    fail(
+        "Pulsar Final must promote either none or the exact Pulsar M2 set, "
+        f"found {sorted(passed_pulsar_m2)}"
+    )
+if passed_pulsar_m2:
+    expected_pulsar_receipt = "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json"
+    for item in scenarios["scenarios"]:
+        if item["id"] in promotable_pulsar_m2 and item.get("evidenceReceipt") != expected_pulsar_receipt:
+            fail(f"{item['id']} does not bind the exact Pulsar M2 Final receipt")
+
+recognized_current = promotable_m1 | promotable_kafka_m2 | promotable_pulsar_m2
 unexpected_current = passed_current - recognized_current
 if unexpected_current:
     fail(f"current-source scenario promotion lacks a closed receipt group: {sorted(unexpected_current)}")

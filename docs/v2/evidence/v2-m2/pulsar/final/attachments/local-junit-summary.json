@@ -1,0 +1,75 @@
+{
+  "schema": "NEREUS_V2_M2_PULSAR_FINAL_LOCAL_JUNIT_SUMMARY_V1",
+  "result": "PASS",
+  "testedSourceCommit": "4af3278234d84df7a2fdce4fc6b3e4e227916d56",
+  "suites": 9,
+  "tests": 85,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "suiteResults": [
+    {
+      "name": "com.nereusstream.pulsar.offload.NereusPulsarLedgerOffloaderV1Test",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.nereusstream.pulsar.offload.PulsarBookKeeperDeletionCoordinatorV1Test",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.nereusstream.pulsar.offload.PulsarDualSourceReadHandleV1Test",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1Test",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.nereusstream.pulsar.offload.PulsarOffloadBlockPolicyV1Test",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.nereusstream.pulsar.offload.PulsarOffloadP0ContractTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.nereusstream.pulsar.offload.PulsarSealedLedgerPublisherV1Test",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.nereusstream.pulsar.offload.npd1.Npd1CodecV1Test",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.nereusstream.pulsar.offload.npo1.Npo1CodecV1Test",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ]
+}

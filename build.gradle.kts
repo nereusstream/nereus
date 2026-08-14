@@ -1100,6 +1100,7 @@ tasks.register("v2M2PulsarP4Check") {
 tasks.register<Exec>("v2M2PulsarP5NativeForkTest") {
     group = "verification"
     description = "Run the exact Pulsar-fork dual-source and source-deletion tests for the P5 native binding."
+    mustRunAfter(":nereus-pulsar-offload:test")
     usesService(pulsarCheckoutGate)
     workingDir = file(pulsarCheckoutPath.get())
     commandLine(
@@ -1157,6 +1158,46 @@ tasks.register("v2M2PulsarFinalPolicyCheck") {
     group = "verification"
     description = "Run Pulsar Final readiness only; no scenario receipt, Pulsar Final, or global M2 PASS is claimed."
     dependsOn("v2M2PulsarFinalPolicySourceCheck", "v2DocumentationCheck")
+}
+
+val v2M2PulsarFinalReceiptPath =
+    layout.projectDirectory.file("docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json")
+
+tasks.register<JavaExec>("v2M2PulsarFinalReceiptSourceCheck") {
+    group = "verification"
+    description = "Resolve the canonical Pulsar M2 Final receipt through the production fail-closed resolver."
+    dependsOn(":nereus-pulsar-offload:classes")
+    classpath = files(layout.projectDirectory.dir("nereus-pulsar-offload/build/classes/java/main"))
+    workingDir = layout.projectDirectory.asFile
+    mainClass.set("com.nereusstream.pulsar.offload.evidence.PulsarM2FinalReceiptCli")
+    setArgs(
+        listOf(
+            "validate",
+            layout.projectDirectory.asFile.absolutePath,
+            v2M2PulsarFinalReceiptPath.asFile.absolutePath,
+        ),
+    )
+}
+
+tasks.register<Exec>("v2M2PulsarFinalEvidenceSourceCheck") {
+    group = "verification"
+    description = "Verify Pulsar Final named results, attachments, source freshness, and scenario publication."
+    dependsOn(":nereus-pulsar-offload:test", "v2M2PulsarFinalReceiptSourceCheck")
+    usesService(pulsarCheckoutGate)
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m2-pulsar-final-evidence.py", pulsarCheckoutPath.get())
+}
+
+tasks.register("v2M2PulsarFinalCheck") {
+    group = "verification"
+    description = "Run the Pulsar-only M2 Final aggregate; broker activation, M8, and global M2 remain separate."
+    dependsOn(
+        "v2M2PulsarFinalEvidenceSourceCheck",
+        "v2M2PulsarFinalPolicyCheck",
+        "v2M2PulsarP6Check",
+        "v2M2KafkaFinalCheck",
+        "v2DocumentationCheck",
+    )
 }
 
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")

@@ -1,0 +1,26 @@
+{
+  "schema": "NEREUS_V2_M2_PULSAR_FINAL_NATIVE_JUNIT_SUMMARY_V1",
+  "result": "PASS",
+  "testedSourceCommit": "4af3278234d84df7a2fdce4fc6b3e4e227916d56",
+  "suites": 2,
+  "tests": 26,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "suiteResults": [
+    {
+      "name": "org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ]
+}

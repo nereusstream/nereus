@@ -547,16 +547,16 @@
       "milestone": "M2",
       "contract": "both BookKeeper profiles ACK at quorum without synchronous Object dependency",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json"
     },
     {
       "id": "V2-BK-002",
       "milestone": "M2",
       "contract": "ManagedLedger metadata is sole Pulsar async offload authority and 0.2 offloads sealed non current ledgers only",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json"
     },
     {
       "id": "V2-BK-003",
@@ -571,56 +571,56 @@
       "milestone": "M2",
       "contract": "one sealed Pulsar ledger attempt uses one bounded data Object plus one deterministic sparse index root Object",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json"
     },
     {
       "id": "V2-BK-005",
       "milestone": "M2",
       "contract": "persisted attempt scope derives deterministic data root keys and a bounded canonical root verifies publication and root first cleanup",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json"
     },
     {
       "id": "V2-BK-006",
       "milestone": "M2",
       "contract": "NPO1 uses one bounded canonical big endian four section root with hard parser limits and self digest before index trust",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json"
     },
     {
       "id": "V2-BK-007",
       "milestone": "M2",
       "contract": "native BookKeeper source deletion performs final exact Object pair and read path revalidation then rechecks the same eligible attempt under CAS",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json"
     },
     {
       "id": "V2-BK-008",
       "milestone": "M2",
       "contract": "native dual source reads allow at most one whole range single source fallback while both sources remain eligible",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json"
     },
     {
       "id": "V2-BK-009",
       "milestone": "M2",
       "contract": "NPO1 indexes ordered gap free independently verifiable NPD1 multi entry blocks with bounded entry directories and no cross block state",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json"
     },
     {
       "id": "V2-BK-010",
       "milestone": "M2",
       "contract": "one ManagedLedger owned dual source handle uses source specific range pins and drains BookKeeper pins before the native deletion CAS",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json"
     },
     {
       "id": "V2-BK-011",
@@ -635,16 +635,16 @@
       "milestone": "M2",
       "contract": "NPD1 uses checked 32 byte data 64 byte block envelopes and 16 byte derived entry ID rows while Object processing streams within admitted provider capabilities",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json"
     },
     {
       "id": "V2-BK-013",
       "milestone": "M2",
       "contract": "NPD1 block policy evidence uses 1 4 8 16 MiB candidates without wire enums Deployment Namespace Topic owns defaults overrides Cell host only cap and resolved class persists per attempt",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json"
     },
     {
       "id": "V2-BK-014",

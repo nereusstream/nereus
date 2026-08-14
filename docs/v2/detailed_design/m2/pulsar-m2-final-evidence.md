@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json
 ---
 
 # Pulsar M2 Final evidence

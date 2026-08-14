@@ -1,0 +1,33 @@
+{
+  "schema": "NEREUS_V2_M2_PULSAR_FINAL_P6_PROVIDER_JUNIT_SUMMARY_V1",
+  "result": "PASS",
+  "testedSourceCommit": "4af3278234d84df7a2fdce4fc6b3e4e227916d56",
+  "suites": 3,
+  "tests": 5,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "suiteResults": [
+    {
+      "name": "com.nereusstream.pulsar.offload.P6MinioProviderEvidenceTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.nereusstream.pulsar.offload.PulsarP6CandidateEvidenceTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.nereusstream.pulsar.offload.S3PulsarOffloadObjectStoreV1Test",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ]
+}
