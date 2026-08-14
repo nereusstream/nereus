@@ -35,6 +35,7 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | M2-P0 | [Pulsar offload input closure](pulsar-m2-p0-input-closure.md) | sealed-ledger attempt, deterministic keys, provider capability, candidate-limit, retention, and delete-state inputs; non-promotable |
 | M2-P1 | [NPD1/NPB1 data codec](pulsar-m2-p1-npd1-codec.md) | streaming file encode, block-local NONE/ZSTD plus AES-GCM, derived 16-byte rows, and targeted corruption matrix; defaults unselected |
 | M2-P2 | [NPO1 sealed-ledger root](pulsar-m2-p2-npo1-root.md) | canonical four-section root, complete sealed-ledger facts, dual-domain sparse coverage, hard parser caps, and self-digest matrix |
+| M2-P3 | [Sealed-ledger publication engine](pulsar-m2-p3-publication-engine.md) | data-before-root immutable publication, response-loss HEAD resolution, exact-EOF streaming body, actual-reader verifier, and root-first cleanup |
 
 M1 Final is complete at the trusted predecessor source tuple. M2 remains `InProgress`. K0 through K9 have focused
 implementation gates, and K10 now has a production closed receipt/resolver plus a current-source Kafka Final receipt.
