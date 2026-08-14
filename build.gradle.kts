@@ -975,6 +975,44 @@ tasks.register("v2M2KafkaK10PolicyCheck") {
     dependsOn("v2M2KafkaK10PolicySourceCheck", "v2M2KafkaK9PlanCheck", "v2DocumentationCheck")
 }
 
+val v2M2KafkaFinalReceiptPath =
+    layout.projectDirectory.file("docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json")
+
+tasks.register<JavaExec>("v2M2KafkaFinalReceiptSourceCheck") {
+    group = "verification"
+    description = "Resolve the canonical Kafka M2 Final receipt through the production fail-closed resolver."
+    dependsOn(":nereus-kafka-bookkeeper:classes")
+    classpath = files(layout.projectDirectory.dir("nereus-kafka-bookkeeper/build/classes/java/main"))
+    workingDir = layout.projectDirectory.asFile
+    mainClass.set("com.nereusstream.kafka.bookkeeper.evidence.KafkaM2FinalReceiptCli")
+    setArgs(
+        listOf(
+            "validate",
+            layout.projectDirectory.asFile.absolutePath,
+            v2M2KafkaFinalReceiptPath.asFile.absolutePath,
+        ),
+    )
+}
+
+tasks.register<Exec>("v2M2KafkaFinalEvidenceSourceCheck") {
+    group = "verification"
+    description = "Verify K10 current-source named results, attachments, freshness, and scenario publication."
+    dependsOn(":nereus-kafka-bookkeeper:test", "v2M2KafkaFinalReceiptSourceCheck")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m2-kafka-final-evidence.py")
+}
+
+tasks.register("v2M2KafkaFinalCheck") {
+    group = "verification"
+    description = "Run the Kafka-only M2 Final aggregate; Pulsar M2 and global v2M2Check remain separate."
+    dependsOn(
+        "v2M2KafkaFinalEvidenceSourceCheck",
+        "v2M2KafkaK10PolicyCheck",
+        "v2M2KafkaK9Check",
+        "v2DocumentationCheck",
+    )
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)

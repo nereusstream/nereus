@@ -55,9 +55,15 @@ if subprocess.run(
 
 allowed_evidence_paths = (
     "build.gradle.kts",
+    "docs/v2/09-scenario-evidence-matrix.md",
+    "docs/v2/v2-scenarios.json",
     "docs/v2/detailed_design/m2/README.md",
     "docs/v2/detailed_design/m2/kafka-m2-k9-real-bookkeeper-evidence.md",
+    "docs/v2/detailed_design/m2/kafka-m2-k10-final-evidence.md",
     "docs/v2/evidence/v2-m2/kafka/k9/",
+    "docs/v2/evidence/v2-m2/kafka/k10/",
+    "scripts/check-v2-documentation.sh",
+    "scripts/check-v2-m2-kafka-final-evidence.py",
     "scripts/check-v2-m2-kafka-k9-evidence.sh",
 )
 changed = subprocess.check_output(

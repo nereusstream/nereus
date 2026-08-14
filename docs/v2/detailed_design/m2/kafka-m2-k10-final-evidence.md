@@ -1,8 +1,8 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Implemented
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
 ---
@@ -46,5 +46,11 @@ publish the canonical K10 receipt and scenario-matrix changes without changing t
 ## Gate boundary
 
 `v2M2KafkaK10PolicyCheck` compiles the production codec/resolver/policy and runs its rejection matrix. It is a readiness
-gate only and cannot promote a scenario. `v2M2KafkaFinalCheck` will exist only with current-source K9 evidence, the
-canonical K10 receipt, exact-suite publication checks, and the ten synchronized scenario rows.
+gate only and cannot promote a scenario. The published
+[`kafka-final.json`](../../evidence/v2-m2/kafka/k10/kafka-final.json) binds tested source
+`2b5d3be9605943c2217daa6d45740ddf832d6d0a`, the refreshed current-source K9 receipt, 40 exact named-suite
+references, and seven typed attachments. `v2M2KafkaFinalCheck` revalidates that receipt through the production resolver,
+reexecutes K2 and the complete K9 aggregate, checks the live local-suite publication and both synchronized scenario
+registries, and rejects any source/configuration change after the tested commit.
+
+This is Kafka Final only. Pulsar M2 and the separate global `v2M2Check` remain pending.

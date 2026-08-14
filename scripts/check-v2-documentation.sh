@@ -1761,9 +1761,10 @@ if implemented_not_run != {"V2-META-003"}:
     fail(f"partial M1 foundation must promote only V2-META-003, found {sorted(implemented_not_run)}")
 passed_current = {key for key, value in json_statuses.items() if value == "PASSED_CURRENT_SOURCE"}
 promotable_m1 = {f"V2-POSITION-{ordinal:03d}" for ordinal in range(3, 12)}
-if passed_current not in (set(), promotable_m1):
-    fail(f"N3 must promote either none or the exact M1 virtual-ledger set, found {sorted(passed_current)}")
-if passed_current:
+passed_m1 = passed_current & promotable_m1
+if passed_m1 not in (set(), promotable_m1):
+    fail(f"N3 must promote either none or the exact M1 virtual-ledger set, found {sorted(passed_m1)}")
+if passed_m1:
     expected_paths = {
         **{f"V2-POSITION-{ordinal:03d}": "docs/v2/evidence/v2-m1/n3/registry-conformance.json"
            for ordinal in range(3, 10)},
@@ -1773,6 +1774,28 @@ if passed_current:
     for item in scenarios["scenarios"]:
         if item["id"] in promotable_m1 and item.get("evidenceReceipt") != expected_paths[item["id"]]:
             fail(f"{item['id']} does not bind the exact N3 receipt")
+
+promotable_kafka_m2 = {
+    "V2-BK-003", "V2-BK-014", "V2-BK-015", "V2-BK-016", "V2-BK-017",
+    "V2-KAF-DATA-001", "V2-KAF-DATA-002", "V2-KAF-DATA-004", "V2-KAF-DATA-005",
+    "V2-KAF-DATA-014",
+}
+passed_kafka_m2 = passed_current & promotable_kafka_m2
+if passed_kafka_m2 not in (set(), promotable_kafka_m2):
+    fail(
+        "K10 must promote either none or the exact Kafka M2 set, "
+        f"found {sorted(passed_kafka_m2)}"
+    )
+if passed_kafka_m2:
+    expected_kafka_receipt = "docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json"
+    for item in scenarios["scenarios"]:
+        if item["id"] in promotable_kafka_m2 and item.get("evidenceReceipt") != expected_kafka_receipt:
+            fail(f"{item['id']} does not bind the exact Kafka M2 Final receipt")
+
+recognized_current = promotable_m1 | promotable_kafka_m2
+unexpected_current = passed_current - recognized_current
+if unexpected_current:
+    fail(f"current-source scenario promotion lacks a closed receipt group: {sorted(unexpected_current)}")
 
 tradeoff_text = tradeoff_path.read_text()
 tradeoff_rows = re.findall(r"^\| (T-[A-Z]+-[0-9]{2}) \| (Accepted|Provisional) \|", tradeoff_text, re.M)

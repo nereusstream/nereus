@@ -563,8 +563,8 @@
       "milestone": "M2",
       "contract": "the accepted one logical ledger chain per Kafka partition layout passes 10k and 100k resource evidence without silently selecting pooled ledgers",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json"
     },
     {
       "id": "V2-BK-004",
@@ -651,48 +651,48 @@
       "milestone": "M2",
       "contract": "Kafka BookKeeper profiles preserve one Kafka Offset Domain while coarse run generation roots and packed in ledger RecordBatch locators map stable logical coverage to replaceable physical extents",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json"
     },
     {
       "id": "V2-BK-015",
       "milestone": "M2",
       "contract": "one Kafka append commit set stores durable group evidence in BookKeeper performs zero per append remote control metadata IO and publishes only through an ordered contiguous queue over bounded overlapping writes",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json"
     },
     {
       "id": "V2-BK-016",
       "milestone": "M2",
       "contract": "Kafka Fetch uses run index floor lookup and a targeted DATA entry read with entry local integrity rather than reading and hashing the complete append extent",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json"
     },
     {
       "id": "V2-BK-017",
       "milestone": "M2",
       "contract": "asynchronous range index checkpoints plus a sealed authenticated footer bound takeover to a declared entry byte time tail without losing or inventing an acknowledged Kafka prefix",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json"
     },
     {
       "id": "V2-KAF-DATA-001",
       "milestone": "M2",
       "contract": "out of order primary WAL completion never advances durable LEO or acknowledgement past a predecessor",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json"
     },
     {
       "id": "V2-KAF-DATA-002",
       "milestone": "M2",
       "contract": "a definitive predecessor failure fences the run and leaves later physical entries unreachable without a Kafka offset hole",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json"
     },
     {
       "id": "V2-KAF-DATA-003",
@@ -707,16 +707,16 @@
       "milestone": "M2",
       "contract": "one producer pipelines sequence contiguous batches through committed plus speculative producer state without duplicate allocation",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json"
     },
     {
       "id": "V2-KAF-DATA-005",
       "milestone": "M2",
       "contract": "takeover reconstructs physical and transaction state while native HW separately derives LSO",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json"
     },
     {
       "id": "V2-KAF-DATA-006",
@@ -787,8 +787,8 @@
       "milestone": "M2",
       "contract": "oversized or capacity rejected Produce fails before offset admission",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json"
     },
     {
       "id": "V2-KAF-DATA-015",

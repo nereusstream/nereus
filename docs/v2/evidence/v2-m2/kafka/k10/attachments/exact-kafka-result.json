@@ -1,0 +1,21 @@
+{
+  "schema": "NEREUS_V2_M2_KAFKA_K10_EXACT_KAFKA_RESULT_V1",
+  "result": "PASS",
+  "testedSourceCommit": "2b5d3be9605943c2217daa6d45740ddf832d6d0a",
+  "kafkaForkCommit": "8afbc425660f3466bdc3255e3dd4eb43f8685af1",
+  "templateSha256": "8b583a5f17033216fa2ce95aaa24c58e4adf1d1c5528a580ec1ba130a4a0f513",
+  "suites": 1,
+  "tests": 13,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "suiteResults": [
+    {
+      "name": "org.apache.kafka.clients.record.Kafka43AssignedRecordBatchConformance",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ]
+}
