@@ -39,6 +39,8 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | M2-P4-OBJ | [Object read handle](pulsar-m2-p4-object-reader.md) | bounded root HEAD/GET, exact immutable data proof, block-local targeted reads, typed failures, and streaming complete-ledger revalidation |
 | M2-P4-DUAL | [Dual-source reads and BK deletion](pulsar-m2-p4-dual-source-and-delete.md) | whole-range one-shot fallback, exact-version pins, quarantine signal, bounded drain, final revalidation, INTENT/DONE CAS, and restart reconciliation |
 | M2-P5 | [Exact-source native offload provider](pulsar-m2-p5-native-provider.md) | source-composite `SourceSafeLedgerOffloader`, bounded native batches, restart-readable driver metadata, native read adapter, and exact fork binding; policy/provider evidence remains P6 |
+| M2-P6 | [Provider and block-policy evidence](pulsar-m2-p6-provider-and-block-policy.md) | exact LocalStack/MinIO/native evidence selects the 1/4/8-MiB class catalog, 4-MiB default, and lower 0.2 provider caps; non-promotable alone |
+| M2-PFINAL | [Pulsar Final evidence](pulsar-m2-final-evidence.md) | production canonical receipt/resolver and exact eleven-scenario allowlist; current-source receipt pending |
 
 M1 Final is complete at the trusted predecessor source tuple. M2 remains `InProgress`. K0 through K9 have focused
 implementation gates, and K10 now has a production closed receipt/resolver plus a current-source Kafka Final receipt.

@@ -1,8 +1,8 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: Complete
-evidenceStatus: Passed
+implementationStatus: InProgress
+evidenceStatus: NotRun
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
 ---

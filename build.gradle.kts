@@ -1143,6 +1143,22 @@ tasks.register("v2M2PulsarP6Check") {
     dependsOn("v2M2PulsarP6SourceCheck", "v2M2PulsarP5Check", "v2DocumentationCheck")
 }
 
+val v2M2PulsarFinalPolicyTest = project(":nereus-pulsar-offload").tasks.named<Test>("test")
+
+tasks.register<Exec>("v2M2PulsarFinalPolicySourceCheck") {
+    group = "verification"
+    description = "Verify the production Pulsar Final receipt mechanics and exact eleven-scenario policy."
+    dependsOn(v2M2PulsarFinalPolicyTest)
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-pulsar-final-policy.sh")
+}
+
+tasks.register("v2M2PulsarFinalPolicyCheck") {
+    group = "verification"
+    description = "Run Pulsar Final readiness only; no scenario receipt, Pulsar Final, or global M2 PASS is claimed."
+    dependsOn("v2M2PulsarFinalPolicySourceCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)

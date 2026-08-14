@@ -60,6 +60,8 @@ required_v2_docs=(
     detailed_design/m2/pulsar-m2-p4-object-reader.md
     detailed_design/m2/pulsar-m2-p4-dual-source-and-delete.md
     detailed_design/m2/pulsar-m2-p5-native-provider.md
+    detailed_design/m2/pulsar-m2-p6-provider-and-block-policy.md
+    detailed_design/m2/pulsar-m2-final-evidence.md
     open-questions.md
     tradeoffs.md
 )
@@ -432,6 +434,9 @@ require_literal 'M2-K8' "docs/v2/detailed_design/m2/README.md"
 require_literal 'hard journal/source/apply-lag bounds' "docs/v2/detailed_design/m2/README.md"
 require_literal 'M2-P5 exact-source native offload provider' "docs/v2/detailed_design/m2/pulsar-m2-p5-native-provider.md"
 require_literal 'v2M2PulsarP5Check' "docs/v2/detailed_design/m2/pulsar-m2-p5-native-provider.md"
+require_literal 'v2M2PulsarFinalPolicyCheck' "docs/v2/detailed_design/m2/pulsar-m2-final-evidence.md"
+require_literal 'exactly 32 scenario-suite references and eight attachments' "docs/v2/detailed_design/m2/pulsar-m2-final-evidence.md"
+require_literal 'V2-BK-011` remains `PLANNED' "docs/v2/detailed_design/m2/pulsar-m2-final-evidence.md"
 require_literal 'm2PulsarNativeBinding' "docs/v2/source-locks.json"
 require_literal 'a14e0e6f4e49be0677318b4ceefc7b85b445823b' "docs/v2/source-locks.json"
 require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
