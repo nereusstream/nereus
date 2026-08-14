@@ -48,8 +48,34 @@ tasks.register<Test>("p6ProviderTest") {
     testClassesDirs = p6ProviderTest.output.classesDirs
     classpath = p6ProviderTest.runtimeClasspath
     useJUnitPlatform()
+    include("**/S3PulsarOffloadObjectStoreV1Test.class")
     maxParallelForks = 1
     outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("p6EvidenceTest") {
+    group = "verification"
+    description = "Generate the M2-P6 S3-compatible candidate matrix evidence receipt."
+    testClassesDirs = p6ProviderTest.output.classesDirs
+    classpath = p6ProviderTest.runtimeClasspath
+    useJUnitPlatform()
+    include("**/PulsarP6CandidateEvidenceTest.class")
+    maxParallelForks = 1
+    maxHeapSize = "2048m"
+    outputs.upToDateWhen { false }
+    systemProperty(
+        "nereus.p6.evidenceOutput",
+        providers.gradleProperty("v2M2PulsarP6EvidenceOutput")
+            .getOrElse(layout.buildDirectory.file("p6-evidence/pulsar-p6-candidate.json").get().asFile.absolutePath),
+    )
+    systemProperty(
+        "nereus.p6.testedSourceCommit",
+        providers.gradleProperty("v2M2PulsarP6TestedSourceCommit").getOrElse("UNSET"),
+    )
+    systemProperty(
+        "nereus.p6.pulsarSourceCommit",
+        providers.gradleProperty("v2M2PulsarP6PulsarSourceCommit").getOrElse("UNSET"),
+    )
 }
 
 tasks.named<Test>("test") {

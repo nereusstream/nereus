@@ -25,7 +25,7 @@ separate capability-source attachment.
 
 The evidence matrix retains exactly the 1/4/8/16-MiB targets and both `FIXED_NONE` and `ZSTD_IF_SMALLER`. Eligible ZSTD
 persists the actual `NONE` or `ZSTD` family independently in every sparse row and never creates a RAW class. The
-selection candidate is limited to `latency-1mib`, `balanced-4mib`, and `throughput-16mib`; it becomes authoritative only
+selection candidate is limited to `latency-1mib`, `balanced-4mib`, and `scan-8mib`; it becomes authoritative only
 when the source-qualified P6 receipt and ADR/open-question updates land together. The initial Deployment default
 candidate is `balanced-4mib`.
 
@@ -36,8 +36,9 @@ reads and source-deletion revalidation use the persisted values after failover. 
 policy drift fail before provider I/O.
 
 The proposed selected hard envelope is 4 GiB per data Object, 1,024 multipart parts, 64 MiB per entry and decoded
-block, and 65,536 entries per block. P6 must cover all four target candidates, 100-byte/50,000-entry ledgers, the stock
-5-MiB message case, a dedicated near-64-MiB entry, random and sequential reads, provider latency/request/byte counts,
+block, and 65,536 entries per block. P6 must cover all four target candidates, 100-byte/50,000-entry ledgers, a 20-MiB
+medium-entry scan ledger, the stock 5-MiB message case, a dedicated near-64-MiB entry, random and sequential reads,
+provider latency/request/byte counts,
 AEAD/decode CPU, compression ratio, observed heap/direct memory, concurrency, and the pinned native Pulsar 1-MiB read
 buffer baseline.
 

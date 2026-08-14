@@ -26,7 +26,7 @@ public final class PulsarOffloadBlockPolicyV1 {
     public enum BlockClass {
         LATENCY_1_MIB("latency-1mib", PulsarOffloadLimitCandidateV1.MIB),
         BALANCED_4_MIB("balanced-4mib", 4 * PulsarOffloadLimitCandidateV1.MIB),
-        THROUGHPUT_16_MIB("throughput-16mib", 16 * PulsarOffloadLimitCandidateV1.MIB);
+        SCAN_8_MIB("scan-8mib", 8 * PulsarOffloadLimitCandidateV1.MIB);
 
         private final String id;
         private final int targetBytes;

@@ -32,12 +32,11 @@ class PulsarOffloadBlockPolicyV1Test {
         assertThat(PulsarOffloadBlockPolicyV1.resolve(BlockClass.BALANCED_4_MIB, null, null, admission, ceiling))
                 .extracting("blockClass", "authority")
                 .containsExactly(BlockClass.BALANCED_4_MIB, Authority.DEPLOYMENT);
-        assertThat(PulsarOffloadBlockPolicyV1.resolve(
-                        BlockClass.BALANCED_4_MIB, "throughput-16mib", null, admission, ceiling))
+        assertThat(PulsarOffloadBlockPolicyV1.resolve(BlockClass.BALANCED_4_MIB, "scan-8mib", null, admission, ceiling))
                 .extracting("blockClass", "authority")
-                .containsExactly(BlockClass.THROUGHPUT_16_MIB, Authority.NAMESPACE);
+                .containsExactly(BlockClass.SCAN_8_MIB, Authority.NAMESPACE);
         assertThat(PulsarOffloadBlockPolicyV1.resolve(
-                        BlockClass.BALANCED_4_MIB, "throughput-16mib", "latency-1mib", admission, ceiling))
+                        BlockClass.BALANCED_4_MIB, "scan-8mib", "latency-1mib", admission, ceiling))
                 .extracting("blockClass", "authority")
                 .containsExactly(BlockClass.LATENCY_1_MIB, Authority.TOPIC);
     }
@@ -58,7 +57,7 @@ class PulsarOffloadBlockPolicyV1Test {
     @Test
     void selectedCatalogHasAtMostThreeExactEvidenceCandidates() {
         assertThat(PulsarOffloadBlockPolicyV1.selectedClassIds())
-                .containsExactlyInAnyOrder("latency-1mib", "balanced-4mib", "throughput-16mib");
-        assertThat(BlockClass.values()).extracting(BlockClass::targetBytes).containsExactly(1 << 20, 4 << 20, 16 << 20);
+                .containsExactlyInAnyOrder("latency-1mib", "balanced-4mib", "scan-8mib");
+        assertThat(BlockClass.values()).extracting(BlockClass::targetBytes).containsExactly(1 << 20, 4 << 20, 8 << 20);
     }
 }
