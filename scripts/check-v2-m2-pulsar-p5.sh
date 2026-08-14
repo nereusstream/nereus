@@ -62,7 +62,7 @@ if "Files.readAllBytes" in provider:
 
 reports = {
     root / "nereus-pulsar-offload/build/test-results/test/TEST-com.nereusstream.pulsar.offload.NereusPulsarLedgerOffloaderV1Test.xml": 3,
-    root / "nereus-pulsar-offload/build/test-results/test/TEST-com.nereusstream.pulsar.offload.npd1.Npd1CodecV1Test.xml": 14,
+    root / "nereus-pulsar-offload/build/test-results/test/TEST-com.nereusstream.pulsar.offload.npd1.Npd1CodecV1Test.xml": 15,
     pulsar / "managed-ledger/build/test-results/test/TEST-org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest.xml": 13,
     pulsar / "managed-ledger/build/test-results/test/TEST-org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest.xml": 13,
 }
@@ -84,7 +84,7 @@ for literal in (
     if literal not in design:
         raise SystemExit(f"Pulsar P5 gate: required source or non-promotion boundary is absent: {literal}")
 
-print("Pulsar M2-P5 native provider verified: Nereus suites=2 tests=17; native suites=2 tests=26; failures=0 errors=0 skips=0")
+print("Pulsar M2-P5 native provider verified: Nereus suites=2 tests=18; native suites=2 tests=26; failures=0 errors=0 skips=0")
 PY
 
 echo "Pulsar P5 proves exact-source provider integration only; P6 evidence, process activation, Pulsar Final, and global M2 PASS remain pending."

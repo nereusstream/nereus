@@ -20,6 +20,7 @@ import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.DeleteState;
 import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.RetentionClass;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionFamily;
+import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionPolicy;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.EntryPayload;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.SparseBlock;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1;
@@ -140,14 +141,14 @@ public final class PulsarObjectReadHandleV1 {
             String providerScopePrefix,
             RetentionClass retentionClass,
             int blockTargetBytes,
-            CompressionFamily compressionFamily,
+            CompressionPolicy compressionPolicy,
             SecretKey attemptKey) {
         Objects.requireNonNull(objectStore, "objectStore");
         Objects.requireNonNull(limits, "limits");
         Objects.requireNonNull(attemptUuid, "attemptUuid");
         Objects.requireNonNull(providerScopePrefix, "providerScopePrefix");
         Objects.requireNonNull(retentionClass, "retentionClass");
-        Objects.requireNonNull(compressionFamily, "compressionFamily");
+        Objects.requireNonNull(compressionPolicy, "compressionPolicy");
         Objects.requireNonNull(attemptKey, "attemptKey");
         if (!limits.blockTargetBytes().contains(blockTargetBytes)) {
             return failed(ReadFailureKind.FORMAT, "persisted NPD1 block target is not admitted");
@@ -168,7 +169,7 @@ public final class PulsarObjectReadHandleV1 {
                                     providerScopePrefix,
                                     retentionClass,
                                     blockTargetBytes,
-                                    compressionFamily));
+                                    compressionPolicy));
                 })
                 .thenCompose(nativeRoot -> provider(() -> objectStore.head(keys.dataKey()), "data HEAD")
                         .thenCompose(dataProof -> validateDataProof(nativeRoot.root(), dataProof)
@@ -298,14 +299,15 @@ public final class PulsarObjectReadHandleV1 {
             String providerScopePrefix,
             RetentionClass retentionClass,
             int blockTargetBytes,
-            CompressionFamily compressionFamily) {
+            CompressionPolicy compressionPolicy) {
         Root root = parseVerifiedRoot(rootBytes, rootProof, limits);
         if (root.attempt().ledgerId() != ledgerId
                 || !root.attempt().attemptUuid().equals(attemptUuid)
                 || !root.attempt().providerScopePrefix().equals(providerScopePrefix)
                 || root.attempt().retentionClass() != retentionClass
                 || root.attempt().blockTargetBytes() != blockTargetBytes
-                || root.sparseIndex().stream().anyMatch(block -> block.compressionFamily() != compressionFamily)) {
+                || root.sparseIndex().stream()
+                        .anyMatch(block -> !compressionPolicyAllows(compressionPolicy, block.compressionFamily()))) {
             throw new ObjectReadException(ReadFailureKind.FORMAT, "NPO1 native attempt identity differs");
         }
         PulsarSealedLedgerAttemptV1 attempt = new PulsarSealedLedgerAttemptV1(
@@ -321,6 +323,14 @@ public final class PulsarObjectReadHandleV1 {
                 DeleteState.BK_DELETE_NONE,
                 false);
         return new NativeRoot(root, attempt);
+    }
+
+    private static boolean compressionPolicyAllows(CompressionPolicy policy, CompressionFamily actual) {
+        return switch (policy) {
+            case FIXED_NONE -> actual == CompressionFamily.NONE;
+            case FIXED_ZSTD -> actual == CompressionFamily.ZSTD;
+            case ZSTD_IF_SMALLER -> actual == CompressionFamily.NONE || actual == CompressionFamily.ZSTD;
+        };
     }
 
     private static Root parseVerifiedRoot(

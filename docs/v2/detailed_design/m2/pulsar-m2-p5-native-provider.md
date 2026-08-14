@@ -23,7 +23,8 @@ NPD1 encoder while retaining only the returned batch plus one decoded block. Pub
 completes only after the production Object reader verifies the immutable pair. Aborted staging files are removed.
 
 The persisted driver metadata fixes policy ID, Cell Provider Scope, key-derivation version, retention class, block
-target, and compression for the attempt. Read, delete, and final source-deletion revalidation consume those persisted
+class/target, and compression policy for the attempt. Each sparse row still binds its actual `NONE` or `ZSTD` family.
+Read, delete, and final source-deletion revalidation consume those persisted
 values rather than recomputing current configuration. The native `ReadHandle` adapter reconstructs the sealed metadata
 without persisting the BookKeeper password and returns exact entry bytes from bounded NPD1 ranges. Cleanup proves root
 absence before data absence and multipart-residue cleanup.
@@ -37,7 +38,7 @@ deletion reaches DONE. Missing native-provider support fails closed rather than 
 
 `v2M2PulsarP5Check` runs the complete Nereus offload module, the native `DualSourceReadHandleTest` and
 `OffloadLedgerDeleteTest`, exact source/branch/cleanliness checks, documentation checks, and every preceding P0-P4 gate.
-The P5-focused counts are 3 provider tests, 14 NPD1 tests, 13 native dual-source tests, and 13 native deletion tests,
+The P5-focused counts are 3 provider tests, 15 NPD1 tests, 13 native dual-source tests, and 13 native deletion tests,
 all with zero failure, error, or skip.
 
 P5 is not Pulsar process/NAR wiring, a provider endorsement, selected Object/block-policy evidence, a Pulsar Final

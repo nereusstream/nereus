@@ -78,6 +78,21 @@ public final class Npd1CodecV1 {
         }
     }
 
+    /** Attempt policy; every sparse row still persists the actual NONE or ZSTD wire family. */
+    public enum CompressionPolicy {
+        FIXED_NONE,
+        FIXED_ZSTD,
+        ZSTD_IF_SMALLER;
+
+        private CompressionFamily select(byte[] decoded, byte[] zstd) {
+            return switch (this) {
+                case FIXED_NONE -> CompressionFamily.NONE;
+                case FIXED_ZSTD -> CompressionFamily.ZSTD;
+                case ZSTD_IF_SMALLER -> zstd.length < decoded.length ? CompressionFamily.ZSTD : CompressionFamily.NONE;
+            };
+        }
+    }
+
     public enum EncryptionFamily {
         AES_GCM_256(1);
 
@@ -195,7 +210,19 @@ public final class Npd1CodecV1 {
             SecretKey attemptKey,
             UUID attemptUuid,
             PulsarOffloadLimitCandidateV1 limits) {
-        return new StreamingEncoder(target, blockTargetBytes, compression, attemptKey, attemptUuid, limits);
+        CompressionPolicy policy =
+                compression == CompressionFamily.NONE ? CompressionPolicy.FIXED_NONE : CompressionPolicy.FIXED_ZSTD;
+        return openStreaming(target, blockTargetBytes, policy, attemptKey, attemptUuid, limits);
+    }
+
+    public static StreamingEncoder openStreaming(
+            Path target,
+            int blockTargetBytes,
+            CompressionPolicy compressionPolicy,
+            SecretKey attemptKey,
+            UUID attemptUuid,
+            PulsarOffloadLimitCandidateV1 limits) {
+        return new StreamingEncoder(target, blockTargetBytes, compressionPolicy, attemptKey, attemptUuid, limits);
     }
 
     public static DataHeader parseDataHeader(byte[] bytes) {
@@ -291,7 +318,7 @@ public final class Npd1CodecV1 {
     public static final class StreamingEncoder implements AutoCloseable {
         private final Path target;
         private final int blockTargetBytes;
-        private final CompressionFamily compression;
+        private final CompressionPolicy compressionPolicy;
         private final SecretKey attemptKey;
         private final UUID attemptUuid;
         private final PulsarOffloadLimitCandidateV1 limits;
@@ -307,12 +334,12 @@ public final class Npd1CodecV1 {
         private StreamingEncoder(
                 Path target,
                 int blockTargetBytes,
-                CompressionFamily compression,
+                CompressionPolicy compressionPolicy,
                 SecretKey attemptKey,
                 UUID attemptUuid,
                 PulsarOffloadLimitCandidateV1 limits) {
             this.target = Objects.requireNonNull(target, "target");
-            this.compression = Objects.requireNonNull(compression, "compression");
+            this.compressionPolicy = Objects.requireNonNull(compressionPolicy, "compressionPolicy");
             validateKey(attemptKey);
             this.attemptKey = attemptKey;
             this.attemptUuid = Objects.requireNonNull(attemptUuid, "attemptUuid");
@@ -401,7 +428,7 @@ public final class Npd1CodecV1 {
             if (sparse.size() >= 65_536) {
                 throw rejected("NPD1 block count exceeds NPO1 sparse-row cap");
             }
-            EncodedBlock encoded = encodeBlock(current, sparse.size(), compression, attemptKey, attemptUuid);
+            EncodedBlock encoded = encodeBlock(current, sparse.size(), compressionPolicy, attemptKey, attemptUuid);
             try {
                 output.write(encoded.bytes());
             } catch (IOException failure) {
@@ -414,7 +441,7 @@ public final class Npd1CodecV1 {
                     offset,
                     encoded.bytes().length,
                     encoded.decodedBytes(),
-                    compression,
+                    encoded.compressionFamily(),
                     EncryptionFamily.AES_GCM_256,
                     sha256(encoded.bytes())));
             offset = checkedAdd(offset, encoded.bytes().length);
@@ -459,7 +486,11 @@ public final class Npd1CodecV1 {
     }
 
     private static EncodedBlock encodeBlock(
-            List<EntryPayload> entries, int ordinal, CompressionFamily compression, SecretKey key, UUID attemptUuid) {
+            List<EntryPayload> entries,
+            int ordinal,
+            CompressionPolicy compressionPolicy,
+            SecretKey key,
+            UUID attemptUuid) {
         long decodedLength = 0;
         for (EntryPayload entry : entries) {
             decodedLength = checkedAdd(decodedLength, entry.payload.length);
@@ -474,7 +505,10 @@ public final class Npd1CodecV1 {
             decoded.put(entry.payload);
             decodedOffset = checkedAdd(decodedOffset, entry.payload.length);
         }
-        byte[] compressed = compress(compression, decoded.array());
+        byte[] zstd =
+                compressionPolicy == CompressionPolicy.FIXED_NONE ? decoded.array() : Zstd.compress(decoded.array());
+        CompressionFamily compression = compressionPolicy.select(decoded.array(), zstd);
+        byte[] compressed = compression == CompressionFamily.NONE ? decoded.array() : zstd;
         int plaintextBytes = checkedInt(checkedAdd(directory.array().length, compressed.length));
         byte[] nonce = nonce(attemptUuid, ordinal);
         byte[] header = blockHeader(
@@ -491,7 +525,7 @@ public final class Npd1CodecV1 {
         byte[] ciphertext = crypt(Cipher.ENCRYPT_MODE, key, nonce, header, plaintext.array());
         ByteBuffer encoded = ByteBuffer.allocate(checkedInt(checkedAdd(header.length, ciphertext.length)));
         encoded.put(header).put(ciphertext);
-        return new EncodedBlock(encoded.array(), decodedLength);
+        return new EncodedBlock(encoded.array(), decodedLength, compression);
     }
 
     private static byte[] dataHeader(int blockCount, long totalBytes) {
@@ -679,7 +713,7 @@ public final class Npd1CodecV1 {
         return new Npd1RejectedException(message);
     }
 
-    private record EncodedBlock(byte[] bytes, long decodedBytes) {}
+    private record EncodedBlock(byte[] bytes, long decodedBytes, CompressionFamily compressionFamily) {}
 
     private record BlockHeader(
             int ordinal,

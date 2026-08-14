@@ -17,13 +17,14 @@ package com.nereusstream.pulsar.offload;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.pulsar.offload.NereusPulsarLedgerOffloaderV1.RuntimePolicy;
+import com.nereusstream.pulsar.offload.PulsarOffloadBlockPolicyV1.BlockClass;
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.Body;
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.Capabilities;
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.FailureKind;
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.ImmutableObject;
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.ObjectStoreException;
 import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.RetentionClass;
-import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionFamily;
+import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionPolicy;
 import io.netty.buffer.Unpooled;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -102,8 +103,9 @@ class NereusPulsarLedgerOffloaderV1Test {
         Map<String, String> persisted = offloader.getOffloadDriverMetadata();
         assertThat(persisted)
                 .containsEntry(NereusPulsarLedgerOffloaderV1.METADATA_KEY_DERIVATION_VERSION, "1")
+                .containsEntry(NereusPulsarLedgerOffloaderV1.METADATA_BLOCK_CLASS, "latency-1mib")
                 .containsEntry(NereusPulsarLedgerOffloaderV1.METADATA_BLOCK_TARGET, "1048576")
-                .containsEntry(NereusPulsarLedgerOffloaderV1.METADATA_COMPRESSION, "NONE");
+                .containsEntry(NereusPulsarLedgerOffloaderV1.METADATA_COMPRESSION_POLICY, "FIXED_NONE");
         ReadHandle object =
                 offloader.readOffloaded(LEDGER_ID, ATTEMPT, persisted).join();
         assertThat(object.getId()).isEqualTo(LEDGER_ID);
@@ -186,8 +188,8 @@ class NereusPulsarLedgerOffloaderV1Test {
                 "m2-pulsar-v1",
                 "cells/pulsar-a",
                 RetentionClass.DELETE_AFTER_VERIFIED,
-                PulsarOffloadLimitCandidateV1.MIB,
-                CompressionFamily.NONE,
+                BlockClass.LATENCY_1_MIB,
+                CompressionPolicy.FIXED_NONE,
                 LIMITS);
         return new NereusPulsarLedgerOffloaderV1(
                 store,

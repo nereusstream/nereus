@@ -18,7 +18,7 @@ import com.nereusstream.pulsar.offload.PulsarObjectReadHandleV1.ObjectReadExcept
 import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.DeleteState;
 import com.nereusstream.pulsar.offload.PulsarSealedLedgerPublisherV1.PreparedAttempt;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1;
-import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionFamily;
+import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionPolicy;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.DataObject;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.EntryPayload;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.StreamingEncoder;
@@ -55,8 +55,9 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
     public static final String METADATA_PROVIDER_SCOPE = "nereus.providerScope";
     public static final String METADATA_KEY_DERIVATION_VERSION = "nereus.keyDerivationVersion";
     public static final String METADATA_RETENTION = "nereus.retention";
+    public static final String METADATA_BLOCK_CLASS = "nereus.blockClass";
     public static final String METADATA_BLOCK_TARGET = "nereus.blockTargetBytes";
-    public static final String METADATA_COMPRESSION = "nereus.compression";
+    public static final String METADATA_COMPRESSION_POLICY = "nereus.compressionPolicy";
 
     @FunctionalInterface
     public interface AttemptKeyResolver {
@@ -72,17 +73,18 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
             String policyId,
             String providerScopePrefix,
             PulsarSealedLedgerAttemptV1.RetentionClass retentionClass,
-            int blockTargetBytes,
-            CompressionFamily compressionFamily,
+            PulsarOffloadBlockPolicyV1.BlockClass blockClass,
+            CompressionPolicy compressionPolicy,
             PulsarOffloadLimitCandidateV1 limits) {
         public RuntimePolicy {
             Objects.requireNonNull(policyId, "policyId");
             Objects.requireNonNull(providerScopePrefix, "providerScopePrefix");
             Objects.requireNonNull(retentionClass, "retentionClass");
-            Objects.requireNonNull(compressionFamily, "compressionFamily");
+            Objects.requireNonNull(blockClass, "blockClass");
+            Objects.requireNonNull(compressionPolicy, "compressionPolicy");
             Objects.requireNonNull(limits, "limits");
             if (!policyId.matches("[a-z0-9][a-z0-9._-]{0,63}")
-                    || !limits.blockTargetBytes().contains(blockTargetBytes)) {
+                    || !limits.blockTargetBytes().contains(blockClass.targetBytes())) {
                 throw new IllegalArgumentException("runtime policy identity or block target is not admitted");
             }
             PulsarOffloadKeysV1.derive(providerScopePrefix, 0, new UUID(0, 0));
@@ -94,8 +96,9 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
                     METADATA_PROVIDER_SCOPE, providerScopePrefix,
                     METADATA_KEY_DERIVATION_VERSION, Integer.toString(PulsarOffloadKeysV1.KEY_DERIVATION_VERSION),
                     METADATA_RETENTION, retentionClass.name(),
-                    METADATA_BLOCK_TARGET, Integer.toString(blockTargetBytes),
-                    METADATA_COMPRESSION, compressionFamily.name());
+                    METADATA_BLOCK_CLASS, blockClass.id(),
+                    METADATA_BLOCK_TARGET, Integer.toString(blockClass.targetBytes()),
+                    METADATA_COMPRESSION_POLICY, compressionPolicy.name());
         }
     }
 
@@ -185,8 +188,8 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
 
         return createStagingFile(ledger.getId(), attemptUuid)
                 .thenCompose(target -> encodeLedger(ledger, attemptUuid, attemptKey, target)
-                        .thenCompose(data -> publisher.publish(
-                                new PreparedAttempt(attempt, sealedLedger, data, policy.blockTargetBytes())))
+                        .thenCompose(data -> publisher.publish(new PreparedAttempt(
+                                attempt, sealedLedger, data, policy.blockClass().targetBytes())))
                         .thenAccept(ignored -> {})
                         .whenComplete((ignored, failure) -> deleteStagingFile(target)))
                 .toCompletableFuture();
@@ -212,8 +215,8 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
                         attemptUuid,
                         nativePolicy.providerScopePrefix(),
                         nativePolicy.retentionClass(),
-                        nativePolicy.blockTargetBytes(),
-                        nativePolicy.compressionFamily(),
+                        nativePolicy.blockClass().targetBytes(),
+                        nativePolicy.compressionPolicy(),
                         attemptKey)
                 .thenApply(handle -> (ReadHandle) new NereusPulsarReadHandleV1(handle))
                 .toCompletableFuture();
@@ -298,8 +301,8 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
                         attemptUuid,
                         nativePolicy.providerScopePrefix(),
                         nativePolicy.retentionClass(),
-                        nativePolicy.blockTargetBytes(),
-                        nativePolicy.compressionFamily(),
+                        nativePolicy.blockClass().targetBytes(),
+                        nativePolicy.compressionPolicy(),
                         attemptKey)
                 .thenCompose(handle -> {
                     CompletableFuture<Void> result = new CompletableFuture<>();
@@ -351,8 +354,8 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
                         () -> {
                             StreamingEncoder encoder = Npd1CodecV1.openStreaming(
                                     target,
-                                    policy.blockTargetBytes(),
-                                    policy.compressionFamily(),
+                                    policy.blockClass().targetBytes(),
+                                    policy.compressionPolicy(),
                                     attemptKey,
                                     attemptUuid,
                                     policy.limits());
@@ -448,15 +451,19 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
         int keyDerivationVersion = Integer.parseInt(required(persisted, METADATA_KEY_DERIVATION_VERSION));
         PulsarSealedLedgerAttemptV1.RetentionClass retention =
                 PulsarSealedLedgerAttemptV1.RetentionClass.valueOf(required(persisted, METADATA_RETENTION));
+        PulsarOffloadBlockPolicyV1.BlockClass blockClass =
+                PulsarOffloadBlockPolicyV1.BlockClass.fromId(required(persisted, METADATA_BLOCK_CLASS));
         int blockTarget = Integer.parseInt(required(persisted, METADATA_BLOCK_TARGET));
-        CompressionFamily compression = CompressionFamily.valueOf(required(persisted, METADATA_COMPRESSION));
+        CompressionPolicy compressionPolicy =
+                CompressionPolicy.valueOf(required(persisted, METADATA_COMPRESSION_POLICY));
         if (!policy.policyId().equals(policyId)
                 || keyDerivationVersion != PulsarOffloadKeysV1.KEY_DERIVATION_VERSION
+                || blockTarget != blockClass.targetBytes()
                 || !policy.limits().blockTargetBytes().contains(blockTarget)) {
             throw new IllegalArgumentException("persisted Nereus offload policy is not supported by this provider");
         }
         PulsarOffloadKeysV1.derive(scope, 0, new UUID(0, 0));
-        return new NativePolicy(scope, retention, blockTarget, compression);
+        return new NativePolicy(scope, retention, blockClass, compressionPolicy);
     }
 
     private static String required(Map<String, String> metadata, String key) {
@@ -531,6 +538,6 @@ public final class NereusPulsarLedgerOffloaderV1 implements SourceSafeLedgerOffl
     private record NativePolicy(
             String providerScopePrefix,
             PulsarSealedLedgerAttemptV1.RetentionClass retentionClass,
-            int blockTargetBytes,
-            CompressionFamily compressionFamily) {}
+            PulsarOffloadBlockPolicyV1.BlockClass blockClass,
+            CompressionPolicy compressionPolicy) {}
 }

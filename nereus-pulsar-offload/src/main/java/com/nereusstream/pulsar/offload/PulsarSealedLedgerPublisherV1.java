@@ -276,6 +276,7 @@ public final class PulsarSealedLedgerPublisherV1 {
             } else {
                 digest.update((byte) value);
                 actualBytes = Math.addExact(actualBytes, 1);
+                rejectOverrun();
             }
             return value;
         }
@@ -288,6 +289,7 @@ public final class PulsarSealedLedgerPublisherV1 {
             } else if (count > 0) {
                 digest.update(bytes, offset, count);
                 actualBytes = Math.addExact(actualBytes, count);
+                rejectOverrun();
             }
             return count;
         }
@@ -311,8 +313,14 @@ public final class PulsarSealedLedgerPublisherV1 {
 
         @Override
         public void close() throws IOException {
-            IOException incomplete =
-                    verified ? null : new IOException("provider closed NPD1 body before exact EOF proof");
+            IOException incomplete = null;
+            if (!verified) {
+                try {
+                    verifyExactLength();
+                } catch (IOException failure) {
+                    incomplete = failure;
+                }
+            }
             try {
                 super.close();
             } catch (IOException closeFailure) {
@@ -331,11 +339,21 @@ public final class PulsarSealedLedgerPublisherV1 {
             if (verified) {
                 return;
             }
+            verifyExactLength();
+        }
+
+        private void verifyExactLength() throws IOException {
             String actualSha = HexFormat.of().formatHex(digest.digest());
             if (actualBytes != expectedBytes || !actualSha.equals(expectedSha)) {
                 throw new IOException("provider stream differs from staged NPD1 descriptor");
             }
             verified = true;
+        }
+
+        private void rejectOverrun() throws IOException {
+            if (actualBytes > expectedBytes) {
+                throw new IOException("provider read beyond the staged NPD1 descriptor");
+            }
         }
     }
 }

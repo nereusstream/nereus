@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.pulsar.offload.PulsarOffloadLimitCandidateV1;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionFamily;
+import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionPolicy;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.DataObject;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.EntryPayload;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.Npd1RejectedException;
@@ -28,6 +29,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -66,6 +68,29 @@ class Npd1CodecV1Test {
         assertThat(decodeAll(object))
                 .usingRecursiveFieldByFieldElementComparator()
                 .containsExactlyElementsOf(entries);
+    }
+
+    @Test
+    void eligibleZstdPersistsTheActualFamilyIndependentlyPerBlock() throws Exception {
+        int payloadBytes = 600_000;
+        byte[] incompressible = new byte[payloadBytes];
+        new Random(7).nextBytes(incompressible);
+        Path target = temporaryDirectory.resolve("adaptive.npd1");
+        DataObject object;
+        try (StreamingEncoder encoder = Npd1CodecV1.openStreaming(
+                target, PulsarOffloadLimitCandidateV1.MIB, CompressionPolicy.ZSTD_IF_SMALLER, KEY, ATTEMPT, LIMITS)) {
+            encoder.append(new EntryPayload(0, new byte[payloadBytes]));
+            encoder.append(new EntryPayload(1, incompressible));
+            object = encoder.finish();
+        }
+
+        assertThat(object.blocks())
+                .extracting(SparseBlock::compressionFamily)
+                .containsExactly(CompressionFamily.ZSTD, CompressionFamily.NONE);
+        List<EntryPayload> decoded = decodeAll(object);
+        assertThat(decoded).extracting(EntryPayload::entryId).containsExactly(0L, 1L);
+        assertThat(decoded.get(0).payload()).containsOnly(0);
+        assertThat(decoded.get(1).payload()).containsExactly(incompressible);
     }
 
     @Test
