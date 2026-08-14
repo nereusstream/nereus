@@ -14,9 +14,11 @@
 
 dependencies {
     implementation(libs.zstd.jni)
+    compileOnly(libs.pulsar.managed.ledger)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
+    testImplementation(libs.pulsar.managed.ledger)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 

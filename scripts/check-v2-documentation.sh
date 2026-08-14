@@ -53,6 +53,13 @@ required_v2_docs=(
     detailed_design/m2/kafka-m2-k1-frontier-publication.md
     detailed_design/m2/kafka-bookkeeper-offset-range-index.md
     detailed_design/m2/kafka-produce-fetch-frontiers-and-recovery.md
+    detailed_design/m2/pulsar-m2-p0-input-closure.md
+    detailed_design/m2/pulsar-m2-p1-npd1-codec.md
+    detailed_design/m2/pulsar-m2-p2-npo1-root.md
+    detailed_design/m2/pulsar-m2-p3-publication-engine.md
+    detailed_design/m2/pulsar-m2-p4-object-reader.md
+    detailed_design/m2/pulsar-m2-p4-dual-source-and-delete.md
+    detailed_design/m2/pulsar-m2-p5-native-provider.md
     open-questions.md
     tradeoffs.md
 )
@@ -423,6 +430,10 @@ require_literal 'M1.1a is complete and M1.1b is exact-locally complete' "docs/v2
 require_literal 'existing-cluster inventory is deferred migration evidence' "docs/v2/detailed_design/m1/README.md"
 require_literal 'M2-K8' "docs/v2/detailed_design/m2/README.md"
 require_literal 'hard journal/source/apply-lag bounds' "docs/v2/detailed_design/m2/README.md"
+require_literal 'M2-P5 exact-source native offload provider' "docs/v2/detailed_design/m2/pulsar-m2-p5-native-provider.md"
+require_literal 'v2M2PulsarP5Check' "docs/v2/detailed_design/m2/pulsar-m2-p5-native-provider.md"
+require_literal 'm2PulsarNativeBinding' "docs/v2/source-locks.json"
+require_literal '1c7694296e69383b6ef1bfb67345ce4069cffd2d' "docs/v2/source-locks.json"
 require_literal 'does not replace or register' "docs/v2/detailed_design/m1/m1.1a-domain-spi-foundation.md"
 require_literal "V2 documentation baseline" ".github/workflows/build.yml"
 require_literal "Superseded by ADR 0012." "docs/decisions/0010-v2-topic-profile-binding.md"

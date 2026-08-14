@@ -16,7 +16,10 @@ package com.nereusstream.pulsar.offload;
 
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.ImmutableObject;
 import com.nereusstream.pulsar.offload.PulsarOffloadObjectStoreV1.ObjectStoreException;
+import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.DeleteState;
+import com.nereusstream.pulsar.offload.PulsarSealedLedgerAttemptV1.RetentionClass;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1;
+import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.CompressionFamily;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.EntryPayload;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.SparseBlock;
 import com.nereusstream.pulsar.offload.npo1.Npo1CodecV1;
@@ -27,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -128,6 +132,68 @@ public final class PulsarObjectReadHandleV1 {
                                 })));
     }
 
+    public static CompletionStage<PulsarObjectReadHandleV1> openNative(
+            PulsarOffloadObjectStoreV1 objectStore,
+            PulsarOffloadLimitCandidateV1 limits,
+            long ledgerId,
+            UUID attemptUuid,
+            String providerScopePrefix,
+            RetentionClass retentionClass,
+            int blockTargetBytes,
+            CompressionFamily compressionFamily,
+            SecretKey attemptKey) {
+        Objects.requireNonNull(objectStore, "objectStore");
+        Objects.requireNonNull(limits, "limits");
+        Objects.requireNonNull(attemptUuid, "attemptUuid");
+        Objects.requireNonNull(providerScopePrefix, "providerScopePrefix");
+        Objects.requireNonNull(retentionClass, "retentionClass");
+        Objects.requireNonNull(compressionFamily, "compressionFamily");
+        Objects.requireNonNull(attemptKey, "attemptKey");
+        if (!limits.blockTargetBytes().contains(blockTargetBytes)) {
+            return failed(ReadFailureKind.FORMAT, "persisted NPD1 block target is not admitted");
+        }
+        PulsarOffloadKeysV1 keys = PulsarOffloadKeysV1.derive(providerScopePrefix, ledgerId, attemptUuid);
+        return provider(() -> objectStore.head(keys.rootKey()), "root HEAD")
+                .thenCompose(rootProof -> {
+                    if (rootProof.bytes() > Npo1CodecV1.MAX_ROOT_BYTES || rootProof.bytes() > Integer.MAX_VALUE) {
+                        return failed(ReadFailureKind.FORMAT, "provider NPO1 length exceeds the hard cap");
+                    }
+                    return readExact(objectStore, keys.rootKey(), 0, Math.toIntExact(rootProof.bytes()), "root GET")
+                            .thenApply(rootBytes -> parseNativeRoot(
+                                    rootBytes,
+                                    rootProof,
+                                    limits,
+                                    ledgerId,
+                                    attemptUuid,
+                                    providerScopePrefix,
+                                    retentionClass,
+                                    blockTargetBytes,
+                                    compressionFamily));
+                })
+                .thenCompose(nativeRoot -> provider(() -> objectStore.head(keys.dataKey()), "data HEAD")
+                        .thenCompose(dataProof -> validateDataProof(nativeRoot.root(), dataProof)
+                                .thenCompose(ignored -> readExact(
+                                        objectStore,
+                                        keys.dataKey(),
+                                        0,
+                                        Npd1CodecV1.DATA_HEADER_BYTES,
+                                        "data header GET"))
+                                .thenApply(header -> {
+                                    validateDataHeader(nativeRoot.root(), header);
+                                    return new PulsarObjectReadHandleV1(
+                                            objectStore,
+                                            limits,
+                                            nativeRoot.attempt(),
+                                            attemptKey,
+                                            nativeRoot.root(),
+                                            header);
+                                })));
+    }
+
+    public PulsarSealedLedgerAttemptV1 attempt() {
+        return attempt;
+    }
+
     public Root root() {
         return root;
     }
@@ -210,6 +276,55 @@ public final class PulsarObjectReadHandleV1 {
             ImmutableObject rootProof,
             PulsarOffloadLimitCandidateV1 limits,
             PulsarSealedLedgerAttemptV1 attempt) {
+        Root root = parseVerifiedRoot(rootBytes, rootProof, limits);
+        if (root.attempt().ledgerId() != attempt.ledgerId()
+                || !root.attempt().attemptUuid().equals(attempt.attemptUuid())
+                || !root.attempt().providerScopePrefix().equals(attempt.providerScopePrefix())
+                || root.attempt().retentionClass() != attempt.retentionClass()
+                || root.sealedLedger().lastAddConfirmed() != attempt.lastAddConfirmed()
+                || root.sealedLedger().entryCount() != attempt.entryCount()
+                || root.sealedLedger().logicalLength() != attempt.logicalLength()) {
+            throw new ObjectReadException(ReadFailureKind.FORMAT, "NPO1 identity or sealed-ledger facts differ");
+        }
+        return root;
+    }
+
+    private static NativeRoot parseNativeRoot(
+            byte[] rootBytes,
+            ImmutableObject rootProof,
+            PulsarOffloadLimitCandidateV1 limits,
+            long ledgerId,
+            UUID attemptUuid,
+            String providerScopePrefix,
+            RetentionClass retentionClass,
+            int blockTargetBytes,
+            CompressionFamily compressionFamily) {
+        Root root = parseVerifiedRoot(rootBytes, rootProof, limits);
+        if (root.attempt().ledgerId() != ledgerId
+                || !root.attempt().attemptUuid().equals(attemptUuid)
+                || !root.attempt().providerScopePrefix().equals(providerScopePrefix)
+                || root.attempt().retentionClass() != retentionClass
+                || root.attempt().blockTargetBytes() != blockTargetBytes
+                || root.sparseIndex().stream().anyMatch(block -> block.compressionFamily() != compressionFamily)) {
+            throw new ObjectReadException(ReadFailureKind.FORMAT, "NPO1 native attempt identity differs");
+        }
+        PulsarSealedLedgerAttemptV1 attempt = new PulsarSealedLedgerAttemptV1(
+                ledgerId,
+                attemptUuid,
+                root.sealedLedger().lastAddConfirmed(),
+                root.sealedLedger().entryCount(),
+                root.sealedLedger().logicalLength(),
+                root.sealedLedger().creationTimestampMillis(),
+                0,
+                providerScopePrefix,
+                retentionClass,
+                DeleteState.BK_DELETE_NONE,
+                false);
+        return new NativeRoot(root, attempt);
+    }
+
+    private static Root parseVerifiedRoot(
+            byte[] rootBytes, ImmutableObject rootProof, PulsarOffloadLimitCandidateV1 limits) {
         String actualSha = sha256(rootBytes);
         if (rootBytes.length != rootProof.bytes() || !actualSha.equals(rootProof.sha256())) {
             throw new ObjectReadException(ReadFailureKind.INTEGRITY, "root Object proof differs from exact GET");
@@ -223,15 +338,6 @@ public final class PulsarObjectReadHandleV1 {
                             ? ReadFailureKind.INTEGRITY
                             : ReadFailureKind.FORMAT;
             throw new ObjectReadException(kind, "NPO1 root validation failed", failure);
-        }
-        if (root.attempt().ledgerId() != attempt.ledgerId()
-                || !root.attempt().attemptUuid().equals(attempt.attemptUuid())
-                || !root.attempt().providerScopePrefix().equals(attempt.providerScopePrefix())
-                || root.attempt().retentionClass() != attempt.retentionClass()
-                || root.sealedLedger().lastAddConfirmed() != attempt.lastAddConfirmed()
-                || root.sealedLedger().entryCount() != attempt.entryCount()
-                || root.sealedLedger().logicalLength() != attempt.logicalLength()) {
-            throw new ObjectReadException(ReadFailureKind.FORMAT, "NPO1 identity or sealed-ledger facts differ");
         }
         return root;
     }
@@ -347,6 +453,8 @@ public final class PulsarObjectReadHandleV1 {
             throw new IllegalStateException("JDK lacks SHA-256", failure);
         }
     }
+
+    private record NativeRoot(Root root, PulsarSealedLedgerAttemptV1 attempt) {}
 
     private static final class VerificationAccumulator {
         private final MessageDigest digest = digest();

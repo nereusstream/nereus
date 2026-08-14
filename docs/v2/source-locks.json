@@ -425,6 +425,16 @@
     "promotionEligible": false,
     "evidenceStatus": "FINAL_SOURCE_LOCK_WITH_FOCUSED_PROVENANCE"
   },
+  "m2PulsarNativeBinding": {
+    "implementationBaseId": "pulsar-v2-pure-graph-base",
+    "implementationBaseCommit": "072aa1c440f85b808f60e7ea59de8a73c4e2a202",
+    "repository": "https://github.com/nereusstream/pulsar.git",
+    "branch": "nereus/v2-m2-pulsar-native-offload",
+    "finalForkCommit": "1c7694296e69383b6ef1bfb67345ce4069cffd2d",
+    "result": "PASS_M2_PULSAR_NATIVE_FOCUSED_ONLY",
+    "promotionEligible": false,
+    "evidenceStatus": "CURRENT_SOURCE_IMPLEMENTATION_ONLY"
+  },
   "r1RegistryAuthorityBinding": {
     "implementationCommit": "42598fe63324ceceb07d39114ff36a770af35eb9",
     "focusedImplementationCommit": "8a213a85bfaa15769a9b9ea4f74ac7e0b2500b6d",

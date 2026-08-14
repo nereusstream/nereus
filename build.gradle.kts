@@ -1097,6 +1097,37 @@ tasks.register("v2M2PulsarP4Check") {
     dependsOn("v2M2PulsarP4DualSourceCheck", "v2M2PulsarP4ObjectCheck", "v2DocumentationCheck")
 }
 
+tasks.register<Exec>("v2M2PulsarP5NativeForkTest") {
+    group = "verification"
+    description = "Run the exact Pulsar-fork dual-source and source-deletion tests for the P5 native binding."
+    usesService(pulsarCheckoutGate)
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        file(pulsarCheckoutPath.get()).resolve("gradlew").absolutePath,
+        ":managed-ledger:test",
+        "--tests",
+        "org.apache.bookkeeper.mledger.impl.DualSourceReadHandleTest",
+        "--tests",
+        "org.apache.bookkeeper.mledger.impl.OffloadLedgerDeleteTest",
+        "--no-daemon",
+    )
+}
+
+tasks.register<Exec>("v2M2PulsarP5SourceCheck") {
+    group = "verification"
+    description = "Verify the exact clean native fork plus bounded Nereus SourceSafeLedgerOffloader adapter."
+    dependsOn(":nereus-pulsar-offload:test", "v2M2PulsarP5NativeForkTest")
+    usesService(pulsarCheckoutGate)
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m2-pulsar-p5.sh", pulsarCheckoutPath.get())
+}
+
+tasks.register("v2M2PulsarP5Check") {
+    group = "verification"
+    description = "Run Pulsar M2-P5 exact-source provider integration; P6 evidence, Pulsar Final, and M2 PASS remain pending."
+    dependsOn("v2M2PulsarP5SourceCheck", "v2M2PulsarP4Check", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)

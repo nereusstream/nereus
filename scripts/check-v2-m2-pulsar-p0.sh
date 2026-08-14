@@ -6,6 +6,7 @@ repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo_root"
 
 production_root="nereus-pulsar-offload/src/main/java/com/nereusstream/pulsar/offload"
+p0_sources=()
 for required in \
     PulsarOffloadKeysV1.java \
     PulsarOffloadLimitCandidateV1.java \
@@ -16,9 +17,10 @@ for required in \
         echo "Pulsar P0 gate: missing production input $required" >&2
         exit 1
     }
+    p0_sources+=("$production_root/$required")
 done
 
-if rg -n 'TODO|FIXME|PLACEHOLDER|NOT_IMPLEMENTED|org\.apache\.pulsar|org\.apache\.bookkeeper' "$production_root"; then
+if rg -n 'TODO|FIXME|PLACEHOLDER|NOT_IMPLEMENTED|org\.apache\.pulsar|org\.apache\.bookkeeper' "${p0_sources[@]}"; then
     echo "Pulsar P0 gate: input boundary imports native Pulsar/BookKeeper or contains an unfinished marker" >&2
     exit 1
 fi

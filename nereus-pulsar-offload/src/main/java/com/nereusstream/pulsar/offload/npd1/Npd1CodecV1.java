@@ -180,64 +180,22 @@ public final class Npd1CodecV1 {
             SecretKey attemptKey,
             UUID attemptUuid,
             PulsarOffloadLimitCandidateV1 limits) {
-        Objects.requireNonNull(target, "target");
         Objects.requireNonNull(entries, "entries");
-        Objects.requireNonNull(compression, "compression");
-        validateKey(attemptKey);
-        Objects.requireNonNull(attemptUuid, "attemptUuid");
-        Objects.requireNonNull(limits, "limits");
-        if (!limits.blockTargetBytes().contains(blockTargetBytes)) {
-            throw rejected("block target is not one of the evidence candidates");
+        try (StreamingEncoder encoder =
+                openStreaming(target, blockTargetBytes, compression, attemptKey, attemptUuid, limits)) {
+            entries.forEach(encoder::append);
+            return encoder.finish();
         }
-        List<List<EntryPayload>> blocks = plan(entries, blockTargetBytes, limits);
-        if (blocks.size() > 65_536) {
-            throw rejected("NPD1 block count exceeds NPO1 sparse-row cap");
-        }
+    }
 
-        List<SparseBlock> sparse = new ArrayList<>(blocks.size());
-        try {
-            Path parent = target.toAbsolutePath().getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            try (RandomAccessFile output = new RandomAccessFile(target.toFile(), "rw")) {
-                output.setLength(0);
-                output.write(new byte[DATA_HEADER_BYTES]);
-                long offset = DATA_HEADER_BYTES;
-                for (int ordinal = 0; ordinal < blocks.size(); ordinal++) {
-                    EncodedBlock encoded =
-                            encodeBlock(blocks.get(ordinal), ordinal, compression, attemptKey, attemptUuid);
-                    output.write(encoded.bytes());
-                    sparse.add(new SparseBlock(
-                            ordinal,
-                            blocks.get(ordinal).get(0).entryId(),
-                            blocks.get(ordinal).size(),
-                            offset,
-                            encoded.bytes().length,
-                            encoded.decodedBytes(),
-                            compression,
-                            EncryptionFamily.AES_GCM_256,
-                            sha256(encoded.bytes())));
-                    offset = checkedAdd(offset, encoded.bytes().length);
-                    if (offset > limits.maxDataObjectBytes()) {
-                        throw rejected("encoded data Object crosses candidate maximum");
-                    }
-                }
-                output.seek(0);
-                output.write(dataHeader(sparse.size(), offset));
-                output.setLength(offset);
-            }
-        } catch (IOException failure) {
-            throw new Npd1RejectedException("cannot encode NPD1 target", failure);
-        }
-        long length;
-        try {
-            length = Files.size(target);
-        } catch (IOException failure) {
-            throw new Npd1RejectedException("cannot stat NPD1 target", failure);
-        }
-        long lastEntryId = entries.get(entries.size() - 1).entryId();
-        return new DataObject(target, length, sha256(target), 0, lastEntryId, sparse);
+    public static StreamingEncoder openStreaming(
+            Path target,
+            int blockTargetBytes,
+            CompressionFamily compression,
+            SecretKey attemptKey,
+            UUID attemptUuid,
+            PulsarOffloadLimitCandidateV1 limits) {
+        return new StreamingEncoder(target, blockTargetBytes, compression, attemptKey, attemptUuid, limits);
     }
 
     public static DataHeader parseDataHeader(byte[] bytes) {
@@ -329,46 +287,175 @@ public final class Npd1CodecV1 {
         return result;
     }
 
-    private static List<List<EntryPayload>> plan(
-            List<EntryPayload> entries, int targetBytes, PulsarOffloadLimitCandidateV1 limits) {
-        if (entries.isEmpty() || entries.get(0).entryId() != 0) {
-            throw rejected("NPD1 requires non-empty entry coverage beginning at zero");
+    /** Incremental encoder that retains at most one decoded block while writing the complete NPD1 file. */
+    public static final class StreamingEncoder implements AutoCloseable {
+        private final Path target;
+        private final int blockTargetBytes;
+        private final CompressionFamily compression;
+        private final SecretKey attemptKey;
+        private final UUID attemptUuid;
+        private final PulsarOffloadLimitCandidateV1 limits;
+        private final RandomAccessFile output;
+        private final List<SparseBlock> sparse = new ArrayList<>();
+        private final List<EntryPayload> current = new ArrayList<>();
+        private long currentBytes;
+        private long expectedEntryId;
+        private long offset = DATA_HEADER_BYTES;
+        private boolean outputClosed;
+        private boolean finished;
+
+        private StreamingEncoder(
+                Path target,
+                int blockTargetBytes,
+                CompressionFamily compression,
+                SecretKey attemptKey,
+                UUID attemptUuid,
+                PulsarOffloadLimitCandidateV1 limits) {
+            this.target = Objects.requireNonNull(target, "target");
+            this.compression = Objects.requireNonNull(compression, "compression");
+            validateKey(attemptKey);
+            this.attemptKey = attemptKey;
+            this.attemptUuid = Objects.requireNonNull(attemptUuid, "attemptUuid");
+            this.limits = Objects.requireNonNull(limits, "limits");
+            if (!limits.blockTargetBytes().contains(blockTargetBytes)) {
+                throw rejected("block target is not one of the evidence candidates");
+            }
+            this.blockTargetBytes = blockTargetBytes;
+            RandomAccessFile opened = null;
+            try {
+                Path parent = target.toAbsolutePath().getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
+                opened = new RandomAccessFile(target.toFile(), "rw");
+                opened.setLength(0);
+                opened.write(new byte[DATA_HEADER_BYTES]);
+                output = opened;
+            } catch (IOException failure) {
+                if (opened != null) {
+                    try {
+                        opened.close();
+                    } catch (IOException closeFailure) {
+                        failure.addSuppressed(closeFailure);
+                    }
+                }
+                try {
+                    Files.deleteIfExists(target);
+                } catch (IOException cleanupFailure) {
+                    failure.addSuppressed(cleanupFailure);
+                }
+                throw new Npd1RejectedException("cannot open NPD1 streaming target", failure);
+            }
         }
-        List<List<EntryPayload>> result = new ArrayList<>();
-        List<EntryPayload> current = new ArrayList<>();
-        long currentBytes = 0;
-        long expectedEntryId = 0;
-        for (EntryPayload entry : entries) {
+
+        public void append(EntryPayload entry) {
+            Objects.requireNonNull(entry, "entry");
+            requireOpen();
             if (entry.entryId() != expectedEntryId) {
                 throw rejected("entry IDs are not ordered and gap-free");
             }
-            expectedEntryId = checkedAdd(expectedEntryId, 1);
             int payloadBytes = entry.payload.length;
-            if (payloadBytes > limits.maxEntryBytes()) {
-                throw rejected("entry payload exceeds candidate hard maximum");
+            if (payloadBytes > limits.maxEntryBytes() || payloadBytes > limits.maxDecodedBlockBytes()) {
+                throw rejected("entry payload exceeds the selected hard maximum");
             }
-            boolean wouldCrossTarget = !current.isEmpty() && checkedAdd(currentBytes, payloadBytes) > targetBytes;
-            boolean wouldCrossCount = current.size() == limits.maxEntriesPerBlock();
-            if (wouldCrossTarget || wouldCrossCount) {
-                result.add(List.copyOf(current));
-                current.clear();
-                currentBytes = 0;
+            boolean crossesTarget = !current.isEmpty() && checkedAdd(currentBytes, payloadBytes) > blockTargetBytes;
+            boolean crossesCount = current.size() == limits.maxEntriesPerBlock();
+            if (crossesTarget || crossesCount) {
+                flushBlock();
             }
             current.add(entry);
             currentBytes = checkedAdd(currentBytes, payloadBytes);
             if (currentBytes > limits.maxDecodedBlockBytes()) {
-                throw rejected("decoded block exceeds candidate hard maximum");
+                throw rejected("decoded block exceeds the selected hard maximum");
             }
-            if (payloadBytes > targetBytes) {
-                result.add(List.copyOf(current));
-                current.clear();
-                currentBytes = 0;
+            expectedEntryId = checkedAdd(expectedEntryId, 1);
+            if (payloadBytes > blockTargetBytes) {
+                flushBlock();
             }
         }
-        if (!current.isEmpty()) {
-            result.add(List.copyOf(current));
+
+        public DataObject finish() {
+            requireOpen();
+            if (expectedEntryId == 0) {
+                throw rejected("NPD1 requires non-empty entry coverage beginning at zero");
+            }
+            flushBlock();
+            try {
+                output.seek(0);
+                output.write(dataHeader(sparse.size(), offset));
+                output.setLength(offset);
+                closeOutput();
+                long length = Files.size(target);
+                DataObject data = new DataObject(target, length, sha256(target), 0, expectedEntryId - 1, sparse);
+                finished = true;
+                return data;
+            } catch (IOException failure) {
+                throw new Npd1RejectedException("cannot finish NPD1 streaming target", failure);
+            }
         }
-        return result;
+
+        private void flushBlock() {
+            if (current.isEmpty()) {
+                return;
+            }
+            if (sparse.size() >= 65_536) {
+                throw rejected("NPD1 block count exceeds NPO1 sparse-row cap");
+            }
+            EncodedBlock encoded = encodeBlock(current, sparse.size(), compression, attemptKey, attemptUuid);
+            try {
+                output.write(encoded.bytes());
+            } catch (IOException failure) {
+                throw new Npd1RejectedException("cannot write NPD1 streaming block", failure);
+            }
+            sparse.add(new SparseBlock(
+                    sparse.size(),
+                    current.get(0).entryId(),
+                    current.size(),
+                    offset,
+                    encoded.bytes().length,
+                    encoded.decodedBytes(),
+                    compression,
+                    EncryptionFamily.AES_GCM_256,
+                    sha256(encoded.bytes())));
+            offset = checkedAdd(offset, encoded.bytes().length);
+            if (offset > limits.maxDataObjectBytes()) {
+                throw rejected("encoded data Object crosses the selected maximum");
+            }
+            current.clear();
+            currentBytes = 0;
+        }
+
+        private void requireOpen() {
+            if (finished || outputClosed) {
+                throw rejected("NPD1 streaming encoder is already closed");
+            }
+        }
+
+        private void closeOutput() throws IOException {
+            if (!outputClosed) {
+                outputClosed = true;
+                output.close();
+            }
+        }
+
+        @Override
+        public void close() {
+            try {
+                closeOutput();
+            } catch (IOException failure) {
+                if (finished) {
+                    throw new Npd1RejectedException("cannot close NPD1 streaming target", failure);
+                }
+            } finally {
+                if (!finished) {
+                    try {
+                        Files.deleteIfExists(target);
+                    } catch (IOException failure) {
+                        // The caller still receives the primary encode failure; cleanup remains best effort.
+                    }
+                }
+            }
+        }
     }
 
     private static EncodedBlock encodeBlock(

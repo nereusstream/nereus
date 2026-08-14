@@ -69,6 +69,31 @@ dependencyResolutionManagement {
     }
 }
 
+val configuredPulsarCheckout = providers.gradleProperty("pulsarCheckout").orNull
+    ?: providers.environmentVariable("NEREUS_PULSAR_CHECKOUT").orNull
+val conventionalPulsarCheckout = file("../../nereusstream/pulsar")
+val pulsarCheckout = configuredPulsarCheckout?.let(::file)
+    ?: conventionalPulsarCheckout.takeIf { it.resolve("settings.gradle.kts").isFile }
+val pulsarSourceRequired = gradle.startParameter.taskNames.any { requested ->
+    val task = requested.substringAfterLast(':')
+    (!requested.contains(':') && task in setOf("assemble", "build", "check", "test"))
+            || requested.contains(":nereus-pulsar-offload:")
+            || task.startsWith("v2M2Pulsar")
+            || task == "v2M2Check"
+}
+
+require(pulsarCheckout != null || !pulsarSourceRequired) {
+    "The requested task requires the exact Pulsar source composite. Set -PpulsarCheckout=/path/to/pulsar " +
+            "or NEREUS_PULSAR_CHECKOUT; the native SourceSafeLedgerOffloader SPI is not a published artifact."
+}
+
+if (pulsarCheckout != null) {
+    require(pulsarCheckout.resolve("settings.gradle.kts").isFile) {
+        "pulsarCheckout must point at the exact Pulsar Gradle checkout: $pulsarCheckout"
+    }
+    includeBuild(pulsarCheckout)
+}
+
 rootProject.name = "nereus"
 
 include("nereus-bom")

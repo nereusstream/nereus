@@ -22,6 +22,7 @@ import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.DataObject;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.EntryPayload;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.Npd1RejectedException;
 import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.SparseBlock;
+import com.nereusstream.pulsar.offload.npd1.Npd1CodecV1.StreamingEncoder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -246,6 +247,45 @@ class Npd1CodecV1Test {
         assertThat(second.sha256()).isEqualTo(first.sha256());
         assertThat(first.sha256()).isEqualTo("e599560c6ff8ac43683d70d4cf25ea487869259b1bc0d92197e1f71963c1c2ad");
         assertThat(Files.readAllBytes(second.path())).containsExactly(Files.readAllBytes(first.path()));
+    }
+
+    @Test
+    void incrementalStreamingMatchesTheCanonicalListEncoder() throws Exception {
+        List<EntryPayload> entries = entries(9, 300_000, false);
+        DataObject canonical = Npd1CodecV1.encode(
+                temporaryDirectory.resolve("canonical-list.npd1"),
+                entries,
+                PulsarOffloadLimitCandidateV1.MIB,
+                CompressionFamily.NONE,
+                KEY,
+                ATTEMPT,
+                LIMITS);
+        DataObject streamed;
+        try (StreamingEncoder encoder = Npd1CodecV1.openStreaming(
+                temporaryDirectory.resolve("canonical-stream.npd1"),
+                PulsarOffloadLimitCandidateV1.MIB,
+                CompressionFamily.NONE,
+                KEY,
+                ATTEMPT,
+                LIMITS)) {
+            entries.forEach(encoder::append);
+            streamed = encoder.finish();
+        }
+
+        assertThat(streamed).usingRecursiveComparison().ignoringFields("path").isEqualTo(canonical);
+        assertThat(Files.readAllBytes(streamed.path())).containsExactly(Files.readAllBytes(canonical.path()));
+    }
+
+    @Test
+    void abortedStreamingDeletesTheIncompleteTarget() {
+        Path target = temporaryDirectory.resolve("aborted-stream.npd1");
+
+        try (StreamingEncoder encoder = Npd1CodecV1.openStreaming(
+                target, PulsarOffloadLimitCandidateV1.MIB, CompressionFamily.NONE, KEY, ATTEMPT, LIMITS)) {
+            encoder.append(new EntryPayload(0, new byte[] {1, 2, 3}));
+        }
+
+        assertThat(target).doesNotExist();
     }
 
     private DataObject encode(List<EntryPayload> entries, CompressionFamily compression) {

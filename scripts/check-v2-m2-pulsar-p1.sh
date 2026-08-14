@@ -41,9 +41,9 @@ if not report.is_file():
     raise SystemExit("Pulsar P1 gate: exact JUnit report is absent")
 attributes = ET.parse(report).getroot().attrib
 actual = tuple(int(attributes[key]) for key in ("tests", "failures", "errors", "skipped"))
-if actual != (12, 0, 0, 0):
+if actual != (14, 0, 0, 0):
     raise SystemExit(f"Pulsar P1 gate: exact test result differs: {actual}")
-print("Pulsar M2-P1 NPD1 codec verified: suites=1 tests=12 failures=0 errors=0 skips=0")
+print("Pulsar M2-P1 NPD1 codec verified: suites=1 tests=14 failures=0 errors=0 skips=0")
 PY
 
 echo "Pulsar P1 proves candidate-parameterized NPD1 only; NPO1, selected defaults, provider/native evidence, and M2 PASS remain pending."
