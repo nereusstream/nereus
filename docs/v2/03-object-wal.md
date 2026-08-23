@@ -25,10 +25,12 @@ limit is configured and observable; no open group may grow or wait indefinitely.
 
 ## Object and frame identity
 
-A group uses the new major body format `NWG1`. Its fixed header identifies the format, shard, node session,
-shard-run epoch, lane ID/sequence, permanent class ID, `packingPolicyVersion`, resolved quantized policy and actual
-close facts, codec, Object-extent digest family, encryption metadata, and frame count. One group mixes only bindings
-with the same class/version/resolved policy. After immutable group-plan seal/admission, the lane allocates sequence;
+A group uses the new major body format `NWG1`. Its fixed header identifies the format, shard/run epoch, lane
+ID/sequence, `packingPolicyVersion`, resolved target payload bytes/linger nanoseconds, actual payload/close-linger/reason
+facts, directory/count bounds, codec, Object-extent digest family, encryption metadata, and Root/Cell/envelope
+commitments. `laneId` is itself the permanent class ID; the Header has no node-session or duplicate packing-class
+field. One group mixes only bindings with the same class/version/resolved policy. After immutable group-plan
+seal/admission, the lane allocates sequence;
 HKDF/encryption then produces the final canonical body and its scoped conditional-create leaf key encodes lane
 identity, fixed-width lane sequence, exclusive directory-prefix end, body length, and complete SHA-256/v1.
 `{bodyLength,SHA-256}` is exact content identity; the complete key is physical immutable identity. That key plus the
@@ -46,7 +48,8 @@ The group object is an `ObjectExtent`. Every frame independently carries:
 - idempotency identity;
 - flags required by the protocol payload mapping.
 
-[ADR 0088](../decisions/0088-v2-m3-nwg1-implementation-input-closure.md) and the
+[ADR 0088](../decisions/0088-v2-m3-nwg1-implementation-input-closure.md), its exact
+[Header amendment ADR 0089](../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and the
 [M3-I0 input closure](detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md) now freeze the exact NWG1 v1
 implementation input. The strict big-endian body uses a 256-byte Header; a 32-byte Directory preamble; 116-byte
 BindingContext rows; 104/96-byte Kafka/Pulsar AppendUnit rows; 48-byte Frame rows; 37-byte HKDF info; 12-byte derived
@@ -54,6 +57,11 @@ nonces; and 272/328-byte Directory/Frame AAD. Its format ceilings are a 4-MiB au
 decoded aggregate, 64-MiB decoded frame, 256 contexts, and 65,536 units/frames. These are parser/compatibility ceilings,
 not production Root targets or Provider evidence. Projection/goldens, codec, mutation runner, state traces and real
 evidence remain unimplemented, so this exact design changes no scenario status.
+
+ADR 0089 is the sole normative Header offset table. The future `docs/v2/wire/nwg1-v1.json` projection must mechanically
+transcribe that gap-free 256-byte table and cannot create an independent field authority. No production NWG1 bytes
+exist, so the amendment correctly retains `wireVersion=1`. The Header fixes Object digest `SHA-256/v1=1/1` and the
+twelve first-satisfied actual-close codes; evidence still owns normal target/linger selection.
 
 One Kafka frame is one complete raw broker-assigned RecordBatch. All frames from one partition `MemoryRecords` storage
 append form one `KafkaAppendCommitSet`: membership, every frame, and all coverage must be durable and valid before any
@@ -87,10 +95,11 @@ and Object SHA-256 protects the final body. No extra commit-set CRC is added.
 NWG1 mandates `AES-256-GCM/HKDF-SHA-256 v1`. One random 256-bit WalRun data key is wrapped once under the immutable
 Cell KMS key identity/version recorded by the Root. A domain-separated HKDF derives a unique key for each
 `{shard,runEpoch,laneId,laneSequence}`. The encrypted/authenticated context+directory unit and frame ordinals use
-disjoint fixed 96-bit nonce domains; run epochs, lane-sequence pairs, and nonces are never reused. The fixed header,
-exact Root SHA, and wrapped-key envelope identity are AAD. Compression precedes frame AEAD, and payload CRC is checked
-only after authentication/decryption/decompression. KMS unwrap/cache is run-scoped and rotation seals the run; the
-Object hot path does not perform one KMS wrap per PUT.
+disjoint fixed 96-bit nonce domains; run epochs, lane-sequence pairs, and nonces are never reused. Directory/Frame AAD
+contains the exact final Header, which already commits the Root and wrapped-key envelope; those commitments are not
+appended a second time. Compression precedes frame AEAD, and payload CRC is checked only after
+authentication/decryption/decompression. KMS unwrap/cache is run-scoped and rotation seals the run; the Object hot path
+does not perform one KMS wrap per PUT.
 
 One group may contain multiple compatible bindings from exactly one Protocol Cell. Object groups never cross Protocol
 Cells in 0.2. A group-level shard epoch cannot authorize every frame and its physical ordering cannot compare protocol
@@ -188,6 +197,9 @@ authoritative for all lanes. Each group leaf has the structural form
 the lane is one ASCII digit and the three remaining numeric fields are zero-padded 19-digit non-negative values.
 Checkpoint/manifest rows store its structured fields rather than the full key. No per-group metadata-service row is
 required for ACK.
+
+The Root's control-plane session authority is not copied into the NWG1 Header, leaf, HKDF info, nonce, or Object
+identity. Header cross-binding uses the exact Root SHA instead.
 
 Builder creation, pre-plan cancellation, resource/admission failure, and early-close decisions allocate no sequence.
 Once the immutable group plan is admitted, sequence allocation occurs before HKDF/encryption/final-body seal. No later

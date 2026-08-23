@@ -16,6 +16,11 @@ existing evidence or selection boundaries. Exact `NWKCP1`, Kafka protocol-checkp
 Pointer canonical wire, and production allocator selection remain later M3 slices rather than synthetic NWG1
 fixture authority.
 
+[ADR 0089](0089-v2-m3-nwg1-v1-header-layout-amendment.md) amends this input before any production NWG1 byte exists by
+freezing the missing exact 256-byte Header offset table. It keeps `wireVersion=1`, removes the erroneous node-session
+Header claim, fixes SHA-256/v1 as Object digest code `1/1`, and assigns all twelve accepted first-satisfied close reasons
+codes `1..12`. It does not reopen any other decision in this ADR.
+
 ## Context
 
 ADRs 0030, 0037 through 0040, 0046 through 0047, and 0053 through 0068 already fix the Object-WAL architecture:
@@ -65,6 +70,12 @@ FrameAAD = 328 bytes
 Java signed-long domain, overflow, overlap, gaps, trailing bytes, and non-canonical order fail closed. A future layout,
 field meaning, AAD, or canonical-encoding change uses another wire version; a discovery/body-architecture change uses
 another magic/family.
+
+ADR 0089 is the sole normative field-offset table for this Header. The Header has no node-session field or duplicate
+packing-class field: `laneId` itself is the permanent `OBJECT_LATENCY/BALANCED/COST` class ID. It records resolved
+target/linger values without selecting their evidence-owned defaults, uses Object digest `SHA256/v1=1/1`, and preserves
+the twelve first-satisfied close reasons in their accepted order. The future machine projection must mechanically
+transcribe that table rather than create a second field-layout authority.
 
 The canonical directory order is preamble, Binding-context table, protocol-specific append-unit table, common frame
 table, canonical NTI1 blob, and CRC32C. Tables use dense ordinals. NTI1 slices and stored frame blocks have no padding,

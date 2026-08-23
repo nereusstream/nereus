@@ -309,13 +309,20 @@ A sealed run is never reopened.
 
 ### `V2-OPEN-OBJ-17`: resolved exact NWG1 cryptographic framing
 
-Resolved by [ADR 0088](../decisions/0088-v2-m3-nwg1-implementation-input-closure.md) and the
+Resolved by [ADR 0088](../decisions/0088-v2-m3-nwg1-implementation-input-closure.md), its accepted
+[ADR 0089 Header amendment](../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and the
 [M3-I0 input closure](detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md). NWG1 v1 now has an exact
 256-byte Header, 32-byte Directory preamble, 116-byte Binding row, 104/96-byte Kafka/Pulsar AppendUnit rows, 48-byte
 Frame row, 37-byte HKDF info, 12-byte nonce, 272/328-byte AAD, closed algorithms, 4-MiB prefix and 4-GiB body/decoded
 aggregate format ceilings, canonical order/equations, and strict verifier precedence. Production projection/goldens,
 codec, mutation/trace runners, Provider evidence and receipts remain M3 implementation work and provide no current
 scenario evidence.
+
+ADR 0089 supplies the previously missing gap-free Header offset table before any production NWG1 byte exists, so the
+first production version remains `wireVersion=1`. The Header excludes node session, owner witness, body SHA and a
+duplicate class field; `laneId` is the permanent class ID. Object digest is SHA-256/v1 code `1/1`, and the twelve
+accepted first-satisfied actual-close reasons use codes `1..12`. Normal target/linger values remain evidence-owned by
+`V2-OPEN-OBJ-19`; the future projection must mechanically transcribe the ADR rather than create another authority.
 
 ### `V2-OPEN-OBJ-18`: resolved WalRun checkpoint pages and open-tail handoff
 
@@ -778,13 +785,19 @@ input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
 
-### M3 NWG1 implementation-readiness rounds 1 through 9: resolved by ADR 0088
+### M3 NWG1 implementation-readiness rounds 1 through 9: resolved by ADRs 0088/0089
 
 Resolved on 2026-08-23 after explicit acceptance and repository-landing authorization. The focused review froze exact
 NWG1 layout/caps/crypto, writer/reader/dispatch cuts, four corpus classes, six positive vectors and 114 component rows,
 84 negative records across 240 verifier paths, 50 deterministic Object-WAL kernel traces, and the D1/D2/D3 capacity
 evidence boundary. It also retains explicit exclusions for positive Storage Epoch ordinal, mixed-policy production
 evidence, production-compressor exact output, and synthetic complete Root/Pointer wire.
+
+ADR 0089 then closes the one implementation-input ambiguity found before production: the exact 256-byte Header offset
+table. With no production bytes to migrate, it keeps v1; removes node session and duplicate packing class from the
+Header; fixes `laneId` as class ID, SHA-256/v1 code `1/1`, and twelve close-reason codes; and makes the projection a
+mechanical transcription. The earlier `1..11` close-reason count was erroneous and does not remove or merge the twelfth
+accepted reason.
 
 This closes `V2-OPEN-OBJ-17` only at the design/input layer. `V2-OPEN-OBJ-19`, `V2-OPEN-PUL-OBJ-09`,
 `V2-OPEN-OBJ-22`, and `V2-OPEN-OBJ-24` keep their evidence/selection boundaries. The complete adjusted decision trail

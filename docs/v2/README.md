@@ -118,9 +118,12 @@ performance-first BookKeeper WAL.
   semantic compaction. `NBKE2` checkpoint carriage is M2, exact Object `NWKCP1` bytes/Head/key caps are M3, and native
   Kafka transport/process activation is M6. The M2 carrier is now verified by M2 Final; `NWKCP1` remains M3 work and
   native transport/process activation remains M6 work.
-- ADR 0088 and the accepted [M3-I0 NWG1 input closure](detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md)
-  freeze the 256/116/104/96/48-byte NWG1 structures, strict code/cap/crypto tables, six-vector/114-component A corpus,
-  84-record/240-path B contract, 50-trace C contract, and tiered D evidence boundary. This is documentation-only:
+- ADR 0088, [ADR 0089's exact Header amendment](../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and the
+  accepted [M3-I0 NWG1 input closure](detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md) freeze the exact
+  256-byte Header offsets, 116/104/96/48-byte NWG1 rows, strict code/cap/crypto tables, six-vector/114-component A corpus,
+  84-record/240-path B contract, 50-trace C contract, and tiered D evidence boundary. The Header has no node session or
+  duplicate class field; `laneId` is the permanent class ID, Object digest is SHA-256/v1 code `1/1`, and all twelve
+  first-satisfied close reasons are distinct. This is documentation-only:
   production codec/manifests/runners/harnesses, Root/Pointer and `NWKCP1`, Provider/KMS/allocator evidence, scenario
   promotion, and M3 Final remain `NotStarted`/`PLANNED`.
 - The initial foundation supplied Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct
@@ -341,6 +344,7 @@ Accepted decisions:
 - [ADR 0086: Kafka BookKeeper run, range index, and ordered pipeline](../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md)
 - [ADR 0087: Kafka Produce/Fetch frontiers, shared-storage ISR, and protocol recovery](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md)
 - [ADR 0088: M3 NWG1 implementation-input closure](../decisions/0088-v2-m3-nwg1-implementation-input-closure.md)
+- [ADR 0089: M3 NWG1 v1 Header layout amendment](../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md)
 
 ## Open design gates
 
@@ -384,6 +388,10 @@ queue/checkpoint/waiter bounds. M2 owns the BK carrier; M3 owns exact `NWKCP1`; 
 ADR 0088 closes `V2-OPEN-OBJ-17` at the documentation/input layer by freezing the NWG1 v1 structures, caps, crypto,
 golden/mutation/trace contracts, and evidence taxonomy. Its machine projections, immutable bytes, production codec,
 executable gates, receipts, and all M3 scenario evidence remain implementation work.
+ADR 0089 amends that input before any production NWG1 bytes exist with the gap-free exact 256-byte Header table. It
+retains `wireVersion=1`, removes node session and any duplicate packing-class field from the Header, fixes Object digest
+`SHA-256/v1=1/1` plus close-reason codes `1..12`, and requires the future projection to mechanically transcribe the ADR.
+Target/linger selection remains owned by `V2-OPEN-OBJ-19` evidence.
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.

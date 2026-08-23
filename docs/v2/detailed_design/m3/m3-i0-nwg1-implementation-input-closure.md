@@ -17,6 +17,10 @@ input. It refines [ADR 0088](../../../decisions/0088-v2-m3-nwg1-implementation-i
 `main@64d21ac5578d50cf0e5b0dc2fb0f10f2472666e9`; this documentation-only descendant changes no production source,
 persisted byte, source lock, receipt, or scenario status.
 
+[ADR 0089](../../../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md) closes the one real input gap found before
+implementation: it is the normative, gap-free 256-byte Header offset table. Because no production NWG1 byte exists,
+the amendment keeps `wireVersion=1`; it does not invent a migration to v2.
+
 M3-I0 closes choices needed to implement NWG1 wire, crypto, verification, deterministic failure traces, and capacity
 evidence. It does not implement them. It also does not close the complete M3 milestone: exact `NWKCP1`, protocol Head,
 complete Root/Pointer/control-record wire, production Provider/KMS admission, publication integration, allocator
@@ -105,10 +109,15 @@ The fixed v1 sizes are:
 | Directory AAD | 272 |
 | Frame AAD | 328 |
 
-The production `docs/v2/wire/nwg1-v1.json` projection is the sole machine-readable Header field-offset authority. It
-must transcribe the accepted 256-byte table and expose every required-zero byte; neither this prose nor the golden
-manifest may maintain a second independent offset table. Until that projection, production constants, and exact
-comparison tests land together, no writer may persist NWG1 v1.
+ADR 0089 is the sole normative Header field-offset authority. The production `docs/v2/wire/nwg1-v1.json` projection
+must mechanically transcribe its exact names, offsets, widths, types, fixed values and required-zero bytes; it cannot
+add or reinterpret a field. Neither this prose nor the golden manifest may maintain a second independent offset table.
+Until that projection, production constants, and exact comparison tests land together, no writer may persist NWG1 v1.
+
+The Header contains no node session, owner witness, body SHA, or duplicate packing-class field. `laneId` is the
+permanent class ID `0=OBJECT_LATENCY`, `1=OBJECT_BALANCED`, or `2=OBJECT_COST`. Object digest kind/version is exactly
+`SHA256/v1=1/1`. Resolved target/linger values are persisted per sealed plan, but their normal evidence-selected values
+remain owned by `V2-OPEN-OBJ-19`.
 
 Header-derived relations are exact:
 
@@ -277,6 +286,7 @@ Independent typed namespaces are not interchangeable merely because their numeri
 ```text
 ProtocolKind:       KAFKA=1, PULSAR=2
 codec registry:     NWG1_FRAME_CODEC_REGISTRY_V1=1/1
+Object digest:      SHA256_V1=1/1
 AEAD:               AES_256_GCM_TAG128_V1=1/1
 KDF:                HKDF_SHA256_OBJECT_INFO_V1=1/1
 nonce layout:       NDIR_NFRM_U32_U64_BE_V1=1
@@ -385,7 +395,9 @@ NWG1_V1_MAX_TOTAL_DECODED_PAYLOAD_BYTES= 4,294,967,296
 ```
 
 The decoded-frame sum equals Header `actualPayloadBytesAtPlanSeal`. It may be zero only for a non-empty Pulsar Object
-containing legal zero-byte entries. `resolvedTargetPayloadBytes` is positive and no greater than 4 GiB.
+containing legal zero-byte entries. `resolvedTargetPayloadBytes` is positive and no greater than 4 GiB. Both
+`resolvedLingerNanos` and `actualCloseLingerNanos` are non-negative `u64` values in the accepted signed-long domain;
+actual close linger ends at plan seal and excludes compression, KMS, encryption and Provider latency.
 
 ### Root-admitted caps
 
@@ -434,22 +446,25 @@ reserve tracker/locator/staging/spool/provider/recovery capacity
 -> reconcile typed outcome
 ```
 
-Plan close reasons are the first satisfied code in this order:
+Plan close reasons are the first satisfied code in this order; the number is the exact `actualCloseReason:u8` value:
 
 ```text
-OBJECT_BODY_CAP
-DIRECTORY_CAP
-APPEND_UNIT_CAP
-FRAME_CAP
-EARLIEST_REQUEST_DEADLINE
-HANDOFF
-RUN_STOP
-POLICY_CHANGE
-RESOURCE_PRESSURE
-EXPLICIT_FLUSH
-TARGET_BYTES
-LINGER_EXPIRED
+ 1 OBJECT_BODY_CAP
+ 2 DIRECTORY_CAP
+ 3 APPEND_UNIT_CAP
+ 4 FRAME_CAP
+ 5 EARLIEST_REQUEST_DEADLINE
+ 6 HANDOFF
+ 7 RUN_STOP
+ 8 POLICY_CHANGE
+ 9 RESOURCE_PRESSURE
+10 EXPLICIT_FLUSH
+11 TARGET_BYTES
+12 LINGER_EXPIRED
 ```
+
+All twelve reasons remain distinct. Zero, unknown values and the earlier erroneous `1..11` count are rejected; no
+implementation may delete, merge or renumber an accepted reason to fit that count.
 
 Payload target and actual payload measure uncompressed protocol-native frame bytes only. Open age ends at plan seal and
 excludes compression, KMS, encryption, and PUT latency. One unit is indivisible and may cross a soft target; a unit
