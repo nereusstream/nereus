@@ -716,18 +716,23 @@ allowed `[2,2^40]` size domain, ACTIVE versioned-slice admission, exact-reread r
 and one stale-candidate ID burn. Production activation is constructible only from a selection-eligible receipt bound to
 the exact running source; there is no default mode.
 
-The current 27 zero-failure/error/skip allocator tests and deterministic `8 workloads x 9 cuts` schedule are local
-implementation conformance, not real/native evidence. The remaining gate must execute ADR 0055's source-qualified
-multi-broker/native 10,000/100,000 protocol, satisfy the frozen absolute and relative SLOs with zero skip, select one
-exact RANGE size if RANGE qualifies, and select at most one persisted mode. Until then both modes remain unselected and
-no `V2-POSITION-013/014/017/018` scenario may cite this local result as PASS.
+The current local allocator tests and deterministic `8 workloads x 9 cuts` schedule are implementation conformance,
+not real/native evidence. ADR 0094 now freezes, before formal execution, the exact executor, workload, independent
+telemetry, numeric absolute/native-relative SLOs, RANGE candidates, and closed at-most-one selection rule that ADRs
+0055/0091 required but did not numerically supply. The remaining gate must execute that source-qualified
+multi-broker/native 10,000/100,000 protocol with zero skip, select the smallest qualifying RANGE size if RANGE alone
+qualifies, and select at most one persisted mode. Until then both modes remain unselected and no
+`V2-POSITION-013/014/017/018` scenario may cite a local or diagnostic result as PASS.
 
 ### `V2-OPEN-PUL-OBJ-10`: allocator target-scale evidence protocol
 
-Resolved by [ADR 0055](../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md). Evidence measures the
-maximum sustainable rollover RPS while all predeclared latency/queue/error/recovery SLOs hold, includes actual
-rollover-rate distribution/jitter/storms and native Pulsar rollover/append-stall baseline, and keeps performance budgets
-out of allocator durable identity. Execution remains `PLANNED`; this resolution is not a performance PASS.
+Resolved at the protocol layer by
+[ADR 0055](../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md), with the previously omitted
+executable workload, telemetry, numeric SLOs, executor envelope, and selection algorithm frozen before the formal run
+by [ADR 0094](../decisions/0094-v2-m3-allocator-evidence-workload-and-selection-amendment.md). Evidence measures the
+maximum sustainable rollover RPS while all bounds hold, includes actual rollover distribution/jitter/storms and native
+Pulsar rollover/append-stall baseline, and keeps performance budgets out of allocator durable identity. Execution
+remains `PLANNED`; these accepted inputs are not a performance PASS.
 
 ### `V2-OPEN-PUL-MIGRATION-01`: new incarnation or HybridManagedLedger
 

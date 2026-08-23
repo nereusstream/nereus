@@ -5,7 +5,9 @@
 Accepted as the M3 production wire, key, transition, and selection-admission contract for Pulsar `OBJECT_WAL` in
 0.2. The local production implementation and deterministic conformance tests exist, but neither
 `STRICT_SERIALIZED` nor `RANGE_LEASED` is selected. No real/native 10,000/100,000 allocator receipt exists at this
-documentation cut, so `V2-OPEN-PUL-OBJ-09` remains open and no scenario is promoted.
+documentation cut, so `V2-OPEN-PUL-OBJ-09` remains open and no scenario is promoted. ADR 0094 freezes the formal
+executor/workload/telemetry/threshold and deterministic selection amendment before the first eligible execution; it
+changes none of this decision's production bytes or transitions.
 
 ## Context
 
@@ -249,5 +251,6 @@ change also invalidates any receipt whose exact Nereus source no longer matches.
 - Native reserved-interval exclusion and M6 broker activation remain separate source-qualified gates.
 - No allocator metadata record may be deleted or reused in 0.2 merely because a local test or stale receipt passed.
 
-This decision refines ADRs 0027, 0032, 0041, 0048, 0049, 0054, 0055, 0061, 0082, 0083, and 0084 and is tracked by
+This decision is made executable for evidence selection by ADR 0094. It refines ADRs 0027, 0032, 0041, 0048, 0049,
+0054, 0055, 0061, 0082, 0083, and 0084 and is tracked by
 `T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-013/014/017/018`, `M3-P1`, and `V2-OPEN-PUL-OBJ-09`.

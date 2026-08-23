@@ -26,7 +26,7 @@ implementation-ready by assertion and does not convert any `PLANNED` scenario in
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | planned; synthetic NWG1 fixtures are not Root/Pointer wire authority |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | planned; exact wire, key, vector caps, backend mapping, recovery, and terminal Head evidence remain M3 work |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | planned; native broker/controller activation remains M6 |
-| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | implementation in progress; [ADR 0091](../../../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md) fixes and locally tests production allocator wire/key/transitions, but no real/native 10k/100k receipt, RANGE size, mode selection, or scenario PASS exists |
+| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | implementation in progress; [ADR 0091](../../../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md) fixes production allocator wire/key/transitions and [ADR 0094](../../../decisions/0094-v2-m3-allocator-evidence-workload-and-selection-amendment.md) freezes the formal workload/SLO/selection inputs, but no real/native 10k/100k receipt, RANGE size, mode selection, or scenario PASS exists |
 | M3-FINAL | exact-source aggregate and scenario promotion | planned; requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
 
 Slice names are execution labels, not new durable wire codes. Implementations may split reviewable commits more

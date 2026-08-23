@@ -135,9 +135,11 @@ domain in the same namespace cannot reuse the interval. ADR 0091 now fixes the p
 keys, STRICT four-write path, RANGE takeover/install/clear path, allowed range-size domain, and receipt-only activation.
 The exact selected RANGE size and allocator mode remain open pending current-source real/native evidence.
 
-ADR 0055 freezes the evidence protocol but selects neither allocator mode. It measures maximum sustainable rollover
-RPS while all predeclared queue/latency/error/recovery SLOs hold, covers real rollover distributions/jitter/storms and
-all crash cuts, including broker-wide takeover of 10,000/100,000 ManagedLedgers, and compares native Pulsar
+ADR 0055 freezes the evidence protocol but selects neither allocator mode. ADR 0094 freezes its exact executor,
+workload, independent telemetry, numeric absolute/native-relative SLOs, four RANGE candidates, and closed at-most-one
+selection rule before formal execution. It measures maximum sustainable rollover RPS while every bound holds, covers
+real rollover distributions/jitter/storms and all crash cuts, including broker-wide takeover of 10,000/100,000
+ManagedLedgers, and compares native Pulsar
 rollover/append-stall behavior. STRICT and RANGE correctness work proceed in parallel. Allocator identity may persist
 only mode, protocol version, and recovery/fencing identity; performance budgets remain versioned Cell policy/evidence
 and host capacity remains a runtime ceiling. ADR 0061 constrains any RANGE candidate without selecting it: a grant
@@ -316,4 +318,5 @@ Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-KAFKA-01`, `T-PROTOCOL-01`, `T-
 [ADR 0086](../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md) and its protocol semantics by
 [ADR 0087](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md), and with the production allocator
 wire/key/selection boundary fixed by
-[ADR 0091](../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md).
+[ADR 0091](../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md) and its pre-execution evidence
+amendment [ADR 0094](../decisions/0094-v2-m3-allocator-evidence-workload-and-selection-amendment.md).
