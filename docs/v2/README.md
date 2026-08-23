@@ -345,6 +345,7 @@ Accepted decisions:
 - [ADR 0087: Kafka Produce/Fetch frontiers, shared-storage ISR, and protocol recovery](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md)
 - [ADR 0088: M3 NWG1 implementation-input closure](../decisions/0088-v2-m3-nwg1-implementation-input-closure.md)
 - [ADR 0089: M3 NWG1 v1 Header layout amendment](../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md)
+- [ADR 0090: M3 NWG1 mutation external-call profiles](../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md)
 
 ## Open design gates
 

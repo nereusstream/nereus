@@ -17,7 +17,7 @@ implementation-ready by assertion and does not convert any `PLANNED` scenario in
 
 | Slice | Design or output | Status at this documentation cut |
 | --- | --- | --- |
-| M3-I0 | [NWG1 implementation-input closure](m3-i0-nwg1-implementation-input-closure.md) plus [ADR 0089 Header amendment](../../../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md) | accepted documentation-only input with exact 256-byte Header offsets; no codec, runner, trace harness, Provider evidence, receipt, or scenario PASS |
+| M3-I0 | [NWG1 implementation-input closure](m3-i0-nwg1-implementation-input-closure.md), [ADR 0089 Header amendment](../../../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and [ADR 0090 mutation-call profiles](../../../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md) | accepted documentation-only input with exact Header offsets and explicit X0/XU call caps; no codec, runner, trace harness, Provider evidence, receipt, or scenario PASS |
 | M3-W1 | current-source M2 regression plus M3 module/API input gate | planned; historical M2 Final remains immutable and current-source regression must equal the eventual M3 tested source |
 | M3-W2 | NWG1 production encoder/decoder, projection, six-vector A corpus, and exact wire gate | planned; projection must mechanically transcribe ADR 0089, and exact bytes plus `PASS_LOCAL_NWG1_WIRE_ONLY` do not exist |
 | M3-W3 | 84-record/240-path B mutation manifest and runner | planned; typed rejection/stage/scope contract is accepted but executable manifest is absent |

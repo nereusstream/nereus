@@ -746,6 +746,13 @@ X0/XU = 30/54
 K0/KM/KZ/P0/PM/PZ = 60/16/4/2/1/1
 ```
 
+[ADR 0090](../../../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md) expands those abbreviations without
+changing the inventory. The 30 `X0` records use `NO_EXTERNAL_CALLS_AFTER_PRELOADED_CUT`: all eleven external-call
+maximums are zero. The 54 `XU` records use `AT_MOST_ONE_KMS_UNWRAP_CALL_AFTER_PRELOADED_CUT`: only `KMS_UNWRAP` has
+maximum one and every metadata/Provider/other KMS maximum is zero. Actual calls may be lower when an earlier stage
+rejects. Every record authors the complete per-kind maximum map; the gate rejects hidden, missing, extra, or excessive
+calls.
+
 The canonical manifest must author all 84 records explicitly. The counts are closed, but no documentation-only file
 may fabricate omitted IDs or expected bytes; implementation review must reject a manifest that reaches these totals by
 runtime expansion or changes a recipe without changing its digest-derived Root.

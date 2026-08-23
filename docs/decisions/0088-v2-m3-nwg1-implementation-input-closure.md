@@ -21,6 +21,10 @@ freezing the missing exact 256-byte Header offset table. It keeps `wireVersion=1
 Header claim, fixes SHA-256/v1 as Object digest code `1/1`, and assigns all twelve accepted first-satisfied close reasons
 codes `1..12`. It does not reopen any other decision in this ADR.
 
+[ADR 0090](0090-v2-m3-nwg1-mutation-external-call-profiles.md) expands the previously abbreviated mutation profiles:
+30 records use `NO_EXTERNAL_CALLS_AFTER_PRELOADED_CUT`; 54 use
+`AT_MOST_ONE_KMS_UNWRAP_CALL_AFTER_PRELOADED_CUT`. It changes no wire byte or corpus total.
+
 ## Context
 
 ADRs 0030, 0037 through 0040, 0046 through 0047, and 0053 through 0068 already fix the Object-WAL architecture:

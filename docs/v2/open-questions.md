@@ -785,7 +785,7 @@ input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
 
-### M3 NWG1 implementation-readiness rounds 1 through 9: resolved by ADRs 0088/0089
+### M3 NWG1 implementation-readiness rounds 1 through 9: resolved by ADRs 0088/0089/0090
 
 Resolved on 2026-08-23 after explicit acceptance and repository-landing authorization. The focused review froze exact
 NWG1 layout/caps/crypto, writer/reader/dispatch cuts, four corpus classes, six positive vectors and 114 component rows,
@@ -798,6 +798,11 @@ table. With no production bytes to migrate, it keeps v1; removes node session an
 Header; fixes `laneId` as class ID, SHA-256/v1 code `1/1`, and twelve close-reason codes; and makes the projection a
 mechanical transcription. The earlier `1..11` close-reason count was erroneous and does not remove or merge the twelfth
 accepted reason.
+
+[ADR 0090](../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md) expands the frozen `X0/XU=30/54` split
+into exact post-preloaded-cut call caps: `X0` permits no external call and `XU` permits at most one KMS unwrap while
+forbidding metadata and Provider calls. It changes no wire byte or corpus total and prevents the manifest from hiding
+calls behind undefined abbreviations.
 
 This closes `V2-OPEN-OBJ-17` only at the design/input layer. `V2-OPEN-OBJ-19`, `V2-OPEN-PUL-OBJ-09`,
 `V2-OPEN-OBJ-22`, and `V2-OPEN-OBJ-24` keep their evidence/selection boundaries. The complete adjusted decision trail
