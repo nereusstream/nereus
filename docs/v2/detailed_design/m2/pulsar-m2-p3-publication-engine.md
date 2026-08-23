@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json
 ---
 
 # Pulsar M2-P3 sealed-ledger publication engine
@@ -24,5 +25,5 @@ absent, then clears deterministic attempt-scoped multipart residue. A root-delet
 cannot expose a data-only deletion race. Every operation remains UUID-scoped and idempotent.
 
 `v2M2PulsarP3Check` proves the publication/response-loss/cut/cleanup state machine with an in-memory immutable provider.
-It does not yet claim the P4 production Object reader, native Pulsar integration, selected provider/block defaults,
-runtime evidence, scenario promotion, or M2 PASS.
+Pulsar Final now binds it with the P4 production Object reader, P5 native integration, and P6 selected provider/block
+evidence; P3 alone does not claim runtime activation, scenario promotion, or M2 PASS.

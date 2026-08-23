@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json
 ---
 
 # Pulsar M2-P0 offload input closure
@@ -26,9 +27,9 @@ The accepted authority remains ADRs 0017, 0020, 0024, 0029, 0035, 0036, 0044, 00
 - `RETAIN_BK` and `DELETE_AFTER_VERIFIED` are the only retention classes, and the latter uses irreversible
   `NONE -> INTENT -> DONE` delete state.
 
-P0 represents the 4-GiB data Object and 1,024-part values only as the evidence candidate named by ADR 0056. The four
-block targets 1/4/8/16 MiB are likewise candidates. A selected production limits record cannot exist until the later
-source-qualified evidence receipt chooses values and the exact Pulsar adapter consumes them.
+P0 represents the 4-GiB data Object and 1,024-part values as the evidence candidates named by ADR 0056. The four block
+targets 1/4/8/16 MiB entered P6 as candidates; the source-qualified receipt selected 1/4/8 MiB with 4 MiB as the
+deployment default, and the exact Pulsar adapter consumes that production limits record.
 
 ## Provider admission boundary
 
@@ -39,6 +40,6 @@ closed. Provider transport limits never become NPD1 wire identity.
 
 ## Exit boundary
 
-`v2M2PulsarP0Check` compiles this module and runs the exact P0 matrix. It proves only the input model. NPD1/NPO1 bytes,
-offload/read/delete execution, exact Pulsar-source integration, provider/native-relative evidence, Pulsar Final, and
-global M2 remain pending.
+`v2M2PulsarP0Check` compiles this module and runs the exact P0 matrix. The focused gate proves only the input model.
+Pulsar Final now binds it with P1-P6 codec, offload/read/delete, exact-source, and provider evidence; P0 alone is not
+Pulsar Final or global M2 evidence.

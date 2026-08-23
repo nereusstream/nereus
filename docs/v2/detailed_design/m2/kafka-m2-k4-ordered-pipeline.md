@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json
 ---
 
 # M2 Kafka K4 capacity-first ordered pipeline
@@ -45,5 +46,6 @@ submission, concurrent insertion linearization, byte/range substitution, B-befor
 failure, proof substitution, observer failure, and permit ownership through each provider terminal and ordered
 completion.
 
-This fake-provider gate proves no producer/transaction mutation, coherent K1 publication, Kafka ACK, recovery, real
-BookKeeper behavior, runtime activation, scenario promotion, or Kafka/global M2 PASS.
+This focused fake-provider gate alone proves no producer/transaction mutation, Kafka ACK, recovery, real BookKeeper
+behavior, runtime activation, scenario promotion, or Kafka/global M2 PASS. Kafka Final now binds it with K5 coherent
+publication and K6-K10 evidence.

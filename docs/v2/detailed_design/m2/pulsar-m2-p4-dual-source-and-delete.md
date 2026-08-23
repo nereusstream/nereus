@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json
 ---
 
 # Pulsar M2-P4 dual-source reads and BookKeeper deletion
@@ -34,4 +35,5 @@ release and pin release are both attempted even if either fails, so fallback can
 
 `v2M2PulsarP4Check` proves the Object child, whole-range source/error table, partial release, no-loop fallback, pin
 fence/drain, bounded timeout, final revalidation interface, irreversible CAS ordering, restart reconciliation, and close
-races. Native Pulsar fork integration, selected defaults/evidence, scenario promotion, and M2 PASS remain pending.
+races. Pulsar Final now binds it with P5 native-fork integration and P6 selected-default evidence; P4 alone is not
+scenario or M2 PASS evidence.

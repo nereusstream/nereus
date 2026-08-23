@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json
 ---
 
 # M2 Kafka K3 run lifecycle and entry sequencer
@@ -16,7 +17,7 @@ publishes the low-frequency ACTIVE root. A root is never published before the he
 
 `KafkaBookKeeperEntrySequencerV1` owns the sole gap-free physical entry sequence beginning at entry one. One DATA-group
 reservation covers all of its members contiguously. A second group or any control reservation is rejected until the
-exact reservation completes, so a checkpoint/footer cannot split a commit set. K4 will submit DATA and own bounded
+exact reservation completes, so a checkpoint/footer cannot split a commit set. K4 submits DATA and owns bounded
 pipeline capacity; K3 does not allocate Kafka offsets or claim append durability.
 
 Protocol checkpoints may be submitted only while ACTIVE and at a group boundary. Run drain stops new reservations and
@@ -35,5 +36,6 @@ control exclusion, exact header/root identity, checkpoint submission, pending-op
 close/root seal order, successor continuity, retirement eligibility, response-unknown create/header cuts, substituted
 append proof, failed close, and successor fence regression.
 
-This gate uses a deterministic fake provider and proves no DATA I/O pipeline, ordered commit publication, recovery,
-real BookKeeper behavior, physical deletion, Kafka runtime activation, scenario promotion, or Kafka/global M2 PASS.
+This focused gate uses a deterministic fake provider and alone proves no DATA I/O pipeline, ordered commit publication,
+recovery, real BookKeeper behavior, runtime activation, scenario promotion, or Kafka/global M2 PASS. Kafka Final now
+binds it with K4-K10, including K9 real-BookKeeper evidence.

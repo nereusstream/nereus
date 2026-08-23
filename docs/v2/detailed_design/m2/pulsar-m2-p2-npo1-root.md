@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json
 ---
 
 # Pulsar M2-P2 NPO1 sealed-ledger root
@@ -35,6 +36,6 @@ Validation requires `entryCount=LAC+1`, entry coverage exactly `0..LAC`, block o
 from the 32-byte NPD1 header through the data length, strict UTF-8, unsigned-UTF-8 map ordering, unique fields, checked
 arithmetic, and the accepted hard caps. Empty ledgers never form an attempt.
 
-`v2M2PulsarP2Check` proves NPO1 bytes, wrapped-key-envelope bounds/defensive copying, and rejection behavior.
-Publication/read/delete execution, native Pulsar
-integration, selected defaults/provider evidence, scenario receipts, and M2 PASS remain pending.
+`v2M2PulsarP2Check` proves NPO1 bytes, wrapped-key-envelope bounds/defensive copying, and rejection behavior. Pulsar
+Final now binds it with P3-P6 publication/read/delete, native Pulsar, and selected provider evidence; P2 alone is not
+scenario or M2 PASS evidence.

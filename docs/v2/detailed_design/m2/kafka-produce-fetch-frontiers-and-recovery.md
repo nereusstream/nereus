@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
-authority: NormativeDetailedDesignWithOpenEvidence
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
+authority: NormativeDetailedDesign
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json
 ---
 
 # M2 Kafka Produce/Fetch frontiers and protocol recovery design
@@ -463,7 +464,7 @@ leader transfer, Fetch purgatory, and comparison with the pinned Kafka baseline.
 An M2 receipt may promote only rows whose milestone is exactly M2. Mixed M2/M3/M4/M5/M6 rows remain `PLANNED` until
 every named owner supplies evidence; `v2M2KafkaFinalCheck` is not the global `v2M2Check`.
 
-Persisted encodings and parser caps freeze through the K0 process before their first durable use. Operational queue,
-checkpoint, cursor, lag, and performance defaults stay evidence-derived. Topic policy cannot enlarge hard correctness/
-recovery bounds; Cell/host pressure may backpressure or seal early without changing persisted bytes or Kafka visibility
-semantics.
+Persisted encodings and parser caps froze through K0 before their first durable use. K9 selected the operational queue,
+checkpoint, cursor, lag, and performance defaults in the canonical defaults projection consumed by Kafka Final. Topic
+policy cannot enlarge hard correctness/recovery bounds; Cell/host pressure may backpressure or seal early without
+changing persisted bytes or Kafka visibility semantics.

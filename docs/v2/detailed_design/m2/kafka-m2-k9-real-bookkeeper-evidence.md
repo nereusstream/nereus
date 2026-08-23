@@ -13,7 +13,7 @@ K9 admits operational defaults only after the committed plan is executed against
 configuration. The plan is
 [`bookkeeper-scale-plan.properties`](../../../../config/v2/m2/kafka/k9/bookkeeper-scale-plan.properties). Its byte
 digest, the exact conformance-configuration digest, the tested Nereus commit, the BookKeeper client/server source and
-image digests, each attachment length/digest, and the two tier results must be bound by the later K9 receipt. No result
+image digests, each attachment length/digest, and the two tier results are bound by the canonical K9 receipt. No result
 may edit the persisted NBKE2 v1 bytes or enlarge a K0 hard cap.
 
 The real provider and engine calibration already exercises quorum append/read, fresh-session open, fence/recovery,
@@ -41,13 +41,13 @@ formal result, selected default, scenario promotion, Kafka Final, or global M2 P
 `4af3278234d84df7a2fdce4fc6b3e4e227916d56`; the thresholds were already fixed at ancestor
 `bd7746850e5c8aa15ca5f01da0118e50186999c7`.
 
-## Candidate defaults and promotion boundary
+## Selected defaults and promotion boundary
 
-The plan predeclares the complete candidate set required by K0: checkpoint cadence; block and active-tail budgets;
+The plan predeclared the complete candidate set required by K0: checkpoint cadence; block and active-tail budgets;
 entry/byte/time recovery envelope; partition/global pipeline limits; byte/entry/age rollover; handle/open admission;
-Observed/Applied and journal bounds; waiter admission; and cursor coalescing. These remain candidates until both scale
-tiers and the real fault matrix pass on the exact source tuple. Topic policy may only lower selected bounds, and
-Cell/host pressure may backpressure, close handles, or roll earlier.
+Observed/Applied and journal bounds; waiter admission; and cursor coalescing. Both scale tiers and the real fault matrix
+passed on the exact source tuple, so the canonical projection now selects all ten operational domains. Topic policy may
+only lower selected bounds, and Cell/host pressure may backpressure, close handles, or roll earlier.
 
 K9 may support the Kafka-owned M2 scenario receipt but does not itself promote a scenario. K10 owns scenario promotion
 and `v2M2KafkaFinalCheck`. Kafka wire/runtime integration, native ISR/HW/election activation, Object WAL, and global M2
@@ -67,5 +67,5 @@ operations/second; the largest recovery p99 was 632,822,042 ns, harness heap pea
 bookie volume was 375,969,272 bytes. The source also passes 42 local suites / 239 tests and 2 exact-image suites / 9
 tests with zero failure, error, or skip.
 
-The receipt remains deliberately non-promotable. K10 must consume it with the complete K1-K8 matrices and publish the
-separate Kafka-owned scenario receipts; K9 alone is not Kafka Final or global M2 PASS.
+The receipt remains deliberately non-promotable. K10 consumed it with the complete K1-K8 matrices and published the
+separate Kafka-owned Final receipt; K9 alone is not Kafka Final or global M2 PASS.

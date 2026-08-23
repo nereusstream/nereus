@@ -75,9 +75,9 @@ The package must freeze, in one table checked by production tests:
   truncation/trailing-byte behavior.
 
 The initial DATA representation remains one complete raw broker-assigned Kafka RecordBatch per BookKeeper entry. K0
-must select one terminal append-group representation before K2 implementation; it may not leave both “last DATA” and
-“extra control entry” as runtime alternatives. Index/checkpoint/footer controls pass through the same entry sequencer
-and may occur only between complete append groups.
+selected the terminal descriptor on the last DATA member before K2; no alternative extra control entry is live.
+Index/checkpoint/footer controls pass through the same entry sequencer and may occur only between complete append
+groups.
 
 `NBKE2` is not a TLV framework and has no unknown-field bag. A future incompatible extension uses a new accepted
 major/version contract. A minor version may be accepted only when the current decoder has an explicit closed rule for
@@ -96,9 +96,9 @@ orders, checks the adapter's exact assigned-byte facts, and rejects mismatch; it
 `ProducerStateManager` or payload-based duplicate protocol.
 
 K8's compact replica descriptor and observation journal are Nereus-local durable wire, not a new Kafka request schema.
-Their exact bytes may land as a later K8 child of this closure process, but they must use the same closed table, parser
-cap, immutable-vector, source-lock, and no-unknown-tail rules before the first durable journal write. M6 separately owns
-the native replica-Fetch transport mapping.
+K8 subsequently froze their exact KRD1/KRO1 bytes under the same closed-table, parser-cap, immutable-vector,
+source-lock, and no-unknown-tail rules before durable journal use. M6 separately owns the native replica-Fetch
+transport mapping.
 
 ## Numeric boundary model
 
@@ -123,12 +123,11 @@ effectiveMaxDataFrameBytes = min(
 )
 ```
 
-The implementation must derive the exact BookKeeper payload allowance from the source-locked protocol/configuration,
-not copy the upstream default `nettyMaxFrameSizeBytes` into the Nereus format. The currently build-selected BookKeeper
-4.18.0 source default is 5 MiB, but M2 has not yet source-locked the server/configuration tuple, a deployment may
-configure another value, and BookKeeper protocol/digest framing consumes bytes. K0 therefore freezes the formula and
-the format ceiling; the provider capability snapshot supplies the exact admitted payload value. A complete Kafka
-RecordBatch that does not fit is rejected before offset allocation.
+The implementation derives the exact BookKeeper payload allowance from the source-locked protocol/configuration, not
+from the upstream default `nettyMaxFrameSizeBytes`. M2 now binds the BookKeeper 4.18.0 source, client JAR/POM, server
+image manifest/config, and capability projection; BookKeeper protocol/digest framing still consumes bytes. K0 freezes
+the formula and format ceiling, while the provider capability snapshot supplies the exact admitted payload value. A
+complete Kafka RecordBatch that does not fit is rejected before offset allocation.
 
 Every decoded count/length first enters a non-negative wide domain, is checked against its field-specific cap, and only
 then converts to a Java array/index type. All additions and multiplications use checked arithmetic. Unsigned 64-bit
@@ -290,10 +289,9 @@ and configuration, source-lock byte digest, artifact manifest, normalized test h
 allowlisted attachment path/length/SHA-256. A receipt never self-locks the commit that first adds itself; Final follows
 the established tested-source then evidence-only descendant model.
 
-Before the first implementation slice, the M2 development source tuple must add the M1 Final base, exact N1 artifact,
-Kafka K1 base/fork, BookKeeper tag/commit and client artifacts, real server image digest, complete relevant BookKeeper
-configuration digest, and capability-snapshot schema. This accepted document does not insert `NOT_PINNED` placeholders
-or change the current root `sourceTupleId`; source-lock bytes change with the implementation that can verify them.
+The M2 development source tuple binds the M1 Final base, exact N1 artifact, Kafka base/fork, BookKeeper tag/commit and
+client artifacts, real server image manifest/configuration digests, and capability-snapshot schema. It contains no
+active `NOT_PINNED` placeholder and retains the root `sourceTupleId`; the nested M2 bindings carry their exact IDs.
 
 ## Scenario and aggregate boundary
 
@@ -308,9 +306,9 @@ Kafka M2 completion is a sub-aggregate, not automatically the global M2 completi
 - pure M6 row `V2-KAF-DATA-009`, Object-checkpoint row `V2-KAF-DATA-021`, source-retirement rows, and complete native
   client/process behavior are never Kafka M2 PASS claims.
 
-Global `v2M2Check` remains the aggregate for every global-M2 Kafka and Pulsar requirement. It exists only after those
-owners and their receipts exist. Passing `v2M2KafkaFinalCheck` alone must be reported as Kafka BookKeeper engine M2
-completion, not global M2 Final, Kafka runtime activation, or product release readiness.
+Global `v2M2Check` is the aggregate for every global-M2 Kafka and Pulsar requirement and now binds both child Final
+receipts. Passing `v2M2KafkaFinalCheck` alone must still be reported as Kafka BookKeeper engine M2 completion, not
+global M2 Final, Kafka runtime activation, or product release readiness.
 
 ## Implementation order and exit
 
@@ -327,6 +325,6 @@ Wire may be reviewed before its writer, but the module, provider, and numeric in
 wire cap table is accepted. No cut creates a long-lived compatibility facade, per-append Oxia/KRaft mapping, shared
 cross-Cell correctness state, Kafka protocol reimplementation, Object-WAL carrier, or dormant PASS-shaped gate.
 
-M2-K1 starts only after the aggregate is green on the exact source tuple. K9 may select operational defaults but cannot
-change `NBKE2` v1 bytes or enlarge its parser caps; an evidence result that cannot operate inside the frozen format
+M2-K1 started only after the aggregate was green on the exact source tuple. K9 selected operational defaults without
+changing `NBKE2` v1 bytes or enlarging its parser caps; an evidence result that cannot operate inside the frozen format
 blocks the profile or requires a new accepted version/layout decision.

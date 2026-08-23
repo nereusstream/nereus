@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json
 ---
 
 # M2 Kafka K2 assigned RecordBatch adapter
@@ -41,5 +42,5 @@ payload, corrupted stored CRC, legacy magic, unassigned leader epoch, two-batch 
 coverage, and raw-byte preservation cuts. The gate also proves the K0 receipt/source-lock prerequisite, exact clean
 Kafka HEAD and remote branch, and production Kafka-SDK absence.
 
-This result proves only the K2 header/CRC/coverage and NBKE2 adapter boundary. It is not appender, real BookKeeper,
-Kafka runtime, scenario, `v2M2KafkaFinalCheck`, or global M2 PASS evidence.
+This focused result proves only the K2 header/CRC/coverage and NBKE2 adapter boundary. Kafka Final now binds it with
+K3-K10 evidence; K2 alone is not appender, real BookKeeper, runtime, scenario, Kafka Final, or global M2 PASS evidence.

@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json
 ---
 
 # Pulsar M2-P4 Object read handle
@@ -24,5 +25,6 @@ most one bounded block at a time. It proves exact entry count, logical length, b
 data SHA without constructing a whole-Object `ByteBuffer`. `PulsarPublishedAttemptVerifierV1` connects this production
 path to the P3 completion cut.
 
-`v2M2PulsarP4ObjectCheck` proves the Object child only. Whole-range dual-source fallback, source pins, deletion CAS,
-native Pulsar integration, selected defaults/evidence, scenario promotion, and M2 PASS remain pending.
+`v2M2PulsarP4ObjectCheck` proves the Object child only. Pulsar Final now binds it with whole-range dual-source fallback,
+source pins, deletion CAS, P5 native integration, and P6 selected-default evidence; this child alone is not scenario or
+M2 PASS evidence.

@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json
 ---
 
 # M2 Kafka K5 coherent protocol publication
@@ -62,5 +63,6 @@ non-idempotent batches, ongoing/commit/abort state, HW-sensitive first-unstable 
 publication, validation before allocation, the assignment-to-stage fence cut, B-before-A durability, publication-
 versus-fence ordering, exact active-tail locator publication, and notification failure after CAS.
 
-This fake-provider/local-state gate proves no Kafka ACK, HW/LSO advancement, native broker error mapping, packed K6
-reader, K7 recovery, K8 replication, real BookKeeper behavior, scenario promotion, or Kafka/global M2 PASS.
+This focused fake-provider/local-state gate alone proves no Kafka ACK, native broker error mapping, real BookKeeper
+behavior, scenario promotion, or Kafka/global M2 PASS. Kafka Final now binds it with the K6 reader, K7 recovery, K8
+replication kernel, and K9/K10 evidence.

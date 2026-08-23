@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json
 ---
 
 # M2 Kafka K8 replica descriptor, journal, and eligibility kernel
@@ -47,7 +48,7 @@ journalDurableThroughObserved
 ```
 
 The offset, byte, age, journal-record, and journal-byte inputs are hard deployment bounds. K8 defines no defaults; K9
-must select them from source-qualified real BookKeeper and scale evidence, and a Topic cannot enlarge them. The kernel
+selected them from source-qualified real BookKeeper and scale evidence, and a Topic cannot enlarge them. The kernel
 stops a descriptor before append when it would exceed a lag bound and reevaluates age and source replacement while the
 range remains unapplied.
 
@@ -60,6 +61,6 @@ BookKeeper descriptor projection, sync proof/response-loss cuts, record/byte bou
 Applied-base compaction, all offset/byte/age/source eligibility cuts, exact/rejected apply proofs, payload-required
 collapse, compatible/incompatible source replacement, journal rollback, and election Applied shortfall/success.
 
-This gate proves no Kafka replica-Fetch framing or transport, no real disk/fsync adapter, no broker restart, no native
-ReplicaManager/Partition ISR/minISR/HW callback, no native election evidence, no real BookKeeper behavior, no selected
-K9 defaults, no scenario promotion, no Kafka Final, and no global M2 PASS.
+This focused gate alone proves no Kafka replica-Fetch framing or transport, real disk/fsync adapter, broker restart,
+native ReplicaManager/Partition ISR/minISR/HW callback, native election evidence, real BookKeeper behavior, scenario
+promotion, Kafka Final, or global M2 PASS. Kafka Final now binds it with selected K9 defaults and K10 evidence.

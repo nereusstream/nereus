@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json
 ---
 
 # M2-P5 exact-source native offload provider
@@ -44,6 +45,6 @@ deletion reaches DONE. Missing native-provider support fails closed rather than 
 The P5-focused counts are 3 provider tests, 15 NPD1 tests, 13 native dual-source tests, and 13 native deletion tests,
 all with zero failure, error, or skip.
 
-P5 is not Pulsar process/NAR wiring, a provider endorsement, selected Object/block-policy evidence, a Pulsar Final
-receipt, native performance parity, or global M2 PASS. P6 must select admitted limits and at most three block classes
-from source-qualified evidence before activation; M6 still owns broker-process integration.
+P5 alone is not Pulsar process/NAR wiring, a provider endorsement, selected Object/block-policy evidence, a Pulsar
+Final receipt, native performance parity, or global M2 PASS. P6 has since selected the admitted limits and three block
+classes from source-qualified evidence, and Pulsar Final binds both cuts; M6 still owns broker-process integration.

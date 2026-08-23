@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
-authority: NormativeDetailedDesignWithOpenEvidence
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
+authority: NormativeDetailedDesign
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json
 ---
 
 # M2 Kafka BookKeeper offset, run, and range-index design
@@ -194,9 +195,11 @@ evidence inputs. Recommended commits are reviewable and independently gated:
 
 No cut introduces a dual-write compatibility mode.
 
-## Open evidence-derived operational values
+## Selected evidence-derived operational values
 
-The following are candidates only until M2 receipts select them:
+K9 selected the following operational domains in the canonical
+[`kafka-bookkeeper-m2-k9-selected-defaults-v1.json`](../../wire/kafka-bookkeeper-m2-k9-selected-defaults-v1.json)
+projection and bound that selection into Kafka Final:
 
 - index checkpoint batch/byte cadence;
 - operational block target bytes/locators at or below the K0 persisted caps;

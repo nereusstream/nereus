@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeDetailedDesign
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/pulsar/final/pulsar-final.json
 ---
 
 # Pulsar M2-P1 NPD1/NPB1 codec
@@ -35,5 +36,5 @@ still reject it before output.
 Decoding consumes one root-selected encoded block range, verifies its SHA-256, exact NPB1 facts, AAD/tag, directory,
 codec result, derived IDs, and no trailing bytes. It does not scan a predecessor block or read the complete Object.
 
-`v2M2PulsarP1Check` proves the codec/golden/corruption matrix only. NPO1, provider publication, native
-`LedgerOffloader`, selected defaults, scenario receipts, and M2 PASS remain pending.
+`v2M2PulsarP1Check` proves the codec/golden/corruption matrix only. Pulsar Final now binds it with P2-P6 NPO1,
+publication, native `LedgerOffloader`, and selected-default evidence; P1 alone is not scenario or M2 PASS evidence.

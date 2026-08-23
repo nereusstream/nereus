@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json
 ---
 
 # M2 Kafka K7 checkpoint kernel and election-bounded recovery
@@ -57,6 +58,7 @@ component bounds, aligned publication, response-loss reread, concurrency/regress
 recovery, checkpoint selection and corrupt fallback, entry/byte/time envelope exhaustion, partial groups, physical
 and Applied shortfall, batch-aligned election cuts, open/fence/header faults, and coherent new-leader bootstrap.
 
-This deterministic fake-provider gate proves no Kafka broker recovery adapter, native election implementation, final
-HW/ISR behavior, K8 replication journal, real BookKeeper behavior, scenario promotion, Kafka Final, or global M2 PASS.
-K9 still selects checkpoint cadence, suffix, timeout, rollover, and resource values from real BookKeeper evidence.
+This focused deterministic fake-provider gate alone proves no Kafka broker recovery adapter, native election
+implementation, final HW/ISR behavior, real BookKeeper behavior, scenario promotion, Kafka Final, or global M2 PASS.
+Kafka Final now binds it with K8-K10, and K9 selected checkpoint cadence, suffix, timeout, rollover, and resource values
+from real-BookKeeper evidence.

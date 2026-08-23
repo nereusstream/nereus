@@ -45,7 +45,7 @@ to the later offset/entry sequencer. A rejection therefore cannot consume an off
 `KafkaBookKeeperRecoveryEnvelopeV1` requires three positive simultaneous dimensions: entry count, encoded bytes, and
 elapsed nanoseconds. Bounds are inclusive, progress accumulation is non-negative and checked, and classification has a
 stable entry/byte/time precedence. `loweredBy` fails if a Topic or lower authority tries to enlarge any dimension. K9
-must source-qualify the exact operational defaults; Cell/host pressure may only provide a fully lower envelope.
+source-qualified the exact operational defaults; Cell/host pressure may only provide a fully lower envelope.
 
 `v2M2KafkaK0NumericCheck` executes 10 focused tests across three suites with zero skip. It proves one-before/at/one-after
 for the persisted raw DATA cap, Provider add-payload cap, Kafka-native RecordBatch cap, and every recovery dimension;

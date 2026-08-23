@@ -21,25 +21,25 @@ wire, numeric admission, provider capability, fault-cut, or scale evidence.
 | M2-K0-W | [Closed NBKE2 v1 wire contract](kafka-m2-k0-nbke2-wire.md) | verified codec/projection/goldens; covered by current Kafka Inputs receipt |
 | M2-K0-N | [Checked numeric admission and recovery envelope](kafka-m2-k0-numeric-admission.md) | verified admission/envelope; covered by current Kafka Inputs receipt |
 | M2-K0-E | [Exact source, receipt, and Kafka Inputs gate](kafka-m2-k0-evidence-and-input-gate.md) | current canonical input receipt: 5 gates, 16 suites, 54 tests, zero skip |
-| M2-K1 | [Coherent frontier and fenced publication cell](kafka-m2-k1-frontier-publication.md) | pure production state/CAS cut and 26-test local gate; Kafka Fast receipt pending |
+| M2-K1 | [Coherent frontier and fenced publication cell](kafka-m2-k1-frontier-publication.md) | verified pure production state/CAS cut and 26-test gate; bound by Kafka Final |
 | M2-K2 | [Kafka-native assigned RecordBatch adapter](kafka-m2-k2-assigned-record-batch-adapter.md) | exact 4.3 native plus local header/CRC/coverage matrix; appender/runtime excluded |
-| M2-K3 | [Leader-epoch run lifecycle and entry sequencer](kafka-m2-k3-run-lifecycle.md) | fake-provider header/drain/checkpoint/seal/successor/retire gate; real BK pending |
+| M2-K3 | [Leader-epoch run lifecycle and entry sequencer](kafka-m2-k3-run-lifecycle.md) | verified fake-provider header/drain/checkpoint/seal/successor/retire gate plus K9 real-BK evidence |
 | M2-K4 | [Capacity-first ordered DATA pipeline](kafka-m2-k4-ordered-pipeline.md) | partition/global entries+bytes admission and B-before-A completion gate; connected to K5 publication |
 | M2-K5 | [Coherent producer/transaction/locator publication](kafka-m2-k5-coherent-protocol-publication.md) | pre-offset protocol validation plus one fenced K1 root replacement; ACK/HW/runtime excluded |
 | M2-K6 | [Packed targeted and sequential reader](kafka-m2-k6-targeted-reader.md) | entry-local NBKE2/Kafka validation and captured isolation bounds; runtime/recovery/real BK excluded |
 | M2-K7 | [Checkpoint kernel and election-bounded recovery](kafka-m2-k7-checkpoint-recovery.md) | aligned KPC1/NBKE2 state, cumulative suffix envelope, and native adoption cut; HW/runtime/real BK excluded |
 | M2-K8 | [Replica descriptor, journal, and eligibility kernel](kafka-m2-k8-replica-observation.md) | fixed KRD1/KRO1, exact sync seam, Observed/Applied bounds, source replacement, and election harness; runtime excluded |
-| M2-K9 | [Real BookKeeper fault and scale evidence](kafka-m2-k9-real-bookkeeper-evidence.md) | current-source exact-image receipt: 110k actual partitions, 110,256 ledgers, 239 local plus 9 real tests, selected defaults; non-promotable until K10 |
+| M2-K9 | [Real BookKeeper fault and scale evidence](kafka-m2-k9-real-bookkeeper-evidence.md) | current-source exact-image receipt: 110k actual partitions, 110,256 ledgers, 239 local plus 9 real tests, selected defaults; non-promotable alone and consumed by K10 |
 | M2-K10 | [Kafka Final evidence](kafka-m2-k10-final-evidence.md) | current-source canonical Kafka Final receipt; 10 exact-M2 scenarios, 40 named suite references, and 7 bound attachments |
-| M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | implementation started at K0 module/provider/wire/numeric inputs; runtime/evidence pending |
-| M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | implementation started at K1 pure coherent state; storage/runtime/evidence pending |
+| M2-KBK | [Kafka BookKeeper offset, run, and range index](kafka-bookkeeper-offset-range-index.md) | verified K0-K10 implementation and selected-default evidence; native broker activation remains M6 |
+| M2-KAF-DATA | [Kafka Produce/Fetch frontiers and protocol recovery](kafka-produce-fetch-frontiers-and-recovery.md) | verified M2 engine/storage primitives and receipt; native Produce/Fetch process activation remains M6 |
 | M2-P0 | [Pulsar offload input closure](pulsar-m2-p0-input-closure.md) | sealed-ledger attempt, deterministic keys, provider capability, candidate-limit, retention, and delete-state inputs; non-promotable |
-| M2-P1 | [NPD1/NPB1 data codec](pulsar-m2-p1-npd1-codec.md) | streaming file encode, block-local NONE/ZSTD plus AES-GCM, derived 16-byte rows, and targeted corruption matrix; defaults unselected |
+| M2-P1 | [NPD1/NPB1 data codec](pulsar-m2-p1-npd1-codec.md) | streaming file encode, block-local NONE/ZSTD plus AES-GCM, derived 16-byte rows, and targeted corruption matrix; P6-selected defaults remain external to the codec |
 | M2-P2 | [NPO1 sealed-ledger root](pulsar-m2-p2-npo1-root.md) | canonical four-section root, complete sealed-ledger facts, dual-domain sparse coverage, hard parser caps, and self-digest matrix |
 | M2-P3 | [Sealed-ledger publication engine](pulsar-m2-p3-publication-engine.md) | data-before-root immutable publication, response-loss HEAD resolution, exact-EOF streaming body, actual-reader verifier, and root-first cleanup |
 | M2-P4-OBJ | [Object read handle](pulsar-m2-p4-object-reader.md) | bounded root HEAD/GET, exact immutable data proof, block-local targeted reads, typed failures, and streaming complete-ledger revalidation |
 | M2-P4-DUAL | [Dual-source reads and BK deletion](pulsar-m2-p4-dual-source-and-delete.md) | whole-range one-shot fallback, exact-version pins, quarantine signal, bounded drain, final revalidation, INTENT/DONE CAS, and restart reconciliation |
-| M2-P5 | [Exact-source native offload provider](pulsar-m2-p5-native-provider.md) | source-composite `SourceSafeLedgerOffloader`, bounded native batches, restart-readable driver metadata, native read adapter, and exact fork binding; policy/provider evidence remains P6 |
+| M2-P5 | [Exact-source native offload provider](pulsar-m2-p5-native-provider.md) | verified source-composite `SourceSafeLedgerOffloader`, bounded native batches, restart-readable driver metadata, native read adapter, and exact fork binding; bound with P6 by Pulsar Final |
 | M2-P6 | [Provider and block-policy evidence](pulsar-m2-p6-provider-and-block-policy.md) | exact LocalStack/MinIO/native evidence selects the 1/4/8-MiB class catalog, 4-MiB default, and lower 0.2 provider caps; non-promotable alone |
 | M2-PFINAL | [Pulsar Final evidence](pulsar-m2-final-evidence.md) | current-source production canonical receipt/resolver; exact eleven-scenario allowlist, 32 suite references, and eight attachments |
 | M2-FINAL | [Global M2 Final aggregate](#global-m2-final-aggregate) | current-source `PASS_V2_M2_FINAL`; exact Kafka/Pulsar child roots and 21-scenario union |
@@ -52,7 +52,9 @@ scenarios; Pulsar Final binds the exact native fork and P6 evidence and promotes
 
 [`m2-final.json`](../../evidence/v2-m2/final/m2-final.json) is the global source-bound root. It binds the byte length and
 SHA-256 of both child receipts, proves their common Nereus/source-lock tuple, rejects overlap, and requires the exact
-sorted 21-scenario union. `v2M2Check` reexecutes both child aggregates before accepting `PASS_V2_M2_FINAL`.
+sorted 21-scenario union. `v2M2Check` directly reexecutes the canonical K0 Inputs aggregate, K1, and both child Final
+aggregates before accepting `PASS_V2_M2_FINAL`; K2-K10 and P0-P6 remain transitive non-zero prerequisites of those
+children.
 
 This completion is deliberately narrower than process or release readiness. It does not activate Kafka broker wire
 paths or Pulsar NARs, prove native ISR/HW/election process behavior, complete M3 Object WAL, establish M8 native parity,

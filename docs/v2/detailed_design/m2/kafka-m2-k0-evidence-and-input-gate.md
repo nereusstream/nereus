@@ -35,10 +35,11 @@ unknown/reordered/trailing bytes, malformed UTF-8, bad identities, missing/dupli
 roots, and every PASS-shaped empty or skipped result.
 
 `v2M2KafkaK0EvidenceCheck` executes nine tests across the exact serializer-limit and receipt-parser suites and verifies
-all locked bytes/hashes. `v2M2KafkaInputsCheck` is registered as a distinct aggregate and requires an explicit
-`-Pv2M2KafkaInputsReceipt=<canonical-file>` input. It reruns all five non-empty child gates, parses the receipt with the
-production validator, requires a clean `HEAD == origin/main`, checks current source-lock and child-input hashes, and
-permits only the canonical receipt path after its tested source commit.
+all locked bytes/hashes. `v2M2KafkaInputsCheck` is registered as a distinct aggregate and defaults to the one canonical
+`docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json` input; an explicit
+`-Pv2M2KafkaInputsReceipt=<canonical-file>` may restate that path. It reruns all five non-empty child gates, parses the
+receipt with the production validator, requires a clean `HEAD == origin/main`, checks current source-lock and child-input
+hashes, and permits only the canonical receipt path after its tested source commit.
 
 The [canonical aggregate receipt](../../evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json) is current-source evidence
 for all five K0 children. `v2M2KafkaInputsCheck` reports five gates, 16 suites, and 54 tests with zero failure, error, or

@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json
 ---
 
 # M2-K1 coherent frontier and fenced publication cell
@@ -49,6 +50,6 @@ read bounds, contiguous/gapped slots, fence/version mismatches, notification fai
 publication-versus-fence interleavings, election truncation, and before/after snapshot coherence. The deterministic
 scheduler is test-owned as required by the K0 module boundary.
 
-This local K1 gate is non-promotable and has no Kafka Fast receipt yet. It performs no offset allocation, BookKeeper
-I/O, run lifecycle, producer/transaction mutation, waiter registration, Kafka runtime activation, scenario promotion,
-or Kafka/global M2 PASS.
+The local K1 gate remains non-promotable by itself and has no standalone Kafka Fast receipt. The canonical Kafka Final
+receipt now binds its named zero-skip suite with K2-K10 evidence. K1 alone still proves no offset allocation,
+BookKeeper I/O, runtime activation, scenario promotion, or Kafka/global M2 PASS.

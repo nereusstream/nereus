@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeImplementationSlice
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m2/kafka/k10/kafka-final.json
 ---
 
 # M2 Kafka K6 packed targeted and sequential reader
@@ -48,7 +49,7 @@ bounded cache eviction, provider outcomes, NBKE2 and raw Kafka CRC corruption, L
 first-oversized behavior, cross-block sequential reads, cursor acceptance/invalidation, aborted metadata, and
 complete-batch upper-bound refusal.
 
-This fake-provider/local-state gate proves no Kafka broker Fetch adapter, delayed Fetch/purgatory integration, ACK or
-HW/LSO advancement, K7 checkpoint/recovery, K8 replication, real BookKeeper behavior, scenario promotion, Kafka Final,
-or global M2 PASS. K9 still selects operational cache, cursor, block, tail, and read-coalescing values from real
-BookKeeper evidence.
+This focused fake-provider/local-state gate alone proves no Kafka broker Fetch adapter, delayed Fetch/purgatory
+integration, ACK/HW/LSO advancement, real BookKeeper behavior, scenario promotion, Kafka Final, or global M2 PASS.
+Kafka Final now binds it with K7-K10, and K9 selected the operational cache, cursor, block, tail, and read-coalescing
+values from real-BookKeeper evidence.
