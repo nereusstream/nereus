@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted as the allocator-mode evidence protocol for Pulsar `OBJECT_WAL` in 0.2. Neither allocator mode is accepted,
-and implementation/runtime evidence has not started at M0.
+Accepted as the allocator-mode evidence protocol for Pulsar `OBJECT_WAL` in 0.2. Neither allocator mode is accepted.
+ADR 0091 now supplies exact M3 production wire/key/transitions and local implementation tests; real/native
+10,000/100,000 runtime evidence has not run.
 
 ## Context
 
@@ -63,11 +64,11 @@ select a different mode or weaken the persisted recovery protocol.
   performance pass.
 - `V2-OPEN-PUL-OBJ-09` remains open and both modes remain unselected. ADR 0061 fixes the correctness constraints for an
   incarnation-owned RANGE grant, RESERVED takeover, owner-only head fencing, one stale-candidate burn, background
-  clear, and bounded permanent-orphan accounting. Exact wire/range size, allocator reservation concurrency, and mode
-  selection remain open.
+  clear, and bounded permanent-orphan accounting. ADR 0091 fixes exact wire/key/transitions and the allowed RANGE
+  domain; real reservation concurrency/cut evidence, exact selected RANGE size, and mode selection remain open.
 - A simple absolute queue threshold or active-ledger-count-only test cannot admit STRICT_SERIALIZED.
 - M1 must publish source-qualified harness-conformance evidence without claiming performance or selection eligibility.
   M3 must execute the complete scale protocol against its pinned source before selecting an allocator mode.
 
-This decision is refined by ADRs 0061/0082, refines ADRs 0022, 0027, 0032, 0041, 0048, 0049, and 0054 and is tracked by
-`T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-010/011/017/018`, and `V2-OPEN-PUL-OBJ-09`.
+This decision is refined by ADRs 0061/0082/0091, refines ADRs 0022, 0027, 0032, 0041, 0048, 0049, and 0054 and is
+tracked by `T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-010/011/017/018`, and `V2-OPEN-PUL-OBJ-09`.

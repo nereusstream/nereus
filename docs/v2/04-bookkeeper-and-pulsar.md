@@ -131,8 +131,9 @@ include retired Cells. Bootstrap fixes `k=40`, 65,536 canonical registry bytes, 
 fails closed before another ID is allocated; more capacity requires a new Protocol Cell and does not migrate existing
 topics or ledgers. After 256 lifetime Cells, only a new `ledgerIdCompatibilityNamespaceId` backed by a bootstrap-proven
 disjoint numeric namespace, or an independent deployment/cluster, may allocate again; a second logical reservation
-domain in the same namespace cannot reuse the interval. Allocator mode,
-exact RANGE wire/size, rollover, and later Ledger Chain mechanics remain open.
+domain in the same namespace cannot reuse the interval. ADR 0091 now fixes the production Cell/Head/node wire, Oxia
+keys, STRICT four-write path, RANGE takeover/install/clear path, allowed range-size domain, and receipt-only activation.
+The exact selected RANGE size and allocator mode remain open pending current-source real/native evidence.
 
 ADR 0055 freezes the evidence protocol but selects neither allocator mode. It measures maximum sustainable rollover
 RPS while all predeclared queue/latency/error/recovery SLOs hold, covers real rollover distributions/jitter/storms and
@@ -145,6 +146,11 @@ RESERVED grant, and at most one stale candidate ID burns instead of the range ta
 head install; allocator clear is a high-priority background reconciliation that still blocks the next Cell grant.
 Unknown responses reread exact equality, while only definitive conflicts fence. Permanent orphan candidates are
 bounded metadata evidence rather than a new 0.2 GC protocol.
+
+ADR 0091 encodes those rules as exact fixed-width `NVAC1`/`NVAH1`/`NVAN1` records and bounded versioned Oxia keys.
+STRICT has no separate install write; RANGE may use an installed grant before high-priority clear. Allocation requires
+an ACTIVE namespace-bound versioned slice view and exact selected-source receipt. The deterministic 10k/100k by
+1/5/10/25-ms schedule and nine cut dimensions are execution inputs only, not measurements or selection evidence.
 
 M1 implements the complete mode-independent Registry and real-Oxia conformance. Registry authority contains one bounded
 inline canonical writer set; there is no external snapshot/reference in 0.2. Rows bind stable writer, exclusion-contract,
@@ -164,9 +170,11 @@ allocation-capable bootstrap/admin row. The exact formula is
 a 51,016-byte largest legal canonical Registry/Oxia value and leaves 14,520 bytes inside the inherited 65,536-byte
 envelope. Row 15 and byte 51,017 fail with stable count/byte errors. There is no separate writer-set-byte cap.
 Patching one Pulsar generator alone is not a completeness proof. The Registry emits `REGISTRY_CONFORMANCE`; the former
-V1 allocator is removed or isolated rather than renamed. STRICT/RANGE candidate SPI and cut injection exist only in
-test/evidence code and emit `HARNESS_CONFORMANCE_ONLY` with schema-fixed `selectionEligible=false`; they persist no mode
-and install no production allocator. M3 owns 10k/100k multi-broker capacity evidence and any eventual selection.
+V1 allocator is removed or isolated rather than renamed. M1's STRICT/RANGE candidate SPI and cut injection remain
+test/evidence-only and emit `HARNESS_CONFORMANCE_ONLY` with schema-fixed `selectionEligible=false`. M3 now has the
+ADR-0091 production allocator SPI/state transitions and 27 zero-failure/error/skip local allocator tests, but
+production activation has no default/public construction path and no mode is selected. M3 still owns real 10k/100k
+multi-broker/native evidence, exact RANGE size, and any eventual single mode selection.
 
 Online Pulsar BookKeeper/Object evolution is not implied by this model. New-incarnation migration versus a future hybrid
 ledger-chain design remains `V2-OPEN-PUL-MIGRATION-01`.
@@ -306,4 +314,6 @@ Relevant tradeoffs: `T-BK-01`, `T-LEDGER-01`, `T-KAFKA-01`, `T-PROTOCOL-01`, `T-
 [ADRs 0082](../decisions/0082-v2-m1-domain-and-control-authority-contracts.md) and
 [0083](../decisions/0083-v2-m1-wire-control-and-evidence-bounds.md), with the Kafka BookKeeper path fixed by
 [ADR 0086](../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md) and its protocol semantics by
-[ADR 0087](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md).
+[ADR 0087](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md), and with the production allocator
+wire/key/selection boundary fixed by
+[ADR 0091](../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md).

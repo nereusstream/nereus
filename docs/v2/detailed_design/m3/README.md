@@ -1,8 +1,8 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
-evidenceStatus: DocumentationOnly
+implementationStatus: InProgress
+evidenceStatus: NotRun
 authority: NormativeExecutionIndex
 sourceTuple: v2-m1
 ---
@@ -26,7 +26,7 @@ implementation-ready by assertion and does not convert any `PLANNED` scenario in
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | planned; synthetic NWG1 fixtures are not Root/Pointer wire authority |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | planned; exact wire, key, vector caps, backend mapping, recovery, and terminal Head evidence remain M3 work |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | planned; native broker/controller activation remains M6 |
-| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | planned; `V2-OPEN-PUL-OBJ-09` remains open until exact wire and evidence select at most one mode |
+| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | implementation in progress; [ADR 0091](../../../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md) fixes and locally tests production allocator wire/key/transitions, but no real/native 10k/100k receipt, RANGE size, mode selection, or scenario PASS exists |
 | M3-FINAL | exact-source aggregate and scenario promotion | planned; requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
 
 Slice names are execution labels, not new durable wire codes. Implementations may split reviewable commits more
@@ -36,6 +36,12 @@ ADR 0089 closes the missing Header offset table before any production NWG1 byte 
 first production version. The Header has no node session, owner witness, body SHA, or duplicate packing-class field;
 `laneId` is the permanent class ID. It fixes SHA-256/v1 as Object digest code `1/1` and all twelve accepted
 first-satisfied close-reason codes, while normal target/linger values remain evidence-owned.
+
+ADR 0091 separately closes M3-P1's allocator wire/key/transition input with exact `NVAC1`/`NVAH1`/`NVAN1` bytes,
+STRICT's four-write path, RANGE same-RESERVED takeover and one-ID burn, and receipt-only exact-source activation. Its
+27 local allocator tests and deterministic `8 workloads x 9 cuts` schedule are implementation conformance only.
+`V2-OPEN-PUL-OBJ-09` remains evidence-blocked until real multi-broker/native 10k/100k execution selects an exact RANGE
+size and at most one mode.
 
 ## Required execution order
 
@@ -78,5 +84,6 @@ complete WalRunRoot/CurrentWalRunPointer canonical wire from a synthetic fixture
 ```
 
 It also does not select evidence-dependent packing target/linger values, Provider proof mode, recovery-skip
-certificate, Pulsar allocator mode/range size, or production Root caps. Those choices close only through their owned M3
-evidence slices and synchronized ADR/open-question updates.
+certificate, Pulsar allocator mode/exact RANGE size, or production Root caps. Those choices close only through their
+owned M3 evidence slices and synchronized ADR/open-question updates. ADR 0091's allowed RANGE domain is a hard
+implementation cap, not an evidence-selected range size.

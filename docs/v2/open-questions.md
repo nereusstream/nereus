@@ -710,13 +710,17 @@ deployment/cluster.
 
 ### `V2-OPEN-PUL-OBJ-09`: virtual-ledger allocator reservation and head publication
 
-This remains open. STRICT_SERIALIZED has four successful writes and still requires ADR 0055 evidence. ADR 0061 now
-constrains any RANGE candidate: the grant belongs to ManagedLedger incarnation, takeover changes only owner epoch, the
-new owner may finish the same RESERVED grant when exact allocation state is unchanged, an unknown response converges by
-exact reread, and at most one stale candidate burns. Installed-range use does not wait for allocator clear, but the
-next Cell grant does and therefore requires a high-priority reconciler. Permanent orphan evidence is bounded/admitted.
-The remaining gate must freeze exact reservation/head/node wire and range size, prove Cell grant concurrency and every
-failure cut, execute the evidence protocol, and then select at most one persisted mode.
+This remains open only at the real evidence/selection boundary. ADR 0091 now fixes exact 384-byte `NVAC1`, 192-byte
+`NVAH1`, and 256-byte `NVAN1` records, 512-byte-capped versioned Oxia keys, STRICT's four successful writes, RANGE's
+allowed `[2,2^40]` size domain, ACTIVE versioned-slice admission, exact-reread reconciliation, same-RESERVED takeover,
+and one stale-candidate ID burn. Production activation is constructible only from a selection-eligible receipt bound to
+the exact running source; there is no default mode.
+
+The current 27 zero-failure/error/skip allocator tests and deterministic `8 workloads x 9 cuts` schedule are local
+implementation conformance, not real/native evidence. The remaining gate must execute ADR 0055's source-qualified
+multi-broker/native 10,000/100,000 protocol, satisfy the frozen absolute and relative SLOs with zero skip, select one
+exact RANGE size if RANGE qualifies, and select at most one persisted mode. Until then both modes remain unselected and
+no `V2-POSITION-013/014/017/018` scenario may cite this local result as PASS.
 
 ### `V2-OPEN-PUL-OBJ-10`: allocator target-scale evidence protocol
 
@@ -966,9 +970,10 @@ Resolved on 2026-08-09 after explicit partial/adjusted confirmation:
   and permanent-orphan accounting ->
   [ADR 0061](../decisions/0061-v2-pulsar-range-grant-owner-takeover.md).
 
-Three lane-local checkpoint chains are rejected. Exact numeric/class values, canonical lane/key wire, final RANGE wire /
-size/evidence, and both allocator modes remain open. The complete response is preserved in
-[the round 10 record](grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md).
+Three lane-local checkpoint chains are rejected. At that round, exact numeric/class values, canonical lane/key wire,
+final RANGE wire/size/evidence, and both allocator modes remained open. ADR 0091 later closes allocator wire/key and the
+allowed RANGE domain only; exact RANGE size, real evidence, and both mode candidates remain open. The complete round-10
+response is preserved in [the round 10 record](grill-notes/12-restarted-grill-2-hints-lanes-and-range-takeover.md).
 
 ### Restarted Grill 2 round 9 adjusted decisions: partially resolved by ADRs 0056 through 0058
 

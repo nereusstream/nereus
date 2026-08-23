@@ -126,6 +126,10 @@ performance-first BookKeeper WAL.
   first-satisfied close reasons are distinct. This is documentation-only:
   production codec/manifests/runners/harnesses, Root/Pointer and `NWKCP1`, Provider/KMS/allocator evidence, scenario
   promotion, and M3 Final remain `NotStarted`/`PLANNED`.
+- ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
+  SPI/transitions, and 27 local allocator tests now exist. This does not change the preceding M3-I0 claim or supply the
+  missing real/native allocator evidence, exact RANGE-size selection, selected mode, scenario PASS, or native broker
+  activation.
 - The initial foundation supplied Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct
   aggregate validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
   guards, and reproducible JAR/source-JAR/POM hashes. It deliberately made no NTA1, Registry, P1/R1, real-backend, or
@@ -346,6 +350,7 @@ Accepted decisions:
 - [ADR 0088: M3 NWG1 implementation-input closure](../decisions/0088-v2-m3-nwg1-implementation-input-closure.md)
 - [ADR 0089: M3 NWG1 v1 Header layout amendment](../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md)
 - [ADR 0090: M3 NWG1 mutation external-call profiles](../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md)
+- [ADR 0091: M3 Pulsar virtual-ledger allocator wire and selection](../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md)
 
 ## Open design gates
 
@@ -393,6 +398,10 @@ ADR 0089 amends that input before any production NWG1 bytes exist with the gap-f
 retains `wireVersion=1`, removes node session and any duplicate packing-class field from the Header, fixes Object digest
 `SHA-256/v1=1/1` plus close-reason codes `1..12`, and requires the future projection to mechanically transcribe the ADR.
 Target/linger selection remains owned by `V2-OPEN-OBJ-19` evidence.
+ADR 0091 closes the production virtual-ledger allocator wire/key/transition input with exact fixed-width
+`NVAC1`/`NVAH1`/`NVAN1`, STRICT's four-write path, RANGE same-RESERVED takeover/one-ID burn, bounded versioned Oxia
+keys, and receipt-only exact-source activation. Its 27 local tests and deterministic `8 x 9` schedule are not
+real/native 10k/100k evidence. `V2-OPEN-PUL-OBJ-09` remains open for exact RANGE-size and at-most-one-mode selection.
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.
@@ -403,7 +412,7 @@ are the remaining active 0.2 evidence gates.
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
 | `V2-OPEN-OBJ-19` | execute evidence and select target/linger/quantized values and numeric budgets without changing ADR-0062 class semantics | M3 Object WAL policy freeze |
-| `V2-OPEN-PUL-OBJ-09` | choose an allocator only after evidence plus exact reservation/head/node wire, range size, Cell reservation concurrency, and ADR 0061 conformance | M1/M3 virtual-ledger allocator freeze |
+| `V2-OPEN-PUL-OBJ-09` | execute current-source real multi-broker/native 10k/100k evidence against ADR 0091, prove all reservation/head/node/concurrency/takeover/cut SLOs with zero skip, select an exact RANGE size if eligible, and select at most one allocator mode | M3 virtual-ledger allocator activation |
 | `V2-OPEN-OBJ-22` | execute bounded recovery and skip-hit evidence; only an SLO miss may reopen a whole-WalRun-first, Root/Seal-bound recovery omission certificate | M3/M7 recovery optimization decision |
 | `V2-OPEN-OBJ-24` | admit a Provider version token only after canonical-binary cap, immutable-version, FULL_OBJECT SHA-256, rows/page, and range-benefit evidence; otherwise retain Root mode NONE | M3 checkpoint provider-proof admission |
 | `V2-OPEN-READ-08` | execute M4 evidence and freeze the bounded proof-window/head/fold physical representation and numeric caps without a per-batch accumulator | M4 durable proof wire freeze |

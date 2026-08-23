@@ -3,8 +3,8 @@
 ## Status
 
 Accepted as a correctness constraint on any 0.2 `RANGE_LEASED` allocator candidate. It does not select or activate
-`RANGE_LEASED`, reject `STRICT_SERIALIZED`, or freeze the final record wire/range size. Implementation and runtime
-evidence have not started at M0.
+`RANGE_LEASED` or reject `STRICT_SERIALIZED`. ADR 0091 now freezes the final record/key wire and allowed range-size
+domain with local implementation tests; exact selected range size and real runtime evidence remain absent.
 
 ## Context
 
@@ -67,8 +67,8 @@ Topic/host configuration cannot enlarge it.
 
 ## Consequences
 
-- `V2-OPEN-PUL-OBJ-09` remains open for exact wire/keys, range-size evidence, the shared allocator reservation protocol,
-  and final mode selection; the owner-takeover correctness shape is no longer open.
+- `V2-OPEN-PUL-OBJ-09` remains open for exact range-size evidence, real shared allocator reservation/concurrency/cut
+  evidence, and final mode selection; ADR 0091 closes wire/keys and the owner-takeover correctness shape.
 - Installed ranges survive broker failover, replacing serialized mass reacquisition with parallel head fencing and at
   most one exact stale-candidate burn per affected ManagedLedger.
 - A stuck clear can block the next grant even though it cannot revoke the installed range, so reconciler priority and
@@ -78,5 +78,6 @@ Topic/host configuration cannot enlarge it.
   equality convergence, same-RESERVED takeover, one-candidate burn, and production-SPI absence. M3 proves definitive-
   conflict fencing, late-old-owner writes, tail preservation, clear reconciliation, and mass-takeover behavior.
 
-This decision refines ADRs 0022, 0027, 0032, 0041, 0048, 0049, 0054, and 0055 and is tracked by `T-POSITION-01`,
-`T-POLICY-01`, `V2-POSITION-010/011/017/018`, and `V2-OPEN-PUL-OBJ-09`.
+This decision is implemented/refined by ADR 0091, refines ADRs 0022, 0027, 0032, 0041, 0048, 0049, 0054, and 0055,
+and is tracked by `T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-010/011/017/018`, and
+`V2-OPEN-PUL-OBJ-09`.
