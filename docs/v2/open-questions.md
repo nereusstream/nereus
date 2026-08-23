@@ -307,14 +307,15 @@ Resolved by [ADR 0047](../decisions/0047-v2-walrun-root-seal-and-successor-publi
 records live in Cell control metadata; a successor binds both and one exact pointer CAS advances only after publication.
 A sealed run is never reopened.
 
-### `V2-OPEN-OBJ-17`: exact NWG1 cryptographic framing
+### `V2-OPEN-OBJ-17`: resolved exact NWG1 cryptographic framing
 
-ADR 0058 makes `maxHeaderAndDirectoryPrefixBytes` primary, derives frame capacity after row widths, benchmarks
-4,096/16,384 first, and rejects pagination/secondary authority. ADR 0059 places an exclusive bounded
-`directoryPrefixEnd19` in every leaf, keeps it outside content digest identity, uses structured descriptors instead of
-full-key repetition, and fixes short/long incremental range reuse. Routine reads need neither ProviderObjectProof nor
-HEAD. ADR 0062 fixes the one-digit `0..2` lane token and complete key grammar. The remaining gate must freeze only exact
-prefix/header/directory/row numeric caps; exact key/Root/version/AEAD mismatch still fails or uses bounded fallback.
+Resolved by [ADR 0088](../decisions/0088-v2-m3-nwg1-implementation-input-closure.md) and the
+[M3-I0 input closure](detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md). NWG1 v1 now has an exact
+256-byte Header, 32-byte Directory preamble, 116-byte Binding row, 104/96-byte Kafka/Pulsar AppendUnit rows, 48-byte
+Frame row, 37-byte HKDF info, 12-byte nonce, 272/328-byte AAD, closed algorithms, 4-MiB prefix and 4-GiB body/decoded
+aggregate format ceilings, canonical order/equations, and strict verifier precedence. Production projection/goldens,
+codec, mutation/trace runners, Provider evidence and receipts remain M3 implementation work and provide no current
+scenario evidence.
 
 ### `V2-OPEN-OBJ-18`: resolved WalRun checkpoint pages and open-tail handoff
 
@@ -776,6 +777,18 @@ For example, one Pulsar entry with batch indexes `0..2` might map to one Kafka O
 input example, not an accepted canonical payload mapping.
 
 ## Resolved questions
+
+### M3 NWG1 implementation-readiness rounds 1 through 9: resolved by ADR 0088
+
+Resolved on 2026-08-23 after explicit acceptance and repository-landing authorization. The focused review froze exact
+NWG1 layout/caps/crypto, writer/reader/dispatch cuts, four corpus classes, six positive vectors and 114 component rows,
+84 negative records across 240 verifier paths, 50 deterministic Object-WAL kernel traces, and the D1/D2/D3 capacity
+evidence boundary. It also retains explicit exclusions for positive Storage Epoch ordinal, mixed-policy production
+evidence, production-compressor exact output, and synthetic complete Root/Pointer wire.
+
+This closes `V2-OPEN-OBJ-17` only at the design/input layer. `V2-OPEN-OBJ-19`, `V2-OPEN-PUL-OBJ-09`,
+`V2-OPEN-OBJ-22`, and `V2-OPEN-OBJ-24` keep their evidence/selection boundaries. The complete adjusted decision trail
+is preserved in [the M3 readiness record](grill-notes/31-m3-nwg1-implementation-readiness.md).
 
 ### Restarted Grill 2 round 18 adjusted decisions: resolved/partially resolved by ADRs 0079/0080
 

@@ -116,7 +116,13 @@ performance-first BookKeeper WAL.
   replication with hard-bounded Observed/Applied eligibility, election-bounded tail adoption, profile-neutral BK/Object
   protocol checkpoints with an independent terminal Head, coherent/delayed Fetch, native read-committed metadata, and
   semantic compaction. `NBKE2` checkpoint carriage is M2, exact Object `NWKCP1` bytes/Head/key caps are M3, and native
-  Kafka transport/process activation is M6; all three implementation/evidence layers remain `NotStarted`.
+  Kafka transport/process activation is M6. The M2 carrier is now verified by M2 Final; `NWKCP1` remains M3 work and
+  native transport/process activation remains M6 work.
+- ADR 0088 and the accepted [M3-I0 NWG1 input closure](detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md)
+  freeze the 256/116/104/96/48-byte NWG1 structures, strict code/cap/crypto tables, six-vector/114-component A corpus,
+  84-record/240-path B contract, 50-trace C contract, and tiered D evidence boundary. This is documentation-only:
+  production codec/manifests/runners/harnesses, Root/Pointer and `NWKCP1`, Provider/KMS/allocator evidence, scenario
+  promotion, and M3 Final remain `NotStarted`/`PLANNED`.
 - The initial foundation supplied Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct
   aggregate validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
   guards, and reproducible JAR/source-JAR/POM hashes. It deliberately made no NTA1, Registry, P1/R1, real-backend, or
@@ -244,7 +250,8 @@ pooling is optional and remains below the independently owned sessions.
 8. [Metadata backends and handoff](06-metadata-backends-and-handoff.md)
 9. [Protocol integrations and product gates](07-protocol-integrations.md)
 10. [Implementation plan and gates](08-implementation-plan-and-gates.md)
-11. [M1 execution index](detailed_design/m1/README.md) and component detailed designs
+11. [M1 execution index](detailed_design/m1/README.md), [M2 detailed-design index](detailed_design/m2/README.md), and
+    [M3 detailed-design index](detailed_design/m3/README.md)
 12. [Scenario evidence matrix](09-scenario-evidence-matrix.md)
 13. [Architecture tradeoffs](tradeoffs.md)
 14. [Open questions](open-questions.md) and [grill session records](grill-notes/)
@@ -333,6 +340,7 @@ Accepted decisions:
 - [ADR 0085: M1 foundation start and deferred codec bounds](../decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md)
 - [ADR 0086: Kafka BookKeeper run, range index, and ordered pipeline](../decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md)
 - [ADR 0087: Kafka Produce/Fetch frontiers, shared-storage ISR, and protocol recovery](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md)
+- [ADR 0088: M3 NWG1 implementation-input closure](../decisions/0088-v2-m3-nwg1-implementation-input-closure.md)
 
 ## Open design gates
 
@@ -373,6 +381,9 @@ ADR 0087 closes the protocol-frontier/ISR/idempotency/transaction/Fetch semantic
 native election adoption, compact descriptor transport, hard-bounded Observed/Applied eligibility, and distinct
 BK/Object protocol checkpoint carriers with a terminal selection Head, without selecting Java structures or numeric
 queue/checkpoint/waiter bounds. M2 owns the BK carrier; M3 owns exact `NWKCP1`; M6 owns native Kafka integration.
+ADR 0088 closes `V2-OPEN-OBJ-17` at the documentation/input layer by freezing the NWG1 v1 structures, caps, crypto,
+golden/mutation/trace contracts, and evidence taxonomy. Its machine projections, immutable bytes, production codec,
+executable gates, receipts, and all M3 scenario evidence remain implementation work.
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.
@@ -382,7 +393,6 @@ are the remaining active 0.2 evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
 | --- | --- | --- |
-| `V2-OPEN-OBJ-17` | freeze exact NWG1 header/directory/row numeric caps after ADRs 0059/0062 fixed the complete leaf grammar | M3 Object WAL format freeze |
 | `V2-OPEN-OBJ-19` | execute evidence and select target/linger/quantized values and numeric budgets without changing ADR-0062 class semantics | M3 Object WAL policy freeze |
 | `V2-OPEN-PUL-OBJ-09` | choose an allocator only after evidence plus exact reservation/head/node wire, range size, Cell reservation concurrency, and ADR 0061 conformance | M1/M3 virtual-ledger allocator freeze |
 | `V2-OPEN-OBJ-22` | execute bounded recovery and skip-hit evidence; only an SLO miss may reopen a whole-WalRun-first, Root/Seal-bound recovery omission certificate | M3/M7 recovery optimization decision |

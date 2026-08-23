@@ -19,6 +19,12 @@ eleven complete claims owned exactly by M2. The global `v2M2Check` binds those c
 A row shared with M3/M4/M5/M6 remains `PLANNED` until every named milestone supplies its evidence; the aggregate does
 not reinterpret a focused or partial result as proof of a complete row.
 
+Acceptance of the [M3-I0 NWG1 implementation-input closure](detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md)
+also changes no scenario status. Its six-vector/84-mutation/50-trace numbers are authored implementation contracts,
+not executed source-bound evidence. Every M3 and mixed M3 row remains `PLANNED` until the production artifacts, real
+Provider/KMS/allocator evidence, exact receipts, and owning aggregate are present in both this matrix and
+`v2-scenarios.json`.
+
 M1.1b-Q1 remains historical `READINESS_EVIDENCE_ONLY` for NTA1 candidate bounds and legality. The subsequent accepted
 design and exact-local implementation still leave `V2-META-003` at `IMPLEMENTED_NOT_RUN` and `V2-META-004` at
 `PLANNED`: 55 domain/73 focused O2/303 whole metadata-oxia tests are not runtime equality, and no real backend or Kafka mapping receipt has

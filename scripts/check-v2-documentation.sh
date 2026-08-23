@@ -62,6 +62,8 @@ required_v2_docs=(
     detailed_design/m2/pulsar-m2-p5-native-provider.md
     detailed_design/m2/pulsar-m2-p6-provider-and-block-policy.md
     detailed_design/m2/pulsar-m2-final-evidence.md
+    detailed_design/m3/README.md
+    detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md
     open-questions.md
     tradeoffs.md
 )
@@ -198,6 +200,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
     "$repo_root/docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
     "$repo_root/docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
+    "$repo_root/docs/decisions/0088-v2-m3-nwg1-implementation-input-closure.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
@@ -651,6 +654,15 @@ require_literal "transitional dual write" "docs/v2/grill-notes/27-kafka-bookkeep
 require_literal "Kafka Produce/Fetch frontiers, ISR, and transaction closure" "docs/v2/grill-notes/28-kafka-produce-fetch-frontiers-isr-transactions.md"
 require_literal "One ambiguous \`committedEndOffset\` is rejected" "docs/v2/grill-notes/28-kafka-produce-fetch-frontiers-isr-transactions.md"
 require_literal "V2-KAF-DATA-017..022" "docs/v2/grill-notes/29-kafka-implementation-readiness-publication-election-and-replication.md"
+require_literal "M3 NWG1 implementation-readiness rounds 1 through 9" "docs/v2/grill-notes/31-m3-nwg1-implementation-readiness.md"
+require_literal "B concrete records      = 84" "docs/v2/grill-notes/31-m3-nwg1-implementation-readiness.md"
+require_literal "M3-I0 NWG1 implementation-input closure" "docs/v2/detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md"
+require_literal "84 concrete records" "docs/v2/detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md"
+require_literal "50 deterministic traces" "docs/v2/detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md"
+require_literal "M3 detailed-design index" "docs/v2/detailed_design/m3/README.md"
+require_literal "M3-W2" "docs/v2/detailed_design/m3/README.md"
+require_literal "V2 M3 NWG1 implementation-input closure" "docs/decisions/0088-v2-m3-nwg1-implementation-input-closure.md"
+require_literal "V2-OPEN-OBJ-17" "docs/decisions/0088-v2-m3-nwg1-implementation-input-closure.md"
 require_literal "Metadata-oxia O2 is also locally" "docs/v2/open-questions.md"
 require_literal 'It explicitly did not accept complete NTA1, `maxWriterCount=8`, or any' "docs/v2/open-questions.md"
 require_literal '`V2-OPEN-PROJECTION-SCOPE-01`' "docs/v2/open-questions.md"
@@ -733,6 +745,7 @@ for resolved_gate in \
     V2-OPEN-BK-10 \
     V2-OPEN-OBJ-15 \
     V2-OPEN-OBJ-16 \
+    V2-OPEN-OBJ-17 \
     V2-OPEN-PUL-OBJ-07 \
     V2-OPEN-KAF-META-03 \
     V2-OPEN-PUL-META-02 \
@@ -764,7 +777,6 @@ for resolved_gate in \
 done
 
 for active_gate in \
-    V2-OPEN-OBJ-17 \
     V2-OPEN-OBJ-19 \
     V2-OPEN-PUL-OBJ-09 \
     V2-OPEN-OBJ-22 \
@@ -1970,6 +1982,7 @@ link_docs=(
     "$repo_root/docs/decisions/0085-v2-m1-foundation-start-and-deferred-codec-bounds.md"
     "$repo_root/docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
     "$repo_root/docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
+    "$repo_root/docs/decisions/0088-v2-m3-nwg1-implementation-input-closure.md"
 )
 
 while IFS=: read -r source match; do

@@ -46,6 +46,15 @@ The group object is an `ObjectExtent`. Every frame independently carries:
 - idempotency identity;
 - flags required by the protocol payload mapping.
 
+[ADR 0088](../decisions/0088-v2-m3-nwg1-implementation-input-closure.md) and the
+[M3-I0 input closure](detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md) now freeze the exact NWG1 v1
+implementation input. The strict big-endian body uses a 256-byte Header; a 32-byte Directory preamble; 116-byte
+BindingContext rows; 104/96-byte Kafka/Pulsar AppendUnit rows; 48-byte Frame rows; 37-byte HKDF info; 12-byte derived
+nonces; and 272/328-byte Directory/Frame AAD. Its format ceilings are a 4-MiB authenticated prefix, 4-GiB body and
+decoded aggregate, 64-MiB decoded frame, 256 contexts, and 65,536 units/frames. These are parser/compatibility ceilings,
+not production Root targets or Provider evidence. Projection/goldens, codec, mutation runner, state traces and real
+evidence remain unimplemented, so this exact design changes no scenario status.
+
 One Kafka frame is one complete raw broker-assigned RecordBatch. All frames from one partition `MemoryRecords` storage
 append form one `KafkaAppendCommitSet`: membership, every frame, and all coverage must be durable and valid before any
 member is visible or acknowledged. One Pulsar frame/commit set is one exact ManagedLedger entry and one
@@ -378,4 +387,5 @@ Relevant tradeoffs: `T-OBJECT-01`, `T-POLICY-01`, and `T-FABRIC-01`. Required sc
 [ADR 0078](../decisions/0078-v2-per-source-retirement-interval-and-batch-retirement.md),
 [ADR 0079](../decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md), and
 [ADR 0080](../decisions/0080-v2-irreversible-source-retirement-batch-tombstone.md), plus
-[ADR 0087](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md).
+[ADR 0087](../decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md) and
+[ADR 0088](../decisions/0088-v2-m3-nwg1-implementation-input-closure.md).
