@@ -60,9 +60,14 @@ total requested operations; backlog must drain inside the same measured interval
 
 Ledger selection uses xorshift64* with seed `0x4e45524555534d33`, actor `requestOrdinal mod 4`, and rejection sampling
 over the complete active population. Trigger classes follow the repeating ten-request schedule
-`ENTRY,ENTRY,ENTRY,ENTRY,ENTRY,BYTE,BYTE,BYTE,AGE,AGE`. ENTRY rolls after one admitted entry. BYTE rolls after the exact
-64-KiB admitted payload boundary. AGE uses a monotonic test clock and the production age-decision path at exactly
-one second; wall-clock sleeping is not authority. Arrival jitter is the repeating signed-microsecond vector
+`ENTRY,ENTRY,ENTRY,ENTRY,ENTRY,BYTE,BYTE,BYTE,AGE,AGE`. ENTRY rolls after one admitted entry. Every BYTE request admits
+an exact 64-KiB payload. The pinned Pulsar API exposes only integer-MiB native byte thresholds, so the native BYTE row
+uses its minimum exact 1-MiB threshold: it pre-fills fifteen 64-KiB entries, admits the sixteenth to reach 1 MiB, then
+includes the next append that invokes the production `currentLedgerIsFull()` decision and rollover. It may not use
+`maxEntries=1` and relabel that entry-triggered cut as BYTE. The candidate allocator records the same 64-KiB BYTE
+rollover demand; allocator evidence does not claim to implement the upstream trigger policy. AGE uses a monotonic test
+clock and the production age-decision path at exactly one second; wall-clock sleeping is not authority. Arrival jitter
+is the repeating signed-microsecond vector
 `{0,125,-125,250,-250,500,-500,0}` clamped so ordinal order never reverses. The harness records offered, admitted,
 completed, fenced, failed, and timed-out ordinals separately and may not replace missing completions with retries under
 a new ordinal.
