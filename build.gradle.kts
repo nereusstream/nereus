@@ -744,13 +744,19 @@ tasks.register("v2M2KafkaK0EvidenceCheck") {
     dependsOn("v2M2KafkaK0EvidenceSourceCheck", "v2DocumentationCheck")
 }
 
-tasks.register("v2M2KafkaInputsReceiptCheck") {
+val v2M2KafkaInputsReceiptPath =
+    providers.gradleProperty("v2M2KafkaInputsReceipt")
+        .orElse("docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json")
+
+tasks.register<JavaExec>("v2M2KafkaInputsReceiptCheck") {
     group = "verification"
     description = "Parse one canonical Kafka Inputs receipt through the production closed-model validator."
-    dependsOn(":nereus-kafka-bookkeeper:v2M2KafkaInputsReceiptCheck")
+    dependsOn(":nereus-kafka-bookkeeper:classes")
+    classpath = files(layout.projectDirectory.dir("nereus-kafka-bookkeeper/build/classes/java/main"))
+    workingDir = layout.projectDirectory.asFile
+    mainClass.set("com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptCli")
+    setArgs(listOf("validate", v2M2KafkaInputsReceiptPath.get()))
 }
-
-val v2M2KafkaInputsReceiptPath = providers.gradleProperty("v2M2KafkaInputsReceipt")
 
 tasks.register<Exec>("v2M2KafkaInputsLiveSourceCheck") {
     group = "verification"
@@ -1202,8 +1208,13 @@ tasks.register("v2M2PulsarFinalCheck") {
 
 tasks.register<Exec>("v2M2FinalSourceCheck") {
     group = "verification"
-    description = "Verify the global M2 child roots, exact 21-scenario union, and downstream boundaries."
-    dependsOn("v2M2KafkaFinalCheck", "v2M2PulsarFinalCheck")
+    description = "Verify all M2 prerequisites, child roots, exact 21-scenario union, and downstream boundaries."
+    dependsOn(
+        "v2M2KafkaInputsCheck",
+        "v2M2KafkaK1Check",
+        "v2M2KafkaFinalCheck",
+        "v2M2PulsarFinalCheck",
+    )
     workingDir = layout.projectDirectory.asFile
     commandLine("python3", "scripts/check-v2-m2-final.py")
 }
