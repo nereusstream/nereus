@@ -14,14 +14,31 @@
 
 package com.nereusstream.metadata.spi.allocator;
 
+import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.domain.registry.allocator.VirtualLedgerCandidateNodeV1;
 import com.nereusstream.metadata.spi.model.MetadataVersion;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 public record VersionedVirtualLedgerCandidateNodeV1(
-        VirtualLedgerCandidateNodeV1 value, MetadataVersion metadataVersion) {
+        Sha256Digest ledgerIdCompatibilityNamespaceId,
+        Sha256Digest sliceAssignmentId,
+        String authorityKey,
+        VirtualLedgerCandidateNodeV1 value,
+        MetadataVersion metadataVersion) {
     public VersionedVirtualLedgerCandidateNodeV1 {
+        Objects.requireNonNull(ledgerIdCompatibilityNamespaceId, "ledgerIdCompatibilityNamespaceId");
+        Objects.requireNonNull(sliceAssignmentId, "sliceAssignmentId");
+        Objects.requireNonNull(authorityKey, "authorityKey");
         Objects.requireNonNull(value, "value");
         Objects.requireNonNull(metadataVersion, "metadataVersion");
+        if (ledgerIdCompatibilityNamespaceId.isZero()
+                || sliceAssignmentId.isZero()
+                || !authorityKey.startsWith("/")
+                || authorityKey.endsWith("/")
+                || authorityKey.contains("//")
+                || authorityKey.getBytes(StandardCharsets.UTF_8).length > 512) {
+            throw new IllegalArgumentException("versioned allocator node has invalid authority provenance");
+        }
     }
 }

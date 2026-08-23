@@ -12,33 +12,35 @@
  * limitations under the License.
  */
 
-package com.nereusstream.metadata.spi.allocator;
+package com.nereusstream.domain.registry.allocator;
 
 import com.nereusstream.domain.bytes.Sha256Digest;
-import com.nereusstream.domain.registry.allocator.ManagedLedgerAllocatorHeadV1;
-import com.nereusstream.metadata.spi.model.MetadataVersion;
-import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-public record VersionedManagedLedgerAllocatorHeadV1(
+/** Terminal accounting fact for an unused RANGE tail. It is deliberately not accepted by reserve. */
+public record TerminalInstalledRangeAbandonmentV1(
         Sha256Digest ledgerIdCompatibilityNamespaceId,
         Sha256Digest sliceAssignmentId,
-        String authorityKey,
-        ManagedLedgerAllocatorHeadV1 value,
-        MetadataVersion metadataVersion) {
-    public VersionedManagedLedgerAllocatorHeadV1 {
+        ManagedLedgerIncarnationIdV1 managedLedgerIncarnation,
+        long grantId,
+        long rangeStartInclusive,
+        long rangeEndExclusive,
+        long nextLedgerId,
+        long ownerEpoch,
+        InstalledRangeAbandonmentAuthorityV1 authority) {
+    public TerminalInstalledRangeAbandonmentV1 {
         Objects.requireNonNull(ledgerIdCompatibilityNamespaceId, "ledgerIdCompatibilityNamespaceId");
         Objects.requireNonNull(sliceAssignmentId, "sliceAssignmentId");
-        Objects.requireNonNull(authorityKey, "authorityKey");
-        Objects.requireNonNull(value, "value");
-        Objects.requireNonNull(metadataVersion, "metadataVersion");
+        Objects.requireNonNull(managedLedgerIncarnation, "managedLedgerIncarnation");
+        Objects.requireNonNull(authority, "authority");
         if (ledgerIdCompatibilityNamespaceId.isZero()
                 || sliceAssignmentId.isZero()
-                || !authorityKey.startsWith("/")
-                || authorityKey.endsWith("/")
-                || authorityKey.contains("//")
-                || authorityKey.getBytes(StandardCharsets.UTF_8).length > 512) {
-            throw new IllegalArgumentException("versioned allocator Head has invalid authority provenance");
+                || grantId <= 0
+                || rangeStartInclusive <= 0
+                || nextLedgerId < rangeStartInclusive
+                || nextLedgerId >= rangeEndExclusive
+                || ownerEpoch <= 0) {
+            throw new IllegalArgumentException("terminal RANGE abandonment must bind one non-empty installed tail");
         }
     }
 }

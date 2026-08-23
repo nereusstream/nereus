@@ -146,11 +146,16 @@ values padded to 19 digits:
 {root}/virtual-ledger-allocator/v1/{namespaceId}/{sliceAssignmentId}/managed-ledgers/{incarnationId}/nodes/{ledgerId19}
 ```
 
-Cell and Head use exact-version single-key CAS. Nodes use create-if-absent and have no delete API. Every dispatched
-create/CAS, including response loss, performs one exact same-key reread. Exact candidate bytes converge as applied;
-an unchanged exact predecessor is reported separately; definitive condition/value conflict fences; missing,
-cross-key, undecodable, non-canonical, or failed reread remains indeterminate. A success response with different stored
-bytes is not success authority.
+Cell and Head use exact-version single-key CAS. Nodes use create-if-absent and have no delete API. A versioned Cell,
+Head, or node snapshot carries the exact namespace, slice-assignment, authority key, canonical value, and metadata
+version that was observed from the store; a caller-constructed value is not authority. Before dispatching any Head or
+node mutation that does not itself CAS the Cell, the coordinator rereads the same Cell key and requires exact versioned
+equality. It likewise proves the exact stored Head and, for publication or burn, exact same-key node occupancy before
+dispatch. Every dispatched create/CAS, including response loss, performs one exact same-key reread. Exact candidate
+bytes converge as applied; an unchanged exact predecessor is reported separately; definitive condition/value conflict
+fences; missing, cross-key, undecodable, non-canonical, or failed reread remains indeterminate. A success response with
+different stored bytes is not success authority. Every Head transition also validates that its grant/range/cursor is
+inside the global reserved interval, the same Cell slice, and the Cell's already-consumed prefix.
 
 ### STRICT and RANGE transition rules
 
@@ -163,8 +168,9 @@ Cell IDLE --CAS reserve one ID--> RESERVED
   --Cell CAS clear--> IDLE
 ```
 
-It has no separate grant-install write. Exact reread recognizes an already reserved, published, or cleared value
-without allocating a second grant or issuing a no-op CAS.
+It has no separate grant-install write or public STRICT install transition. Cell clear is valid only after the exact
+one-ID reservation has been published through the Head and consumed; it cannot strand an unconsumed ID. Exact reread
+recognizes an already reserved, published, or cleared value without allocating a second grant or issuing a no-op CAS.
 
 `RANGE_LEASED` admits an evidence-selected range size in `[2, 2^40]`:
 
@@ -175,20 +181,27 @@ Cell RESERVED --background CAS clear--> IDLE
 Head/node CAS allocation repeats inside the installed range
 ```
 
-The installed range may be used before Cell clear; clear still blocks the next Cell-wide grant. Any current owner may
-reconcile an installed grant/clear through exact rereads. A stuck clear, queue age, and append impact remain evidence
-gates.
+The installed range may be used before Cell clear; clear still blocks the next Cell-wide grant. Normal allocation may
+not reserve, burn, abandon, or regrant an installed range while its cursor is below `rangeEndExclusive`. An accepted
+retirement, incompatibility, or corruption authority may emit a terminal `TerminalInstalledRangeAbandonmentV1`
+accounting fact for the unused tail. That fact is not allocator state, cannot be installed into a Cell or Head, and
+cannot authorize reuse or regrant. Any current owner may reconcile an installed grant/clear through exact rereads. A
+stuck clear, queue age, and append impact remain evidence gates.
 
 Owner takeover is an exact Head CAS that changes only `ownerEpoch`, preserving incarnation, visible pointer, grant,
 range, and cursor. The new owner may install the same RESERVED grant if the owner-independent expected allocation
 state is unchanged. A candidate binds the grant, creator owner, ledger ID, and exact predecessor. A stale-owner node is
 never adopted. For the one persisted single-flight candidate at the exact cursor, a cursor-only Head CAS may advance
-by exactly one while preserving the visible pointer. Exact reread recognizes that burn idempotently. It cannot burn the
+by exactly one while preserving the visible pointer. Burn requires the versioned, store-observed candidate at the
+exact cursor, exact node key, and exact canonical bytes. Exact reread recognizes that single-ID burn idempotently;
+fabricated, absent, repeated-at-another-cursor, or arbitrary node input cannot advance the Head. It cannot burn the
 range tail, reuse an ID, or make an orphan visible.
 
 Whole-tail abandonment remains limited to the ADR 0061 retirement/incompatibility/corruption cases. Slice exhaustion,
 overflow, inactive `RETIRING/RETIRED` lifecycle, namespace/assignment/geometry drift, missing versioned derived view,
-mode/version mismatch, and unavailable selection authority all fail closed before allocation.
+mode/version mismatch, and unavailable selection authority all fail closed before allocation. `RETIRING` or `RETIRED`
+blocks reserve, install, create-candidate, publish, and burn at every cut. Cleanup-only clear/reconciliation remains
+available, but takeover still requires the exact current stored Cell proof described above.
 
 ### Receipt-only activation and evidence matrix
 
@@ -196,6 +209,10 @@ There is no default mode and no public construction path for production allocato
 obtains activation only from a validated `AllocatorSelectionReceiptV1` whose Nereus source commit is exactly the
 running 40-character lowercase commit. Persisted Cell mode/version must equal that activation. Hosts cannot override a
 mode or range size.
+
+Formal evidence candidates use the closed `AllocatorEvidenceCandidateV1` set and invoke these same production
+coordinator methods and validation paths. Their evidence seam always reports `runtimeActivated=false`; it can exercise
+STRICT or a permitted RANGE size for measurement, but it is not a receipt and can never authorize runtime allocation.
 
 The selection input must bind exactly one mode, protocol version `1`, the allowed range size, a non-zero receipt SHA,
 `selectionEligible=true`, thresholds frozen before execution, completed multi-broker crash/mass takeover, non-empty
@@ -233,8 +250,9 @@ real multi-broker/native 10,000/100,000 run.
 
 The M3 production domain/SPI/Oxia implementation has local tests for fixed-width round trips, reserved-byte
 corruption, exact keys, slice bounds/exhaustion, STRICT/RANGE transitions, same-RESERVED takeover, idempotent recovery,
-one-candidate burn, and create/CAS response loss. Together with the preserved M1 allocator harness, 27 allocator tests
-currently report zero failure, error, and skip.
+one-candidate burn, create/CAS response loss, stale Cell/Head/node provenance, lifecycle cuts, no-tail-regrant, and the
+evidence-only production seam. Together with the preserved M1 allocator harness, 38 allocator tests currently report
+zero failure, error, and skip.
 
 That is local implementation conformance only. It is not a source-qualified M3 allocator receipt, real Oxia/native
 Pulsar capacity result, 10,000/100,000 execution, range-size selection, mode selection, or scenario PASS. A later code

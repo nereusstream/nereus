@@ -23,6 +23,11 @@ public final class AllocatorProtocolException extends IllegalArgumentException {
         this.code = code;
     }
 
+    public AllocatorProtocolException(Code code, String message, Throwable cause) {
+        super(message, cause);
+        this.code = code;
+    }
+
     public Code code() {
         return code;
     }
@@ -36,12 +41,16 @@ public final class AllocatorProtocolException extends IllegalArgumentException {
         SLICE_IDENTITY_DRIFT,
         SLICE_EXHAUSTED,
         RESERVATION_BUSY,
+        RANGE_TAIL_NOT_EXHAUSTED,
+        CELL_STATE_DRIFT,
         HEAD_IDENTITY,
+        HEAD_GEOMETRY,
         HEAD_STATE_DRIFT,
         OWNER_FENCED,
         GRANT_NOT_INSTALLED,
         RANGE_EXHAUSTED,
         CANDIDATE_CONFLICT,
+        CANDIDATE_OCCUPANCY_NOT_PROVEN,
         STALE_CANDIDATE_REQUIRED,
         NON_CANONICAL_WIRE
     }

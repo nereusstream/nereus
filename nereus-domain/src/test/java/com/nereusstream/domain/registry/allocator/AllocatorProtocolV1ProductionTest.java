@@ -50,6 +50,27 @@ class AllocatorProtocolV1ProductionTest {
     }
 
     @Test
+    void strictFencesStaleCreatorAndForbidsSeparateInstallOrEarlyClear() {
+        VirtualLedgerCellAllocatorStateV1 cell = cell(AllocatorModeV1.STRICT_SERIALIZED);
+        ManagedLedgerAllocatorHeadV1 head = head(cell, 7);
+        cell = AllocatorProtocolV1.reserve(cell, head, digest("strict-fenced"), 1);
+        VirtualLedgerCandidateNodeV1 stale =
+                AllocatorProtocolV1.strictCandidateFromReservation(cell, head, digest("strict-node"));
+        ManagedLedgerAllocatorHeadV1 takenOver = AllocatorProtocolV1.takeover(head, 8);
+        VirtualLedgerCellAllocatorStateV1 reserved = cell;
+
+        assertThatThrownBy(() -> AllocatorProtocolV1.publishStrictReserved(reserved, takenOver, stale))
+                .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
+                        .isEqualTo(AllocatorProtocolException.Code.OWNER_FENCED));
+        assertThatThrownBy(() -> AllocatorProtocolV1.installReservedRange(reserved, head))
+                .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
+                        .isEqualTo(AllocatorProtocolException.Code.MODE_MISMATCH));
+        assertThatThrownBy(() -> AllocatorProtocolV1.clearInstalledReservation(reserved, head))
+                .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
+                        .isEqualTo(AllocatorProtocolException.Code.GRANT_NOT_INSTALLED));
+    }
+
+    @Test
     void rangeGrantSurvivesOwnerTakeoverAndClearDoesNotGateInstalledUse() {
         VirtualLedgerCellAllocatorStateV1 cell = cell(AllocatorModeV1.RANGE_LEASED);
         ManagedLedgerAllocatorHeadV1 head = head(cell, 10);
@@ -67,6 +88,26 @@ class AllocatorProtocolV1ProductionTest {
         assertThat(head.ownerEpoch()).isEqualTo(11);
         assertThat(head.rangeEndExclusive() - head.rangeStartInclusive()).isEqualTo(8);
         assertThat(cleared.reservation()).isEmpty();
+    }
+
+    @Test
+    void rangeUnusedTailCannotBeRegrantedAndTerminalAbandonmentNeverReturnsAllocatorState() {
+        VirtualLedgerCellAllocatorStateV1 cell = cell(AllocatorModeV1.RANGE_LEASED);
+        ManagedLedgerAllocatorHeadV1 head = head(cell, 10);
+        cell = AllocatorProtocolV1.reserve(cell, head, digest("range-one"), 8);
+        head = AllocatorProtocolV1.installReservedRange(cell, head);
+        VirtualLedgerCellAllocatorStateV1 cleared = AllocatorProtocolV1.clearInstalledReservation(cell, head);
+        ManagedLedgerAllocatorHeadV1 installed = head;
+
+        assertThatThrownBy(() -> AllocatorProtocolV1.reserve(cleared, installed, digest("range-two"), 8))
+                .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
+                        .isEqualTo(AllocatorProtocolException.Code.RANGE_TAIL_NOT_EXHAUSTED));
+        TerminalInstalledRangeAbandonmentV1 terminal = AllocatorProtocolV1.abandonInstalledRangeTerminal(
+                cleared, installed, InstalledRangeAbandonmentAuthorityV1.SLICE_RETIREMENT);
+        assertThat(terminal.nextLedgerId()).isLessThan(terminal.rangeEndExclusive());
+        assertThat(terminal.authority()).isEqualTo(InstalledRangeAbandonmentAuthorityV1.SLICE_RETIREMENT);
+        assertThat(TerminalInstalledRangeAbandonmentV1.class.isAssignableFrom(VirtualLedgerCellAllocatorStateV1.class))
+                .isFalse();
     }
 
     @Test
@@ -154,6 +195,10 @@ class AllocatorProtocolV1ProductionTest {
         assertThatThrownBy(() -> AllocatorWireV1.decodeHead(CanonicalBytes.copyOf(corrupted)))
                 .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
                         .isEqualTo(AllocatorProtocolException.Code.NON_CANONICAL_WIRE));
+        assertThatThrownBy(() ->
+                        new ManagedLedgerAllocatorHeadV1(1, incarnation(), 1, ChainPointerV1.absent(), 1, 1, 2, 1))
+                .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
+                        .isEqualTo(AllocatorProtocolException.Code.HEAD_GEOMETRY));
     }
 
     @Test

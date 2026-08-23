@@ -713,11 +713,16 @@ deployment/cluster.
 This remains open only at the real evidence/selection boundary. ADR 0091 now fixes exact 384-byte `NVAC1`, 192-byte
 `NVAH1`, and 256-byte `NVAN1` records, 512-byte-capped versioned Oxia keys, STRICT's four successful writes, RANGE's
 allowed `[2,2^40]` size domain, ACTIVE versioned-slice admission, exact-reread reconciliation, same-RESERVED takeover,
-and one stale-candidate ID burn. Production activation is constructible only from a selection-eligible receipt bound to
-the exact running source; there is no default mode.
+and one stale-candidate ID burn. STRICT has no separate install transition and cannot clear an unconsumed reservation.
+RANGE cannot normally abandon or regrant an installed unused tail; accepted terminal retirement/incompatibility/
+corruption authority emits only a non-allocator accounting fact. Every non-Cell-CAS mutation proves the exact current
+stored Cell, and all Head/node transitions prove exact namespace/slice/key/version provenance plus consumed-prefix
+geometry. Production activation is constructible only from a selection-eligible receipt bound to the exact running
+source; there is no default mode. Formal candidates use the same production coordinator while remaining
+`runtimeActivated=false`, so the evidence seam cannot activate either candidate.
 
-The current local allocator tests and deterministic `8 workloads x 9 cuts` schedule are implementation conformance,
-not real/native evidence. ADR 0094 now freezes, before formal execution, the exact executor, workload, independent
+The current 38 local allocator tests and deterministic `8 workloads x 9 cuts` schedule are implementation
+conformance, not real/native evidence. ADR 0094 now freezes, before formal execution, the exact executor, workload, independent
 telemetry, numeric absolute/native-relative SLOs, RANGE candidates, and closed at-most-one selection rule that ADRs
 0055/0091 required but did not numerically supply. The remaining gate must execute that source-qualified
 multi-broker/native 10,000/100,000 protocol with zero skip, select the smallest qualifying RANGE size if RANGE alone

@@ -38,8 +38,10 @@ first production version. The Header has no node session, owner witness, body SH
 first-satisfied close-reason codes, while normal target/linger values remain evidence-owned.
 
 ADR 0091 separately closes M3-P1's allocator wire/key/transition input with exact `NVAC1`/`NVAH1`/`NVAN1` bytes,
-STRICT's four-write path, RANGE same-RESERVED takeover and one-ID burn, and receipt-only exact-source activation. Its
-27 local allocator tests and deterministic `8 workloads x 9 cuts` schedule are implementation conformance only.
+STRICT's inseparable four-write path, RANGE same-RESERVED takeover with no unused-tail regrant, exact stored
+Cell/Head/node provenance and one-ID burn, and receipt-only exact-source activation. Formal candidates traverse the
+same production coordinator but remain `runtimeActivated=false`. Its 38 local allocator tests and deterministic
+`8 workloads x 9 cuts` schedule are implementation conformance only.
 `V2-OPEN-PUL-OBJ-09` remains evidence-blocked until real multi-broker/native 10k/100k execution selects an exact RANGE
 size and at most one mode.
 

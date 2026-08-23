@@ -48,6 +48,7 @@ public final class AllocatorProtocolV1 {
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(exactHead, "exactHead");
         Objects.requireNonNull(requestId, "requestId");
+        requireHeadWithinConsumedSlicePrefix(state, exactHead);
         if (state.reservation().isPresent()) {
             CellAllocatorReservationV1 existing = state.reservation().orElseThrow();
             if (existing.managedLedgerIncarnation().equals(exactHead.managedLedgerIncarnation())
@@ -61,6 +62,13 @@ public final class AllocatorProtocolV1 {
                 || (state.mode() == AllocatorModeV1.STRICT_SERIALIZED && selectedRangeSize != 1)
                 || (state.mode() == AllocatorModeV1.RANGE_LEASED && selectedRangeSize <= 1)) {
             throw failure(AllocatorProtocolException.Code.MODE_MISMATCH, "selected range size does not match mode");
+        }
+        if (state.mode() == AllocatorModeV1.RANGE_LEASED
+                && exactHead.grantId() != 0
+                && exactHead.nextLedgerId() < exactHead.rangeEndExclusive()) {
+            throw failure(
+                    AllocatorProtocolException.Code.RANGE_TAIL_NOT_EXHAUSTED,
+                    "normal RANGE reserve cannot abandon or regrant an installed unused tail");
         }
         long end;
         try {
@@ -92,6 +100,12 @@ public final class AllocatorProtocolV1 {
 
     public static ManagedLedgerAllocatorHeadV1 installReservedRange(
             VirtualLedgerCellAllocatorStateV1 state, ManagedLedgerAllocatorHeadV1 exactHead) {
+        if (state.mode() != AllocatorModeV1.RANGE_LEASED) {
+            throw failure(
+                    AllocatorProtocolException.Code.MODE_MISMATCH,
+                    "separate grant installation exists only for RANGE mode");
+        }
+        requireHeadWithinConsumedSlicePrefix(state, exactHead);
         CellAllocatorReservationV1 reservation = state.reservation()
                 .orElseThrow(() ->
                         failure(AllocatorProtocolException.Code.GRANT_NOT_INSTALLED, "no Cell reservation is present"));
@@ -218,11 +232,13 @@ public final class AllocatorProtocolV1 {
                 && exactHead.nextLedgerId() == reservation.rangeEndExclusive()) {
             return exactHead;
         }
+        if (exactNode.creatorOwnerEpoch() != exactHead.ownerEpoch()) {
+            throw failure(AllocatorProtocolException.Code.OWNER_FENCED, "candidate creator is not the current owner");
+        }
         if (!reservation.expectedAllocationState().equals(exactHead.allocationState())
                 || reservation.rangeEndExclusive() != reservation.rangeStartInclusive() + 1
                 || exactNode.ledgerId() != reservation.rangeStartInclusive()
                 || exactNode.grantId() != reservation.grantId()
-                || exactNode.creatorOwnerEpoch() != exactHead.ownerEpoch()
                 || !exactNode.expectedPredecessor().equals(exactHead.visibleChainHead())) {
             throw failure(
                     AllocatorProtocolException.Code.CANDIDATE_CONFLICT,
@@ -279,6 +295,15 @@ public final class AllocatorProtocolV1 {
                     AllocatorProtocolException.Code.GRANT_NOT_INSTALLED,
                     "head does not contain the exact RESERVED grant");
         }
+        if (state.mode() == AllocatorModeV1.STRICT_SERIALIZED
+                && (exactHead.nextLedgerId() != reservation.rangeEndExclusive()
+                        || exactHead
+                                .visibleChainHead()
+                                .equals(reservation.expectedAllocationState().visibleChainHead()))) {
+            throw failure(
+                    AllocatorProtocolException.Code.GRANT_NOT_INSTALLED,
+                    "STRICT reservation clears only after its exact node was published and consumed");
+        }
         return new VirtualLedgerCellAllocatorStateV1(
                 state.mode(),
                 state.allocatorProtocolVersion(),
@@ -289,6 +314,54 @@ public final class AllocatorProtocolV1 {
                 state.nextSliceLedgerId(),
                 state.nextGrantId(),
                 Optional.empty());
+    }
+
+    /**
+     * Accounts for an unused installed RANGE tail only at a terminal retirement/incompatibility/corruption boundary.
+     * The result is not allocator state and cannot authorize another reservation.
+     */
+    public static TerminalInstalledRangeAbandonmentV1 abandonInstalledRangeTerminal(
+            VirtualLedgerCellAllocatorStateV1 state,
+            ManagedLedgerAllocatorHeadV1 exactHead,
+            InstalledRangeAbandonmentAuthorityV1 authority) {
+        Objects.requireNonNull(authority, "authority");
+        if (state.mode() != AllocatorModeV1.RANGE_LEASED) {
+            throw failure(AllocatorProtocolException.Code.MODE_MISMATCH, "terminal abandonment requires RANGE mode");
+        }
+        requireHeadWithinConsumedSlicePrefix(state, exactHead);
+        if (exactHead.grantId() == 0 || exactHead.nextLedgerId() >= exactHead.rangeEndExclusive()) {
+            throw failure(
+                    AllocatorProtocolException.Code.RANGE_TAIL_NOT_EXHAUSTED,
+                    "terminal abandonment requires one installed unused RANGE tail");
+        }
+        return new TerminalInstalledRangeAbandonmentV1(
+                state.ledgerIdCompatibilityNamespaceId(),
+                state.sliceAssignmentId(),
+                exactHead.managedLedgerIncarnation(),
+                exactHead.grantId(),
+                exactHead.rangeStartInclusive(),
+                exactHead.rangeEndExclusive(),
+                exactHead.nextLedgerId(),
+                exactHead.ownerEpoch(),
+                authority);
+    }
+
+    /** Validates that every Head grant/cursor lies inside the Cell's already-consumed slice prefix. */
+    public static void requireHeadWithinConsumedSlicePrefix(
+            VirtualLedgerCellAllocatorStateV1 state, ManagedLedgerAllocatorHeadV1 head) {
+        Objects.requireNonNull(state, "state");
+        Objects.requireNonNull(head, "head");
+        if (head.nextLedgerId() < state.sliceStartInclusive()
+                || head.nextLedgerId() > state.nextSliceLedgerId()
+                || (head.grantId() != 0
+                        && (head.rangeStartInclusive() < state.sliceStartInclusive()
+                                || head.rangeEndExclusive() > state.nextSliceLedgerId()
+                                || head.nextLedgerId() < head.rangeStartInclusive()
+                                || head.nextLedgerId() > head.rangeEndExclusive()))) {
+            throw failure(
+                    AllocatorProtocolException.Code.HEAD_GEOMETRY,
+                    "allocator Head range/cursor lies outside the Cell consumed slice prefix");
+        }
     }
 
     private static void requireIncarnation(CellAllocatorReservationV1 reservation, ManagedLedgerAllocatorHeadV1 head) {

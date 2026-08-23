@@ -14,6 +14,7 @@
 
 package com.nereusstream.domain.registry.allocator;
 
+import com.nereusstream.domain.registry.VirtualLedgerSliceAssignmentV1;
 import java.util.Objects;
 
 /** Owner-fenced ManagedLedger allocation cursor and explicit Ledger Chain head. */
@@ -37,6 +38,15 @@ public record ManagedLedgerAllocatorHeadV1(
             throw new IllegalArgumentException("head owner/grant/cursor is invalid");
         }
         new AllocatorHeadStateV1(visibleChainHead, grantId, rangeStartInclusive, rangeEndExclusive, nextLedgerId);
+        if (nextLedgerId < VirtualLedgerSliceAssignmentV1.RESERVED_START_INCLUSIVE
+                || nextLedgerId > VirtualLedgerSliceAssignmentV1.RESERVED_END_INCLUSIVE + 1
+                || (grantId != 0
+                        && (rangeStartInclusive < VirtualLedgerSliceAssignmentV1.RESERVED_START_INCLUSIVE
+                                || rangeEndExclusive > VirtualLedgerSliceAssignmentV1.RESERVED_END_INCLUSIVE + 1))) {
+            throw new AllocatorProtocolException(
+                    AllocatorProtocolException.Code.HEAD_GEOMETRY,
+                    "allocator Head lies outside the reserved virtual-ledger interval");
+        }
     }
 
     public static ManagedLedgerAllocatorHeadV1 initial(

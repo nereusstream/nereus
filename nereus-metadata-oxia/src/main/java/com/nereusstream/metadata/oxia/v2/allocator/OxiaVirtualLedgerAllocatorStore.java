@@ -136,6 +136,11 @@ public final class OxiaVirtualLedgerAllocatorStore implements PulsarVirtualLedge
                 throw new IllegalArgumentException("allocator Head predecessor and candidate incarnations differ");
             }
             String key = keys.headKey(namespaceId, sliceAssignmentId, candidate.managedLedgerIncarnation());
+            if (!exactPredecessor.ledgerIdCompatibilityNamespaceId().equals(namespaceId)
+                    || !exactPredecessor.sliceAssignmentId().equals(sliceAssignmentId)
+                    || !exactPredecessor.authorityKey().equals(key)) {
+                throw new IllegalArgumentException("allocator Head predecessor provenance differs from exact key");
+            }
             return mutationEngine.compareAndSet(
                     key,
                     AllocatorWireV1.encodeHead(candidate),
@@ -270,7 +275,8 @@ public final class OxiaVirtualLedgerAllocatorStore implements PulsarVirtualLedge
                 || !key.equals(keys.headKey(namespaceId, sliceAssignmentId, incarnation))) {
             throw new IllegalArgumentException("allocator Head key and value identities differ");
         }
-        return new VersionedManagedLedgerAllocatorHeadV1(decoded, MetadataVersionMapper.fromOxia(record.versionId()));
+        return new VersionedManagedLedgerAllocatorHeadV1(
+                namespaceId, sliceAssignmentId, key, decoded, MetadataVersionMapper.fromOxia(record.versionId()));
     }
 
     private VersionedVirtualLedgerCandidateNodeV1 decodeNode(
@@ -287,7 +293,8 @@ public final class OxiaVirtualLedgerAllocatorStore implements PulsarVirtualLedge
                 || !key.equals(keys.nodeKey(namespaceId, sliceAssignmentId, incarnation, ledgerId))) {
             throw new IllegalArgumentException("allocator node key and value identities differ");
         }
-        return new VersionedVirtualLedgerCandidateNodeV1(decoded, MetadataVersionMapper.fromOxia(record.versionId()));
+        return new VersionedVirtualLedgerCandidateNodeV1(
+                namespaceId, sliceAssignmentId, key, decoded, MetadataVersionMapper.fromOxia(record.versionId()));
     }
 
     private static void requireSameCell(
