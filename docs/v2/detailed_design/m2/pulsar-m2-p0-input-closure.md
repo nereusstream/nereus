@@ -27,9 +27,9 @@ The accepted authority remains ADRs 0017, 0020, 0024, 0029, 0035, 0036, 0044, 00
 - `RETAIN_BK` and `DELETE_AFTER_VERIFIED` are the only retention classes, and the latter uses irreversible
   `NONE -> INTENT -> DONE` delete state.
 
-P0 represents the 4-GiB data Object and 1,024-part values as the evidence candidates named by ADR 0056. The four block
-targets 1/4/8/16 MiB entered P6 as candidates; the source-qualified receipt selected 1/4/8 MiB with 4 MiB as the
-deployment default, and the exact Pulsar adapter consumes that production limits record.
+P0 represents the 4-GiB data Object and 1,024-part values only as the evidence candidate named by ADR 0056. The four
+block targets 1/4/8/16 MiB likewise entered P6 as candidates; the source-qualified receipt has since selected 1/4/8 MiB
+with 4 MiB as the deployment default, and the exact Pulsar adapter consumes that production limits record.
 
 ## Provider admission boundary
 
