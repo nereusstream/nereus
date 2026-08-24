@@ -407,7 +407,8 @@ run_logged pulsar-p6-native env \
     "NEREUS_P6_LOCALSTACKENDPOINT=http://127.0.0.1:$native_port" \
     "NEREUS_P6_NATIVEEVIDENCEOUTPUT=$native" \
     "NEREUS_P6_PULSARSOURCECOMMIT=$pulsar_commit" \
-    "$pulsar_worktree/gradlew" :tiered-storage:jcloud:test --no-daemon --rerun-tasks \
+    "$pulsar_worktree/gradlew" --project-dir "$pulsar_worktree" \
+    :tiered-storage:tiered-storage-jcloud:test --no-daemon --rerun-tasks \
     --tests org.apache.bookkeeper.mledger.offload.jcloud.impl.P6NativeLocalStackEvidenceTest
 "$docker_bin" rm -f "$native_container" >/dev/null
 native_container=""

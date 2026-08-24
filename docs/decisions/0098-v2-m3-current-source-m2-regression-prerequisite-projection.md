@@ -46,6 +46,10 @@ The M3 trusted runner owns an explicit prerequisite projection before it invokes
     only that exact `DOCKER_HOST`, the environment/system-property strategy, and `api.version=1.44`. This avoids
     Testcontainers 1.20.4's API-1.32 fallback against Docker Engine 29 while leaving user-global Testcontainers
     configuration untouched.
+11. The P6 native LocalStack command invokes the Gradle wrapper from the dedicated Pulsar worktree and also passes that
+    same absolute path as `--project-dir`; its exact task path is the locked Pulsar build's
+    `:tiered-storage:tiered-storage-jcloud:test`. The Nereus process working directory and a stale Maven module name are
+    never allowed to select or abbreviate the Gradle project for an exact-source native Pulsar test.
 
 The current-source receipt remains schema `NEREUS_V2_M3_CURRENT_SOURCE_M2_REGRESSION_V1`, non-promotable, and records
 `m2AmendmentLineage: []`. This is an M3 execution-profile correction, not an M2 semantic or correctness amendment.
@@ -68,5 +72,7 @@ runner rejects such a change rather than expanding the current-only allowlist by
   profile proves both remote branch identities at one exact commit.
 - P6 uses the same already-verified Docker daemon as the runner's exact image checks. A different socket, symbolic
   socket, non-Unix context, or server that excludes API 1.44 fails before Testcontainers starts.
+- P6 native LocalStack cannot resolve `:tiered-storage:jcloud` against the Nereus build merely because the trusted
+  runner itself was launched from the Nereus root.
 - Receipt publication still requires all 25 non-empty child gates with zero failure, error, and skip at one exact
   current source commit.

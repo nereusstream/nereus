@@ -111,6 +111,15 @@ the active Docker-context socket and fixed API 1.44; ADR 0098 now makes those va
 diagnosis one command omitted `-PpulsarCheckout`, was interrupted during compilation, and updated only pre-existing
 ignored build state in the shared Pulsar checkout; its Git worktree remained clean, no product source changed, and no
 cleanup was performed.
+A later local documentation-gate invocation also omitted the dedicated Pulsar property and was interrupted while
+configuring Gradle build logic. It likewise left the shared Pulsar Git worktree clean, may have refreshed only ignored
+Gradle build state, and was not cleaned or used as evidence; every replacement invocation names both dedicated
+worktrees explicitly.
+The first complete formal attempt at the fixed Docker profile then passed local M2, exact Kafka/Pulsar native, real
+BookKeeper, Kafka 10k/100k, and both local P6 Testcontainers suites before the native LocalStack command resolved its
+Gradle project against the Nereus working directory. ADR 0098 now pins both the Pulsar wrapper and `--project-dir` to
+the dedicated exact-source Pulsar worktree and uses the exact current Gradle task
+`:tiered-storage:tiered-storage-jcloud:test`; that failed output remains diagnostic and non-promotable.
 
 Serial continuation order is current-source M2 regression, formal exact-source Provider/KMS and allocator evidence,
 and finally final source locks, child receipts, scenario synchronization, and M3 Final.

@@ -239,6 +239,25 @@ class RunnerPreflightTest(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("does not admit the fixed Testcontainers API 1.44", result.stdout)
 
+    def test_native_pulsar_execution_is_rooted_in_dedicated_worktree(self) -> None:
+        runner = RUNNER.read_text()
+        self.assertIn(
+            '"$pulsar_worktree/gradlew" --project-dir "$pulsar_worktree"',
+            runner,
+        )
+        self.assertNotIn(
+            '"$pulsar_worktree/gradlew" :tiered-storage:jcloud:test',
+            runner,
+        )
+        self.assertIn(
+            ':tiered-storage:tiered-storage-jcloud:test',
+            runner,
+        )
+        self.assertNotIn(
+            ':tiered-storage:jcloud:test',
+            runner,
+        )
+
     def test_rejects_unapproved_current_only_source_lock_member(self) -> None:
         lock_path = self.fixture.repo / "docs/v2/source-locks.json"
         locks = json.loads(lock_path.read_text())
