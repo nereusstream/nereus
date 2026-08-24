@@ -154,6 +154,7 @@ localstack_image_id="sha256:ad76d8f93de9cb765653983d32f4b2994ca981b8f6ccfcf7b52b
 minio_tag="quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
 minio_digest="quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"
 minio_image_id="sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253"
+m3_m2_evidence_branch="nereus/v2-m3-m2-regression-evidence"
 
 assert_dedicated_worktree() {
     local label="$1"
@@ -168,10 +169,16 @@ assert_dedicated_worktree() {
         || fail "$label origin differs from the source lock"
     [[ "$(git -C "$checkout" rev-parse HEAD)" = "$commit" ]] \
         || fail "$label HEAD differs from the source lock"
-    [[ "$(git -C "$checkout" branch --show-current)" = "$branch" ]] \
-        || fail "$label worktree branch differs from the source lock"
+    local checkout_branch
+    checkout_branch="$(git -C "$checkout" branch --show-current)"
+    [[ "$checkout_branch" = "$branch" || "$checkout_branch" = "$m3_m2_evidence_branch" ]] \
+        || fail "$label worktree branch is neither the source lock nor the fixed M3 evidence branch"
     [[ "$(git -C "$checkout" rev-parse "refs/remotes/origin/$branch")" = "$commit" ]] \
         || fail "$label remote-tracking branch differs from the source lock"
+    if [[ "$checkout_branch" = "$m3_m2_evidence_branch" ]]; then
+        [[ "$(git -C "$checkout" rev-parse "refs/remotes/origin/$m3_m2_evidence_branch")" = "$commit" ]] \
+            || fail "$label fixed M3 evidence branch is not pushed at the source-locked commit"
+    fi
     git -C "$checkout" merge-base --is-ancestor "$base" "$commit" \
         || fail "$label locked commit does not descend from its implementation base"
     [[ -z "$(git -C "$checkout" status --porcelain=v1 --untracked-files=all)" ]] \

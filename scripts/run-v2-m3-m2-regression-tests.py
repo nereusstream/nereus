@@ -118,6 +118,12 @@ class Fixture:
     def environment(self) -> dict[str, str]:
         return {**os.environ, "NEREUS_M3_DOCKER_BIN": str(self.fake_docker)}
 
+    def use_fixed_evidence_branches(self) -> None:
+        evidence_branch = "nereus/v2-m3-m2-regression-evidence"
+        for worktree in (self.kafka_worktree, self.pulsar_worktree):
+            git(worktree, "checkout", "-b", evidence_branch)
+            git(worktree, "push", "-u", "origin", evidence_branch)
+
 
 class RunnerPreflightTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -134,6 +140,16 @@ class RunnerPreflightTest(unittest.TestCase):
         self.assertEqual(25, len({line.split("|", 1)[0] for line in rows}))
         self.assertIn("formalRuns=0", result.stdout)
         self.assertFalse(self.fixture.output.exists())
+
+    def test_dry_run_accepts_only_pushed_fixed_evidence_branches(self) -> None:
+        self.fixture.use_fixed_evidence_branches()
+        result = run(*self.fixture.command(), env=self.fixture.environment())
+        self.assertEqual(0, result.returncode, result.stdout)
+
+        git(self.fixture.kafka_worktree, "checkout", "-b", "unapproved-evidence")
+        result = run(*self.fixture.command(), env=self.fixture.environment())
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("neither the source lock nor the fixed M3 evidence branch", result.stdout)
 
     def test_rejects_shared_checkout_dirty_source_and_existing_output(self) -> None:
         shared = self.fixture.base / "kafka-seed"
