@@ -58,7 +58,9 @@ dependencies {
     api(project(":nereus-metadata-spi"))
     api(project(":nereus-storage-object"))
     implementation(platform(libs.grpc.bom))
-    implementation(platform(libs.opentelemetry.bom))
+    // Oxia's public client API exposes OpenTelemetry API types. Publish its BOM on the API edge so
+    // an external M3 consumer never resolves the source-locked oxia-client-api with an empty version.
+    api(platform(libs.opentelemetry.bom))
     implementation(platform(libs.opentelemetry.bom.alpha))
     api(libs.oxia.client)
 

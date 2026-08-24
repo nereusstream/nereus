@@ -213,6 +213,20 @@ if not any(
 ):
     raise SystemExit("V2 M3 module/API gate: storage-bookkeeper does not publish BookKeeper types as compile API")
 
+metadata_oxia_pom = repository / "com" / "nereusstream" / "nereus-metadata-oxia" / version / f"nereus-metadata-oxia-{version}.pom"
+metadata_oxia_root = ET.parse(metadata_oxia_pom).getroot()
+if not any(
+    dependency.findtext("m:groupId", namespaces=namespace) == "io.opentelemetry"
+    and dependency.findtext("m:artifactId", namespaces=namespace) == "opentelemetry-bom"
+    and dependency.findtext("m:version", namespaces=namespace) == "1.63.0"
+    and dependency.findtext("m:type", default="jar", namespaces=namespace) == "pom"
+    and dependency.findtext("m:scope", default="compile", namespaces=namespace) == "import"
+    for dependency in metadata_oxia_root.findall(
+        "m:dependencyManagement/m:dependencies/m:dependency", namespace
+    )
+):
+    raise SystemExit("V2 M3 module/API gate: metadata-oxia does not publish the Oxia API OpenTelemetry BOM")
+
 bom = repository / "com" / "nereusstream" / "nereus-bom" / version / f"nereus-bom-{version}.pom"
 bom_root = ET.parse(bom).getroot()
 constraints = {
