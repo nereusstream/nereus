@@ -40,8 +40,13 @@ fork commits are not M3 evidence and do not promote a scenario.
   common-coordinator `ProtocolRecoveryHandler` that stages the three secure lane spools exactly once under the durable
   owner fence. This is local current-tree conformance, not the dedicated-fork/native source receipt.
 - The dedicated Kafka fork branch `nereus/v2-m3-object-wal-evidence` is clean and pushed at
-  `ffee27e5fd19b50802fc9fe0a12f86e09f709b14`. Its three M3 commits guard native owner callbacks and add deterministic
-  rollback/takeover-cut tests, but the branch has not completed a current-Nereus-artifact compile or evidence run.
+  `323e035145d203f7e74e969341cb610f33e71b7d`. Its four M3 commits guard native owner callbacks, add deterministic
+  rollback/takeover-cut tests, and split the legacy F9 product repository from the V2 M3 repository. A dedicated
+  dual-repository run built the F9 product closure from Nereus `884a2cb6521c56885fa42d18138d138bb4fefb35`
+  and the V2 M3 closure from `d3ad9274ce0509af95626ef9cc6f27c7cd835f36`; the five owner-fence tests and one
+  whole-suffix rollback/takeover test pass with zero failure/error/skip, together with core main/test Checkstyle and
+  SpotBugs. The V2 coordinate in this checkpoint remains a temporary exact-worktree `0.2.0-SNAPSHOT`, so this is a
+  non-promotable compile checkpoint rather than the final source-qualified native receipt.
 - The dedicated Pulsar fork branch of the same name is clean and unchanged at
   `a14e0e6f4e49be0677318b4ceefc7b85b445823b`; current Pulsar Object-WAL integration exists only in the uncommitted
   Nereus module tree at this snapshot.
@@ -66,8 +71,8 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | M3-C1 | 50-trace Object-WAL kernel harness | common kernel and manifest implemented; local 7-test gate covers 50 traces/21 outcomes, but backend integration and exact-source receipt remain open |
 | M3-D1 | local capacity conformance and exact Provider C1/C2 evidence | planned; C1 production admission and C2 benefit remain unproved |
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; backend integration, real evidence, and receipt remain open |
-| M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | Kafka source implemented; local 260-test module check covers strict wire/key/caps, OPEN/TERMINAL Head, backend mapping and bounded recovery, but dedicated-fork/native exact-source receipt remains open |
-| M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; current-artifact fork evidence remains open and native broker/controller activation remains M6 |
+| M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | Kafka source implemented; local 260-test module check covers strict wire/key/caps, OPEN/TERMINAL Head, backend mapping and bounded recovery; the dedicated fork now compiles against the split F9/M3 artifact inputs with 6/6 tests, while the final source-qualified native receipt remains open |
+| M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; the dedicated-fork dual-repository compile checkpoint passes 6/6 tests, but a source-qualified receipt remains open and native broker/controller activation remains M6 |
 | M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | implementation in progress; [ADR 0091](../../../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md) fixes production allocator wire/key/transitions and [ADR 0094](../../../decisions/0094-v2-m3-allocator-evidence-workload-and-selection-amendment.md) freezes the formal workload/SLO/selection inputs, but no real/native 10k/100k receipt, RANGE size, mode selection, or scenario PASS exists |
 | M3-FINAL | exact-source aggregate and scenario promotion | planned; requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
 
