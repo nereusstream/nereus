@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -14,6 +15,7 @@ import unittest
 
 RUNNER = Path(__file__).with_name("run-v2-m3-m2-regression.sh")
 CONTRACT = Path(__file__).with_name("check-v2-m3-m2-regression.py")
+PROJECTION = Path(__file__).with_name("check-v2-m3-m2-source-lock-projection.py")
 
 
 def run(*args: str, cwd: Path | None = None, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -39,6 +41,7 @@ class Fixture:
         scripts = self.repo / "scripts"
         scripts.mkdir()
         shutil.copy2(CONTRACT, scripts / CONTRACT.name)
+        shutil.copy2(PROJECTION, scripts / PROJECTION.name)
         self.kafka_repo, self.kafka_worktree, kafka = self.source("kafka", "m2-kafka")
         self.pulsar_repo, self.pulsar_worktree, pulsar = self.source("pulsar", "m2-pulsar")
         locks = {
@@ -57,12 +60,30 @@ class Fixture:
                 "repository": self.pulsar_repo.as_uri(), "branch": "m2-pulsar",
                 "finalForkCommit": pulsar, "implementationBaseCommit": pulsar,
             },
+            "historicalUnrelated": {"fixture": "immutable"},
         }
         lock_path = self.repo / "docs/v2/source-locks.json"
         lock_path.parent.mkdir(parents=True)
         lock_path.write_text(json.dumps(locks) + "\n")
         git(self.repo, "add", ".")
-        git(self.repo, "commit", "-m", "fixture source")
+        git(self.repo, "commit", "-m", "historical M2 source locks")
+        historical = git(self.repo, "rev-parse", "HEAD")
+        historical_sha = hashlib.sha256(lock_path.read_bytes()).hexdigest()
+        receipt_path = self.repo / "docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json"
+        receipt_path.parent.mkdir(parents=True)
+        receipt_path.write_text(json.dumps({
+            "promotionEligible": False,
+            "result": "PASS_KAFKA_M2_INPUTS_ONLY",
+            "schema": "NEREUS_V2_M2_KAFKA_INPUTS_RECEIPT_V1",
+            "sourceTuple": {
+                "nereusCommit": historical,
+                "sourceLocksSha256": historical_sha,
+            },
+        }) + "\n")
+        locks["m3AllocatorEvidenceBinding"] = {"fixture": "current-only"}
+        lock_path.write_text(json.dumps(locks) + "\n")
+        git(self.repo, "add", ".")
+        git(self.repo, "commit", "-m", "fixture current M3 source")
         self.tested = git(self.repo, "rev-parse", "HEAD")
         self.output = self.base / "external-output"
         self.fake_docker = self.base / "docker"
@@ -189,6 +210,30 @@ class RunnerPreflightTest(unittest.TestCase):
         result = run(*self.fixture.command(), env=environment)
         self.assertNotEqual(0, result.returncode)
         self.assertIn("Docker image ID differs", result.stdout)
+
+    def test_rejects_unapproved_current_only_source_lock_member(self) -> None:
+        lock_path = self.fixture.repo / "docs/v2/source-locks.json"
+        locks = json.loads(lock_path.read_text())
+        locks["unapprovedM3Binding"] = {"fixture": "drift"}
+        lock_path.write_text(json.dumps(locks) + "\n")
+        git(self.fixture.repo, "add", str(lock_path))
+        git(self.fixture.repo, "commit", "-m", "add unapproved source lock")
+        self.fixture.tested = git(self.fixture.repo, "rev-parse", "HEAD")
+        result = run(*self.fixture.command(), env=self.fixture.environment())
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("exact M3-only allowlist", result.stdout)
+
+    def test_rejects_historical_source_lock_member_drift(self) -> None:
+        lock_path = self.fixture.repo / "docs/v2/source-locks.json"
+        locks = json.loads(lock_path.read_text())
+        locks["historicalUnrelated"]["fixture"] = "changed"
+        lock_path.write_text(json.dumps(locks) + "\n")
+        git(self.fixture.repo, "add", str(lock_path))
+        git(self.fixture.repo, "commit", "-m", "change historical source lock")
+        self.fixture.tested = git(self.fixture.repo, "rev-parse", "HEAD")
+        result = run(*self.fixture.command(), env=self.fixture.environment())
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("exact M3-only allowlist", result.stdout)
 
 
 if __name__ == "__main__":

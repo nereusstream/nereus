@@ -30,12 +30,16 @@ python3 - <<'PY'
 from pathlib import Path
 import hashlib
 import json
+import os
 import subprocess
 import xml.etree.ElementTree as ET
 
 root = Path.cwd()
 receipt = json.loads((root / "docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json").read_bytes())
-source_locks_sha = hashlib.sha256((root / "docs/v2/source-locks.json").read_bytes()).hexdigest()
+source_locks_path = Path(os.environ.get(
+    "NEREUS_V2_M2_PREREQUISITE_SOURCE_LOCKS", root / "docs/v2/source-locks.json"
+))
+source_locks_sha = hashlib.sha256(source_locks_path.read_bytes()).hexdigest()
 if receipt.get("result") != "PASS_KAFKA_M2_INPUTS_ONLY" or receipt.get("promotionEligible") is not False:
     raise SystemExit("V2 M2 Kafka K6 gate: K0 prerequisite is not the input-only PASS")
 if receipt.get("sourceTuple", {}).get("sourceLocksSha256") != source_locks_sha:

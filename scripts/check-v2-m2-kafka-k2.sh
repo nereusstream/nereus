@@ -25,6 +25,7 @@ fi
 python3 - "$repo_root" <<'PY'
 import hashlib
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -34,7 +35,10 @@ root = pathlib.Path(sys.argv[1])
 receipt = json.loads((root / "docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json").read_bytes())
 if receipt.get("result") != "PASS_KAFKA_M2_INPUTS_ONLY" or receipt.get("promotionEligible") is not False:
     raise SystemExit("V2 M2 Kafka K2 gate: K0 prerequisite receipt is not the closed input-only PASS")
-source_locks_sha = hashlib.sha256((root / "docs/v2/source-locks.json").read_bytes()).hexdigest()
+source_locks_path = pathlib.Path(os.environ.get(
+    "NEREUS_V2_M2_PREREQUISITE_SOURCE_LOCKS", root / "docs/v2/source-locks.json"
+))
+source_locks_sha = hashlib.sha256(source_locks_path.read_bytes()).hexdigest()
 source = receipt.get("sourceTuple", {})
 if source.get("sourceLocksSha256") != source_locks_sha:
     raise SystemExit("V2 M2 Kafka K2 gate: K0 source-lock input changed after its receipt")

@@ -351,6 +351,13 @@ Accepted decisions:
 - [ADR 0089: M3 NWG1 v1 Header layout amendment](../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md)
 - [ADR 0090: M3 NWG1 mutation external-call profiles](../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md)
 - [ADR 0091: M3 Pulsar virtual-ledger allocator wire and selection](../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md)
+- [ADR 0092: M3 Object-WAL protocol checkpoint and data path](../decisions/0092-v2-m3-object-wal-protocol-checkpoint-and-data-path.md)
+- [ADR 0093: M3 WalRun control wire and lifecycle](../decisions/0093-v2-m3-walrun-control-wire-and-lifecycle.md)
+- [ADR 0094: M3 allocator evidence workload and selection amendment](../decisions/0094-v2-m3-allocator-evidence-workload-and-selection-amendment.md)
+- [ADR 0095: M3 recovery envelope and C1 lifecycle amendment](../decisions/0095-v2-m3-recovery-envelope-and-c1-lifecycle-amendment.md)
+- [ADR 0096: M3 owner-open conservative rollover amendment](../decisions/0096-v2-m3-owner-open-conservative-rollover-amendment.md)
+- [ADR 0097: M3 reproducible allocator Oxia image amendment](../decisions/0097-v2-m3-reproducible-allocator-oxia-image-amendment.md)
+- [ADR 0098: M3 current-source M2 regression prerequisite projection](../decisions/0098-v2-m3-current-source-m2-regression-prerequisite-projection.md)
 
 ## Open design gates
 

@@ -78,8 +78,11 @@ output_dir="$output_parent/$(basename "$output_dir")"
     || fail "Nereus worktree must be clean before preflight"
 
 contract="$repo_root/scripts/check-v2-m3-m2-regression.py"
+projection_check="$repo_root/scripts/check-v2-m3-m2-source-lock-projection.py"
 locks="$repo_root/docs/v2/source-locks.json"
 [[ -f "$contract" && ! -L "$contract" ]] || fail "M2 regression contract is absent or symbolic"
+[[ -f "$projection_check" && ! -L "$projection_check" ]] \
+    || fail "M2 prerequisite projection checker is absent or symbolic"
 [[ -f "$locks" && ! -L "$locks" ]] || fail "source locks are absent or symbolic"
 
 source_values=()
@@ -216,6 +219,9 @@ assert_image "$bookkeeper_image" "$bookkeeper_image_id" "$bookkeeper_image"
 assert_image "$localstack_tag" "$localstack_image_id" "$localstack_digest"
 assert_image "$minio_tag" "$minio_image_id" "$minio_digest"
 
+PYTHONDONTWRITEBYTECODE=1 python3 "$projection_check" \
+    --repo-root "$repo_root" --tested-commit "$tested_commit"
+
 plan_rows=(
     "KAFKA_K0|local|fresh JUnit|v2M2KafkaK0Module/Provider/Wire/Numeric/Evidence source gates"
     "KAFKA_K1|local|fresh JUnit|scripts/check-v2-m2-kafka-k1.sh"
@@ -252,6 +258,12 @@ fi
 
 mkdir -m 700 "$output_dir"
 mkdir -m 700 "$output_dir/logs" "$output_dir/raw" "$output_dir/children"
+
+m2_prerequisite_source_locks="$output_dir/raw/historical-m2-prerequisite-source-locks.json"
+export NEREUS_V2_M2_PREREQUISITE_SOURCE_LOCKS="$m2_prerequisite_source_locks"
+PYTHONDONTWRITEBYTECODE=1 python3 "$projection_check" \
+    --repo-root "$repo_root" --tested-commit "$tested_commit" \
+    --output "$m2_prerequisite_source_locks"
 
 bk_project="nereus-v2-m3-m2-regression-real"
 native_container=""

@@ -94,6 +94,12 @@ tests, and external fork commits are not M3 evidence and do not promote a scenar
 - Exact M3 source locks, fresh child receipts, aggregate Final, and Markdown/JSON scenario promotions do not exist.
   `implementationStatus: InProgress` and `evidenceStatus: NotRun` therefore remain authoritative.
 
+The first full M2 regression diagnostic at exact source `eb2db10d2d5d41834d67d2c03f4a427f4432ec69` correctly
+stopped at K1 because the historical gate hashed the whole source-lock document after the disjoint M3 allocator member
+was added. [ADR 0098](../../../decisions/0098-v2-m3-current-source-m2-regression-prerequisite-projection.md) now
+requires an exact historical-member/current-only-member projection while leaving the default M2 gates and historical
+receipts unchanged; the failed external directory is diagnostic and non-promotable.
+
 Serial continuation order is current-source M2 regression, formal exact-source Provider/KMS and allocator evidence,
 and finally final source locks, child receipts, scenario synchronization, and M3 Final.
 Each stable boundary must be committed and pushed before the next evidence-bearing boundary is evaluated.
@@ -103,7 +109,7 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | Slice | Design or output | Status at this documentation cut |
 | --- | --- | --- |
 | M3-I0 | [NWG1 implementation-input closure](m3-i0-nwg1-implementation-input-closure.md), [ADR 0089 Header amendment](../../../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and [ADR 0090 mutation-call profiles](../../../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md) | accepted documentation-only input with exact Header offsets and explicit X0/XU call caps; no codec, runner, trace harness, Provider evidence, receipt, or scenario PASS |
-| M3-W1 | current-source M2 regression plus M3 module/API input gate | M3 inputs and the eleven-module source-qualified API closure pass at clean source `98a6384a9a0cf0a4579212f2df9b9a760a3b1f59`; historical M2 Final remains immutable, while the complete current-source M2 regression receipt at the eventual M3 tested source remains open |
+| M3-W1 | current-source M2 regression plus M3 module/API input gate | M3 inputs and the eleven-module source-qualified API closure pass at clean source `98a6384a9a0cf0a4579212f2df9b9a760a3b1f59`; historical M2 Final remains immutable; ADR 0098 closes the M3-only source-lock prerequisite projection after the first diagnostic stopped at K1, while a successful complete current-source receipt at the eventual M3 tested source remains open |
 | M3-W2 | NWG1 production encoder/decoder, projection, six-vector A corpus, and exact wire gate | common source implemented; local 17-test/114-row wire-source gate passes, but no exact-source child receipt exists |
 | M3-W3 | 84-record/240-path B mutation manifest and runner | common source implemented; local 3-test gate covers exactly 84 records/240 paths with no generated inventory, but no exact-source child receipt exists |
 | M3-C1 | 50-trace Object-WAL kernel harness | common kernel and manifest implemented; local 7-test gate covers 50 traces/21 outcomes, but backend integration and exact-source receipt remain open |
