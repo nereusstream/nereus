@@ -173,7 +173,11 @@ one failure, zero errors, and zero skips; external checksum-manifest SHA-256 is
 mode. The harness now separates the concurrent Head-takeover phase from the following fresh-owner rollover phase, so
 all Head takeovers prove the unchanged exact Cell before any rollover mutates it, and each concurrent Cell proof read
 has a request-local telemetry binding. The fresh nine-test allocator contract and two-test native-path gates pass
-with zero failure/error/skip; a fresh real-Oxia diagnostic remains required before the full matrix.
+with zero failure/error/skip. The replacement exact-source diagnostic at
+`6335ed1d62e04509972de66d79509f5ec40715cc` then passed the full STRICT 10k nine-cut batch as one test with zero
+failure/error/skip in 86.270 seconds; its external checksum-manifest SHA-256 is
+`e9e9a4dc5805daa71683658441540c256dfaa4b3876ed6df7b96a7804be3cb27`. It emits no receipt, covers neither RANGE
+nor 100k/throughput rows, selects no mode, and promotes no scenario. The complete raw matrix remains required.
 
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
