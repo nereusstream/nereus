@@ -486,7 +486,7 @@ public final class WalRunObjectSession implements AutoCloseable {
     }
 
     /** Two-stage C1 prefix + exact selected append-unit frame ranges; no full GET and no recovery-budget charge. */
-    public synchronized Nwg1ObjectReaderV1.VerifiedAppendUnit readRoutineNwg1AppendUnit(
+    public synchronized VerifiedRoutineNwg1AppendUnit readRoutineNwg1AppendUnit(
             ObjectIdentity identity,
             Nwg1VerificationContextV1 verificationContext,
             long selectedFrameOrdinal,
@@ -501,7 +501,7 @@ public final class WalRunObjectSession implements AutoCloseable {
                 kms.readAuthenticatedPrefix(prefixBytes.toByteArray(), identity.bodyLength(), verificationContext);
         requirePrefixIdentity(prefix, leaf);
         requirePrefixWithinRootCaps(prefix);
-        return kms.readSelectedAppendUnitStreaming(
+        Nwg1ObjectReaderV1.VerifiedAppendUnit appendUnit = kms.readSelectedAppendUnitStreaming(
                 prefix,
                 (range, ignored) -> provider.readExactRange(
                                 identity, range.inclusiveStart(), range.exclusiveEnd(), Optional.empty())
@@ -509,6 +509,7 @@ public final class WalRunObjectSession implements AutoCloseable {
                 selectedFrameOrdinal,
                 verificationContext,
                 Objects.requireNonNull(consumer, "consumer"));
+        return new VerifiedRoutineNwg1AppendUnit(prefix, appendUnit);
     }
 
     /** One cumulative range-GET authenticates the complete Directory needed to rebuild exact recovery locators. */
@@ -555,6 +556,16 @@ public final class WalRunObjectSession implements AutoCloseable {
     public synchronized ProviderObjectResult reconcileUnknownExtent(ObjectIdentity identity) throws IOException {
         requireUsable();
         return recovery.reconcileUnknownExtent(identity);
+    }
+
+    /** Authenticated routine prefix plus the compact selected-unit fold; it never retains decoded frame bytes. */
+    public record VerifiedRoutineNwg1AppendUnit(
+            Nwg1ObjectReaderV1.AuthenticatedPrefix authenticatedPrefix,
+            Nwg1ObjectReaderV1.VerifiedAppendUnit appendUnit) {
+        public VerifiedRoutineNwg1AppendUnit {
+            Objects.requireNonNull(authenticatedPrefix, "authenticatedPrefix");
+            Objects.requireNonNull(appendUnit, "appendUnit");
+        }
     }
 
     /** Complete streaming lane discovery is available only to a lineage-restored current-Root owner. */

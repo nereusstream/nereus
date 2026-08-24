@@ -214,7 +214,8 @@ class P6MinioProviderEvidenceTest {
                         + "  \"multipartCleanupAndRelist\": true,\n"
                         + "  \"canonicalNpd1Npo1RoundTrip\": true,\n"
                         + "  \"result\": \"PASS_MINIO_PROVIDER_ONLY\",\n"
-                        + "  \"claimBoundary\": \"Admits this MinIO release only; no Amazon S3 endorsement or performance claim\"\n"
+                        + "  \"claimBoundary\": \"Admits this MinIO release only; "
+                        + "no Amazon S3 endorsement or performance claim\"\n"
                         + "}\n",
                 Instant.now(),
                 sourceCommit,

@@ -372,8 +372,8 @@ class PulsarP6CandidateEvidenceTest {
                 .append("  \"selection\": {\"classes\": [\"latency-1mib\", \"balanced-4mib\", ")
                 .append("\"scan-8mib\"], \"deploymentDefault\": \"balanced-4mib\", ")
                 .append("\"excludedCandidateBytes\": 16777216},\n")
-                .append(
-                        "  \"claimBoundary\": \"LocalStack proves S3-compatible adapter behavior; it is not Amazon S3 performance or service endorsement\"\n")
+                .append("  \"claimBoundary\": \"LocalStack proves S3-compatible adapter behavior; ")
+                .append("it is not Amazon S3 performance or service endorsement\"\n")
                 .append("}\n");
         return output.toString();
     }

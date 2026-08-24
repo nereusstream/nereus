@@ -13,10 +13,12 @@
  */
 
 dependencies {
+    api(project(":nereus-storage-object"))
+    api(project(":nereus-metadata-spi"))
     implementation(libs.zstd.jni)
-    implementation(platform(libs.aws.sdk.v2.bom))
-    implementation(libs.aws.sdk.v2.s3)
-    compileOnly(libs.pulsar.managed.ledger)
+    api(platform(libs.aws.sdk.v2.bom))
+    api(libs.aws.sdk.v2.s3)
+    compileOnlyApi(libs.pulsar.managed.ledger)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
@@ -109,6 +111,69 @@ tasks.register<Test>("p6RealProviderTest") {
 
 tasks.named<Test>("test") {
     maxHeapSize = "1024m"
+}
+
+val v2M3PulsarNativeReceiptOutput = providers.gradleProperty("v2M3PulsarNativeReceiptOutput")
+val v2M3PulsarTestedSourceCommit = providers.gradleProperty("v2M3PulsarTestedSourceCommit")
+val v2M3PulsarSourceRepository = providers.gradleProperty("v2M3PulsarSourceRepository")
+val v2M3PulsarSourceCommit = providers.gradleProperty("v2M3PulsarSourceCommit")
+val v2M3PulsarTestStartedAtUtc = providers.gradleProperty("v2M3PulsarTestStartedAtUtc")
+val v2M3PulsarTestFinishedAtUtc = providers.gradleProperty("v2M3PulsarTestFinishedAtUtc")
+
+tasks.register<JavaExec>("v2M3PulsarNativeReceiptEmit") {
+    group = "verification"
+    description = "Emit the source/JUnit-bound M3 Pulsar Object-WAL raw native receipt to an explicit untracked path."
+    dependsOn(tasks.named("test"), tasks.named("classes"))
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalNativeResultV1")
+    outputs.upToDateWhen { false }
+    doFirst {
+        val output = v2M3PulsarNativeReceiptOutput.orNull
+            ?: throw GradleException("-Pv2M3PulsarNativeReceiptOutput is required")
+        val outputPath = file(output).toPath().toAbsolutePath().normalize()
+        val repositoryPath = rootProject.projectDir.toPath().toAbsolutePath().normalize()
+        val buildPath = rootProject.layout.buildDirectory.get().asFile.toPath().toAbsolutePath().normalize()
+        val moduleBuildPath = layout.buildDirectory.get().asFile.toPath().toAbsolutePath().normalize()
+        if (outputPath.startsWith(repositoryPath)
+            && !outputPath.startsWith(buildPath)
+            && !outputPath.startsWith(moduleBuildPath)
+        ) {
+            throw GradleException("M3 raw receipt output must remain outside tracked repository paths")
+        }
+        args(
+            "generate",
+            rootProject.projectDir.absolutePath,
+            v2M3PulsarTestedSourceCommit.orNull
+                ?: throw GradleException("-Pv2M3PulsarTestedSourceCommit is required"),
+            v2M3PulsarSourceRepository.orNull
+                ?: throw GradleException("-Pv2M3PulsarSourceRepository is required"),
+            v2M3PulsarSourceCommit.orNull
+                ?: throw GradleException("-Pv2M3PulsarSourceCommit is required"),
+            v2M3PulsarTestStartedAtUtc.orNull
+                ?: throw GradleException("-Pv2M3PulsarTestStartedAtUtc is required"),
+            v2M3PulsarTestFinishedAtUtc.orNull
+                ?: throw GradleException("-Pv2M3PulsarTestFinishedAtUtc is required"),
+            outputPath.toString(),
+        )
+    }
+}
+
+val v2M3PulsarNativeReceiptInput = providers.gradleProperty("v2M3PulsarNativeReceiptInput")
+
+tasks.register<JavaExec>("v2M3PulsarNativeReceiptCheck") {
+    group = "verification"
+    description = "Strictly parse and self-hash-check one explicit M3 Pulsar Object-WAL raw native receipt."
+    dependsOn(tasks.named("classes"))
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalNativeResultV1")
+    outputs.upToDateWhen { false }
+    doFirst {
+        args(
+            "parse",
+            v2M3PulsarNativeReceiptInput.orNull
+                ?: throw GradleException("-Pv2M3PulsarNativeReceiptInput is required"),
+        )
+    }
 }
 
 tasks.withType<Jar>().configureEach {
