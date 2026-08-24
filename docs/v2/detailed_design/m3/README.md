@@ -91,8 +91,9 @@ tests, and external fork commits are not M3 evidence and do not promote a scenar
   modules at the source-qualified coordinate, verifies their POM/Gradle metadata/BOM closure, and compiles an
   independent consumer. This is ordinary current-source implementation evidence, not a child receipt or scenario
   promotion.
-- Exact M3 source locks, fresh child receipts, aggregate Final, and Markdown/JSON scenario promotions do not exist.
-  `implementationStatus: InProgress` and `evidenceStatus: NotRun` therefore remain authoritative.
+- W1 now has a complete non-promotable current-source M2 regression receipt. Fresh Provider/KMS/allocator and the
+  remaining M3 child receipts, aggregate Final, and Markdown/JSON scenario promotions do not yet exist.
+  `implementationStatus: InProgress` therefore remains authoritative.
 
 The first full M2 regression diagnostic at exact source `eb2db10d2d5d41834d67d2c03f4a427f4432ec69` correctly
 stopped at K1 because the historical gate hashed the whole source-lock document after the disjoint M3 allocator member
@@ -120,9 +121,16 @@ BookKeeper, Kafka 10k/100k, and both local P6 Testcontainers suites before the n
 Gradle project against the Nereus working directory. ADR 0098 now pins both the Pulsar wrapper and `--project-dir` to
 the dedicated exact-source Pulsar worktree and uses the exact current Gradle task
 `:tiered-storage:tiered-storage-jcloud:test`; that failed output remains diagnostic and non-promotable.
+The replacement formal profile completed all 25 trusted children at exact source
+`89a766124c9ecd1ae407eb76024acddffbe19f69`: 687 tests, zero failure/error/skip, exact Kafka and Pulsar native
+sources, real BookKeeper, Kafka 10k/100k, P6 candidate/native/MinIO, and the immutable historical M2 prerequisite.
+The [published W1 receipt](../../evidence/v2-m3/w1/m2-regression/receipt.json) is non-promotable, has SHA-256
+`4a7e25060ff2e2700f1d4373b5ecb8123b5a51f587f0f80b0209ce4810dfd7bd`, leaves `m2AmendmentLineage` empty, and
+promotes no scenario. It remains an intermediate checkpoint: any subsequent non-evidence source change requires a
+fresh complete profile before M3 Final can bind it.
 
-Serial continuation order is current-source M2 regression, formal exact-source Provider/KMS and allocator evidence,
-and finally final source locks, child receipts, scenario synchronization, and M3 Final.
+Serial continuation order is formal exact-source Provider/KMS and allocator evidence, the remaining child receipts,
+then final-source M2 regression freshness, source locks, scenario synchronization, and M3 Final.
 Each stable boundary must be committed and pushed before the next evidence-bearing boundary is evaluated.
 
 ## Current boundary
@@ -130,7 +138,7 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | Slice | Design or output | Status at this documentation cut |
 | --- | --- | --- |
 | M3-I0 | [NWG1 implementation-input closure](m3-i0-nwg1-implementation-input-closure.md), [ADR 0089 Header amendment](../../../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and [ADR 0090 mutation-call profiles](../../../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md) | accepted documentation-only input with exact Header offsets and explicit X0/XU call caps; no codec, runner, trace harness, Provider evidence, receipt, or scenario PASS |
-| M3-W1 | current-source M2 regression plus M3 module/API input gate | M3 inputs and the eleven-module source-qualified API closure pass at clean source `98a6384a9a0cf0a4579212f2df9b9a760a3b1f59`; historical M2 Final remains immutable; ADR 0098 closes the M3-only source-lock prerequisite projection after the first diagnostic stopped at K1, while a successful complete current-source receipt at the eventual M3 tested source remains open |
+| M3-W1 | current-source M2 regression plus M3 module/API input gate | M3 inputs and the eleven-module source-qualified API closure pass; historical M2 Final remains immutable; ADR 0098 closes the M3-only prerequisite projection; the exact-source `89a76612…` formal profile publishes 25/25 children and 687 zero-failure/error/skip tests as a non-promotable W1 checkpoint, while Final still requires a freshness rerun at its eventual exact tested source |
 | M3-W2 | NWG1 production encoder/decoder, projection, six-vector A corpus, and exact wire gate | common source implemented; local 17-test/114-row wire-source gate passes, but no exact-source child receipt exists |
 | M3-W3 | 84-record/240-path B mutation manifest and runner | common source implemented; local 3-test gate covers exactly 84 records/240 paths with no generated inventory, but no exact-source child receipt exists |
 | M3-C1 | 50-trace Object-WAL kernel harness | common kernel and manifest implemented; local 7-test gate covers 50 traces/21 outcomes, but backend integration and exact-source receipt remain open |
