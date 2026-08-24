@@ -134,6 +134,22 @@ configuration-cache serialization of the live Git/exclusive-output task closures
 diagnostic and non-promotable. The formal tasks now declare this intentional incompatibility so the repository's
 default configuration-cache setting cannot turn successful execution into a failed aggregate after publication.
 
+The integration owner switched the remaining work to a single-agent serial continuation before the allocator
+selection run. No parallel worker may edit, build, publish, or promote M3 state; the one owner audits and integrates
+each boundary in order. The exact-source Provider/KMS rerun at `99ab89d5dcea04c93369a9dbd66b9f75d632e2f8`
+executed one Provider and one KMS test with zero failure/error/skip, but it is an intermediate result that must be
+rerun after the final source is frozen. It proves no production KMS deployment and does not promote C2.
+
+The first complete allocator raw-matrix attempt at the same source is retained only as diagnostic evidence. It
+completed the native workload before the first fault transition exposed a production instrumentation defect:
+concurrent reservations for one exact Oxia authority key were rejected as an overlapping binding. Its JUnit result is
+exactly one test, one failure, zero errors, and zero skips; no allocator mode or RANGE size was selected. The preserved
+external diagnostic directory is
+`/Users/liusinan/Documents/Codex/2026-08-24/nereus-v2-m3-allocator/diagnostic-overlap-99ab89d5`.
+The failure must be fixed with deterministic same-key concurrency coverage, then a new raw matrix must select at most
+one qualified mode before source locks and the formal allocator receipt can be frozen. The M2 regression and
+Provider/KMS results must subsequently be rerun for freshness at the eventual exact Final source.
+
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
 `NEREUS_V2_M3_D1_LOCAL_CAP_RESULT_V1` payload with CREATE_NEW after the runner hashes the harness, its test, and all
@@ -142,8 +158,9 @@ generic child publisher and reparses the local result through the governed valid
 allocation-free analytical format-cap conformance, claims no Provider transfer, and cannot substitute for the
 separate fixed-digest C1 Provider/KMS evidence.
 
-Serial continuation order is formal exact-source Provider/KMS and allocator evidence, the remaining child receipts,
-then final-source M2 regression freshness, source locks, scenario synchronization, and M3 Final.
+Serial continuation order is allocator concurrency repair and raw mode selection, source-lock closure and formal
+allocator evidence, the remaining child receipts, then final-source Provider/KMS and M2 regression freshness,
+scenario synchronization, and M3 Final.
 Each stable boundary must be committed and pushed before the next evidence-bearing boundary is evaluated.
 
 ## Current boundary
