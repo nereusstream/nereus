@@ -13,9 +13,17 @@
  */
 
 val n1Version = "0.2.0-n1.330aaec349c51fb2ace52b1085e8a9e5a60b5e3e"
+val sourceQualifiedM3 = rootProject.version.toString().contains("-m3.")
 
 dependencies {
-    api("com.nereusstream:nereus-domain:$n1Version")
+    // M2 continues to consume the immutable N1 domain artifact. The complete M3 source-qualified
+    // publication is deliberately different: its public Storage API must expose the current domain
+    // contract, otherwise an external M3 consumer resolves an old domain through this API edge.
+    if (sourceQualifiedM3) {
+        api(project(":nereus-domain"))
+    } else {
+        api("com.nereusstream:nereus-domain:$n1Version")
+    }
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)

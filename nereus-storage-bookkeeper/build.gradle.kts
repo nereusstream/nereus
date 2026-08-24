@@ -12,9 +12,17 @@
  * limitations under the License.
  */
 
+val sourceQualifiedM3 = rootProject.version.toString().contains("-m3.")
+
 dependencies {
     api(project(":nereus-storage-api"))
-    implementation(libs.bookkeeper.server)
+    // The public Cell-session implementation exposes BookKeeper client API types. Keep the historical
+    // M2 runtime-only edge unchanged, but publish it as API for the M3 external-consumer closure.
+    if (sourceQualifiedM3) {
+        api(libs.bookkeeper.server)
+    } else {
+        implementation(libs.bookkeeper.server)
+    }
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)

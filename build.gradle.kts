@@ -31,6 +31,8 @@ abstract class PulsarCheckoutGateService : BuildService<BuildServiceParameters.N
 
 abstract class KafkaCheckoutGateService : BuildService<BuildServiceParameters.None>
 
+abstract class M3NestedGradleGateService : BuildService<BuildServiceParameters.None>
+
 abstract class V2ProjectClasspathVerificationTask : DefaultTask() {
     @get:org.gradle.api.tasks.Classpath
     abstract val compileClasspath: org.gradle.api.file.ConfigurableFileCollection
@@ -163,10 +165,10 @@ val configuredNereusVersion = providers.gradleProperty("nereusVersion").get()
 require(
     Regex(
         "[0-9]+\\.[0-9]+\\.[0-9]+" +
-            "(?:-SNAPSHOT|-n1\\.[0-9a-f]{40}|-p1\\.[0-9a-f]{40}|-m2\\.[0-9a-f]{40})?",
+            "(?:-SNAPSHOT|-n1\\.[0-9a-f]{40}|-p1\\.[0-9a-f]{40}|-m2\\.[0-9a-f]{40}|-m3\\.[0-9a-f]{40})?",
     ).matches(configuredNereusVersion),
 ) {
-    "nereusVersion must be X.Y.Z, X.Y.Z-SNAPSHOT, or source-qualified X.Y.Z-n1/p1/m2.<40-lowercase-hex>"
+    "nereusVersion must be X.Y.Z, X.Y.Z-SNAPSHOT, or source-qualified X.Y.Z-n1/p1/m2/m3.<40-lowercase-hex>"
 }
 if ("-p1." in configuredNereusVersion) {
     val allowedP1ArtifactTasks = setOf("clean", "p1ArtifactJar", "p1ArtifactSourcesJar")
@@ -199,6 +201,37 @@ if ("-m2." in configuredNereusVersion) {
         "The source-qualified M2 coordinate is restricted to the three Kafka K0 production artifacts"
     }
 }
+if ("-m3." in configuredNereusVersion) {
+    val allowedM3Modules = setOf(
+        "nereus-bom",
+        "nereus-domain",
+        "nereus-metadata-spi",
+        "nereus-metadata-oxia",
+        "nereus-storage-api",
+        "nereus-storage-bookkeeper",
+        "nereus-storage-object",
+        "nereus-storage-object-s3",
+        "nereus-storage-object-vault",
+        "nereus-kafka-bookkeeper",
+        "nereus-pulsar-offload",
+    )
+    val allowedM3ArtifactTasks = setOf(
+        "clean",
+        "jar",
+        "sourcesJar",
+        "generatePomFileForMavenJavaPublication",
+        "generateMetadataFileForMavenJavaPublication",
+        "publishMavenJavaPublicationToDevelopmentRepository",
+    )
+    check(
+        gradle.startParameter.taskNames.isNotEmpty() && gradle.startParameter.taskNames.all { requested ->
+            val components = requested.split(':').filter(String::isNotEmpty)
+            components.size == 2 && components[0] in allowedM3Modules && components[1] in allowedM3ArtifactTasks
+        },
+    ) {
+        "The source-qualified M3 coordinate is restricted to the complete M3 production artifact closure"
+    }
+}
 version = configuredNereusVersion
 
 val javaLanguageVersion = providers.gradleProperty("javaVersion").map(String::toInt).getOrElse(21)
@@ -224,6 +257,12 @@ val pulsarCheckoutGate = gradle.sharedServices.registerIfAbsent(
 val kafkaCheckoutGate = gradle.sharedServices.registerIfAbsent(
     "nereusKafkaCheckoutGate",
     KafkaCheckoutGateService::class,
+) {
+    maxParallelUsages.set(1)
+}
+val m3NestedGradleGate = gradle.sharedServices.registerIfAbsent(
+    "nereusM3NestedGradleGate",
+    M3NestedGradleGateService::class,
 ) {
     maxParallelUsages.set(1)
 }
@@ -291,7 +330,9 @@ configure(subprojects.filter { it.name != "nereus-bom" }) {
         repositories {
             maven {
                 name = "development"
-                url = rootProject.layout.buildDirectory.dir("development-repository").get().asFile.toURI()
+                url = rootProject.providers.gradleProperty("developmentRepository")
+                    .map { rootProject.file(it).toURI() }
+                    .getOrElse(rootProject.layout.buildDirectory.dir("development-repository").get().asFile.toURI())
             }
         }
         publications {
@@ -1225,12 +1266,378 @@ tasks.register("v2M2Check") {
     dependsOn("v2M2FinalSourceCheck", "v2DocumentationCheck")
 }
 
+tasks.register<Exec>("v2M3HistoricalM2FinalSourceCheck") {
+    group = "verification"
+    description = "Verify the immutable historical M2 Final input without relabelling it as current-source evidence."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m3-inputs.py")
+}
+
+tasks.register("v2M3InputsCheck") {
+    group = "verification"
+    description = "Verify immutable M2 history and the accepted M3 implementation inputs before any M3 evidence run."
+    dependsOn("v2M3HistoricalM2FinalSourceCheck", "v2DocumentationCheck")
+}
+
+tasks.register<Exec>("v2M3Nwg1WireSourceCheck") {
+    group = "verification"
+    description = "Verify the production NWG1 projection, sealed six-vector corpus, 114-row TSV, and exact bytes."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m3-nwg1-wire-source.sh")
+    usesService(m3NestedGradleGate)
+}
+
+tasks.register<Exec>("v2M3Nwg1MutationCheck") {
+    group = "verification"
+    description = "Execute all 84 authored NWG1 mutations and 240 production verification paths."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m3-nwg1-mutation.sh")
+    usesService(m3NestedGradleGate)
+}
+
+tasks.register<Exec>("v2M3ObjectWalStateTraceCheck") {
+    group = "verification"
+    description = "Execute and verify the closed 50-trace, 21-outcome Object-WAL state kernel."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m3-object-wal-state-trace.sh")
+    usesService(m3NestedGradleGate)
+}
+
+tasks.register("v2M3Nwg1WireCheck") {
+    group = "verification"
+    description = "Run the non-promotable exact NWG1 A/B wire aggregate."
+    dependsOn("v2M3Nwg1WireSourceCheck", "v2M3Nwg1MutationCheck", "v2DocumentationCheck")
+}
+
+tasks.register<Exec>("v2M3ModuleApiSourceCheck") {
+    group = "verification"
+    description = "Run the serialized clean M3 module/API publication, JUnit/style, and external-consumer closure gate."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-v2-m3-module-api.sh", pulsarCheckoutPath.get())
+    usesService(m3NestedGradleGate)
+}
+
+tasks.register("v2M3ModuleApiCheck") {
+    group = "verification"
+    description = "Run the exact-source M3 module/API closure gate."
+    dependsOn("v2M3ModuleApiSourceCheck", "v2DocumentationCheck")
+}
+
 val oxiaClientCheckoutPath = providers.gradleProperty("oxiaClientCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_CLIENT_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-client-java").asFile.absolutePath)
 val oxiaServerCheckoutPath = providers.gradleProperty("oxiaServerCheckout")
     .orElse(providers.environmentVariable("NEREUS_OXIA_SERVER_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia").asFile.absolutePath)
+
+val v2M3TestedCommit = providers.gradleProperty("v2M3TestedCommit")
+val v2M3KafkaEvidenceWorktree = providers.gradleProperty("v2M3KafkaEvidenceWorktree")
+    .orElse(providers.environmentVariable("NEREUS_M3_KAFKA_EVIDENCE_WORKTREE"))
+    .orElse(layout.projectDirectory.dir("../../nereusstream/kafka-worktrees/nereus-v2-m3").asFile.absolutePath)
+val v2M3PulsarEvidenceWorktree = providers.gradleProperty("v2M3PulsarEvidenceWorktree")
+    .orElse(providers.environmentVariable("NEREUS_M3_PULSAR_EVIDENCE_WORKTREE"))
+    .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar-worktrees/nereus-v2-m3").asFile.absolutePath)
+val v2M3OxiaServerEvidenceWorktree = providers.gradleProperty("v2M3OxiaServerEvidenceWorktree")
+    .orElse(providers.environmentVariable("NEREUS_M3_OXIA_SERVER_EVIDENCE_WORKTREE"))
+    .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-worktrees/nereus-v2-m3").asFile.absolutePath)
+val v2M3OxiaClientEvidenceWorktree = providers.gradleProperty("v2M3OxiaClientEvidenceWorktree")
+    .orElse(providers.environmentVariable("NEREUS_M3_OXIA_CLIENT_EVIDENCE_WORKTREE"))
+    .orElse(
+        layout.projectDirectory.dir("../../nereusstream/oxia-client-java-worktrees/nereus-v2-m3")
+            .asFile.absolutePath,
+    )
+
+val v2M3GovernanceTaskProviders = linkedMapOf(
+    "v2M3InputsContractTest" to "scripts/check-v2-m3-inputs-tests.py",
+    "v2M3M2RegressionContractTest" to "scripts/check-v2-m3-m2-regression-tests.py",
+    "v2M3M2RegressionPublisherContractTest" to "scripts/publish-v2-m3-m2-regression-tests.py",
+    "v2M3M2RegressionRunnerContractTest" to "scripts/run-v2-m3-m2-regression-tests.py",
+    "v2M3ChildCheckerContractTest" to "scripts/check-v2-m3-child-tests.py",
+    "v2M3ChildPublisherContractTest" to "scripts/publish-v2-m3-child-tests.py",
+    "v2M3FinalCheckerContractTest" to "scripts/check-v2-m3-final-tests.py",
+    "v2M3FinalPublisherContractTest" to "scripts/publish-v2-m3-final-tests.py",
+).map { (taskName, script) ->
+    tasks.register<Exec>(taskName) {
+        group = "verification"
+        description = "Run the non-empty fail-closed M3 governance contract: $script"
+        workingDir = layout.projectDirectory.asFile
+        commandLine("python3", script)
+    }
+}
+
+tasks.register("v2M3GovernanceCheck") {
+    group = "verification"
+    description =
+        "Run all eight M3 governance contracts; no source, Provider, allocator, or Final result is synthesized."
+    dependsOn(v2M3GovernanceTaskProviders)
+}
+
+tasks.register("v2M3OrdinarySourceCheck") {
+    group = "verification"
+    description = "Run every ordinary M3 source/JUnit/style gate with non-empty zero-failure/error/skip reports."
+    dependsOn(
+        "v2M3Nwg1WireSourceCheck",
+        "v2M3Nwg1MutationCheck",
+        "v2M3ObjectWalStateTraceCheck",
+        "v2M3ModuleApiSourceCheck",
+        "v2M3GovernanceCheck",
+    )
+}
+
+tasks.register("v2M3SourceCheck") {
+    group = "verification"
+    description = "Run immutable inputs plus complete ordinary current-source M3 gates without claiming real evidence."
+    dependsOn("v2M3InputsCheck", "v2M3OrdinarySourceCheck", "v2DocumentationCheck")
+}
+
+val v2M3M2RegressionOutputDirectory = providers.gradleProperty("v2M3M2RegressionOutputDirectory")
+
+tasks.register<Exec>("v2M3M2RegressionSourceCheck") {
+    group = "verification"
+    description = "Execute all 25 trusted current-source M2 gates into one explicit fresh external directory."
+    workingDir = layout.projectDirectory.asFile
+    usesService(m3NestedGradleGate)
+    doFirst {
+        commandLine(
+            "bash",
+            "scripts/run-v2-m3-m2-regression.sh",
+            "--execute",
+            "--repo-root",
+            layout.projectDirectory.asFile.absolutePath,
+            "--tested-commit",
+            v2M3TestedCommit.get(),
+            "--kafka-worktree",
+            v2M3KafkaEvidenceWorktree.get(),
+            "--pulsar-worktree",
+            v2M3PulsarEvidenceWorktree.get(),
+            "--output-dir",
+            v2M3M2RegressionOutputDirectory.get(),
+        )
+    }
+}
+
+val v2M3ProviderEvidenceOutput = providers.gradleProperty("v2M3ProviderEvidenceOutput")
+    .map { file(it) }
+    .orElse(
+        project(":nereus-storage-object-s3").layout.buildDirectory
+            .file("m3-evidence/c1-minio-provider.json")
+            .map { it.asFile },
+    )
+val v2M3KmsEvidenceOutput = providers.gradleProperty("v2M3KmsEvidenceOutput")
+    .map { file(it) }
+    .orElse(
+        project(":nereus-storage-object-vault").layout.buildDirectory
+            .file("m3-evidence/vault-transit-kms.json")
+            .map { it.asFile },
+    )
+
+tasks.register("v2M3RealProviderCheck") {
+    group = "verification"
+    description = "Run and seal exact-digest MinIO C1 evidence with one non-skipped Provider testcase."
+    dependsOn(":nereus-storage-object-s3:realProviderTest")
+    doLast {
+        val output = v2M3ProviderEvidenceOutput.get()
+        check(output.isFile && output.length() > 0) { "sealed real Provider evidence is absent or empty: $output" }
+    }
+}
+
+tasks.register("v2M3RealKmsCheck") {
+    group = "verification"
+    description = "Run and seal exact-digest Vault Transit evidence with one non-skipped KMS testcase."
+    dependsOn(":nereus-storage-object-vault:realKmsTest")
+    doLast {
+        val output = v2M3KmsEvidenceOutput.get()
+        check(output.isFile && output.length() > 0) { "sealed real KMS evidence is absent or empty: $output" }
+    }
+}
+
+tasks.register("v2M3RealProviderKmsCheck") {
+    group = "verification"
+    description = "Require both independently sealed real Provider and KMS execution receipts."
+    dependsOn("v2M3RealProviderCheck", "v2M3RealKmsCheck")
+}
+
+tasks.register<Exec>("v2M3AllocatorRealEvidenceSourceCheck") {
+    group = "verification"
+    description = "Run the exact-source real Oxia/Pulsar allocator workload and sealed production verification chain."
+    workingDir = layout.projectDirectory.asFile
+    usesService(m3NestedGradleGate)
+    doFirst {
+        environment("NEREUS_M3_ALLOCATOR_EXPECTED_NEREUS_COMMIT", v2M3TestedCommit.get())
+        environment(
+            "NEREUS_M3_ALLOCATOR_OUTPUT_DIRECTORY",
+            layout.projectDirectory.dir(
+                "nereus-metadata-oxia/build/m3-allocator-evidence/formal/${v2M3TestedCommit.get()}",
+            ).asFile.absolutePath,
+        )
+        commandLine(
+            "bash",
+            "scripts/run-v2-m3-real-allocator-evidence.sh",
+            v2M3PulsarEvidenceWorktree.get(),
+            v2M3OxiaServerEvidenceWorktree.get(),
+            v2M3OxiaClientEvidenceWorktree.get(),
+        )
+    }
+}
+
+val v2M3AllocatorVerificationReceiptOutput = providers.gradleProperty("v2M3AllocatorVerificationReceiptOutput")
+
+tasks.register<Exec>("v2M3AllocatorVerificationSeal") {
+    group = "verification"
+    description = "Seal and reparse the allocator verifier plus all thirteen external raw/source files."
+    dependsOn("v2M3AllocatorRealEvidenceSourceCheck")
+    workingDir = layout.projectDirectory.asFile
+    doFirst {
+        val commit = v2M3TestedCommit.get()
+        val formal = layout.projectDirectory.dir(
+            "nereus-metadata-oxia/build/m3-allocator-evidence/formal/$commit",
+        ).asFile
+        val executor = layout.projectDirectory.file(
+            "nereus-metadata-oxia/build/m3-allocator-evidence/executor/$commit.json",
+        ).asFile
+        val oxiaClientJar = layout.projectDirectory.file(
+            "gradle/locked-artifacts/oxia-client-java/091a42c2780d92da56e9ec1f02ce1c3d988adc16/" +
+                "m2/io/github/oxia-db/oxia-client/0.9.4/oxia-client-0.9.4.jar",
+        ).asFile
+        val runtimeClasspath = layout.projectDirectory.file(
+            "nereus-metadata-oxia/build/m3-allocator-evidence/runtime-classpath.txt",
+        ).asFile
+        check(runtimeClasspath.isFile && runtimeClasspath.length() > 0) {
+            "allocator formal runtime classpath is absent or empty: $runtimeClasspath"
+        }
+        val runtimeArtifacts = runtimeClasspath.readLines()
+            .filter(String::isNotBlank)
+            .map { file(it).canonicalFile }
+        fun exactRuntimeArtifact(directory: File, basenamePrefix: String): File {
+            val exactDirectory = directory.canonicalFile
+            val matches = runtimeArtifacts.filter { candidate ->
+                candidate.parentFile == exactDirectory &&
+                    candidate.name.startsWith(basenamePrefix) &&
+                    candidate.name.endsWith(".jar") &&
+                    !candidate.name.endsWith("-sources.jar")
+            }
+            check(matches.size == 1 && matches.single().isFile && matches.single().length() > 0) {
+                "allocator runtime artifact is absent or ambiguous: directory=$exactDirectory " +
+                    "prefix=$basenamePrefix matches=$matches"
+            }
+            return matches.single()
+        }
+        val runtimeDomain = exactRuntimeArtifact(
+            layout.projectDirectory.dir("nereus-domain/build/libs").asFile,
+            "nereus-domain-",
+        )
+        val runtimeMetadataOxia = exactRuntimeArtifact(
+            layout.projectDirectory.dir("nereus-metadata-oxia/build/libs").asFile,
+            "nereus-metadata-oxia-",
+        )
+        val runtimeMetadataSpi = exactRuntimeArtifact(
+            layout.projectDirectory.dir("nereus-metadata-spi/build/libs").asFile,
+            "nereus-metadata-spi-",
+        )
+        val testedEvidence = exactRuntimeArtifact(
+            layout.projectDirectory.dir("nereus-metadata-oxia/build/libs").asFile,
+            "nereus-v2-m3-real-allocator-evidence-",
+        )
+        val output = v2M3AllocatorVerificationReceiptOutput.orNull?.let { file(it) }
+            ?: layout.buildDirectory.file("v2-m3/governed/allocator-raw-verification-$commit.json").get().asFile
+        val command = mutableListOf(
+            "python3",
+            "scripts/publish-v2-m3-child.py",
+            "--repo-root",
+            layout.projectDirectory.asFile.absolutePath,
+            "--tested-commit",
+            commit,
+            "--seal-allocator-verification",
+            "--raw-evidence",
+            formal.resolve("raw-verification.json").absolutePath,
+            "--junit-xml",
+            layout.projectDirectory.file(
+                "nereus-metadata-oxia/build/test-results/realAllocatorRawVerificationTest/" +
+                    "TEST-com.nereusstream.metadata.oxia.v2.allocator.evidence." +
+                    "M3AllocatorRawEvidenceVerificationTest.xml",
+            ).asFile.absolutePath,
+        )
+        linkedMapOf(
+            "selection.nars" to formal.resolve("selection.nars"),
+            "test.naea" to formal.resolve("test.naea"),
+            "native.naea" to formal.resolve("native.naea"),
+            "fault.naea" to formal.resolve("fault.naea"),
+            "scale-10000.naea" to formal.resolve("scale-10000.naea"),
+            "scale-100000.naea" to formal.resolve("scale-100000.naea"),
+            "executorManifest" to executor,
+            "oxiaClientJar" to oxiaClientJar,
+            "runtimeDomainArtifact" to runtimeDomain,
+            "runtimeMetadataOxiaArtifact" to runtimeMetadataOxia,
+            "runtimeMetadataSpiArtifact" to runtimeMetadataSpi,
+            "sourceLocks" to layout.projectDirectory.file("docs/v2/source-locks.json").asFile,
+            "testedEvidenceArtifact" to testedEvidence,
+        ).forEach { (name, path) ->
+            command.addAll(listOf("--allocator-external-file", "$name=${path.absolutePath}"))
+        }
+        command.addAll(listOf("--sealed-output", output.absolutePath))
+        commandLine(command)
+    }
+}
+
+tasks.register("v2M3AllocatorCheck") {
+    group = "verification"
+    description = "Require the formal allocator run and governed thirteen-file raw verification receipt."
+    dependsOn("v2M3AllocatorVerificationSeal")
+}
+
+tasks.register("v2M3Nwg1CapacityCheck") {
+    group = "verification"
+    description = "Require ordinary local-cap coverage plus separate real Provider/KMS execution evidence."
+    dependsOn("v2M3OrdinarySourceCheck", "v2M3RealProviderKmsCheck", "v2DocumentationCheck")
+}
+
+val v2M3FinalReceipt = providers.gradleProperty("v2M3FinalReceipt")
+    .orElse("docs/v2/evidence/v2-m3/final/m3-final.json")
+
+tasks.register<Exec>("v2M3FinalSourceCheck") {
+    group = "verification"
+    description =
+        "Reparse all eleven child receipts, raw attachments, source locks, and the exact 26-scenario allowlist."
+    workingDir = layout.projectDirectory.asFile
+    doFirst {
+        commandLine(
+            "python3",
+            "scripts/check-v2-m3-final.py",
+            "--repo-root",
+            layout.projectDirectory.asFile.absolutePath,
+            "--receipt",
+            v2M3FinalReceipt.get(),
+            "--expected-tested-commit",
+            v2M3TestedCommit.get(),
+        )
+    }
+}
+
+val v2M3FinalCandidate = providers.gradleProperty("v2M3FinalCandidate")
+
+tasks.register<Exec>("v2M3FinalPublish") {
+    group = "verification"
+    description = "Publish one prebuilt validated M3 Final candidate without overwrite."
+    workingDir = layout.projectDirectory.asFile
+    doFirst {
+        commandLine(
+            "python3",
+            "scripts/publish-v2-m3-final.py",
+            "--repo-root",
+            layout.projectDirectory.asFile.absolutePath,
+            "--candidate",
+            v2M3FinalCandidate.get(),
+            "--output",
+            v2M3FinalReceipt.get(),
+        )
+    }
+}
+
+tasks.register("v2M3Check") {
+    group = "verification"
+    description = "Validate the exact-source M3 Final; formal evidence generation remains a separate clean-source run."
+    dependsOn("v2M3FinalSourceCheck", "v2DocumentationCheck")
+}
 
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
