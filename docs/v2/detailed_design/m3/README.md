@@ -13,6 +13,38 @@ M3 implements the one-Cell Object WAL carrier over the accepted M1 identities/me
 state machines. The M3-I0 review closes the NWG1 implementation inputs; it does not make the whole milestone
 implementation-ready by assertion and does not convert any `PLANNED` scenario into evidence.
 
+## Working implementation snapshot (2026-08-24, non-promotable)
+
+This snapshot records the integration handoff from parallel slice development to one serial integration owner. It is
+an implementation ledger only: uncommitted source, compilation, static governance tests, focused tests, and external
+fork commits are not M3 evidence and do not promote a scenario.
+
+- The last committed Nereus implementation baseline before this ledger, with `main` and `origin/main` exactly aligned,
+  is `356cbe687cd7becd9d3e5ecb9e66e75dda37b3c0`. That committed line contains the M3 input gate, immutable historical
+  M2/current-source M2 regression separation, NWG1 mutation profiles, and allocator protocol/evidence groundwork.
+- The handoff inventory counted 73 changed or untracked Nereus paths. The in-progress tree contains NWG1 wire/crypto/streaming
+  decode work; Object-WAL trace, control, checkpoint, recovery, Provider/KMS, Kafka, Pulsar, and allocator work; M3
+  gate/publisher scripts; and synchronized draft ADR/design updates. None of those uncommitted paths is a receipt.
+- `:nereus-storage-object:compileJava` passes on that working tree. `:nereus-storage-object:testClasses` does not yet
+  compile: ten test-source errors remain across KMS/Provider session construction, one digest-call type mismatch, and
+  one recovery-limit accessor mismatch. Therefore no common Object-WAL test or gate is recorded as passing at this
+  snapshot.
+- The dedicated Kafka fork branch `nereus/v2-m3-object-wal-evidence` is clean and pushed at
+  `ffee27e5fd19b50802fc9fe0a12f86e09f709b14`. Its three M3 commits guard native owner callbacks and add deterministic
+  rollback/takeover-cut tests, but the branch has not completed a current-Nereus-artifact compile or evidence run.
+- The dedicated Pulsar fork branch of the same name is clean and unchanged at
+  `a14e0e6f4e49be0677318b4ceefc7b85b445823b`; current Pulsar Object-WAL integration exists only in the uncommitted
+  Nereus module tree at this snapshot.
+- Kafka and Pulsar adapters are both mid-migration to the bounded owner-open recovery coordinator and have not been
+  compiled as an integrated current-source M3 tree. Provider/KMS and allocator results so far are local/static or
+  stale after later source edits; real Provider/KMS/allocator evidence has not run.
+- Exact M3 source locks, fresh child receipts, aggregate Final, and Markdown/JSON scenario promotions do not exist.
+  `implementationStatus: InProgress` and `evidenceStatus: NotRun` therefore remain authoritative.
+
+Serial continuation order is common Object-WAL test compilation and tests, then Kafka integration, Pulsar integration,
+real Provider/KMS/allocator evidence, and finally exact-source locks, receipts, scenario synchronization, and M3 Final.
+Each stable boundary must be committed and pushed before the next evidence-bearing boundary is evaluated.
+
 ## Current boundary
 
 | Slice | Design or output | Status at this documentation cut |
@@ -38,10 +70,15 @@ first production version. The Header has no node session, owner witness, body SH
 first-satisfied close-reason codes, while normal target/linger values remain evidence-owned.
 
 ADR 0091 separately closes M3-P1's allocator wire/key/transition input with exact `NVAC1`/`NVAH1`/`NVAN1` bytes,
-STRICT's inseparable four-write path, RANGE same-RESERVED takeover with no unused-tail regrant, exact stored
-Cell/Head/node provenance and one-ID burn, and receipt-only exact-source activation. Formal candidates traverse the
-same production coordinator but remain `runtimeActivated=false`. Its 38 local allocator tests and deterministic
-`8 workloads x 9 cuts` schedule are implementation conformance only.
+STRICT's inseparable four-write path plus exact prior-owner RESERVED-node burn that consumes without publishing,
+RANGE same-RESERVED takeover with no unused-tail regrant, exact stored Cell/Head/node provenance and one-ID burn, and
+receipt-only exact-source activation. Its closed raw path is the same-directory five-file
+`test/native/fault/scale-10000/scale-100000.naea` inventory plus fixed `selection.nars`; the parser rehashes source and
+runtime artifacts, reparses exact JUnit XML, replays queue/interval/fault facts, and runtime activation hashes the
+packaged domain/SPI/Oxia JARs. Request-keyed writer shards preserve one request's async endpoint order without
+inventing a global file order. Formal candidates traverse the same production coordinator but remain
+`runtimeActivated=false`. Its 48 ordinary allocator tests and deterministic `8 workloads x 9 cuts` schedule are local
+implementation conformance only until the exact-source verification run records zero failure/error/skip.
 `V2-OPEN-PUL-OBJ-09` remains evidence-blocked until real multi-broker/native 10k/100k execution selects an exact RANGE
 size and at most one mode.
 
