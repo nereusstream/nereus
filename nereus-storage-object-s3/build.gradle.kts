@@ -72,6 +72,9 @@ dependencies {
 tasks.register<Test>("realProviderTest") {
     group = "verification"
     description = "Run the exact-digest MinIO C1 Provider integration evidence."
+    notCompatibleWithConfigurationCache(
+        "formal evidence performs live Git admission and exclusive post-test receipt publication",
+    )
     testClassesDirs = realProviderTest.output.classesDirs
     classpath = realProviderTest.runtimeClasspath
     useJUnitPlatform()

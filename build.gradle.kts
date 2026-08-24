@@ -1434,6 +1434,7 @@ val v2M3KmsEvidenceOutput = providers.gradleProperty("v2M3KmsEvidenceOutput")
 tasks.register("v2M3RealProviderCheck") {
     group = "verification"
     description = "Run and seal exact-digest MinIO C1 evidence with one non-skipped Provider testcase."
+    notCompatibleWithConfigurationCache("formal evidence checks an exclusive external receipt after execution")
     dependsOn(":nereus-storage-object-s3:realProviderTest")
     doLast {
         val output = v2M3ProviderEvidenceOutput.get()
@@ -1444,6 +1445,7 @@ tasks.register("v2M3RealProviderCheck") {
 tasks.register("v2M3RealKmsCheck") {
     group = "verification"
     description = "Run and seal exact-digest Vault Transit evidence with one non-skipped KMS testcase."
+    notCompatibleWithConfigurationCache("formal evidence checks an exclusive external receipt after execution")
     dependsOn(":nereus-storage-object-vault:realKmsTest")
     doLast {
         val output = v2M3KmsEvidenceOutput.get()

@@ -65,6 +65,9 @@ configurations[realKmsTest.runtimeOnlyConfigurationName]
 tasks.register<Test>("realKmsTest") {
     group = "verification"
     description = "Run exact-digest HashiCorp Vault Transit KMS integration evidence."
+    notCompatibleWithConfigurationCache(
+        "formal evidence performs live Git admission and exclusive post-test receipt publication",
+    )
     testClassesDirs = realKmsTest.output.classesDirs
     classpath = realKmsTest.runtimeClasspath
     useJUnitPlatform()

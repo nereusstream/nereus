@@ -128,6 +128,11 @@ The [published W1 receipt](../../evidence/v2-m3/w1/m2-regression/receipt.json) i
 `4a7e25060ff2e2700f1d4373b5ecb8123b5a51f587f0f80b0209ce4810dfd7bd`, leaves `m2AmendmentLineage` empty, and
 promotes no scenario. It remains an intermediate checkpoint: any subsequent non-evidence source change requires a
 fresh complete profile before M3 Final can bind it.
+The first formal Provider/KMS aggregate invocation at source `3d88ebd50a5dd805bcfeb76f8dd9cf018240e9f5`
+completed both one-test fixed-digest real executions and sealed their outputs, but the Gradle build then rejected
+configuration-cache serialization of the live Git/exclusive-output task closures. That entire invocation remains
+diagnostic and non-promotable. The formal tasks now declare this intentional incompatibility so the repository's
+default configuration-cache setting cannot turn successful execution into a failed aggregate after publication.
 
 Serial continuation order is formal exact-source Provider/KMS and allocator evidence, the remaining child receipts,
 then final-source M2 regression freshness, source locks, scenario synchronization, and M3 Final.
