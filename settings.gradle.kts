@@ -72,16 +72,29 @@ dependencyResolutionManagement {
 val configuredPulsarCheckout = providers.gradleProperty("pulsarCheckout").orNull
     ?: providers.environmentVariable("NEREUS_PULSAR_CHECKOUT").orNull
 val conventionalPulsarCheckout = file("../../nereusstream/pulsar")
-val pulsarCheckout = configuredPulsarCheckout?.let(::file)
-    ?: conventionalPulsarCheckout.takeIf { it.resolve("settings.gradle.kts").isFile }
+val m3DedicatedPulsarRequired = gradle.startParameter.taskNames.any { requested ->
+    val task = requested.substringAfterLast(':')
+    task.startsWith("v2M3ModuleApi") || task == "v2M3Check"
+}
 val pulsarSourceRequired = gradle.startParameter.taskNames.any { requested ->
     val task = requested.substringAfterLast(':')
     (!requested.contains(':') && task in setOf("assemble", "build", "check", "test"))
             || requested.contains(":nereus-pulsar-offload:")
             || task.startsWith("v2M2Pulsar")
+            || task.startsWith("v2M3Pulsar")
+            || task.startsWith("v2M3ModuleApi")
+            || task in setOf("v2M3M2RegressionSourceCheck", "v2M3InputsCheck", "v2M3Check")
             || task == "v2M2Check"
 }
+val pulsarCheckout = configuredPulsarCheckout?.let(::file)
+    ?: conventionalPulsarCheckout.takeIf {
+        pulsarSourceRequired && !m3DedicatedPulsarRequired && it.resolve("settings.gradle.kts").isFile
+    }
 
+require(!m3DedicatedPulsarRequired || configuredPulsarCheckout != null) {
+    "The M3 module/API gate requires an explicit dedicated Pulsar worktree via " +
+            "-PpulsarCheckout=/path/to/pulsar or NEREUS_PULSAR_CHECKOUT; it never falls back to the shared checkout."
+}
 require(pulsarCheckout != null || !pulsarSourceRequired) {
     "The requested task requires the exact Pulsar source composite. Set -PpulsarCheckout=/path/to/pulsar " +
             "or NEREUS_PULSAR_CHECKOUT; the native SourceSafeLedgerOffloader SPI is not a published artifact."
@@ -103,5 +116,7 @@ include("nereus-metadata-oxia")
 include("nereus-storage-api")
 include("nereus-storage-bookkeeper")
 include("nereus-storage-object")
+include("nereus-storage-object-s3")
+include("nereus-storage-object-vault")
 include("nereus-kafka-bookkeeper")
 include("nereus-pulsar-offload")

@@ -67,13 +67,18 @@ fork commits are not M3 evidence and do not promote a scenario.
   fixed 2^40 slice endpoint. Because the coordinate is a temporary SNAPSHOT and this does not activate broker/topic
   lifecycle wiring, it is a non-promotable compile checkpoint; native broker/controller activation remains M6.
 - Kafka and Pulsar Nereus adapters now use the bounded owner-open recovery coordinator and both have dedicated
-  external-fork compile checkpoints. Provider/KMS and allocator results so far are local/static or stale after later
-  source edits; real Provider/KMS/allocator evidence has not run.
+  external-fork compile checkpoints. The production S3 C1 and Vault Transit adapters, their independently classified
+  failure surfaces, and their formal exact-source test tasks are implemented. Their ordinary module checks execute
+  nine tests with zero failure/error/skip and pass Spotless/Checkstyle; fixed-digest MinIO and Vault diagnostic runs
+  execute two additional tests with zero failure/error/skip, including the 64-MiB admitted C1 transfer/fault cuts and
+  Vault v1-to-v2 rotation gated by a production `WalRunObjectSession` terminal-closure proof. Diagnostic runs are
+  explicitly non-evidence: the clean-pushed exact-source formal Provider/KMS receipts and allocator evidence remain
+  open.
 - Exact M3 source locks, fresh child receipts, aggregate Final, and Markdown/JSON scenario promotions do not exist.
   `implementationStatus: InProgress` and `evidenceStatus: NotRun` therefore remain authoritative.
 
-Serial continuation order is the dedicated Pulsar fork integration, real Provider/KMS/allocator evidence, and finally
-exact-source locks, receipts, scenario synchronization, and M3 Final.
+Serial continuation order is source integration, formal exact-source Provider/KMS and allocator evidence, and finally
+source locks, current-source M2 regression, child receipts, scenario synchronization, and M3 Final.
 Each stable boundary must be committed and pushed before the next evidence-bearing boundary is evaluated.
 
 ## Current boundary
@@ -85,8 +90,8 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | M3-W2 | NWG1 production encoder/decoder, projection, six-vector A corpus, and exact wire gate | common source implemented; local 17-test/114-row wire-source gate passes, but no exact-source child receipt exists |
 | M3-W3 | 84-record/240-path B mutation manifest and runner | common source implemented; local 3-test gate covers exactly 84 records/240 paths with no generated inventory, but no exact-source child receipt exists |
 | M3-C1 | 50-trace Object-WAL kernel harness | common kernel and manifest implemented; local 7-test gate covers 50 traces/21 outcomes, but backend integration and exact-source receipt remain open |
-| M3-D1 | local capacity conformance and exact Provider C1/C2 evidence | planned; C1 production admission and C2 benefit remain unproved |
-| M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; backend integration, real evidence, and receipt remain open |
+| M3-D1 | local capacity conformance and exact Provider C1/C2 evidence | S3 C1 and Vault Transit production adapters plus formal clean-source tasks are implemented; nine ordinary tests and two fixed-digest diagnostic real tests pass with zero failure/error/skip, but diagnostic results are non-evidence, formal exact-source receipts remain open, and C2 remains non-promotable without independent benefit evidence |
+| M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; Kafka/Pulsar backend integration and dedicated-fork compile checkpoints pass, while formal Provider/KMS receipts remain open |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | Kafka source implemented; local 260-test module check covers strict wire/key/caps, OPEN/TERMINAL Head, backend mapping and bounded recovery; the dedicated fork now compiles against the split F9/M3 artifact inputs with 6/6 tests, while the final source-qualified native receipt remains open |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; the dedicated-fork dual-repository compile checkpoint passes 6/6 tests, but a source-qualified receipt remains open and native broker/controller activation remains M6 |
 | M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; [ADR 0091](../../../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md) fixes production allocator wire/key/transitions and [ADR 0094](../../../decisions/0094-v2-m3-allocator-evidence-workload-and-selection-amendment.md) freezes the formal workload/SLO/selection inputs, but the exact-source receipt and real/native 10k/100k allocator receipt, RANGE size, mode selection, and scenario PASS remain open |

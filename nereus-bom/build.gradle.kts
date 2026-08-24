@@ -26,10 +26,25 @@ dependencies {
         api(project(":nereus-domain"))
         api(project(":nereus-metadata-spi"))
         api(project(":nereus-metadata-oxia"))
+        api(project(":nereus-storage-api"))
+        api(project(":nereus-storage-bookkeeper"))
+        api(project(":nereus-storage-object"))
+        api(project(":nereus-storage-object-s3"))
+        api(project(":nereus-storage-object-vault"))
+        api(project(":nereus-kafka-bookkeeper"))
+        api(project(":nereus-pulsar-offload"))
     }
 }
 
 publishing {
+    repositories {
+        maven {
+            name = "development"
+            url = rootProject.providers.gradleProperty("developmentRepository")
+                .map { rootProject.file(it).toURI() }
+                .getOrElse(rootProject.layout.buildDirectory.dir("development-repository").get().asFile.toURI())
+        }
+    }
     publications {
         create<MavenPublication>("mavenJava") {
             from(components["javaPlatform"])
