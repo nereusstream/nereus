@@ -16,13 +16,27 @@ package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceAttachmentKindV1;
+import com.nereusstream.domain.registry.allocator.AllocatorEvidenceCandidateV1;
+import com.nereusstream.domain.registry.allocator.AllocatorEvidenceContextV1;
+import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1;
+import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.EventKind;
+import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.OxiaOperationKind;
+import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
+import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -44,6 +58,84 @@ class M3AllocatorEvidenceWiringTest {
         assertThatThrownBy(() -> M3AllocatorEvidenceSealMain.main(new String[0]))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("expected output");
+    }
+
+    @Test
+    void keepsConcurrentSameKeyMutationAndRereadChainsBoundToTheirExactRequest() throws Exception {
+        List<AllocatorRawEvidenceEventV1> events = Collections.synchronizedList(new java.util.ArrayList<>());
+        M3AllocatorRequestTelemetry telemetry = new M3AllocatorRequestTelemetry(events::add, System.nanoTime());
+        AllocatorEvidenceContextV1 context = AllocatorEvidenceContextV1.candidateContext(
+                AllocatorEvidenceCandidateV1.strict(), 10_000, 1, 200);
+        M3AllocatorRequestTelemetry.RequestTrace firstTrace = telemetry.trace(
+                context,
+                new M3AllocatorWorkloadPlan.PlannedRequest(
+                        11, 1, 101, M3AllocatorWorkloadPlan.Trigger.ENTRY,
+                        M3AllocatorWorkloadPlan.Phase.MEASURED_STEADY, 0),
+                null,
+                1);
+        M3AllocatorRequestTelemetry.RequestTrace secondTrace = telemetry.trace(
+                context,
+                new M3AllocatorWorkloadPlan.PlannedRequest(
+                        22, 1, 202, M3AllocatorWorkloadPlan.Trigger.BYTE,
+                        M3AllocatorWorkloadPlan.Phase.MEASURED_STEADY, 0),
+                null,
+                1);
+        PendingConditionalClient delegate = new PendingConditionalClient();
+        String key = "/nereus/v2/m3/allocator/exact-cell";
+        CanonicalBytes firstBytes = CanonicalBytes.copyOf(new byte[] {1, 2, 3});
+        CanonicalBytes secondBytes = CanonicalBytes.copyOf(new byte[] {4, 5, 6, 7});
+
+        try (M3RealOxiaActors.InstrumentedClient client =
+                new M3RealOxiaActors.InstrumentedClient(1, delegate)) {
+            OxiaConditionalClient first = client.bound(
+                    client.binding(key, firstTrace, OxiaOperationKind.CELL_RESERVE_CAS));
+            OxiaConditionalClient second = client.bound(
+                    client.binding(key, secondTrace, OxiaOperationKind.CELL_RESERVE_CAS));
+
+            CompletionStage<Void> firstChain = first.compareAndSet(key, firstBytes, 1)
+                    .thenCompose(ignored -> first.read(key).thenApply(record -> null));
+            CompletionStage<Void> secondChain = second.compareAndSet(key, secondBytes, 2)
+                    .thenCompose(ignored -> second.read(key).thenApply(record -> null));
+
+            assertThat(delegate.mutations).hasSize(2);
+            delegate.mutations.get(1).complete(null);
+            delegate.mutations.get(0).complete(null);
+            CompletableFuture.allOf(
+                            firstChain.toCompletableFuture(), secondChain.toCompletableFuture())
+                    .join();
+
+            assertThat(events.stream().filter(event -> event.requestOrdinal() == 11))
+                    .extracting(AllocatorRawEvidenceEventV1::kind)
+                    .containsExactly(
+                            EventKind.OXIA_OPERATION_START,
+                            EventKind.OXIA_OPERATION_END,
+                            EventKind.OXIA_OPERATION_START,
+                            EventKind.OXIA_OPERATION_END);
+            assertThat(events.stream().filter(event -> event.requestOrdinal() == 11))
+                    .extracting(AllocatorRawEvidenceEventV1::oxiaOperationKind)
+                    .containsExactly(
+                            OxiaOperationKind.CELL_RESERVE_CAS,
+                            OxiaOperationKind.CELL_RESERVE_CAS,
+                            OxiaOperationKind.EXACT_READ,
+                            OxiaOperationKind.EXACT_READ);
+            assertThat(events.stream().filter(event -> event.requestOrdinal() == 22))
+                    .extracting(AllocatorRawEvidenceEventV1::kind)
+                    .containsExactly(
+                            EventKind.OXIA_OPERATION_START,
+                            EventKind.OXIA_OPERATION_END,
+                            EventKind.OXIA_OPERATION_START,
+                            EventKind.OXIA_OPERATION_END);
+            assertThat(events.stream().filter(event -> event.requestOrdinal() == 22))
+                    .extracting(AllocatorRawEvidenceEventV1::oxiaOperationKind)
+                    .containsExactly(
+                            OxiaOperationKind.CELL_RESERVE_CAS,
+                            OxiaOperationKind.CELL_RESERVE_CAS,
+                            OxiaOperationKind.EXACT_READ,
+                            OxiaOperationKind.EXACT_READ);
+            assertThatThrownBy(() -> first.read(key + "/other"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("crossed an exact Oxia authority key");
+        }
     }
 
     @Test
@@ -115,5 +207,31 @@ class M3AllocatorEvidenceWiringTest {
                 + M3AllocatorVerificationSealMain.TEST_CLASS
                 + "\"/>\n"
                 + "</testsuite>\n";
+    }
+
+    private static final class PendingConditionalClient implements OxiaConditionalClient {
+        private final List<CompletableFuture<Void>> mutations = new CopyOnWriteArrayList<>();
+
+        @Override
+        public CompletionStage<Optional<AuthorityRecord>> read(String key) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+
+        @Override
+        public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes storedBytes) {
+            return mutation();
+        }
+
+        @Override
+        public CompletionStage<Void> compareAndSet(
+                String key, CanonicalBytes storedBytes, long expectedVersionId) {
+            return mutation();
+        }
+
+        private CompletionStage<Void> mutation() {
+            CompletableFuture<Void> pending = new CompletableFuture<>();
+            mutations.add(pending);
+            return pending;
+        }
     }
 }

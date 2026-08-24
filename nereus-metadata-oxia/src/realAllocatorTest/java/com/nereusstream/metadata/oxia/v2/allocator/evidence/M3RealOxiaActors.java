@@ -30,8 +30,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -149,34 +147,35 @@ final class M3RealOxiaActors implements AutoCloseable {
         private final AtomicInteger controlledLatencyMillis = new AtomicInteger();
         private final AtomicBoolean loseNextMutationResponse = new AtomicBoolean();
         private final AtomicReference<CrashBarrier> crashBarrier = new AtomicReference<>();
-        private final ConcurrentMap<String, OperationBinding> bindings = new ConcurrentHashMap<>();
 
         private InstrumentedClient(int actorId, AsyncOxiaClient rawClient) {
+            this(actorId, new Session(rawClient));
+        }
+
+        InstrumentedClient(int actorId, OxiaConditionalClient delegate) {
+            this(actorId, new Session(() -> {}, Objects.requireNonNull(delegate, "delegate")));
+        }
+
+        private InstrumentedClient(int actorId, Session initialSession) {
             this.actorId = actorId;
             delayScheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
                 Thread thread = new Thread(runnable, "m3-allocator-oxia-delay-" + actorId);
                 thread.setDaemon(true);
                 return thread;
             });
-            session.set(new Session(rawClient));
+            session.set(Objects.requireNonNull(initialSession, "initialSession"));
         }
 
-        OperationBinding bind(
+        OperationBinding binding(
                 String key, M3AllocatorRequestTelemetry.RequestTrace trace, OxiaOperationKind mutationKind) {
             if (trace == null) {
                 return null;
             }
-            OperationBinding binding = new OperationBinding(trace, mutationKind);
-            if (bindings.putIfAbsent(key, binding) != null) {
-                throw new IllegalStateException("allocator evidence overlaps one exact Oxia authority key");
-            }
-            return binding;
+            return new OperationBinding(key, trace, mutationKind);
         }
 
-        void unbind(String key, OperationBinding binding) {
-            if (binding != null && !bindings.remove(key, binding)) {
-                throw new IllegalStateException("allocator evidence Oxia key binding drifted");
-            }
+        OxiaConditionalClient bound(OperationBinding binding) {
+            return binding == null ? this : new BoundClient(this, binding);
         }
 
         void setControlledLatencyMillis(int latencyMillis) {
@@ -199,7 +198,11 @@ final class M3RealOxiaActors implements AutoCloseable {
 
         @Override
         public CompletionStage<Optional<AuthorityRecord>> read(String key) {
-            OperationBinding binding = bindings.get(key);
+            return read(null, key);
+        }
+
+        private CompletionStage<Optional<AuthorityRecord>> read(OperationBinding binding, String key) {
+            requireBindingKey(binding, key);
             M3AllocatorRequestTelemetry.OxiaOperation operation = binding == null
                     ? null
                     : binding.trace.startOxia(
@@ -227,17 +230,22 @@ final class M3RealOxiaActors implements AutoCloseable {
 
         @Override
         public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes storedBytes) {
-            return mutation(key, storedBytes, delegate -> delegate.createIfAbsent(key, storedBytes));
+            return mutation(null, key, storedBytes, delegate -> delegate.createIfAbsent(key, storedBytes));
         }
 
         @Override
         public CompletionStage<Void> compareAndSet(
                 String key, CanonicalBytes storedBytes, long expectedVersionId) {
-            return mutation(key, storedBytes, delegate -> delegate.compareAndSet(key, storedBytes, expectedVersionId));
+            return mutation(
+                    null,
+                    key,
+                    storedBytes,
+                    delegate -> delegate.compareAndSet(key, storedBytes, expectedVersionId));
         }
 
-        private CompletionStage<Void> mutation(String key, CanonicalBytes storedBytes, MutationDispatch dispatch) {
-            OperationBinding binding = bindings.get(key);
+        private CompletionStage<Void> mutation(
+                OperationBinding binding, String key, CanonicalBytes storedBytes, MutationDispatch dispatch) {
+            requireBindingKey(binding, key);
             M3AllocatorRequestTelemetry.OxiaOperation operation = binding == null
                     ? null
                     : binding.trace.startOxia(binding.mutationKind, storedBytes.length());
@@ -260,6 +268,13 @@ final class M3RealOxiaActors implements AutoCloseable {
                             operation, failure == null ? EventOutcome.SUCCESS : EventOutcome.FAILED, 0);
                 }
             });
+        }
+
+        private static void requireBindingKey(OperationBinding binding, String key) {
+            Objects.requireNonNull(key, "key");
+            if (binding != null && !binding.key.equals(key)) {
+                throw new IllegalStateException("allocator evidence binding crossed an exact Oxia authority key");
+            }
         }
 
         private <T> CompletionStage<T> delayed(CompletionStage<T> source, boolean loseResponse) {
@@ -334,13 +349,17 @@ final class M3RealOxiaActors implements AutoCloseable {
         }
 
         static final class OperationBinding {
+            private final String key;
             private final M3AllocatorRequestTelemetry.RequestTrace trace;
             private final OxiaOperationKind mutationKind;
             private final AtomicReference<WriteProof> writeProof = new AtomicReference<>();
             private final AtomicBoolean rereadRecorded = new AtomicBoolean();
 
             private OperationBinding(
-                    M3AllocatorRequestTelemetry.RequestTrace trace, OxiaOperationKind mutationKind) {
+                    String key,
+                    M3AllocatorRequestTelemetry.RequestTrace trace,
+                    OxiaOperationKind mutationKind) {
+                this.key = Objects.requireNonNull(key, "key");
                 this.trace = Objects.requireNonNull(trace, "trace");
                 this.mutationKind = Objects.requireNonNull(mutationKind, "mutationKind");
             }
@@ -350,7 +369,36 @@ final class M3RealOxiaActors implements AutoCloseable {
             }
         }
 
-        private record Session(AsyncOxiaClient raw, OxiaConditionalClient delegate) {
+        private record BoundClient(InstrumentedClient client, OperationBinding binding)
+                implements OxiaConditionalClient {
+            private BoundClient {
+                Objects.requireNonNull(client, "client");
+                Objects.requireNonNull(binding, "binding");
+            }
+
+            @Override
+            public CompletionStage<Optional<AuthorityRecord>> read(String key) {
+                return client.read(binding, key);
+            }
+
+            @Override
+            public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes storedBytes) {
+                return client.mutation(
+                        binding, key, storedBytes, delegate -> delegate.createIfAbsent(key, storedBytes));
+            }
+
+            @Override
+            public CompletionStage<Void> compareAndSet(
+                    String key, CanonicalBytes storedBytes, long expectedVersionId) {
+                return client.mutation(
+                        binding,
+                        key,
+                        storedBytes,
+                        delegate -> delegate.compareAndSet(key, storedBytes, expectedVersionId));
+            }
+        }
+
+        private record Session(AutoCloseable raw, OxiaConditionalClient delegate) {
             private Session(AsyncOxiaClient raw) {
                 this(Objects.requireNonNull(raw, "raw"), new AsyncOxiaConditionalClient(raw));
             }

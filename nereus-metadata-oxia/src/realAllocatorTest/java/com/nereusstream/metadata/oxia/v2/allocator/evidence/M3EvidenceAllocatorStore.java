@@ -25,6 +25,7 @@ import com.nereusstream.metadata.oxia.v2.allocator.OxiaVirtualLedgerAllocatorKey
 import com.nereusstream.metadata.oxia.v2.allocator.OxiaVirtualLedgerAllocatorStore;
 import com.nereusstream.metadata.oxia.v2.mutation.ConditionalMutationEngine;
 import com.nereusstream.metadata.oxia.v2.mutation.MutationFailureClassifier;
+import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import com.nereusstream.metadata.spi.allocator.PulsarVirtualLedgerAllocatorStore;
 import com.nereusstream.metadata.spi.allocator.VersionedAllocatorCellStateV1;
 import com.nereusstream.metadata.spi.allocator.VersionedManagedLedgerAllocatorHeadV1;
@@ -40,7 +41,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * Raw-evidence decorator around the exact production Oxia adapter. It never implements allocator transitions itself;
@@ -49,7 +49,6 @@ import java.util.function.Supplier;
 final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStore {
     private final OxiaVirtualLedgerAllocatorKeys keys;
     private final M3RealOxiaActors.InstrumentedClient client;
-    private final OxiaVirtualLedgerAllocatorStore delegate;
     private final TraceRegistry traces;
 
     M3EvidenceAllocatorStore(
@@ -57,18 +56,13 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
         keys = new OxiaVirtualLedgerAllocatorKeys(root);
         this.client = Objects.requireNonNull(client, "client");
         this.traces = Objects.requireNonNull(traces, "traces");
-        delegate = new OxiaVirtualLedgerAllocatorStore(
-                () -> {},
-                keys,
-                client,
-                new ConditionalMutationEngine(client, new MutationFailureClassifier()));
     }
 
     @Override
     public CompletionStage<Optional<VersionedAllocatorCellStateV1>> readCell(
             Sha256Digest namespaceId, Sha256Digest sliceAssignmentId) {
         String key = keys.cellKey(namespaceId, sliceAssignmentId);
-        return read(key, traces.cellTrace(), () -> delegate.readCell(namespaceId, sliceAssignmentId));
+        return read(key, traces.cellTrace(), delegate -> delegate.readCell(namespaceId, sliceAssignmentId));
     }
 
     @Override
@@ -79,7 +73,7 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
                 key,
                 traces.cellTrace(),
                 OxiaOperationKind.CELL_CREATE,
-                () -> delegate.createCell(candidate),
+                delegate -> delegate.createCell(candidate),
                 result -> outcome(result.outcome()));
     }
 
@@ -93,7 +87,7 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
                 key,
                 traces.cellTrace(),
                 traces.cellMutationKind(),
-                () -> delegate.compareAndSetCell(exactPredecessor, candidate),
+                delegate -> delegate.compareAndSetCell(exactPredecessor, candidate),
                 result -> outcome(result.outcome()));
     }
 
@@ -106,7 +100,7 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
         return read(
                 key,
                 traces.trace(managedLedgerIncarnation),
-                () -> delegate.readHead(namespaceId, sliceAssignmentId, managedLedgerIncarnation));
+                delegate -> delegate.readHead(namespaceId, sliceAssignmentId, managedLedgerIncarnation));
     }
 
     @Override
@@ -119,7 +113,7 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
                 key,
                 traces.trace(candidate.managedLedgerIncarnation()),
                 OxiaOperationKind.HEAD_CREATE,
-                () -> delegate.createHead(namespaceId, sliceAssignmentId, candidate),
+                delegate -> delegate.createHead(namespaceId, sliceAssignmentId, candidate),
                 result -> outcome(result.outcome()));
     }
 
@@ -135,7 +129,8 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
                 key,
                 traces.trace(incarnation),
                 traces.headMutationKind(incarnation),
-                () -> delegate.compareAndSetHead(namespaceId, sliceAssignmentId, exactPredecessor, candidate),
+                delegate ->
+                        delegate.compareAndSetHead(namespaceId, sliceAssignmentId, exactPredecessor, candidate),
                 result -> outcome(result.outcome()));
     }
 
@@ -149,7 +144,7 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
         return read(
                 key,
                 traces.trace(managedLedgerIncarnation),
-                () -> delegate.readNode(namespaceId, sliceAssignmentId, managedLedgerIncarnation, ledgerId));
+                delegate -> delegate.readNode(namespaceId, sliceAssignmentId, managedLedgerIncarnation, ledgerId));
     }
 
     @Override
@@ -163,59 +158,56 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
                 key,
                 traces.trace(candidate.managedLedgerIncarnation()),
                 OxiaOperationKind.NODE_CREATE,
-                () -> delegate.createNode(namespaceId, sliceAssignmentId, candidate),
+                delegate -> delegate.createNode(namespaceId, sliceAssignmentId, candidate),
                 result -> outcome(result.outcome()));
     }
 
     private <T> CompletionStage<T> read(
-            String key, M3AllocatorRequestTelemetry.RequestTrace trace, Supplier<CompletionStage<T>> operation) {
+            String key,
+            M3AllocatorRequestTelemetry.RequestTrace trace,
+            Function<OxiaVirtualLedgerAllocatorStore, CompletionStage<T>> operation) {
         M3RealOxiaActors.InstrumentedClient.OperationBinding binding =
-                client.bind(key, trace, OxiaOperationKind.EXACT_READ);
-        CompletionStage<T> stage;
-        try {
-            stage = Objects.requireNonNull(operation.get(), "allocator evidence read stage");
-        } catch (RuntimeException failure) {
-            client.unbind(key, binding);
-            throw failure;
-        }
-        return stage.whenComplete((ignored, failure) -> client.unbind(key, binding));
+                client.binding(key, trace, OxiaOperationKind.EXACT_READ);
+        return Objects.requireNonNull(
+                operation.apply(productionDelegate(binding)), "allocator evidence read stage");
     }
 
     private <T> CompletionStage<T> mutation(
             String key,
             M3AllocatorRequestTelemetry.RequestTrace trace,
             OxiaOperationKind kind,
-            Supplier<CompletionStage<T>> operation,
+            Function<OxiaVirtualLedgerAllocatorStore, CompletionStage<T>> operation,
             Function<T, EventOutcome> terminalOutcome) {
-        M3RealOxiaActors.InstrumentedClient.OperationBinding binding = client.bind(key, trace, kind);
-        CompletionStage<T> stage;
-        try {
-            stage = Objects.requireNonNull(operation.get(), "allocator evidence mutation stage");
-        } catch (RuntimeException failure) {
-            client.unbind(key, binding);
-            throw failure;
-        }
+        M3RealOxiaActors.InstrumentedClient.OperationBinding binding = client.binding(key, trace, kind);
+        CompletionStage<T> stage = Objects.requireNonNull(
+                operation.apply(productionDelegate(binding)), "allocator evidence mutation stage");
         return stage.whenComplete((result, failure) -> {
-            try {
-                if (binding != null && trace.faultCut() != null) {
-                    M3RealOxiaActors.InstrumentedClient.WriteProof proof = binding.writeProof();
-                    if (proof == null) {
-                        throw new IllegalStateException("fault mutation did not dispatch an exact Oxia write");
-                    }
-                    if (failure != null) {
-                        trace.unexpectedError();
-                    } else {
-                        trace.typedTerminal(
-                                proof.operation(),
-                                proof.writeToken(),
-                                proof.canonicalBytes(),
-                                terminalOutcome.apply(result));
-                    }
+            if (binding != null && trace.faultCut() != null) {
+                M3RealOxiaActors.InstrumentedClient.WriteProof proof = binding.writeProof();
+                if (proof == null) {
+                    throw new IllegalStateException("fault mutation did not dispatch an exact Oxia write");
                 }
-            } finally {
-                client.unbind(key, binding);
+                if (failure != null) {
+                    trace.unexpectedError();
+                } else {
+                    trace.typedTerminal(
+                            proof.operation(),
+                            proof.writeToken(),
+                            proof.canonicalBytes(),
+                            terminalOutcome.apply(result));
+                }
             }
         });
+    }
+
+    private OxiaVirtualLedgerAllocatorStore productionDelegate(
+            M3RealOxiaActors.InstrumentedClient.OperationBinding binding) {
+        OxiaConditionalClient boundClient = client.bound(binding);
+        return new OxiaVirtualLedgerAllocatorStore(
+                () -> {},
+                keys,
+                boundClient,
+                new ConditionalMutationEngine(boundClient, new MutationFailureClassifier()));
     }
 
     private static EventOutcome outcome(CreateMutationOutcome outcome) {

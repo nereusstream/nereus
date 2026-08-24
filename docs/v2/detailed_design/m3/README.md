@@ -146,9 +146,13 @@ concurrent reservations for one exact Oxia authority key were rejected as an ove
 exactly one test, one failure, zero errors, and zero skips; no allocator mode or RANGE size was selected. The preserved
 external diagnostic directory is
 `/Users/liusinan/Documents/Codex/2026-08-24/nereus-v2-m3-allocator/diagnostic-overlap-99ab89d5`.
-The failure must be fixed with deterministic same-key concurrency coverage, then a new raw matrix must select at most
-one qualified mode before source locks and the formal allocator receipt can be frozen. The M2 regression and
-Provider/KMS results must subsequently be rerun for freshness at the eventual exact Final source.
+The repair removes the key-global trace map and gives each top-level production-store invocation one explicit bound
+client that carries its mutation and same-key reread as a single request association. A deterministic test completes
+two same-key chains in reverse order and verifies their independent operation sequences plus cross-key rejection; the
+fresh six-test contract gate and two-test native-path gate pass with zero failure/error/skip. The repair does not
+serialize the real workload or relax raw-event validation. A new raw matrix must still select at most one qualified
+mode before source locks and the formal allocator receipt can be frozen. The M2 regression and Provider/KMS results
+must subsequently be rerun for freshness at the eventual exact Final source.
 
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
