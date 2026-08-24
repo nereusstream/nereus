@@ -39,6 +39,7 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -226,6 +227,64 @@ class M3AllocatorEvidenceWiringTest {
         } finally {
             worker.shutdownNow();
             assertThat(worker.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test
+    void bindsConcurrentCellProofReadsToEachCallingRequest() throws Exception {
+        M3EvidenceAllocatorStore.TraceRegistry registry = new M3EvidenceAllocatorStore.TraceRegistry();
+        M3AllocatorRequestTelemetry telemetry =
+                new M3AllocatorRequestTelemetry(event -> {}, System.nanoTime());
+        AllocatorEvidenceContextV1 context = AllocatorEvidenceContextV1.candidateContext(
+                AllocatorEvidenceCandidateV1.strict(), 10_000, 1, 200);
+        M3AllocatorRequestTelemetry.RequestTrace first = telemetry.trace(
+                context,
+                new M3AllocatorWorkloadPlan.PlannedRequest(
+                        31,
+                        1,
+                        101,
+                        M3AllocatorWorkloadPlan.Trigger.ENTRY,
+                        M3AllocatorWorkloadPlan.Phase.MEASURED_STEADY,
+                        0),
+                null,
+                1);
+        M3AllocatorRequestTelemetry.RequestTrace second = telemetry.trace(
+                context,
+                new M3AllocatorWorkloadPlan.PlannedRequest(
+                        32,
+                        2,
+                        202,
+                        M3AllocatorWorkloadPlan.Trigger.BYTE,
+                        M3AllocatorWorkloadPlan.Phase.MEASURED_STEADY,
+                        0),
+                null,
+                1);
+        CyclicBarrier overlap = new CyclicBarrier(2);
+        ExecutorService workers = Executors.newFixedThreadPool(2);
+        try {
+            Future<M3AllocatorRequestTelemetry.RequestTrace> firstObserved = workers.submit(() -> {
+                registry.bindCellRead(first);
+                try {
+                    overlap.await(5, TimeUnit.SECONDS);
+                    return registry.cellTrace();
+                } finally {
+                    registry.unbindCellRead(first);
+                }
+            });
+            Future<M3AllocatorRequestTelemetry.RequestTrace> secondObserved = workers.submit(() -> {
+                registry.bindCellRead(second);
+                try {
+                    overlap.await(5, TimeUnit.SECONDS);
+                    return registry.cellTrace();
+                } finally {
+                    registry.unbindCellRead(second);
+                }
+            });
+            assertThat(firstObserved.get(5, TimeUnit.SECONDS)).isSameAs(first);
+            assertThat(secondObserved.get(5, TimeUnit.SECONDS)).isSameAs(second);
+        } finally {
+            workers.shutdownNow();
+            assertThat(workers.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
         }
     }
 

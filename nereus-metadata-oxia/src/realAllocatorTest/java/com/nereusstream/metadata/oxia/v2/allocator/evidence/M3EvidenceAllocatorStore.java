@@ -235,6 +235,7 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
                 new ConcurrentHashMap<>();
         private final AtomicReference<M3AllocatorRequestTelemetry.RequestTrace> cellTrace = new AtomicReference<>();
         private final AtomicReference<OxiaOperationKind> cellMutationKind = new AtomicReference<>();
+        private final ThreadLocal<M3AllocatorRequestTelemetry.RequestTrace> cellReadTrace = new ThreadLocal<>();
 
         void bindHead(
                 ManagedLedgerIncarnationIdV1 incarnation,
@@ -271,6 +272,21 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
             cellMutationKind.set(Objects.requireNonNull(kind, "kind"));
         }
 
+        void bindCellRead(M3AllocatorRequestTelemetry.RequestTrace trace) {
+            Objects.requireNonNull(trace, "trace");
+            if (cellReadTrace.get() != null) {
+                throw new IllegalStateException("allocator evidence overlaps one thread's Cell read trace");
+            }
+            cellReadTrace.set(trace);
+        }
+
+        void unbindCellRead(M3AllocatorRequestTelemetry.RequestTrace trace) {
+            if (cellReadTrace.get() != trace) {
+                throw new IllegalStateException("allocator evidence Cell read trace drifted");
+            }
+            cellReadTrace.remove();
+        }
+
         void unbindCell(M3AllocatorRequestTelemetry.RequestTrace trace) {
             if (!cellTrace.compareAndSet(trace, null)) {
                 throw new IllegalStateException("allocator evidence Cell trace drifted");
@@ -286,8 +302,9 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
             return headMutationKinds.getOrDefault(incarnation, OxiaOperationKind.HEAD_PUBLISH_CAS);
         }
 
-        private M3AllocatorRequestTelemetry.RequestTrace cellTrace() {
-            return cellTrace.get();
+        M3AllocatorRequestTelemetry.RequestTrace cellTrace() {
+            M3AllocatorRequestTelemetry.RequestTrace exactRead = cellReadTrace.get();
+            return exactRead == null ? cellTrace.get() : exactRead;
         }
 
         private OxiaOperationKind cellMutationKind() {

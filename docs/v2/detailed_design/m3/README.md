@@ -163,7 +163,17 @@ failure, zero errors, and zero skips. It selects no mode and is not evidence. Th
 interruptible Oxia waits, drains every submitted completion before rethrowing the first exact failure, attaches a
 cleanup failure only as suppressed, and exposes a separate 10k STRICT real-Oxia fault-batch task that writes no
 receipt. The expanded eight-test allocator contract and two-test native-path gates pass with zero
-failure/error/skip; the real diagnostic task still must run before another full matrix is attempted.
+failure/error/skip.
+
+That fault-batch task then ran at exact clean source `c44b60f1f9f5c304effebcbb996bca33d9271959` and returned the
+previously hidden first failure in 3.732 seconds: exact-current-Cell proof correctly rejected a stale version while
+affected-ledger Head takeovers were interleaved with rollovers that changed the shared Cell. Its JUnit is one test,
+one failure, zero errors, and zero skips; external checksum-manifest SHA-256 is
+`cca2f457601402c9647e5da25694bf3d0c4f0544bfcda3fb5451cd7cbfd81816`. This is diagnostic only and selects no
+mode. The harness now separates the concurrent Head-takeover phase from the following fresh-owner rollover phase, so
+all Head takeovers prove the unchanged exact Cell before any rollover mutates it, and each concurrent Cell proof read
+has a request-local telemetry binding. The fresh nine-test allocator contract and two-test native-path gates pass
+with zero failure/error/skip; a fresh real-Oxia diagnostic remains required before the full matrix.
 
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record

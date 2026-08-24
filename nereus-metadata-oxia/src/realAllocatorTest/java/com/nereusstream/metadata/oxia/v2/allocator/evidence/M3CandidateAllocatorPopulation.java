@@ -168,8 +168,14 @@ final class M3CandidateAllocatorPopulation {
             traces.bindHead(incarnation, trace, OxiaOperationKind.HEAD_TAKEOVER_CAS);
             try {
                 traces.setHeadMutationKind(incarnation, OxiaOperationKind.HEAD_TAKEOVER_CAS);
-                VersionedManagedLedgerAllocatorHeadV1 successor = exact(
-                        allocator(trace.actorId()).takeover(cell.get(), predecessor, newOwnerEpoch));
+                traces.bindCellRead(trace);
+                VersionedManagedLedgerAllocatorHeadV1 successor;
+                try {
+                    successor = exact(
+                            allocator(trace.actorId()).takeover(cell.get(), predecessor, newOwnerEpoch));
+                } finally {
+                    traces.unbindCellRead(trace);
+                }
                 heads.set(ledgerIndex, successor);
                 trace.setOwnerEpoch(successor.value().ownerEpoch());
                 return successor;

@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /** Executes every ADR-0094 cut against a full candidate population and four real Oxia sessions. */
 final class M3AllocatorFaultRunner {
@@ -144,10 +145,18 @@ final class M3AllocatorFaultRunner {
 
         List<Integer> affected = population.ledgersOwnedByActor(
                 CRASHED_ACTOR, context.activeManagedLedgers());
+        AtomicReferenceArray<M3AllocatorRequestTelemetry.RequestTrace> recoveryTraces =
+                new AtomicReferenceArray<>(context.activeManagedLedgers());
+        for (int ledgerIndex : affected) {
+            recoveryTraces.set(ledgerIndex, massTrace(context, cut, ledgerIndex));
+        }
         parallel(affected, ledgerIndex -> {
-            M3AllocatorRequestTelemetry.RequestTrace trace = massTrace(context, cut, ledgerIndex);
+            M3AllocatorRequestTelemetry.RequestTrace trace = recoveryTraces.get(ledgerIndex);
             long newOwnerEpoch = population.nextOwnerEpoch(ledgerIndex);
             population.takeover(trace, ledgerIndex, newOwnerEpoch);
+        });
+        parallel(affected, ledgerIndex -> {
+            M3AllocatorRequestTelemetry.RequestTrace trace = recoveryTraces.get(ledgerIndex);
             population.rollover(trace, ledgerIndex, M3CandidateAllocatorPopulation.ResponseLossAt.NONE);
             trace.freshOwnerAppendComplete();
         });
