@@ -154,6 +154,17 @@ serialize the real workload or relax raw-event validation. A new raw matrix must
 mode before source locks and the formal allocator receipt can be frozen. The M2 regression and Provider/KMS results
 must subsequently be rerun for freshness at the eventual exact Final source.
 
+The next full diagnostic at exact source `60ae2d8ee52c14af7e4411313baae2e6c10dde9a` completed the native matrix and
+entered the STRICT 10k fault batch, but its reported five-minute worker-termination failure masked the first task
+failure during `BROKER_SESSION_CRASH_MASS_TAKEOVER`. It is preserved outside the repository as
+`diagnostic-worker-drain-60ae2d8e`; its checksum manifest SHA-256 is
+`7a877c1e02bfca4021c44fc37cc9bdfa89c62949e62f21b9c632f5d9dea34afb`, and its JUnit is exactly one test, one
+failure, zero errors, and zero skips. It selects no mode and is not evidence. The runner now uses bounded,
+interruptible Oxia waits, drains every submitted completion before rethrowing the first exact failure, attaches a
+cleanup failure only as suppressed, and exposes a separate 10k STRICT real-Oxia fault-batch task that writes no
+receipt. The expanded eight-test allocator contract and two-test native-path gates pass with zero
+failure/error/skip; the real diagnostic task still must run before another full matrix is attempted.
+
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
 `NEREUS_V2_M3_D1_LOCAL_CAP_RESULT_V1` payload with CREATE_NEW after the runner hashes the harness, its test, and all

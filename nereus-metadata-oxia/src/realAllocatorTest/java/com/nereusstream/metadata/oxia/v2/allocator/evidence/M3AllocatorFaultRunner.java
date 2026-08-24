@@ -19,7 +19,6 @@ import com.nereusstream.domain.registry.allocator.AllocatorFaultCutV1;
 import java.util.List;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -29,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 final class M3AllocatorFaultRunner {
     private static final int CRASHED_ACTOR = 0;
     private static final int STORM_CONCURRENCY = M3AllocatorWorkloadPlan.WORKER_THREADS;
+    private static final long FAULT_BATCH_DRAIN_TIMEOUT_SECONDS = 120;
 
     private final ExecutorService workers;
     private final M3RealOxiaActors actors;
@@ -192,17 +192,11 @@ final class M3AllocatorFaultRunner {
     }
 
     private static void await(CompletionService<Void> completions, int count) throws Exception {
-        for (int index = 0; index < count; index++) {
-            try {
-                completions.take().get();
-            } catch (ExecutionException failure) {
-                Throwable cause = failure.getCause();
-                if (cause instanceof Exception exception) {
-                    throw exception;
-                }
-                throw new RuntimeException(cause);
-            }
-        }
+        M3BoundedCompletionDrain.await(
+                completions,
+                count,
+                FAULT_BATCH_DRAIN_TIMEOUT_SECONDS,
+                "allocator fault batch");
     }
 
     private M3AllocatorRequestTelemetry.RequestTrace trace(

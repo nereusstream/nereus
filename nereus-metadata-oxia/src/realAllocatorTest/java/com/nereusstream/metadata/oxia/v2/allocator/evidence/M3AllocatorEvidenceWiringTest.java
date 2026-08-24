@@ -35,8 +35,17 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionService;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -135,6 +144,88 @@ class M3AllocatorEvidenceWiringTest {
             assertThatThrownBy(() -> first.read(key + "/other"))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("crossed an exact Oxia authority key");
+        }
+    }
+
+    @Test
+    void drainsEverySubmittedCompletionBeforeRethrowingTheFirstFailure() throws Exception {
+        ExecutorService workers = Executors.newFixedThreadPool(2);
+        CompletionService<Void> completions = new ExecutorCompletionService<>(workers);
+        CountDownLatch secondStarted = new CountDownLatch(1);
+        CountDownLatch releaseSecond = new CountDownLatch(1);
+        AtomicBoolean secondCompleted = new AtomicBoolean();
+        AtomicReference<Throwable> observed = new AtomicReference<>();
+        Thread waiter = new Thread(() -> {
+            try {
+                M3BoundedCompletionDrain.await(completions, 2, 5, "test completion batch");
+            } catch (Throwable failure) {
+                observed.set(failure);
+            }
+        });
+        try {
+            Future<Void> first = completions.submit(() -> {
+                throw new IllegalStateException("first exact failure");
+            });
+            completions.submit(() -> {
+                secondStarted.countDown();
+                releaseSecond.await();
+                secondCompleted.set(true);
+                return null;
+            });
+            assertThatThrownBy(first::get)
+                    .hasCauseInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("IllegalStateException");
+            assertThat(secondStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            waiter.start();
+            waiter.join(100);
+            assertThat(waiter.isAlive()).isTrue();
+            releaseSecond.countDown();
+            waiter.join(TimeUnit.SECONDS.toMillis(5));
+            assertThat(waiter.isAlive()).isFalse();
+            assertThat(secondCompleted.get()).isTrue();
+            assertThat(observed.get())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("first exact failure");
+        } finally {
+            releaseSecond.countDown();
+            workers.shutdownNow();
+            assertThat(workers.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+            if (waiter.isAlive()) {
+                waiter.interrupt();
+                waiter.join(TimeUnit.SECONDS.toMillis(5));
+            }
+        }
+    }
+
+    @Test
+    void interruptsPendingOxiaStageWaitDuringBoundedCleanup() throws Exception {
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        CompletableFuture<String> never = new CompletableFuture<>();
+        CountDownLatch entered = new CountDownLatch(1);
+        AtomicReference<Throwable> observed = new AtomicReference<>();
+        AtomicBoolean interruptRestored = new AtomicBoolean();
+        try {
+            Future<?> pending = worker.submit(() -> {
+                entered.countDown();
+                try {
+                    M3CandidateAllocatorPopulation.awaitStage(never, "test Oxia mutation");
+                } catch (Throwable failure) {
+                    observed.set(failure);
+                    interruptRestored.set(Thread.currentThread().isInterrupted());
+                }
+            });
+            assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(pending.cancel(true)).isTrue();
+            worker.shutdown();
+            assertThat(worker.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(observed.get())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("interrupted during bounded cleanup");
+            assertThat(observed.get().getCause()).isInstanceOf(InterruptedException.class);
+            assertThat(interruptRestored.get()).isTrue();
+        } finally {
+            worker.shutdownNow();
+            assertThat(worker.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
         }
     }
 

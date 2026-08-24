@@ -47,6 +47,7 @@ class M3RealAllocatorEvidenceTest {
         workers.prestartAllCoreThreads();
 
         M3AllocatorRawEvidenceFiles.EvidenceCounts counts;
+        Throwable executionFailure = null;
         try (M3AllocatorRawEvidenceFiles evidence = new M3AllocatorRawEvidenceFiles(
                         outputDirectory, M3AllocatorRawEvidenceFiles.sourceTupleFromSystemProperties());
                 M3RealOxiaActors actors = new M3RealOxiaActors(serviceAddress)) {
@@ -104,10 +105,18 @@ class M3RealAllocatorEvidenceTest {
                 }
             }
             counts = evidence.counts();
+        } catch (Exception | Error failure) {
+            executionFailure = failure;
+            throw failure;
         } finally {
             workers.shutdownNow();
             if (!workers.awaitTermination(5, TimeUnit.MINUTES)) {
-                throw new IllegalStateException("allocator 96-worker executor did not terminate");
+                IllegalStateException termination =
+                        new IllegalStateException("allocator 96-worker executor did not terminate");
+                if (executionFailure == null) {
+                    throw termination;
+                }
+                executionFailure.addSuppressed(termination);
             }
         }
 
@@ -141,7 +150,7 @@ class M3RealAllocatorEvidenceTest {
         return List.copyOf(candidates);
     }
 
-    private static ThreadPoolExecutor exactWorkers() {
+    static ThreadPoolExecutor exactWorkers() {
         AtomicInteger threadId = new AtomicInteger();
         ThreadFactory factory = runnable -> {
             Thread thread = new Thread(runnable, "m3-allocator-worker-" + threadId.getAndIncrement());

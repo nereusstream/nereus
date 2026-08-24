@@ -442,6 +442,30 @@ tasks.register<Test>("realAllocatorNativePathTest") {
     }
 }
 
+tasks.register<Test>("realAllocatorFaultBatchDiagnosticTest") {
+    group = "verification"
+    description = "Run the diagnostic-only 10k STRICT fault batch against real Oxia without emitting evidence."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    testClassesDirs = realAllocatorTest.output.classesDirs
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3RealAllocatorFaultBatchDiagnosticTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    systemProperty(
+        "nereus.m3.allocator.oxiaServiceAddress",
+        providers.gradleProperty("v2M3AllocatorOxiaServiceAddress").getOrElse("UNSET"),
+    )
+    systemProperty(
+        "nereus.m3.allocator.nereusSourceCommit",
+        providers.gradleProperty("v2M3AllocatorNereusSourceCommit").getOrElse("UNSET"),
+    )
+}
+
 tasks.register<Test>("m3ObjectWalMetadataTest") {
     group = "verification"
     description = "Run the deterministic M3 Object-WAL Oxia control-metadata adapter gate."

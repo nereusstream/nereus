@@ -42,10 +42,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletionService;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -54,6 +56,8 @@ import java.util.concurrent.locks.ReentrantLock;
 /** One full real-Oxia candidate population driven only through the production allocator SPI. */
 final class M3CandidateAllocatorPopulation {
     private static final long INITIAL_OWNER_EPOCH = 1;
+    private static final long OPERATION_TIMEOUT_SECONDS = 120;
+    private static final long POPULATION_DRAIN_TIMEOUT_SECONDS = 600;
 
     private final AllocatorEvidenceCandidateV1 candidate;
     private final M3RealOxiaActors actors;
@@ -269,10 +273,9 @@ final class M3CandidateAllocatorPopulation {
 
                 traces.setHeadMutationKind(incarnation, OxiaOperationKind.HEAD_PUBLISH_CAS);
                 trace.setOwnerEpoch(staleOwnerHead.value().ownerEpoch());
-                ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1> late = allocator
-                        .publishCandidate(allocationCell, staleOwnerHead, staleNode, currentView)
-                        .toCompletableFuture()
-                        .join();
+                ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1> late = awaitStage(
+                        allocator.publishCandidate(allocationCell, staleOwnerHead, staleNode, currentView),
+                        "late old-owner publish");
                 if (late.outcome() != ConditionalCasOutcome.DEFINITIVE_CONFLICT
                         || late.exactSnapshot().isPresent()) {
                     throw new AssertionError("late old-owner publish did not end in exact definitive conflict");
@@ -447,17 +450,11 @@ final class M3CandidateAllocatorPopulation {
                 return null;
             });
         }
-        for (int index = fromInclusive; index < toExclusive; index++) {
-            try {
-                completions.take().get();
-            } catch (ExecutionException failure) {
-                Throwable cause = failure.getCause();
-                if (cause instanceof Exception exception) {
-                    throw exception;
-                }
-                throw new RuntimeException(cause);
-            }
-        }
+        M3BoundedCompletionDrain.await(
+                completions,
+                toExclusive - fromInclusive,
+                POPULATION_DRAIN_TIMEOUT_SECONDS,
+                "allocator population construction");
     }
 
     private static VirtualLedgerSliceAssignmentV1 assignment(int candidateIndex, String discriminator) {
@@ -482,8 +479,8 @@ final class M3CandidateAllocatorPopulation {
         return Sha256Digest.hash(CanonicalBytes.copyOf(value.getBytes(StandardCharsets.UTF_8)));
     }
 
-    private static <T> T exact(java.util.concurrent.CompletionStage<ConditionalCasResult<T>> stage) {
-        return exactResult(stage.toCompletableFuture().join());
+    private static <T> T exact(CompletionStage<ConditionalCasResult<T>> stage) {
+        return exactResult(awaitStage(stage, "allocator conditional CAS"));
     }
 
     private static <T> T exactResult(ConditionalCasResult<T> result) {
@@ -494,14 +491,37 @@ final class M3CandidateAllocatorPopulation {
         return result.exactSnapshot().orElseThrow();
     }
 
-    private static <T> T exactCreate(java.util.concurrent.CompletionStage<CreateMutationResult<T>> stage) {
-        CreateMutationResult<T> result = stage.toCompletableFuture().join();
+    private static <T> T exactCreate(CompletionStage<CreateMutationResult<T>> stage) {
+        CreateMutationResult<T> result = awaitStage(stage, "allocator create mutation");
         if (result.outcome() != CreateMutationOutcome.CREATED
                 && result.outcome() != CreateMutationOutcome.EXISTING_EXACT) {
             throw new IllegalStateException(
                     "allocator production create did not converge exactly: " + result.outcome());
         }
         return result.exactSnapshot().orElseThrow();
+    }
+
+    static <T> T awaitStage(CompletionStage<T> stage, String label) {
+        Objects.requireNonNull(stage, "stage");
+        Objects.requireNonNull(label, "label");
+        try {
+            return stage.toCompletableFuture().get(OPERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(label + " was interrupted during bounded cleanup", failure);
+        } catch (TimeoutException failure) {
+            throw new IllegalStateException(
+                    label + " exceeded the " + OPERATION_TIMEOUT_SECONDS + " second operation cap", failure);
+        } catch (ExecutionException failure) {
+            Throwable cause = failure.getCause();
+            if (cause instanceof RuntimeException exception) {
+                throw exception;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new IllegalStateException(label + " failed", cause);
+        }
     }
 
     enum ResponseLossAt {
