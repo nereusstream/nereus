@@ -41,6 +41,11 @@ The M3 trusted runner owns an explicit prerequisite projection before it invokes
 9. P5 applies the same linked-worktree rule to Pulsar and requires the fixed
    `nereus/v2-m3-m2-regression-evidence` branch plus both that branch and the historical source-lock branch on
    `origin` to resolve to the same locked commit. Its ordinary entry point continues to require the historical branch.
+10. Before P6, the runner resolves the active Docker context, requires a non-symlink Unix socket, and verifies that
+    the server's declared minimum/maximum API interval contains fixed API `1.44`. P6 Testcontainers processes receive
+    only that exact `DOCKER_HOST`, the environment/system-property strategy, and `api.version=1.44`. This avoids
+    Testcontainers 1.20.4's API-1.32 fallback against Docker Engine 29 while leaving user-global Testcontainers
+    configuration untouched.
 
 The current-source receipt remains schema `NEREUS_V2_M3_CURRENT_SOURCE_M2_REGRESSION_V1`, non-promotable, and records
 `m2AmendmentLineage: []`. This is an M3 execution-profile correction, not an M2 semantic or correctness amendment.
@@ -61,5 +66,7 @@ runner rejects such a change rather than expanding the current-only allowlist by
   than the historical entry point and still rejects a shared checkout.
 - P5 cannot substitute the shared Pulsar checkout merely to satisfy a historical branch-name assertion; the M3
   profile proves both remote branch identities at one exact commit.
+- P6 uses the same already-verified Docker daemon as the runner's exact image checks. A different socket, symbolic
+  socket, non-Unix context, or server that excludes API 1.44 fails before Testcontainers starts.
 - Receipt publication still requires all 25 non-empty child gates with zero failure, error, and skip at one exact
   current source commit.

@@ -203,6 +203,34 @@ PY
 docker_bin="${NEREUS_M3_DOCKER_BIN:-docker}"
 command -v "$docker_bin" >/dev/null || fail "Docker client is unavailable: $docker_bin"
 "$docker_bin" compose version >/dev/null || fail "Docker Compose v2 is unavailable"
+docker_context="$($docker_bin context show)"
+[[ -n "$docker_context" && "$docker_context" != *$'\n'* && "$docker_context" != *$'\r'* ]] \
+    || fail "active Docker context name is absent or non-canonical"
+docker_host="$($docker_bin context inspect --format '{{.Endpoints.docker.Host}}' "$docker_context")"
+[[ "$docker_host" == unix:///* ]] || fail "active Docker context is not a Unix socket: $docker_context"
+docker_socket="${docker_host#unix://}"
+[[ "$docker_socket" = /* && -S "$docker_socket" && ! -L "$docker_socket" ]] \
+    || fail "active Docker context socket is absent, symbolic, or not a socket: $docker_socket"
+docker_api_values=($($docker_bin version --format '{{.Server.APIVersion}} {{.Server.MinAPIVersion}}'))
+[[ ${#docker_api_values[@]} -eq 2 ]] || fail "Docker server API tuple is incomplete"
+python3 - "${docker_api_values[0]}" "${docker_api_values[1]}" <<'PY'
+import re
+import sys
+
+def version(value: str) -> tuple[int, int]:
+    match = re.fullmatch(r"([0-9]+)\.([0-9]+)", value)
+    if match is None:
+        raise SystemExit(f"Docker API version is not canonical: {value}")
+    return int(match.group(1)), int(match.group(2))
+
+maximum = version(sys.argv[1])
+minimum = version(sys.argv[2])
+target = (1, 44)
+if not minimum <= target <= maximum:
+    raise SystemExit(
+        f"Docker server does not admit the fixed Testcontainers API 1.44: min={sys.argv[2]} max={sys.argv[1]}"
+    )
+PY
 
 assert_image() {
     local reference="$1"
@@ -356,7 +384,11 @@ candidate="$output_dir/raw/pulsar-p6/candidate-matrix.json"
 native="$output_dir/raw/pulsar-p6/native-baseline.json"
 minio="$output_dir/raw/pulsar-p6/minio-provider.json"
 mkdir -p "$(dirname "$candidate")"
-run_logged pulsar-p6-local "${gradle[@]}" \
+run_logged pulsar-p6-local env \
+    "DOCKER_HOST=$docker_host" \
+    TESTCONTAINERS_DOCKER_CLIENT_STRATEGY=org.testcontainers.dockerclient.EnvironmentAndSystemPropertyClientProviderStrategy \
+    JAVA_TOOL_OPTIONS=-Dapi.version=1.44 \
+    "${gradle[@]}" \
     :nereus-pulsar-offload:p6ProviderTest :nereus-pulsar-offload:p6EvidenceTest \
     "-Pv2M2PulsarP6EvidenceOutput=$candidate" \
     "-Pv2M2PulsarP6TestedSourceCommit=$tested_commit" \

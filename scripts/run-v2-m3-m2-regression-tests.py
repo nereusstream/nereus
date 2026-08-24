@@ -7,6 +7,7 @@ import json
 import hashlib
 import os
 from pathlib import Path
+import socket
 import shutil
 import subprocess
 import tempfile
@@ -86,11 +87,17 @@ class Fixture:
         git(self.repo, "commit", "-m", "fixture current M3 source")
         self.tested = git(self.repo, "rev-parse", "HEAD")
         self.output = self.base / "external-output"
+        self.docker_socket_path = self.base / "docker.sock"
+        self.docker_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.docker_socket.bind(str(self.docker_socket_path))
         self.fake_docker = self.base / "docker"
         self.fake_docker.write_text(
             "#!/usr/bin/env bash\n"
             "set -eu\n"
             "if [[ \"$1 $2\" == 'compose version' ]]; then echo 'Docker Compose version v2-test'; exit 0; fi\n"
+            "if [[ \"$1 $2\" == 'context show' ]]; then echo 'fixture'; exit 0; fi\n"
+            "if [[ \"$1 $2\" == 'context inspect' ]]; then echo 'unix://" + str(self.docker_socket_path) + "'; exit 0; fi\n"
+            "if [[ \"$1 $2\" == 'version --format' ]]; then echo '1.55 1.40'; exit 0; fi\n"
             "if [[ \"$1 $2 $3\" == 'image inspect --format' ]]; then\n"
             "  format=$4; ref=$5\n"
             "  case \"$ref\" in\n"
@@ -126,6 +133,7 @@ class Fixture:
         return repository, worktree, commit
 
     def cleanup(self) -> None:
+        self.docker_socket.close()
         self.temporary.cleanup()
 
     def command(self, *extra: str) -> list[str]:
@@ -202,6 +210,9 @@ class RunnerPreflightTest(unittest.TestCase):
         bad_docker.write_text(
             "#!/usr/bin/env bash\n"
             "if [[ \"$1 $2\" == 'compose version' ]]; then exit 0; fi\n"
+            "if [[ \"$1 $2\" == 'context show' ]]; then echo 'fixture'; exit 0; fi\n"
+            "if [[ \"$1 $2\" == 'context inspect' ]]; then echo 'unix://" + str(self.fixture.docker_socket_path) + "'; exit 0; fi\n"
+            "if [[ \"$1 $2\" == 'version --format' ]]; then echo '1.55 1.40'; exit 0; fi\n"
             "if [[ \"$1 $2 $3\" == 'image inspect --format' ]]; then echo 'sha256:bad'; exit 0; fi\n"
             "exit 2\n"
         )
@@ -210,6 +221,23 @@ class RunnerPreflightTest(unittest.TestCase):
         result = run(*self.fixture.command(), env=environment)
         self.assertNotEqual(0, result.returncode)
         self.assertIn("Docker image ID differs", result.stdout)
+
+    def test_rejects_docker_server_that_excludes_fixed_api(self) -> None:
+        incompatible_docker = self.fixture.base / "incompatible-docker"
+        incompatible_docker.write_text(
+            "#!/usr/bin/env bash\n"
+            "if [[ \"$1 $2\" == 'version --format' ]]; then echo '1.55 1.45'; exit 0; fi\n"
+            "exec \"$NEREUS_M3_FIXTURE_DOCKER\" \"$@\"\n"
+        )
+        incompatible_docker.chmod(0o755)
+        environment = {
+            **os.environ,
+            "NEREUS_M3_DOCKER_BIN": str(incompatible_docker),
+            "NEREUS_M3_FIXTURE_DOCKER": str(self.fixture.fake_docker),
+        }
+        result = run(*self.fixture.command(), env=environment)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("does not admit the fixed Testcontainers API 1.44", result.stdout)
 
     def test_rejects_unapproved_current_only_source_lock_member(self) -> None:
         lock_path = self.fixture.repo / "docs/v2/source-locks.json"

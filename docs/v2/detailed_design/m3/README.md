@@ -105,6 +105,12 @@ no shared Kafka checkout was substituted.
 The following diagnostic completed K2's local/exact-source 30 tests and P5's native 26 tests before P5 rejected the
 fixed evidence branch name; ADR 0098 now makes P5 prove the linked worktree and both published branch refs at the same
 locked commit instead of falling back to the shared checkout.
+The next diagnostic completed real BookKeeper plus Kafka 10k/100k before P6 exposed Testcontainers 1.20.4's API-1.32
+fallback against Docker Engine 29.7.2 (minimum API 1.40). A dedicated-worktree diagnostic passed both P6 suites with
+the active Docker-context socket and fixed API 1.44; ADR 0098 now makes those values fail-closed runner inputs. During
+diagnosis one command omitted `-PpulsarCheckout`, was interrupted during compilation, and updated only pre-existing
+ignored build state in the shared Pulsar checkout; its Git worktree remained clean, no product source changed, and no
+cleanup was performed.
 
 Serial continuation order is current-source M2 regression, formal exact-source Provider/KMS and allocator evidence,
 and finally final source locks, child receipts, scenario synchronization, and M3 Final.
