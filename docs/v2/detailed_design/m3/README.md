@@ -20,14 +20,16 @@ slice workers are quiescent; the main repository owner alone now integrates, rer
 evidence. It is an implementation ledger only: uncommitted source, compilation, static governance tests, focused
 tests, and external fork commits are not M3 evidence and do not promote a scenario.
 
-- The serial-integration handoff baseline is `768a97faaef1d87cd914cf7ec840f637c1bdc4c3`. The current pushed main checkpoint
-  is `ff1abd1c66efa06d05243f4e40992ae5021e7587`, with `main` and `origin/main` exactly aligned before allocator
-  integration. Seven reviewable commits since the handoff baseline contain the common Object-WAL foundation, Kafka
-  and Pulsar paths plus their documentation checkpoints, and the real Provider/KMS adapters.
-- The remaining in-progress tree is limited to allocator/Oxia production and evidence work, its reproducible Oxia
-  evidence image, synchronized allocator ADR/open-question/source-lock changes, and staged M3 governance scripts.
-  Former worker test summaries are inputs for serial review only; any source change invalidates their freshness and
-  requires a main-owner rerun. None of the uncommitted paths or prior local XML files is a receipt.
+- The serial-integration handoff baseline is `768a97faaef1d87cd914cf7ec840f637c1bdc4c3`. The latest source-tested
+  implementation checkpoint is `98a6384a9a0cf0a4579212f2df9b9a760a3b1f59`; `main`, `origin/main`, and the
+  working tree were exactly aligned for its ordinary module/API run. Ten reviewable implementation commits since the
+  handoff baseline contain the common Object-WAL foundation, Kafka and Pulsar paths plus their documentation
+  checkpoints, real Provider/KMS adapters, allocator/Oxia production and evidence paths, aggregate governance, and
+  the source-qualified module/API closure.
+- All former slice workers are stopped. Former worker test summaries are inputs for serial review only; any source
+  change invalidates their freshness and requires a main-owner rerun. The remaining work is execution and publication
+  of exact-source M2 regression, Provider/KMS and allocator evidence, child receipts, scenarios, and Final. Prior local
+  or diagnostic XML/JSON files are not receipts.
 - The current common-module tree passes `:nereus-storage-object:check`: 147 tests execute with zero failure, error, or
   skip, and Checkstyle plus Spotless pass. The non-promotable local gates also pass with 17 wire-source tests over the
   six positive vectors and 114-row TSV, 3 mutation tests over all 84 authored records and 240 paths, and 7 state-trace
@@ -76,11 +78,24 @@ tests, and external fork commits are not M3 evidence and do not promote a scenar
   Vault v1-to-v2 rotation gated by a production `WalRunObjectSession` terminal-closure proof. Diagnostic runs are
   explicitly non-evidence: the clean-pushed exact-source formal Provider/KMS receipts and allocator evidence remain
   open.
+- Nereus `a95e492e2597a48c77bcbdc2354ca189d93fc552` commits the allocator/Oxia production path and formal evidence
+  runner. Fresh ordinary execution covers 48 allocator tests, eight Object-WAL Oxia adapter tests, five frozen
+  allocator-contract tests, and two pinned native-path tests with zero failure/error/skip; one separate test passes
+  against the exact source-locked real Oxia image. ADR 0097 independently versions that reproducible local M3 evidence
+  image as `nereus/oxia-m3-allocator:37a17bef1720` with config digest
+  `sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da`, without changing the historical M1
+  image lock. The real-Oxia run and dirty-tree preflight are diagnostic only; 10k/100k formal execution and selection
+  remain open.
+- At exact clean source `98a6384a9a0cf0a4579212f2df9b9a760a3b1f59`, `v2M3ModuleApiSourceCheck` verifies ten
+  production modules with non-empty zero-failure/error/skip JUnit reports and style gates, publishes all eleven M3
+  modules at the source-qualified coordinate, verifies their POM/Gradle metadata/BOM closure, and compiles an
+  independent consumer. This is ordinary current-source implementation evidence, not a child receipt or scenario
+  promotion.
 - Exact M3 source locks, fresh child receipts, aggregate Final, and Markdown/JSON scenario promotions do not exist.
   `implementationStatus: InProgress` and `evidenceStatus: NotRun` therefore remain authoritative.
 
-Serial continuation order is source integration, formal exact-source Provider/KMS and allocator evidence, and finally
-source locks, current-source M2 regression, child receipts, scenario synchronization, and M3 Final.
+Serial continuation order is current-source M2 regression, formal exact-source Provider/KMS and allocator evidence,
+and finally final source locks, child receipts, scenario synchronization, and M3 Final.
 Each stable boundary must be committed and pushed before the next evidence-bearing boundary is evaluated.
 
 ## Current boundary
@@ -88,7 +103,7 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | Slice | Design or output | Status at this documentation cut |
 | --- | --- | --- |
 | M3-I0 | [NWG1 implementation-input closure](m3-i0-nwg1-implementation-input-closure.md), [ADR 0089 Header amendment](../../../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and [ADR 0090 mutation-call profiles](../../../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md) | accepted documentation-only input with exact Header offsets and explicit X0/XU call caps; no codec, runner, trace harness, Provider evidence, receipt, or scenario PASS |
-| M3-W1 | current-source M2 regression plus M3 module/API input gate | planned; historical M2 Final remains immutable and current-source regression must equal the eventual M3 tested source |
+| M3-W1 | current-source M2 regression plus M3 module/API input gate | M3 inputs and the eleven-module source-qualified API closure pass at clean source `98a6384a9a0cf0a4579212f2df9b9a760a3b1f59`; historical M2 Final remains immutable, while the complete current-source M2 regression receipt at the eventual M3 tested source remains open |
 | M3-W2 | NWG1 production encoder/decoder, projection, six-vector A corpus, and exact wire gate | common source implemented; local 17-test/114-row wire-source gate passes, but no exact-source child receipt exists |
 | M3-W3 | 84-record/240-path B mutation manifest and runner | common source implemented; local 3-test gate covers exactly 84 records/240 paths with no generated inventory, but no exact-source child receipt exists |
 | M3-C1 | 50-trace Object-WAL kernel harness | common kernel and manifest implemented; local 7-test gate covers 50 traces/21 outcomes, but backend integration and exact-source receipt remain open |
@@ -96,8 +111,8 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; Kafka/Pulsar backend integration and dedicated-fork compile checkpoints pass, while formal Provider/KMS receipts remain open |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | Kafka source implemented; local 260-test module check covers strict wire/key/caps, OPEN/TERMINAL Head, backend mapping and bounded recovery; the dedicated fork now compiles against the split F9/M3 artifact inputs with 6/6 tests, while the final source-qualified native receipt remains open |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; the dedicated-fork dual-repository compile checkpoint passes 6/6 tests, but a source-qualified receipt remains open and native broker/controller activation remains M6 |
-| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; [ADR 0091](../../../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md) fixes production allocator wire/key/transitions and [ADR 0094](../../../decisions/0094-v2-m3-allocator-evidence-workload-and-selection-amendment.md) freezes the formal workload/SLO/selection inputs, but the exact-source receipt and real/native 10k/100k allocator receipt, RANGE size, mode selection, and scenario PASS remain open |
-| M3-FINAL | exact-source aggregate and scenario promotion | planned; requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
+| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; allocator production/evidence code is committed at `a95e492e2597a48c77bcbdc2354ca189d93fc552` and its ordinary 48-test inventory passes; ADRs 0091/0094/0097 freeze the wire, raw workload/SLO/selection, and reproducible evidence-image inputs, but the formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open |
+| M3-FINAL | exact-source aggregate and scenario promotion | fail-closed child/final checker and publisher contracts are implemented and their 74 governance tests pass; Final remains open and requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
 
 Slice names are execution labels, not new durable wire codes. Implementations may split reviewable commits more
 finely, but may not merge authority, evidence, or promotion boundaries merely to reduce the number of commits.
