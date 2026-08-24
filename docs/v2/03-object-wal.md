@@ -233,10 +233,11 @@ only exact candidate equality, definitive conflicts adopt only a same-Root compo
 publisher locally merges predecessors. Each failed publisher epoch can leave at most one bounded unreachable page.
 
 Policy is Protocol Cell x shard scoped and persisted in the next Root. Proactive cadence may be disabled, but aggregate
-uncovered provider-resolved extent/byte bounds and per-lane age are finite. Open recovery/handoff always strong-LIST
-uncovered lane tails; invalid pages fall back to full bounded run LIST. Besides Root identity, the Seal binds only one
-provider-resolved terminal sequence vector, one final checkpoint-head key/SHA, and minimum aggregate count/body-byte
-completeness facts. Three lane-local chains are not used.
+uncovered provider-resolved extent/byte bounds and per-lane age are finite. Under ADR 0096's conservative owner-open
+amendment, recovery/handoff first verifies the complete exact checkpoint chain and then strong-LIST folds all three
+uncovered lane tails. An invalid or incomplete checkpoint stream fails closed and cannot fall back to a second full-run
+LIST path. Besides Root identity, the Seal binds only one provider-resolved terminal sequence vector, one final
+checkpoint-head key/SHA, and minimum aggregate count/body-byte completeness facts. Three lane-local chains are not used.
 
 ### Kafka protocol checkpoints are a separate Object family
 
@@ -282,7 +283,9 @@ aggregate count/body-byte facts needed to validate the provider-resolved invento
 ACK, gap, or per-binding coverage. A successor Root references both
 predecessor Root and Seal identities. Each shard then CASes `CurrentWalRunPointer` from the exact predecessor tuple to
 the successor tuple. A crash that leaves the pointer on a sealed Root finishes/adopts the matching successor and never
-reopens that run. Recovery walks the bounded lineage to the retirement frontier, and every group header binds its Root
+reopens that run. A same-call CAS self-winner converges exactly; a different winner is validated only by a fresh
+owner-open attempt under that winner's persisted envelope, never under the losing candidate's budget. Recovery walks
+the bounded lineage to the retirement frontier, and every group header binds its Root
 SHA. Missing/hash-mismatched/cyclic/forked/over-depth lineage fails closed. Owner-open, rollover, and handoff use these
 records; normal admitted group append performs no metadata-service I/O.
 
