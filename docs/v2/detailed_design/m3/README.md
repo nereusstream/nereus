@@ -34,6 +34,11 @@ fork commits are not M3 evidence and do not promote a scenario.
 - ADR 0096 records the explicit pre-closure-to-closed NWR1 golden lineage and the conservative different-CAS-winner
   rollover rule. Wire versions, field order and widths, rejection codes, validation stages, strict-decoder behavior,
   and the M3-I0 exclusions are unchanged.
+- The current Kafka module tree passes `:nereus-kafka-bookkeeper:check`: 260 tests execute with zero failure, error, or
+  skip, and all module Checkstyle/Spotless gates pass. The Object path now uses compact streaming publication
+  verification, Root-bound NWKCP1 keys and strict Head state, whole-suffix rollback, physical/binding frontiers, and a
+  common-coordinator `ProtocolRecoveryHandler` that stages the three secure lane spools exactly once under the durable
+  owner fence. This is local current-tree conformance, not the dedicated-fork/native source receipt.
 - The dedicated Kafka fork branch `nereus/v2-m3-object-wal-evidence` is clean and pushed at
   `ffee27e5fd19b50802fc9fe0a12f86e09f709b14`. Its three M3 commits guard native owner callbacks and add deterministic
   rollback/takeover-cut tests, but the branch has not completed a current-Nereus-artifact compile or evidence run.
@@ -61,8 +66,8 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | M3-C1 | 50-trace Object-WAL kernel harness | common kernel and manifest implemented; local 7-test gate covers 50 traces/21 outcomes, but backend integration and exact-source receipt remain open |
 | M3-D1 | local capacity conformance and exact Provider C1/C2 evidence | planned; C1 production admission and C2 benefit remain unproved |
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; backend integration, real evidence, and receipt remain open |
-| M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | planned; exact wire, key, vector caps, backend mapping, recovery, and terminal Head evidence remain M3 work |
-| M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | planned; native broker/controller activation remains M6 |
+| M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | Kafka source implemented; local 260-test module check covers strict wire/key/caps, OPEN/TERMINAL Head, backend mapping and bounded recovery, but dedicated-fork/native exact-source receipt remains open |
+| M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; current-artifact fork evidence remains open and native broker/controller activation remains M6 |
 | M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | implementation in progress; [ADR 0091](../../../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md) fixes production allocator wire/key/transitions and [ADR 0094](../../../decisions/0094-v2-m3-allocator-evidence-workload-and-selection-amendment.md) freezes the formal workload/SLO/selection inputs, but no real/native 10k/100k receipt, RANGE size, mode selection, or scenario PASS exists |
 | M3-FINAL | exact-source aggregate and scenario promotion | planned; requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
 

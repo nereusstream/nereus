@@ -15,6 +15,7 @@
 dependencies {
     api(project(":nereus-storage-api"))
     implementation(project(":nereus-storage-bookkeeper"))
+    api(project(":nereus-storage-object"))
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
@@ -99,4 +100,73 @@ tasks.register<JavaExec>("v2M2KafkaFinalReceiptCheck") {
         rootProject.projectDir.absolutePath,
         providers.gradleProperty("v2M2KafkaFinalReceipt").get(),
     )
+}
+
+val v2M3KafkaNativeReceiptOutput = providers.gradleProperty("v2M3KafkaNativeReceiptOutput")
+val v2M3KafkaTestedSourceCommit = providers.gradleProperty("v2M3KafkaTestedSourceCommit")
+val v2M3KafkaSourceRepository = providers.gradleProperty("v2M3KafkaSourceRepository")
+val v2M3KafkaSourceCommit = providers.gradleProperty("v2M3KafkaSourceCommit")
+val v2M3KafkaTestStartedAtUtc = providers.gradleProperty("v2M3KafkaTestStartedAtUtc")
+val v2M3KafkaTestFinishedAtUtc = providers.gradleProperty("v2M3KafkaTestFinishedAtUtc")
+
+tasks.register<JavaExec>("v2M3KafkaNativeReceiptEmit") {
+    group = "verification"
+    description = "Emit the source/JUnit-bound M3 Kafka Object-WAL raw native receipt to an explicit untracked path."
+    dependsOn(
+        tasks.named("test"),
+        tasks.named("classes"),
+        tasks.named("spotlessCheck"),
+        tasks.named("checkstyleMain"),
+        tasks.named("checkstyleTest"),
+    )
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.nereusstream.kafka.bookkeeper.object.evidence.KafkaObjectWalNativeResultV1")
+    outputs.upToDateWhen { false }
+    doFirst {
+        val output = v2M3KafkaNativeReceiptOutput.orNull
+            ?: throw GradleException("-Pv2M3KafkaNativeReceiptOutput is required")
+        val outputPath = file(output).toPath().toAbsolutePath().normalize()
+        val repositoryPath = rootProject.projectDir.toPath().toAbsolutePath().normalize()
+        val rootBuildPath = rootProject.layout.buildDirectory.get().asFile.toPath().toAbsolutePath().normalize()
+        val moduleBuildPath = layout.buildDirectory.get().asFile.toPath().toAbsolutePath().normalize()
+        if (outputPath.startsWith(repositoryPath)
+            && !outputPath.startsWith(rootBuildPath)
+            && !outputPath.startsWith(moduleBuildPath)
+        ) {
+            throw GradleException("M3 raw receipt output must remain outside tracked repository paths")
+        }
+        args(
+            "generate",
+            rootProject.projectDir.absolutePath,
+            v2M3KafkaTestedSourceCommit.orNull
+                ?: throw GradleException("-Pv2M3KafkaTestedSourceCommit is required"),
+            v2M3KafkaSourceRepository.orNull
+                ?: throw GradleException("-Pv2M3KafkaSourceRepository is required"),
+            v2M3KafkaSourceCommit.orNull
+                ?: throw GradleException("-Pv2M3KafkaSourceCommit is required"),
+            v2M3KafkaTestStartedAtUtc.orNull
+                ?: throw GradleException("-Pv2M3KafkaTestStartedAtUtc is required"),
+            v2M3KafkaTestFinishedAtUtc.orNull
+                ?: throw GradleException("-Pv2M3KafkaTestFinishedAtUtc is required"),
+            outputPath.toString(),
+        )
+    }
+}
+
+val v2M3KafkaNativeReceiptInput = providers.gradleProperty("v2M3KafkaNativeReceiptInput")
+
+tasks.register<JavaExec>("v2M3KafkaNativeReceiptCheck") {
+    group = "verification"
+    description = "Strictly parse and self-hash-check one explicit M3 Kafka Object-WAL raw native receipt."
+    dependsOn(tasks.named("classes"))
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.nereusstream.kafka.bookkeeper.object.evidence.KafkaObjectWalNativeResultV1")
+    outputs.upToDateWhen { false }
+    doFirst {
+        args(
+            "parse",
+            v2M3KafkaNativeReceiptInput.orNull
+                ?: throw GradleException("-Pv2M3KafkaNativeReceiptInput is required"),
+        )
+    }
 }

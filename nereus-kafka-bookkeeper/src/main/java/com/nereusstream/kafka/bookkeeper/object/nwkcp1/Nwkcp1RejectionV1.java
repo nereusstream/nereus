@@ -12,12 +12,24 @@
  * limitations under the License.
  */
 
-package com.nereusstream.kafka.bookkeeper.protocol;
+package com.nereusstream.kafka.bookkeeper.object.nwkcp1;
 
-/** Closed reason for one successful state-root replacement. */
-public enum KafkaPartitionPublicationKindV1 {
-    COMMIT,
-    FENCE_TRANSITION,
-    SPECULATIVE_ROLLBACK,
-    OBJECT_TAIL_RETIREMENT
+/** Stable fail-closed NWKCP1 decode rejection identities. */
+public enum Nwkcp1RejectionV1 {
+    OBJECT_TOO_LARGE,
+    OBJECT_LENGTH,
+    OBJECT_DIGEST,
+    OBJECT_KEY,
+    TRUNCATED,
+    MAGIC_VERSION,
+    HEADER_LENGTH,
+    HEADER_FLAGS,
+    HEADER_CRC,
+    ROOT_IDENTITY,
+    ROW_COUNT,
+    ROW_LENGTH,
+    ROW_DIGEST,
+    ROW_STATE,
+    ROW_ORDER,
+    TRAILING_BYTES
 }

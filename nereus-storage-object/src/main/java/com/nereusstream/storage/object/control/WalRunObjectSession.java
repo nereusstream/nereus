@@ -791,8 +791,16 @@ public final class WalRunObjectSession implements AutoCloseable {
         if (root.protocolCellIdentity().protocolKind().code() != 1 || identity.bodyLength() > 64L * 1024 * 1024) {
             throw new IllegalArgumentException("WalRun does not admit this Kafka protocol Object identity");
         }
-        String expected = root.providerConfiguration().exclusiveNamespacePrefix()
-                + "/protocol/kafka/nwkcp1-v1/objects/sha256-v1-"
+        String namespace = root.providerConfiguration().exclusiveNamespacePrefix();
+        String marker = "/protocol/kafka/nwkcp1-v1/objects/sha256-v1-";
+        int markerOffset = identity.key().lastIndexOf(marker);
+        if (markerOffset < namespace.length()
+                || !identity.key().startsWith(namespace + "/")
+                || markerOffset != identity.key().indexOf(marker)) {
+            throw new IllegalArgumentException("Kafka protocol Object key differs from the exact Root-bound grammar");
+        }
+        String expected = identity.key().substring(0, markerOffset)
+                + marker
                 + identity.bodySha256().toHex()
                 + ".nwkcp1";
         if (!identity.key().equals(expected) || expected.getBytes(StandardCharsets.US_ASCII).length > 1024) {

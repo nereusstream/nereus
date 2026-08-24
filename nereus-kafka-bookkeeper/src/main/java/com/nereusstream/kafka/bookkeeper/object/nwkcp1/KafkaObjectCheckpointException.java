@@ -12,12 +12,15 @@
  * limitations under the License.
  */
 
-package com.nereusstream.kafka.bookkeeper.protocol;
+package com.nereusstream.kafka.bookkeeper.object.nwkcp1;
 
-/** Closed reason for one successful state-root replacement. */
-public enum KafkaPartitionPublicationKindV1 {
-    COMMIT,
-    FENCE_TRANSITION,
-    SPECULATIVE_ROLLBACK,
-    OBJECT_TAIL_RETIREMENT
+/** Fail-closed publication/recovery failure for the independent Kafka protocol checkpoint family. */
+public class KafkaObjectCheckpointException extends IllegalStateException {
+    public KafkaObjectCheckpointException(String message) {
+        super(message);
+    }
+
+    public KafkaObjectCheckpointException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

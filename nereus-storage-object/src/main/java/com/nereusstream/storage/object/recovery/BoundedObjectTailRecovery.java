@@ -60,6 +60,8 @@ public final class BoundedObjectTailRecovery {
     private final int exactExtentKeyBytes;
     private boolean compositeWorkingSetActive;
     private final Set<ObjectIdentity> reconciliationAttempts = new HashSet<>();
+    private final Map<ObjectIdentity, CumulativeRecoveryBudget.ListReservation> pendingExtentListReservations =
+            new LinkedHashMap<>();
 
     BoundedObjectTailRecovery(C1ObjectProviderSession provider, CumulativeRecoveryBudget budget) {
         this.provider = new RawProviderAccess(Objects.requireNonNull(provider, "provider"));
@@ -591,8 +593,13 @@ public final class BoundedObjectTailRecovery {
                 + "/"
                 + leaf.laneId().leafToken()
                 + "/";
-        CumulativeRecoveryBudget.ListReservation reservation = budget.reserveRemainingList();
+        CumulativeRecoveryBudget.ListReservation reservation = pendingExtentListReservations.remove(identity);
+        if (reservation == null) {
+            reservation = budget.reserveRemainingList();
+        }
+        CumulativeRecoveryBudget.ListReservation exactReservation = reservation;
         budget.acquireWorkingSet(reservation.maximumCanonicalKeyBytes());
+        boolean settled = false;
         try {
             budget.chargeFullGet(identity.bodyLength());
             ProviderReconciliationResult reconciliation = provider.reconcileUnknown(
@@ -603,12 +610,17 @@ public final class BoundedObjectTailRecovery {
                     reservation.maximumCanonicalKeyBytes(),
                     exactExtentKeyBytes);
             reconciliation.inventory().ifPresent(inventory -> {
-                reservation.settle(inventory.pageCount(), inventory.objects().size(), inventory.canonicalKeyBytes());
+                exactReservation.settle(
+                        inventory.pageCount(), inventory.objects().size(), inventory.canonicalKeyBytes());
                 validateExtentInventory(leaf.laneId(), inventory);
             });
+            settled = reconciliation.inventory().isPresent();
             budget.checkWallTime();
             return reconciliation.objectResult();
         } finally {
+            if (!settled) {
+                pendingExtentListReservations.put(identity, reservation);
+            }
             budget.releaseWorkingSet(reservation.maximumCanonicalKeyBytes());
         }
     }
