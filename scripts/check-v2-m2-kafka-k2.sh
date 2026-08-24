@@ -95,7 +95,13 @@ base_commit="${lock_values[1]}"
 branch="${lock_values[2]}"
 fork_commit="${lock_values[3]}"
 
-[[ -d "$kafka_checkout/.git" ]] || fail "Kafka checkout is not a Git repository"
+if [[ -n "${NEREUS_V2_M2_PREREQUISITE_SOURCE_LOCKS:-}" ]]; then
+    [[ -f "$kafka_checkout/.git" && ! -L "$kafka_checkout/.git" ]] \
+        || fail "Kafka checkout must be a dedicated linked worktree in the M3 regression profile"
+else
+    [[ -e "$kafka_checkout/.git" && ! -L "$kafka_checkout/.git" ]] \
+        || fail "Kafka checkout is not a Git repository"
+fi
 [[ -z "$(git -C "$kafka_checkout" status --porcelain=v1 --untracked-files=all)" ]] \
     || fail "Kafka checkout must be clean before execution"
 [[ "$(git -C "$kafka_checkout" remote get-url origin)" == "$repository" ]] \

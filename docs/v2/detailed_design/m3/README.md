@@ -99,6 +99,9 @@ stopped at K1 because the historical gate hashed the whole source-lock document 
 was added. [ADR 0098](../../../decisions/0098-v2-m3-current-source-m2-regression-prerequisite-projection.md) now
 requires an exact historical-member/current-only-member projection while leaving the default M2 gates and historical
 receipts unchanged; the failed external directory is diagnostic and non-promotable.
+The next diagnostic advanced through the current-source local K0/K1/K3-K10 and Pulsar P0-P4 gates before K2 exposed
+an old `.git`-directory-only assumption. ADR 0098 now also requires K2's M3 input to be a linked-worktree `.git` file;
+no shared Kafka checkout was substituted.
 
 Serial continuation order is current-source M2 regression, formal exact-source Provider/KMS and allocator evidence,
 and finally final source locks, child receipts, scenario synchronization, and M3 Final.

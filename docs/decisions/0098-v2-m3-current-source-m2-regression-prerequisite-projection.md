@@ -35,6 +35,9 @@ The M3 trusted runner owns an explicit prerequisite projection before it invokes
 7. Compile, execute, source-scan, and parse all M2 production code and JUnit XML from the exact current M3 source. The
    historical blob supplies only the immutable K0 prerequisite identity; it cannot substitute historical code or
    test results.
+8. In this profile K2 requires its Kafka checkout to expose a non-symlink `.git` file, proving that the already
+   source-locked checkout is a linked worktree. The ordinary K2 entry point continues to accept either a normal Git
+   checkout or a linked worktree. A `.git` directory cannot satisfy the M3 profile.
 
 The current-source receipt remains schema `NEREUS_V2_M3_CURRENT_SOURCE_M2_REGRESSION_V1`, non-promotable, and records
 `m2AmendmentLineage: []`. This is an M3 execution-profile correction, not an M2 semantic or correctness amendment.
@@ -51,5 +54,7 @@ runner rejects such a change rather than expanding the current-only allowlist by
   never admitted by a prefix or wildcard.
 - Failed or partial raw-run directories remain diagnostics outside the repository and cannot be published as trusted
   children.
+- The K2 Git-layout check no longer misclassifies linked worktrees as non-repositories; the M3 profile is stricter
+  than the historical entry point and still rejects a shared checkout.
 - Receipt publication still requires all 25 non-empty child gates with zero failure, error, and skip at one exact
   current source commit.
