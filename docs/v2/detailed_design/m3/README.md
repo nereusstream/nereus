@@ -55,11 +55,19 @@ fork commits are not M3 evidence and do not promote a scenario.
   ledger/entry, commit-set, storage-attempt, and assigned-payload SHA fields. The common
   `:nereus-storage-object:check` also remains green after this API integration. This is local current-tree conformance,
   not native Pulsar or allocator evidence.
-- The dedicated Pulsar fork branch `nereus/v2-m3-object-wal-evidence` remains clean and unchanged at
-  `a14e0e6f4e49be0677318b4ceefc7b85b445823b`; its exact-artifact native owner/rollover integration and source-bound
-  receipt remain the next Pulsar work. Native broker/controller activation remains excluded to M6.
-- Kafka and Pulsar Nereus adapters now use the bounded owner-open recovery coordinator, but only Kafka has a dedicated
-  external-fork compile checkpoint. Provider/KMS and allocator results so far are local/static or stale after later
+- The dedicated Pulsar fork branch `nereus/v2-m3-object-wal-evidence` is clean and pushed at
+  `7ff908330809f2e9bc5c69ead87bb85c566bc0a9`. It adds the non-activating native Cell-owner maintenance bridge and
+  resolves the Nereus M3 artifacts from a separate explicit repository. The exact input artifacts were published from
+  the clean detached Nereus source `bc8691a636456cef48119ded637ea027679b0903`; the temporary
+  `nereus-pulsar-offload` SNAPSHOT JAR SHA-256 is
+  `f30542d41bb860ab93bc08f56e9ef88f04d9d2493a3b60fcc24a245b97290158`. Five native-boundary tests pass with zero
+  failure/error/skip, main/test Checkstyle passes, the M3-enabled broker main/test sources compile, and the same branch
+  compiles the stock broker main/test sources when the optional M3 input is disabled. The bridge blocks Cell-owner
+  replacement across the complete synchronous Provider callback and proves stock Position/MessageId retention at the
+  fixed 2^40 slice endpoint. Because the coordinate is a temporary SNAPSHOT and this does not activate broker/topic
+  lifecycle wiring, it is a non-promotable compile checkpoint; native broker/controller activation remains M6.
+- Kafka and Pulsar Nereus adapters now use the bounded owner-open recovery coordinator and both have dedicated
+  external-fork compile checkpoints. Provider/KMS and allocator results so far are local/static or stale after later
   source edits; real Provider/KMS/allocator evidence has not run.
 - Exact M3 source locks, fresh child receipts, aggregate Final, and Markdown/JSON scenario promotions do not exist.
   `implementationStatus: InProgress` and `evidenceStatus: NotRun` therefore remain authoritative.
@@ -81,7 +89,7 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; backend integration, real evidence, and receipt remain open |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | Kafka source implemented; local 260-test module check covers strict wire/key/caps, OPEN/TERMINAL Head, backend mapping and bounded recovery; the dedicated fork now compiles against the split F9/M3 artifact inputs with 6/6 tests, while the final source-qualified native receipt remains open |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; the dedicated-fork dual-repository compile checkpoint passes 6/6 tests, but a source-qualified receipt remains open and native broker/controller activation remains M6 |
-| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; [ADR 0091](../../../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md) fixes production allocator wire/key/transitions and [ADR 0094](../../../decisions/0094-v2-m3-allocator-evidence-workload-and-selection-amendment.md) freezes the formal workload/SLO/selection inputs, but the dedicated Pulsar fork and real/native 10k/100k allocator receipt, RANGE size, mode selection, and scenario PASS remain open |
+| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; [ADR 0091](../../../decisions/0091-v2-m3-pulsar-virtual-ledger-allocator-wire-and-selection.md) fixes production allocator wire/key/transitions and [ADR 0094](../../../decisions/0094-v2-m3-allocator-evidence-workload-and-selection-amendment.md) freezes the formal workload/SLO/selection inputs, but the exact-source receipt and real/native 10k/100k allocator receipt, RANGE size, mode selection, and scenario PASS remain open |
 | M3-FINAL | exact-source aggregate and scenario promotion | planned; requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
 
 Slice names are execution labels, not new durable wire codes. Implementations may split reviewable commits more
