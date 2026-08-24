@@ -15,17 +15,19 @@ implementation-ready by assertion and does not convert any `PLANNED` scenario in
 
 ## Working implementation snapshot (2026-08-24, non-promotable)
 
-This snapshot records the integration handoff from parallel slice development to one serial integration owner. It is
-an implementation ledger only: uncommitted source, compilation, static governance tests, focused tests, and external
-fork commits are not M3 evidence and do not promote a scenario.
+This snapshot records the completed handoff from parallel slice development to one serial integration owner. All
+slice workers are quiescent; the main repository owner alone now integrates, reruns, commits, pushes, and publishes
+evidence. It is an implementation ledger only: uncommitted source, compilation, static governance tests, focused
+tests, and external fork commits are not M3 evidence and do not promote a scenario.
 
-- The serial-integration handoff baseline, with `main` and `origin/main` exactly aligned before the common-module
-  checkpoint, is `768a97faaef1d87cd914cf7ec840f637c1bdc4c3`. Its implementation parent
-  `356cbe687cd7becd9d3e5ecb9e66e75dda37b3c0` contains the M3 input gate, immutable historical M2/current-source M2
-  regression separation, NWG1 mutation profiles, and allocator protocol/evidence groundwork.
-- The handoff inventory counted 73 changed or untracked Nereus paths. The in-progress tree contains NWG1 wire/crypto/streaming
-  decode work; Object-WAL trace, control, checkpoint, recovery, Provider/KMS, Kafka, Pulsar, and allocator work; M3
-  gate/publisher scripts; and synchronized draft ADR/design updates. None of those uncommitted paths is a receipt.
+- The serial-integration handoff baseline is `768a97faaef1d87cd914cf7ec840f637c1bdc4c3`. The current pushed main checkpoint
+  is `ff1abd1c66efa06d05243f4e40992ae5021e7587`, with `main` and `origin/main` exactly aligned before allocator
+  integration. Seven reviewable commits since the handoff baseline contain the common Object-WAL foundation, Kafka
+  and Pulsar paths plus their documentation checkpoints, and the real Provider/KMS adapters.
+- The remaining in-progress tree is limited to allocator/Oxia production and evidence work, its reproducible Oxia
+  evidence image, synchronized allocator ADR/open-question/source-lock changes, and staged M3 governance scripts.
+  Former worker test summaries are inputs for serial review only; any source change invalidates their freshness and
+  requires a main-owner rerun. None of the uncommitted paths or prior local XML files is a receipt.
 - The current common-module tree passes `:nereus-storage-object:check`: 147 tests execute with zero failure, error, or
   skip, and Checkstyle plus Spotless pass. The non-promotable local gates also pass with 17 wire-source tests over the
   six positive vectors and 114-row TSV, 3 mutation tests over all 84 authored records and 240 paths, and 7 state-trace

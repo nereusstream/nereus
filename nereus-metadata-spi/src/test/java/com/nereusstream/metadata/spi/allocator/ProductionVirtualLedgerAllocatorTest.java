@@ -26,8 +26,11 @@ import com.nereusstream.domain.registry.VirtualLedgerSliceAssignmentV1;
 import com.nereusstream.domain.registry.VirtualLedgerSliceLifecycleV1;
 import com.nereusstream.domain.registry.VirtualLedgerSliceViewV1;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceCandidateV1;
+import com.nereusstream.domain.registry.allocator.AllocatorEvidenceSourceTupleV1;
+import com.nereusstream.domain.registry.allocator.AllocatorModeV1;
 import com.nereusstream.domain.registry.allocator.AllocatorProtocolException;
 import com.nereusstream.domain.registry.allocator.AllocatorProtocolV1;
+import com.nereusstream.domain.registry.allocator.AllocatorSelectionReceiptV1;
 import com.nereusstream.domain.registry.allocator.AllocatorWireV1;
 import com.nereusstream.domain.registry.allocator.ManagedLedgerAllocatorHeadV1;
 import com.nereusstream.domain.registry.allocator.ManagedLedgerIncarnationIdV1;
@@ -39,6 +42,7 @@ import com.nereusstream.metadata.spi.model.MetadataVersion;
 import com.nereusstream.metadata.spi.model.VersionedVirtualLedgerSliceViewV1;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -90,6 +94,30 @@ class ProductionVirtualLedgerAllocatorTest {
     }
 
     @Test
+    void runtimeActivationBindsExactDomainSpiAndConcreteStoreArtifacts() throws Exception {
+        Sha256Digest domain = digest("domain-artifact");
+        Sha256Digest spi = digest("spi-artifact");
+        Sha256Digest oxia = digest("oxia-artifact");
+        AllocatorSelectionReceiptV1 receipt = selectionReceipt(domain, spi, oxia);
+
+        assertThat(ProductionVirtualLedgerAllocator.activateExactArtifacts(receipt, store, domain, spi, oxia)
+                        .runtimeActivated())
+                .isTrue();
+        for (int changed = 0; changed < 3; changed++) {
+            int exactChanged = changed;
+            assertThatThrownBy(() -> ProductionVirtualLedgerAllocator.activateExactArtifacts(
+                            receipt,
+                            store,
+                            exactChanged == 0 ? digest("wrong-domain") : domain,
+                            exactChanged == 1 ? digest("wrong-spi") : spi,
+                            exactChanged == 2 ? digest("wrong-oxia") : oxia))
+                    .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
+                            .isEqualTo(AllocatorProtocolException.Code.SOURCE_MISMATCH));
+        }
+        assertThat(ProductionVirtualLedgerAllocator.class.getConstructors()).isEmpty();
+    }
+
+    @Test
     void burnRequiresCurrentStoreObservedExactNodeAndIsIdempotentForOneIdOnly() {
         cell = exact(allocator.reserve(cell, head, activeView(), digest("reserve")));
         head = exact(allocator.installRangeReservedGrant(cell, head, activeView()));
@@ -127,6 +155,65 @@ class ProductionVirtualLedgerAllocatorTest {
                 .rootCause()
                 .extracting(value -> ((AllocatorProtocolException) value).code())
                 .isEqualTo(AllocatorProtocolException.Code.CANDIDATE_OCCUPANCY_NOT_PROVEN);
+    }
+
+    @Test
+    void strictOldOwnerNodeIsExactlyBurnedConsumedAndClearedAfterTakeover() {
+        InMemoryExactStore strictStore = new InMemoryExactStore();
+        ProductionVirtualLedgerAllocator strict = ProductionVirtualLedgerAllocator.forEvidenceCandidate(
+                AllocatorEvidenceCandidateV1.strict(), strictStore);
+        VirtualLedgerCellAllocatorStateV1 initial = VirtualLedgerCellAllocatorStateV1.initial(
+                AllocatorEvidenceCandidateV1.strict().mode(), assignment());
+        VersionedAllocatorCellStateV1 strictCell = strictStore
+                .createCell(initial)
+                .toCompletableFuture()
+                .join()
+                .exactSnapshot()
+                .orElseThrow();
+        VersionedManagedLedgerAllocatorHeadV1 strictHead = strictStore
+                .createHead(
+                        namespace(),
+                        assignment().sliceAssignmentId(),
+                        ManagedLedgerAllocatorHeadV1.initial(incarnation(), 10, initial.nextSliceLedgerId()))
+                .toCompletableFuture()
+                .join()
+                .exactSnapshot()
+                .orElseThrow();
+        strictCell = exact(strict.reserve(strictCell, strictHead, activeView(), digest("strict-reserve")));
+        VersionedVirtualLedgerCandidateNodeV1 stale =
+                exactCreate(strict.createCandidate(strictCell, strictHead, activeView(), digest("strict-stale")));
+        strictHead = exact(strict.takeover(strictCell, strictHead, 11));
+
+        VersionedVirtualLedgerCandidateNodeV1 unobservedVersion = new VersionedVirtualLedgerCandidateNodeV1(
+                stale.ledgerIdCompatibilityNamespaceId(),
+                stale.sliceAssignmentId(),
+                stale.authorityKey(),
+                stale.value(),
+                version(999));
+        VersionedManagedLedgerAllocatorHeadV1 takenOver = strictHead;
+        VersionedAllocatorCellStateV1 exactReserved = strictCell;
+        assertFutureCode(
+                () -> strict.burnStaleCandidate(exactReserved, takenOver, unobservedVersion, activeView()),
+                AllocatorProtocolException.Code.CANDIDATE_OCCUPANCY_NOT_PROVEN);
+
+        strictHead = exact(strict.burnStaleCandidate(strictCell, strictHead, stale, activeView()));
+        assertThat(strictHead.value().visibleChainHead())
+                .isEqualTo(stale.value().expectedPredecessor());
+        assertThat(strictHead.value().nextLedgerId()).isEqualTo(stale.value().ledgerId() + 1);
+        assertThat(exact(strict.burnStaleCandidate(strictCell, strictHead, stale, activeView())))
+                .isEqualTo(strictHead);
+        VersionedVirtualLedgerCandidateNodeV1 removed =
+                strictStore.nodes.remove(stale.value().ledgerId());
+        VersionedManagedLedgerAllocatorHeadV1 burned = strictHead;
+        VersionedAllocatorCellStateV1 reserved = strictCell;
+        assertFutureCode(
+                () -> strict.clearReservation(reserved, burned),
+                AllocatorProtocolException.Code.CANDIDATE_OCCUPANCY_NOT_PROVEN);
+        strictStore.nodes.put(stale.value().ledgerId(), removed);
+        assertThat(exact(strict.clearReservation(strictCell, strictHead))
+                        .value()
+                        .reservation())
+                .isEmpty();
     }
 
     @Test
@@ -267,6 +354,38 @@ class ProductionVirtualLedgerAllocatorTest {
     private static MetadataVersion version(long value) {
         return new MetadataVersion(CanonicalBytes.copyOf(
                 java.nio.ByteBuffer.allocate(8).putLong(value).array()));
+    }
+
+    private static AllocatorSelectionReceiptV1 selectionReceipt(
+            Sha256Digest domain, Sha256Digest spi, Sha256Digest oxia) throws Exception {
+        var constructor = AllocatorSelectionReceiptV1.class.getDeclaredConstructor(
+                AllocatorModeV1.class,
+                int.class,
+                long.class,
+                AllocatorEvidenceSourceTupleV1.class,
+                Sha256Digest.class,
+                List.class,
+                Map.class);
+        constructor.setAccessible(true);
+        return constructor.newInstance(
+                AllocatorModeV1.STRICT_SERIALIZED,
+                1,
+                1L,
+                new AllocatorEvidenceSourceTupleV1(
+                        "a".repeat(40),
+                        "b".repeat(40),
+                        "c".repeat(40),
+                        "d".repeat(40),
+                        digest("oxia-client-jar"),
+                        digest("tested-evidence"),
+                        domain,
+                        spi,
+                        oxia,
+                        digest("source-locks"),
+                        digest("executor")),
+                digest("selection"),
+                List.of(),
+                Map.of());
     }
 
     private static final class InMemoryExactStore implements PulsarVirtualLedgerAllocatorStore {

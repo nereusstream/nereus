@@ -169,8 +169,12 @@ Cell IDLE --CAS reserve one ID--> RESERVED
 ```
 
 It has no separate grant-install write or public STRICT install transition. Cell clear is valid only after the exact
-one-ID reservation has been published through the Head and consumed; it cannot strand an unconsumed ID. Exact reread
-recognizes an already reserved, published, or cleared value without allocating a second grant or issuing a no-op CAS.
+one-ID reservation has been published through the Head and consumed, or after takeover has exact-store-proven the
+persisted prior-owner node and atomically stale-burn consumed that same ID. The stale burn installs the RESERVED grant,
+advances its cursor by one, leaves the visible pointer unchanged, and grants no allocation or publication authority.
+Clear rereads the exact node and rejects an absent, fabricated, current-owner, wrong-grant, wrong-ID, or
+wrong-predecessor proof. Exact reread recognizes an already reserved, published, stale-burned, or cleared value without
+allocating a second grant or issuing a no-op CAS.
 
 `RANGE_LEASED` admits an evidence-selected range size in `[2, 2^40]`:
 
@@ -192,8 +196,10 @@ Owner takeover is an exact Head CAS that changes only `ownerEpoch`, preserving i
 range, and cursor. The new owner may install the same RESERVED grant if the owner-independent expected allocation
 state is unchanged. A candidate binds the grant, creator owner, ledger ID, and exact predecessor. A stale-owner node is
 never adopted. For the one persisted single-flight candidate at the exact cursor, a cursor-only Head CAS may advance
-by exactly one while preserving the visible pointer. Burn requires the versioned, store-observed candidate at the
-exact cursor, exact node key, and exact canonical bytes. Exact reread recognizes that single-ID burn idempotently;
+by exactly one while preserving the visible pointer. This includes STRICT's exact RESERVED node before its grant has
+otherwise reached the Head, and RANGE's exact installed-range cursor. Burn requires the versioned, store-observed
+candidate at the exact cursor/reservation, exact node key, and exact canonical bytes. Exact reread recognizes that
+single-ID burn idempotently;
 fabricated, absent, repeated-at-another-cursor, or arbitrary node input cannot advance the Head. It cannot burn the
 range tail, reuse an ID, or make an orphan visible.
 
@@ -206,9 +212,27 @@ available, but takeover still requires the exact current stored Cell proof descr
 ### Receipt-only activation and evidence matrix
 
 There is no default mode and no public construction path for production allocator activation. Production composition
-obtains activation only from a validated `AllocatorSelectionReceiptV1` whose Nereus source commit is exactly the
-running 40-character lowercase commit. Persisted Cell mode/version must equal that activation. Hosts cannot override a
-mode or range size.
+obtains activation only from a validated `AllocatorSelectionReceiptV1`. Its source tuple binds the clean Nereus,
+Pulsar, Oxia-client, and Oxia-server commits, exact Oxia client JAR, tested evidence artifact, runtime domain/SPI/Oxia
+JARs, source-lock snapshot, and executor manifest. Activation hashes the actual packaged regular-file domain, SPI, and
+concrete Oxia-store code sources and requires all three to equal the receipt; the superseded caller-supplied source
+string path does not exist. Persisted Cell mode/version must equal that activation. Hosts cannot override a mode,
+range size, digest, or eligibility result.
+
+The raw inventory is exactly five same-directory `NAEA1` files named `test.naea`, `native.naea`, `fault.naea`,
+`scale-10000.naea`, and `scale-100000.naea`. Each 360-byte envelope header binds the complete source tuple, kind,
+payload length, and payload SHA-256. The four event payloads are streaming fixed-union `NARE1`; `test.naea` contains
+the exact JUnit XML under `NAJT1`, and both writer and parser independently recompute suite/testcase
+failure/error/skip counts with DTD and external entities disabled. The parser rehashes the envelope and revalidates the
+payload while consuming it. The event writer uses 64 request-keyed 1-MiB shards: async endpoints for one request retain
+physical order even when completion changes thread, while no global file order is claimed. The parser replays
+lifecycle, timestamped queue-depth, interval-drain, per-operation, ID-use, and fault-cut facts and accepts no caller
+aggregate rate, percentile, pass flag, or selected-mode Boolean.
+
+An eligible result writes exactly one fixed 2,328-byte `selection.nars` beside those files with CREATE_NEW semantics.
+`NARS1` contains the selected candidate's eight recomputed rows and the SHA-256 of every complete NAEA1 envelope, then
+is reparsed only together with those same five files and source artifacts. The receipt identity is SHA-256 of the exact
+NARS1 bytes; it is deliberately derived content identity rather than a recursively embedded self-hash field.
 
 Formal evidence candidates use the closed `AllocatorEvidenceCandidateV1` set and invoke these same production
 coordinator methods and validation paths. Their evidence seam always reports `runtimeActivated=false`; it can exercise
@@ -250,9 +274,10 @@ real multi-broker/native 10,000/100,000 run.
 
 The M3 production domain/SPI/Oxia implementation has local tests for fixed-width round trips, reserved-byte
 corruption, exact keys, slice bounds/exhaustion, STRICT/RANGE transitions, same-RESERVED takeover, idempotent recovery,
-one-candidate burn, create/CAS response loss, stale Cell/Head/node provenance, lifecycle cuts, no-tail-regrant, and the
-evidence-only production seam. Together with the preserved M1 allocator harness, 38 allocator tests currently report
-zero failure, error, and skip.
+exact prior-owner STRICT consume-without-publish burn, create/CAS response loss, stale Cell/Head/node provenance,
+lifecycle cuts, no-tail-regrant, the five-path NAEA1/NARS1 parser/writer, JUnit reparse, queue caller-forgery rejection,
+and three-artifact activation. Together with the preserved M1 allocator harness, 48 ordinary allocator tests are the
+current local inventory; their zero-failure/error/skip claim still requires the exact-source verification run.
 
 That is local implementation conformance only. It is not a source-qualified M3 allocator receipt, real Oxia/native
 Pulsar capacity result, 10,000/100,000 execution, range-size selection, mode selection, or scenario PASS. A later code

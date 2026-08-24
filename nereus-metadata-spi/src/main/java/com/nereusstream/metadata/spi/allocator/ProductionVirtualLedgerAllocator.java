@@ -15,11 +15,11 @@
 package com.nereusstream.metadata.spi.allocator;
 
 import com.nereusstream.domain.bytes.Sha256Digest;
-import com.nereusstream.domain.registry.allocator.AllocatorActivationV1;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceCandidateV1;
 import com.nereusstream.domain.registry.allocator.AllocatorModeV1;
 import com.nereusstream.domain.registry.allocator.AllocatorProtocolException;
 import com.nereusstream.domain.registry.allocator.AllocatorProtocolV1;
+import com.nereusstream.domain.registry.allocator.AllocatorSelectionReceiptV1;
 import com.nereusstream.domain.registry.allocator.ManagedLedgerAllocatorHeadV1;
 import com.nereusstream.domain.registry.allocator.ManagedLedgerIncarnationIdV1;
 import com.nereusstream.domain.registry.allocator.VirtualLedgerCandidateNodeV1;
@@ -27,6 +27,14 @@ import com.nereusstream.domain.registry.allocator.VirtualLedgerCellAllocatorStat
 import com.nereusstream.metadata.spi.model.ConditionalCasResult;
 import com.nereusstream.metadata.spi.model.CreateMutationResult;
 import com.nereusstream.metadata.spi.model.VersionedVirtualLedgerSliceViewV1;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -39,29 +47,57 @@ public final class ProductionVirtualLedgerAllocator {
     private final boolean runtimeActivated;
     private final PulsarVirtualLedgerAllocatorStore store;
 
-    public ProductionVirtualLedgerAllocator(AllocatorActivationV1 activation, PulsarVirtualLedgerAllocatorStore store) {
-        Objects.requireNonNull(activation, "activation");
-        this.selectedMode = activation.selectedMode();
-        this.allocatorProtocolVersion = activation.allocatorProtocolVersion();
-        this.selectedRangeSize = activation.selectedRangeSize();
-        this.runtimeActivated = true;
-        this.store = Objects.requireNonNull(store, "store");
-    }
-
     private ProductionVirtualLedgerAllocator(
-            AllocatorEvidenceCandidateV1 candidate, PulsarVirtualLedgerAllocatorStore store) {
+            AllocatorEvidenceCandidateV1 candidate, PulsarVirtualLedgerAllocatorStore store, boolean runtimeActivated) {
         Objects.requireNonNull(candidate, "candidate");
         this.selectedMode = candidate.mode();
         this.allocatorProtocolVersion = candidate.allocatorProtocolVersion();
         this.selectedRangeSize = candidate.rangeSize();
-        this.runtimeActivated = false;
+        this.runtimeActivated = runtimeActivated;
         this.store = Objects.requireNonNull(store, "store");
     }
 
     /** Formal evidence seam: exact production coordinator and store adapter, without runtime activation authority. */
     public static ProductionVirtualLedgerAllocator forEvidenceCandidate(
             AllocatorEvidenceCandidateV1 candidate, PulsarVirtualLedgerAllocatorStore store) {
-        return new ProductionVirtualLedgerAllocator(candidate, store);
+        return new ProductionVirtualLedgerAllocator(candidate, store, false);
+    }
+
+    /**
+     * Runtime activation verifies the actual packaged domain, SPI, and concrete Oxia adapter artifacts against the raw
+     * evidence-derived receipt. No caller supplies an artifact digest or eligibility Boolean.
+     */
+    public static ProductionVirtualLedgerAllocator activate(
+            AllocatorSelectionReceiptV1 receipt, PulsarVirtualLedgerAllocatorStore store) {
+        Objects.requireNonNull(receipt, "receipt");
+        Objects.requireNonNull(store, "store");
+        return activateExactArtifacts(
+                receipt,
+                store,
+                packagedArtifactSha256(AllocatorSelectionReceiptV1.class),
+                packagedArtifactSha256(ProductionVirtualLedgerAllocator.class),
+                packagedArtifactSha256(store.getClass()));
+    }
+
+    static ProductionVirtualLedgerAllocator activateExactArtifacts(
+            AllocatorSelectionReceiptV1 receipt,
+            PulsarVirtualLedgerAllocatorStore store,
+            Sha256Digest domainArtifact,
+            Sha256Digest spiArtifact,
+            Sha256Digest oxiaArtifact) {
+        Objects.requireNonNull(receipt, "receipt");
+        Objects.requireNonNull(store, "store");
+        if (!receipt.sourceTuple().runtimeDomainArtifactSha256().equals(domainArtifact)
+                || !receipt.sourceTuple().runtimeMetadataSpiArtifactSha256().equals(spiArtifact)
+                || !receipt.sourceTuple().runtimeMetadataOxiaArtifactSha256().equals(oxiaArtifact)) {
+            throw failure(
+                    AllocatorProtocolException.Code.SOURCE_MISMATCH,
+                    "allocator receipt differs from the exact running domain/SPI/Oxia artifacts");
+        }
+        AllocatorEvidenceCandidateV1 selected = receipt.selectedMode() == AllocatorModeV1.STRICT_SERIALIZED
+                ? AllocatorEvidenceCandidateV1.strict()
+                : AllocatorEvidenceCandidateV1.range(receipt.selectedRangeSize());
+        return new ProductionVirtualLedgerAllocator(selected, store, true);
     }
 
     public CompletionStage<CreateMutationResult<VersionedAllocatorCellStateV1>> createCell(
@@ -192,7 +228,10 @@ public final class ProductionVirtualLedgerAllocator {
         requireHeadBoundToCell(exactCell.value(), exactHead);
         requireNodeBoundToCell(exactCell.value(), exactStaleNode);
         ManagedLedgerAllocatorHeadV1 successor =
-                AllocatorProtocolV1.burnOneStaleCandidate(exactHead.value(), exactStaleNode.value());
+                exactCell.value().mode() == com.nereusstream.domain.registry.allocator.AllocatorModeV1.STRICT_SERIALIZED
+                        ? AllocatorProtocolV1.burnStrictReservedStaleCandidate(
+                                exactCell.value(), exactHead.value(), exactStaleNode.value())
+                        : AllocatorProtocolV1.burnOneStaleCandidate(exactHead.value(), exactStaleNode.value());
         return requireStoredCell(exactCell)
                 .thenCompose(ignored -> requireStoredNode(exactCell.value(), exactStaleNode))
                 .thenCompose(ignored -> successor.equals(exactHead.value())
@@ -208,12 +247,34 @@ public final class ProductionVirtualLedgerAllocator {
             VersionedAllocatorCellStateV1 exactCell, VersionedManagedLedgerAllocatorHeadV1 exactHead) {
         requireActivation(exactCell.value());
         requireHeadBoundToCell(exactCell.value(), exactHead);
-        VirtualLedgerCellAllocatorStateV1 successor =
-                AllocatorProtocolV1.clearInstalledReservation(exactCell.value(), exactHead.value());
         return requireStoredHead(exactCell.value(), exactHead)
-                .thenCompose(ignored -> successor.equals(exactCell.value())
+                .thenCompose(ignored -> clearSuccessor(exactCell, exactHead))
+                .thenCompose(successor -> successor.equals(exactCell.value())
                         ? unchanged(exactCell)
                         : store.compareAndSetCell(exactCell, successor));
+    }
+
+    private CompletionStage<VirtualLedgerCellAllocatorStateV1> clearSuccessor(
+            VersionedAllocatorCellStateV1 exactCell, VersionedManagedLedgerAllocatorHeadV1 exactHead) {
+        if (exactCell.value().reservation().isEmpty()
+                || exactCell.value().mode() != AllocatorModeV1.STRICT_SERIALIZED) {
+            return CompletableFuture.completedFuture(
+                    AllocatorProtocolV1.clearInstalledReservation(exactCell.value(), exactHead.value()));
+        }
+        long ledgerId = exactCell.value().reservation().orElseThrow().rangeStartInclusive();
+        return store.readNode(
+                        exactCell.value().ledgerIdCompatibilityNamespaceId(),
+                        exactCell.value().sliceAssignmentId(),
+                        exactHead.value().managedLedgerIncarnation(),
+                        ledgerId)
+                .thenApply(observed -> {
+                    VersionedVirtualLedgerCandidateNodeV1 exactNode = observed.orElseThrow(() -> failure(
+                            AllocatorProtocolException.Code.CANDIDATE_OCCUPANCY_NOT_PROVEN,
+                            "STRICT clear requires its exact store-observed node"));
+                    requireNodeBoundToCell(exactCell.value(), exactNode);
+                    return AllocatorProtocolV1.clearStrictTerminalReservation(
+                            exactCell.value(), exactHead.value(), exactNode.value());
+                });
     }
 
     private void requireActivation(VirtualLedgerCellAllocatorStateV1 cell) {
@@ -304,6 +365,37 @@ public final class ProductionVirtualLedgerAllocator {
                     }
                     return null;
                 });
+    }
+
+    private static Sha256Digest packagedArtifactSha256(Class<?> type) {
+        try {
+            var source = type.getProtectionDomain().getCodeSource();
+            if (source == null) {
+                throw failure(AllocatorProtocolException.Code.SOURCE_MISMATCH, "allocator code source is absent");
+            }
+            Path artifact = Path.of(source.getLocation().toURI());
+            if (!Files.isRegularFile(artifact, LinkOption.NOFOLLOW_LINKS) || Files.size(artifact) == 0) {
+                throw failure(
+                        AllocatorProtocolException.Code.SOURCE_MISMATCH,
+                        "allocator runtime activation requires packaged regular-file artifacts");
+            }
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream input = Files.newInputStream(artifact, LinkOption.NOFOLLOW_LINKS)) {
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = input.read(buffer)) >= 0) {
+                    if (read > 0) {
+                        digest.update(buffer, 0, read);
+                    }
+                }
+            }
+            return Sha256Digest.copyOf(digest.digest());
+        } catch (IOException | URISyntaxException | NoSuchAlgorithmException error) {
+            throw new AllocatorProtocolException(
+                    AllocatorProtocolException.Code.SOURCE_MISMATCH,
+                    "allocator packaged runtime artifact could not be hashed",
+                    error);
+        }
     }
 
     private static AllocatorProtocolException failure(AllocatorProtocolException.Code code, String message) {

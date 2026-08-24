@@ -26,7 +26,6 @@ import com.nereusstream.domain.registry.VirtualLedgerSliceAssignmentV1;
 import com.nereusstream.domain.registry.VirtualLedgerSliceLifecycleV1;
 import com.nereusstream.domain.registry.VirtualLedgerSliceViewV1;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -41,7 +40,7 @@ class AllocatorProtocolV1ProductionTest {
                 AllocatorProtocolV1.strictCandidateFromReservation(cell, head, digest("ledger-1"));
         head = AllocatorProtocolV1.publishStrictReserved(cell, head, node);
         assertThat(AllocatorProtocolV1.publishStrictReserved(cell, head, node)).isSameAs(head);
-        cell = AllocatorProtocolV1.clearInstalledReservation(cell, head);
+        cell = AllocatorProtocolV1.clearStrictTerminalReservation(cell, head, node);
         assertThat(AllocatorProtocolV1.clearInstalledReservation(cell, head)).isSameAs(cell);
 
         assertThat(head.visibleChainHead()).isEqualTo(node.pointer());
@@ -67,7 +66,7 @@ class AllocatorProtocolV1ProductionTest {
                         .isEqualTo(AllocatorProtocolException.Code.MODE_MISMATCH));
         assertThatThrownBy(() -> AllocatorProtocolV1.clearInstalledReservation(reserved, head))
                 .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
-                        .isEqualTo(AllocatorProtocolException.Code.GRANT_NOT_INSTALLED));
+                        .isEqualTo(AllocatorProtocolException.Code.CANDIDATE_OCCUPANCY_NOT_PROVEN));
     }
 
     @Test
@@ -223,25 +222,23 @@ class AllocatorProtocolV1ProductionTest {
     }
 
     @Test
-    void activationRequiresCompleteZeroSkipReceiptAndExactSource() {
-        String source = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        List<AllocatorNativeRelativeMetricsV1> metrics = new ArrayList<>();
-        for (AllocatorEvidenceWorkloadV1 workload :
-                AllocatorEvidenceWorkloadV1.completeMatrix(AllocatorModeV1.STRICT_SERIALIZED, 1, 4)) {
-            metrics.add(new AllocatorNativeRelativeMetricsV1(
-                    workload, 200, 210, 1_000, 2, 2_000, 3_000, 4_000, 5_000, 1, 0, 0, 0, 0));
-        }
-        AllocatorSelectionReceiptV1 receipt = new AllocatorSelectionReceiptV1(
-                AllocatorModeV1.STRICT_SERIALIZED, 1, 1, source, digest("receipt"), metrics, 9, 9, true, true, true);
-        assertThat(receipt.activate(source).selectedMode()).isEqualTo(AllocatorModeV1.STRICT_SERIALIZED);
-        assertThatThrownBy(() -> receipt.activate("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
-                .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
-                        .isEqualTo(AllocatorProtocolException.Code.SOURCE_MISMATCH));
-        assertThatThrownBy(() -> new AllocatorSelectionReceiptV1(
-                        receipt.selectedMode(), 1, 1, source, digest("bad-receipt"), metrics, 9, 9, true, true, false))
+    void selectionReceiptHasNoCallerAggregateOrBooleanConstructionPath() {
+        AllocatorEvidenceSourceArtifactsV1 absentArtifacts = new AllocatorEvidenceSourceArtifactsV1(
+                java.nio.file.Path.of("absent-client"),
+                java.nio.file.Path.of("absent-evidence"),
+                java.nio.file.Path.of("absent-domain"),
+                java.nio.file.Path.of("absent-spi"),
+                java.nio.file.Path.of("absent-oxia"),
+                java.nio.file.Path.of("absent-locks"),
+                java.nio.file.Path.of("absent-executor"));
+        assertThatThrownBy(() -> AllocatorSelectionReceiptV1.evaluateCanonicalAttachments(List.of(), absentArtifacts))
                 .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
                         .isEqualTo(AllocatorProtocolException.Code.SELECTION_NOT_ELIGIBLE));
-        assertThat(AllocatorActivationV1.class.getConstructors()).isEmpty();
+        assertThat(AllocatorSelectionReceiptV1.class.getConstructors()).isEmpty();
+        assertThat(java.util.Arrays.stream(AllocatorSelectionReceiptV1.class.getMethods())
+                        .flatMap(method -> java.util.Arrays.stream(method.getParameterTypes()))
+                        .filter(type -> type == AllocatorNativeRelativeMetricsV1.class || type == boolean.class))
+                .isEmpty();
     }
 
     private static VirtualLedgerCellAllocatorStateV1 cell(AllocatorModeV1 mode) {

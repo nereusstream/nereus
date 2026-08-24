@@ -62,12 +62,18 @@ Ledger selection uses xorshift64* with seed `0x4e45524555534d33`, actor `request
 over the complete active population. Trigger classes follow the repeating ten-request schedule
 `ENTRY,ENTRY,ENTRY,ENTRY,ENTRY,BYTE,BYTE,BYTE,AGE,AGE`. ENTRY rolls after one admitted entry. Every BYTE request admits
 an exact 64-KiB payload. The pinned Pulsar API exposes only integer-MiB native byte thresholds, so the native BYTE row
-uses its minimum exact 1-MiB threshold: it pre-fills fifteen 64-KiB entries, admits the sixteenth to reach 1 MiB, then
-includes the next append that invokes the production `currentLedgerIsFull()` decision and rollover. It may not use
-`maxEntries=1` and relabel that entry-triggered cut as BYTE. The candidate allocator records the same 64-KiB BYTE
-rollover demand; allocator evidence does not claim to implement the upstream trigger policy. AGE uses a monotonic test
-clock and the production age-decision path at exactly one second; wall-clock sleeping is not authority. Arrival jitter
-is the repeating signed-microsecond vector
+uses its minimum exact 1-MiB threshold. Starting from successor entry `0`, it keeps the size limit unlimited while it
+adds fifteen further 64-KiB entries and proves the predecessor has exactly sixteen entries and exactly 1 MiB. Only
+then may it arm the 1-MiB limit. Arming the limit before this exact prefill is an invalid workload: the pinned
+`ManagedLedgerImpl` would close on entry `15` when the prefill merely reaches 1 MiB. The measured trigger is the next
+64-KiB append, entry `16`. The pinned implementation accounts that append to the still-open predecessor, evaluates
+`currentLedgerIsFull()` after the accounting, returns the predecessor position, and drives predecessor close and
+successor creation. A following append must establish entry `0` on a different successor ledger ID before the
+rollover operation is complete. It may not treat the trigger as successor entry `0`, arm the limit before the exact
+unlimited prefill, use `maxEntries=1` and relabel that entry-triggered cut as BYTE, or end measurement at predecessor
+close. The candidate allocator records the same 64-KiB BYTE rollover demand; allocator evidence does not claim to
+implement the upstream trigger policy. AGE uses a monotonic test clock and the production age-decision path at exactly
+one second; wall-clock sleeping is not authority. Arrival jitter is the repeating signed-microsecond vector
 `{0,125,-125,250,-250,500,-500,0}` clamped so ordinal order never reverses. The harness records offered, admitted,
 completed, fenced, failed, and timed-out ordinals separately and may not replace missing completions with retries under
 a new ordinal.
@@ -93,7 +99,13 @@ The runner measures rather than derives or aliases:
 One timestamp or latency value cannot populate more than one metric unless the events are actually identical and the
 receipt names both event endpoints. Queue depth cannot be the active-ledger count. A native row records the same
 population, trigger schedule, offered-rate set, actor count, latency target, and independent rollover/append-stall
-metrics. Candidate takeover CAS operations/second is diagnostic only and is not compared with native rollover RPS.
+metrics. For the native row, end-to-end rollover runs from the original offer through verified successor entry `0`.
+The independent append-stall pair brackets only the measured trigger append call through its synchronous callback,
+which in the pinned implementation includes predecessor close; BYTE prefill is outside both admission and append-stall
+measurement, while successor establishment remains inside end-to-end rollover but outside that append-stall pair.
+Using one pair for the complete rollover, including prefill in append stall, or releasing append stall only after
+successor establishment aliases the two metrics and is invalid. Candidate takeover CAS operations/second is diagnostic
+only and is not compared with native rollover RPS.
 
 ### Frozen pass bounds
 
@@ -141,6 +153,36 @@ eight aggregate rows plus SHA-256 identities for the complete raw evidence, even
 summary, JUnit reports, and source-lock snapshot. Its production parser recomputes the closed selection from those
 attachments and requires the Nereus tested commit to equal the running source. It has no public constructor from
 caller metrics or booleans.
+
+### Canonical evidence files and post-test verification
+
+The canonical selection-input inventory in one admitted execution directory is exactly one fixed 2,328-byte
+`selection.nars` plus the five closed NAEA1 inputs `native.naea`, `fault.naea`, `scale-10000.naea`,
+`scale-100000.naea`, and `test.naea`. The first four contain only NARE1 events. `test.naea` contains the exact
+`realAllocatorEvidenceTest` JUnit XML and its non-zero
+tests/failures/errors/skips counters. Every NAEA1 header binds the same clean tested commit, exact Pulsar/Oxia source
+tuple, Oxia client JAR, thin evidence-runner JAR, runtime domain/SPI/Oxia JARs, source-lock file, and executor manifest.
+The bound executor manifest in turn binds the preflight JSON SHA-256 and the ordered runtime classpath's exact basename,
+byte length, and SHA-256 inventory, including the source-built pinned `managed-ledger` and `testmocks` JARs; a clean
+source commit without those executed artifact identities is insufficient. NARS1 binds each complete NAEA1 envelope
+SHA-256. Large NAEA1 files remain external evidence attachments; copying or normalizing their events into a small
+child receipt is not authority.
+
+After NARS1 creation, a separate one-test verifier must call the production `evaluateCanonicalAttachments` and
+`parseCanonical` paths over the already sealed NARS1, all five NAEA1 files, and all seven exact source artifacts. Its
+only testcase is
+`M3AllocatorRawEvidenceVerificationTest.recomputesNarsNaeaJunitAndExactSourceArtifacts()`. The production reparser
+first writes `raw-verification-payload.json`, schema
+`NEREUS_V2_M3_ALLOCATOR_RAW_RECOMPUTATION_V1`, with its own zeroed-field self-hash. The post-test sealer verifies that
+self-hash, then emits `raw-verification.json`, schema `NEREUS_V2_M3_ALLOCATOR_SEALED_VERIFICATION_V1`, with an
+independent outer self-hash and binding the verifier's exact JUnit XML
+bytes/SHA/testcase, selection bytes/SHA, every attachment basename/bytes/envelope SHA, every source-artifact
+basename/bytes/SHA, raw JUnit counts, and the parser-enforced 288-interval, nine-cut, eight-selected-row inventory.
+Each JSON's `selfSha256` is SHA-256 of its exact UTF-8 bytes after replacing its own field's 64 hexadecimal characters
+with 64 ASCII zeroes, identified by
+`selfHashRule=SHA256_OF_EXACT_UTF8_WITH_SELF_SHA256_64_ZERO_HEX`. This small verification
+file is a source-bound index into the external raw files, not a replacement for them; Final must still require the raw
+attachments to exist and match.
 
 ## Consequences
 

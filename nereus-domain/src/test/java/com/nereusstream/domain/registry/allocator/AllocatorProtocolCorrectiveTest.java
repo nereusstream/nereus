@@ -46,7 +46,43 @@ class AllocatorProtocolCorrectiveTest {
                         .isEqualTo(AllocatorProtocolException.Code.MODE_MISMATCH));
         assertThatThrownBy(() -> AllocatorProtocolV1.clearInstalledReservation(reserved, head))
                 .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
-                        .isEqualTo(AllocatorProtocolException.Code.GRANT_NOT_INSTALLED));
+                        .isEqualTo(AllocatorProtocolException.Code.CANDIDATE_OCCUPANCY_NOT_PROVEN));
+    }
+
+    @Test
+    void strictTakeoverBurnsExactReservedStaleNodeThenClearsWithoutPublishingIt() {
+        VirtualLedgerCellAllocatorStateV1 cell = cell(AllocatorModeV1.STRICT_SERIALIZED);
+        ManagedLedgerAllocatorHeadV1 original = head(cell, 7);
+        cell = AllocatorProtocolV1.reserve(cell, original, digest("strict-reserve"), 1);
+        VirtualLedgerCandidateNodeV1 stale =
+                AllocatorProtocolV1.strictCandidateFromReservation(cell, original, digest("strict-stale"));
+        ManagedLedgerAllocatorHeadV1 takenOver = AllocatorProtocolV1.takeover(original, 8);
+
+        ManagedLedgerAllocatorHeadV1 burned =
+                AllocatorProtocolV1.burnStrictReservedStaleCandidate(cell, takenOver, stale);
+        assertThat(burned.visibleChainHead()).isEqualTo(original.visibleChainHead());
+        assertThat(burned.nextLedgerId()).isEqualTo(stale.ledgerId() + 1);
+        assertThat(AllocatorProtocolV1.burnStrictReservedStaleCandidate(cell, burned, stale))
+                .isSameAs(burned);
+        assertThat(AllocatorProtocolV1.clearStrictTerminalReservation(cell, burned, stale)
+                        .reservation())
+                .isEmpty();
+
+        VirtualLedgerCandidateNodeV1 currentOwner = AllocatorWireV1.createNode(
+                stale.managedLedgerIncarnation(),
+                stale.ledgerId(),
+                stale.grantId(),
+                takenOver.ownerEpoch(),
+                stale.expectedPredecessor(),
+                digest("not-stale"));
+        VirtualLedgerCellAllocatorStateV1 reserved = cell;
+        assertThatThrownBy(
+                        () -> AllocatorProtocolV1.burnStrictReservedStaleCandidate(reserved, takenOver, currentOwner))
+                .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
+                        .isEqualTo(AllocatorProtocolException.Code.STALE_CANDIDATE_REQUIRED));
+        assertThatThrownBy(() -> AllocatorProtocolV1.clearStrictTerminalReservation(reserved, burned, currentOwner))
+                .isInstanceOfSatisfying(AllocatorProtocolException.class, error -> assertThat(error.code())
+                        .isEqualTo(AllocatorProtocolException.Code.CANDIDATE_OCCUPANCY_NOT_PROVEN));
     }
 
     @Test

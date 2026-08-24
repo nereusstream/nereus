@@ -229,6 +229,7 @@ public final class AllocatorProtocolV1 {
         requireIncarnation(reservation, exactHead);
         if (alreadyPublished(exactHead, exactNode)
                 && headContainsGrant(exactHead, reservation)
+                && strictReservationMatchesNode(reservation, exactNode)
                 && exactHead.nextLedgerId() == reservation.rangeEndExclusive()) {
             return exactHead;
         }
@@ -281,11 +282,98 @@ public final class AllocatorProtocolV1 {
                 Math.addExact(exactHead.nextLedgerId(), 1));
     }
 
+    /** STRICT installs and consumes, but never publishes, one exact RESERVED node left by a fenced prior owner. */
+    public static ManagedLedgerAllocatorHeadV1 burnStrictReservedStaleCandidate(
+            VirtualLedgerCellAllocatorStateV1 state,
+            ManagedLedgerAllocatorHeadV1 exactHead,
+            VirtualLedgerCandidateNodeV1 staleNode) {
+        if (state.mode() != AllocatorModeV1.STRICT_SERIALIZED) {
+            throw failure(AllocatorProtocolException.Code.MODE_MISMATCH, "STRICT stale burn requires STRICT mode");
+        }
+        CellAllocatorReservationV1 reservation = state.reservation()
+                .orElseThrow(() ->
+                        failure(AllocatorProtocolException.Code.GRANT_NOT_INSTALLED, "no Cell reservation is present"));
+        requireIncarnation(reservation, exactHead);
+        if (headContainsGrant(exactHead, reservation)
+                && exactHead.nextLedgerId() == reservation.rangeEndExclusive()
+                && exactHead.visibleChainHead().equals(staleNode.expectedPredecessor())
+                && strictReservationMatchesNode(reservation, staleNode)
+                && staleNode.ledgerId() == reservation.rangeStartInclusive()
+                && staleNode.grantId() == reservation.grantId()
+                && staleNode.creatorOwnerEpoch() < exactHead.ownerEpoch()) {
+            return exactHead;
+        }
+        if (!reservation.expectedAllocationState().equals(exactHead.allocationState())
+                || reservation.rangeEndExclusive() != reservation.rangeStartInclusive() + 1
+                || staleNode.ledgerId() != reservation.rangeStartInclusive()
+                || staleNode.grantId() != reservation.grantId()
+                || !staleNode.managedLedgerIncarnation().equals(exactHead.managedLedgerIncarnation())
+                || !staleNode.expectedPredecessor().equals(exactHead.visibleChainHead())) {
+            throw failure(
+                    AllocatorProtocolException.Code.CANDIDATE_CONFLICT,
+                    "STRICT stale candidate does not match the exact RESERVED grant and Head predecessor");
+        }
+        if (staleNode.creatorOwnerEpoch() >= exactHead.ownerEpoch()) {
+            throw failure(
+                    AllocatorProtocolException.Code.STALE_CANDIDATE_REQUIRED,
+                    "STRICT burn requires one exact candidate from an older owner");
+        }
+        return new ManagedLedgerAllocatorHeadV1(
+                exactHead.allocatorProtocolVersion(),
+                exactHead.managedLedgerIncarnation(),
+                exactHead.ownerEpoch(),
+                exactHead.visibleChainHead(),
+                reservation.grantId(),
+                reservation.rangeStartInclusive(),
+                reservation.rangeEndExclusive(),
+                reservation.rangeEndExclusive());
+    }
+
     public static VirtualLedgerCellAllocatorStateV1 clearInstalledReservation(
             VirtualLedgerCellAllocatorStateV1 state, ManagedLedgerAllocatorHeadV1 exactHead) {
         if (state.reservation().isEmpty()) {
             return state;
         }
+        if (state.mode() == AllocatorModeV1.STRICT_SERIALIZED) {
+            throw failure(
+                    AllocatorProtocolException.Code.CANDIDATE_OCCUPANCY_NOT_PROVEN,
+                    "STRICT clear requires its exact published or stale-burned node proof");
+        }
+        return clearInstalledReservationAfterProof(state, exactHead);
+    }
+
+    /** STRICT clear accepts only the exact node proven published or consumed by the stale-owner burn transition. */
+    public static VirtualLedgerCellAllocatorStateV1 clearStrictTerminalReservation(
+            VirtualLedgerCellAllocatorStateV1 state,
+            ManagedLedgerAllocatorHeadV1 exactHead,
+            VirtualLedgerCandidateNodeV1 exactNode) {
+        Objects.requireNonNull(exactNode, "exactNode");
+        if (state.reservation().isEmpty()) {
+            return state;
+        }
+        if (state.mode() != AllocatorModeV1.STRICT_SERIALIZED) {
+            throw failure(AllocatorProtocolException.Code.MODE_MISMATCH, "STRICT clear requires STRICT mode");
+        }
+        CellAllocatorReservationV1 reservation = state.reservation().orElseThrow();
+        requireIncarnation(reservation, exactHead);
+        boolean exactNodeIdentity = exactNode.managedLedgerIncarnation().equals(exactHead.managedLedgerIncarnation())
+                && exactNode.ledgerId() == reservation.rangeStartInclusive()
+                && exactNode.grantId() == reservation.grantId()
+                && strictReservationMatchesNode(reservation, exactNode);
+        boolean published = exactHead.visibleChainHead().equals(exactNode.pointer())
+                && exactNode.creatorOwnerEpoch() <= exactHead.ownerEpoch();
+        boolean staleBurned = exactHead.visibleChainHead().equals(exactNode.expectedPredecessor())
+                && exactNode.creatorOwnerEpoch() < exactHead.ownerEpoch();
+        if (!exactNodeIdentity || (!published && !staleBurned)) {
+            throw failure(
+                    AllocatorProtocolException.Code.CANDIDATE_OCCUPANCY_NOT_PROVEN,
+                    "STRICT clear node is neither the exact published node nor exact stale-burn proof");
+        }
+        return clearInstalledReservationAfterProof(state, exactHead);
+    }
+
+    private static VirtualLedgerCellAllocatorStateV1 clearInstalledReservationAfterProof(
+            VirtualLedgerCellAllocatorStateV1 state, ManagedLedgerAllocatorHeadV1 exactHead) {
         CellAllocatorReservationV1 reservation = state.reservation().orElseThrow();
         requireIncarnation(reservation, exactHead);
         if (exactHead.grantId() != reservation.grantId()
@@ -296,13 +384,10 @@ public final class AllocatorProtocolV1 {
                     "head does not contain the exact RESERVED grant");
         }
         if (state.mode() == AllocatorModeV1.STRICT_SERIALIZED
-                && (exactHead.nextLedgerId() != reservation.rangeEndExclusive()
-                        || exactHead
-                                .visibleChainHead()
-                                .equals(reservation.expectedAllocationState().visibleChainHead()))) {
+                && exactHead.nextLedgerId() != reservation.rangeEndExclusive()) {
             throw failure(
                     AllocatorProtocolException.Code.GRANT_NOT_INSTALLED,
-                    "STRICT reservation clears only after its exact node was published and consumed");
+                    "STRICT reservation clears only after its exact node was published or stale-burn consumed");
         }
         return new VirtualLedgerCellAllocatorStateV1(
                 state.mode(),
@@ -387,6 +472,13 @@ public final class AllocatorProtocolV1 {
                 && head.rangeEndExclusive() == reservation.rangeEndExclusive()
                 && head.nextLedgerId() >= reservation.rangeStartInclusive()
                 && head.nextLedgerId() <= reservation.rangeEndExclusive();
+    }
+
+    private static boolean strictReservationMatchesNode(
+            CellAllocatorReservationV1 reservation, VirtualLedgerCandidateNodeV1 node) {
+        return reservation.rangeEndExclusive() == reservation.rangeStartInclusive() + 1
+                && node.expectedPredecessor()
+                        .equals(reservation.expectedAllocationState().visibleChainHead());
     }
 
     private static boolean alreadyPublished(ManagedLedgerAllocatorHeadV1 head, VirtualLedgerCandidateNodeV1 node) {

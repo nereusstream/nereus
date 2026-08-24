@@ -279,6 +279,10 @@ limit can be crossed.
 
 ### `V2-OPEN-OBJ-12`: resolved recovery envelope as an admission invariant
 
+M3 owner-open does not reopen an admitting Root: [ADR 0096](../decisions/0096-v2-m3-owner-open-conservative-rollover-amendment.md)
+requires a terminal, conservative rollover cut. A future same-Root resume remains open until durable fenced pending
+dispatch wire is separately accepted and evidenced.
+
 Resolved by [ADR 0039](../decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md). One cumulative
 worst-case envelope constrains normal ACK/admission across provider, decode, memory, retry, and time work. Fallback never
 resets it; predicted exhaustion backpressures and actual exhaustion fails closed.
@@ -713,16 +717,22 @@ deployment/cluster.
 This remains open only at the real evidence/selection boundary. ADR 0091 now fixes exact 384-byte `NVAC1`, 192-byte
 `NVAH1`, and 256-byte `NVAN1` records, 512-byte-capped versioned Oxia keys, STRICT's four successful writes, RANGE's
 allowed `[2,2^40]` size domain, ACTIVE versioned-slice admission, exact-reread reconciliation, same-RESERVED takeover,
-and one stale-candidate ID burn. STRICT has no separate install transition and cannot clear an unconsumed reservation.
+and one stale-candidate ID burn. STRICT has no separate install transition and cannot clear an unconsumed reservation;
+after takeover its only pre-publish recovery exact-store-proves the prior-owner RESERVED node, consumes that one ID in
+the Head without changing the visible pointer, and rereads the same node before clear. The burn cannot allocate or
+publish the node, and absent/fabricated/current-owner/wrong-grant/wrong-ID/wrong-predecessor proofs fail closed.
 RANGE cannot normally abandon or regrant an installed unused tail; accepted terminal retirement/incompatibility/
 corruption authority emits only a non-allocator accounting fact. Every non-Cell-CAS mutation proves the exact current
 stored Cell, and all Head/node transitions prove exact namespace/slice/key/version provenance plus consumed-prefix
-geometry. Production activation is constructible only from a selection-eligible receipt bound to the exact running
-source; there is no default mode. Formal candidates use the same production coordinator while remaining
+geometry. Production activation is constructible only from a selection-eligible fixed `selection.nars` reparsed
+against the exact same-directory `test/native/fault/scale-10000/scale-100000.naea` files and source artifacts; it
+rehashes the actual packaged domain/SPI/Oxia code sources and has no caller digest, aggregate, Boolean, or default mode.
+Formal candidates use the same production coordinator while remaining
 `runtimeActivated=false`, so the evidence seam cannot activate either candidate.
 
-The current 38 local allocator tests and deterministic `8 workloads x 9 cuts` schedule are implementation
-conformance, not real/native evidence. ADR 0094 now freezes, before formal execution, the exact executor, workload, independent
+The current 48 ordinary allocator tests and deterministic `8 workloads x 9 cuts` schedule are implementation
+conformance, not real/native evidence; the exact-source verification run must still prove their zero
+failure/error/skip counts. ADR 0094 now freezes, before formal execution, the exact executor, workload, independent
 telemetry, numeric absolute/native-relative SLOs, RANGE candidates, and closed at-most-one selection rule that ADRs
 0055/0091 required but did not numerically supply. The remaining gate must execute that source-qualified
 multi-broker/native 10,000/100,000 protocol with zero skip, select the smallest qualifying RANGE size if RANGE alone
