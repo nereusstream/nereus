@@ -134,6 +134,14 @@ configuration-cache serialization of the live Git/exclusive-output task closures
 diagnostic and non-promotable. The formal tasks now declare this intentional incompatibility so the repository's
 default configuration-cache setting cannot turn successful execution into a failed aggregate after publication.
 
+The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
+source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
+`NEREUS_V2_M3_D1_LOCAL_CAP_RESULT_V1` payload with CREATE_NEW after the runner hashes the harness, its test, and all
+six production component sources from the exact tested Git commit. The runner seals the exact JUnit XML through the
+generic child publisher and reparses the local result through the governed validator. The payload remains
+allocation-free analytical format-cap conformance, claims no Provider transfer, and cannot substitute for the
+separate fixed-digest C1 Provider/KMS evidence.
+
 Serial continuation order is formal exact-source Provider/KMS and allocator evidence, the remaining child receipts,
 then final-source M2 regression freshness, source locks, scenario synchronization, and M3 Final.
 Each stable boundary must be committed and pushed before the next evidence-bearing boundary is evaluated.
@@ -147,7 +155,7 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | M3-W2 | NWG1 production encoder/decoder, projection, six-vector A corpus, and exact wire gate | common source implemented; local 17-test/114-row wire-source gate passes, but no exact-source child receipt exists |
 | M3-W3 | 84-record/240-path B mutation manifest and runner | common source implemented; local 3-test gate covers exactly 84 records/240 paths with no generated inventory, but no exact-source child receipt exists |
 | M3-C1 | 50-trace Object-WAL kernel harness | common kernel and manifest implemented; local 7-test gate covers 50 traces/21 outcomes, but backend integration and exact-source receipt remain open |
-| M3-D1 | local capacity conformance and exact Provider C1/C2 evidence | S3 C1 and Vault Transit production adapters plus formal clean-source tasks are implemented; nine ordinary tests and two fixed-digest diagnostic real tests pass with zero failure/error/skip, but diagnostic results are non-evidence, formal exact-source receipts remain open, and C2 remains non-promotable without independent benefit evidence |
+| M3-D1 | local capacity conformance and exact Provider C1/C2 evidence | the exact six-test/six-record local-cap runner, S3 C1, and Vault Transit production adapters plus formal clean-source tasks are implemented; the local result is allocation-free and explicitly claims no Provider transfer, while final-source D1/C1 child receipts remain open and C2 remains non-promotable without independent benefit evidence |
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; Kafka/Pulsar backend integration and dedicated-fork compile checkpoints pass, while formal Provider/KMS receipts remain open |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | Kafka source implemented; local 260-test module check covers strict wire/key/caps, OPEN/TERMINAL Head, backend mapping and bounded recovery; the dedicated fork now compiles against the split F9/M3 artifact inputs with 6/6 tests, while the final source-qualified native receipt remains open |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; the dedicated-fork dual-repository compile checkpoint passes 6/6 tests, but a source-qualified receipt remains open and native broker/controller activation remains M6 |

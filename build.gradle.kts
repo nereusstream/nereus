@@ -1587,10 +1587,34 @@ tasks.register("v2M3AllocatorCheck") {
     dependsOn("v2M3AllocatorVerificationSeal")
 }
 
+val v2M3LocalCapEvidenceOutputDirectory = providers.gradleProperty("v2M3LocalCapEvidenceOutputDirectory")
+
+tasks.register<Exec>("v2M3LocalCapacityEvidenceCheck") {
+    group = "verification"
+    description = "Execute and seal the exact-source six-record allocation-free D1 local-cap evidence."
+    notCompatibleWithConfigurationCache("formal D1 evidence checks live Git state and exclusive external outputs")
+    workingDir = layout.projectDirectory.asFile
+    usesService(m3NestedGradleGate)
+    doFirst {
+        commandLine(
+            "bash",
+            "scripts/run-v2-m3-local-cap-evidence.sh",
+            v2M3TestedCommit.get(),
+            v2M3PulsarEvidenceWorktree.get(),
+            v2M3LocalCapEvidenceOutputDirectory.get(),
+        )
+    }
+}
+
 tasks.register("v2M3Nwg1CapacityCheck") {
     group = "verification"
     description = "Require ordinary local-cap coverage plus separate real Provider/KMS execution evidence."
-    dependsOn("v2M3OrdinarySourceCheck", "v2M3RealProviderKmsCheck", "v2DocumentationCheck")
+    dependsOn(
+        "v2M3OrdinarySourceCheck",
+        "v2M3LocalCapacityEvidenceCheck",
+        "v2M3RealProviderKmsCheck",
+        "v2DocumentationCheck",
+    )
 }
 
 val v2M3FinalReceipt = providers.gradleProperty("v2M3FinalReceipt")

@@ -42,9 +42,11 @@ The accepted [M3 detailed-design index](detailed_design/m3/README.md) and
 authority only. Production projection/codec, mutation runner, Object-WAL state kernel, runtime/control/provider
 integration, Kafka/Pulsar paths, allocator/Oxia path, and ordinary/governance/module-API gates now exist at the exact
 implementation checkpoints recorded by the M3 index. W1 also has a complete non-promotable current-source M2
-regression checkpoint; formal Provider/KMS/allocator receipts, final-source W1 freshness, scenario promotion, and
-Final remain open. No empty task, documentation-only receipt, synthetic Root fixture, diagnostic real-service run, or
-focused local PASS may promote an M3 scenario.
+regression checkpoint. D1 now has an exact-source six-test/six-record local-cap runner whose CREATE_NEW payload binds
+the harness, test, and six component sources and explicitly claims no Provider transfer; it remains separate from C1
+real Provider/KMS evidence. Formal final-source D1/C1/allocator receipts, final-source W1 freshness, scenario
+promotion, and Final remain open. No empty task, documentation-only receipt, synthetic Root fixture, diagnostic
+real-service run, or focused local PASS may promote an M3 scenario.
 
 ADR 0015 limits 0.2 to one initial Storage Epoch per Topic Incarnation and no online profile-transition runtime. ADR 0016
 excludes Kafka/Pulsar Access Projection and Migration Link runtime. Their future state machines, Pulsar

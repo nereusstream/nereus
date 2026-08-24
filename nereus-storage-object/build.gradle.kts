@@ -42,6 +42,58 @@ tasks.register<JavaExec>("nwg1GoldenEmitter") {
     outputs.upToDateWhen { false }
 }
 
+val v2M3LocalCapEvidenceTest = tasks.register<Test>("v2M3LocalCapEvidenceTest") {
+    group = "verification"
+    description = "Execute the exact six-record D1 local format-cap conformance suite."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        listOf(
+            "localFormulaRecordExercisesExactAndCartesianBoundaries",
+            "localParserRecordExercisesLengthsFirstEnvelopeParser",
+            "localCheckedArithmeticRecordExercisesOverflowAndNarrowing",
+            "localKmsEnvelopeRecordExercisesRoundTripAndOversizeRejection",
+            "localZstdRecordExercisesSemanticRoundTripWithoutExactOutputClaim",
+            "localStreamingCounterRecordIsAnalyticalAndClaimsNoProviderTransfer",
+        ).forEach { method ->
+            includeTestsMatching(
+                "com.nereusstream.storage.object.extent.CheckedExtentAccountingTest.$method",
+            )
+        }
+    }
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<JavaExec>("v2M3LocalCapEvidenceEmit") {
+    group = "verification"
+    description = "Emit the exact-source D1 local-cap result after the governed six-test execution."
+    dependsOn(v2M3LocalCapEvidenceTest, tasks.named("classes"))
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.nereusstream.storage.object.extent.ObjectWalLocalCapacityHarnessV1")
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(name: String): String = providers.gradleProperty(name).orNull
+            ?: throw GradleException("-P$name is required for formal D1 local-cap evidence")
+        val output = file(required("v2M3LocalCapEvidenceOutput")).toPath().toAbsolutePath().normalize()
+        val repository = rootProject.projectDir.toPath().toAbsolutePath().normalize()
+        if (output.startsWith(repository)) {
+            throw GradleException("formal D1 local-cap output must remain outside the repository")
+        }
+        setArgs(
+            listOf(
+                output.toString(),
+                required("v2M3LocalCapTestedCommit"),
+                required("v2M3LocalCapHarnessSourceSha256"),
+                required("v2M3LocalCapHarnessTestSourceSha256"),
+            ) + (0..5).map { ordinal ->
+                required("v2M3LocalCapComponentSourceSha256$ordinal")
+            },
+        )
+    }
+}
+
 tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
