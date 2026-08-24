@@ -38,6 +38,9 @@ The M3 trusted runner owns an explicit prerequisite projection before it invokes
 8. In this profile K2 requires its Kafka checkout to expose a non-symlink `.git` file, proving that the already
    source-locked checkout is a linked worktree. The ordinary K2 entry point continues to accept either a normal Git
    checkout or a linked worktree. A `.git` directory cannot satisfy the M3 profile.
+9. P5 applies the same linked-worktree rule to Pulsar and requires the fixed
+   `nereus/v2-m3-m2-regression-evidence` branch plus both that branch and the historical source-lock branch on
+   `origin` to resolve to the same locked commit. Its ordinary entry point continues to require the historical branch.
 
 The current-source receipt remains schema `NEREUS_V2_M3_CURRENT_SOURCE_M2_REGRESSION_V1`, non-promotable, and records
 `m2AmendmentLineage: []`. This is an M3 execution-profile correction, not an M2 semantic or correctness amendment.
@@ -56,5 +59,7 @@ runner rejects such a change rather than expanding the current-only allowlist by
   children.
 - The K2 Git-layout check no longer misclassifies linked worktrees as non-repositories; the M3 profile is stricter
   than the historical entry point and still rejects a shared checkout.
+- P5 cannot substitute the shared Pulsar checkout merely to satisfy a historical branch-name assertion; the M3
+  profile proves both remote branch identities at one exact commit.
 - Receipt publication still requires all 25 non-empty child gates with zero failure, error, and skip at one exact
   current source commit.

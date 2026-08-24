@@ -13,6 +13,7 @@ pulsar_checkout="$(cd "$1" && pwd)"
 
 python3 - "$pulsar_checkout" <<'PY'
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -27,12 +28,21 @@ def git(*args: str) -> str:
 
 if git("rev-parse", "HEAD") != binding["finalForkCommit"]:
     raise SystemExit("Pulsar P5 gate: checkout HEAD differs from the locked native fork commit")
-if git("branch", "--show-current") != binding["branch"]:
-    raise SystemExit("Pulsar P5 gate: checkout branch differs from the locked native fork branch")
+m3_profile = bool(os.environ.get("NEREUS_V2_M2_PREREQUISITE_SOURCE_LOCKS"))
+expected_branch = (
+    "nereus/v2-m3-m2-regression-evidence" if m3_profile else binding["branch"]
+)
+if m3_profile and (not (pulsar / ".git").is_file() or (pulsar / ".git").is_symlink()):
+    raise SystemExit("Pulsar P5 gate: M3 regression checkout is not a dedicated linked worktree")
+if git("branch", "--show-current") != expected_branch:
+    raise SystemExit("Pulsar P5 gate: checkout branch differs from the exact execution profile")
 if git("status", "--porcelain"):
     raise SystemExit("Pulsar P5 gate: exact Pulsar checkout is dirty")
-if git("rev-parse", f"origin/{binding['branch']}") != binding["finalForkCommit"]:
-    raise SystemExit("Pulsar P5 gate: remote-tracking branch does not publish the locked commit")
+for branch in (binding["branch"], expected_branch):
+    if git("rev-parse", f"origin/{branch}") != binding["finalForkCommit"]:
+        raise SystemExit(
+            f"Pulsar P5 gate: remote-tracking branch does not publish the locked commit: {branch}"
+        )
 
 required = [
     root / "nereus-pulsar-offload/src/main/java/com/nereusstream/pulsar/offload/NereusPulsarLedgerOffloaderV1.java",

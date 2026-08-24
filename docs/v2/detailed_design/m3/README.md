@@ -102,6 +102,9 @@ receipts unchanged; the failed external directory is diagnostic and non-promotab
 The next diagnostic advanced through the current-source local K0/K1/K3-K10 and Pulsar P0-P4 gates before K2 exposed
 an old `.git`-directory-only assumption. ADR 0098 now also requires K2's M3 input to be a linked-worktree `.git` file;
 no shared Kafka checkout was substituted.
+The following diagnostic completed K2's local/exact-source 30 tests and P5's native 26 tests before P5 rejected the
+fixed evidence branch name; ADR 0098 now makes P5 prove the linked worktree and both published branch refs at the same
+locked commit instead of falling back to the shared checkout.
 
 Serial continuation order is current-source M2 regression, formal exact-source Provider/KMS and allocator evidence,
 and finally final source locks, child receipts, scenario synchronization, and M3 Final.
