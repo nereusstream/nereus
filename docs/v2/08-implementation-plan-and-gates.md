@@ -55,7 +55,11 @@ select nothing. ADR 0104 replaces exhaustive formal execution with a validator-p
 retaining all 288 logical cells, and removes the one-JVM Cell-proof lock as formal performance authority. Its offline
 `--plan-only` freezes 13/17/288 execution bounds and separate phase budgets; the interrupted
 `full-matrix-16254510-r1` and all V1 products remain immutable diagnostic-only. No full formal V2 campaign may run
-until its V2 planner, bounded runner, four-actor workflow, compatibility, and short real-Oxia gates are clean. No empty
+until its bounded runner, four-actor workflow, compatibility, and short real-Oxia gates are clean. The pure domain V2
+campaign schema/planner/validator/selector is now implemented: it enumerates all 288 logical cells, recomputes both
+terminal-conservation equations and every disposition, drives descending native/candidate rates, and returns valid
+non-promotable `NONE_QUALIFIED`/`BOTH_QUALIFIED` evaluations. Its 13 focused tests cover the 13/17/288 execution
+bounds without accessing Oxia. This is implementation conformance, not campaign evidence. No empty
 task, documentation-only receipt, synthetic Root fixture, diagnostic
 real-service run, or focused local PASS may promote an M3 scenario.
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains

@@ -297,6 +297,16 @@ admission; and separates completed evaluation from promotion. No full formal V2 
 planner/validator, V1 compatibility, bounded-runner conservation, four-actor workflow, and short real-Oxia diagnostics
 all pass with zero failure/error/skip.
 
+The first ADR-0104 implementation slice is now pure domain code. `AllocatorCampaignV2` freezes the 288 logical cells
+and raw interval/fault schemas; `AllocatorCampaignPlannerV2` descends native and eligible candidate rates, distinguishes
+executed cells from typed dispositions, and still searches RANGE after STRICT qualifies; the validator recomputes
+every disposition and both offered/admitted conservation equations before the selector can emit any of the four
+closed outcomes. Thirteen focused tests cover 13/17/288 executed-cell bounds, native-baseline absence, caller
+disposition tampering, rate ordering, drop conservation, all four outcomes, and incomplete-evaluation rejection with
+zero failure/error/skip. The code has no Oxia dependency and does not create a checkpoint, receipt, selection, or
+scenario PASS. Bounded CAS/reconcile, the four-actor Runner, sealing/resume gates, and short real-Oxia diagnostics
+remain required before any full formal V2 campaign.
+
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
 `NEREUS_V2_M3_D1_LOCAL_CAP_RESULT_V1` payload with CREATE_NEW after the runner hashes the harness, its test, and all
@@ -325,7 +335,7 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; Kafka/Pulsar backend integration and dedicated-fork compile checkpoints pass, while formal Provider/KMS receipts remain open |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | Kafka source implemented; local 260-test module check covers strict wire/key/caps, OPEN/TERMINAL Head, backend mapping and bounded recovery; the dedicated fork now compiles against the split F9/M3 artifact inputs with 6/6 tests, while the final source-qualified native receipt remains open |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; the dedicated-fork dual-repository compile checkpoint passes 6/6 tests, but a source-qualified receipt remains open and native broker/controller activation remains M6 |
-| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; allocator production/evidence code and its ordinary 48-test inventory pass, while ADR 0104 now supersedes exhaustive V1 formal execution and the one-JVM Cell-proof lock as performance authority; its offline plan freezes 288 logical cells, 13/17/288 execution bounds, hard phase budgets, four independent actor coordinators, bounded admission, and evaluation/promotion separation; the V2 implementation and pre-campaign gates, formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open, and no full formal campaign is currently allowed |
+| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; ADR-0104's pure V2 schema/planner/validator/selector and 13 focused tests now enforce the 288-cell inventory, 13/17/288 execution bounds, descending rates, independently reproved dispositions/conservation, and valid non-promotable NONE/BOTH outcomes without Oxia; bounded CAS/reconcile, the four-actor Runner, checkpoint/sealer/promotion gates, short real-Oxia diagnostics, formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open, and no full formal campaign is currently allowed |
 | M3-FINAL | exact-source aggregate and scenario promotion | fail-closed child/final checker and publisher contracts are implemented and their 74 governance tests pass; Final remains open and requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
 
 Slice names are execution labels, not new durable wire codes. Implementations may split reviewable commits more

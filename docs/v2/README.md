@@ -429,6 +429,12 @@ the 288 logical cells remain fixed, while V2 execution is adaptive only through 
 four independent actor coordinators. The offline `--plan-only` projection freezes the 13/17/288 execution bounds and
 separate hard phase budgets. Old V1 matrices, including interrupted `full-matrix-16254510-r1`, remain immutable
 diagnostics and cannot be resumed, sealed, evaluated, selected, receipted, or promoted as V2 evidence.
+The pure domain V2 campaign schema/planner/validator/selector now implements the unchanged 288-cell inventory,
+descending adaptive execution, native-relative rate eligibility, validator-reproved dispositions, exact
+offered/admitted conservation, and the four closed evaluation outcomes. Thirteen focused tests cover the 13-cell
+minimum, 17-cell minimum promotable, and 288-cell maximum paths plus caller-tamper failures. It has no Oxia access and
+is implementation conformance only; bounded workflow/Runner, checkpoint/sealer, short real-Oxia diagnostics, and all
+formal evidence remain open.
 The replacement `9f88fbfb...` source passes its one-test 10k RANGE Cell-proof diagnostic with zero
 failure/error/skip. The separate exact-source `e739799f...` diagnostic-only RANGE-1024 10k-to-100k construction guard
 also passes one testcase in 459.537 seconds with zero failure/error/skip and unchanged operation/drain caps. Its

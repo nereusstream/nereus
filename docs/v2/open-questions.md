@@ -764,6 +764,10 @@ execution protocol is further amended by
 [ADR 0104](../decisions/0104-v2-m3-allocator-validator-proof-adaptive-campaign-amendment.md): all 288 logical cells
 remain, but executed and disposition cells are distinct, every disposition is validator-reproved, four actor lanes use
 independent coordinators, and budget exhaustion interrupts rather than completing the campaign. The exact-source
+pure schema/planner/validator/selector is now implemented and covered by 13 focused zero-skip tests, including all
+four evaluation outcomes and the 13/17/288 execution bounds. It accesses no Oxia and is not formal evidence. The
+bounded CAS/reconcile workflow, four-actor Runner, checkpoint/sealer/promotion gates, and required short real-Oxia
+diagnostics remain open before any formal V2 campaign. The exact-source
 `1ef4f108...` matrix passed its one testcase but failed the sealed-evidence task on an oversized 113,519,059-byte
 JUnit XML caused by 970,241 copies of one expected native-harness cleanup WARN. It produced no evaluation, selection,
 or verifier output and remains diagnostic. The following `bd254d24...` run kept JUnit at 1,988 bytes but failed
