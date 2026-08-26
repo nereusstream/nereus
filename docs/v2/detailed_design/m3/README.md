@@ -496,6 +496,18 @@ raises the non-empty governance inventory to 100/0/0/0. The same run executes NW
 outcomes. It produces no real formal allocator campaign, NACP2/NAEV2 selection evidence, child receipt, source-lock
 selection, scenario PASS, or Final.
 
+At exact clean published source `9355e64aab5143fc24f6959f123c4874d27831d1`, the V2 evidence source also contains
+the bounded adaptive campaign executor that was previously missing between the pure planner and checkpoint codec. It
+persists sequence- and digest-named CREATE_NEW NACP2 checkpoints before execution and after each validator-required
+action or terminal stop, accounts the seven hard-budget phases independently before admission, preserves exact
+source/executor and observation prefixes across resume, and refuses evaluation sealing. Its eight offline tests cover
+the validator-derived 20-performance-cell/eight-fault-row STRICT-selected route, interruption/resume, exact lineage,
+budget refusal, forged or infrastructure-invalid action output, action failure, and persistence no-overwrite. A fresh
+`--pre-campaign-check` reruns and passes 223 domain/SPI plus 31 allocator-contract tests with zero
+failure/error/skip and clean Checkstyle; the separate plan/configuration contracts pass 5/5. The executor remains
+inside the evidence source set with no registered formal-run task or script mode. It accessed no Oxia and produced no
+campaign evidence, NAEV2, selected mode, child receipt, scenario PASS, or Final claim.
+
 ## Current boundary
 
 | Slice | Design or output | Status at this documentation cut |

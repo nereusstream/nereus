@@ -191,6 +191,19 @@ failure/error/skip. Its 212-byte diagnostic-only NADV2 SHA-256 is
 attempt also ran four zero-failure/error/skip tests but the sealer rejected its non-wire testcase-name expectation, so
 it produced no NADV2 and remains diagnostic-only. Neither run authorizes a full formal campaign or promotion.
 
+At exact clean published source `9355e64aab5143fc24f6959f123c4874d27831d1`, the bounded adaptive executor now
+persists the initial RUNNING NACP2 and one new canonical checkpoint after every validator-required action, explicit
+stop, budget refusal, interruption, or infrastructure failure. It never accepts caller dispositions, never executes
+the 329th action, charges seven independent phase budgets before admission, resumes only the exact source/executor
+prefix, and writes checkpoints with CREATE_NEW names that include sequence and content digest. Completed execution
+does not seal NAEV2 or perform promotion. Eight offline orchestration tests cover the exact 20-performance-cell plus
+eight-fault-row STRICT_SELECTED path, stop/resume lineage, source mismatch, budget exhaustion and budget-accounting
+failure, reordered or infrastructure-invalid raw results, action failure, and no-overwrite persistence. The freshly
+rerun pre-campaign inventory passes 223 domain/SPI plus 31 allocator-contract tests with zero failure/error/skip and
+Checkstyle clean; the separate plan/configuration checker passes 5/5. No formal execution task or script mode was
+enabled, no Oxia service was accessed, and no NACP2 campaign evidence, NAEV2, selection, receipt, or scenario PASS was
+created.
+
 ## Consequences
 
 - The logical workload and all ADR-0094 qualification thresholds remain unchanged, while typical execution can stop

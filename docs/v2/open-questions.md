@@ -792,6 +792,12 @@ binds NACP2/NAEV2/NADV2, both JUnit inputs, source/executor/workload identity, a
 checker independently replays planner/disposition/selector semantics rather than trusting a promotion JSON. Exact
 `cccf16c4...` governance covers validator-derived 20-cell STRICT and 17-cell RANGE_16 selections plus a fully rehashed
 disposition-forgery rejection as part of 100/0/0/0 local contract tests. No formal campaign has run.
+Exact `9355e64a...` adds the bounded adaptive executor without changing that boundary. The executor checkpoints before
+execution and after every validator-required action or terminal transition, admits no action whose independent phase
+budget is insufficient, rejects source/prefix drift and reordered observations, and never seals NAEV2. Its eight
+offline tests bring the freshly rerun pre-campaign inventory to 254/0/0/0, while the separate plan/configuration
+contracts remain 5/5. No formal-run task or script path was enabled, no Oxia service was accessed, and no campaign
+evidence, selection, receipt, or scenario PASS exists.
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.
