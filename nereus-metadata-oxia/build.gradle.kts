@@ -466,6 +466,31 @@ tasks.register<Test>("realAllocatorFaultBatchDiagnosticTest") {
     )
 }
 
+tasks.register<Test>("realAllocatorRangeCellProofDiagnosticTest") {
+    group = "verification"
+    description =
+        "Run diagnostic-only 10k RANGE construction and exact-Cell renewal overlap against real Oxia."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    testClassesDirs = realAllocatorTest.output.classesDirs
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3RealAllocatorRangeCellProofDiagnosticTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    systemProperty(
+        "nereus.m3.allocator.oxiaServiceAddress",
+        providers.gradleProperty("v2M3AllocatorOxiaServiceAddress").getOrElse("UNSET"),
+    )
+    systemProperty(
+        "nereus.m3.allocator.nereusSourceCommit",
+        providers.gradleProperty("v2M3AllocatorNereusSourceCommit").getOrElse("UNSET"),
+    )
+}
+
 tasks.register<Test>("m3ObjectWalMetadataTest") {
     group = "verification"
     description = "Run the deterministic M3 Object-WAL Oxia control-metadata adapter gate."

@@ -736,7 +736,9 @@ failure/error/skip counts. ADR 0094 now freezes, before formal execution, the ex
 telemetry, numeric absolute/native-relative SLOs, RANGE candidates, and closed at-most-one selection rule that ADRs
 0055/0091 required but did not numerically supply. ADR 0100 clarifies that broker-crash recovery ends at exact
 fresh-owner append admission after the production Head takeover; it forbids an unrelated second allocator rollover
-per affected ledger and retains late completion as a disqualifying timeout. The remaining gate must execute that source-qualified
+per affected ledger and retains late completion as a disqualifying timeout. ADR 0101 keeps installed RANGE Head/node
+operations concurrent through shared exact-Cell proof phases while Cell-mutating grant chains use an exclusive measured
+phase; the failed `d819500f...` matrix is diagnostic only and selected nothing. The remaining gate must execute that source-qualified
 multi-broker/native 10,000/100,000 protocol with zero skip, select the smallest qualifying RANGE size if RANGE alone
 qualifies, and select at most one persisted mode. Until then both modes remain unselected and no
 `V2-POSITION-013/014/017/018` scenario may cite a local or diagnostic result as PASS.
@@ -748,7 +750,9 @@ Resolved at the protocol layer by
 executable workload, telemetry, numeric SLOs, executor envelope, and selection algorithm frozen before the formal run
 by [ADR 0094](../decisions/0094-v2-m3-allocator-evidence-workload-and-selection-amendment.md), with exact mass-takeover
 recovery termination refined by
-[ADR 0100](../decisions/0100-v2-m3-allocator-mass-takeover-recovery-endpoint-amendment.md). Evidence measures the
+[ADR 0100](../decisions/0100-v2-m3-allocator-mass-takeover-recovery-endpoint-amendment.md), and exact Cell-proof
+concurrency scheduling refined by
+[ADR 0101](../decisions/0101-v2-m3-allocator-cell-proof-concurrency-scheduling-amendment.md). Evidence measures the
 maximum sustainable rollover RPS while all bounds hold, includes actual rollover distribution/jitter/storms and native
 Pulsar rollover/append-stall baseline, and keeps performance budgets out of allocator durable identity. Execution
 remains `PLANNED`; these accepted inputs are not a performance PASS.

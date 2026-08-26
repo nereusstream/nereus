@@ -127,7 +127,8 @@ performance-first BookKeeper WAL.
   production codec/manifests/runners/harnesses, Root/Pointer and `NWKCP1`, Provider/KMS/allocator evidence, scenario
   promotion, and M3 Final remain `NotStarted`/`PLANNED`.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
-  SPI/transitions, and 27 local allocator tests now exist. This does not change the preceding M3-I0 claim or supply the
+  SPI/transitions, 48 ordinary allocator tests, and an 11-test formal-runner contract gate now exist. This does not
+  change the preceding M3-I0 claim or supply the
   missing real/native allocator evidence, exact RANGE-size selection, selected mode, scenario PASS, or native broker
   activation.
 - The initial foundation supplied Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct
@@ -359,6 +360,7 @@ Accepted decisions:
 - [ADR 0097: M3 reproducible allocator Oxia image amendment](../decisions/0097-v2-m3-reproducible-allocator-oxia-image-amendment.md)
 - [ADR 0098: M3 current-source M2 regression prerequisite projection](../decisions/0098-v2-m3-current-source-m2-regression-prerequisite-projection.md)
 - [ADR 0100: M3 allocator mass-takeover recovery endpoint amendment](../decisions/0100-v2-m3-allocator-mass-takeover-recovery-endpoint-amendment.md)
+- [ADR 0101: M3 allocator Cell-proof concurrency scheduling amendment](../decisions/0101-v2-m3-allocator-cell-proof-concurrency-scheduling-amendment.md)
 
 ## Open design gates
 
@@ -410,6 +412,8 @@ ADR 0091 closes the production virtual-ledger allocator wire/key/transition inpu
 `NVAC1`/`NVAH1`/`NVAN1`, STRICT's four-write path, RANGE same-RESERVED takeover/one-ID burn, bounded versioned Oxia
 keys, and receipt-only exact-source activation. Its 27 local tests and deterministic `8 x 9` schedule are not
 real/native 10k/100k evidence. `V2-OPEN-PUL-OBJ-09` remains open for exact RANGE-size and at-most-one-mode selection.
+ADR 0101 retains the exact-current-Cell proof while giving installed RANGE paths a shared proof phase and Cell-mutating
+grant chains an exclusive measured phase; its focused/diagnostic gates cannot substitute for the complete raw matrix.
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.

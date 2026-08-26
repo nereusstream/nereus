@@ -45,7 +45,8 @@ implementation checkpoints recorded by the M3 index. W1 also has a complete non-
 regression checkpoint. D1 now has an exact-source six-test/six-record local-cap runner whose CREATE_NEW payload binds
 the harness, test, and six component sources and explicitly claims no Provider transfer; it remains separate from C1
 real Provider/KMS evidence. Formal final-source D1/C1/allocator receipts, final-source W1 freshness, scenario
-promotion, and Final remain open. No empty task, documentation-only receipt, synthetic Root fixture, diagnostic
+promotion, and Final remain open. ADR 0101 now preserves exact Cell proofs under concurrent RANGE renewal after the
+failed `d819500f...` matrix selected no mode. No empty task, documentation-only receipt, synthetic Root fixture, diagnostic
 real-service run, or focused local PASS may promote an M3 scenario.
 
 ADR 0015 limits 0.2 to one initial Storage Epoch per Topic Incarnation and no online profile-transition runtime. ADR 0016

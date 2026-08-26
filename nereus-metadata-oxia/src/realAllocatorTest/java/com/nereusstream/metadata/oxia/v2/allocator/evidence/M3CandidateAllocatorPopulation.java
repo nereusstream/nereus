@@ -51,7 +51,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /** One full real-Oxia candidate population driven only through the production allocator SPI. */
 final class M3CandidateAllocatorPopulation {
@@ -69,7 +71,7 @@ final class M3CandidateAllocatorPopulation {
     private final AtomicReferenceArray<VersionedManagedLedgerAllocatorHeadV1> heads =
             new AtomicReferenceArray<>(100_000);
     private final ReentrantLock[] headLocks = new ReentrantLock[100_000];
-    private final ReentrantLock cellLock = new ReentrantLock();
+    private final ReentrantReadWriteLock cellProofLock = new ReentrantReadWriteLock(true);
     private final AtomicInteger activePopulation = new AtomicInteger();
 
     M3CandidateAllocatorPopulation(
@@ -115,6 +117,7 @@ final class M3CandidateAllocatorPopulation {
         if (!M3AllocatorWorkloadPlan.ACTIVE_POPULATIONS.contains(requestedPopulation)) {
             throw new IllegalArgumentException("allocator population differs from ADR 0094");
         }
+        actors.requirePopulationConstructionLatencyDisabled();
         int from = activePopulation.get();
         if (requestedPopulation < from) {
             return 0;
@@ -166,6 +169,8 @@ final class M3CandidateAllocatorPopulation {
             VersionedManagedLedgerAllocatorHeadV1 predecessor = requireHead(ledgerIndex);
             ManagedLedgerIncarnationIdV1 incarnation = predecessor.value().managedLedgerIncarnation();
             traces.bindHead(incarnation, trace, OxiaOperationKind.HEAD_TAKEOVER_CAS);
+            Lock proofLock = cellProofLock.readLock();
+            proofLock.lock();
             try {
                 traces.setHeadMutationKind(incarnation, OxiaOperationKind.HEAD_TAKEOVER_CAS);
                 traces.bindCellRead(trace);
@@ -180,6 +185,7 @@ final class M3CandidateAllocatorPopulation {
                 trace.setOwnerEpoch(successor.value().ownerEpoch());
                 return successor;
             } finally {
+                proofLock.unlock();
                 traces.unbindHead(incarnation);
             }
         } finally {
@@ -223,8 +229,14 @@ final class M3CandidateAllocatorPopulation {
                 trace.admitted();
                 trace.appendAdmissionStart();
                 traces.setHeadMutationKind(incarnation, OxiaOperationKind.HEAD_TAKEOVER_CAS);
-                head = exact(allocator(trace.actorId())
-                        .takeover(cell.get(), head, Math.addExact(head.value().ownerEpoch(), 1)));
+                Lock proofLock = cellProofLock.readLock();
+                proofLock.lock();
+                try {
+                    head = exact(allocator(trace.actorId())
+                            .takeover(cell.get(), head, Math.addExact(head.value().ownerEpoch(), 1)));
+                } finally {
+                    proofLock.unlock();
+                }
                 heads.set(ledgerIndex, head);
                 trace.setOwnerEpoch(head.value().ownerEpoch());
                 traces.setHeadMutationKind(incarnation, OxiaOperationKind.HEAD_PUBLISH_CAS);
@@ -252,6 +264,8 @@ final class M3CandidateAllocatorPopulation {
             VersionedManagedLedgerAllocatorHeadV1 head = requireHead(ledgerIndex);
             ManagedLedgerIncarnationIdV1 incarnation = head.value().managedLedgerIncarnation();
             traces.bindHead(incarnation, trace, OxiaOperationKind.HEAD_PUBLISH_CAS);
+            Lock proofLock = cellProofLock(head);
+            proofLock.lock();
             VersionedAllocatorCellStateV1 allocationCell = cell.get();
             boolean cellBound = false;
             try {
@@ -260,7 +274,6 @@ final class M3CandidateAllocatorPopulation {
                 trace.appendAdmissionStart();
                 ProductionVirtualLedgerAllocator allocator = allocator(trace.actorId());
                 if (candidate.mode() == AllocatorModeV1.STRICT_SERIALIZED) {
-                    cellLock.lock();
                     traces.bindCell(trace, OxiaOperationKind.CELL_RESERVE_CAS);
                     cellBound = true;
                     allocationCell = exact(allocator.reserve(
@@ -268,7 +281,6 @@ final class M3CandidateAllocatorPopulation {
                     cell.set(allocationCell);
                 } else if (head.value().grantId() == 0
                         || head.value().nextLedgerId() >= head.value().rangeEndExclusive()) {
-                    cellLock.lock();
                     traces.bindCell(trace, OxiaOperationKind.CELL_RESERVE_CAS);
                     cellBound = true;
                     allocationCell = exact(allocator.reserve(
@@ -282,7 +294,6 @@ final class M3CandidateAllocatorPopulation {
                     allocationCell = cell.get();
                     traces.unbindCell(trace);
                     cellBound = false;
-                    cellLock.unlock();
                 }
 
                 VersionedManagedLedgerAllocatorHeadV1 staleOwnerHead = head;
@@ -323,8 +334,8 @@ final class M3CandidateAllocatorPopulation {
             } finally {
                 if (cellBound) {
                     traces.unbindCell(trace);
-                    cellLock.unlock();
                 }
+                proofLock.unlock();
                 traces.unbindHead(incarnation);
             }
         } finally {
@@ -352,7 +363,8 @@ final class M3CandidateAllocatorPopulation {
             int ledgerIndex,
             VersionedManagedLedgerAllocatorHeadV1 head,
             ResponseLossAt responseLossAt) {
-        cellLock.lock();
+        Lock proofLock = cellProofLock.writeLock();
+        proofLock.lock();
         traces.bindCell(trace, OxiaOperationKind.CELL_RESERVE_CAS);
         try {
             ProductionVirtualLedgerAllocator allocator = allocator(trace.actorId());
@@ -377,7 +389,7 @@ final class M3CandidateAllocatorPopulation {
             return new Allocation(node.value().ledgerId(), node.value().grantId());
         } finally {
             traces.unbindCell(trace);
-            cellLock.unlock();
+            proofLock.unlock();
         }
     }
 
@@ -388,60 +400,92 @@ final class M3CandidateAllocatorPopulation {
             ResponseLossAt responseLossAt) {
         VersionedManagedLedgerAllocatorHeadV1 head = initialHead;
         ProductionVirtualLedgerAllocator allocator = allocator(trace.actorId());
-        if (head.value().grantId() == 0 || head.value().nextLedgerId() >= head.value().rangeEndExclusive()) {
-            cellLock.lock();
-            traces.bindCell(trace, OxiaOperationKind.CELL_RESERVE_CAS);
-            try {
-                maybeLoseResponse(trace.actorId(), responseLossAt, ResponseLossAt.RESERVE);
-                VersionedAllocatorCellStateV1 reserved = exact(allocator.reserve(
-                        cell.get(), head, currentView, digest("reserve:" + trace.identity())));
-                cell.set(reserved);
+        Lock proofLock = cellProofLock(head);
+        proofLock.lock();
+        try {
+            if (head.value().grantId() == 0 || head.value().nextLedgerId() >= head.value().rangeEndExclusive()) {
+                traces.bindCell(trace, OxiaOperationKind.CELL_RESERVE_CAS);
+                try {
+                    maybeLoseResponse(trace.actorId(), responseLossAt, ResponseLossAt.RESERVE);
+                    VersionedAllocatorCellStateV1 reserved = exact(allocator.reserve(
+                            cell.get(), head, currentView, digest("reserve:" + trace.identity())));
+                    cell.set(reserved);
 
-                traces.setHeadMutationKind(
-                        head.value().managedLedgerIncarnation(), OxiaOperationKind.RANGE_GRANT_INSTALL_CAS);
-                maybeLoseResponse(trace.actorId(), responseLossAt, ResponseLossAt.RANGE_GRANT_INSTALL);
-                head = exact(allocator.installRangeReservedGrant(reserved, head, currentView));
-                heads.set(ledgerIndex, head);
+                    traces.setHeadMutationKind(
+                            head.value().managedLedgerIncarnation(), OxiaOperationKind.RANGE_GRANT_INSTALL_CAS);
+                    maybeLoseResponse(trace.actorId(), responseLossAt, ResponseLossAt.RANGE_GRANT_INSTALL);
+                    head = exact(allocator.installRangeReservedGrant(reserved, head, currentView));
+                    heads.set(ledgerIndex, head);
 
-                traces.setCellMutationKind(OxiaOperationKind.CELL_CLEAR_CAS);
-                maybeLoseResponse(trace.actorId(), responseLossAt, ResponseLossAt.CELL_CLEAR);
-                cell.set(exact(allocator.clearReservation(reserved, head)));
-            } finally {
-                traces.unbindCell(trace);
-                cellLock.unlock();
+                    traces.setCellMutationKind(OxiaOperationKind.CELL_CLEAR_CAS);
+                    maybeLoseResponse(trace.actorId(), responseLossAt, ResponseLossAt.CELL_CLEAR);
+                    cell.set(exact(allocator.clearReservation(reserved, head)));
+                } finally {
+                    traces.unbindCell(trace);
+                }
             }
-        }
 
-        maybeLoseResponse(trace.actorId(), responseLossAt, ResponseLossAt.NODE_CREATE);
-        VersionedVirtualLedgerCandidateNodeV1 node = exactCreate(
-                allocator.createCandidate(cell.get(), head, currentView, digest("descriptor:" + trace.identity())));
-        traces.setHeadMutationKind(head.value().managedLedgerIncarnation(), OxiaOperationKind.HEAD_PUBLISH_CAS);
-        maybeLoseResponse(trace.actorId(), responseLossAt, ResponseLossAt.HEAD_PUBLISH);
-        VersionedManagedLedgerAllocatorHeadV1 published =
-                exact(allocator.publishCandidate(cell.get(), head, node, currentView));
-        heads.set(ledgerIndex, published);
-        return new Allocation(node.value().ledgerId(), node.value().grantId());
+            maybeLoseResponse(trace.actorId(), responseLossAt, ResponseLossAt.NODE_CREATE);
+            VersionedVirtualLedgerCandidateNodeV1 node = exactCreate(
+                    allocator.createCandidate(cell.get(), head, currentView, digest("descriptor:" + trace.identity())));
+            traces.setHeadMutationKind(head.value().managedLedgerIncarnation(), OxiaOperationKind.HEAD_PUBLISH_CAS);
+            maybeLoseResponse(trace.actorId(), responseLossAt, ResponseLossAt.HEAD_PUBLISH);
+            VersionedManagedLedgerAllocatorHeadV1 published =
+                    exact(allocator.publishCandidate(cell.get(), head, node, currentView));
+            heads.set(ledgerIndex, published);
+            return new Allocation(node.value().ledgerId(), node.value().grantId());
+        } finally {
+            proofLock.unlock();
+        }
     }
 
     private void createHead(int index) {
+        if (candidate.mode() == AllocatorModeV1.RANGE_LEASED) {
+            Lock proofLock = cellProofLock.writeLock();
+            proofLock.lock();
+            try {
+                createHeadFromExactCurrentCell(index);
+            } finally {
+                proofLock.unlock();
+            }
+            return;
+        }
+        createHeadFromExactCurrentCell(index);
+    }
+
+    private void createHeadFromExactCurrentCell(int index) {
+        requireRangePopulationCellIsolation(candidate, cellProofLock);
         int actorId = index & 3;
         VersionedAllocatorCellStateV1 exactCell = cell.get();
         VersionedManagedLedgerAllocatorHeadV1 head = exactCreate(allocator(actorId)
                 .createHead(exactCell, currentView, incarnation(index), INITIAL_OWNER_EPOCH));
         if (candidate.mode() == AllocatorModeV1.RANGE_LEASED && !reservedForFaultCuts(index)) {
-            cellLock.lock();
-            try {
-                VersionedAllocatorCellStateV1 currentCell = cell.get();
-                VersionedAllocatorCellStateV1 reserved = exact(allocator(actorId)
-                        .reserve(currentCell, head, currentView, digest("population-grant:" + index)));
-                cell.set(reserved);
-                head = exact(allocator(actorId).installRangeReservedGrant(reserved, head, currentView));
-                cell.set(exact(allocator(actorId).clearReservation(reserved, head)));
-            } finally {
-                cellLock.unlock();
-            }
+            VersionedAllocatorCellStateV1 currentCell = cell.get();
+            VersionedAllocatorCellStateV1 reserved = exact(allocator(actorId)
+                    .reserve(currentCell, head, currentView, digest("population-grant:" + index)));
+            cell.set(reserved);
+            head = exact(allocator(actorId).installRangeReservedGrant(reserved, head, currentView));
+            cell.set(exact(allocator(actorId).clearReservation(reserved, head)));
         }
         heads.set(index, head);
+    }
+
+    static void requireRangePopulationCellIsolation(
+            AllocatorEvidenceCandidateV1 candidate, ReentrantReadWriteLock cellProofLock) {
+        Objects.requireNonNull(candidate, "candidate");
+        Objects.requireNonNull(cellProofLock, "cellProofLock");
+        if (candidate.mode() == AllocatorModeV1.RANGE_LEASED
+                && !cellProofLock.isWriteLockedByCurrentThread()) {
+            throw new IllegalStateException(
+                    "RANGE population construction captured the exact Cell outside its proof lock");
+        }
+    }
+
+    private Lock cellProofLock(VersionedManagedLedgerAllocatorHeadV1 head) {
+        boolean requiresCellMutation = candidate.mode() == AllocatorModeV1.STRICT_SERIALIZED
+                || head.value().grantId() == 0
+                || head.value().nextLedgerId() >= head.value().rangeEndExclusive();
+        return requiresCellMutation ? cellProofLock.writeLock() : cellProofLock.readLock();
     }
 
     private static boolean reservedForFaultCuts(int index) {

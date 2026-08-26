@@ -77,6 +77,21 @@ final class M3RealOxiaActors implements AutoCloseable {
         actors.forEach(actor -> actor.client.setControlledLatencyMillis(latencyMillis));
     }
 
+    void requirePopulationConstructionLatencyDisabled() {
+        requirePopulationConstructionLatencyDisabled(
+                actors.stream().map(actor -> actor.client).toList());
+    }
+
+    static void requirePopulationConstructionLatencyDisabled(List<InstrumentedClient> clients) {
+        Objects.requireNonNull(clients, "clients");
+        if (clients.isEmpty()
+                || clients.stream().anyMatch(client ->
+                        Objects.requireNonNull(client, "client").controlledLatencyMillis() != 0)) {
+            throw new IllegalStateException(
+                    "allocator population construction inherited measured metadata latency");
+        }
+    }
+
     @Override
     public void close() throws Exception {
         Exception failure = null;
@@ -180,6 +195,10 @@ final class M3RealOxiaActors implements AutoCloseable {
 
         void setControlledLatencyMillis(int latencyMillis) {
             controlledLatencyMillis.set(latencyMillis);
+        }
+
+        int controlledLatencyMillis() {
+            return controlledLatencyMillis.get();
         }
 
         void loseNextMutationResponse() {

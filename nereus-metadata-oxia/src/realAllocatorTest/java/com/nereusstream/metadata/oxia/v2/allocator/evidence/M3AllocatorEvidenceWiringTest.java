@@ -15,6 +15,7 @@
 package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceAttachmentKindV1;
@@ -49,6 +50,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -56,6 +58,42 @@ import org.junit.jupiter.api.io.TempDir;
 
 class M3AllocatorEvidenceWiringTest {
     private static final Pattern SELF_SHA = Pattern.compile("\\\"selfSha256\\\":\\\"([0-9a-f]{64})\\\"");
+
+    @Test
+    void isolatesRangePopulationExactCellAndRejectsInjectedConstructionLatency() throws Exception {
+        ReentrantReadWriteLock cellLock = new ReentrantReadWriteLock(true);
+        assertThatCode(() -> M3CandidateAllocatorPopulation.requireRangePopulationCellIsolation(
+                        AllocatorEvidenceCandidateV1.strict(), cellLock))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> M3CandidateAllocatorPopulation.requireRangePopulationCellIsolation(
+                        AllocatorEvidenceCandidateV1.range(16), cellLock))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("outside its proof lock");
+        cellLock.writeLock().lock();
+        try {
+            assertThatCode(() -> M3CandidateAllocatorPopulation.requireRangePopulationCellIsolation(
+                            AllocatorEvidenceCandidateV1.range(16), cellLock))
+                    .doesNotThrowAnyException();
+        } finally {
+            cellLock.writeLock().unlock();
+        }
+
+        PendingConditionalClient firstDelegate = new PendingConditionalClient();
+        PendingConditionalClient secondDelegate = new PendingConditionalClient();
+        try (M3RealOxiaActors.InstrumentedClient first =
+                        new M3RealOxiaActors.InstrumentedClient(0, firstDelegate);
+                M3RealOxiaActors.InstrumentedClient second =
+                        new M3RealOxiaActors.InstrumentedClient(1, secondDelegate)) {
+            assertThatCode(() -> M3RealOxiaActors.requirePopulationConstructionLatencyDisabled(
+                            List.of(first, second)))
+                    .doesNotThrowAnyException();
+            second.setControlledLatencyMillis(25);
+            assertThatThrownBy(() -> M3RealOxiaActors.requirePopulationConstructionLatencyDisabled(
+                            List.of(first, second)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("inherited measured metadata latency");
+        }
+    }
 
     @Test
     void recordsLateFreshOwnerAdmissionAsExactRecoveryProofAndTypedTimeout() {

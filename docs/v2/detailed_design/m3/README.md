@@ -197,6 +197,20 @@ task-owned Oxia container was removed. This remains diagnostic only: it emits no
 100k/throughput rows, selects no mode, and promotes no scenario. The complete raw matrix at the eventual exact source
 remains mandatory.
 
+The following complete-matrix diagnostic at exact clean source
+`d819500f6da8d024e77bc1bcb26ba7dcf4ee42da` ran for 5,071.065 seconds before RANGE concurrency exposed
+`CELL_STATE_DRIFT`: an installed-range Head/node path had captured a cached Cell while a different request advanced the
+same Cell through reserve/install/clear. JUnit is exactly one test, one failure, zero errors, and zero skips, and no
+selection/evaluation/verifier file exists. The closed external directory is
+`/Users/liusinan/Documents/Codex/2026-08-26/nereus-v2-m3-allocator/full-matrix-d819500f-r4`; every file rehashes against
+`SHA256SUMS`, whose SHA-256 is `bd2ae96c38ccb7a1fb416541dab9109684bdddfff3e0d734f74a84ce2805ca67`.
+[ADR 0101](../../../decisions/0101-v2-m3-allocator-cell-proof-concurrency-scheduling-amendment.md) preserves the
+production exact-current-Cell check and gives installed RANGE paths a fair shared proof phase while Cell mutation
+chains use an exclusive measured phase. RANGE population construction captures its exact Cell only under that exclusive
+phase, and construction rejects inherited injected latency. The focused formal-runner contract now passes 11 tests
+with zero failure/error/skip; a real-Oxia RANGE overlap diagnostic and then the complete raw matrix remain mandatory and
+cannot be promoted independently.
+
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
 `NEREUS_V2_M3_D1_LOCAL_CAP_RESULT_V1` payload with CREATE_NEW after the runner hashes the harness, its test, and all
@@ -223,7 +237,7 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; Kafka/Pulsar backend integration and dedicated-fork compile checkpoints pass, while formal Provider/KMS receipts remain open |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | Kafka source implemented; local 260-test module check covers strict wire/key/caps, OPEN/TERMINAL Head, backend mapping and bounded recovery; the dedicated fork now compiles against the split F9/M3 artifact inputs with 6/6 tests, while the final source-qualified native receipt remains open |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; the dedicated-fork dual-repository compile checkpoint passes 6/6 tests, but a source-qualified receipt remains open and native broker/controller activation remains M6 |
-| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; allocator production/evidence code is committed at `a95e492e2597a48c77bcbdc2354ca189d93fc552` and its ordinary 48-test inventory passes; ADRs 0091/0094/0097 freeze the wire, raw workload/SLO/selection, and reproducible evidence-image inputs, but the formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open |
+| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; allocator production/evidence code and its ordinary 48-test inventory pass, while the 11-test runner contract enforces ADR 0101 Cell-proof scheduling; ADRs 0091/0094/0097/0100/0101 freeze the wire, raw workload/SLO/selection, reproducible image, recovery endpoint, and concurrency schedule, but the formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open |
 | M3-FINAL | exact-source aggregate and scenario promotion | fail-closed child/final checker and publisher contracts are implemented and their 74 governance tests pass; Final remains open and requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
 
 Slice names are execution labels, not new durable wire codes. Implementations may split reviewable commits more
