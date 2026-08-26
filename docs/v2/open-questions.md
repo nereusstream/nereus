@@ -780,8 +780,10 @@ Only a complete checkpoint seals; NONE/BOTH remain valid non-promotable decision
 produces no evaluation. Formal workflows additionally enforce the exact 64-retry/four-second/25-ms envelope inside
 the five-second Runner cleanup grace and prevent late store completions from dispatching a post-timeout operation.
 The old default full/V1 script path fails closed. Real-Oxia diagnostics remain
-open at this source checkpoint. The promotion gate does not trust a caller-created canonical evaluation or diagnostic
-attestation: it rederives exact NAEV2 bytes and rehashes both the diagnostic and formal JUnit inputs.
+diagnostic-only rather than promotion authority: exact source `5d86b572...` passes the required four scenarios as
+`4/0/0/0`, with NADV2 `9694673...d6e3` and JUnit `a8b0f884...55f3e`. The promotion gate does not trust a
+caller-created canonical evaluation or diagnostic attestation: it rederives exact NAEV2 bytes and rehashes both the
+diagnostic and formal JUnit inputs. Formal V2 campaign/evaluation/selection remain open and prohibited.
 The exact-source
 `1ef4f108...` matrix passed its one testcase but failed the sealed-evidence task on an oversized 113,519,059-byte
 JUnit XML caused by 970,241 copies of one expected native-harness cleanup WARN. It produced no evaluation, selection,
@@ -794,8 +796,9 @@ remains `PLANNED`; the `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes, and
 diagnostic-only RANGE-1024 100k construction guard. That guard passes at exact `e739799f...` in 459.537 seconds with
 zero failure/error/skip and unchanged caps, with attachment-set `SHA256SUMS` SHA-256
 `1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`. Neither result is a performance PASS or a
-selection input. Full V2 formal execution remains forbidden until ADR 0104's plan, compatibility, bounded-runner,
-four-actor, and short real-Oxia diagnostic gates are all clean.
+selection input. ADR 0104's plan, compatibility, bounded-runner, four-actor, and short real-Oxia diagnostic gates are
+now clean, but the current execution authority still explicitly forbids any full formal allocator campaign until a
+later instruction authorizes the adaptive engine and exact-source run.
 
 ### `V2-OPEN-PUL-MIGRATION-01`: new incarnation or HybridManagedLedger
 

@@ -182,6 +182,15 @@ The formal-run script now fails closed for its former default exhaustive/V1 path
 short-diagnostic script may start only the four-test real-Oxia prerequisite and seal `NADV2`; it cannot start a formal
 campaign or create an evaluation, selection, receipt, or scenario PASS.
 
+The exact-source short diagnostic at Nereus `5d86b572e826f56a29726ca7c77f1c98bc941e4b`, dedicated Pulsar
+`7ff908330809f2e9bc5c69ead87bb85c566bc0a9`, and Oxia image ID
+`7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da` passes the four required tests with zero
+failure/error/skip. Its 212-byte diagnostic-only NADV2 SHA-256 is
+`9694673ac388f7ce79a7338ef7d9d932c227854973c3ee52843ace5bb4dbd6e3`; exact JUnit SHA-256 is
+`a8b0f884097b6698e56f69562700c6fe42a9bb284601667e0abd574a80255f3e`. The immediately preceding `f07e11c3...`
+attempt also ran four zero-failure/error/skip tests but the sealer rejected its non-wire testcase-name expectation, so
+it produced no NADV2 and remains diagnostic-only. Neither run authorizes a full formal campaign or promotion.
+
 ## Consequences
 
 - The logical workload and all ADR-0094 qualification thresholds remain unchanged, while typical execution can stop

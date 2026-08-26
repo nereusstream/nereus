@@ -80,10 +80,10 @@ checkpoint, evaluation, promotion, and separate short-diagnostic entrypoints are
 also capped at 64 retries, four seconds total elapsed, and 25 milliseconds maximum backoff, inside the five-second
 Runner cleanup grace; a request-local lock-free store guard rejects post-timeout continuation dispatch. Promotion
 independently rederives NAEV2 and rehashes both diagnostic and formal JUnit bytes;
-it cannot trust a caller-constructed canonical seal. This is still implementation conformance: the short real-Oxia
-gate and any formal V2 campaign
-remain unexecuted at this checkpoint. No empty
-task, documentation-only receipt, synthetic Root fixture, diagnostic
+it cannot trust a caller-constructed canonical seal. The exact `5d86b572...` short real-Oxia gate now passes its four
+STRICT/installed-RANGE/range-renewal/conflict-storm tests with zero failure/error/skip and seals diagnostic-only NADV2
+`9694673...d6e3`; its JUnit is `a8b0f884...55f3e`. No formal V2 campaign has run. No empty task,
+documentation-only receipt, synthetic Root fixture, diagnostic
 real-service run, or focused local PASS may promote an M3 scenario.
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
