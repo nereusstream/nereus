@@ -110,7 +110,10 @@ open at that implementation boundary and neither artifact promotes a scenario or
 evidence. Exact `35e6784d...` R evidence subsequently passes 9/0/0/0 and publishes non-promotable child
 `1863f293...8f90`. Exact `fc7aa790...` K evidence then passes 5/0/0/0 and publishes non-promotable child
 `864fdedc...0c7f`, binding the production-codec fixture. Post-selection R/K freshness and the separate Kafka native
-child remain open.
+child remain open at that source boundary. Exact `53361fe2...` U evidence subsequently seals the five closed Kafka
+Object-WAL suites at 41/0/0/0, all 52 source artifacts, and dedicated Kafka commit `323e0351...`; its independent
+JUnit/native wrappers publish non-promotable child `3dcb5e9e...52dd` with derived totals 82/0/0/0. Post-selection U
+freshness, Pulsar native evidence, allocator selection, and M6 native activation remain open.
 
 ADR 0105 versions M3 typed-evidence source locks so the current preselection state is explicitly `UNSELECTED`.
 Non-allocator children may bind the exact M3 Kafka/Pulsar branches and fixed Provider/KMS artifacts in that state,

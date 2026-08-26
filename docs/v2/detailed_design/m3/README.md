@@ -384,7 +384,7 @@ At clean published source `1d181dc65e86f1cc9da6d0a6bd840b8fffee21bf`, the govern
 [Object-WAL state-trace child](../../evidence/v2-m3/children/02-C_OBJECT_WAL_STATE_TRACE/receipt.json) with SHA-256
 `ed5b131eb22ecc03e0ec698723b8fad30ade32cb27e04dbe1f219224bc0c2f4a`. Its typed manifest binds all 50
 authored deterministic traces and the closed 21-outcome/call-profile inventory. It proves the common kernel only;
-Kafka/Pulsar native backend evidence, scenario promotion, and a fresh post-selection Final-source rerun remain open.
+Pulsar native backend evidence, scenario promotion, and a fresh post-selection Final-source rerun remain open.
 
 R/K evidence inputs now have closed, content-validating artifacts. The eight-row WalRun recovery manifest maps the
 control wire, three lazy lanes, checkpoint publication and streaming recovery, Seal/successor, exact lineage,
@@ -397,6 +397,15 @@ publishes non-promotable [control/recovery child](../../evidence/v2-m3/children/
 `1863f293...8f90`. The subsequent exact `fc7aa790...` K execution passes 5/0/0/0 and publishes non-promotable
 [NWKCP1 child](../../evidence/v2-m3/children/06-K_NWKCP1/receipt.json) `864fdedc...0c7f`. The protocol fixture does
 not freeze complete synthetic Root/Pointer wire or replace the Kafka native child.
+
+At clean published source `53361fe200080a5525ce92ab930cacba107cc28b`, the exact U execution seals all five
+closed Kafka Object-WAL suites at 41/0/0/0, 52 exact Nereus source artifacts, and the dedicated Kafka M3 commit
+`323e035145d203f7e74e969341cb610f33e71b7d`. The independent governed JUnit and sealed native wrappers produce
+the non-promotable [Kafka Object-WAL child](../../evidence/v2-m3/children/07-U_KAFKA_OBJECT_WAL/receipt.json)
+`3dcb5e9e...52dd` with derived totals 82/0/0/0. It covers fenced publication/ACK ordering, Root-bound recovery,
+whole-suffix rollback, native state, locator retirement, and shared/Binding isolation. This preselection child does
+not activate Kafka broker/controller paths, substitute for Pulsar or allocator evidence, or remove the required
+post-selection Final-source rerun.
 
 Serial continuation order completed the ADR-0104 V2 schema/planner/validator/selector, bounded CAS/reconcile workflow,
 bounded four-actor Runner, checkpoint/resume/sealer/promotion implementation, and required short real-Oxia diagnostic
@@ -413,11 +422,11 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | M3-W1 | current-source M2 regression plus M3 module/API input gate | M3 inputs and the eleven-module source-qualified API closure pass; historical M2 Final remains immutable; ADR 0098 closes the M3-only prerequisite projection; the exact-source `89a76612…` formal profile publishes 25/25 children and 687 zero-failure/error/skip tests as a non-promotable W1 checkpoint, while Final still requires a freshness rerun at its eventual exact tested source |
 | M3-W2 | NWG1 production encoder/decoder, projection, six-vector A corpus, and exact wire gate | exact `f0a3310d...` A/B evidence passes 20/0/0/0 and publishes non-promotable child `26c50098...e14b`, binding the six-vector/two-fixture canonical manifest and exact 114-row TSV; a fresh Final-source rerun remains required after allocator selection |
 | M3-W3 | 84-record/240-path B mutation manifest and runner | the same exact-source A/B child binds 84 authored records/240 paths, 25/25 rejection codes, and 16/16 validation stages with no generated inventory; a fresh Final-source rerun remains required after allocator selection |
-| M3-C1 | 50-trace Object-WAL kernel harness | exact `1d181dc6...` evidence passes 7/0/0/0 and publishes non-promotable child `ed5b131e...2f4a`, binding all 50 authored traces and 21 outcomes; Kafka/Pulsar native backend evidence and a fresh post-selection Final-source rerun remain open |
+| M3-C1 | 50-trace Object-WAL kernel harness | exact `1d181dc6...` evidence passes 7/0/0/0 and publishes non-promotable child `ed5b131e...2f4a`, binding all 50 authored traces and 21 outcomes; Pulsar native backend evidence and a fresh post-selection Final-source rerun remain open |
 | M3-D1 | local capacity conformance and exact Provider C1/C2 evidence | exact `2b9636dd...` local-cap evidence publishes non-promotable 12/0/0/0 D1 child `6769769b...2a78` and explicitly claims no Provider/KMS execution; exact `e4d207e3...` real Provider/KMS plus ordinary session evidence passes 4/0/0/0 and publishes non-promotable C1 child `184fa0e2...a180`; fresh Final-source D1/C1 reruns remain required after allocator selection, and C2 remains non-promotable without independent benefit evidence |
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | exact `35e6784d...` evidence passes 9/0/0/0 and publishes non-promotable child `1863f293...8f90`, binding the closed eight-row recovery manifest; post-selection Final-source freshness and native backend evidence remain open |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | exact `fc7aa790...` evidence passes 5/0/0/0 and publishes non-promotable child `864fdedc...0c7f`, binding the production-codec 324-byte Object and 434-byte OPEN/TERMINAL Heads; post-selection K freshness and the separate Kafka native child remain open |
-| M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; the dedicated-fork dual-repository compile checkpoint passes 6/6 tests, but a source-qualified receipt remains open and native broker/controller activation remains M6 |
+| M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | exact `53361fe2...` execution seals five closed suites at 41/0/0/0 and 52 source artifacts against dedicated Kafka `323e0351...`, publishing non-promotable child `3dcb5e9e...52dd` with derived totals 82/0/0/0; post-selection freshness remains required and native broker/controller activation remains M6 |
 | M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; ADR-0104's pure V2 schema/planner/validator/selector and 13 focused tests enforce the 288-cell inventory, 13/17/288 execution bounds, descending rates, independently reproved dispositions/conservation, and valid non-promotable NONE/BOTH outcomes without Oxia; the production-neutral bounded workflow preserves request/candidate identity through exact CAS/reread, four-second elapsed/25-ms backoff/64-retry bounds, typed fail-closed outcomes, and post-timeout dispatch rejection without a Java lock; the physical four-actor Runner and production-workflow harness cover queue/cutoff/terminal conservation and concurrency four with one in-flight per actor; strict NACP2/NAEV2/NADV2 checkpoint, evaluation, diagnostic and promotion gates are implemented without enabling the old full path; exact-source short real-Oxia diagnostics pass 4/0/0/0 and seal non-promotable NADV2 `9694673...d6e3`; formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open, and no full formal campaign is currently allowed |
 | M3-FINAL | exact-source aggregate and scenario promotion | fail-closed child/final checker and publisher contracts are implemented and their 74 governance tests pass; Final remains open and requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
 
