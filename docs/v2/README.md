@@ -433,8 +433,11 @@ The pure domain V2 campaign schema/planner/validator/selector now implements the
 descending adaptive execution, native-relative rate eligibility, validator-reproved dispositions, exact
 offered/admitted conservation, and the four closed evaluation outcomes. Thirteen focused tests cover the 13-cell
 minimum, 17-cell minimum promotable, and 288-cell maximum paths plus caller-tamper failures. It has no Oxia access and
-is implementation conformance only; bounded workflow/Runner, checkpoint/sealer, short real-Oxia diagnostics, and all
-formal evidence remain open.
+is implementation conformance only. The production-neutral bounded workflow is now implemented in the metadata SPI.
+Each coordinator fixes request, descriptor, exact Head, and slice-view identity; retries only through exact store CAS/reread;
+and fails closed on owner, slice/context, descriptor, or retry-budget drift without a shared Java lock. Eight focused
+tests cover STRICT/RANGE happy paths, every response-loss stage, two independent coordinator conflict, and one-ID
+consumption. The four-actor Runner/harness and real-Oxia diagnostics remain open, so this still selects nothing.
 The replacement `9f88fbfb...` source passes its one-test 10k RANGE Cell-proof diagnostic with zero
 failure/error/skip. The separate exact-source `e739799f...` diagnostic-only RANGE-1024 10k-to-100k construction guard
 also passes one testcase in 459.537 seconds with zero failure/error/skip and unchanged operation/drain caps. Its

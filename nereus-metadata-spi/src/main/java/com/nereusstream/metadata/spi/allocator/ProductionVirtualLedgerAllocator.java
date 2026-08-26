@@ -290,6 +290,12 @@ public final class ProductionVirtualLedgerAllocator {
         return runtimeActivated;
     }
 
+    /** Creates one independent lock-free coordinator whose retries are serialized only by exact store authority. */
+    public BoundedVirtualLedgerAllocatorWorkflowV2 boundedWorkflow(
+            int maximumReconcileRetries, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler retryScheduler) {
+        return new BoundedVirtualLedgerAllocatorWorkflowV2(this, store, maximumReconcileRetries, retryScheduler);
+    }
+
     private void requireCurrentActiveCell(
             VirtualLedgerCellAllocatorStateV1 cell, VersionedVirtualLedgerSliceViewV1 currentView) {
         Objects.requireNonNull(currentView, "currentView");

@@ -52,6 +52,9 @@ public final class AllocatorProtocolException extends IllegalArgumentException {
         CANDIDATE_CONFLICT,
         CANDIDATE_OCCUPANCY_NOT_PROVEN,
         STALE_CANDIDATE_REQUIRED,
+        REQUEST_CONTEXT_DRIFT,
+        DESCRIPTOR_MISMATCH,
+        RECONCILE_RETRY_EXHAUSTED,
         NON_CANONICAL_WIRE
     }
 }

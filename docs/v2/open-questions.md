@@ -767,7 +767,10 @@ independent coordinators, and budget exhaustion interrupts rather than completin
 pure schema/planner/validator/selector is now implemented and covered by 13 focused zero-skip tests, including all
 four evaluation outcomes and the 13/17/288 execution bounds. It accesses no Oxia and is not formal evidence. The
 bounded CAS/reconcile workflow, four-actor Runner, checkpoint/sealer/promotion gates, and required short real-Oxia
-diagnostics remain open before any formal V2 campaign. The exact-source
+diagnostics remain open before any formal V2 campaign. The bounded CAS/reconcile workflow is now implemented in the
+metadata SPI and covered by eight focused zero-skip tests: it fixes request/candidate context, uses only exact store
+CAS/reread with a global retry bound, contains no shared Java lock, and rejects owner/slice/descriptor drift. The
+four-actor Runner, sealing/resume/promotion gates, and real-Oxia diagnostics remain open. The exact-source
 `1ef4f108...` matrix passed its one testcase but failed the sealed-evidence task on an oversized 113,519,059-byte
 JUnit XML caused by 970,241 copies of one expected native-harness cleanup WARN. It produced no evaluation, selection,
 or verifier output and remains diagnostic. The following `bd254d24...` run kept JUnit at 1,988 bytes but failed
