@@ -97,6 +97,10 @@ Its attachment set rehashes under `SHA256SUMS` SHA-256
 `1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`; it emits no selection input or receipt. It
 cannot be reused by the ADR-0104 V2 campaign.
 
+Exact `1d181dc6...` common Object-WAL state evidence passes 7/0/0/0 and publishes non-promotable child
+`ed5b131e...2f4a`, binding all 50 deterministic traces and the closed 21-outcome/call-profile inventory. This child
+is common-kernel evidence only; it neither substitutes for Kafka/Pulsar native evidence nor promotes a scenario.
+
 ADR 0105 versions M3 typed-evidence source locks so the current preselection state is explicitly `UNSELECTED`.
 Non-allocator children may bind the exact M3 Kafka/Pulsar branches and fixed Provider/KMS artifacts in that state,
 but allocator sealing and M3 Final require a uniquely qualified `STRICT` or `RANGE` mode. The mode transition changes
