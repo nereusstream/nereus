@@ -49,10 +49,10 @@ import org.w3c.dom.NodeList;
 public final class M3V2AllocatorProtocolMain {
     private static final Pattern SHA256_HEX = Pattern.compile("[0-9a-f]{64}");
     private static final Set<String> DIAGNOSTIC_TESTS = Set.of(
-            "strictWorkflowUsesRealOxia",
-            "installedRangeReusesGrant",
-            "rangeRenewalUsesCellCas",
-            "conflictStormUsesFourIndependentCoordinators");
+            "strictWorkflowUsesRealOxia()",
+            "installedRangeReusesGrant()",
+            "rangeRenewalUsesCellCas()",
+            "conflictStormUsesFourIndependentCoordinators()");
 
     private M3V2AllocatorProtocolMain() {}
 

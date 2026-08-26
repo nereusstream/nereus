@@ -87,8 +87,8 @@ class M3V2AllocatorProtocolMainTest {
         Files.writeString(
                 junit,
                 diagnosticJUnit().replace(
-                        "<testcase name=\"strictWorkflowUsesRealOxia\"/>",
-                        "<testcase name=\"strictWorkflowUsesRealOxia\"><failure/></testcase>"));
+                        "<testcase name=\"strictWorkflowUsesRealOxia()\"/>",
+                        "<testcase name=\"strictWorkflowUsesRealOxia()\"><failure/></testcase>"));
         assertThatThrownBy(() -> M3V2AllocatorProtocolMain.main(arguments(
                         "seal-diagnostic", junit, temporaryDirectory.resolve("forged.nadv"), source)))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -274,10 +274,10 @@ class M3V2AllocatorProtocolMainTest {
 
     private static String diagnosticJUnit() {
         return "<testsuite tests=\"4\" failures=\"0\" errors=\"0\" skipped=\"0\">"
-                + "<testcase name=\"strictWorkflowUsesRealOxia\"/>"
-                + "<testcase name=\"installedRangeReusesGrant\"/>"
-                + "<testcase name=\"rangeRenewalUsesCellCas\"/>"
-                + "<testcase name=\"conflictStormUsesFourIndependentCoordinators\"/>"
+                + "<testcase name=\"strictWorkflowUsesRealOxia()\"/>"
+                + "<testcase name=\"installedRangeReusesGrant()\"/>"
+                + "<testcase name=\"rangeRenewalUsesCellCas()\"/>"
+                + "<testcase name=\"conflictStormUsesFourIndependentCoordinators()\"/>"
                 + "</testsuite>";
     }
 
