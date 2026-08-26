@@ -60,6 +60,7 @@ class FixtureBuilder:
         client = source_lock_value["dependencyEvidenceBindings"]["oxiaClientArtifacts"]["artifacts"]["clientJar"]
         client["bytes"] = len(CHILD_TEST_SUPPORT.ALLOCATOR_FIXTURE_CLIENT_BYTES)
         client["sha256"] = CHILD.sha256(CHILD_TEST_SUPPORT.ALLOCATOR_FIXTURE_CLIENT_BYTES)
+        source_lock_value["m3AllocatorEvidenceBinding"]["oxiaClientJarSha256"] = client["sha256"]
         self.bindings = self._source_bindings(source_lock_value)
         source_lock_value["m3EvidenceBindings"] = {
             "allocatorMode": "STRICT",
@@ -117,16 +118,9 @@ class FixtureBuilder:
 
     @staticmethod
     def _source_bindings(source_locks: dict) -> dict[tuple[str, str], dict[str, str]]:
-        kafka = source_locks["k1KafkaAuthorityBinding"]
-        pulsar = source_locks["m2PulsarNativeBinding"]
-        oxia = next(
-            row
-            for row in source_locks["dependencyForkOutputs"]
-            if row["id"] == "oxia-client-notification-continuity"
-        )
-        dependencies = source_locks["dependencyEvidenceBindings"]
-        oxia_client = dependencies["oxiaClientArtifacts"]["artifacts"]["clientJar"]
-        oxia_server = dependencies["oxiaServerRuntime"]
+        kafka = source_locks["m3KafkaNativeBinding"]
+        pulsar = source_locks["m3PulsarNativeBinding"]
+        allocator = source_locks["m3AllocatorEvidenceBinding"]
         identities = {
             "provider": (
                 "MINIO_S3_COMPATIBLE|artifactReference=quay.io/minio/minio@sha256:"
@@ -140,14 +134,14 @@ class FixtureBuilder:
                 + "|artifactConfigDigest=sha256:"
                 + "ba5ade3c7f155978f41dbca62b16e5e08f5331f5d12f9be2d333698b49484457"
             ),
-            "kafka": f"KAFKA_NATIVE|repository=apache/kafka|commit={kafka['finalForkCommit']}",
-            "pulsar": f"PULSAR_NATIVE|repository=apache/pulsar|commit={pulsar['finalForkCommit']}",
+            "kafka": f"KAFKA_NATIVE|repository=apache/kafka|commit={kafka['sourceCommit']}",
+            "pulsar": f"PULSAR_NATIVE|repository=apache/pulsar|commit={pulsar['sourceCommit']}",
             "allocator": (
-                f"OXIA_AND_PULSAR|pulsarCommit={pulsar['finalForkCommit']}"
-                f"|oxiaClientCommit={oxia['finalForkCommit']}"
-                f"|oxiaClientJarSha256={oxia_client['sha256']}"
-                f"|oxiaServerCommit={oxia_server['sourceCommit']}"
-                f"|oxiaServerImageDigest={oxia_server['imageDigest']}"
+                f"OXIA_AND_PULSAR|pulsarCommit={allocator['pulsarSourceCommit']}"
+                f"|oxiaClientCommit={allocator['oxiaClientSourceCommit']}"
+                f"|oxiaClientJarSha256={allocator['oxiaClientJarSha256']}"
+                f"|oxiaServerCommit={allocator['oxiaServerSourceCommit']}"
+                f"|oxiaServerImageDigest={allocator['oxiaServerImageDigest']}"
             ),
         }
         specs = {

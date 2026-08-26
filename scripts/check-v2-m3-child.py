@@ -107,7 +107,8 @@ REAL_PROVIDER_BACKENDS = {
     "MINIO_S3_COMPATIBLE",
 }
 REAL_KMS_BACKENDS = {"AWS_KMS", "AZURE_KEY_VAULT", "GCP_CLOUD_KMS", "VAULT_TRANSIT"}
-SOURCE_BINDING_SCHEMA = "NEREUS_V2_M3_EVIDENCE_SOURCE_LOCKS_V1"
+SOURCE_BINDING_SCHEMA = "NEREUS_V2_M3_EVIDENCE_SOURCE_LOCKS_V2"
+SOURCE_LOCK_ALLOCATOR_MODES = {*FINAL.ALLOCATOR_MODES, "UNSELECTED"}
 M3_EXTERNAL_EVIDENCE_BRANCH = "nereus/v2-m3-object-wal-evidence"
 EXTERNAL_ARTIFACT_IDENTITY = re.compile(
     r"(?:AWS_S3|AZURE_BLOB_STORAGE|GCS_OBJECT_STORAGE|MINIO_S3_COMPATIBLE|"
@@ -734,6 +735,13 @@ def _required_string(value: object, label: str) -> str:
     return value
 
 
+def _m3_evidence_branch(value: object, label: str) -> str:
+    branch = _required_string(value, label)
+    if branch != M3_EXTERNAL_EVIDENCE_BRANCH:
+        raise ChildError(f"M3 external evidence branch differs: {label}")
+    return branch
+
+
 def _find_by_id(value: object, expected_id: str, label: str) -> dict[str, Any]:
     if not isinstance(value, list):
         raise ChildError(f"source-lock list is absent: {label}")
@@ -747,48 +755,62 @@ def _expected_locked_identity(
     locks: dict[str, Any], evidence_kind: str, backend: str, locked_identity: str
 ) -> str:
     if evidence_kind == "NATIVE_RESULT" and backend == "KAFKA_NATIVE":
-        kafka = _required_object(locks.get("k1KafkaAuthorityBinding"), "k1KafkaAuthorityBinding")
+        kafka = _required_object(locks.get("m3KafkaNativeBinding"), "m3KafkaNativeBinding")
         return (
             "KAFKA_NATIVE|repository=apache/kafka"
             + "|commit="
-            + _required_string(kafka.get("finalForkCommit"), "k1KafkaAuthorityBinding.finalForkCommit")
+            + _required_string(kafka.get("sourceCommit"), "m3KafkaNativeBinding.sourceCommit")
         )
-    if evidence_kind in {"NATIVE_RESULT", "ALLOCATOR_NATIVE_RELATIVE_SUMMARY"}:
-        pulsar = _required_object(locks.get("m2PulsarNativeBinding"), "m2PulsarNativeBinding")
+    if evidence_kind == "NATIVE_RESULT":
+        pulsar = _required_object(locks.get("m3PulsarNativeBinding"), "m3PulsarNativeBinding")
         return (
             "PULSAR_NATIVE|repository=apache/pulsar"
             + "|commit="
-            + _required_string(pulsar.get("finalForkCommit"), "m2PulsarNativeBinding.finalForkCommit")
+            + _required_string(pulsar.get("sourceCommit"), "m3PulsarNativeBinding.sourceCommit")
+        )
+    allocator = _required_object(
+        locks.get("m3AllocatorEvidenceBinding"), "m3AllocatorEvidenceBinding"
+    )
+    if evidence_kind == "ALLOCATOR_NATIVE_RELATIVE_SUMMARY":
+        return (
+            "PULSAR_NATIVE|repository=apache/pulsar"
+            + "|commit="
+            + _required_string(
+                allocator.get("pulsarSourceCommit"),
+                "m3AllocatorEvidenceBinding.pulsarSourceCommit",
+            )
         )
     if evidence_kind in {
         "ALLOCATOR_FAULT_SUMMARY",
         "ALLOCATOR_SCALE_10000_SUMMARY",
         "ALLOCATOR_SCALE_100000_SUMMARY",
     }:
-        pulsar = _required_object(locks.get("m2PulsarNativeBinding"), "m2PulsarNativeBinding")
-        oxia_fork = _find_by_id(
-            locks.get("dependencyForkOutputs"),
-            "oxia-client-notification-continuity",
-            "dependencyForkOutputs",
-        )
-        dependency = _required_object(
-            locks.get("dependencyEvidenceBindings"), "dependencyEvidenceBindings"
-        )
-        client = _required_object(dependency.get("oxiaClientArtifacts"), "oxiaClientArtifacts")
-        artifacts = _required_object(client.get("artifacts"), "oxiaClientArtifacts.artifacts")
-        client_jar = _required_object(artifacts.get("clientJar"), "oxiaClientArtifacts.clientJar")
-        server = _required_object(dependency.get("oxiaServerRuntime"), "oxiaServerRuntime")
         return (
             "OXIA_AND_PULSAR|pulsarCommit="
-            + _required_string(pulsar.get("finalForkCommit"), "m2PulsarNativeBinding.finalForkCommit")
+            + _required_string(
+                allocator.get("pulsarSourceCommit"),
+                "m3AllocatorEvidenceBinding.pulsarSourceCommit",
+            )
             + "|oxiaClientCommit="
-            + _required_string(oxia_fork.get("finalForkCommit"), "oxia client finalForkCommit")
+            + _required_string(
+                allocator.get("oxiaClientSourceCommit"),
+                "m3AllocatorEvidenceBinding.oxiaClientSourceCommit",
+            )
             + "|oxiaClientJarSha256="
-            + _required_string(client_jar.get("sha256"), "oxia client jar SHA")
+            + _required_string(
+                allocator.get("oxiaClientJarSha256"),
+                "m3AllocatorEvidenceBinding.oxiaClientJarSha256",
+            )
             + "|oxiaServerCommit="
-            + _required_string(server.get("sourceCommit"), "oxia server sourceCommit")
+            + _required_string(
+                allocator.get("oxiaServerSourceCommit"),
+                "m3AllocatorEvidenceBinding.oxiaServerSourceCommit",
+            )
             + "|oxiaServerImageDigest="
-            + _required_string(server.get("imageDigest"), "oxia server imageDigest")
+            + _required_string(
+                allocator.get("oxiaServerImageDigest"),
+                "m3AllocatorEvidenceBinding.oxiaServerImageDigest",
+            )
         )
     if evidence_kind in {"PROVIDER_REAL_RECEIPT", "KMS_REAL_RECEIPT"}:
         if (
@@ -804,25 +826,46 @@ def _expected_locked_provenance(
     locks: dict[str, Any], evidence_kind: str, backend: str, source_identity: str
 ) -> str:
     if evidence_kind == "NATIVE_RESULT" and backend == "KAFKA_NATIVE":
-        kafka = _required_object(locks.get("k1KafkaAuthorityBinding"), "k1KafkaAuthorityBinding")
+        kafka = _required_object(locks.get("m3KafkaNativeBinding"), "m3KafkaNativeBinding")
         return (
             "KAFKA_FORK|repository="
-            + _required_string(kafka.get("repository"), "k1KafkaAuthorityBinding.repository")
+            + _required_string(kafka.get("repository"), "m3KafkaNativeBinding.repository")
             + "|branch="
-            + M3_EXTERNAL_EVIDENCE_BRANCH
+            + _m3_evidence_branch(kafka.get("branch"), "m3KafkaNativeBinding.branch")
             + "|commit="
-            + _required_string(kafka.get("finalForkCommit"), "k1KafkaAuthorityBinding.finalForkCommit")
+            + _required_string(kafka.get("sourceCommit"), "m3KafkaNativeBinding.sourceCommit")
             + "|logicalRepository=apache/kafka"
         )
-    if evidence_kind in {"NATIVE_RESULT", "ALLOCATOR_NATIVE_RELATIVE_SUMMARY"}:
-        pulsar = _required_object(locks.get("m2PulsarNativeBinding"), "m2PulsarNativeBinding")
+    if evidence_kind == "NATIVE_RESULT":
+        pulsar = _required_object(locks.get("m3PulsarNativeBinding"), "m3PulsarNativeBinding")
         return (
             "PULSAR_FORK|repository="
-            + _required_string(pulsar.get("repository"), "m2PulsarNativeBinding.repository")
+            + _required_string(pulsar.get("repository"), "m3PulsarNativeBinding.repository")
             + "|branch="
-            + M3_EXTERNAL_EVIDENCE_BRANCH
+            + _m3_evidence_branch(pulsar.get("branch"), "m3PulsarNativeBinding.branch")
             + "|commit="
-            + _required_string(pulsar.get("finalForkCommit"), "m2PulsarNativeBinding.finalForkCommit")
+            + _required_string(pulsar.get("sourceCommit"), "m3PulsarNativeBinding.sourceCommit")
+            + "|logicalRepository=apache/pulsar"
+        )
+    allocator = _required_object(
+        locks.get("m3AllocatorEvidenceBinding"), "m3AllocatorEvidenceBinding"
+    )
+    if evidence_kind == "ALLOCATOR_NATIVE_RELATIVE_SUMMARY":
+        return (
+            "PULSAR_FORK|repository="
+            + _required_string(
+                allocator.get("pulsarRepository"),
+                "m3AllocatorEvidenceBinding.pulsarRepository",
+            )
+            + "|branch="
+            + _m3_evidence_branch(
+                allocator.get("pulsarBranch"), "m3AllocatorEvidenceBinding.pulsarBranch"
+            )
+            + "|commit="
+            + _required_string(
+                allocator.get("pulsarSourceCommit"),
+                "m3AllocatorEvidenceBinding.pulsarSourceCommit",
+            )
             + "|logicalRepository=apache/pulsar"
         )
     if evidence_kind in {
@@ -830,25 +873,36 @@ def _expected_locked_provenance(
         "ALLOCATOR_SCALE_10000_SUMMARY",
         "ALLOCATOR_SCALE_100000_SUMMARY",
     }:
-        pulsar = _required_object(locks.get("m2PulsarNativeBinding"), "m2PulsarNativeBinding")
-        oxia = _find_by_id(
-            locks.get("dependencyForkOutputs"),
-            "oxia-client-notification-continuity",
-            "dependencyForkOutputs",
-        )
         return (
             "ALLOCATOR_FORKS|pulsarRepository="
-            + _required_string(pulsar.get("repository"), "m2PulsarNativeBinding.repository")
+            + _required_string(
+                allocator.get("pulsarRepository"),
+                "m3AllocatorEvidenceBinding.pulsarRepository",
+            )
             + "|pulsarBranch="
-            + M3_EXTERNAL_EVIDENCE_BRANCH
+            + _m3_evidence_branch(
+                allocator.get("pulsarBranch"), "m3AllocatorEvidenceBinding.pulsarBranch"
+            )
             + "|pulsarCommit="
-            + _required_string(pulsar.get("finalForkCommit"), "m2PulsarNativeBinding.finalForkCommit")
+            + _required_string(
+                allocator.get("pulsarSourceCommit"),
+                "m3AllocatorEvidenceBinding.pulsarSourceCommit",
+            )
             + "|pulsarLogicalRepository=apache/pulsar|oxiaClientRepository="
-            + _required_string(oxia.get("repository"), "oxia client repository")
+            + _required_string(
+                allocator.get("oxiaClientRepository"),
+                "m3AllocatorEvidenceBinding.oxiaClientRepository",
+            )
             + "|oxiaClientBranch="
-            + _required_string(oxia.get("branch"), "oxia client branch")
+            + _m3_evidence_branch(
+                allocator.get("oxiaClientEvidenceCheckoutBranch"),
+                "m3AllocatorEvidenceBinding.oxiaClientEvidenceCheckoutBranch",
+            )
             + "|oxiaClientCommit="
-            + _required_string(oxia.get("finalForkCommit"), "oxia client finalForkCommit")
+            + _required_string(
+                allocator.get("oxiaClientSourceCommit"),
+                "m3AllocatorEvidenceBinding.oxiaClientSourceCommit",
+            )
         )
     return source_identity
 
@@ -863,7 +917,7 @@ def source_bindings(
         "sourceLocks.m3EvidenceBindings",
     )
     mode = policy["allocatorMode"]
-    if policy["schema"] != SOURCE_BINDING_SCHEMA or mode not in FINAL.ALLOCATOR_MODES:
+    if policy["schema"] != SOURCE_BINDING_SCHEMA or mode not in SOURCE_LOCK_ALLOCATOR_MODES:
         raise ChildError("M3 evidence source-lock schema or allocator mode differs")
     if allocator_mode is not None and mode != allocator_mode:
         raise ChildError("Final allocator mode is not derived from exact tested source locks")
@@ -2501,6 +2555,8 @@ def seal_allocator_verification_receipt(
     if _allocator_external_path(junit_xml_path, "allocator verifier JUnit path") != ALLOCATOR_VERIFIER_JUNIT_PATH:
         raise ChildError("allocator verifier JUnit formal path differs")
     locked_mode, _ = source_bindings(root, tested_commit)
+    if locked_mode == "UNSELECTED":
+        raise ChildError("allocator evidence requires a selected source-lock mode")
     external_rows = allocator_external_file_rows(root, tested_commit, external_paths)
     _validate_java_allocator_verification(
         java_verification, junit_xml, root, tested_commit, locked_mode, external_rows
@@ -2569,6 +2625,8 @@ def validate_allocator_verification(
     if wrapper["receiptSha256"] != sha256(canonical_bytes(_allocator_wrapper_unsigned(wrapper))):
         raise ChildError("governed allocator verification self-hash differs")
     locked_mode, _ = source_bindings(root, tested_commit)
+    if locked_mode == "UNSELECTED":
+        raise ChildError("allocator evidence requires a selected source-lock mode")
     return _validate_java_allocator_verification(
         java_verification,
         junit_xml,

@@ -82,6 +82,9 @@ class Fixture:
             },
         }) + "\n")
         locks["m3AllocatorEvidenceBinding"] = {"fixture": "current-only"}
+        locks["m3EvidenceBindings"] = {"fixture": "current-only"}
+        locks["m3KafkaNativeBinding"] = {"fixture": "current-only"}
+        locks["m3PulsarNativeBinding"] = {"fixture": "current-only"}
         lock_path.write_text(json.dumps(locks) + "\n")
         git(self.repo, "add", ".")
         git(self.repo, "commit", "-m", "fixture current M3 source")

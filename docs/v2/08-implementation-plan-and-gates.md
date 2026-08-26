@@ -92,6 +92,11 @@ Its attachment set rehashes under `SHA256SUMS` SHA-256
 `1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`; it emits no selection input or receipt. It
 cannot be reused by the ADR-0104 V2 campaign.
 
+ADR 0105 versions M3 typed-evidence source locks so the current preselection state is explicitly `UNSELECTED`.
+Non-allocator children may bind the exact M3 Kafka/Pulsar branches and fixed Provider/KMS artifacts in that state,
+but allocator sealing and M3 Final require a uniquely qualified `STRICT` or `RANGE` mode. The mode transition changes
+production source and therefore forces fresh Final-source child receipts; it cannot reuse preselection receipts.
+
 ADR 0015 limits 0.2 to one initial Storage Epoch per Topic Incarnation and no online profile-transition runtime. ADR 0016
 excludes Kafka/Pulsar Access Projection and Migration Link runtime. Their future state machines, Pulsar
 BookKeeper/Object profile transition, and KoP therefore remain outside the 0.2 implementation plan; their deferred

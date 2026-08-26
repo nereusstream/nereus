@@ -33,19 +33,18 @@ CONTRACT = load_module("m3_child_checker_test", CHECKER_PATH)
 ALLOCATOR_FIXTURE_CLIENT_BYTES = b"governed allocator fixture Oxia client JAR\n"
 
 
-def source_lock_fixture() -> tuple[dict, dict[tuple[str, str], dict[str, str]]]:
+def source_lock_fixture(
+    allocator_mode: str = "STRICT",
+) -> tuple[dict, dict[tuple[str, str], dict[str, str]]]:
     value = json.loads((SOURCE_ROOT / CONTRACT.FINAL.SOURCE_LOCKS_PATH).read_text())
-    kafka = value["k1KafkaAuthorityBinding"]
-    pulsar = value["m2PulsarNativeBinding"]
-    oxia = next(
-        row for row in value["dependencyForkOutputs"]
-        if row["id"] == "oxia-client-notification-continuity"
-    )
+    kafka = value["m3KafkaNativeBinding"]
+    pulsar = value["m3PulsarNativeBinding"]
+    allocator = value["m3AllocatorEvidenceBinding"]
     dependencies = value["dependencyEvidenceBindings"]
     client = dependencies["oxiaClientArtifacts"]["artifacts"]["clientJar"]
     client["bytes"] = len(ALLOCATOR_FIXTURE_CLIENT_BYTES)
     client["sha256"] = CONTRACT.sha256(ALLOCATOR_FIXTURE_CLIENT_BYTES)
-    server = dependencies["oxiaServerRuntime"]
+    allocator["oxiaClientJarSha256"] = client["sha256"]
     identities = {
         "provider": (
             "MINIO_S3_COMPATIBLE|artifactReference=quay.io/minio/minio@sha256:"
@@ -59,12 +58,14 @@ def source_lock_fixture() -> tuple[dict, dict[tuple[str, str], dict[str, str]]]:
             "|artifactConfigDigest=sha256:"
             "ba5ade3c7f155978f41dbca62b16e5e08f5331f5d12f9be2d333698b49484457"
         ),
-        "kafka": f"KAFKA_NATIVE|repository=apache/kafka|commit={kafka['finalForkCommit']}",
-        "pulsar": f"PULSAR_NATIVE|repository=apache/pulsar|commit={pulsar['finalForkCommit']}",
+        "kafka": f"KAFKA_NATIVE|repository=apache/kafka|commit={kafka['sourceCommit']}",
+        "pulsar": f"PULSAR_NATIVE|repository=apache/pulsar|commit={pulsar['sourceCommit']}",
         "allocator": (
-            f"OXIA_AND_PULSAR|pulsarCommit={pulsar['finalForkCommit']}"
-            f"|oxiaClientCommit={oxia['finalForkCommit']}|oxiaClientJarSha256={client['sha256']}"
-            f"|oxiaServerCommit={server['sourceCommit']}|oxiaServerImageDigest={server['imageDigest']}"
+            f"OXIA_AND_PULSAR|pulsarCommit={allocator['pulsarSourceCommit']}"
+            f"|oxiaClientCommit={allocator['oxiaClientSourceCommit']}"
+            f"|oxiaClientJarSha256={allocator['oxiaClientJarSha256']}"
+            f"|oxiaServerCommit={allocator['oxiaServerSourceCommit']}"
+            f"|oxiaServerImageDigest={allocator['oxiaServerImageDigest']}"
         ),
     }
     specs = {
@@ -98,7 +99,7 @@ def source_lock_fixture() -> tuple[dict, dict[tuple[str, str], dict[str, str]]]:
             ),
         }
     value["m3EvidenceBindings"] = {
-        "allocatorMode": "STRICT",
+        "allocatorMode": allocator_mode,
         "bindings": [bindings[key] for key in sorted(bindings)],
         "schema": CONTRACT.SOURCE_BINDING_SCHEMA,
     }
@@ -782,7 +783,7 @@ def git(root: Path, *args: str) -> str:
 
 
 class Fixture:
-    def __init__(self) -> None:
+    def __init__(self, allocator_mode: str = "STRICT") -> None:
         self.temporary = tempfile.TemporaryDirectory(prefix="nereus-m3-child-checker-")
         self.root = Path(self.temporary.name) / "repo"
         self.root.mkdir()
@@ -791,7 +792,7 @@ class Fixture:
         git(self.root, "config", "user.email", "m3-child@example.invalid")
         locks = self.root / CONTRACT.FINAL.SOURCE_LOCKS_PATH
         locks.parent.mkdir(parents=True)
-        source_locks, self.bindings = source_lock_fixture()
+        source_locks, self.bindings = source_lock_fixture(allocator_mode)
         locks.write_text(json.dumps(source_locks, indent=2) + "\n")
         client = source_locks["dependencyEvidenceBindings"]["oxiaClientArtifacts"]["artifacts"]["clientJar"]
         client_path = self.root / client["relativePath"]
@@ -1025,6 +1026,21 @@ class M3ChildCheckerTest(unittest.TestCase):
                 self.assertGreater(identity["tests"], 0)
                 self.assertEqual(0, identity["skipped"])
                 self.assertFalse(identity["promotionEligible"])
+
+    def test_preselection_source_locks_allow_non_allocator_children_only(self) -> None:
+        fixture = Fixture("UNSELECTED")
+        try:
+            output, _ = fixture.build("C1_REAL_PROVIDER_KMS")
+            identity = CONTRACT.build_final_child_identity(
+                fixture.root, output, "C1_REAL_PROVIDER_KMS", fixture.tested
+            )
+            self.assertEqual("C1_REAL_PROVIDER_KMS", identity["kind"])
+            with self.assertRaisesRegex(
+                CONTRACT.ChildError, "requires a selected source-lock mode"
+            ):
+                fixture.build("ALLOCATOR_SELECTION")
+        finally:
+            fixture.cleanup()
 
     def test_rejects_attachment_tamper(self) -> None:
         output, value = self.fixture.build("AB_NWG1_WIRE")

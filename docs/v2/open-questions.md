@@ -745,6 +745,9 @@ immutable diagnostic-only and cannot be resumed or promoted. The remaining gate 
 multi-broker/native 10,000/100,000 protocol with zero skip, select the smallest qualifying RANGE size if RANGE alone
 qualifies, and select at most one persisted mode. Until then both modes remain unselected and no
 `V2-POSITION-013/014/017/018` scenario may cite a local or diagnostic result as PASS.
+ADR 0105 records this state as source-lock mode `UNSELECTED`; it permits unrelated non-allocator child evidence but
+explicitly rejects allocator sealing and Final until a completed uniquely qualified V2 evaluation changes the lock
+to `STRICT` or `RANGE` and all Final-owned evidence is refreshed.
 
 ### `V2-OPEN-PUL-OBJ-10`: allocator target-scale evidence protocol
 
@@ -784,6 +787,9 @@ diagnostic-only rather than promotion authority: exact source `5d86b572...` pass
 `4/0/0/0`, with NADV2 `9694673...d6e3` and JUnit `a8b0f884...55f3e`. The promotion gate does not trust a
 caller-created canonical evaluation or diagnostic attestation: it rederives exact NAEV2 bytes and rehashes both the
 diagnostic and formal JUnit inputs. Formal V2 campaign/evaluation/selection remain open and prohibited.
+ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
+`UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
+ADR-0097 image.
 The exact-source
 `1ef4f108...` matrix passed its one testcase but failed the sealed-evidence task on an oversized 113,519,059-byte
 JUnit XML caused by 970,241 copies of one expected native-harness cleanup WARN. It produced no evaluation, selection,

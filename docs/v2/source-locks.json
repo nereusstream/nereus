@@ -476,6 +476,24 @@
     "promotionEligible": false,
     "evidenceStatus": "FOCUSED_EXACT_SOURCE_EVIDENCE"
   },
+  "m3KafkaNativeBinding": {
+    "repository": "https://github.com/nereusstream/kafka.git",
+    "branch": "nereus/v2-m3-object-wal-evidence",
+    "sourceCommit": "323e035145d203f7e74e969341cb610f33e71b7d",
+    "publishedRef": "refs/heads/nereus/v2-m3-object-wal-evidence",
+    "result": "M3_NATIVE_BOUNDARY_INPUT_ONLY",
+    "promotionEligible": false,
+    "evidenceStatus": "CURRENT_SOURCE_INPUT_ONLY"
+  },
+  "m3PulsarNativeBinding": {
+    "repository": "https://github.com/nereusstream/pulsar.git",
+    "branch": "nereus/v2-m3-object-wal-evidence",
+    "sourceCommit": "7ff908330809f2e9bc5c69ead87bb85c566bc0a9",
+    "publishedRef": "refs/heads/nereus/v2-m3-object-wal-evidence",
+    "result": "M3_NATIVE_BOUNDARY_INPUT_ONLY",
+    "promotionEligible": false,
+    "evidenceStatus": "CURRENT_SOURCE_INPUT_ONLY"
+  },
   "m3AllocatorEvidenceBinding": {
     "decision": "docs/decisions/0097-v2-m3-reproducible-allocator-oxia-image-amendment.md",
     "pulsarRepository": "https://github.com/nereusstream/pulsar.git",
@@ -503,6 +521,76 @@
     "result": "ACCEPTED_M3_ALLOCATOR_EXECUTOR_INPUT_ONLY",
     "promotionEligible": false,
     "evidenceStatus": "ACCEPTED_INPUT_ONLY"
+  },
+  "m3EvidenceBindings": {
+    "allocatorMode": "UNSELECTED",
+    "bindings": [
+      {
+        "backend": "OXIA_AND_PULSAR",
+        "childKind": "ALLOCATOR_SELECTION",
+        "evidenceKind": "ALLOCATOR_FAULT_SUMMARY",
+        "executionClass": "FAULT_INJECTION",
+        "sourceIdentity": "OXIA_AND_PULSAR|pulsarCommit=7ff908330809f2e9bc5c69ead87bb85c566bc0a9|oxiaClientCommit=091a42c2780d92da56e9ec1f02ce1c3d988adc16|oxiaClientJarSha256=0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5|oxiaServerCommit=37a17bef17202d5fd6e23282da5fd26d94865484|oxiaServerImageDigest=sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da",
+        "sourceProvenance": "ALLOCATOR_FORKS|pulsarRepository=https://github.com/nereusstream/pulsar.git|pulsarBranch=nereus/v2-m3-object-wal-evidence|pulsarCommit=7ff908330809f2e9bc5c69ead87bb85c566bc0a9|pulsarLogicalRepository=apache/pulsar|oxiaClientRepository=https://github.com/nereusstream/oxia-client-java.git|oxiaClientBranch=nereus/v2-m3-object-wal-evidence|oxiaClientCommit=091a42c2780d92da56e9ec1f02ce1c3d988adc16"
+      },
+      {
+        "backend": "PULSAR_NATIVE",
+        "childKind": "ALLOCATOR_SELECTION",
+        "evidenceKind": "ALLOCATOR_NATIVE_RELATIVE_SUMMARY",
+        "executionClass": "NATIVE_REFERENCE_EXECUTION",
+        "sourceIdentity": "PULSAR_NATIVE|repository=apache/pulsar|commit=7ff908330809f2e9bc5c69ead87bb85c566bc0a9",
+        "sourceProvenance": "PULSAR_FORK|repository=https://github.com/nereusstream/pulsar.git|branch=nereus/v2-m3-object-wal-evidence|commit=7ff908330809f2e9bc5c69ead87bb85c566bc0a9|logicalRepository=apache/pulsar"
+      },
+      {
+        "backend": "OXIA_AND_PULSAR",
+        "childKind": "ALLOCATOR_SELECTION",
+        "evidenceKind": "ALLOCATOR_SCALE_100000_SUMMARY",
+        "executionClass": "SCALE_EXECUTION",
+        "sourceIdentity": "OXIA_AND_PULSAR|pulsarCommit=7ff908330809f2e9bc5c69ead87bb85c566bc0a9|oxiaClientCommit=091a42c2780d92da56e9ec1f02ce1c3d988adc16|oxiaClientJarSha256=0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5|oxiaServerCommit=37a17bef17202d5fd6e23282da5fd26d94865484|oxiaServerImageDigest=sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da",
+        "sourceProvenance": "ALLOCATOR_FORKS|pulsarRepository=https://github.com/nereusstream/pulsar.git|pulsarBranch=nereus/v2-m3-object-wal-evidence|pulsarCommit=7ff908330809f2e9bc5c69ead87bb85c566bc0a9|pulsarLogicalRepository=apache/pulsar|oxiaClientRepository=https://github.com/nereusstream/oxia-client-java.git|oxiaClientBranch=nereus/v2-m3-object-wal-evidence|oxiaClientCommit=091a42c2780d92da56e9ec1f02ce1c3d988adc16"
+      },
+      {
+        "backend": "OXIA_AND_PULSAR",
+        "childKind": "ALLOCATOR_SELECTION",
+        "evidenceKind": "ALLOCATOR_SCALE_10000_SUMMARY",
+        "executionClass": "SCALE_EXECUTION",
+        "sourceIdentity": "OXIA_AND_PULSAR|pulsarCommit=7ff908330809f2e9bc5c69ead87bb85c566bc0a9|oxiaClientCommit=091a42c2780d92da56e9ec1f02ce1c3d988adc16|oxiaClientJarSha256=0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5|oxiaServerCommit=37a17bef17202d5fd6e23282da5fd26d94865484|oxiaServerImageDigest=sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da",
+        "sourceProvenance": "ALLOCATOR_FORKS|pulsarRepository=https://github.com/nereusstream/pulsar.git|pulsarBranch=nereus/v2-m3-object-wal-evidence|pulsarCommit=7ff908330809f2e9bc5c69ead87bb85c566bc0a9|pulsarLogicalRepository=apache/pulsar|oxiaClientRepository=https://github.com/nereusstream/oxia-client-java.git|oxiaClientBranch=nereus/v2-m3-object-wal-evidence|oxiaClientCommit=091a42c2780d92da56e9ec1f02ce1c3d988adc16"
+      },
+      {
+        "backend": "VAULT_TRANSIT",
+        "childKind": "C1_REAL_PROVIDER_KMS",
+        "evidenceKind": "KMS_REAL_RECEIPT",
+        "executionClass": "REAL_EXTERNAL_PROCESS",
+        "sourceIdentity": "VAULT_TRANSIT|artifactReference=hashicorp/vault@sha256:268bb80aa9c6d13d65fcfa05c0c268caca068952240a8087291a6ce0b66e3a10|artifactConfigDigest=sha256:ba5ade3c7f155978f41dbca62b16e5e08f5331f5d12f9be2d333698b49484457",
+        "sourceProvenance": "VAULT_TRANSIT|artifactReference=hashicorp/vault@sha256:268bb80aa9c6d13d65fcfa05c0c268caca068952240a8087291a6ce0b66e3a10|artifactConfigDigest=sha256:ba5ade3c7f155978f41dbca62b16e5e08f5331f5d12f9be2d333698b49484457"
+      },
+      {
+        "backend": "MINIO_S3_COMPATIBLE",
+        "childKind": "C1_REAL_PROVIDER_KMS",
+        "evidenceKind": "PROVIDER_REAL_RECEIPT",
+        "executionClass": "REAL_EXTERNAL_PROCESS",
+        "sourceIdentity": "MINIO_S3_COMPATIBLE|artifactReference=quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e|artifactConfigDigest=sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253",
+        "sourceProvenance": "MINIO_S3_COMPATIBLE|artifactReference=quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e|artifactConfigDigest=sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253"
+      },
+      {
+        "backend": "PULSAR_NATIVE",
+        "childKind": "P_PULSAR_OBJECT_WAL",
+        "evidenceKind": "NATIVE_RESULT",
+        "executionClass": "NATIVE_REFERENCE_EXECUTION",
+        "sourceIdentity": "PULSAR_NATIVE|repository=apache/pulsar|commit=7ff908330809f2e9bc5c69ead87bb85c566bc0a9",
+        "sourceProvenance": "PULSAR_FORK|repository=https://github.com/nereusstream/pulsar.git|branch=nereus/v2-m3-object-wal-evidence|commit=7ff908330809f2e9bc5c69ead87bb85c566bc0a9|logicalRepository=apache/pulsar"
+      },
+      {
+        "backend": "KAFKA_NATIVE",
+        "childKind": "U_KAFKA_OBJECT_WAL",
+        "evidenceKind": "NATIVE_RESULT",
+        "executionClass": "NATIVE_REFERENCE_EXECUTION",
+        "sourceIdentity": "KAFKA_NATIVE|repository=apache/kafka|commit=323e035145d203f7e74e969341cb610f33e71b7d",
+        "sourceProvenance": "KAFKA_FORK|repository=https://github.com/nereusstream/kafka.git|branch=nereus/v2-m3-object-wal-evidence|commit=323e035145d203f7e74e969341cb610f33e71b7d|logicalRepository=apache/kafka"
+      }
+    ],
+    "schema": "NEREUS_V2_M3_EVIDENCE_SOURCE_LOCKS_V2"
   },
   "localImplementationEvidenceBindings": {
     "m1.1aO2Scaffold": {
