@@ -56,8 +56,11 @@ in parallel, then executes the unchanged initial grant chains in index order wit
 task, documentation-only receipt, synthetic Root fixture, diagnostic
 real-service run, or focused local PASS may promote an M3 scenario.
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
-non-promotable. A dedicated RANGE-1024 10k-to-100k construction-only task now guards the former r6 failure boundary
-before another complete matrix; it also emits no selection input or receipt.
+non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
+459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.
+Its attachment set rehashes under `SHA256SUMS` SHA-256
+`1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`; it emits no selection input or receipt, and
+the complete matrix must still rerun at its later exact clean source.
 
 ADR 0015 limits 0.2 to one initial Storage Epoch per Topic Incarnation and no online profile-transition runtime. ADR 0016
 excludes Kafka/Pulsar Access Projection and Migration Link runtime. Their future state machines, Pulsar

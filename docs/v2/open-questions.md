@@ -765,8 +765,10 @@ also selected nothing. The changed exact source must execute the complete matrix
 maximum sustainable rollover RPS while all bounds hold, includes actual rollover distribution/jitter/storms and native
 Pulsar rollover/append-stall baseline, and keeps performance budgets out of allocator durable identity. Execution
 remains `PLANNED`; the `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes, and the source now exposes a separate
-diagnostic-only RANGE-1024 100k construction guard before the next complete matrix, but neither result is a performance
-PASS or a selection input.
+diagnostic-only RANGE-1024 100k construction guard. That guard passes at exact `e739799f...` in 459.537 seconds with
+zero failure/error/skip and unchanged caps, with attachment-set `SHA256SUMS` SHA-256
+`1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`. Neither result is a performance PASS or a
+selection input, and the complete matrix remains required at its later exact clean source.
 
 ### `V2-OPEN-PUL-MIGRATION-01`: new incarnation or HybridManagedLedger
 

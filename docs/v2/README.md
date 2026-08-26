@@ -425,8 +425,11 @@ now runs one exclusive batch: immutable unique-Head creates drain in parallel be
 reserve/install/clear chains begin. Exact progress is reported on timeout, but no construction counter is selection
 authority.
 The replacement `9f88fbfb...` source passes its one-test 10k RANGE Cell-proof diagnostic with zero
-failure/error/skip. A separate diagnostic-only RANGE-1024 100k construction task now guards the exact r6 timeout seam
-before the next complete matrix; neither diagnostic can select a mode or promote a scenario.
+failure/error/skip. The separate exact-source `e739799f...` diagnostic-only RANGE-1024 10k-to-100k construction guard
+also passes one testcase in 459.537 seconds with zero failure/error/skip and unchanged operation/drain caps. Its
+`SHA256SUMS` SHA-256 is `1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`. Neither
+diagnostic can select a mode or promote a scenario; the complete matrix remains required at its next exact clean
+source.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

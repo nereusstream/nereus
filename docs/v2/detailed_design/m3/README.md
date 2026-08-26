@@ -277,8 +277,16 @@ and JUnit, and records exact manual removal of the task-owned container. The fou
 10k diagnostic-only coverage and selects nothing. A separate
 `realAllocatorRange100kConstructionDiagnosticTest` now exercises RANGE-1024 through the exact 10k-to-100k
 construction boundary with the same production SPI, real Oxia adapter, and unchanged caps, while emitting no NAEA1,
-selection, receipt, or scenario result. That probe and then the complete formal matrix must still run at their exact
-clean sources.
+selection, receipt, or scenario result. At exact clean source `e739799f9e22922124cf8369900d2d699b5c7518`, the
+formal preflight admitted the locked real Oxia/Pulsar/Oxia-client tuple with zero blockers and the probe passed one
+testcase in 459.537 seconds with zero failure/error/skip; Gradle completed in 7 minutes 51 seconds and the task-owned
+container was removed automatically. Gradle 9 shortened the XML source basename because of its length, so the wrapper
+did not copy the expected full-name path; orchestration records that boundary and the unique exact XML was copied
+without modification. The five-file diagnostic set lives at
+`/Users/liusinan/Documents/Codex/2026-08-26/nereus-v2-m3-allocator/diagnostic-range-100k-e739799f-r1` and rehashes
+under `SHA256SUMS` SHA-256 `1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`.
+This construction-only result is not native-relative evidence, selection, a child receipt, or scenario PASS; the
+complete formal matrix must still run at its later exact clean source.
 
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
