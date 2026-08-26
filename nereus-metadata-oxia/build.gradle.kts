@@ -427,7 +427,155 @@ tasks.register<Test>("realAllocatorContractTest") {
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3AllocatorWorkloadPlanTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3AllocatorEvidenceWiringTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2BoundedActorLaneRunnerTest")
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AllocatorProtocolMainTest")
     }
+}
+
+val realAllocatorV2ShortDiagnosticTest = tasks.register<Test>("realAllocatorV2ShortDiagnosticTest") {
+    group = "verification"
+    description =
+        "Run the four-test non-promotable V2 STRICT/installed-RANGE/renewal/conflict diagnostic against real Oxia."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    testClassesDirs = realAllocatorTest.output.classesDirs
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2RealOxiaDiagnosticTest")
+    }
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for the V2 allocator short diagnostic")
+        systemProperty("nereus.m3.allocator.v2.oxiaServiceAddress", required("v2M3AllocatorOxiaServiceAddress"))
+        systemProperty("nereus.m3.allocator.v2.nereusCommit", required("v2M3AllocatorV2NereusCommit"))
+        systemProperty("nereus.m3.allocator.v2.diagnosticRunId", required("v2M3AllocatorV2DiagnosticRunId"))
+    }
+}
+
+val realAllocatorV2DiagnosticJUnitXml = layout.buildDirectory.file(
+    "test-results/realAllocatorV2ShortDiagnosticTest/" +
+        "TEST-com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2RealOxiaDiagnosticTest.xml",
+)
+
+tasks.register<JavaExec>("sealRealAllocatorV2Diagnostic") {
+    group = "verification"
+    description = "Seal the exact four-test real-Oxia diagnostic JUnit as non-promotable NADV2."
+    dependsOn(realAllocatorV2ShortDiagnosticTest, realAllocatorEvidenceArtifactJar)
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    mainClass.set("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AllocatorProtocolMain")
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for V2 allocator diagnostic sealing")
+        setArgs(
+            listOf(
+                "seal-diagnostic",
+                realAllocatorV2DiagnosticJUnitXml.get().asFile.absolutePath,
+                file(required("v2M3AllocatorV2DiagnosticOutput")).absolutePath,
+                required("v2M3AllocatorV2NereusCommit"),
+                required("v2M3AllocatorV2OxiaImageDigest"),
+                required("v2M3AllocatorV2DependencyLockDigest"),
+                required("v2M3AllocatorV2ExecutorDigest"),
+                required("v2M3AllocatorV2WorkloadDigest"),
+            ),
+        )
+    }
+}
+
+tasks.register<JavaExec>("validateRealAllocatorV2Checkpoint") {
+    group = "verification"
+    description = "Offline strict NACP2 checkpoint/resume validation; accesses no Oxia service."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    mainClass.set("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AllocatorProtocolMain")
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for V2 allocator checkpoint validation")
+        setArgs(
+            listOf(
+                "validate-checkpoint",
+                file(required("v2M3AllocatorV2CheckpointPath")).absolutePath,
+                required("v2M3AllocatorV2NereusCommit"),
+                required("v2M3AllocatorV2OxiaImageDigest"),
+                required("v2M3AllocatorV2DependencyLockDigest"),
+                required("v2M3AllocatorV2ExecutorDigest"),
+                required("v2M3AllocatorV2WorkloadDigest"),
+            ),
+        )
+    }
+}
+
+tasks.register<JavaExec>("sealRealAllocatorV2Evaluation") {
+    group = "verification"
+    description = "Seal one complete validator-reproved NACP2 as NAEV2; NONE/BOTH remain valid and non-promotable."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    mainClass.set("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AllocatorProtocolMain")
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for V2 allocator evaluation sealing")
+        setArgs(
+            listOf(
+                "seal-evaluation",
+                file(required("v2M3AllocatorV2CheckpointPath")).absolutePath,
+                file(required("v2M3AllocatorV2EvaluationOutput")).absolutePath,
+                required("v2M3AllocatorV2NereusCommit"),
+                required("v2M3AllocatorV2OxiaImageDigest"),
+                required("v2M3AllocatorV2DependencyLockDigest"),
+                required("v2M3AllocatorV2ExecutorDigest"),
+                required("v2M3AllocatorV2WorkloadDigest"),
+            ),
+        )
+    }
+}
+
+tasks.register<JavaExec>("realAllocatorV2PromotionCheck") {
+    group = "verification"
+    description = "Verify exact NAEV2/NACP2/NADV2/JUnit/attachment freshness and emit one promotion decision."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    mainClass.set("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AllocatorProtocolMain")
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for the V2 allocator promotion gate")
+        setArgs(
+            listOf(
+                "promotion-check",
+                file(required("v2M3AllocatorV2EvaluationPath")).absolutePath,
+                file(required("v2M3AllocatorV2CheckpointPath")).absolutePath,
+                file(required("v2M3AllocatorV2DiagnosticPath")).absolutePath,
+                file(required("v2M3AllocatorV2DiagnosticJUnitPath")).absolutePath,
+                file(required("v2M3AllocatorV2FormalJUnitPath")).absolutePath,
+                file(required("v2M3AllocatorV2AttachmentDirectory")).absolutePath,
+                file(required("v2M3AllocatorV2PromotionOutput")).absolutePath,
+                required("v2M3AllocatorV2NereusCommit"),
+                required("v2M3AllocatorV2OxiaImageDigest"),
+                required("v2M3AllocatorV2DependencyLockDigest"),
+                required("v2M3AllocatorV2ExecutorDigest"),
+                required("v2M3AllocatorV2WorkloadDigest"),
+            ),
+        )
+    }
+}
+
+tasks.register("realAllocatorV2PreCampaignCheck") {
+    group = "verification"
+    description = "Run every offline V2 allocator prerequisite; this task never starts a formal campaign."
+    dependsOn(
+        project(":nereus-domain").tasks.named("test"),
+        project(":nereus-metadata-spi").tasks.named("test"),
+        tasks.named("realAllocatorContractTest"),
+        tasks.named("checkstyleRealAllocatorTest"),
+    )
 }
 
 tasks.register<Test>("realAllocatorNativePathTest") {

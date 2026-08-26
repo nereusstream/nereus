@@ -85,6 +85,18 @@ evaluation. `NONE_QUALIFIED` and `BOTH_QUALIFIED` are valid completed evaluation
 JUnit or Gradle failures. Only exactly one qualified mode produces a promotion-eligible evaluation. An interrupted or
 infrastructure-failed campaign produces no formal evaluation or selection receipt.
 
+The implementation encodes the checkpoint as canonical `NACP2`. Its strict two-MiB parser reconstructs the full 288
+Cell inventory, ordered interval/fault observations, one nonzero content digest per executed attachment, typed
+dispositions and dependencies, the exact Nereus/image/dependency-lock/executor/workload tuple, independent remaining
+phase budgets, campaign identity, checkpoint sequence, and predecessor-checkpoint digest. Resume requires an exact
+ordered execution prefix, the same campaign/source tuple, a monotonically increasing sequence, the exact predecessor
+digest, and non-increasing phase budgets. The complete checkpoint alone can produce fixed 284-byte `NAEV2`; the four
+required short real-Oxia scenarios seal separately as fixed 212-byte diagnostic-only `NADV2`. Promotion reparses all
+three, independently rederives the exact NAEV2 bytes from NACP2, rehashes the complete attachment directory plus the
+diagnostic and formal JUnit files, recomputes suite totals from testcase outcome nodes, and accepts only a
+current-source uniquely qualified evaluation. `NONE_QUALIFIED` and `BOTH_QUALIFIED` reach the promotion gate as valid
+`NON_PROMOTABLE_EVALUATION` decisions rather than task failures.
+
 Budget exhaustion is `INTERRUPTED`. It cannot turn a required unexecuted cell into a disposition. Evaluation and
 promotion are separate gates: evaluation proves the complete campaign result, while promotion additionally requires
 exact current-source freshness, all external attachments, zero failure/error/skip gates, and a unique qualified mode.
@@ -100,6 +112,14 @@ named diagnostics; it is not formal performance or selection authority.
 The request ID and candidate identity are stable across retry. A retry may not consume a second ledger ID. Stale
 owner, slice or context change, or descriptor mismatch fails closed. Every actor owns an independent production
 coordinator; the formal harness and production-neutral workflow use the same reconcile path.
+
+Every formal coordinator uses one source-governed envelope: at most 64 reconcile retries, a four-second total elapsed
+deadline, and a maximum 25-millisecond retry backoff. The elapsed bound is shorter than the Runner's five-second
+cleanup grace, so a terminally timed-out lane cannot leave the workflow authorized to continue beyond the interval
+cleanup boundary. A request-local lock-free guard wraps every store call, so a read/CAS completion arriving after the
+deadline cannot dispatch the next metadata operation. Deadline and backoff exhaustion are separate typed failures.
+Smaller test bounds are allowed, but
+the formal harness rejects a coordinator whose envelope differs from the exact formal constants.
 
 Admission is physically bounded. A request not admitted by the frozen cutoff records only
 `OVERLOAD_DROPPED_BEFORE_ADMISSION`; it cannot synthesize admission, start, release, or generation-failure events. A
@@ -156,6 +176,11 @@ No full formal V2 campaign may run until plan-only stability, V1 compatibility, 
 bounded-runner conservation, four-actor workflow, and short real-Oxia STRICT/installed-RANGE/range-renewal/conflict-
 storm diagnostics all pass with zero JUnit failure, error, and skip. Those diagnostics remain non-promotable. M6 still
 owns native broker/controller activation.
+
+The formal-run script now fails closed for its former default exhaustive/V1 path. Its active offline modes are
+`--plan-only`, `--pre-campaign-check`, `--validate-checkpoint`, `--seal-evaluation`, and `--promotion-check`. A separate
+short-diagnostic script may start only the four-test real-Oxia prerequisite and seal `NADV2`; it cannot start a formal
+campaign or create an evaluation, selection, receipt, or scenario PASS.
 
 ## Consequences
 

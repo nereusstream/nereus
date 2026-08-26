@@ -321,6 +321,22 @@ independent actor routing, and no Java correctness lock/worker pool. These tests
 campaign or evidence. Checkpoint/resume/sealer/promotion wiring and short real-Oxia diagnostics remain required before
 any full formal V2 campaign.
 
+The final ADR-0104 implementation slice now adds strict canonical protocol and gate wiring without running a formal
+campaign. `NACP2` binds the full logical inventory, ordered executed facts and attachment digests, validator-reproved
+dispositions, exact source/image/dependency/executor/workload tuple, independent remaining budgets, and checkpoint
+lineage under a two-MiB cap. Resume cannot change the source tuple, remove/reorder an observation, increase a budget,
+or skip a predecessor digest. Only complete NACP2 can seal fixed `NAEV2`; interrupted and infrastructure-failed states
+produce no evaluation. NONE/BOTH seal normally but the promotion gate returns valid non-promotable status. The four
+short real-Oxia scenario names seal separately as fixed diagnostic-only `NADV2`, and promotion additionally rehashes
+all formal attachments, both diagnostic and formal zero-skip JUnit files, and the exact NAEV2 rederived from NACP2.
+JUnit suite totals must equal the independently counted testcase failure/error/skip nodes.
+The formal workflow envelope is now exactly 64 retries, four seconds total elapsed, and 25 milliseconds maximum
+backoff, which terminates inside the Runner's fixed five-second cleanup grace. Its request-local lock-free store guard
+prevents a late asynchronous completion from dispatching another operation after timeout. Gradle exposes offline
+pre-campaign/checkpoint/evaluation/promotion tasks and a separate four-test real-Oxia
+diagnostic task/sealer. The old script's default exhaustive/V1 path now refuses execution; no full formal campaign is
+enabled.
+
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
 `NEREUS_V2_M3_D1_LOCAL_CAP_RESULT_V1` payload with CREATE_NEW after the runner hashes the harness, its test, and all
@@ -330,8 +346,8 @@ allocation-free analytical format-cap conformance, claims no Provider transfer, 
 separate fixed-digest C1 Provider/KMS evidence.
 
 Serial continuation order completed the ADR-0104 V2 schema/planner/validator/selector, bounded CAS/reconcile workflow,
-and bounded four-actor Runner slices. It continues with checkpoint/resume/sealer/promotion gates and the required
-short real-Oxia diagnostics before any
+bounded four-actor Runner, and checkpoint/resume/sealer/promotion implementation slices. It continues with the
+required short real-Oxia diagnostics before any
 new formal allocator campaign. Source-lock closure and formal allocator evidence follow only after those gates, then
 the remaining child receipts, final-source Provider/KMS and M2 regression freshness, scenario synchronization, and M3
 Final.
@@ -350,7 +366,7 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; Kafka/Pulsar backend integration and dedicated-fork compile checkpoints pass, while formal Provider/KMS receipts remain open |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | Kafka source implemented; local 260-test module check covers strict wire/key/caps, OPEN/TERMINAL Head, backend mapping and bounded recovery; the dedicated fork now compiles against the split F9/M3 artifact inputs with 6/6 tests, while the final source-qualified native receipt remains open |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; the dedicated-fork dual-repository compile checkpoint passes 6/6 tests, but a source-qualified receipt remains open and native broker/controller activation remains M6 |
-| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; ADR-0104's pure V2 schema/planner/validator/selector and 13 focused tests enforce the 288-cell inventory, 13/17/288 execution bounds, descending rates, independently reproved dispositions/conservation, and valid non-promotable NONE/BOTH outcomes without Oxia; the production-neutral bounded workflow and eight tests preserve request/candidate identity through exact CAS/reread and fail closed without a Java lock; the physical four-actor Runner and production-workflow harness add seven focused tests for queue/cutoff/terminal conservation and concurrency four with one in-flight per actor; checkpoint/sealer/promotion gates, short real-Oxia diagnostics, formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open, and no full formal campaign is currently allowed |
+| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; ADR-0104's pure V2 schema/planner/validator/selector and 13 focused tests enforce the 288-cell inventory, 13/17/288 execution bounds, descending rates, independently reproved dispositions/conservation, and valid non-promotable NONE/BOTH outcomes without Oxia; the production-neutral bounded workflow preserves request/candidate identity through exact CAS/reread, four-second elapsed/25-ms backoff/64-retry bounds, and typed fail-closed outcomes without a Java lock; the physical four-actor Runner and production-workflow harness cover queue/cutoff/terminal conservation and concurrency four with one in-flight per actor; strict NACP2/NAEV2/NADV2 checkpoint, evaluation, diagnostic and promotion gates are implemented without enabling the old full path; short real-Oxia diagnostics, formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open, and no full formal campaign is currently allowed |
 | M3-FINAL | exact-source aggregate and scenario promotion | fail-closed child/final checker and publisher contracts are implemented and their 74 governance tests pass; Final remains open and requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
 
 Slice names are execution labels, not new durable wire codes. Implementations may split reviewable commits more

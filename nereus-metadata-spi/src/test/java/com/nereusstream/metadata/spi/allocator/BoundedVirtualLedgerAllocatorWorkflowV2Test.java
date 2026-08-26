@@ -43,6 +43,7 @@ import com.nereusstream.metadata.spi.model.VersionedVirtualLedgerSliceViewV1;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -250,6 +251,53 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         assertThat(store.nodes).isEmpty();
     }
 
+    @Test
+    void sourceGovernedElapsedAndBackoffBoundsFailClosedWithTypedOutcomes() {
+        store.cellCasPredecessorUnchanged = true;
+        var boundedBackoff =
+                new BoundedVirtualLedgerAllocatorWorkflowV2.Bounds(2, Duration.ofMillis(100), Duration.ofMillis(10));
+        assertCode(
+                strictAllocator
+                        .boundedWorkflow(boundedBackoff, (number, reason) -> new CompletableFuture<>())
+                        .allocate(request(head, "backoff-timeout")),
+                AllocatorProtocolException.Code.RETRY_BACKOFF_EXCEEDED);
+
+        store.cellCasPredecessorUnchanged = false;
+        store.readCellNeverCompletes = true;
+        var elapsed =
+                new BoundedVirtualLedgerAllocatorWorkflowV2.Bounds(2, Duration.ofMillis(30), Duration.ofMillis(10));
+        assertCode(
+                strictAllocator
+                        .boundedWorkflow(elapsed, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler.immediate())
+                        .allocate(request(head, "elapsed-timeout")),
+                AllocatorProtocolException.Code.WORKFLOW_DEADLINE_EXCEEDED);
+        assertThat(store.nodes).isEmpty();
+        assertThat(BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal().totalElapsedDeadline())
+                .isLessThan(Duration.ofSeconds(5));
+    }
+
+    @Test
+    void lateStoreCompletionAfterDeadlineCannotDispatchTheNextAuthorizedOperation() {
+        store.delayReadCellCall = 2;
+        var elapsed =
+                new BoundedVirtualLedgerAllocatorWorkflowV2.Bounds(2, Duration.ofMillis(30), Duration.ofMillis(10));
+
+        assertCode(
+                strictAllocator
+                        .boundedWorkflow(elapsed, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler.immediate())
+                        .allocate(request(head, "late-store-completion")),
+                AllocatorProtocolException.Code.WORKFLOW_DEADLINE_EXCEEDED);
+        assertThat(store.delayedReadCell).isNotNull();
+        assertThat(store.cell.value().reservation()).isPresent();
+        int readsBeforeLateCompletion = store.readHeadCalls;
+
+        store.delayedReadCell.complete(Optional.of(store.cell));
+
+        assertThat(store.readHeadCalls).isEqualTo(readsBeforeLateCompletion);
+        assertThat(store.createNodeCalls).isZero();
+        assertThat(store.nodes).isEmpty();
+    }
+
     private VersionedAllocatorCellStateV1 createCell(AllocatorModeV1 mode) {
         return exactCreate(store.createCell(VirtualLedgerCellAllocatorStateV1.initial(mode, assignment())));
     }
@@ -339,6 +387,12 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         private int loseNodeCreateResponses;
         private int barrierCellCasCount;
         private boolean cellCasPredecessorUnchanged;
+        private boolean readCellNeverCompletes;
+        private int delayReadCellCall;
+        private int readCellCalls;
+        private int readHeadCalls;
+        private int createNodeCalls;
+        private CompletableFuture<Optional<VersionedAllocatorCellStateV1>> delayedReadCell;
 
         private MetadataVersion nextVersion() {
             return version(version++);
@@ -347,6 +401,14 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         @Override
         public synchronized CompletionStage<Optional<VersionedAllocatorCellStateV1>> readCell(
                 Sha256Digest namespaceId, Sha256Digest sliceAssignmentId) {
+            readCellCalls++;
+            if (readCellNeverCompletes) {
+                return new CompletableFuture<>();
+            }
+            if (readCellCalls == delayReadCellCall) {
+                delayedReadCell = new CompletableFuture<>();
+                return delayedReadCell;
+            }
             return CompletableFuture.completedFuture(Optional.ofNullable(cell));
         }
 
@@ -404,6 +466,7 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
                 Sha256Digest namespaceId,
                 Sha256Digest sliceAssignmentId,
                 ManagedLedgerIncarnationIdV1 managedLedgerIncarnation) {
+            readHeadCalls++;
             return CompletableFuture.completedFuture(Optional.ofNullable(head));
         }
 
@@ -455,6 +518,7 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         @Override
         public synchronized CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>> createNode(
                 Sha256Digest namespaceId, Sha256Digest sliceAssignmentId, VirtualLedgerCandidateNodeV1 candidate) {
+            createNodeCalls++;
             candidateValues.add(candidate);
             VersionedVirtualLedgerCandidateNodeV1 existing = nodes.get(candidate.ledgerId());
             if (existing != null) {

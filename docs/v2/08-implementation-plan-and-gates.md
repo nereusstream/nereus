@@ -71,7 +71,18 @@ and the harness revalidates both conservation equations while adapting four iden
 production-neutral workflow. Seven focused contract tests cover Cell concurrency four with per-lane concurrency one,
 queue overflow/cutoff, completion/failure/timeout partitioning, warm-up separation, independent actor routing, and the
 absence of a Java correctness lock or worker pool. It is not yet wired to a V2 campaign/checkpoint/sealer and is not
-real-Oxia or promotion evidence. No empty
+real-Oxia or promotion evidence. The next offline slice now implements canonical `NACP2` checkpoint/resume, fixed
+`NAEV2` evaluation, fixed diagnostic-only `NADV2`, and the exact source/attachment/JUnit promotion decision. Resume
+revalidates the complete ordered prefix, predecessor digest, source/executor tuple, and non-increasing independent
+budgets. Interrupted/infrastructure-failed checkpoints cannot seal; NONE/BOTH seal and reach the gate as valid
+non-promotable decisions. The former default V1/full script path now refuses execution, while plan, pre-campaign,
+checkpoint, evaluation, promotion, and separate short-diagnostic entrypoints are explicit. Formal actor workflows are
+also capped at 64 retries, four seconds total elapsed, and 25 milliseconds maximum backoff, inside the five-second
+Runner cleanup grace; a request-local lock-free store guard rejects post-timeout continuation dispatch. Promotion
+independently rederives NAEV2 and rehashes both diagnostic and formal JUnit bytes;
+it cannot trust a caller-constructed canonical seal. This is still implementation conformance: the short real-Oxia
+gate and any formal V2 campaign
+remain unexecuted at this checkpoint. No empty
 task, documentation-only receipt, synthetic Root fixture, diagnostic
 real-service run, or focused local PASS may promote an M3 scenario.
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains

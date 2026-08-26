@@ -47,6 +47,9 @@ final class M3V2AllocatorFormalHarness {
         for (int actorId = 0; actorId < workflows.size(); actorId++) {
             BoundedVirtualLedgerAllocatorWorkflowV2 workflow = Objects.requireNonNull(
                     workflows.get(actorId), "candidate workflow");
+            if (!workflow.bounds().equals(BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal())) {
+                throw new IllegalArgumentException("allocator V2 formal workflow bounds differ from source authority");
+            }
             endpoints.add(new ActorEndpoint(actorId, workflow, workflow::allocate));
         }
         return new M3V2AllocatorFormalHarness(M3V2BoundedActorLaneRunner.formal(), endpoints);

@@ -55,6 +55,8 @@ public final class AllocatorProtocolException extends IllegalArgumentException {
         REQUEST_CONTEXT_DRIFT,
         DESCRIPTOR_MISMATCH,
         RECONCILE_RETRY_EXHAUSTED,
+        WORKFLOW_DEADLINE_EXCEEDED,
+        RETRY_BACKOFF_EXCEEDED,
         NON_CANONICAL_WIRE
     }
 }

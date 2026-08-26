@@ -20,15 +20,20 @@ import com.nereusstream.domain.registry.allocator.AllocatorProtocolException;
 import com.nereusstream.domain.registry.allocator.AllocatorProtocolV1;
 import com.nereusstream.domain.registry.allocator.CellAllocatorReservationV1;
 import com.nereusstream.domain.registry.allocator.ManagedLedgerAllocatorHeadV1;
+import com.nereusstream.domain.registry.allocator.ManagedLedgerIncarnationIdV1;
 import com.nereusstream.domain.registry.allocator.VirtualLedgerCandidateNodeV1;
+import com.nereusstream.domain.registry.allocator.VirtualLedgerCellAllocatorStateV1;
 import com.nereusstream.metadata.spi.model.ConditionalCasResult;
 import com.nereusstream.metadata.spi.model.CreateMutationResult;
 import com.nereusstream.metadata.spi.model.VersionedVirtualLedgerSliceViewV1;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 /**
@@ -38,27 +43,35 @@ import java.util.function.Supplier;
 public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
     private final ProductionVirtualLedgerAllocator allocator;
     private final PulsarVirtualLedgerAllocatorStore store;
-    private final int maximumReconcileRetries;
+    private final Bounds bounds;
     private final RetryScheduler retryScheduler;
 
     BoundedVirtualLedgerAllocatorWorkflowV2(
             ProductionVirtualLedgerAllocator allocator,
             PulsarVirtualLedgerAllocatorStore store,
-            int maximumReconcileRetries,
+            Bounds bounds,
             RetryScheduler retryScheduler) {
         this.allocator = Objects.requireNonNull(allocator, "allocator");
         this.store = Objects.requireNonNull(store, "store");
-        if (maximumReconcileRetries < 0 || maximumReconcileRetries > 64) {
-            throw new IllegalArgumentException("allocator reconcile retry bound must be between zero and 64");
-        }
-        this.maximumReconcileRetries = maximumReconcileRetries;
+        this.bounds = Objects.requireNonNull(bounds, "bounds");
         this.retryScheduler = Objects.requireNonNull(retryScheduler, "retryScheduler");
     }
 
     public CompletionStage<Result> allocate(Request request) {
         Objects.requireNonNull(request, "request");
-        State state = new State();
-        return acquireGrant(request, state);
+        State state = new State(bounds);
+        PulsarVirtualLedgerAllocatorStore guardedStore = new DeadlineGuardedStore(store, state);
+        BoundedVirtualLedgerAllocatorWorkflowV2 execution = new BoundedVirtualLedgerAllocatorWorkflowV2(
+                allocator.withStore(guardedStore), guardedStore, bounds, retryScheduler);
+        return withinWorkflowDeadline(
+                invoke(() -> execution.acquireGrant(request, state)),
+                state,
+                AllocatorProtocolException.Code.WORKFLOW_DEADLINE_EXCEEDED,
+                "allocator workflow exceeded its source-governed elapsed deadline");
+    }
+
+    public Bounds bounds() {
+        return bounds;
     }
 
     private CompletionStage<Result> acquireGrant(Request request, State state) {
@@ -552,13 +565,25 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
     }
 
     private CompletionStage<Result> retry(State state, RetryReason reason, Supplier<CompletionStage<Result>> retry) {
-        if (state.reconcileRetries == maximumReconcileRetries) {
+        if (state.reconcileRetries == bounds.maximumReconcileRetries()) {
             return failed(failure(
                     AllocatorProtocolException.Code.RECONCILE_RETRY_EXHAUSTED,
                     "allocator bounded reconcile retry budget exhausted at " + reason));
         }
+        long remainingNanos = state.remainingNanos();
+        if (remainingNanos <= 0) {
+            return failed(failure(
+                    AllocatorProtocolException.Code.WORKFLOW_DEADLINE_EXCEEDED,
+                    "allocator workflow deadline elapsed before retry " + reason));
+        }
         state.reconcileRetries++;
-        return invoke(() -> retryScheduler.beforeRetry(state.reconcileRetries, reason))
+        long backoffNanos =
+                Math.min(remainingNanos, bounds.maximumRetryBackoff().toNanos());
+        return withinDeadline(
+                        invoke(() -> retryScheduler.beforeRetry(state.reconcileRetries, reason)),
+                        backoffNanos,
+                        AllocatorProtocolException.Code.RETRY_BACKOFF_EXCEEDED,
+                        "allocator retry backoff exceeded its source-governed bound at " + reason)
                 .thenCompose(ignored -> invoke(retry));
     }
 
@@ -716,6 +741,49 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
         }
     }
 
+    private static <T> CompletionStage<T> withinDeadline(
+            CompletionStage<T> source, long timeoutNanos, AllocatorProtocolException.Code code, String message) {
+        if (timeoutNanos <= 0) {
+            return failed(failure(code, message));
+        }
+        CompletableFuture<T> bounded = new CompletableFuture<>();
+        source.whenComplete((value, failure) -> {
+            if (failure == null) {
+                bounded.complete(value);
+            } else {
+                bounded.completeExceptionally(unwrap(failure));
+            }
+        });
+        CompletableFuture.delayedExecutor(timeoutNanos, TimeUnit.NANOSECONDS)
+                .execute(() -> bounded.completeExceptionally(failure(code, message)));
+        return bounded;
+    }
+
+    private static <T> CompletionStage<T> withinWorkflowDeadline(
+            CompletionStage<T> source, State state, AllocatorProtocolException.Code code, String message) {
+        long timeoutNanos = state.remainingNanos();
+        if (timeoutNanos <= 0) {
+            state.terminate();
+            return failed(failure(code, message));
+        }
+        CompletableFuture<T> bounded = new CompletableFuture<>();
+        source.whenComplete((value, sourceFailure) -> {
+            if (state.terminate()) {
+                if (sourceFailure == null) {
+                    bounded.complete(value);
+                } else {
+                    bounded.completeExceptionally(unwrap(sourceFailure));
+                }
+            }
+        });
+        CompletableFuture.delayedExecutor(timeoutNanos, TimeUnit.NANOSECONDS).execute(() -> {
+            if (state.terminate()) {
+                bounded.completeExceptionally(failure(code, message));
+            }
+        });
+        return bounded;
+    }
+
     private static <T> CompletionStage<T> failed(Throwable failure) {
         return CompletableFuture.failedFuture(failure);
     }
@@ -789,11 +857,132 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
         }
     }
 
+    /** Source-governed bounds used by every formal actor coordinator. */
+    public record Bounds(int maximumReconcileRetries, Duration totalElapsedDeadline, Duration maximumRetryBackoff) {
+        private static final Bounds FORMAL = new Bounds(64, Duration.ofSeconds(4), Duration.ofMillis(25));
+
+        public Bounds {
+            Objects.requireNonNull(totalElapsedDeadline, "totalElapsedDeadline");
+            Objects.requireNonNull(maximumRetryBackoff, "maximumRetryBackoff");
+            if (maximumReconcileRetries < 0
+                    || maximumReconcileRetries > 64
+                    || totalElapsedDeadline.isZero()
+                    || totalElapsedDeadline.isNegative()
+                    || totalElapsedDeadline.compareTo(Duration.ofSeconds(4)) > 0
+                    || maximumRetryBackoff.isZero()
+                    || maximumRetryBackoff.isNegative()
+                    || maximumRetryBackoff.compareTo(Duration.ofMillis(25)) > 0
+                    || maximumRetryBackoff.compareTo(totalElapsedDeadline) > 0) {
+                throw new IllegalArgumentException("allocator workflow bounds differ from the source-governed caps");
+            }
+        }
+
+        public static Bounds formal() {
+            return FORMAL;
+        }
+    }
+
     private record Authorities(VersionedAllocatorCellStateV1 cell, VersionedManagedLedgerAllocatorHeadV1 head) {}
 
     private static final class State {
+        private final long deadlineNanos;
+        private final AtomicBoolean terminal = new AtomicBoolean();
         private int reconcileRetries;
         private VirtualLedgerCandidateNodeV1 candidateValue;
         private VersionedVirtualLedgerCandidateNodeV1 exactNode;
+
+        private State(Bounds bounds) {
+            deadlineNanos = Math.addExact(
+                    System.nanoTime(), bounds.totalElapsedDeadline().toNanos());
+        }
+
+        private long remainingNanos() {
+            return deadlineNanos - System.nanoTime();
+        }
+
+        private void requireAuthorized() {
+            if (terminal.get() || remainingNanos() <= 0) {
+                throw failure(
+                        AllocatorProtocolException.Code.WORKFLOW_DEADLINE_EXCEEDED,
+                        "allocator workflow is no longer authorized after its elapsed deadline");
+            }
+        }
+
+        private boolean terminate() {
+            return terminal.compareAndSet(false, true);
+        }
+    }
+
+    private static final class DeadlineGuardedStore implements PulsarVirtualLedgerAllocatorStore {
+        private final PulsarVirtualLedgerAllocatorStore delegate;
+        private final State state;
+
+        private DeadlineGuardedStore(PulsarVirtualLedgerAllocatorStore delegate, State state) {
+            this.delegate = Objects.requireNonNull(delegate, "delegate");
+            this.state = Objects.requireNonNull(state, "state");
+        }
+
+        @Override
+        public CompletionStage<Optional<VersionedAllocatorCellStateV1>> readCell(
+                Sha256Digest namespaceId, Sha256Digest sliceAssignmentId) {
+            return authorized(() -> delegate.readCell(namespaceId, sliceAssignmentId));
+        }
+
+        @Override
+        public CompletionStage<CreateMutationResult<VersionedAllocatorCellStateV1>> createCell(
+                VirtualLedgerCellAllocatorStateV1 candidate) {
+            return authorized(() -> delegate.createCell(candidate));
+        }
+
+        @Override
+        public CompletionStage<ConditionalCasResult<VersionedAllocatorCellStateV1>> compareAndSetCell(
+                VersionedAllocatorCellStateV1 exactPredecessor, VirtualLedgerCellAllocatorStateV1 candidate) {
+            return authorized(() -> delegate.compareAndSetCell(exactPredecessor, candidate));
+        }
+
+        @Override
+        public CompletionStage<Optional<VersionedManagedLedgerAllocatorHeadV1>> readHead(
+                Sha256Digest namespaceId,
+                Sha256Digest sliceAssignmentId,
+                ManagedLedgerIncarnationIdV1 managedLedgerIncarnation) {
+            return authorized(() -> delegate.readHead(namespaceId, sliceAssignmentId, managedLedgerIncarnation));
+        }
+
+        @Override
+        public CompletionStage<CreateMutationResult<VersionedManagedLedgerAllocatorHeadV1>> createHead(
+                Sha256Digest namespaceId, Sha256Digest sliceAssignmentId, ManagedLedgerAllocatorHeadV1 candidate) {
+            return authorized(() -> delegate.createHead(namespaceId, sliceAssignmentId, candidate));
+        }
+
+        @Override
+        public CompletionStage<ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1>> compareAndSetHead(
+                Sha256Digest namespaceId,
+                Sha256Digest sliceAssignmentId,
+                VersionedManagedLedgerAllocatorHeadV1 exactPredecessor,
+                ManagedLedgerAllocatorHeadV1 candidate) {
+            return authorized(
+                    () -> delegate.compareAndSetHead(namespaceId, sliceAssignmentId, exactPredecessor, candidate));
+        }
+
+        @Override
+        public CompletionStage<Optional<VersionedVirtualLedgerCandidateNodeV1>> readNode(
+                Sha256Digest namespaceId,
+                Sha256Digest sliceAssignmentId,
+                ManagedLedgerIncarnationIdV1 managedLedgerIncarnation,
+                long ledgerId) {
+            return authorized(
+                    () -> delegate.readNode(namespaceId, sliceAssignmentId, managedLedgerIncarnation, ledgerId));
+        }
+
+        @Override
+        public CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>> createNode(
+                Sha256Digest namespaceId, Sha256Digest sliceAssignmentId, VirtualLedgerCandidateNodeV1 candidate) {
+            return authorized(() -> delegate.createNode(namespaceId, sliceAssignmentId, candidate));
+        }
+
+        private <T> CompletionStage<T> authorized(Supplier<CompletionStage<T>> operation) {
+            state.requireAuthorized();
+            return Objects.requireNonNull(operation.get(), "allocator guarded store stage");
+        }
     }
 }

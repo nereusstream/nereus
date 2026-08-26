@@ -774,7 +774,14 @@ four-actor Runner and production-workflow harness are now implemented and covere
 They keep four concurrent actor lanes at one in-flight each, physically bound the queue to twice the offered rate,
 drop only pre-admission work at cutoff, apply the frozen cleanup deadline to admitted work, expose terminal/gauge
 facts, and revalidate both conservation equations without a shared Java correctness lock. This is focused local
-conformance, not real-Oxia evidence. Checkpoint/sealing/resume/promotion gates and real-Oxia diagnostics remain open.
+conformance, not real-Oxia evidence. Canonical NACP2 checkpoint/resume, NAEV2 evaluation, diagnostic-only NADV2, and
+the exact-source attachment/JUnit promotion decision are now implemented and have explicit Gradle/script entrypoints.
+Only a complete checkpoint seals; NONE/BOTH remain valid non-promotable decisions; interruption/infrastructure failure
+produces no evaluation. Formal workflows additionally enforce the exact 64-retry/four-second/25-ms envelope inside
+the five-second Runner cleanup grace and prevent late store completions from dispatching a post-timeout operation.
+The old default full/V1 script path fails closed. Real-Oxia diagnostics remain
+open at this source checkpoint. The promotion gate does not trust a caller-created canonical evaluation or diagnostic
+attestation: it rederives exact NAEV2 bytes and rehashes both the diagnostic and formal JUnit inputs.
 The exact-source
 `1ef4f108...` matrix passed its one testcase but failed the sealed-evidence task on an oversized 113,519,059-byte
 JUnit XML caused by 970,241 copies of one expected native-harness cleanup WARN. It produced no evaluation, selection,

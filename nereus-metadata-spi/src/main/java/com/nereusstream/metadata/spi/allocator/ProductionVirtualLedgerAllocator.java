@@ -293,7 +293,24 @@ public final class ProductionVirtualLedgerAllocator {
     /** Creates one independent lock-free coordinator whose retries are serialized only by exact store authority. */
     public BoundedVirtualLedgerAllocatorWorkflowV2 boundedWorkflow(
             int maximumReconcileRetries, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler retryScheduler) {
-        return new BoundedVirtualLedgerAllocatorWorkflowV2(this, store, maximumReconcileRetries, retryScheduler);
+        return boundedWorkflow(
+                new BoundedVirtualLedgerAllocatorWorkflowV2.Bounds(
+                        maximumReconcileRetries, java.time.Duration.ofSeconds(4), java.time.Duration.ofMillis(25)),
+                retryScheduler);
+    }
+
+    /** Creates one coordinator with an exact source-governed attempts/elapsed/backoff envelope. */
+    public BoundedVirtualLedgerAllocatorWorkflowV2 boundedWorkflow(
+            BoundedVirtualLedgerAllocatorWorkflowV2.Bounds bounds,
+            BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler retryScheduler) {
+        return new BoundedVirtualLedgerAllocatorWorkflowV2(this, store, bounds, retryScheduler);
+    }
+
+    ProductionVirtualLedgerAllocator withStore(PulsarVirtualLedgerAllocatorStore replacementStore) {
+        AllocatorEvidenceCandidateV1 candidate = selectedMode == AllocatorModeV1.STRICT_SERIALIZED
+                ? AllocatorEvidenceCandidateV1.strict()
+                : AllocatorEvidenceCandidateV1.range(selectedRangeSize);
+        return new ProductionVirtualLedgerAllocator(candidate, replacementStore, runtimeActivated);
     }
 
     private void requireCurrentActiveCell(

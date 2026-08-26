@@ -55,6 +55,97 @@ JSON
   exit 0
 fi
 
+protocol_pulsar_checkout="${NEREUS_M3_ALLOCATOR_PULSAR_CHECKOUT:-/Users/liusinan/apps/ideaproject/nereusstream/pulsar-worktrees/nereus-v2-m3}"
+protocol_commit="${NEREUS_M3_ALLOCATOR_EXPECTED_NEREUS_COMMIT:-}"
+protocol_oxia_image_digest="${NEREUS_M3_ALLOCATOR_V2_OXIA_IMAGE_DIGEST:-}"
+protocol_dependency_lock_digest="${NEREUS_M3_ALLOCATOR_V2_DEPENDENCY_LOCK_DIGEST:-}"
+protocol_executor_digest="${NEREUS_M3_ALLOCATOR_V2_EXECUTOR_DIGEST:-}"
+protocol_workload_digest="${NEREUS_M3_ALLOCATOR_V2_WORKLOAD_DIGEST:-}"
+
+require_protocol_binding() {
+  test -n "$protocol_commit"
+  test -n "$protocol_oxia_image_digest"
+  test -n "$protocol_dependency_lock_digest"
+  test -n "$protocol_executor_digest"
+  test -n "$protocol_workload_digest"
+  test "$(git -C "$repo_root" rev-parse HEAD)" = "$protocol_commit"
+  test "$(git -C "$repo_root" rev-parse refs/remotes/origin/main)" = "$protocol_commit"
+}
+
+protocol_gradle_properties=(
+  "-PpulsarCheckout=$protocol_pulsar_checkout"
+  "-Pv2M3AllocatorV2NereusCommit=$protocol_commit"
+  "-Pv2M3AllocatorV2OxiaImageDigest=$protocol_oxia_image_digest"
+  "-Pv2M3AllocatorV2DependencyLockDigest=$protocol_dependency_lock_digest"
+  "-Pv2M3AllocatorV2ExecutorDigest=$protocol_executor_digest"
+  "-Pv2M3AllocatorV2WorkloadDigest=$protocol_workload_digest"
+)
+
+if [[ "${1:-}" == "--pre-campaign-check" ]]; then
+  if (( $# != 1 )); then
+    echo "usage: $0 --pre-campaign-check" >&2
+    exit 64
+  fi
+  "$repo_root/gradlew" :nereus-metadata-oxia:realAllocatorV2PreCampaignCheck \
+    "-PpulsarCheckout=$protocol_pulsar_checkout" \
+    --console=plain \
+    --no-configuration-cache
+  exit 0
+fi
+
+if [[ "${1:-}" == "--validate-checkpoint" ]]; then
+  if (( $# != 2 )); then
+    echo "usage: $0 --validate-checkpoint checkpoint.nacp" >&2
+    exit 64
+  fi
+  require_protocol_binding
+  "$repo_root/gradlew" :nereus-metadata-oxia:validateRealAllocatorV2Checkpoint \
+    "${protocol_gradle_properties[@]}" \
+    "-Pv2M3AllocatorV2CheckpointPath=$2" \
+    --console=plain \
+    --no-configuration-cache
+  exit 0
+fi
+
+if [[ "${1:-}" == "--seal-evaluation" ]]; then
+  if (( $# != 3 )); then
+    echo "usage: $0 --seal-evaluation checkpoint.nacp evaluation.naev" >&2
+    exit 64
+  fi
+  require_protocol_binding
+  "$repo_root/gradlew" :nereus-metadata-oxia:sealRealAllocatorV2Evaluation \
+    "${protocol_gradle_properties[@]}" \
+    "-Pv2M3AllocatorV2CheckpointPath=$2" \
+    "-Pv2M3AllocatorV2EvaluationOutput=$3" \
+    --console=plain \
+    --no-configuration-cache
+  exit 0
+fi
+
+if [[ "${1:-}" == "--promotion-check" ]]; then
+  if (( $# != 8 )); then
+    echo "usage: $0 --promotion-check evaluation.naev checkpoint.nacp diagnostic.nadv diagnostic-junit.xml formal-junit.xml attachments-dir decision.json" >&2
+    exit 64
+  fi
+  require_protocol_binding
+  "$repo_root/gradlew" :nereus-metadata-oxia:realAllocatorV2PromotionCheck \
+    "${protocol_gradle_properties[@]}" \
+    "-Pv2M3AllocatorV2EvaluationPath=$2" \
+    "-Pv2M3AllocatorV2CheckpointPath=$3" \
+    "-Pv2M3AllocatorV2DiagnosticPath=$4" \
+    "-Pv2M3AllocatorV2DiagnosticJUnitPath=$5" \
+    "-Pv2M3AllocatorV2FormalJUnitPath=$6" \
+    "-Pv2M3AllocatorV2AttachmentDirectory=$7" \
+    "-Pv2M3AllocatorV2PromotionOutput=$8" \
+    --console=plain \
+    --no-configuration-cache
+  exit 0
+fi
+
+echo "full allocator execution is disabled: complete ADR-0104 V2 pre-campaign and short real-Oxia gates first" >&2
+echo "the immutable V1 runner below is diagnostic compatibility code and cannot be resumed or promoted" >&2
+exit 64
+
 pulsar_checkout="${1:-/Users/liusinan/apps/ideaproject/nereusstream/pulsar-worktrees/nereus-v2-m3}"
 oxia_server_checkout="${2:-/Users/liusinan/apps/ideaproject/nereusstream/oxia-worktrees/nereus-v2-m3}"
 oxia_client_checkout="${3:-/Users/liusinan/apps/ideaproject/nereusstream/oxia-client-java-worktrees/nereus-v2-m3}"
