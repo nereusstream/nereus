@@ -108,7 +108,9 @@ The child validator recomputes their rows, keys, byte lengths, SHA-256 values, R
 rejects fully rehashed substitutions. Module checks pass 148/0/0/0 and 261/0/0/0; exact-source R/K receipts remain
 open at that implementation boundary and neither artifact promotes a scenario or substitutes for Kafka native
 evidence. Exact `35e6784d...` R evidence subsequently passes 9/0/0/0 and publishes non-promotable child
-`1863f293...8f90`; post-selection R freshness and the exact-source K child remain open.
+`1863f293...8f90`. Exact `fc7aa790...` K evidence then passes 5/0/0/0 and publishes non-promotable child
+`864fdedc...0c7f`, binding the production-codec fixture. Post-selection R/K freshness and the separate Kafka native
+child remain open.
 
 ADR 0105 versions M3 typed-evidence source locks so the current preselection state is explicitly `UNSELECTED`.
 Non-allocator children may bind the exact M3 Kafka/Pulsar branches and fixed Provider/KMS artifacts in that state,
