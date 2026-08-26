@@ -177,7 +177,9 @@ with zero failure/error/skip. The replacement exact-source diagnostic at
 `6335ed1d62e04509972de66d79509f5ec40715cc` then passed the full STRICT 10k nine-cut batch as one test with zero
 failure/error/skip in 86.270 seconds; its external checksum-manifest SHA-256 is
 `e9e9a4dc5805daa71683658441540c256dfaa4b3876ed6df7b96a7804be3cb27`. It emits no receipt, covers neither RANGE
-nor 100k/throughput rows, selects no mode, and promotes no scenario. The complete raw matrix remains required.
+nor 100k/throughput rows, selects no mode, and promotes no scenario. Its historical complete-matrix rerun requirement
+is superseded by ADR 0104; only a completed validator-proof V2 campaign may become selection input after the new
+pre-campaign gates pass.
 
 The next complete-matrix attempt at exact clean source `e4f376c63e1b8458c8798d5ea9ca56cf39364377` ran for 40 minutes
 4 seconds, completed the native matrix, and then failed in the STRICT 10k mass-takeover second phase because 2,500
@@ -208,8 +210,8 @@ selection/evaluation/verifier file exists. The closed external directory is
 production exact-current-Cell check and gives installed RANGE paths a fair shared proof phase while Cell mutation
 chains use an exclusive measured phase. RANGE population construction captures its exact Cell only under that exclusive
 phase, and construction rejects inherited injected latency. The focused formal-runner contract now passes 11 tests
-with zero failure/error/skip; a real-Oxia RANGE overlap diagnostic and then the complete raw matrix remain mandatory and
-cannot be promoted independently.
+with zero failure/error/skip. Its historical complete-matrix rerun requirement is superseded by ADR 0104; the
+diagnostic cannot be promoted independently.
 
 The first exact-source ADR-0101 diagnostic at
 `69c81bef9348631e39dabf91db15385cf48cd116` constructed 10,000 RANGE-16 Heads/grants and overlapped 4,096 installed
@@ -230,8 +232,8 @@ wrapper returned zero, and task-owned container
 `43b7163e3fc6eb26b9d3ca5e00cb7b698698b92bf0d0dd0fe379039f285fe774` was removed by its exit trap. The closed
 directory is `/Users/liusinan/Documents/Codex/2026-08-26/nereus-v2-m3-allocator/diagnostic-range-fault-3f1fa7ca`, and
 its `SHA256SUMS` SHA-256 is `68a4e4188e610bf8413c4256cf91446adbeb39a591fcf57ef9fdaf1b3d4c3d0d`. It emits no raw selection inventory or
-receipt, covers neither 100k nor native/throughput rows, selects no mode, and promotes no scenario. The complete matrix
-is still the only selection input.
+receipt, covers neither 100k nor native/throughput rows, selects no mode, and promotes no scenario. It is not an input
+to ADR 0104's V2 campaign.
 
 The following complete five-candidate matrix at exact clean source
 `1ef4f108307cb95a06fd5c55950b041eebadc813` then executed for 15,462.505 testcase seconds and returned exactly one
@@ -246,8 +248,8 @@ rehash against `SHA256SUMS`, whose SHA-256 is
 [ADR 0102](../../../decisions/0102-v2-m3-allocator-junit-diagnostic-output-containment-amendment.md) leaves the cap,
 parser, workload, SLOs, and selection rule unchanged. The exact runner now rejects only that exact WARN/message pair,
 retains every other WARN and every ERROR, and verifies the active Log4j decisions before constructing a population.
-Because the runner artifact digest changed, r5 raw
-archives cannot be resealed or reused; the complete matrix must execute again at the later exact clean source.
+Because the runner artifact digest changed, r5 raw archives cannot be resealed or reused. ADR 0104 later supersedes
+that historical complete-matrix rerun requirement.
 
 That immediate rerun at exact clean source `bd254d2463c6bdfd0ab46bc8cd8c6f5b9abe016e` retained the fixed JUnit cap
 and exact-message filter, but failed during RANGE-1024 10k-to-100k population expansion. Its testcase ran for
@@ -264,8 +266,7 @@ rehash, and its `SHA256SUMS` SHA-256 is
 unchanged. RANGE construction now holds one outer exclusive immutable-Cell phase, drains unique Head creates in
 parallel, proves the captured Cell unchanged, and only then executes initial grant chains in index order. Timeout
 progress is diagnostic-only and the owned batch is interrupted/cancelled. The fresh focused contract now passes 13
-tests with zero failure/error/skip. r6 remains non-promotable and the complete matrix must rerun at the changed exact
-source.
+tests with zero failure/error/skip. r6 remains non-promotable and is not reusable by ADR 0104's V2 campaign.
 
 At the committed/pushed replacement source `9f88fbfb115e35d1e41ab8aacedeb0a1233fca0e`, the diagnostic-only 10k
 RANGE-16 Cell-proof task passes its one testcase in 49.909 seconds with zero failure/error/skip against the exact real
@@ -286,7 +287,15 @@ without modification. The five-file diagnostic set lives at
 `/Users/liusinan/Documents/Codex/2026-08-26/nereus-v2-m3-allocator/diagnostic-range-100k-e739799f-r1` and rehashes
 under `SHA256SUMS` SHA-256 `1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`.
 This construction-only result is not native-relative evidence, selection, a child receipt, or scenario PASS; the
-complete formal matrix must still run at its later exact clean source.
+complete formal matrix must not be resumed. The later interrupted
+`/Users/liusinan/Documents/Codex/2026-08-26/nereus-v2-m3-allocator/full-matrix-16254510-r1` directory and all earlier
+V1 products are immutable diagnostic-only. [ADR 0104](../../../decisions/0104-v2-m3-allocator-validator-proof-adaptive-campaign-amendment.md)
+retains all 288 logical performance cells but replaces exhaustive formal execution with a validator-proof adaptive V2
+campaign. It separates logical, executed, and disposition cells; freezes 13/17/288 execution bounds and independent
+phase budgets through an offline `--plan-only`; requires four independent actor coordinators and bounded physical
+admission; and separates completed evaluation from promotion. No full formal V2 campaign may run until its V2
+planner/validator, V1 compatibility, bounded-runner conservation, four-actor workflow, and short real-Oxia diagnostics
+all pass with zero failure/error/skip.
 
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
@@ -296,9 +305,11 @@ generic child publisher and reparses the local result through the governed valid
 allocation-free analytical format-cap conformance, claims no Provider transfer, and cannot substitute for the
 separate fixed-digest C1 Provider/KMS evidence.
 
-Serial continuation order is allocator population-batch rerun and raw mode selection, source-lock closure and formal
-allocator evidence, the remaining child receipts, then final-source Provider/KMS and M2 regression freshness,
-scenario synchronization, and M3 Final.
+Serial continuation order is ADR-0104 V2 schema/planner/validator/selector, bounded CAS/reconcile workflow, bounded
+four-actor Runner, checkpoint/resume/sealer/promotion gates, and the required short real-Oxia diagnostics before any
+new formal allocator campaign. Source-lock closure and formal allocator evidence follow only after those gates, then
+the remaining child receipts, final-source Provider/KMS and M2 regression freshness, scenario synchronization, and M3
+Final.
 Each stable boundary must be committed and pushed before the next evidence-bearing boundary is evaluated.
 
 ## Current boundary
@@ -314,7 +325,7 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; Kafka/Pulsar backend integration and dedicated-fork compile checkpoints pass, while formal Provider/KMS receipts remain open |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | Kafka source implemented; local 260-test module check covers strict wire/key/caps, OPEN/TERMINAL Head, backend mapping and bounded recovery; the dedicated fork now compiles against the split F9/M3 artifact inputs with 6/6 tests, while the final source-qualified native receipt remains open |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; the dedicated-fork dual-repository compile checkpoint passes 6/6 tests, but a source-qualified receipt remains open and native broker/controller activation remains M6 |
-| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; allocator production/evidence code and its ordinary 48-test inventory pass, while the 13-test runner contract enforces ADR 0101 Cell-proof scheduling, ADR 0102 exact diagnostic containment, and ADR 0103 bounded immutable-Cell population batches; ADRs 0091/0094/0097/0100..0103 freeze the wire, raw workload/SLO/selection, reproducible image, recovery endpoint, concurrency/construction schedule, and JUnit cap boundary, but the formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open |
+| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; allocator production/evidence code and its ordinary 48-test inventory pass, while ADR 0104 now supersedes exhaustive V1 formal execution and the one-JVM Cell-proof lock as performance authority; its offline plan freezes 288 logical cells, 13/17/288 execution bounds, hard phase budgets, four independent actor coordinators, bounded admission, and evaluation/promotion separation; the V2 implementation and pre-campaign gates, formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open, and no full formal campaign is currently allowed |
 | M3-FINAL | exact-source aggregate and scenario promotion | fail-closed child/final checker and publisher contracts are implemented and their 74 governance tests pass; Final remains open and requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
 
 Slice names are execution labels, not new durable wire codes. Implementations may split reviewable commits more

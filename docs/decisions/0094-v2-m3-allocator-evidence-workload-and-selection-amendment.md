@@ -1,5 +1,9 @@
 # ADR 0094: V2 M3 allocator evidence workload and selection amendment
 
+> Amended by [ADR 0104](0104-v2-m3-allocator-validator-proof-adaptive-campaign-amendment.md): the 288 logical cells
+> remain authoritative, but formal V2 execution is adaptive and validator-proven; budget exhaustion may not create a
+> disposition, and V1 products remain diagnostic-only inputs to no V2 evaluation.
+
 ## Status
 
 Accepted before the first formal M3 allocator scale execution. This decision amends only the executable evidence

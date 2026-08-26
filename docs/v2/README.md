@@ -363,6 +363,7 @@ Accepted decisions:
 - [ADR 0101: M3 allocator Cell-proof concurrency scheduling amendment](../decisions/0101-v2-m3-allocator-cell-proof-concurrency-scheduling-amendment.md)
 - [ADR 0102: M3 allocator JUnit diagnostic-output containment amendment](../decisions/0102-v2-m3-allocator-junit-diagnostic-output-containment-amendment.md)
 - [ADR 0103: M3 allocator population-construction batch scheduling amendment](../decisions/0103-v2-m3-allocator-population-construction-batch-scheduling-amendment.md)
+- [ADR 0104: M3 allocator validator-proof adaptive campaign amendment](../decisions/0104-v2-m3-allocator-validator-proof-adaptive-campaign-amendment.md)
 
 ## Open design gates
 
@@ -423,13 +424,17 @@ ADR 0103 retains the 600-second RANGE construction cap and exact Cell proof afte
 while expanding RANGE-1024 from 10k to 100k. Its immutable diagnostic selected nothing. RANGE population construction
 now runs one exclusive batch: immutable unique-Head creates drain in parallel before the unchanged index-ordered
 reserve/install/clear chains begin. Exact progress is reported on timeout, but no construction counter is selection
-authority.
+authority. ADR 0104 now supersedes exhaustive formal execution and the one-JVM proof lock as performance authority:
+the 288 logical cells remain fixed, while V2 execution is adaptive only through validator-reproved dispositions over
+four independent actor coordinators. The offline `--plan-only` projection freezes the 13/17/288 execution bounds and
+separate hard phase budgets. Old V1 matrices, including interrupted `full-matrix-16254510-r1`, remain immutable
+diagnostics and cannot be resumed, sealed, evaluated, selected, receipted, or promoted as V2 evidence.
 The replacement `9f88fbfb...` source passes its one-test 10k RANGE Cell-proof diagnostic with zero
 failure/error/skip. The separate exact-source `e739799f...` diagnostic-only RANGE-1024 10k-to-100k construction guard
 also passes one testcase in 459.537 seconds with zero failure/error/skip and unchanged operation/drain caps. Its
 `SHA256SUMS` SHA-256 is `1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`. Neither
-diagnostic can select a mode or promote a scenario; the complete matrix remains required at its next exact clean
-source.
+diagnostic can select a mode or promote a scenario. Only a completed ADR-0104 V2 campaign may become a future
+selection input, after all pre-campaign gates pass.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

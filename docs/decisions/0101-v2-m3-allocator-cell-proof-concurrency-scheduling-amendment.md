@@ -1,5 +1,9 @@
 # ADR 0101: V2 M3 allocator Cell-proof concurrency scheduling amendment
 
+> Amended by [ADR 0104](0104-v2-m3-allocator-validator-proof-adaptive-campaign-amendment.md): the exact-Cell proof
+> remains mandatory, but the one-JVM shared/exclusive proof lock is no longer formal performance or selection
+> authority. Formal V2 execution uses four independent actor coordinators and Oxia CAS/reconcile only.
+
 - Status: Accepted
 - Date: 2026-08-26
 - Amends: ADR 0094's formal candidate coordinator scheduling

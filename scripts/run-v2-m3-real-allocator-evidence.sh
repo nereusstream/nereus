@@ -4,6 +4,57 @@ export LC_ALL=C
 export LANG=C
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ "${1:-}" == "--plan-only" ]]; then
+  if (( $# != 1 )); then
+    echo "usage: $0 --plan-only" >&2
+    exit 64
+  fi
+  cat <<'JSON'
+{
+  "schema": "NEREUS_V2_M3_ALLOCATOR_CAMPAIGN_PLAN_V2",
+  "plannerVersion": 2,
+  "logicalPerformanceCells": 288,
+  "executedPerformanceCellsMin": 13,
+  "executedPerformanceCellsMinPromotable": 17,
+  "executedPerformanceCellsMax": 288,
+  "interval": {
+    "warmupSeconds": 10,
+    "measuredSeconds": 30,
+    "totalSeconds": 40,
+    "executedMinSeconds": 520,
+    "executedMinDuration": "PT8M40S",
+    "executedMinPromotableSeconds": 680,
+    "executedMinPromotableDuration": "PT11M20S",
+    "executedMaxSeconds": 11520,
+    "executedMaxDuration": "PT3H12M"
+  },
+  "hardUpperBounds": {
+    "setupSeconds": 900,
+    "populationPathsMax": 6,
+    "populationPerPathSeconds": 900,
+    "populationTotalSeconds": 5400,
+    "faultRowsMax": 40,
+    "faultPerRowSeconds": 180,
+    "faultTotalSeconds": 7200,
+    "scalePathsMax": 6,
+    "scalePerPathSeconds": 900,
+    "scaleTotalSeconds": 5400,
+    "cleanupPerExecutedCellSeconds": 5,
+    "cleanupTotalMaxSeconds": 1440,
+    "checkpointResumeSealSeconds": 600,
+    "formalCampaignTotalMaxSeconds": 32460,
+    "formalCampaignTotalMaxDuration": "PT9H1M"
+  },
+  "budgetExhaustionMayCreateDisposition": false,
+  "evaluationRequiresCompletedCampaign": true,
+  "promotionRequiresUniqueQualifiedMode": true,
+  "accessesOxia": false
+}
+JSON
+  exit 0
+fi
+
 pulsar_checkout="${1:-/Users/liusinan/apps/ideaproject/nereusstream/pulsar-worktrees/nereus-v2-m3}"
 oxia_server_checkout="${2:-/Users/liusinan/apps/ideaproject/nereusstream/oxia-worktrees/nereus-v2-m3}"
 oxia_client_checkout="${3:-/Users/liusinan/apps/ideaproject/nereusstream/oxia-client-java-worktrees/nereus-v2-m3}"

@@ -738,7 +738,10 @@ telemetry, numeric absolute/native-relative SLOs, RANGE candidates, and closed a
 fresh-owner append admission after the production Head takeover; it forbids an unrelated second allocator rollover
 per affected ledger and retains late completion as a disqualifying timeout. ADR 0101 keeps installed RANGE Head/node
 operations concurrent through shared exact-Cell proof phases while Cell-mutating grant chains use an exclusive measured
-phase; the failed `d819500f...` matrix is diagnostic only and selected nothing. The remaining gate must execute that source-qualified
+phase; the failed `d819500f...` matrix is diagnostic only and selected nothing. ADR 0104 supersedes the one-JVM lock
+as formal performance authority and replaces exhaustive execution with a validator-proof adaptive V2 campaign over
+the unchanged 288 logical cells. The interrupted `full-matrix-16254510-r1` and all earlier V1 products remain
+immutable diagnostic-only and cannot be resumed or promoted. The remaining gate must execute that source-qualified
 multi-broker/native 10,000/100,000 protocol with zero skip, select the smallest qualifying RANGE size if RANGE alone
 qualifies, and select at most one persisted mode. Until then both modes remain unselected and no
 `V2-POSITION-013/014/017/018` scenario may cite a local or diagnostic result as PASS.
@@ -757,18 +760,23 @@ containment refined without changing the 16-MiB cap by
 [ADR 0102](../decisions/0102-v2-m3-allocator-junit-diagnostic-output-containment-amendment.md), with the unchanged
 600-second construction cap and immutable-Cell two-phase RANGE batch refined by
 [ADR 0103](../decisions/0103-v2-m3-allocator-population-construction-batch-scheduling-amendment.md). The exact-source
+execution protocol is further amended by
+[ADR 0104](../decisions/0104-v2-m3-allocator-validator-proof-adaptive-campaign-amendment.md): all 288 logical cells
+remain, but executed and disposition cells are distinct, every disposition is validator-reproved, four actor lanes use
+independent coordinators, and budget exhaustion interrupts rather than completing the campaign. The exact-source
 `1ef4f108...` matrix passed its one testcase but failed the sealed-evidence task on an oversized 113,519,059-byte
 JUnit XML caused by 970,241 copies of one expected native-harness cleanup WARN. It produced no evaluation, selection,
 or verifier output and remains diagnostic. The following `bd254d24...` run kept JUnit at 1,988 bytes but failed
 RANGE-1024 10k-to-100k construction after 600 seconds, before that candidate's 100k measurement; its partial archives
-also selected nothing. The changed exact source must execute the complete matrix again. Evidence measures the
+also selected nothing. Neither execution can be resumed or reused by the ADR-0104 V2 campaign. Evidence measures the
 maximum sustainable rollover RPS while all bounds hold, includes actual rollover distribution/jitter/storms and native
 Pulsar rollover/append-stall baseline, and keeps performance budgets out of allocator durable identity. Execution
 remains `PLANNED`; the `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes, and the source now exposes a separate
 diagnostic-only RANGE-1024 100k construction guard. That guard passes at exact `e739799f...` in 459.537 seconds with
 zero failure/error/skip and unchanged caps, with attachment-set `SHA256SUMS` SHA-256
 `1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`. Neither result is a performance PASS or a
-selection input, and the complete matrix remains required at its later exact clean source.
+selection input. Full V2 formal execution remains forbidden until ADR 0104's plan, compatibility, bounded-runner,
+four-actor, and short real-Oxia diagnostic gates are all clean.
 
 ### `V2-OPEN-PUL-MIGRATION-01`: new incarnation or HybridManagedLedger
 

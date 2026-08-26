@@ -51,16 +51,19 @@ failed `d819500f...` matrix selected no mode. ADR 0102 keeps the immutable 16-Mi
 cleanup WARNs expanded the exact XML to 113,519,059 bytes; that run also selected no mode and must be rerun from raw
 execution at the later exact source. ADR 0103 keeps the 600-second construction cap after the `bd254d24...` rerun
 failed RANGE-1024 10k-to-100k population expansion before any RANGE-1024 100k measurement row. Its diagnostic files
-select nothing. The corrected runner holds one exclusive immutable-Cell construction batch, drains unique Head creates
-in parallel, then executes the unchanged initial grant chains in index order with exact timeout progress. No empty
+select nothing. ADR 0104 replaces exhaustive formal execution with a validator-proof adaptive V2 campaign while
+retaining all 288 logical cells, and removes the one-JVM Cell-proof lock as formal performance authority. Its offline
+`--plan-only` freezes 13/17/288 execution bounds and separate phase budgets; the interrupted
+`full-matrix-16254510-r1` and all V1 products remain immutable diagnostic-only. No full formal V2 campaign may run
+until its V2 planner, bounded runner, four-actor workflow, compatibility, and short real-Oxia gates are clean. No empty
 task, documentation-only receipt, synthetic Root fixture, diagnostic
 real-service run, or focused local PASS may promote an M3 scenario.
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.
 Its attachment set rehashes under `SHA256SUMS` SHA-256
-`1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`; it emits no selection input or receipt, and
-the complete matrix must still rerun at its later exact clean source.
+`1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`; it emits no selection input or receipt. It
+cannot be reused by the ADR-0104 V2 campaign.
 
 ADR 0015 limits 0.2 to one initial Storage Epoch per Topic Incarnation and no online profile-transition runtime. ADR 0016
 excludes Kafka/Pulsar Access Projection and Migration Link runtime. Their future state machines, Pulsar
