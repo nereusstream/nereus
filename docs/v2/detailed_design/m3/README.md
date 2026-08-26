@@ -211,6 +211,18 @@ phase, and construction rejects inherited injected latency. The focused formal-r
 with zero failure/error/skip; a real-Oxia RANGE overlap diagnostic and then the complete raw matrix remain mandatory and
 cannot be promoted independently.
 
+The first exact-source ADR-0101 diagnostic at
+`69c81bef9348631e39dabf91db15385cf48cd116` constructed 10,000 RANGE-16 Heads/grants and overlapped 4,096 installed
+Head/node allocations with Cell-wide range renewals. Its one testcase completed in 54.982 seconds with zero
+failure/error/skip. The outer interactive zsh wrapper then returned exit `1` because it used bash-only `PIPESTATUS`,
+even though the exact Gradle run log ended `BUILD SUCCESSFUL`; this post-test orchestration failure and the subsequent
+exact-target manual removal of task-owned container
+`706b6a0f2789ededf761c06b22b0ec7e8062f1835bb20af53eb605af660aa212` are retained in `orchestration.json` rather
+than hidden. The closed directory is
+`/Users/liusinan/Documents/Codex/2026-08-26/nereus-v2-m3-allocator/diagnostic-range-cell-proof-69c81bef`, and its
+`SHA256SUMS` SHA-256 is `854d44ecad346a4446d874628f00b97c49d079bccbe9c753a86f05bd2dfc5638`. This remains diagnostic only, emits no
+selection/receipt, and does not replace a 10k RANGE nine-cut diagnostic or the complete five-candidate matrix.
+
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
 `NEREUS_V2_M3_D1_LOCAL_CAP_RESULT_V1` payload with CREATE_NEW after the runner hashes the harness, its test, and all
