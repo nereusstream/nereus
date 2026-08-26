@@ -362,6 +362,7 @@ Accepted decisions:
 - [ADR 0100: M3 allocator mass-takeover recovery endpoint amendment](../decisions/0100-v2-m3-allocator-mass-takeover-recovery-endpoint-amendment.md)
 - [ADR 0101: M3 allocator Cell-proof concurrency scheduling amendment](../decisions/0101-v2-m3-allocator-cell-proof-concurrency-scheduling-amendment.md)
 - [ADR 0102: M3 allocator JUnit diagnostic-output containment amendment](../decisions/0102-v2-m3-allocator-junit-diagnostic-output-containment-amendment.md)
+- [ADR 0103: M3 allocator population-construction batch scheduling amendment](../decisions/0103-v2-m3-allocator-population-construction-batch-scheduling-amendment.md)
 
 ## Open design gates
 
@@ -418,6 +419,11 @@ grant chains an exclusive measured phase; its focused/diagnostic gates cannot su
 ADR 0102 retains the fixed 16-MiB JUnit cap and filters only the exact expected native-harness cleanup WARN while
 preserving every other WARN and all ERROR output. The passed-test/failed-seal `1ef4f108...` matrix is diagnostic only,
 selected no mode, and cannot be resealed after the runner source changed.
+ADR 0103 retains the 600-second RANGE construction cap and exact Cell proof after the `bd254d24...` matrix timed out
+while expanding RANGE-1024 from 10k to 100k. Its immutable diagnostic selected nothing. RANGE population construction
+now runs one exclusive batch: immutable unique-Head creates drain in parallel before the unchanged index-ordered
+reserve/install/clear chains begin. Exact progress is reported on timeout, but no construction counter is selection
+authority.
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.

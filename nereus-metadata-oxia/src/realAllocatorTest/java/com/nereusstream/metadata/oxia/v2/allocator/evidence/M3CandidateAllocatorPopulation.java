@@ -38,6 +38,7 @@ import com.nereusstream.metadata.spi.model.CreateMutationResult;
 import com.nereusstream.metadata.spi.model.MetadataVersion;
 import com.nereusstream.metadata.spi.model.VersionedVirtualLedgerSliceViewV1;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -46,6 +47,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -123,7 +125,15 @@ final class M3CandidateAllocatorPopulation {
             return 0;
         }
         long started = System.nanoTime();
-        parallel(from, requestedPopulation, this::createHead);
+        if (candidate.mode() == AllocatorModeV1.RANGE_LEASED) {
+            constructRangePopulation(from, requestedPopulation);
+        } else {
+            parallel(
+                    from,
+                    requestedPopulation,
+                    this::createStrictHead,
+                    "allocator STRICT population Head construction");
+        }
         if (!activePopulation.compareAndSet(from, requestedPopulation)) {
             throw new IllegalStateException("allocator population construction raced");
         }
@@ -439,35 +449,81 @@ final class M3CandidateAllocatorPopulation {
         }
     }
 
-    private void createHead(int index) {
-        if (candidate.mode() == AllocatorModeV1.RANGE_LEASED) {
-            Lock proofLock = cellProofLock.writeLock();
-            proofLock.lock();
-            try {
-                createHeadFromExactCurrentCell(index);
-            } finally {
-                proofLock.unlock();
-            }
-            return;
-        }
-        createHeadFromExactCurrentCell(index);
+    private void constructRangePopulation(int fromInclusive, int toExclusive) throws Exception {
+        int expectedHeads = toExclusive - fromInclusive;
+        int expectedGrants = initialRangeGrantCount(fromInclusive, toExclusive);
+        AtomicInteger createdHeads = new AtomicInteger();
+        AtomicInteger installedGrants = new AtomicInteger();
+        String label = "allocator " + candidate + " population construction " + fromInclusive + "->" + toExclusive;
+        M3BoundedPopulationConstruction.run(
+                workers,
+                Duration.ofSeconds(POPULATION_DRAIN_TIMEOUT_SECONDS),
+                label,
+                () -> "headCreates="
+                        + createdHeads.get()
+                        + "/"
+                        + expectedHeads
+                        + ", initialGrants="
+                        + installedGrants.get()
+                        + "/"
+                        + expectedGrants,
+                () -> {
+                    Lock proofLock = cellProofLock.writeLock();
+                    proofLock.lockInterruptibly();
+                    try {
+                        requireRangePopulationCellIsolation(candidate, cellProofLock);
+                        VersionedAllocatorCellStateV1 capturedCell = cell.get();
+                        parallel(
+                                fromInclusive,
+                                toExclusive,
+                                index -> createRangeHead(index, capturedCell, createdHeads),
+                                label + " immutable-Cell Head phase");
+                        requireRangePopulationCapturedCellUnchanged(
+                                candidate, cellProofLock, capturedCell, cell.get());
+                        for (int index = fromInclusive; index < toExclusive; index++) {
+                            if (Thread.currentThread().isInterrupted()) {
+                                throw new InterruptedException(label + " grant phase was interrupted");
+                            }
+                            if (!reservedForFaultCuts(index)) {
+                                installInitialRangeGrant(index);
+                                installedGrants.incrementAndGet();
+                            }
+                        }
+                    } finally {
+                        proofLock.unlock();
+                    }
+                });
     }
 
-    private void createHeadFromExactCurrentCell(int index) {
+    private void createStrictHead(int index) {
         requireRangePopulationCellIsolation(candidate, cellProofLock);
         int actorId = index & 3;
         VersionedAllocatorCellStateV1 exactCell = cell.get();
         VersionedManagedLedgerAllocatorHeadV1 head = exactCreate(allocator(actorId)
                 .createHead(exactCell, currentView, incarnation(index), INITIAL_OWNER_EPOCH));
-        if (candidate.mode() == AllocatorModeV1.RANGE_LEASED && !reservedForFaultCuts(index)) {
-            VersionedAllocatorCellStateV1 currentCell = cell.get();
-            VersionedAllocatorCellStateV1 reserved = exact(allocator(actorId)
-                    .reserve(currentCell, head, currentView, digest("population-grant:" + index)));
-            cell.set(reserved);
-            head = exact(allocator(actorId).installRangeReservedGrant(reserved, head, currentView));
-            cell.set(exact(allocator(actorId).clearReservation(reserved, head)));
-        }
         heads.set(index, head);
+    }
+
+    private void createRangeHead(
+            int index, VersionedAllocatorCellStateV1 capturedCell, AtomicInteger createdHeads) {
+        int actorId = index & 3;
+        VersionedManagedLedgerAllocatorHeadV1 head = exactCreate(allocator(actorId)
+                .createHead(capturedCell, currentView, incarnation(index), INITIAL_OWNER_EPOCH));
+        heads.set(index, head);
+        createdHeads.incrementAndGet();
+    }
+
+    private void installInitialRangeGrant(int index) {
+        int actorId = index & 3;
+        VersionedManagedLedgerAllocatorHeadV1 head = requireHead(index);
+        VersionedAllocatorCellStateV1 currentCell = cell.get();
+        VersionedAllocatorCellStateV1 reserved = exact(allocator(actorId)
+                .reserve(currentCell, head, currentView, digest("population-grant:" + index)));
+        cell.set(reserved);
+        VersionedManagedLedgerAllocatorHeadV1 installed =
+                exact(allocator(actorId).installRangeReservedGrant(reserved, head, currentView));
+        cell.set(exact(allocator(actorId).clearReservation(reserved, installed)));
+        heads.set(index, installed);
     }
 
     static void requireRangePopulationCellIsolation(
@@ -481,6 +537,19 @@ final class M3CandidateAllocatorPopulation {
         }
     }
 
+    static void requireRangePopulationCapturedCellUnchanged(
+            AllocatorEvidenceCandidateV1 candidate,
+            ReentrantReadWriteLock cellProofLock,
+            Object capturedCell,
+            Object currentCell) {
+        requireRangePopulationCellIsolation(candidate, cellProofLock);
+        Objects.requireNonNull(capturedCell, "capturedCell");
+        Objects.requireNonNull(currentCell, "currentCell");
+        if (candidate.mode() == AllocatorModeV1.RANGE_LEASED && capturedCell != currentCell) {
+            throw new IllegalStateException("RANGE population Head phase mutated its captured exact Cell");
+        }
+    }
+
     private Lock cellProofLock(VersionedManagedLedgerAllocatorHeadV1 head) {
         boolean requiresCellMutation = candidate.mode() == AllocatorModeV1.STRICT_SERIALIZED
                 || head.value().grantId() == 0
@@ -491,6 +560,16 @@ final class M3CandidateAllocatorPopulation {
     private static boolean reservedForFaultCuts(int index) {
         int within10k = index % 10_000;
         return within10k >= 9_936;
+    }
+
+    private static int initialRangeGrantCount(int fromInclusive, int toExclusive) {
+        int count = 0;
+        for (int index = fromInclusive; index < toExclusive; index++) {
+            if (!reservedForFaultCuts(index)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private ProductionVirtualLedgerAllocator allocator(int actorId) {
@@ -513,20 +592,24 @@ final class M3CandidateAllocatorPopulation {
         return Objects.requireNonNull(heads.get(ledgerIndex), "allocator Head population is incomplete");
     }
 
-    private void parallel(int fromInclusive, int toExclusive, IndexedOperation operation) throws Exception {
+    private void parallel(
+            int fromInclusive, int toExclusive, IndexedOperation operation, String label) throws Exception {
         CompletionService<Void> completions = new ExecutorCompletionService<>(workers);
+        List<Future<Void>> submitted = new ArrayList<>(toExclusive - fromInclusive);
         for (int index = fromInclusive; index < toExclusive; index++) {
             int exactIndex = index;
-            completions.submit(() -> {
+            submitted.add(completions.submit(() -> {
                 operation.run(exactIndex);
                 return null;
-            });
+            }));
         }
-        M3BoundedCompletionDrain.await(
-                completions,
-                toExclusive - fromInclusive,
-                POPULATION_DRAIN_TIMEOUT_SECONDS,
-                "allocator population construction");
+        try {
+            M3BoundedCompletionDrain.await(
+                    completions, toExclusive - fromInclusive, POPULATION_DRAIN_TIMEOUT_SECONDS, label);
+        } catch (InterruptedException | TimeoutException failure) {
+            submitted.forEach(future -> future.cancel(true));
+            throw failure;
+        }
     }
 
     private static VirtualLedgerSliceAssignmentV1 assignment(int candidateIndex, String discriminator) {

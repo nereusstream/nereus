@@ -754,10 +754,14 @@ recovery termination refined by
 concurrency scheduling refined by
 [ADR 0101](../decisions/0101-v2-m3-allocator-cell-proof-concurrency-scheduling-amendment.md), and exact JUnit diagnostic
 containment refined without changing the 16-MiB cap by
-[ADR 0102](../decisions/0102-v2-m3-allocator-junit-diagnostic-output-containment-amendment.md). The exact-source
+[ADR 0102](../decisions/0102-v2-m3-allocator-junit-diagnostic-output-containment-amendment.md), with the unchanged
+600-second construction cap and immutable-Cell two-phase RANGE batch refined by
+[ADR 0103](../decisions/0103-v2-m3-allocator-population-construction-batch-scheduling-amendment.md). The exact-source
 `1ef4f108...` matrix passed its one testcase but failed the sealed-evidence task on an oversized 113,519,059-byte
 JUnit XML caused by 970,241 copies of one expected native-harness cleanup WARN. It produced no evaluation, selection,
-or verifier output and remains diagnostic; the later exact source must execute the complete matrix again. Evidence measures the
+or verifier output and remains diagnostic. The following `bd254d24...` run kept JUnit at 1,988 bytes but failed
+RANGE-1024 10k-to-100k construction after 600 seconds, before that candidate's 100k measurement; its partial archives
+also selected nothing. The changed exact source must execute the complete matrix again. Evidence measures the
 maximum sustainable rollover RPS while all bounds hold, includes actual rollover distribution/jitter/storms and native
 Pulsar rollover/append-stall baseline, and keeps performance budgets out of allocator durable identity. Execution
 remains `PLANNED`; these accepted inputs are not a performance PASS.

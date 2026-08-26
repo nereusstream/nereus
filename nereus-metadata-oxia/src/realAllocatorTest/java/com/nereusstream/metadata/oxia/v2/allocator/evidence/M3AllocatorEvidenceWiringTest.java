@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HexFormat;
@@ -48,7 +49,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
@@ -79,6 +82,14 @@ class M3AllocatorEvidenceWiringTest {
             assertThatCode(() -> M3CandidateAllocatorPopulation.requireRangePopulationCellIsolation(
                             AllocatorEvidenceCandidateV1.range(16), cellLock))
                     .doesNotThrowAnyException();
+            Object capturedCell = new Object();
+            assertThatCode(() -> M3CandidateAllocatorPopulation.requireRangePopulationCapturedCellUnchanged(
+                            AllocatorEvidenceCandidateV1.range(16), cellLock, capturedCell, capturedCell))
+                    .doesNotThrowAnyException();
+            assertThatThrownBy(() -> M3CandidateAllocatorPopulation.requireRangePopulationCapturedCellUnchanged(
+                            AllocatorEvidenceCandidateV1.range(16), cellLock, capturedCell, new Object()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("mutated its captured exact Cell");
         } finally {
             cellLock.writeLock().unlock();
         }
@@ -97,6 +108,45 @@ class M3AllocatorEvidenceWiringTest {
                             List.of(first, second)))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("inherited measured metadata latency");
+        }
+    }
+
+    @Test
+    void boundsPopulationConstructionAndReportsExactInterruptedProgress() throws Exception {
+        ExecutorService workers = Executors.newFixedThreadPool(2);
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch interrupted = new CountDownLatch(1);
+        AtomicInteger createdHeads = new AtomicInteger(12_345);
+        AtomicInteger installedGrants = new AtomicInteger(6_789);
+        try {
+            assertThatThrownBy(() -> M3BoundedPopulationConstruction.run(
+                            workers,
+                            Duration.ofMillis(50),
+                            "allocator RANGE_LEASED(1024) population construction 10000->100000",
+                            () -> "headCreates="
+                                    + createdHeads.get()
+                                    + "/90000, initialGrants="
+                                    + installedGrants.get()
+                                    + "/89424",
+                            () -> {
+                                entered.countDown();
+                                try {
+                                    new CountDownLatch(1).await();
+                                } catch (InterruptedException failure) {
+                                    interrupted.countDown();
+                                    throw failure;
+                                }
+                            }))
+                    .isInstanceOf(TimeoutException.class)
+                    .hasMessage(
+                            "allocator RANGE_LEASED(1024) population construction 10000->100000 did not finish "
+                                    + "within 50 milliseconds; headCreates=12345/90000, "
+                                    + "initialGrants=6789/89424");
+            assertThat(entered.getCount()).isZero();
+            assertThat(interrupted.await(5, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            workers.shutdownNow();
+            assertThat(workers.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
         }
     }
 

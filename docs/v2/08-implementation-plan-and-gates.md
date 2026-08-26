@@ -49,7 +49,11 @@ promotion, and Final remain open. ADR 0101 now preserves exact Cell proofs under
 failed `d819500f...` matrix selected no mode. ADR 0102 keeps the immutable 16-MiB JUnit cap after the
 `1ef4f108...` full matrix passed its one testcase but failed sealing because 970,241 identical expected native-harness
 cleanup WARNs expanded the exact XML to 113,519,059 bytes; that run also selected no mode and must be rerun from raw
-execution at the later exact source. No empty task, documentation-only receipt, synthetic Root fixture, diagnostic
+execution at the later exact source. ADR 0103 keeps the 600-second construction cap after the `bd254d24...` rerun
+failed RANGE-1024 10k-to-100k population expansion before any RANGE-1024 100k measurement row. Its diagnostic files
+select nothing. The corrected runner holds one exclusive immutable-Cell construction batch, drains unique Head creates
+in parallel, then executes the unchanged initial grant chains in index order with exact timeout progress. No empty
+task, documentation-only receipt, synthetic Root fixture, diagnostic
 real-service run, or focused local PASS may promote an M3 scenario.
 
 ADR 0015 limits 0.2 to one initial Storage Epoch per Topic Incarnation and no online profile-transition runtime. ADR 0016
