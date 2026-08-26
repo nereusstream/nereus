@@ -357,6 +357,15 @@ SHA-256 is `382de9ab725164ad209f27e9e494e9f0259f09ad811b4b2ff8fd8e533a357a32`. I
 still creates no NACP2, NAEV2, formal campaign evidence, selection, child receipt, or scenario PASS; a selected-mode
 source change requires another freshness rerun before promotion.
 
+The prerequisite was freshened again at exact clean published source
+`520838a05dffe3f421f1001c5023662426b2f631` after the direct-task/dedicated-worktree and `--rerun-tasks`
+enforcement landed. The four real-Oxia diagnostics pass `4/0/0/0`, sealing a 212-byte diagnostic-only NADV2 with
+SHA-256 `4bd6d4feefb7a6e3df05ee0a54b7ab996ad2faf6a158a734d9ac47056d26c0cc`; the exact JUnit SHA-256 is
+`942171e8647e18dcd9719586dc7ecaf9ca3680a1b77d701145e7f2e46a929eef`. The immutable output is preserved under
+`/Users/liusinan/Documents/Codex/2026-08-27/nereus-v2-m3-allocator/diagnostic-v2-520838a0-r1`. It remains a
+diagnostic prerequisite only and supplies no NACP2, NAEV2, campaign evaluation, mode selection, child receipt,
+scenario PASS, or authority to run a full formal campaign.
+
 [ADR 0105](../../../decisions/0105-v2-m3-preselection-evidence-source-lock-amendment.md) versions the typed-evidence
 source-lock contract as `NEREUS_V2_M3_EVIDENCE_SOURCE_LOCKS_V2`. Its `UNSELECTED` state permits exact non-allocator
 child evidence without fabricating a mode, while allocator sealing and Final still require the uniquely qualified
@@ -446,10 +455,16 @@ the generic shared Pulsar checkout default that its own fail-closed script must 
 configuration boundary in both root build and settings; callers may still use the legacy explicit `pulsarCheckout`
 override, but the M3-specific property/environment has precedence.
 
-At exact clean published source `4ca5e3db2abf014772ff906cdfeb90f6b55cb54e`, the no-argument authoritative
-`v2M3SourceCheck` passes end to end in 6 minutes 9 seconds. Its ordinary module phase executes 937 tests across ten
+Direct `realAllocator*`, `*RealAllocator*`, `validateRealAllocatorV2*`, and `sealRealAllocatorV2*` tasks inherit the
+same dedicated-worktree default. The pre-campaign entrypoint additionally forces `--rerun-tasks`, so cached Gradle
+outcomes cannot masquerade as a current-source prerequisite. Four governance tests freeze the byte-stable plan-only
+projection, fresh dedicated pre-campaign execution, the direct-task default, and the fail-closed disabled legacy
+formal entrypoint.
+
+At exact clean published source `520838a05dffe3f421f1001c5023662426b2f631`, the no-argument authoritative
+`v2M3SourceCheck` passes end to end in 6 minutes 7 seconds. Its ordinary module phase executes 937 tests across ten
 modules with zero failure/error/skip and verifies all style gates; it publishes the eleven source-qualified module,
-POM, Gradle-metadata, sources, and BOM closure and compiles an independent consumer. The aggregate also passes 87
+POM, Gradle-metadata, sources, and BOM closure and compiles an independent consumer. The aggregate also passes 91
 non-empty governance contract tests, historical M2 Final immutability and M3 inputs, the 17-test/114-row NWG1 wire
 gate, the 3-test 84-record/240-path mutation gate, and the 7-test 50-trace/21-outcome state gate. This is current-source
 ordinary closure only: it does not execute the prohibited allocator campaign, refresh the formal M2 regression,
@@ -468,8 +483,8 @@ select an allocator mode, promote a scenario, or claim M3 Final.
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | exact `35e6784d...` evidence passes 9/0/0/0 and publishes non-promotable child `1863f293...8f90`, binding the closed eight-row recovery manifest; native U/P children are separately published and post-selection Final-source freshness remains open |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | exact `fc7aa790...` evidence passes 5/0/0/0 and publishes non-promotable child `864fdedc...0c7f`, binding the production-codec 324-byte Object and 434-byte OPEN/TERMINAL Heads; the Kafka native child is separately published and post-selection K freshness remains open |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | exact `53361fe2...` execution seals five closed suites at 41/0/0/0 and 52 source artifacts against dedicated Kafka `323e0351...`, publishing non-promotable child `3dcb5e9e...52dd` with derived totals 82/0/0/0; post-selection freshness remains required and native broker/controller activation remains M6 |
-| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | exact `4c546639...` P execution passes the full module at 140/0/0/0, seals 46/0/0/0 across two closed suites and six source artifacts against dedicated Pulsar `7ff90833...`, and publishes non-promotable child `94084eac...071c` with derived totals 92/0/0/0; ADR-0104's pure V2 schema/planner/validator/selector and 13 focused tests enforce the 288-cell inventory, 13/17/288 execution bounds, descending rates, independently reproved dispositions/conservation, and valid non-promotable NONE/BOTH outcomes without Oxia; the production-neutral bounded workflow preserves request/candidate identity through exact CAS/reread, four-second elapsed/25-ms backoff/64-retry bounds, typed fail-closed outcomes, and post-timeout dispatch rejection without a Java lock; the physical four-actor Runner and production-workflow harness cover queue/cutoff/terminal conservation and concurrency four with one in-flight per actor; strict NACP2/NAEV2/NADV2 checkpoint, evaluation, diagnostic and promotion gates are implemented without enabling the old full path; the latest executed exact `48df1793...` short real-Oxia prerequisite passes 4/0/0/0 and seals diagnostic-only NADV2 `b4250552...88115`; formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open, and no full formal campaign is currently allowed |
-| M3-FINAL | exact-source aggregate and scenario promotion | fail-closed child/final checker and publisher contracts are implemented and the exact `4ca5e3db...` ordinary aggregate passes 87 governance tests plus 937 module tests with zero failure/error/skip; Final remains open and requires the allocator selection child, post-selection current-source M2 and all child freshness, and the exact M3 scenario allowlist |
+| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | exact `4c546639...` P execution passes the full module at 140/0/0/0, seals 46/0/0/0 across two closed suites and six source artifacts against dedicated Pulsar `7ff90833...`, and publishes non-promotable child `94084eac...071c` with derived totals 92/0/0/0; ADR-0104's pure V2 schema/planner/validator/selector and 13 focused tests enforce the 288-cell inventory, 13/17/288 execution bounds, descending rates, independently reproved dispositions/conservation, and valid non-promotable NONE/BOTH outcomes without Oxia; the production-neutral bounded workflow preserves request/candidate identity through exact CAS/reread, four-second elapsed/25-ms backoff/64-retry bounds, typed fail-closed outcomes, and post-timeout dispatch rejection without a Java lock; the physical four-actor Runner and production-workflow harness cover queue/cutoff/terminal conservation and concurrency four with one in-flight per actor; strict NACP2/NAEV2/NADV2 checkpoint, evaluation, diagnostic and promotion gates are implemented without enabling the old full path; the latest executed exact `520838a...` short real-Oxia prerequisite passes 4/0/0/0 and seals diagnostic-only NADV2 `4bd6d4fe...c0cc`; formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open, and no full formal campaign is currently allowed |
+| M3-FINAL | exact-source aggregate and scenario promotion | fail-closed child/final checker and publisher contracts are implemented and the exact `520838a...` ordinary aggregate passes 91 governance tests plus 937 module tests with zero failure/error/skip; Final remains open and requires the allocator selection child, post-selection current-source M2 and all child freshness, and the exact M3 scenario allowlist |
 
 Slice names are execution labels, not new durable wire codes. Implementations may split reviewable commits more
 finely, but may not merge authority, evidence, or promotion boundaries merely to reduce the number of commits.

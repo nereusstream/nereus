@@ -123,9 +123,10 @@ performance-first BookKeeper WAL.
   256-byte Header offsets, 116/104/96/48-byte NWG1 rows, strict code/cap/crypto tables, six-vector/114-component A corpus,
   84-record/240-path B contract, 50-trace C contract, and tiered D evidence boundary. The Header has no node session or
   duplicate class field; `laneId` is the permanent class ID, Object digest is SHA-256/v1 code `1/1`, and all twelve
-  first-satisfied close reasons are distinct. This is documentation-only:
-  production codec/manifests/runners/harnesses, Root/Pointer and `NWKCP1`, Provider/KMS/allocator evidence, scenario
-  promotion, and M3 Final remain `NotStarted`/`PLANNED`.
+  first-satisfied close reasons are distinct. That M3-I0 acceptance was documentation-only; later accepted ADRs and
+  exact-source implementation descendants now supply the production codec/manifests/runners/harnesses,
+  Root/Pointer, `NWKCP1`, and preselection Provider/KMS/native-reference children. Allocator selection, post-selection
+  freshness, scenario promotion, and M3 Final remain open.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and an 11-test formal-runner contract gate now exist. This does not
   change the preceding M3-I0 claim or supply the
@@ -406,8 +407,9 @@ native election adoption, compact descriptor transport, hard-bounded Observed/Ap
 BK/Object protocol checkpoint carriers with a terminal selection Head, without selecting Java structures or numeric
 queue/checkpoint/waiter bounds. M2 owns the BK carrier; M3 owns exact `NWKCP1`; M6 owns native Kafka integration.
 ADR 0088 closes `V2-OPEN-OBJ-17` at the documentation/input layer by freezing the NWG1 v1 structures, caps, crypto,
-golden/mutation/trace contracts, and evidence taxonomy. Its machine projections, immutable bytes, production codec,
-executable gates, receipts, and all M3 scenario evidence remain implementation work.
+golden/mutation/trace contracts, and evidence taxonomy. Later M3 descendants implement its machine projections,
+immutable bytes, production codec, executable ordinary gates, and preselection receipts; allocator selection,
+post-selection freshness, all M3 scenario promotion, and Final remain implementation/evidence work.
 ADR 0089 amends that input before any production NWG1 bytes exist with the gap-free exact 256-byte Header table. It
 retains `wireVersion=1`, removes node session and any duplicate packing-class field from the Header, fixes Object digest
 `SHA-256/v1=1/1` plus close-reason codes `1..12`, and requires the future projection to mechanically transcribe the ADR.
@@ -438,13 +440,12 @@ is implementation conformance only. The production-neutral bounded workflow is n
 Each coordinator fixes request, descriptor, exact Head, and slice-view identity; retries only through exact store CAS/reread;
 and fails closed on owner, slice/context, descriptor, or retry-budget drift without a shared Java lock. Eight focused
 tests cover STRICT/RANGE happy paths, every response-loss stage, two independent coordinator conflict, and one-ID
-consumption. The four-actor Runner/harness and real-Oxia diagnostics remain open, so this still selects nothing.
-The replacement `9f88fbfb...` source passes its one-test 10k RANGE Cell-proof diagnostic with zero
-failure/error/skip. The separate exact-source `e739799f...` diagnostic-only RANGE-1024 10k-to-100k construction guard
-also passes one testcase in 459.537 seconds with zero failure/error/skip and unchanged operation/drain caps. Its
-`SHA256SUMS` SHA-256 is `1161419f12ad18b6402a31c36f42f2f7571a97ecc540f217d562a075d8e85229`. Neither
-diagnostic can select a mode or promote a scenario. Only a completed ADR-0104 V2 campaign may become a future
-selection input, after all pre-campaign gates pass.
+consumption. The bounded four-actor Runner/harness now enforces four independent coordinators, at most one in-flight
+request per lane, physical admission cutoff, exact terminal conservation, and no Java correctness lock. At exact
+clean source `520838a...`, a fresh 246-test offline pre-campaign rerun and the four-test real-Oxia prerequisite pass
+with zero failure/error/skip; the latter seals diagnostic-only NADV2 `4bd6d4fe...c0cc`. Historical V1 Cell-proof and
+construction runs remain immutable diagnostics. None can select a mode or promote a scenario, and no full formal
+campaign is currently authorized.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
