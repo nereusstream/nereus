@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 class M3RealAllocatorEvidenceTest {
     @Test
     void executesCompleteRawMatrixAndAllNineCutsWithoutCallerSelectionInputs() throws Exception {
+        M3AllocatorEvidenceLoggingContract.requireInstalled();
         assertFormalClassOrigins();
         Path outputDirectory = Path.of(M3AllocatorRawEvidenceFiles.requiredProperty("outputDirectory"));
         String serviceAddress = M3AllocatorRawEvidenceFiles.requiredProperty("oxiaServiceAddress");

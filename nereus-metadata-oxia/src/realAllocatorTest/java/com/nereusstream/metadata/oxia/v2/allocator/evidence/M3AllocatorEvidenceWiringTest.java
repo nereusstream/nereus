@@ -60,6 +60,11 @@ class M3AllocatorEvidenceWiringTest {
     private static final Pattern SELF_SHA = Pattern.compile("\\\"selfSha256\\\":\\\"([0-9a-f]{64})\\\"");
 
     @Test
+    void installsOnlyTheExpectedNativeHarnessCleanupWarningFilter() {
+        assertThatCode(M3AllocatorEvidenceLoggingContract::requireInstalled).doesNotThrowAnyException();
+    }
+
+    @Test
     void isolatesRangePopulationExactCellAndRejectsInjectedConstructionLatency() throws Exception {
         ReentrantReadWriteLock cellLock = new ReentrantReadWriteLock(true);
         assertThatCode(() -> M3CandidateAllocatorPopulation.requireRangePopulationCellIsolation(

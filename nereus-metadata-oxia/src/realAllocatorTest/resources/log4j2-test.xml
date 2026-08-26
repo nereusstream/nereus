@@ -6,6 +6,20 @@
     </Console>
   </Appenders>
   <Loggers>
+    <!--
+      The exact native-Pulsar harness deliberately releases closed mock-ledger payloads before
+      ManagedLedger performs its later asynchronous delete. That second delete returns the
+      production NoSuchLedger outcome and emits this one expected WARN once per rollover. Keep
+      every other WARN and every ERROR visible in the exact Gradle JUnit attachment while
+      preventing nearly one million identical harness-cleanup lines from exceeding NAEA1's
+      immutable 16-MiB JUnit bound.
+    -->
+    <Logger name="org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl" level="WARN" additivity="true">
+      <Filters>
+        <LevelMatchFilter level="WARN" onMatch="NEUTRAL" onMismatch="ACCEPT"/>
+        <RegexFilter regex="^Ledger was already deleted$" onMatch="DENY" onMismatch="NEUTRAL"/>
+      </Filters>
+    </Logger>
     <Root level="WARN">
       <AppenderRef ref="Console"/>
     </Root>

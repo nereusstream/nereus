@@ -361,6 +361,7 @@ Accepted decisions:
 - [ADR 0098: M3 current-source M2 regression prerequisite projection](../decisions/0098-v2-m3-current-source-m2-regression-prerequisite-projection.md)
 - [ADR 0100: M3 allocator mass-takeover recovery endpoint amendment](../decisions/0100-v2-m3-allocator-mass-takeover-recovery-endpoint-amendment.md)
 - [ADR 0101: M3 allocator Cell-proof concurrency scheduling amendment](../decisions/0101-v2-m3-allocator-cell-proof-concurrency-scheduling-amendment.md)
+- [ADR 0102: M3 allocator JUnit diagnostic-output containment amendment](../decisions/0102-v2-m3-allocator-junit-diagnostic-output-containment-amendment.md)
 
 ## Open design gates
 
@@ -414,6 +415,9 @@ keys, and receipt-only exact-source activation. Its 27 local tests and determini
 real/native 10k/100k evidence. `V2-OPEN-PUL-OBJ-09` remains open for exact RANGE-size and at-most-one-mode selection.
 ADR 0101 retains the exact-current-Cell proof while giving installed RANGE paths a shared proof phase and Cell-mutating
 grant chains an exclusive measured phase; its focused/diagnostic gates cannot substitute for the complete raw matrix.
+ADR 0102 retains the fixed 16-MiB JUnit cap and filters only the exact expected native-harness cleanup WARN while
+preserving every other WARN and all ERROR output. The passed-test/failed-seal `1ef4f108...` matrix is diagnostic only,
+selected no mode, and cannot be resealed after the runner source changed.
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.

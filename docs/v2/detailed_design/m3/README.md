@@ -233,6 +233,22 @@ its `SHA256SUMS` SHA-256 is `68a4e4188e610bf8413c4256cf91446adbeb39a591fcf57ef9f
 receipt, covers neither 100k nor native/throughput rows, selects no mode, and promotes no scenario. The complete matrix
 is still the only selection input.
 
+The following complete five-candidate matrix at exact clean source
+`1ef4f108307cb95a06fd5c55950b041eebadc813` then executed for 15,462.505 testcase seconds and returned exactly one
+test with zero failure/error/skip. Sealing still failed closed: Gradle's exact JUnit XML was 113,519,059 bytes, of
+which 113,518,209 bytes were `system-out` containing 970,241 copies of the expected native-harness cleanup warning
+`ManagedLedgerImpl - Ledger was already deleted`. The fixed 16-MiB NAEA1 JUnit cap rejected it, so no
+`evaluation.json`, `selection.nars`, or `raw-verification.json` exists and no mode or RANGE size was selected. The
+closed diagnostic directory is
+`/Users/liusinan/Documents/Codex/2026-08-26/nereus-v2-m3-allocator/full-matrix-1ef4f108-r5`; all ten listed files
+rehash against `SHA256SUMS`, whose SHA-256 is
+`5d896755fb3434539e5817105bc871e2004124f431405bc92648ffe02c8a573d`.
+[ADR 0102](../../../decisions/0102-v2-m3-allocator-junit-diagnostic-output-containment-amendment.md) leaves the cap,
+parser, workload, SLOs, and selection rule unchanged. The exact runner now rejects only that exact WARN/message pair,
+retains every other WARN and every ERROR, and verifies the active Log4j decisions before constructing a population.
+The focused contract passes 12 tests with zero failure/error/skip. Because the runner artifact digest changed, r5 raw
+archives cannot be resealed or reused; the complete matrix must execute again at the later exact clean source.
+
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
 `NEREUS_V2_M3_D1_LOCAL_CAP_RESULT_V1` payload with CREATE_NEW after the runner hashes the harness, its test, and all
@@ -241,7 +257,7 @@ generic child publisher and reparses the local result through the governed valid
 allocation-free analytical format-cap conformance, claims no Provider transfer, and cannot substitute for the
 separate fixed-digest C1 Provider/KMS evidence.
 
-Serial continuation order is allocator concurrency repair and raw mode selection, source-lock closure and formal
+Serial continuation order is allocator exact-output containment and raw mode selection, source-lock closure and formal
 allocator evidence, the remaining child receipts, then final-source Provider/KMS and M2 regression freshness,
 scenario synchronization, and M3 Final.
 Each stable boundary must be committed and pushed before the next evidence-bearing boundary is evaluated.
@@ -259,7 +275,7 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; Kafka/Pulsar backend integration and dedicated-fork compile checkpoints pass, while formal Provider/KMS receipts remain open |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | Kafka source implemented; local 260-test module check covers strict wire/key/caps, OPEN/TERMINAL Head, backend mapping and bounded recovery; the dedicated fork now compiles against the split F9/M3 artifact inputs with 6/6 tests, while the final source-qualified native receipt remains open |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | Kafka source implemented and locally tested, including one-fence owner-open staging and whole-suffix rollback; the dedicated-fork dual-repository compile checkpoint passes 6/6 tests, but a source-qualified receipt remains open and native broker/controller activation remains M6 |
-| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; allocator production/evidence code and its ordinary 48-test inventory pass, while the 11-test runner contract enforces ADR 0101 Cell-proof scheduling; ADRs 0091/0094/0097/0100/0101 freeze the wire, raw workload/SLO/selection, reproducible image, recovery endpoint, and concurrency schedule, but the formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open |
+| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | local Nereus Object-WAL/controller implementation is committed at `bc8691a636456cef48119ded637ea027679b0903` and its 140-test module gate passes; dedicated Pulsar branch `7ff908330809f2e9bc5c69ead87bb85c566bc0a9` passes its 5-test native-boundary compile checkpoint; allocator production/evidence code and its ordinary 48-test inventory pass, while the 12-test runner contract enforces ADR 0101 Cell-proof scheduling and ADR 0102 exact diagnostic containment; ADRs 0091/0094/0097/0100..0102 freeze the wire, raw workload/SLO/selection, reproducible image, recovery endpoint, concurrency schedule, and JUnit cap boundary, but the formal real/native 10k/100k receipt, RANGE size, mode selection, and scenario PASS remain open |
 | M3-FINAL | exact-source aggregate and scenario promotion | fail-closed child/final checker and publisher contracts are implemented and their 74 governance tests pass; Final remains open and requires all owned slices, current-source M2 regression, real Provider/KMS/allocator evidence, and the exact M3 scenario allowlist |
 
 Slice names are execution labels, not new durable wire codes. Implementations may split reviewable commits more

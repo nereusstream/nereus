@@ -46,7 +46,10 @@ regression checkpoint. D1 now has an exact-source six-test/six-record local-cap 
 the harness, test, and six component sources and explicitly claims no Provider transfer; it remains separate from C1
 real Provider/KMS evidence. Formal final-source D1/C1/allocator receipts, final-source W1 freshness, scenario
 promotion, and Final remain open. ADR 0101 now preserves exact Cell proofs under concurrent RANGE renewal after the
-failed `d819500f...` matrix selected no mode. No empty task, documentation-only receipt, synthetic Root fixture, diagnostic
+failed `d819500f...` matrix selected no mode. ADR 0102 keeps the immutable 16-MiB JUnit cap after the
+`1ef4f108...` full matrix passed its one testcase but failed sealing because 970,241 identical expected native-harness
+cleanup WARNs expanded the exact XML to 113,519,059 bytes; that run also selected no mode and must be rerun from raw
+execution at the later exact source. No empty task, documentation-only receipt, synthetic Root fixture, diagnostic
 real-service run, or focused local PASS may promote an M3 scenario.
 
 ADR 0015 limits 0.2 to one initial Storage Epoch per Topic Incarnation and no online profile-transition runtime. ADR 0016
