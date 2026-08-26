@@ -424,6 +424,10 @@ while expanding RANGE-1024 from 10k to 100k. Its immutable diagnostic selected n
 now runs one exclusive batch: immutable unique-Head creates drain in parallel before the unchanged index-ordered
 reserve/install/clear chains begin. Exact progress is reported on timeout, but no construction counter is selection
 authority.
+The replacement `9f88fbfb...` source passes its one-test 10k RANGE Cell-proof diagnostic with zero
+failure/error/skip. A separate diagnostic-only RANGE-1024 100k construction task now guards the exact r6 timeout seam
+before the next complete matrix; neither diagnostic can select a mode or promote a scenario.
+
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.

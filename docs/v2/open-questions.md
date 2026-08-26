@@ -764,7 +764,9 @@ RANGE-1024 10k-to-100k construction after 600 seconds, before that candidate's 1
 also selected nothing. The changed exact source must execute the complete matrix again. Evidence measures the
 maximum sustainable rollover RPS while all bounds hold, includes actual rollover distribution/jitter/storms and native
 Pulsar rollover/append-stall baseline, and keeps performance budgets out of allocator durable identity. Execution
-remains `PLANNED`; these accepted inputs are not a performance PASS.
+remains `PLANNED`; the `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes, and the source now exposes a separate
+diagnostic-only RANGE-1024 100k construction guard before the next complete matrix, but neither result is a performance
+PASS or a selection input.
 
 ### `V2-OPEN-PUL-MIGRATION-01`: new incarnation or HybridManagedLedger
 

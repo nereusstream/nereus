@@ -491,6 +491,31 @@ tasks.register<Test>("realAllocatorRangeCellProofDiagnosticTest") {
     )
 }
 
+tasks.register<Test>("realAllocatorRange100kConstructionDiagnosticTest") {
+    group = "verification"
+    description = "Run diagnostic-only RANGE-1024 construction through 100k Heads against real Oxia."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    testClassesDirs = realAllocatorTest.output.classesDirs
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence." +
+                "M3RealAllocatorRange100kConstructionDiagnosticTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    systemProperty(
+        "nereus.m3.allocator.oxiaServiceAddress",
+        providers.gradleProperty("v2M3AllocatorOxiaServiceAddress").getOrElse("UNSET"),
+    )
+    systemProperty(
+        "nereus.m3.allocator.nereusSourceCommit",
+        providers.gradleProperty("v2M3AllocatorNereusSourceCommit").getOrElse("UNSET"),
+    )
+}
+
 tasks.register<Test>("realAllocatorRangeFaultBatchDiagnosticTest") {
     group = "verification"
     description = "Run the diagnostic-only 10k RANGE-16 nine-cut batch against real Oxia without emitting evidence."

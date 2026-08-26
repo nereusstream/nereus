@@ -267,6 +267,19 @@ progress is diagnostic-only and the owned batch is interrupted/cancelled. The fr
 tests with zero failure/error/skip. r6 remains non-promotable and the complete matrix must rerun at the changed exact
 source.
 
+At the committed/pushed replacement source `9f88fbfb115e35d1e41ab8aacedeb0a1233fca0e`, the diagnostic-only 10k
+RANGE-16 Cell-proof task passes its one testcase in 49.909 seconds with zero failure/error/skip against the exact real
+Oxia image. Gradle completed successfully in 1 minute 3 seconds. The outer zsh wrapper then failed only while reading
+the Bash-specific `PIPESTATUS`; orchestration records `wrapperExitCode=1`, preserves the exact successful Gradle log
+and JUnit, and records exact manual removal of the task-owned container. The four listed files rehash under
+`/Users/liusinan/Documents/Codex/2026-08-26/nereus-v2-m3-allocator/diagnostic-range-cell-proof-9f88fbfb-r2`, whose
+`SHA256SUMS` SHA-256 is `ce8cd001d7b48675daeddd8b56eac39e9f3b3c4546df96187980bec1b3db0d47`. This remains
+10k diagnostic-only coverage and selects nothing. A separate
+`realAllocatorRange100kConstructionDiagnosticTest` now exercises RANGE-1024 through the exact 10k-to-100k
+construction boundary with the same production SPI, real Oxia adapter, and unchanged caps, while emitting no NAEA1,
+selection, receipt, or scenario result. That probe and then the complete formal matrix must still run at their exact
+clean sources.
+
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
 `NEREUS_V2_M3_D1_LOCAL_CAP_RESULT_V1` payload with CREATE_NEW after the runner hashes the harness, its test, and all

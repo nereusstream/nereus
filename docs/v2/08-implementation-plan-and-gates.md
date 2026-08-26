@@ -55,6 +55,9 @@ select nothing. The corrected runner holds one exclusive immutable-Cell construc
 in parallel, then executes the unchanged initial grant chains in index order with exact timeout progress. No empty
 task, documentation-only receipt, synthetic Root fixture, diagnostic
 real-service run, or focused local PASS may promote an M3 scenario.
+The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
+non-promotable. A dedicated RANGE-1024 10k-to-100k construction-only task now guards the former r6 failure boundary
+before another complete matrix; it also emits no selection input or receipt.
 
 ADR 0015 limits 0.2 to one initial Storage Epoch per Topic Incarnation and no online profile-transition runtime. ADR 0016
 excludes Kafka/Pulsar Access Projection and Migration Link runtime. Their future state machines, Pulsar
