@@ -113,7 +113,10 @@ evidence. Exact `35e6784d...` R evidence subsequently passes 9/0/0/0 and publish
 child remain open at that source boundary. Exact `53361fe2...` U evidence subsequently seals the five closed Kafka
 Object-WAL suites at 41/0/0/0, all 52 source artifacts, and dedicated Kafka commit `323e0351...`; its independent
 JUnit/native wrappers publish non-promotable child `3dcb5e9e...52dd` with derived totals 82/0/0/0. Post-selection U
-freshness, Pulsar native evidence, allocator selection, and M6 native activation remain open.
+freshness remains required. Exact `4c546639...` P evidence then passes the full Pulsar offload module at 140/0/0/0,
+seals its two closed suites at 46/0/0/0 with six source artifacts against dedicated Pulsar `7ff90833...`, and
+publishes non-promotable child `94084eac...071c` with derived totals 92/0/0/0. Post-selection P freshness, allocator
+selection, and M6 native activation remain open.
 
 ADR 0105 versions M3 typed-evidence source locks so the current preselection state is explicitly `UNSELECTED`.
 Non-allocator children may bind the exact M3 Kafka/Pulsar branches and fixed Provider/KMS artifacts in that state,
