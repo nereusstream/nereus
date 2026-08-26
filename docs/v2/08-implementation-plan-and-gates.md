@@ -123,6 +123,10 @@ Non-allocator children may bind the exact M3 Kafka/Pulsar branches and fixed Pro
 but allocator sealing and M3 Final require a uniquely qualified `STRICT` or `RANGE` mode. The mode transition changes
 production source and therefore forces fresh Final-source child receipts; it cannot reuse preselection receipts.
 
+Exact `c27c2f3f...` C2 evidence-only execution passes 1/0/0/0 and publishes non-promotable child
+`b55114e4...485e`. It carries no independent benefit evidence, remains outside the production allowlist, cannot
+substitute for C1, and promotes no scenario; its presence closes only the required Final child inventory shape.
+
 ADR 0015 limits 0.2 to one initial Storage Epoch per Topic Incarnation and no online profile-transition runtime. ADR 0016
 excludes Kafka/Pulsar Access Projection and Migration Link runtime. Their future state machines, Pulsar
 BookKeeper/Object profile transition, and KoP therefore remain outside the 0.2 implementation plan; their deferred
