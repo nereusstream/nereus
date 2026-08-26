@@ -12,6 +12,7 @@ import unittest
 ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "scripts" / "run-v2-m3-real-allocator-evidence.sh"
 SETTINGS = ROOT / "settings.gradle.kts"
+ROOT_BUILD = ROOT / "build.gradle.kts"
 
 
 class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
@@ -88,6 +89,7 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         settings = SETTINGS.read_text()
         for token in (
             'task.startsWith("realAllocator")',
+            'task.startsWith("v2M3Allocator")',
             'task.contains("RealAllocator")',
             'task.startsWith("validateRealAllocatorV2")',
             'task.startsWith("sealRealAllocatorV2")',
@@ -111,6 +113,18 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertEqual("", result.stdout)
         self.assertIn("full allocator execution is disabled", result.stderr)
         self.assertIn("immutable V1 runner", result.stderr)
+
+    def test_allocator_child_gate_defaults_to_v2_and_keeps_v1_compatibility_separate(self) -> None:
+        source = ROOT_BUILD.read_text()
+        v2_block = source.split('tasks.register<Exec>("v2M3AllocatorV2VerificationSeal")', 1)[1]
+        v2_block = v2_block.split('tasks.register("v2M3AllocatorV1CompatibilityCheck")', 1)[0]
+        self.assertIn('dependsOn(":nereus-metadata-oxia:realAllocatorV2PromotionCheck")', v2_block)
+        self.assertIn('"--seal-allocator-v2-verification"', v2_block)
+        self.assertIn('"--allocator-v2-execution-attachment"', v2_block)
+        default_block = source.split('tasks.register("v2M3AllocatorCheck")', 1)[1]
+        default_block = default_block.split('val v2M3LocalCapEvidenceOutputDirectory', 1)[0]
+        self.assertIn('dependsOn("v2M3AllocatorV2VerificationSeal")', default_block)
+        self.assertNotIn('dependsOn("v2M3AllocatorVerificationSeal")', default_block)
 
 
 if __name__ == "__main__":

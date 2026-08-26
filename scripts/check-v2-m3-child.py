@@ -100,6 +100,8 @@ ALLOCATOR_DERIVED_KINDS = {
     "ALLOCATOR_SCALE_10000_SUMMARY",
     "ALLOCATOR_SCALE_100000_SUMMARY",
 }
+ALLOCATOR_V1_AUTHORITY_ATTACHMENTS = set(FINAL.ALLOCATOR_V1_AUTHORITY_ATTACHMENTS)
+ALLOCATOR_V2_AUTHORITY_ATTACHMENTS = set(FINAL.ALLOCATOR_V2_AUTHORITY_ATTACHMENTS)
 REAL_RECEIPT_KINDS = {"PROVIDER_REAL_RECEIPT", "KMS_REAL_RECEIPT"}
 
 REAL_PROVIDER_BACKENDS = {
@@ -414,6 +416,28 @@ ALLOCATOR_VERIFIER_TEST_CLASS = (
 )
 ALLOCATOR_VERIFIER_TEST_CASE = "recomputesNarsNaeaJunitAndExactSourceArtifacts()"
 ALLOCATOR_VERIFICATION_MAX_BYTES = 2 * 1024 * 1024
+ALLOCATOR_V2_VERIFICATION_SCHEMA = (
+    "NEREUS_V2_M3_GOVERNED_ALLOCATOR_CAMPAIGN_VERIFICATION_V2"
+)
+ALLOCATOR_V2_PROMOTION_SCHEMA = "NEREUS_V2_M3_ALLOCATOR_PROMOTION_DECISION_V2"
+ALLOCATOR_V2_VERIFICATION_MAX_BYTES = 48 * 1024 * 1024
+ALLOCATOR_V2_CHECKPOINT_MAX_BYTES = 2 * 1024 * 1024
+ALLOCATOR_V2_JUNIT_MAX_BYTES = 16 * 1024 * 1024
+ALLOCATOR_V2_EXTERNAL_MAX_BYTES = 16 * 1024 * 1024
+ALLOCATOR_V2_MAX_EXTERNAL_ATTACHMENTS = 328
+ALLOCATOR_V2_NAEV_BYTES = 284
+ALLOCATOR_V2_NADV_BYTES = 212
+ALLOCATOR_V2_CANDIDATES = tuple(range(6))
+ALLOCATOR_V2_POPULATIONS = (10_000, 100_000)
+ALLOCATOR_V2_LATENCIES_MILLIS = (1, 5, 10, 25)
+ALLOCATOR_V2_DESCENDING_RATES = (1000, 750, 500, 333, 250, 200)
+ALLOCATOR_V2_LONG_MAX = (1 << 63) - 1
+ALLOCATOR_V2_DIAGNOSTIC_TESTS = {
+    "strictWorkflowUsesRealOxia()",
+    "installedRangeReusesGrant()",
+    "rangeRenewalUsesCellCas()",
+    "conflictStormUsesFourIndependentCoordinators()",
+}
 ALLOCATOR_NAEA_HEADER_BYTES = 360
 ALLOCATOR_NAEA_MAX_BYTES = (8 << 30) + ALLOCATOR_NAEA_HEADER_BYTES
 ALLOCATOR_SOURCE_ARTIFACT_MAX_BYTES = 2 << 30
@@ -439,6 +463,22 @@ ALLOCATOR_EXTERNAL_NAMES = (
     "sourceLocks",
     "testedEvidenceArtifact",
 )
+
+
+def allocator_authority_profile(kinds: set[str]) -> str:
+    v1 = kinds.intersection(ALLOCATOR_V1_AUTHORITY_ATTACHMENTS)
+    v2 = kinds.intersection(ALLOCATOR_V2_AUTHORITY_ATTACHMENTS)
+    if v2:
+        if v2 != ALLOCATOR_V2_AUTHORITY_ATTACHMENTS or v1:
+            raise ChildError(
+                "allocator child mixes or incompletely supplies V1/V2 authority attachments"
+            )
+        return "V2"
+    if v1 != ALLOCATOR_V1_AUTHORITY_ATTACHMENTS:
+        raise ChildError(
+            "allocator child lacks one complete V1 or V2 authority attachment profile"
+        )
+    return "V1"
 PULSAR_NATIVE_COMMAND = (
     "./gradlew :nereus-pulsar-offload:test :nereus-pulsar-offload:spotlessCheck "
     ":nereus-pulsar-offload:checkstyleMain :nereus-pulsar-offload:checkstyleTest"
@@ -1035,7 +1075,14 @@ def source_bindings(
     expected_keys = sorted(
         (child_kind, evidence_kind)
         for child_kind, kinds in FINAL.REQUIRED_TYPED_ATTACHMENTS.items()
-        for evidence_kind in kinds
+        for evidence_kind in (
+            kinds
+            | (
+                ALLOCATOR_DERIVED_KINDS
+                if child_kind == "ALLOCATOR_SELECTION"
+                else set()
+            )
+        )
         if evidence_kind in NORMALIZED_TYPED_KINDS
     )
     rows = policy["bindings"]
@@ -2844,6 +2891,909 @@ def validate_allocator_verification(
     )
 
 
+class _AllocatorV2Cursor:
+    def __init__(self, raw: bytes, label: str) -> None:
+        self.raw = raw
+        self.label = label
+        self.offset = 0
+
+    def take(self, count: int) -> bytes:
+        if count < 0 or self.offset + count > len(self.raw):
+            raise ChildError(f"{self.label} is truncated")
+        value = self.raw[self.offset : self.offset + count]
+        self.offset += count
+        return value
+
+    def unsigned(self, width: int) -> int:
+        return int.from_bytes(self.take(width), "big", signed=False)
+
+    def nonnegative_long(self) -> int:
+        value = self.unsigned(8)
+        if value > ALLOCATOR_V2_LONG_MAX:
+            raise ChildError(f"{self.label} contains a negative Java long")
+        return value
+
+    def finish(self) -> None:
+        if self.offset != len(self.raw):
+            raise ChildError(f"{self.label} has trailing bytes")
+
+
+def _allocator_v2_logical_cells() -> list[dict[str, int]]:
+    cells: list[dict[str, int]] = []
+    for candidate in ALLOCATOR_V2_CANDIDATES:
+        base = 0 if candidate == 0 else 48 + (candidate - 1) * 48
+        for population_index, population in enumerate(ALLOCATOR_V2_POPULATIONS):
+            for latency_index, latency in enumerate(ALLOCATOR_V2_LATENCIES_MILLIS):
+                for rate, rate_index in zip(
+                    ALLOCATOR_V2_DESCENDING_RATES, (5, 4, 3, 2, 1, 0), strict=True
+                ):
+                    cells.append(
+                        {
+                            "candidate": candidate,
+                            "contextId": base
+                            + population_index * 24
+                            + latency_index * 6
+                            + rate_index,
+                            "latency": latency,
+                            "population": population,
+                            "rate": rate,
+                        }
+                    )
+    context_ids = [cell["contextId"] for cell in cells]
+    if len(context_ids) != 288 or len(set(context_ids)) != 288:
+        raise AssertionError("allocator V2 logical context inventory differs")
+    return cells
+
+
+def _allocator_v2_context_ids() -> list[int]:
+    return [cell["contextId"] for cell in _allocator_v2_logical_cells()]
+
+
+def _allocator_v2_rows(candidate: int) -> list[tuple[int, int, int]]:
+    return [
+        (candidate, population, latency)
+        for population in ALLOCATOR_V2_POPULATIONS
+        for latency in ALLOCATOR_V2_LATENCIES_MILLIS
+    ]
+
+
+def _allocator_v2_complete_zero_failure(observation: dict[str, Any]) -> bool:
+    cell = observation["cell"]
+    values = observation["values"]
+    expected = cell["rate"] * 30
+    return (
+        values[0] == expected
+        and values[1] == expected
+        and values[2] == 0
+        and values[3] == expected
+        and values[4] == 0
+        and values[5] == 0
+        and all(values[index] == 0 for index in (7, 8, 9, 10, 11, 18, 19, 20))
+    )
+
+
+def _allocator_v2_absolute_candidate_bounds_pass(observation: dict[str, Any]) -> bool:
+    cell = observation["cell"]
+    values = observation["values"]
+    return (
+        _allocator_v2_complete_zero_failure(observation)
+        and values[12] <= 250_000
+        and values[13] <= 250_000
+        and values[14] <= 1_000_000
+        and values[15] <= 2 * cell["rate"]
+        and values[16] <= 2_000_000
+        and values[17] <= 2_000_000
+    )
+
+
+def _allocator_v2_fault_bounds_pass(observation: dict[str, Any]) -> bool:
+    population = observation["row"][1]
+    values = observation["values"]
+    recovery_bound = 30_000_000 if population == 10_000 else 60_000_000
+    return (
+        observation["cuts"] == 0x1FF
+        and all(values[index] == 0 for index in range(8))
+        and values[8] <= 1
+        and values[9] <= recovery_bound
+    )
+
+
+class _AllocatorV2Planner:
+    """Independent Python transcription of AllocatorCampaignPlannerV2."""
+
+    def __init__(self) -> None:
+        self.cells = _allocator_v2_logical_cells()
+        self.cell_by_context = {cell["contextId"]: cell for cell in self.cells}
+        self.native_rows = _allocator_v2_rows(0)
+        self.native_results: dict[tuple[int, int, int], dict[str, Any]] = {}
+        self.dispositions: list[tuple[int, int, tuple[int, ...]]] = []
+        self.disposition_contexts: set[int] = set()
+        self.qualified_candidates: list[int] = []
+        self.current_row_contexts: list[int] = []
+        self.current_candidate_qualification_contexts: list[int] = []
+        self.phase = "NATIVE"
+        self.native_row_index = 0
+        self.native_rate_index = 0
+        self.candidate = 1
+        self.candidate_row_index = 0
+        self.candidate_eligible_rate_index = 0
+        self.candidate_eliminated = False
+        self.elimination_dependency: int | None = None
+        self.pending_sustainable: dict[str, Any] | None = None
+        self.executed_performance_cells = 0
+
+    def _cell(self, candidate: int, population: int, latency: int, rate: int) -> dict[str, int]:
+        base = 0 if candidate == 0 else 48 + (candidate - 1) * 48
+        population_index = ALLOCATOR_V2_POPULATIONS.index(population)
+        latency_index = ALLOCATOR_V2_LATENCIES_MILLIS.index(latency)
+        rate_index = (5, 4, 3, 2, 1, 0)[ALLOCATOR_V2_DESCENDING_RATES.index(rate)]
+        return self.cell_by_context[
+            base + population_index * 24 + latency_index * 6 + rate_index
+        ]
+
+    def _disposition(
+        self, cell: dict[str, int], kind: int, dependencies: list[int] | tuple[int, ...]
+    ) -> None:
+        context = cell["contextId"]
+        if context in self.disposition_contexts:
+            raise ChildError("allocator V2 deterministic planner produced a duplicate disposition")
+        self.disposition_contexts.add(context)
+        self.dispositions.append((context, kind, tuple(dependencies)))
+
+    @staticmethod
+    def _eligible_rates(native_sustainable_rate: int) -> list[int]:
+        eligible = [
+            rate
+            for rate in ALLOCATOR_V2_DESCENDING_RATES
+            if rate * 100 >= native_sustainable_rate * 80
+        ]
+        if not eligible:
+            raise ChildError("allocator V2 native sustainable rate has no relative candidate rate")
+        return eligible
+
+    def next_action(self) -> tuple[str, Any] | None:
+        while True:
+            if self.phase == "COMPLETE":
+                return None
+            if self.phase == "NATIVE":
+                if self.native_row_index == len(self.native_rows):
+                    self.phase = "CANDIDATE"
+                    continue
+                _, population, latency = self.native_rows[self.native_row_index]
+                return (
+                    "interval",
+                    self._cell(
+                        0,
+                        population,
+                        latency,
+                        ALLOCATOR_V2_DESCENDING_RATES[self.native_rate_index],
+                    ),
+                )
+            if self.candidate >= len(ALLOCATOR_V2_CANDIDATES):
+                self.phase = "COMPLETE"
+                continue
+            rows = _allocator_v2_rows(self.candidate)
+            if self.candidate_eliminated:
+                self._disposition_remaining_candidate(rows)
+                self._advance_candidate()
+                continue
+            if self.candidate_row_index == len(rows):
+                self.qualified_candidates.append(self.candidate)
+                if self.candidate >= 2:
+                    self._disposition_larger_ranges()
+                    self.phase = "COMPLETE"
+                else:
+                    self._advance_candidate()
+                continue
+            _, population, latency = rows[self.candidate_row_index]
+            native_result = self.native_results.get((0, population, latency))
+            if native_result is None:
+                raise ChildError("allocator V2 candidate row precedes its native baseline")
+            if native_result["sustainableRate"] == 0:
+                for rate in ALLOCATOR_V2_DESCENDING_RATES:
+                    self._disposition(
+                        self._cell(self.candidate, population, latency, rate),
+                        3,
+                        native_result["executedContexts"],
+                    )
+                self.candidate_eliminated = True
+                self.elimination_dependency = native_result["executedContexts"][-1]
+                self.candidate_row_index += 1
+                continue
+            if self.pending_sustainable is not None:
+                return ("fault", (self.candidate, population, latency))
+            eligible = self._eligible_rates(native_result["sustainableRate"])
+            self._disposition_rates_below_floor(population, latency, native_result, eligible)
+            return (
+                "interval",
+                self._cell(
+                    self.candidate,
+                    population,
+                    latency,
+                    eligible[self.candidate_eligible_rate_index],
+                ),
+            )
+
+    def accept(self, observation: dict[str, Any]) -> None:
+        if observation["tag"] == "interval":
+            self.executed_performance_cells += 1
+            self.current_row_contexts.append(observation["cell"]["contextId"])
+            if self.phase == "NATIVE":
+                self._accept_native(observation)
+            elif self.phase == "CANDIDATE":
+                self._accept_candidate(observation)
+            else:
+                raise ChildError("allocator V2 interval occurs after campaign completion")
+            return
+        if self.pending_sustainable is None:
+            raise ChildError("allocator V2 fault row has no sustainable interval dependency")
+        dependency = self.pending_sustainable["cell"]["contextId"]
+        if not _allocator_v2_fault_bounds_pass(observation):
+            self._eliminate_candidate(dependency)
+            return
+        self.current_candidate_qualification_contexts.append(dependency)
+        self.candidate_row_index += 1
+        self.candidate_eligible_rate_index = 0
+        self.pending_sustainable = None
+        self.current_row_contexts.clear()
+
+    def _accept_native(self, observation: dict[str, Any]) -> None:
+        cell = observation["cell"]
+        if _allocator_v2_complete_zero_failure(observation):
+            for lower_index in range(
+                self.native_rate_index + 1, len(ALLOCATOR_V2_DESCENDING_RATES)
+            ):
+                self._disposition(
+                    self._cell(0, cell["population"], cell["latency"], ALLOCATOR_V2_DESCENDING_RATES[lower_index]),
+                    0,
+                    [cell["contextId"]],
+                )
+            self.native_results[(0, cell["population"], cell["latency"])] = {
+                "appendStallP99Micros": observation["values"][17],
+                "executedContexts": list(self.current_row_contexts),
+                "sustainableRate": cell["rate"],
+            }
+            self._advance_native_row()
+        elif self.native_rate_index + 1 == len(ALLOCATOR_V2_DESCENDING_RATES):
+            self.native_results[(0, cell["population"], cell["latency"])] = {
+                "appendStallP99Micros": 0,
+                "executedContexts": list(self.current_row_contexts),
+                "sustainableRate": 0,
+            }
+            self._advance_native_row()
+        else:
+            self.native_rate_index += 1
+
+    def _accept_candidate(self, observation: dict[str, Any]) -> None:
+        cell = observation["cell"]
+        native_result = self.native_results[(0, cell["population"], cell["latency"])]
+        eligible = self._eligible_rates(native_result["sustainableRate"])
+        if not _allocator_v2_absolute_candidate_bounds_pass(observation):
+            if self.candidate_eligible_rate_index + 1 < len(eligible):
+                self.candidate_eligible_rate_index += 1
+                return
+            self._eliminate_candidate(cell["contextId"])
+            return
+        for lower_index in range(self.candidate_eligible_rate_index + 1, len(eligible)):
+            self._disposition(
+                self._cell(
+                    cell["candidate"],
+                    cell["population"],
+                    cell["latency"],
+                    eligible[lower_index],
+                ),
+                2,
+                [cell["contextId"]],
+            )
+        if observation["values"][17] > native_result["appendStallP99Micros"] + 250_000:
+            self._eliminate_candidate(cell["contextId"])
+            return
+        self.pending_sustainable = observation
+
+    def _advance_native_row(self) -> None:
+        self.native_row_index += 1
+        self.native_rate_index = 0
+        self.current_row_contexts.clear()
+
+    def _advance_candidate(self) -> None:
+        self.candidate += 1
+        self.candidate_row_index = 0
+        self.candidate_eligible_rate_index = 0
+        self.candidate_eliminated = False
+        self.elimination_dependency = None
+        self.pending_sustainable = None
+        self.current_row_contexts.clear()
+        self.current_candidate_qualification_contexts.clear()
+
+    def _eliminate_candidate(self, dependency: int) -> None:
+        self.candidate_eliminated = True
+        self.elimination_dependency = dependency
+        self.pending_sustainable = None
+        self.candidate_row_index += 1
+        self.candidate_eligible_rate_index = 0
+        self.current_row_contexts.clear()
+
+    def _disposition_rates_below_floor(
+        self,
+        population: int,
+        latency: int,
+        native_result: dict[str, Any],
+        eligible: list[int],
+    ) -> None:
+        for rate in ALLOCATOR_V2_DESCENDING_RATES:
+            cell = self._cell(self.candidate, population, latency, rate)
+            if rate not in eligible and cell["contextId"] not in self.disposition_contexts:
+                self._disposition(cell, 1, [native_result["executedContexts"][-1]])
+
+    def _disposition_remaining_candidate(self, rows: list[tuple[int, int, int]]) -> None:
+        if self.elimination_dependency is None:
+            raise ChildError("allocator V2 eliminated candidate has no executed dependency")
+        for _, population, latency in rows[self.candidate_row_index :]:
+            for rate in ALLOCATOR_V2_DESCENDING_RATES:
+                cell = self._cell(self.candidate, population, latency, rate)
+                if cell["contextId"] not in self.disposition_contexts:
+                    self._disposition(cell, 4, [self.elimination_dependency])
+
+    def _disposition_larger_ranges(self) -> None:
+        if len(self.current_candidate_qualification_contexts) != 8:
+            raise ChildError("allocator V2 qualified RANGE does not bind all eight row intervals")
+        for candidate in range(self.candidate + 1, len(ALLOCATOR_V2_CANDIDATES)):
+            for _, population, latency in _allocator_v2_rows(candidate):
+                for rate in ALLOCATOR_V2_DESCENDING_RATES:
+                    self._disposition(
+                        self._cell(candidate, population, latency, rate),
+                        5,
+                        self.current_candidate_qualification_contexts,
+                    )
+
+
+def _allocator_v2_recompute(observations: list[dict[str, Any]]) -> dict[str, Any]:
+    planner = _AllocatorV2Planner()
+    for observation in observations:
+        expected = planner.next_action()
+        if expected is None or expected[0] != observation["tag"]:
+            raise ChildError("allocator V2 observation differs from deterministic planner action")
+        if observation["tag"] == "interval":
+            if expected[1]["contextId"] != observation["cell"]["contextId"]:
+                raise ChildError("allocator V2 interval observation is reordered or for another cell")
+        elif expected[1] != observation["row"]:
+            raise ChildError("allocator V2 fault observation is reordered or for another row")
+        planner.accept(observation)
+    completed = planner.next_action() is None
+    if completed and planner.executed_performance_cells + len(planner.dispositions) != 288:
+        raise ChildError("allocator V2 terminal deterministic plan does not account for 288 cells")
+    return {
+        "completed": completed,
+        "dispositions": planner.dispositions,
+        "executedPerformanceCells": planner.executed_performance_cells,
+        "qualifiedCandidates": planner.qualified_candidates,
+    }
+
+
+def _allocator_v2_source(cursor: _AllocatorV2Cursor) -> dict[str, str]:
+    try:
+        commit = cursor.take(40).decode("ascii")
+    except UnicodeDecodeError as error:
+        raise ChildError(f"{cursor.label} Nereus commit is not ASCII") from error
+    if not COMMIT_PATTERN.fullmatch(commit):
+        raise ChildError(f"{cursor.label} Nereus commit is not canonical")
+    return {
+        "nereusCommit": commit,
+        "oxiaImageDigest": cursor.take(32).hex(),
+        "dependencyLockDigest": cursor.take(32).hex(),
+        "executorDigest": cursor.take(32).hex(),
+        "workloadDigest": cursor.take(32).hex(),
+    }
+
+
+def _allocator_v2_campaign_id(source: dict[str, str], context_ids: list[int]) -> str:
+    digest = hashlib.sha256()
+    digest.update(b"NEREUS-V2-M3-ALLOCATOR-CAMPAIGN-ID-V2")
+    digest.update(source["nereusCommit"].encode("ascii"))
+    for name in (
+        "oxiaImageDigest",
+        "dependencyLockDigest",
+        "executorDigest",
+        "workloadDigest",
+    ):
+        digest.update(bytes.fromhex(source[name]))
+    digest.update((2).to_bytes(4, "big"))
+    for context_id in context_ids:
+        digest.update(context_id.to_bytes(4, "big"))
+    return digest.hexdigest()
+
+
+def _allocator_v2_attachment_root(digests: list[str]) -> str:
+    digest = hashlib.sha256()
+    digest.update(b"NEREUS-V2-M3-ALLOCATOR-ATTACHMENT-ROOT-V2")
+    for value in digests:
+        digest.update(bytes.fromhex(value))
+    return digest.hexdigest()
+
+
+def _parse_allocator_v2_checkpoint(raw: bytes) -> dict[str, Any]:
+    if not raw or len(raw) > ALLOCATOR_V2_CHECKPOINT_MAX_BYTES:
+        raise ChildError("allocator V2 NACP2 bytes are empty or over cap")
+    cursor = _AllocatorV2Cursor(raw, "allocator V2 NACP2")
+    if cursor.take(8) != b"NACP2\0\0\0" or cursor.unsigned(2) != 2:
+        raise ChildError("allocator V2 NACP2 magic/version differs")
+    status = cursor.unsigned(1)
+    if status != 1 or cursor.unsigned(1) != 0:
+        raise ChildError("allocator V2 NACP2 is not a completed canonical checkpoint")
+    sequence = cursor.nonnegative_long()
+    source = _allocator_v2_source(cursor)
+    campaign_id = cursor.take(32).hex()
+    predecessor = cursor.take(32).hex()
+    if (sequence == 0) != (predecessor == "0" * 64):
+        raise ChildError("allocator V2 NACP2 predecessor lineage differs")
+    budget_bounds = (900, 5_400, 7_200, 5_400, 11_520, 1_440, 600)
+    budgets = tuple(cursor.nonnegative_long() for _ in budget_bounds)
+    if any(value > maximum for value, maximum in zip(budgets, budget_bounds, strict=True)):
+        raise ChildError("allocator V2 NACP2 remaining phase budget exceeds its frozen cap")
+    expected_contexts = _allocator_v2_context_ids()
+    if cursor.unsigned(4) != len(expected_contexts):
+        raise ChildError("allocator V2 NACP2 logical inventory count differs")
+    actual_contexts = [cursor.unsigned(4) for _ in expected_contexts]
+    if actual_contexts != expected_contexts:
+        raise ChildError("allocator V2 NACP2 logical inventory order differs")
+    known_contexts = set(expected_contexts)
+    record_count = cursor.unsigned(4)
+    if not 1 <= record_count <= ALLOCATOR_V2_MAX_EXTERNAL_ATTACHMENTS:
+        raise ChildError("allocator V2 NACP2 execution record count differs")
+    attachment_digests: list[str] = []
+    executed_contexts: set[int] = set()
+    fault_rows: set[tuple[int, int, int]] = set()
+    observations: list[dict[str, Any]] = []
+    interval_count = 0
+    cells_by_context = {
+        cell["contextId"]: cell for cell in _allocator_v2_logical_cells()
+    }
+    for _ in range(record_count):
+        tag = cursor.unsigned(1)
+        if tag == 1:
+            context_id = cursor.unsigned(4)
+            if context_id not in known_contexts or context_id in executed_contexts:
+                raise ChildError("allocator V2 NACP2 interval context is unknown or duplicated")
+            executed_contexts.add(context_id)
+            values = [cursor.nonnegative_long() for _ in range(21)]
+            offered, admitted, dropped, completed, failed, timed_out, terminal = values[:7]
+            if (
+                offered != dropped + completed + failed + timed_out
+                or admitted != completed + failed + timed_out
+                or terminal != admitted
+            ):
+                raise ChildError("allocator V2 NACP2 interval conservation differs")
+            observations.append(
+                {
+                    "cell": cells_by_context[context_id],
+                    "tag": "interval",
+                    "values": values,
+                }
+            )
+            interval_count += 1
+        elif tag == 2:
+            candidate = cursor.unsigned(1)
+            population = cursor.unsigned(4)
+            latency = cursor.unsigned(4)
+            cuts = cursor.unsigned(4)
+            row = (candidate, population, latency)
+            if (
+                candidate not in {1, 2, 3, 4, 5}
+                or population not in {10_000, 100_000}
+                or latency not in {1, 5, 10, 25}
+                or cuts & ~0x1FF != 0
+                or row in fault_rows
+            ):
+                raise ChildError("allocator V2 NACP2 fault row/cut inventory differs")
+            fault_rows.add(row)
+            values = [cursor.nonnegative_long() for _ in range(10)]
+            observations.append(
+                {"cuts": cuts, "row": row, "tag": "fault", "values": values}
+            )
+        else:
+            raise ChildError("allocator V2 NACP2 observation tag differs")
+        attachment = cursor.take(32).hex()
+        if attachment == "0" * 64 or attachment in attachment_digests:
+            raise ChildError("allocator V2 NACP2 execution attachment digest is zero or aliased")
+        attachment_digests.append(attachment)
+    disposition_count = cursor.unsigned(4)
+    if disposition_count > 288:
+        raise ChildError("allocator V2 NACP2 disposition count exceeds the logical inventory")
+    disposition_contexts: set[int] = set()
+    dispositions: list[tuple[int, int, tuple[int, ...]]] = []
+    for _ in range(disposition_count):
+        context_id = cursor.unsigned(4)
+        kind = cursor.unsigned(1)
+        dependency_count = cursor.unsigned(2)
+        dependencies = [cursor.unsigned(4) for _ in range(dependency_count)]
+        if (
+            context_id not in known_contexts
+            or context_id in executed_contexts
+            or context_id in disposition_contexts
+            or kind > 5
+            or not 1 <= dependency_count <= record_count
+            or len(set(dependencies)) != len(dependencies)
+            or any(dependency not in executed_contexts for dependency in dependencies)
+        ):
+            raise ChildError("allocator V2 NACP2 disposition envelope differs")
+        disposition_contexts.add(context_id)
+        dispositions.append((context_id, kind, tuple(dependencies)))
+    cursor.finish()
+    recomputed = _allocator_v2_recompute(observations)
+    if not recomputed["completed"]:
+        raise ChildError("allocator V2 NACP2 completed checkpoint has a required action")
+    if dispositions != recomputed["dispositions"]:
+        raise ChildError(
+            "allocator V2 NACP2 caller dispositions differ from deterministic recomputation"
+        )
+    if (
+        interval_count != recomputed["executedPerformanceCells"]
+        or interval_count + disposition_count != 288
+    ):
+        raise ChildError("allocator V2 NACP2 executed/disposition cell conservation differs")
+    if campaign_id != _allocator_v2_campaign_id(source, expected_contexts):
+        raise ChildError("allocator V2 NACP2 campaign identity differs from its source tuple")
+    return {
+        "attachmentDigests": attachment_digests,
+        "attachmentRootDigest": _allocator_v2_attachment_root(attachment_digests),
+        "campaignId": campaign_id,
+        "checkpointDigest": sha256(raw),
+        "dispositionCells": disposition_count,
+        "executedPerformanceCells": interval_count,
+        "qualifiedCandidates": recomputed["qualifiedCandidates"],
+        "source": source,
+    }
+
+
+def _parse_allocator_v2_evaluation(raw: bytes, checkpoint: dict[str, Any]) -> dict[str, Any]:
+    if len(raw) != ALLOCATOR_V2_NAEV_BYTES:
+        raise ChildError("allocator V2 NAEV2 fixed bytes differ")
+    cursor = _AllocatorV2Cursor(raw, "allocator V2 NAEV2")
+    if cursor.take(8) != b"NAEV2\0\0\0" or cursor.unsigned(2) != 2:
+        raise ChildError("allocator V2 NAEV2 magic/version differs")
+    status = cursor.unsigned(1)
+    selected = cursor.unsigned(1)
+    executed = cursor.unsigned(4)
+    dispositions = cursor.unsigned(4)
+    source = _allocator_v2_source(cursor)
+    campaign_id = cursor.take(32).hex()
+    checkpoint_digest = cursor.take(32).hex()
+    attachment_root = cursor.take(32).hex()
+    cursor.finish()
+    qualified = checkpoint["qualifiedCandidates"]
+    strict = 1 in qualified
+    ranges = [candidate for candidate in qualified if candidate >= 2]
+    selected_range = min(ranges) if ranges else None
+    if strict and selected_range is None:
+        recomputed_status, recomputed_selected = 0, 1
+    elif not strict and selected_range is not None:
+        recomputed_status, recomputed_selected = 1, selected_range
+    elif not strict:
+        recomputed_status, recomputed_selected = 2, 255
+    else:
+        recomputed_status, recomputed_selected = 3, 255
+    eligible = status in {0, 1}
+    if (
+        status not in {0, 1, 2, 3}
+        or eligible != (selected != 255)
+        or (status == 0 and selected != 1)
+        or (status == 1 and selected not in {2, 3, 4, 5})
+        or (status in {2, 3} and selected != 255)
+        or status != recomputed_status
+        or selected != recomputed_selected
+        or executed + dispositions != 288
+        or executed != checkpoint["executedPerformanceCells"]
+        or dispositions != checkpoint["dispositionCells"]
+        or source != checkpoint["source"]
+        or campaign_id != checkpoint["campaignId"]
+        or checkpoint_digest != checkpoint["checkpointDigest"]
+        or attachment_root != checkpoint["attachmentRootDigest"]
+    ):
+        raise ChildError("allocator V2 NAEV2 accounting/selection/link differs")
+    return {
+        "evaluationDigest": sha256(raw),
+        "selectedCandidate": selected,
+        "status": status,
+    }
+
+
+def _allocator_v2_junit_summary(raw: bytes, diagnostic: bool) -> dict[str, int]:
+    if (
+        not raw
+        or len(raw) > ALLOCATOR_V2_JUNIT_MAX_BYTES
+        or b"<!DOCTYPE" in raw.upper()
+        or b"<!ENTITY" in raw.upper()
+    ):
+        raise ChildError("allocator V2 JUnit XML is empty, unsafe, or over cap")
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as error:
+        raise ChildError(f"cannot parse allocator V2 JUnit XML: {error}") from error
+    if root.tag != "testsuite":
+        raise ChildError("allocator V2 JUnit root must be one exact testsuite")
+    cases = root.findall("testcase")
+    names: set[str] = set()
+    observed = {"tests": len(cases), "failures": 0, "errors": 0, "skipped": 0}
+    for case in cases:
+        name = case.attrib.get("name")
+        if not name or name in names:
+            raise ChildError("allocator V2 JUnit testcase name is absent or duplicated")
+        names.add(name)
+        for field in ("failure", "error", "skipped"):
+            if case.find(field) is not None:
+                observed["skipped" if field == "skipped" else field + "s"] += 1
+    declared: dict[str, int] = {}
+    for field in ("tests", "failures", "errors", "skipped"):
+        try:
+            declared[field] = int(root.attrib[field])
+        except (KeyError, ValueError) as error:
+            raise ChildError(f"allocator V2 JUnit declared {field} is invalid") from error
+    if declared != observed or declared["tests"] <= 0 or any(
+        declared[field] != 0 for field in ("failures", "errors", "skipped")
+    ):
+        raise ChildError("allocator V2 JUnit counters are empty, nonzero, or differ from testcase nodes")
+    if diagnostic and names != ALLOCATOR_V2_DIAGNOSTIC_TESTS:
+        raise ChildError("allocator V2 diagnostic JUnit testcase inventory differs")
+    return declared
+
+
+def _parse_allocator_v2_diagnostic(
+    raw: bytes, checkpoint: dict[str, Any], diagnostic_junit: bytes
+) -> None:
+    if len(raw) != ALLOCATOR_V2_NADV_BYTES:
+        raise ChildError("allocator V2 NADV2 fixed bytes differ")
+    cursor = _AllocatorV2Cursor(raw, "allocator V2 NADV2")
+    if cursor.take(8) != b"NADV2\0\0\0" or cursor.unsigned(2) != 2:
+        raise ChildError("allocator V2 NADV2 magic/version differs")
+    if cursor.unsigned(1) != 0x0F or cursor.unsigned(1) != 0:
+        raise ChildError("allocator V2 NADV2 diagnostic mask/reserved byte differs")
+    source = _allocator_v2_source(cursor)
+    receipt_digest = cursor.take(32).hex()
+    cursor.finish()
+    if source != checkpoint["source"] or receipt_digest != sha256(diagnostic_junit):
+        raise ChildError("allocator V2 NADV2 source or diagnostic JUnit link differs")
+
+
+def _allocator_v2_embedded(
+    wrapper: dict[str, Any], prefix: str, maximum: int
+) -> bytes:
+    raw = _decode_sealed_bytes(
+        wrapper[f"{prefix}Base64"], f"allocator V2 {prefix}", maximum
+    )
+    if wrapper[f"{prefix}Sha256"] != sha256(raw):
+        raise ChildError(f"allocator V2 {prefix} embedded bytes/SHA differ")
+    return raw
+
+
+def _allocator_v2_file_rows(
+    root: Path,
+    rows: object,
+    label: str,
+    maximum_count: int,
+    required_names: tuple[str, ...] | None = None,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    if not isinstance(rows, list) or not 1 <= len(rows) <= maximum_count:
+        raise ChildError(f"{label} file count is outside its cap")
+    validated: list[dict[str, Any]] = []
+    digests: list[str] = []
+    for index, value in enumerate(rows):
+        members = {"bytes", "path", "sha256"}
+        if required_names is not None:
+            members.add("name")
+        row = _exact_members(value, members, f"{label}[{index}]")
+        path = _allocator_external_path(row["path"], f"{label}[{index}].path", True)
+        size, digest, _, _ = _allocator_stream_identity(
+            root, path, ALLOCATOR_V2_EXTERNAL_MAX_BYTES, allow_absolute=True
+        )
+        if row["bytes"] != size or row["sha256"] != digest:
+            raise ChildError(f"{label}[{index}] bytes/SHA differ from the exact file")
+        validated.append(row)
+        digests.append(digest)
+    paths = [row["path"] for row in validated]
+    if len(paths) != len(set(paths)) or (required_names is None and paths != sorted(paths)):
+        raise ChildError(f"{label} paths are duplicated or unsorted")
+    if required_names is not None:
+        names = [row["name"] for row in validated]
+        if names != list(required_names):
+            raise ChildError(f"{label} logical-name inventory differs")
+    return validated, digests
+
+
+def _allocator_v2_expected_source(
+    root: Path,
+    tested_commit: str,
+    source_files: list[dict[str, Any]],
+) -> dict[str, str]:
+    locks = _source_locks(root, tested_commit)
+    allocator = _required_object(locks.get("m3AllocatorEvidenceBinding"), "m3AllocatorEvidenceBinding")
+    image = _required_string(
+        allocator.get("oxiaServerImageDigest"), "m3AllocatorEvidenceBinding.oxiaServerImageDigest"
+    )
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", image):
+        raise ChildError("allocator V2 locked Oxia image digest differs")
+    source_locks_raw = git(root, "show", f"{tested_commit}:{FINAL.SOURCE_LOCKS_PATH}")
+    assert isinstance(source_locks_raw, bytes)
+    by_name = {row["name"]: row for row in source_files}
+    return {
+        "nereusCommit": tested_commit,
+        "oxiaImageDigest": image.removeprefix("sha256:"),
+        "dependencyLockDigest": sha256(source_locks_raw),
+        "executorDigest": by_name["executorArtifact"]["sha256"],
+        "workloadDigest": by_name["workloadPlan"]["sha256"],
+    }
+
+
+def _allocator_v2_unsigned(value: dict[str, Any]) -> dict[str, Any]:
+    unsigned = dict(value)
+    unsigned["receiptSha256"] = "0" * 64
+    return unsigned
+
+
+def validate_allocator_v2_campaign_verification(
+    value: object, root: Path, tested_commit: str
+) -> dict[str, Any]:
+    members = {
+        "checkpointBase64",
+        "checkpointSha256",
+        "diagnosticBase64",
+        "diagnosticJunitBase64",
+        "diagnosticJunitSha256",
+        "diagnosticSha256",
+        "evaluationBase64",
+        "evaluationSha256",
+        "executionAttachments",
+        "formalJunitBase64",
+        "formalJunitSha256",
+        "promotionDecisionBase64",
+        "promotionDecisionSha256",
+        "receiptSha256",
+        "schema",
+        "sourceFiles",
+        "testedCommit",
+    }
+    wrapper = _exact_members(value, members, "governed allocator V2 campaign verification")
+    if wrapper["schema"] != ALLOCATOR_V2_VERIFICATION_SCHEMA or wrapper["testedCommit"] != tested_commit:
+        raise ChildError("governed allocator V2 verification schema/source differs")
+    _sha_text(wrapper["receiptSha256"], "governed allocator V2 verification receipt SHA")
+    if wrapper["receiptSha256"] != sha256(canonical_bytes(_allocator_v2_unsigned(wrapper))):
+        raise ChildError("governed allocator V2 verification self-hash differs")
+    checkpoint_raw = _allocator_v2_embedded(wrapper, "checkpoint", ALLOCATOR_V2_CHECKPOINT_MAX_BYTES)
+    evaluation_raw = _allocator_v2_embedded(wrapper, "evaluation", 4_096)
+    diagnostic_raw = _allocator_v2_embedded(wrapper, "diagnostic", 4_096)
+    diagnostic_junit = _allocator_v2_embedded(wrapper, "diagnosticJunit", ALLOCATOR_V2_JUNIT_MAX_BYTES)
+    formal_junit = _allocator_v2_embedded(wrapper, "formalJunit", ALLOCATOR_V2_JUNIT_MAX_BYTES)
+    promotion_raw = _allocator_v2_embedded(wrapper, "promotionDecision", MAX_CANONICAL_BYTES)
+    source_files, _ = _allocator_v2_file_rows(
+        root,
+        wrapper["sourceFiles"],
+        "allocator V2 source files",
+        2,
+        ("executorArtifact", "workloadPlan"),
+    )
+    execution_files, execution_digests = _allocator_v2_file_rows(
+        root,
+        wrapper["executionAttachments"],
+        "allocator V2 execution attachments",
+        ALLOCATOR_V2_MAX_EXTERNAL_ATTACHMENTS,
+    )
+    del execution_files
+    checkpoint = _parse_allocator_v2_checkpoint(checkpoint_raw)
+    if checkpoint["source"] != _allocator_v2_expected_source(root, tested_commit, source_files):
+        raise ChildError("allocator V2 NACP2 source tuple differs from exact tested locks/files")
+    if set(execution_digests) != set(checkpoint["attachmentDigests"]):
+        raise ChildError("allocator V2 external attachment set differs from NACP2")
+    evaluation = _parse_allocator_v2_evaluation(evaluation_raw, checkpoint)
+    diagnostic_summary = _allocator_v2_junit_summary(diagnostic_junit, True)
+    formal_summary = _allocator_v2_junit_summary(formal_junit, False)
+    _parse_allocator_v2_diagnostic(diagnostic_raw, checkpoint, diagnostic_junit)
+    decision = load_canonical_json(
+        promotion_raw, "allocator V2 promotion decision", MAX_CANONICAL_BYTES
+    )
+    decision = _exact_members(
+        decision,
+        {
+            "checkpointSha256",
+            "diagnosticJUnitSha256",
+            "diagnosticSha256",
+            "evaluationSha256",
+            "formalJUnitSha256",
+            "schema",
+            "selectedCandidate",
+            "status",
+        },
+        "allocator V2 promotion decision",
+    )
+    candidate_names = {1: "STRICT", 2: "RANGE_16", 3: "RANGE_64", 4: "RANGE_256", 5: "RANGE_1024"}
+    selected_name = candidate_names.get(evaluation["selectedCandidate"])
+    locked_mode, _ = source_bindings(root, tested_commit)
+    expected_mode = "STRICT" if selected_name == "STRICT" else "RANGE"
+    if (
+        evaluation["status"] not in {0, 1}
+        or selected_name is None
+        or decision
+        != {
+            "schema": ALLOCATOR_V2_PROMOTION_SCHEMA,
+            "status": "PROMOTABLE",
+            "selectedCandidate": selected_name,
+            "checkpointSha256": sha256(checkpoint_raw),
+            "evaluationSha256": sha256(evaluation_raw),
+            "diagnosticSha256": sha256(diagnostic_raw),
+            "diagnosticJUnitSha256": sha256(diagnostic_junit),
+            "formalJUnitSha256": sha256(formal_junit),
+        }
+        or locked_mode != expected_mode
+    ):
+        raise ChildError("allocator V2 promotion decision/evaluation/source-lock mode differs")
+    return {
+        "mode": locked_mode,
+        "selectedRangeSize": {
+            "STRICT": 1,
+            "RANGE_16": 16,
+            "RANGE_64": 64,
+            "RANGE_256": 256,
+            "RANGE_1024": 1024,
+        }[selected_name],
+        "summary": _sum_summaries([formal_summary, diagnostic_summary]),
+    }
+
+
+def seal_allocator_v2_campaign_verification_receipt(
+    root: Path,
+    tested_commit: str,
+    checkpoint_raw: bytes,
+    evaluation_raw: bytes,
+    diagnostic_raw: bytes,
+    diagnostic_junit: bytes,
+    formal_junit: bytes,
+    promotion_raw: bytes,
+    source_paths: list[tuple[str, object]],
+    execution_paths: list[object],
+) -> dict[str, Any]:
+    if [name for name, _ in source_paths] != ["executorArtifact", "workloadPlan"]:
+        raise ChildError("allocator V2 source-file logical-name inventory differs")
+
+    def file_row(name: str | None, raw_path: object) -> dict[str, Any]:
+        path = _allocator_external_path(raw_path, "allocator V2 governed external path", True)
+        size, digest, _, _ = _allocator_stream_identity(
+            root, path, ALLOCATOR_V2_EXTERNAL_MAX_BYTES, allow_absolute=True
+        )
+        row: dict[str, Any] = {"bytes": size, "path": str(path), "sha256": digest}
+        if name is not None:
+            row["name"] = name
+        return row
+
+    source_files = [file_row(name, path) for name, path in source_paths]
+    execution_files = sorted(
+        (file_row(None, path) for path in execution_paths), key=lambda row: row["path"]
+    )
+    promotion_value = load_external_json(
+        promotion_raw, "allocator V2 promotion decision", MAX_CANONICAL_BYTES
+    )
+    promotion_raw = canonical_bytes(promotion_value)
+    receipt: dict[str, Any] = {
+        "checkpointBase64": base64.b64encode(checkpoint_raw).decode("ascii"),
+        "checkpointSha256": sha256(checkpoint_raw),
+        "diagnosticBase64": base64.b64encode(diagnostic_raw).decode("ascii"),
+        "diagnosticJunitBase64": base64.b64encode(diagnostic_junit).decode("ascii"),
+        "diagnosticJunitSha256": sha256(diagnostic_junit),
+        "diagnosticSha256": sha256(diagnostic_raw),
+        "evaluationBase64": base64.b64encode(evaluation_raw).decode("ascii"),
+        "evaluationSha256": sha256(evaluation_raw),
+        "executionAttachments": execution_files,
+        "formalJunitBase64": base64.b64encode(formal_junit).decode("ascii"),
+        "formalJunitSha256": sha256(formal_junit),
+        "promotionDecisionBase64": base64.b64encode(promotion_raw).decode("ascii"),
+        "promotionDecisionSha256": sha256(promotion_raw),
+        "receiptSha256": "0" * 64,
+        "schema": ALLOCATOR_V2_VERIFICATION_SCHEMA,
+        "sourceFiles": source_files,
+        "testedCommit": tested_commit,
+    }
+    receipt["receiptSha256"] = sha256(canonical_bytes(receipt))
+    validate_allocator_v2_campaign_verification(receipt, root, tested_commit)
+    return receipt
+
+
 def _native_ordered_projection(
     row: dict[str, Any], counter_keys: tuple[str, ...], receipt_sha256: str | None = None
 ) -> dict[str, Any]:
@@ -3473,10 +4423,13 @@ def validate_generic_value(
     missing = REQUIRED_ATTACHMENTS[kind] - set(attachment_kinds)
     if missing:
         raise ChildError(f"child mandatory typed attachments are absent: {kind} {sorted(missing)}")
-    misplaced_typed = (
-        set(attachment_kinds).intersection(NORMALIZED_TYPED_KINDS)
-        - REQUIRED_ATTACHMENTS[kind]
-    )
+    allocator_profile: str | None = None
+    if kind == "ALLOCATOR_SELECTION":
+        allocator_profile = allocator_authority_profile(set(attachment_kinds))
+    allowed_typed = set(REQUIRED_ATTACHMENTS[kind])
+    if allocator_profile == "V1":
+        allowed_typed.update(ALLOCATOR_DERIVED_KINDS)
+    misplaced_typed = set(attachment_kinds).intersection(NORMALIZED_TYPED_KINDS) - allowed_typed
     if misplaced_typed:
         raise ChildError(
             "child contains typed attachments outside its closed profile: "
@@ -3488,7 +4441,8 @@ def validate_generic_value(
     normalized: list[dict[str, int]] = []
     _, bindings = source_bindings(root, tested)
     allocator_authority: dict[str, Any] | None = None
-    if kind == "ALLOCATOR_SELECTION":
+    allocator_v2_authority: dict[str, Any] | None = None
+    if kind == "ALLOCATOR_SELECTION" and allocator_profile == "V1":
         raw_row = next(
             (row for row in rows if row["kind"] == "ALLOCATOR_RAW_VERIFICATION"),
             None,
@@ -3500,6 +4454,22 @@ def validate_generic_value(
         allocator_authority = validate_allocator_verification(
             load_canonical_json(
                 raw_bytes, str(raw_path), ALLOCATOR_VERIFICATION_MAX_BYTES
+            ),
+            root,
+            tested,
+        )
+    elif kind == "ALLOCATOR_SELECTION":
+        v2_row = next(
+            (row for row in rows if row["kind"] == "ALLOCATOR_V2_CAMPAIGN_VERIFICATION"),
+            None,
+        )
+        if v2_row is None:
+            raise ChildError("allocator V2 child lacks governed campaign verification")
+        v2_path = safe_relative(v2_row["path"], "allocator V2 verification path")
+        v2_bytes = read_safe_file(root, v2_path, ALLOCATOR_V2_VERIFICATION_MAX_BYTES)
+        allocator_v2_authority = validate_allocator_v2_campaign_verification(
+            load_canonical_json(
+                v2_bytes, str(v2_path), ALLOCATOR_V2_VERIFICATION_MAX_BYTES
             ),
             root,
             tested,
@@ -3554,6 +4524,9 @@ def validate_generic_value(
                     allocator_authority["verifierSummary"],
                 ]
             )
+        elif row["kind"] == "ALLOCATOR_V2_CAMPAIGN_VERIFICATION":
+            assert allocator_v2_authority is not None
+            normalized.append(allocator_v2_authority["summary"])
         elif row["kind"] in ALLOCATOR_DERIVED_KINDS:
             assert allocator_authority is not None
             validate_allocator_derived_evidence(

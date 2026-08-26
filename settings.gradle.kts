@@ -81,6 +81,7 @@ val m3DedicatedPulsarRequired = gradle.startParameter.taskNames.any { requested 
     val task = requested.substringAfterLast(':')
     task.startsWith("v2M3ModuleApi") ||
         task == "v2M3Check" ||
+        task.startsWith("v2M3Allocator") ||
         task.startsWith("realAllocator") ||
         task.contains("RealAllocator") ||
         task.startsWith("validateRealAllocatorV2") ||

@@ -831,6 +831,236 @@ def git(root: Path, *args: str) -> str:
     ).strip()
 
 
+def allocator_v2_campaign_fixture(root: Path, tested_commit: str) -> dict:
+    fixture_root = root / "nereus-metadata-oxia/build/m3-allocator-evidence/v2-fixture"
+    attachment_root = fixture_root / "attachments"
+    attachment_root.mkdir(parents=True, exist_ok=True)
+    executor = fixture_root / "executor.jar"
+    workload = fixture_root / "plan.txt"
+    executor.write_bytes(b"allocator V2 governed fixture executor\n")
+    workload.write_bytes(b"logicalPerformanceCells=288\nplannerVersion=2\n")
+    locks = CONTRACT._source_locks(root, tested_commit)
+    allocator_mode = locks["m3EvidenceBindings"]["allocatorMode"]
+    if allocator_mode not in {"STRICT", "RANGE"}:
+        raise AssertionError("allocator V2 selection fixture requires a selected source-lock mode")
+    image = locks["m3AllocatorEvidenceBinding"]["oxiaServerImageDigest"].removeprefix("sha256:")
+    source_locks_raw = CONTRACT.git(
+        root, "show", f"{tested_commit}:{CONTRACT.FINAL.SOURCE_LOCKS_PATH}"
+    )
+    assert isinstance(source_locks_raw, bytes)
+    source = {
+        "nereusCommit": tested_commit,
+        "oxiaImageDigest": image,
+        "dependencyLockDigest": CONTRACT.sha256(source_locks_raw),
+        "executorDigest": CONTRACT.sha256(executor.read_bytes()),
+        "workloadDigest": CONTRACT.sha256(workload.read_bytes()),
+    }
+
+    def source_bytes() -> bytes:
+        return tested_commit.encode("ascii") + b"".join(
+            bytes.fromhex(source[name])
+            for name in (
+                "oxiaImageDigest",
+                "dependencyLockDigest",
+                "executorDigest",
+                "workloadDigest",
+            )
+        )
+
+    planner = CONTRACT._AllocatorV2Planner()
+    observations: list[dict] = []
+    for _ in range(400):
+        action = planner.next_action()
+        if action is None:
+            break
+        if action[0] == "interval":
+            cell = action[1]
+            offered = cell["rate"] * 30
+            values = [offered, offered, 0, offered, 0, 0, offered, 0, 0, 0, 0, 0]
+            values.extend(
+                [
+                    100_000,
+                    100_000,
+                    100_000,
+                    cell["rate"],
+                    100_000,
+                    100_000,
+                    0,
+                    0,
+                    0,
+                ]
+            )
+            relative_failure = (
+                allocator_mode == "STRICT" and cell["candidate"] >= 2
+            ) or (allocator_mode == "RANGE" and cell["candidate"] == 1)
+            if relative_failure:
+                values[17] = 400_001
+            observation = {"cell": cell, "tag": "interval", "values": values}
+        else:
+            observation = {
+                "cuts": 0x1FF,
+                "row": action[1],
+                "tag": "fault",
+                "values": [0, 0, 0, 0, 0, 0, 0, 0, 1, 1_000_000],
+            }
+        observations.append(observation)
+        planner.accept(observation)
+    else:
+        raise AssertionError("allocator V2 governed fixture planner did not terminate")
+    recomputed = CONTRACT._allocator_v2_recompute(observations)
+    expected_qualified = [1] if allocator_mode == "STRICT" else [2]
+    expected_executed = 20 if allocator_mode == "STRICT" else 17
+    if not recomputed["completed"] or (
+        recomputed["qualifiedCandidates"] != expected_qualified
+        or recomputed["executedPerformanceCells"] != expected_executed
+    ):
+        raise AssertionError("allocator V2 governed fixture selection differs")
+
+    execution_paths: list[Path] = []
+    attachment_digests: list[str] = []
+    for index in range(len(observations)):
+        path = attachment_root / f"{index:03d}.bin"
+        path.write_bytes(f"allocator V2 execution attachment {index}\n".encode())
+        execution_paths.append(path)
+        attachment_digests.append(CONTRACT.sha256(path.read_bytes()))
+
+    contexts = CONTRACT._allocator_v2_context_ids()
+    checkpoint = bytearray(b"NACP2\0\0\0")
+    checkpoint.extend(struct.pack(">HBBQ", 2, 1, 0, 0))
+    checkpoint.extend(source_bytes())
+    checkpoint.extend(bytes.fromhex(CONTRACT._allocator_v2_campaign_id(source, contexts)))
+    checkpoint.extend(bytes(32))
+    checkpoint.extend(struct.pack(">7Q", 900, 5_400, 7_200, 5_400, 11_520, 1_440, 600))
+    checkpoint.extend(struct.pack(">I", len(contexts)))
+    checkpoint.extend(b"".join(struct.pack(">I", context) for context in contexts))
+    checkpoint.extend(struct.pack(">I", len(observations)))
+    for index, observation in enumerate(observations):
+        if observation["tag"] == "interval":
+            checkpoint.extend(
+                struct.pack(
+                    ">BI21Q",
+                    1,
+                    observation["cell"]["contextId"],
+                    *observation["values"],
+                )
+            )
+        else:
+            candidate, population, latency = observation["row"]
+            checkpoint.extend(
+                struct.pack(
+                    ">BBIII10Q",
+                    2,
+                    candidate,
+                    population,
+                    latency,
+                    observation["cuts"],
+                    *observation["values"],
+                )
+            )
+        checkpoint.extend(bytes.fromhex(attachment_digests[index]))
+    dispositions = recomputed["dispositions"]
+    checkpoint.extend(struct.pack(">I", len(dispositions)))
+    for context, kind, dependencies in dispositions:
+        checkpoint.extend(struct.pack(">IBH", context, kind, len(dependencies)))
+        checkpoint.extend(b"".join(struct.pack(">I", value) for value in dependencies))
+    checkpoint_raw = bytes(checkpoint)
+    checkpoint_sha = CONTRACT.sha256(checkpoint_raw)
+    attachment_root_sha = CONTRACT._allocator_v2_attachment_root(attachment_digests)
+
+    evaluation_status = 0 if allocator_mode == "STRICT" else 1
+    selected_candidate = 1 if allocator_mode == "STRICT" else 2
+    selected_name = "STRICT" if allocator_mode == "STRICT" else "RANGE_16"
+    evaluation_raw = (
+        b"NAEV2\0\0\0"
+        + struct.pack(
+            ">HBBII",
+            2,
+            evaluation_status,
+            selected_candidate,
+            recomputed["executedPerformanceCells"],
+            len(dispositions),
+        )
+        + source_bytes()
+        + bytes.fromhex(CONTRACT._allocator_v2_campaign_id(source, contexts))
+        + bytes.fromhex(checkpoint_sha)
+        + bytes.fromhex(attachment_root_sha)
+    )
+    diagnostic_junit = (
+        '<testsuite name="M3V2RealOxiaDiagnosticTest" tests="4" failures="0" errors="0" skipped="0">\n'
+        + "".join(
+            f'  <testcase classname="M3V2RealOxiaDiagnosticTest" name="{name}"/>\n'
+            for name in sorted(CONTRACT.ALLOCATOR_V2_DIAGNOSTIC_TESTS)
+        )
+        + "</testsuite>\n"
+    ).encode()
+    formal_junit = (
+        '<testsuite name="M3V2AllocatorFormalCampaignTest" tests="1" failures="0" errors="0" skipped="0">\n'
+        '  <testcase classname="M3V2AllocatorFormalCampaignTest" name="runsValidatorProofAdaptiveCampaign()"/>\n'
+        "</testsuite>\n"
+    ).encode()
+    diagnostic_raw = (
+        b"NADV2\0\0\0"
+        + struct.pack(">HBB", 2, 0x0F, 0)
+        + source_bytes()
+        + bytes.fromhex(CONTRACT.sha256(diagnostic_junit))
+    )
+    decision = CONTRACT.canonical_bytes(
+        {
+            "checkpointSha256": checkpoint_sha,
+            "diagnosticJUnitSha256": CONTRACT.sha256(diagnostic_junit),
+            "diagnosticSha256": CONTRACT.sha256(diagnostic_raw),
+            "evaluationSha256": CONTRACT.sha256(evaluation_raw),
+            "formalJUnitSha256": CONTRACT.sha256(formal_junit),
+            "schema": CONTRACT.ALLOCATOR_V2_PROMOTION_SCHEMA,
+            "selectedCandidate": selected_name,
+            "status": "PROMOTABLE",
+        }
+    )
+    paths = {
+        "checkpoint": fixture_root / "campaign.nacp",
+        "evaluation": fixture_root / "evaluation.naev",
+        "diagnostic": fixture_root / "diagnostic.nadv",
+        "diagnosticJunit": fixture_root / "diagnostic-junit.xml",
+        "formalJunit": fixture_root / "formal-junit.xml",
+        "promotionDecision": fixture_root / "promotion.json",
+        "executor": executor,
+        "workload": workload,
+    }
+    for name, raw in (
+        ("checkpoint", checkpoint_raw),
+        ("evaluation", evaluation_raw),
+        ("diagnostic", diagnostic_raw),
+        ("diagnosticJunit", diagnostic_junit),
+        ("formalJunit", formal_junit),
+        ("promotionDecision", decision),
+    ):
+        paths[name].write_bytes(raw)
+
+    def relative(path: Path) -> str:
+        return path.relative_to(root).as_posix()
+
+    receipt = CONTRACT.seal_allocator_v2_campaign_verification_receipt(
+        root,
+        tested_commit,
+        checkpoint_raw,
+        evaluation_raw,
+        diagnostic_raw,
+        diagnostic_junit,
+        formal_junit,
+        decision,
+        [
+            ("executorArtifact", relative(executor)),
+            ("workloadPlan", relative(workload)),
+        ],
+        [relative(path) for path in execution_paths],
+    )
+    return {
+        "executionPaths": execution_paths,
+        "paths": paths,
+        "receipt": CONTRACT.canonical_bytes(receipt),
+    }
+
+
 class Fixture:
     def __init__(self, allocator_mode: str = "STRICT") -> None:
         self.temporary = tempfile.TemporaryDirectory(prefix="nereus-m3-child-checker-")
@@ -928,7 +1158,10 @@ class Fixture:
     ) -> tuple[PurePosixPath, dict]:
         omit = omit or set()
         overrides = overrides or {}
-        required = sorted(CONTRACT.REQUIRED_ATTACHMENTS[kind] - omit)
+        required_kinds = set(CONTRACT.REQUIRED_ATTACHMENTS[kind])
+        if kind == "ALLOCATOR_SELECTION":
+            required_kinds.update(CONTRACT.ALLOCATOR_V1_AUTHORITY_ATTACHMENTS)
+        required = sorted(required_kinds - omit)
         output = PurePosixPath(f"docs/v2/evidence/v2-m3/children/{kind}.json")
         rows: list[dict] = []
         normalized_summaries: list[dict[str, int]] = []
@@ -1047,6 +1280,61 @@ class Fixture:
         destination.write_bytes(self.canonical(receipt))
         return output, receipt
 
+    def build_allocator_v2(self) -> tuple[PurePosixPath, dict]:
+        output = PurePosixPath("docs/v2/evidence/v2-m3/children/ALLOCATOR_SELECTION_V2.json")
+        campaign = allocator_v2_campaign_fixture(self.root, self.tested)
+        raw_by_kind = {
+            "ALLOCATOR_V2_CAMPAIGN_VERIFICATION": campaign["receipt"],
+            "JUNIT_SUMMARY": self.junit("ALLOCATOR_SELECTION"),
+        }
+        rows: list[dict] = []
+        summaries: list[dict[str, int]] = []
+        for index, attachment_kind in enumerate(sorted(raw_by_kind)):
+            raw = raw_by_kind[attachment_kind]
+            relative = output.parent / "attachments-v2" / f"{index:02d}-{attachment_kind}.json"
+            path = self.root.joinpath(*relative.parts)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+            rows.append(
+                {
+                    "bytes": len(raw),
+                    "kind": attachment_kind,
+                    "path": str(relative),
+                    "sha256": CONTRACT.sha256(raw),
+                }
+            )
+            if attachment_kind == "JUNIT_SUMMARY":
+                summaries.append(
+                    CONTRACT.validate_junit(
+                        CONTRACT.load_canonical_json(raw, str(relative)),
+                        self.root,
+                        self.tested,
+                        "ALLOCATOR_SELECTION",
+                    )
+                )
+            else:
+                authority = CONTRACT.validate_allocator_v2_campaign_verification(
+                    CONTRACT.load_canonical_json(
+                        raw, str(relative), CONTRACT.ALLOCATOR_V2_VERIFICATION_MAX_BYTES
+                    ),
+                    self.root,
+                    self.tested,
+                )
+                summaries.append(authority["summary"])
+        receipt = {
+            "attachments": rows,
+            "exclusions": CONTRACT.expected_exclusions("ALLOCATOR_SELECTION"),
+            "kind": "ALLOCATOR_SELECTION",
+            "promotionEligible": False,
+            "result": CONTRACT.CHILD_RESULTS["ALLOCATOR_SELECTION"],
+            "schema": CONTRACT.SCHEMA,
+            "sourceTuple": CONTRACT.expected_source_tuple(self.root, self.tested),
+            "testSummary": CONTRACT._sum_summaries(summaries),
+        }
+        destination = self.root.joinpath(*output.parts)
+        destination.write_bytes(self.canonical(receipt))
+        return output, receipt
+
     def rewrite(self, output: PurePosixPath, value: dict) -> None:
         self.root.joinpath(*output.parts).write_bytes(self.canonical(value))
 
@@ -1094,6 +1382,143 @@ class M3ChildCheckerTest(unittest.TestCase):
                 fixture.build("ALLOCATOR_SELECTION")
         finally:
             fixture.cleanup()
+
+    def test_accepts_exact_allocator_v2_campaign_profile(self) -> None:
+        output, _ = self.fixture.build_allocator_v2()
+        identity = CONTRACT.build_final_child_identity(
+            self.fixture.root, output, "ALLOCATOR_SELECTION", self.fixture.tested
+        )
+        self.assertEqual("ALLOCATOR_SELECTION", identity["kind"])
+        self.assertEqual(8, identity["tests"])
+        self.assertEqual(0, identity["skipped"])
+
+    def test_accepts_exact_allocator_v2_range_campaign_profile(self) -> None:
+        fixture = Fixture("RANGE")
+        try:
+            output, _ = fixture.build_allocator_v2()
+            identity = CONTRACT.build_final_child_identity(
+                fixture.root, output, "ALLOCATOR_SELECTION", fixture.tested
+            )
+            self.assertEqual("ALLOCATOR_SELECTION", identity["kind"])
+            self.assertEqual(8, identity["tests"])
+            self.assertEqual(0, identity["skipped"])
+        finally:
+            fixture.cleanup()
+
+    def test_rejects_mixed_allocator_v1_v2_authority_profiles(self) -> None:
+        output, receipt = self.fixture.build_allocator_v2()
+        raw = allocator_receipt_fixture(self.fixture.root, self.fixture.tested)
+        relative = output.parent / "attachments-v2" / "00-ALLOCATOR_RAW_VERIFICATION.json"
+        path = self.fixture.root.joinpath(*relative.parts)
+        path.write_bytes(raw)
+        receipt["attachments"].append(
+            {
+                "bytes": len(raw),
+                "kind": "ALLOCATOR_RAW_VERIFICATION",
+                "path": str(relative),
+                "sha256": CONTRACT.sha256(raw),
+            }
+        )
+        receipt["attachments"].sort(key=lambda row: row["kind"])
+        self.fixture.rewrite(output, receipt)
+        with self.assertRaisesRegex(CONTRACT.ChildError, "mixes or incompletely"):
+            CONTRACT.build_final_child_identity(
+                self.fixture.root, output, "ALLOCATOR_SELECTION", self.fixture.tested
+            )
+
+    def test_rejects_allocator_v2_external_attachment_tamper(self) -> None:
+        output, _ = self.fixture.build_allocator_v2()
+        external = (
+            self.fixture.root
+            / "nereus-metadata-oxia/build/m3-allocator-evidence/v2-fixture/attachments/000.bin"
+        )
+        external.write_bytes(external.read_bytes() + b"tamper")
+        with self.assertRaisesRegex(CONTRACT.ChildError, "bytes/SHA differ"):
+            CONTRACT.build_final_child_identity(
+                self.fixture.root, output, "ALLOCATOR_SELECTION", self.fixture.tested
+            )
+
+    def test_rejects_fully_rehashed_allocator_v2_caller_disposition_forgery(self) -> None:
+        output, receipt = self.fixture.build_allocator_v2()
+        row = next(
+            item
+            for item in receipt["attachments"]
+            if item["kind"] == "ALLOCATOR_V2_CAMPAIGN_VERIFICATION"
+        )
+        wrapper = json.loads((self.fixture.root / row["path"]).read_bytes())
+        checkpoint = bytearray(base64.b64decode(wrapper["checkpointBase64"]))
+        offset = 8 + 2 + 1 + 1 + 8 + 40 + 32 * 6 + 7 * 8 + 4 + 288 * 4
+        record_count = struct.unpack_from(">I", checkpoint, offset)[0]
+        offset += 4
+        for _ in range(record_count):
+            tag = checkpoint[offset]
+            if tag == 1:
+                offset += 1 + 4 + 21 * 8 + 32
+            elif tag == 2:
+                offset += 1 + 1 + 4 + 4 + 4 + 10 * 8 + 32
+            else:
+                raise AssertionError("allocator V2 fixture observation tag differs")
+        disposition_count = struct.unpack_from(">I", checkpoint, offset)[0]
+        self.assertGreater(disposition_count, 0)
+        first_kind_offset = offset + 4 + 4
+        checkpoint[first_kind_offset] = (checkpoint[first_kind_offset] + 1) % 6
+        checkpoint_raw = bytes(checkpoint)
+        checkpoint_sha = CONTRACT.sha256(checkpoint_raw)
+
+        evaluation = bytearray(base64.b64decode(wrapper["evaluationBase64"]))
+        evaluation[220:252] = bytes.fromhex(checkpoint_sha)
+        evaluation_raw = bytes(evaluation)
+        decision = json.loads(base64.b64decode(wrapper["promotionDecisionBase64"]))
+        decision["checkpointSha256"] = checkpoint_sha
+        decision["evaluationSha256"] = CONTRACT.sha256(evaluation_raw)
+        decision_raw = CONTRACT.canonical_bytes(decision)
+
+        for prefix, raw in (
+            ("checkpoint", checkpoint_raw),
+            ("evaluation", evaluation_raw),
+            ("promotionDecision", decision_raw),
+        ):
+            wrapper[f"{prefix}Base64"] = base64.b64encode(raw).decode("ascii")
+            wrapper[f"{prefix}Sha256"] = CONTRACT.sha256(raw)
+        wrapper["receiptSha256"] = "0" * 64
+        wrapper["receiptSha256"] = CONTRACT.sha256(CONTRACT.canonical_bytes(wrapper))
+        self.fixture.rebind_attachment(
+            output,
+            receipt,
+            "ALLOCATOR_V2_CAMPAIGN_VERIFICATION",
+            CONTRACT.canonical_bytes(wrapper),
+        )
+        with self.assertRaisesRegex(CONTRACT.ChildError, "caller dispositions differ"):
+            CONTRACT.build_final_child_identity(
+                self.fixture.root, output, "ALLOCATOR_SELECTION", self.fixture.tested
+            )
+
+    def test_rejects_allocator_v2_non_promotable_decision_as_selection_child(self) -> None:
+        output, receipt = self.fixture.build_allocator_v2()
+        row = next(
+            item
+            for item in receipt["attachments"]
+            if item["kind"] == "ALLOCATOR_V2_CAMPAIGN_VERIFICATION"
+        )
+        wrapper = json.loads((self.fixture.root / row["path"]).read_bytes())
+        decision = json.loads(base64.b64decode(wrapper["promotionDecisionBase64"]))
+        decision["status"] = "NON_PROMOTABLE_EVALUATION"
+        decision["selectedCandidate"] = "NONE"
+        decision_raw = CONTRACT.canonical_bytes(decision)
+        wrapper["promotionDecisionBase64"] = base64.b64encode(decision_raw).decode("ascii")
+        wrapper["promotionDecisionSha256"] = CONTRACT.sha256(decision_raw)
+        wrapper["receiptSha256"] = "0" * 64
+        wrapper["receiptSha256"] = CONTRACT.sha256(CONTRACT.canonical_bytes(wrapper))
+        self.fixture.rebind_attachment(
+            output,
+            receipt,
+            "ALLOCATOR_V2_CAMPAIGN_VERIFICATION",
+            CONTRACT.canonical_bytes(wrapper),
+        )
+        with self.assertRaisesRegex(CONTRACT.ChildError, "promotion decision"):
+            CONTRACT.build_final_child_identity(
+                self.fixture.root, output, "ALLOCATOR_SELECTION", self.fixture.tested
+            )
 
     def test_rejects_attachment_tamper(self) -> None:
         output, value = self.fixture.build("AB_NWG1_WIRE")
@@ -1427,7 +1852,7 @@ class M3ChildCheckerTest(unittest.TestCase):
         output, _ = self.fixture.build(
             "ALLOCATOR_SELECTION", omit={"ALLOCATOR_SCALE_100000_SUMMARY"}
         )
-        with self.assertRaisesRegex(CONTRACT.ChildError, "mandatory typed attachments"):
+        with self.assertRaisesRegex(CONTRACT.ChildError, "complete V1 or V2 authority"):
             CONTRACT.build_final_child_identity(
                 self.fixture.root, output, "ALLOCATOR_SELECTION", self.fixture.tested
             )

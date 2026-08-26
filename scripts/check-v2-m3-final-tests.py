@@ -46,11 +46,12 @@ def git(root: Path, *args: str) -> str:
 
 
 class FixtureBuilder:
-    def __init__(self) -> None:
+    def __init__(self, allocator_v2: bool = False) -> None:
         self.temporary = tempfile.TemporaryDirectory(prefix="nereus-m3-final-checker-")
         self.base = Path(self.temporary.name)
         self.root = self.base / "repo"
         self.root.mkdir()
+        self.allocator_v2 = allocator_v2
         git(self.root, "init", "-b", "main")
         git(self.root, "config", "user.name", "M3 Final Test")
         git(self.root, "config", "user.email", "m3-final@example.invalid")
@@ -263,6 +264,19 @@ class FixtureBuilder:
             summary = CHILD._sum_summaries(
                 [authority["rawSummary"], authority["verifierSummary"]]
             )
+        elif kind == "ALLOCATOR_V2_CAMPAIGN_VERIFICATION":
+            campaign = CHILD_TEST_SUPPORT.allocator_v2_campaign_fixture(
+                self.root, self.tested
+            )
+            raw = campaign["receipt"]
+            authority = CHILD.validate_allocator_v2_campaign_verification(
+                CHILD.load_canonical_json(
+                    raw, str(path), CHILD.ALLOCATOR_V2_VERIFICATION_MAX_BYTES
+                ),
+                self.root,
+                self.tested,
+            )
+            summary = authority["summary"]
         elif kind in CHILD.ALLOCATOR_DERIVED_KINDS:
             binding = self.bindings[(child_kind, kind)]
             _, _, subject_count = CHILD._expected_typed_profile(kind, child_kind)
@@ -316,7 +330,14 @@ class FixtureBuilder:
         for index, kind in enumerate(CONTRACT.CHILD_KINDS):
             if kind == "W1_CURRENT_SOURCE_M2_REGRESSION":
                 continue
-            attachment_kinds = sorted(CHILD.REQUIRED_ATTACHMENTS[kind])
+            attachment_kind_set = set(CHILD.REQUIRED_ATTACHMENTS[kind])
+            if kind == "ALLOCATOR_SELECTION":
+                attachment_kind_set.update(
+                    CHILD.ALLOCATOR_V2_AUTHORITY_ATTACHMENTS
+                    if self.allocator_v2
+                    else CHILD.ALLOCATOR_V1_AUTHORITY_ATTACHMENTS
+                )
+            attachment_kinds = sorted(attachment_kind_set)
             built = [
                 self._attachment(index, attachment_index, kind, attachment_kind)
                 for attachment_index, attachment_kind in enumerate(attachment_kinds)
@@ -436,6 +457,29 @@ class CheckerTest(unittest.TestCase):
         self.assertEqual(self.fixture.tested, tested)
         self.assertEqual(git(self.fixture.root, "rev-parse", "HEAD"), head)
         self.assertGreaterEqual(descendants, 3)
+
+    def test_accepts_exact_complete_final_with_allocator_v2_profile(self) -> None:
+        fixture = FixtureBuilder(allocator_v2=True)
+        try:
+            fixture.publish()
+            fixture.commit_final_and_sync_scenarios()
+            tested, head, descendants = CONTRACT.validate_receipt(
+                fixture.root, OUTPUT, fixture.tested
+            )
+            self.assertEqual(fixture.tested, tested)
+            self.assertEqual(git(fixture.root, "rev-parse", "HEAD"), head)
+            self.assertGreaterEqual(descendants, 3)
+            allocator = next(
+                row
+                for row in fixture.children
+                if row["kind"] == "ALLOCATOR_SELECTION"
+            )
+            self.assertEqual(
+                ["ALLOCATOR_V2_CAMPAIGN_VERIFICATION", "JUNIT_SUMMARY"],
+                [row["kind"] for row in allocator["attachments"]],
+            )
+        finally:
+            fixture.cleanup()
 
     def test_rejects_noncanonical_receipt(self) -> None:
         self.receipt_path().write_bytes(self.receipt_path().read_bytes() + b"\n")

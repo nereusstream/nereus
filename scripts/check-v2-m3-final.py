@@ -51,6 +51,7 @@ ATTACHMENT_KINDS = {
     "ALLOCATOR_RAW_VERIFICATION",
     "ALLOCATOR_SCALE_100000_SUMMARY",
     "ALLOCATOR_SCALE_10000_SUMMARY",
+    "ALLOCATOR_V2_CAMPAIGN_VERIFICATION",
     "CURRENT_SOURCE_M2_GATE_RESULT",
     "JUNIT_SUMMARY",
     "KMS_REAL_RECEIPT",
@@ -78,6 +79,14 @@ EXCLUSIONS = {
 }
 FINAL_EXCLUSIONS = ["M6_PROCESS_ACTIVATION", "M8_NATIVE_PARITY"]
 ALLOCATOR_MODES = {"RANGE", "STRICT"}
+ALLOCATOR_V1_AUTHORITY_ATTACHMENTS = {
+    "ALLOCATOR_FAULT_SUMMARY",
+    "ALLOCATOR_NATIVE_RELATIVE_SUMMARY",
+    "ALLOCATOR_RAW_VERIFICATION",
+    "ALLOCATOR_SCALE_10000_SUMMARY",
+    "ALLOCATOR_SCALE_100000_SUMMARY",
+}
+ALLOCATOR_V2_AUTHORITY_ATTACHMENTS = {"ALLOCATOR_V2_CAMPAIGN_VERIFICATION"}
 REQUIRED_TYPED_ATTACHMENTS = {
     "W1_CURRENT_SOURCE_M2_REGRESSION": {"CURRENT_SOURCE_M2_GATE_RESULT"},
     "AB_NWG1_WIRE": {
@@ -93,13 +102,7 @@ REQUIRED_TYPED_ATTACHMENTS = {
     "K_NWKCP1": {"PROTOCOL_FIXTURE"},
     "U_KAFKA_OBJECT_WAL": {"NATIVE_RESULT"},
     "P_PULSAR_OBJECT_WAL": {"NATIVE_RESULT"},
-    "ALLOCATOR_SELECTION": {
-        "ALLOCATOR_FAULT_SUMMARY",
-        "ALLOCATOR_NATIVE_RELATIVE_SUMMARY",
-        "ALLOCATOR_RAW_VERIFICATION",
-        "ALLOCATOR_SCALE_10000_SUMMARY",
-        "ALLOCATOR_SCALE_100000_SUMMARY",
-    },
+    "ALLOCATOR_SELECTION": set(),
 }
 REQUIRED_SCENARIOS = (
     "V2-FABRIC-002",
@@ -402,6 +405,15 @@ def _validate_child_shape(value: object, expected_kind: str, final_commit: str) 
     }
     if missing_kinds:
         raise FinalError(f"child mandatory typed attachments are absent: {expected_kind} {sorted(missing_kinds)}")
+    if expected_kind == "ALLOCATOR_SELECTION":
+        kinds = {row["kind"] for row in validated}
+        v1 = kinds.intersection(ALLOCATOR_V1_AUTHORITY_ATTACHMENTS)
+        v2 = kinds.intersection(ALLOCATOR_V2_AUTHORITY_ATTACHMENTS)
+        if v2:
+            if v2 != ALLOCATOR_V2_AUTHORITY_ATTACHMENTS or v1:
+                raise FinalError("allocator child mixes or incompletely supplies V1/V2 authority attachments")
+        elif v1 != ALLOCATOR_V1_AUTHORITY_ATTACHMENTS:
+            raise FinalError("allocator child lacks one complete V1 or V2 authority attachment profile")
     return child
 
 

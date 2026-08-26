@@ -1586,10 +1586,85 @@ tasks.register<Exec>("v2M3AllocatorVerificationSeal") {
     }
 }
 
+val v2M3AllocatorV2CheckpointPath = providers.gradleProperty("v2M3AllocatorV2CheckpointPath")
+val v2M3AllocatorV2EvaluationPath = providers.gradleProperty("v2M3AllocatorV2EvaluationPath")
+val v2M3AllocatorV2DiagnosticPath = providers.gradleProperty("v2M3AllocatorV2DiagnosticPath")
+val v2M3AllocatorV2DiagnosticJUnitPath = providers.gradleProperty("v2M3AllocatorV2DiagnosticJUnitPath")
+val v2M3AllocatorV2FormalJUnitPath = providers.gradleProperty("v2M3AllocatorV2FormalJUnitPath")
+val v2M3AllocatorV2PromotionOutput = providers.gradleProperty("v2M3AllocatorV2PromotionOutput")
+val v2M3AllocatorV2ExecutorArtifact = providers.gradleProperty("v2M3AllocatorV2ExecutorArtifact")
+val v2M3AllocatorV2WorkloadPlan = providers.gradleProperty("v2M3AllocatorV2WorkloadPlan")
+val v2M3AllocatorV2AttachmentDirectory = providers.gradleProperty("v2M3AllocatorV2AttachmentDirectory")
+val v2M3AllocatorV2VerificationReceiptOutput =
+    providers.gradleProperty("v2M3AllocatorV2VerificationReceiptOutput")
+
+tasks.register<Exec>("v2M3AllocatorV2VerificationSeal") {
+    group = "verification"
+    description =
+        "Run the offline V2 promotion reproof and seal NACP2/NAEV2/NADV2/JUnit/attachment authority for one future child."
+    dependsOn(":nereus-metadata-oxia:realAllocatorV2PromotionCheck")
+    workingDir = layout.projectDirectory.asFile
+    doFirst {
+        val attachmentDirectory = file(v2M3AllocatorV2AttachmentDirectory.get()).canonicalFile
+        check(attachmentDirectory.isDirectory && !java.nio.file.Files.isSymbolicLink(attachmentDirectory.toPath())) {
+            "allocator V2 execution attachment directory is absent or a link: $attachmentDirectory"
+        }
+        val attachments = attachmentDirectory.listFiles()
+            ?.sortedBy { it.name }
+            ?: emptyList()
+        check(attachments.size in 1..328 && attachments.all {
+            it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) && it.length() in 1..(16L * 1024L * 1024L)
+        }) {
+            "allocator V2 execution attachment inventory is empty, oversized, or not regular"
+        }
+        val command = mutableListOf(
+            "python3",
+            "scripts/publish-v2-m3-child.py",
+            "--repo-root",
+            layout.projectDirectory.asFile.absolutePath,
+            "--tested-commit",
+            v2M3TestedCommit.get(),
+            "--seal-allocator-v2-verification",
+            "--allocator-v2-checkpoint",
+            file(v2M3AllocatorV2CheckpointPath.get()).absolutePath,
+            "--allocator-v2-evaluation",
+            file(v2M3AllocatorV2EvaluationPath.get()).absolutePath,
+            "--allocator-v2-diagnostic",
+            file(v2M3AllocatorV2DiagnosticPath.get()).absolutePath,
+            "--allocator-v2-diagnostic-junit",
+            file(v2M3AllocatorV2DiagnosticJUnitPath.get()).absolutePath,
+            "--allocator-v2-formal-junit",
+            file(v2M3AllocatorV2FormalJUnitPath.get()).absolutePath,
+            "--allocator-v2-promotion-decision",
+            file(v2M3AllocatorV2PromotionOutput.get()).absolutePath,
+            "--allocator-v2-executor-artifact",
+            file(v2M3AllocatorV2ExecutorArtifact.get()).absolutePath,
+            "--allocator-v2-workload-plan",
+            file(v2M3AllocatorV2WorkloadPlan.get()).absolutePath,
+        )
+        attachments.forEach { attachment ->
+            command.addAll(listOf("--allocator-v2-execution-attachment", attachment.absolutePath))
+        }
+        command.addAll(
+            listOf(
+                "--sealed-output",
+                file(v2M3AllocatorV2VerificationReceiptOutput.get()).absolutePath,
+            ),
+        )
+        commandLine(command)
+    }
+}
+
+tasks.register("v2M3AllocatorV1CompatibilityCheck") {
+    group = "verification"
+    description = "Retain the strict V1 NARS1/NAEA1 governed parser path as compatibility-only authority."
+    dependsOn("v2M3AllocatorVerificationSeal")
+}
+
 tasks.register("v2M3AllocatorCheck") {
     group = "verification"
-    description = "Require the formal allocator run and governed thirteen-file raw verification receipt."
-    dependsOn("v2M3AllocatorVerificationSeal")
+    description = "Require one completed, uniquely selected ADR-0104 V2 campaign and its governed verification receipt."
+    dependsOn("v2M3AllocatorV2VerificationSeal")
 }
 
 val v2M3LocalCapEvidenceOutputDirectory = providers.gradleProperty("v2M3LocalCapEvidenceOutputDirectory")

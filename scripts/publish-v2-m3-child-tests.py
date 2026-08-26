@@ -124,7 +124,10 @@ class Fixture:
 
     def inputs_for(self, kind: str) -> list[tuple[str, Path]]:
         result: list[tuple[str, Path]] = []
-        for index, attachment_kind in enumerate(sorted(CONTRACT.REQUIRED_ATTACHMENTS[kind])):
+        required_kinds = set(CONTRACT.REQUIRED_ATTACHMENTS[kind])
+        if kind == "ALLOCATOR_SELECTION":
+            required_kinds.update(CONTRACT.ALLOCATOR_V1_AUTHORITY_ATTACHMENTS)
+        for index, attachment_kind in enumerate(sorted(required_kinds)):
             if (
                 kind == "ALLOCATOR_SELECTION"
                 and attachment_kind in CONTRACT.ALLOCATOR_DERIVED_KINDS
@@ -562,6 +565,85 @@ class M3ChildPublisherTest(unittest.TestCase):
                 PurePosixPath("docs/v2/evidence/v2-m3/children/allocator-forged.json"),
                 forged_inputs,
             )
+
+    def test_allocator_v2_sealer_and_publisher_bind_campaign_authority(self) -> None:
+        campaign = SUPPORT.allocator_v2_campaign_fixture(
+            self.fixture.root, self.fixture.tested
+        )
+        paths = campaign["paths"]
+        sealed_path = self.fixture.inputs / "allocator-v2-governed.json"
+        sealed = PUBLISHER.seal_allocator_v2_verification(
+            self.fixture.root,
+            self.fixture.tested,
+            paths["checkpoint"],
+            paths["evaluation"],
+            paths["diagnostic"],
+            paths["diagnosticJunit"],
+            paths["formalJunit"],
+            paths["promotionDecision"],
+            paths["executor"],
+            paths["workload"],
+            campaign["executionPaths"],
+            sealed_path,
+        )
+        authority = CONTRACT.validate_allocator_v2_campaign_verification(
+            CONTRACT.load_canonical_json(
+                sealed,
+                str(sealed_path),
+                CONTRACT.ALLOCATOR_V2_VERIFICATION_MAX_BYTES,
+            ),
+            self.fixture.root,
+            self.fixture.tested,
+        )
+        self.assertEqual("STRICT", authority["mode"])
+        self.assertEqual(1, authority["selectedRangeSize"])
+        self.assertEqual(
+            {"errors": 0, "failures": 0, "skipped": 0, "tests": 5},
+            authority["summary"],
+        )
+        with self.assertRaisesRegex(CONTRACT.ChildError, "refuses to overwrite"):
+            PUBLISHER.seal_allocator_v2_verification(
+                self.fixture.root,
+                self.fixture.tested,
+                paths["checkpoint"],
+                paths["evaluation"],
+                paths["diagnostic"],
+                paths["diagnosticJunit"],
+                paths["formalJunit"],
+                paths["promotionDecision"],
+                paths["executor"],
+                paths["workload"],
+                campaign["executionPaths"],
+                sealed_path,
+            )
+
+        inputs = sorted(
+            [
+                ("ALLOCATOR_V2_CAMPAIGN_VERIFICATION", sealed_path),
+                ("JUNIT_SUMMARY", self.fixture.junit("ALLOCATOR_SELECTION")),
+            ],
+            key=lambda item: item[0],
+        )
+        output = PurePosixPath("docs/v2/evidence/v2-m3/children/allocator-v2.json")
+        receipt_raw = PUBLISHER.publish_generic(
+            self.fixture.root,
+            "ALLOCATOR_SELECTION",
+            self.fixture.tested,
+            output,
+            inputs,
+        )
+        receipt = CONTRACT.load_canonical_json(receipt_raw, "published allocator V2 child")
+        self.assertEqual(
+            ["ALLOCATOR_V2_CAMPAIGN_VERIFICATION", "JUNIT_SUMMARY"],
+            [row["kind"] for row in receipt["attachments"]],
+        )
+        self.assertEqual(
+            {"errors": 0, "failures": 0, "skipped": 0, "tests": 8},
+            receipt["testSummary"],
+        )
+        CONTRACT.build_final_child_identity(
+            self.fixture.root, output, "ALLOCATOR_SELECTION", self.fixture.tested
+        )
 
     def test_refuses_overwrite(self) -> None:
         output = PurePosixPath("docs/v2/evidence/v2-m3/children/existing.json")
