@@ -44,8 +44,9 @@ integration, Kafka/Pulsar paths, allocator/Oxia path, and ordinary/governance/mo
 implementation checkpoints recorded by the M3 index. W1 also has a complete non-promotable current-source M2
 regression checkpoint. D1 now has an exact-source six-test/six-record local-cap runner whose CREATE_NEW payload binds
 the harness, test, and six component sources and explicitly claims no Provider transfer; it remains separate from C1
-real Provider/KMS evidence. Exact preselection C1 evidence now passes 4/0/0/0 at `e4d207e3...` and publishes
-non-promotable child `184fa0e2...a180`. Formal post-selection D1/C1/allocator receipts, final-source W1 freshness,
+real Provider/KMS evidence. Exact preselection D1 evidence passes 12/0/0/0 at `2b9636dd...` and publishes child
+`6769769b...2a78`; C1 passes 4/0/0/0 at `e4d207e3...` and publishes child `184fa0e2...a180`. Both are
+non-promotable. Formal post-selection D1/C1/allocator receipts, final-source W1 freshness,
 scenario promotion, and Final remain open. ADR 0101 now preserves exact Cell proofs under concurrent RANGE renewal after the
 failed `d819500f...` matrix selected no mode. ADR 0102 keeps the immutable 16-MiB JUnit cap after the
 `1ef4f108...` full matrix passed its one testcase but failed sealing because 970,241 identical expected native-harness
