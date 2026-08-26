@@ -223,6 +223,16 @@ than hidden. The closed directory is
 `SHA256SUMS` SHA-256 is `854d44ecad346a4446d874628f00b97c49d079bccbe9c753a86f05bd2dfc5638`. This remains diagnostic only, emits no
 selection/receipt, and does not replace a 10k RANGE nine-cut diagnostic or the complete five-candidate matrix.
 
+The follow-up exact-source RANGE-16 fault diagnostic at
+`3f1fa7caeb2c3e409d436e57c875562e573d9fdc` constructed the complete 10,000-Head population and executed all nine
+ADR-0094 cuts against real Oxia. Its one testcase completed in 47.696 seconds with zero failure/error/skip, the bash
+wrapper returned zero, and task-owned container
+`43b7163e3fc6eb26b9d3ca5e00cb7b698698b92bf0d0dd0fe379039f285fe774` was removed by its exit trap. The closed
+directory is `/Users/liusinan/Documents/Codex/2026-08-26/nereus-v2-m3-allocator/diagnostic-range-fault-3f1fa7ca`, and
+its `SHA256SUMS` SHA-256 is `68a4e4188e610bf8413c4256cf91446adbeb39a591fcf57ef9fdaf1b3d4c3d0d`. It emits no raw selection inventory or
+receipt, covers neither 100k nor native/throughput rows, selects no mode, and promotes no scenario. The complete matrix
+is still the only selection input.
+
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
 `NEREUS_V2_M3_D1_LOCAL_CAP_RESULT_V1` payload with CREATE_NEW after the runner hashes the harness, its test, and all
