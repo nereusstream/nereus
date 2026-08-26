@@ -55,7 +55,7 @@ public final class KafkaObjectWalNativeResultV1 {
             Path.of("nereus-kafka-bookkeeper/src/test/java/com/nereusstream/kafka/bookkeeper/object");
     private static final Path XML_ROOT = Path.of("nereus-kafka-bookkeeper/build/test-results/test");
     private static final Path BUILD_FILE = Path.of("nereus-kafka-bookkeeper/build.gradle.kts");
-    private static final int SOURCE_ARTIFACT_COUNT = 51;
+    private static final int SOURCE_ARTIFACT_COUNT = 52;
     private static final List<Path> M2_BRIDGE_SOURCES = List.of(
             Path.of("nereus-kafka-bookkeeper/src/main/java/com/nereusstream/kafka/bookkeeper/commit/"
                     + "KafkaCoherentCommitCoordinatorV1.java"),

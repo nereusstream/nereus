@@ -160,7 +160,7 @@ class KafkaObjectWalNativeResultV1Test {
                         + "KafkaPartitionPublicationOutcomeV1.java",
                 "nereus-kafka-bookkeeper/src/main/java/com/nereusstream/kafka/bookkeeper/protocol/"
                         + "KafkaPartitionSpeculativeRollbackSlotV1.java"));
-        for (int index = 0; index < 44; index++) {
+        for (int index = 0; index < 45; index++) {
             paths.add("nereus-kafka-bookkeeper/src/main/java/com/nereusstream/kafka/bookkeeper/object/"
                     + String.format("SyntheticInventory%02d.java", index));
         }
