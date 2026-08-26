@@ -294,6 +294,7 @@ change also invalidates any receipt whose exact Nereus source no longer matches.
 - Native reserved-interval exclusion and M6 broker activation remain separate source-qualified gates.
 - No allocator metadata record may be deleted or reused in 0.2 merely because a local test or stale receipt passed.
 
-This decision is made executable for evidence selection by ADR 0094. It refines ADRs 0027, 0032, 0041, 0048, 0049,
+This decision is made executable for evidence selection by ADR 0094; ADR 0100 refines the mass-takeover recovery
+endpoint without changing its wire or activation rule. It refines ADRs 0027, 0032, 0041, 0048, 0049,
 0054, 0055, 0061, 0082, 0083, and 0084 and is tracked by
 `T-POSITION-01`, `T-POLICY-01`, `V2-POSITION-013/014/017/018`, `M3-P1`, and `V2-OPEN-PUL-OBJ-09`.

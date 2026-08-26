@@ -195,5 +195,6 @@ attachments to exist and match.
 - ADRs 0055 and 0091 are amended only where they previously said thresholds/workload were predeclared but omitted the
   executable values. Their correctness, wire, and no-default rules remain unchanged.
 
-This decision refines ADRs 0055 and 0091 and is tracked by `T-POSITION-01`, `T-POLICY-01`,
+The mass-takeover recovery endpoint and bounded post-deadline drain are refined by ADR 0100. This decision refines
+ADRs 0055 and 0091 and is tracked by `T-POSITION-01`, `T-POLICY-01`,
 `V2-POSITION-013/014/017/018`, `V2-OPEN-PUL-OBJ-09`, and `M3-P1`.

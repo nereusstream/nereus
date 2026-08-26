@@ -1266,7 +1266,7 @@ final class AllocatorRawEvidenceValidatorV1 {
         private boolean qualifies(int population) {
             return cuts == AllocatorSelectionReceiptV1.REQUIRED_FAULT_CUTS
                     && recoveryMicros >= 0
-                    && recoveryMicros <= (population == 10_000 ? 30_000_000L : 60_000_000L)
+                    && recoveryMicros <= AllocatorEvidenceContextV1.massTakeoverRecoveryBoundMicros(population)
                     && failedAssertions == 0
                     && skippedAssertions == 0
                     && unexpectedErrors == 0

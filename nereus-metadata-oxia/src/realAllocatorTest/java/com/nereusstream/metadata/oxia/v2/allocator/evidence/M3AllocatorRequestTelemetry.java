@@ -214,7 +214,7 @@ final class M3AllocatorRequestTelemetry {
             endpoint(EventKind.OWNER_LOSS_DETECTED, EventOutcome.NONE);
         }
 
-        void freshOwnerAppendComplete() {
+        void freshOwnerRecoveryComplete(boolean withinSelectionDeadline) {
             rawWithOwnerEpoch(
                     EventKind.FRESH_OWNER_APPEND_COMPLETE,
                     EventOutcome.SUCCESS,
@@ -224,6 +224,11 @@ final class M3AllocatorRequestTelemetry {
                     0,
                     0,
                     ownerEpoch);
+            if (withinSelectionDeadline) {
+                completed();
+            } else {
+                timedOut();
+            }
         }
 
         void cutBegin() {

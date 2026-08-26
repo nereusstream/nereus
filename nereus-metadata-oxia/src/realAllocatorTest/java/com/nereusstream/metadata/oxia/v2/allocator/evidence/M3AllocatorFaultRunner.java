@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /** Executes every ADR-0094 cut against a full candidate population and four real Oxia sessions. */
@@ -30,6 +31,7 @@ final class M3AllocatorFaultRunner {
     private static final int CRASHED_ACTOR = 0;
     private static final int STORM_CONCURRENCY = M3AllocatorWorkloadPlan.WORKER_THREADS;
     private static final long FAULT_BATCH_DRAIN_TIMEOUT_SECONDS = 120;
+    private static final long MASS_TAKEOVER_POST_DEADLINE_DRAIN_SECONDS = 120;
 
     private final ExecutorService workers;
     private final M3RealOxiaActors actors;
@@ -138,28 +140,49 @@ final class M3AllocatorFaultRunner {
                 M3CandidateAllocatorPopulation.ResponseLossAt.NONE));
         barrier.awaitApplied();
         cutTrace.ownerLossDetected();
+        long recoveryDeadlineNanos = System.nanoTime()
+                + TimeUnit.MICROSECONDS.toNanos(
+                        AllocatorEvidenceContextV1.massTakeoverRecoveryBoundMicros(
+                                context.activeManagedLedgers()));
+        long cleanupDeadlineNanos = recoveryDeadlineNanos
+                + TimeUnit.SECONDS.toNanos(MASS_TAKEOVER_POST_DEADLINE_DRAIN_SECONDS);
         actor.closeSessionWithWorkInFlight();
         actor.reopenFreshSession();
         barrier.releaseResponse();
         inFlight.get(30, TimeUnit.SECONDS);
+        cutTrace.completed();
 
         List<Integer> affected = population.ledgersOwnedByActor(
                 CRASHED_ACTOR, context.activeManagedLedgers());
         AtomicReferenceArray<M3AllocatorRequestTelemetry.RequestTrace> recoveryTraces =
                 new AtomicReferenceArray<>(context.activeManagedLedgers());
+        AtomicLongArray recoveryOwnerEpochs = new AtomicLongArray(context.activeManagedLedgers());
         for (int ledgerIndex : affected) {
-            recoveryTraces.set(ledgerIndex, massTrace(context, cut, ledgerIndex));
+            M3AllocatorRequestTelemetry.RequestTrace trace = massTrace(context, cut, ledgerIndex);
+            trace.offered();
+            trace.enqueued();
+            trace.dispatched();
+            recoveryTraces.set(ledgerIndex, trace);
+            recoveryOwnerEpochs.set(ledgerIndex, population.nextOwnerEpoch(ledgerIndex));
         }
-        parallel(affected, ledgerIndex -> {
-            M3AllocatorRequestTelemetry.RequestTrace trace = recoveryTraces.get(ledgerIndex);
-            long newOwnerEpoch = population.nextOwnerEpoch(ledgerIndex);
-            population.takeover(trace, ledgerIndex, newOwnerEpoch);
-        });
-        parallel(affected, ledgerIndex -> {
-            M3AllocatorRequestTelemetry.RequestTrace trace = recoveryTraces.get(ledgerIndex);
-            population.rollover(trace, ledgerIndex, M3CandidateAllocatorPopulation.ResponseLossAt.NONE);
-            trace.freshOwnerAppendComplete();
-        });
+        parallelUntil(
+                affected,
+                ledgerIndex -> population.takeover(
+                        recoveryTraces.get(ledgerIndex),
+                        ledgerIndex,
+                        recoveryOwnerEpochs.get(ledgerIndex)),
+                cleanupDeadlineNanos,
+                "allocator mass-takeover Head phase");
+        parallelUntil(
+                affected,
+                ledgerIndex -> {
+                    M3AllocatorRequestTelemetry.RequestTrace trace = recoveryTraces.get(ledgerIndex);
+                    population.admitAppendUnderFreshOwner(
+                            trace, ledgerIndex, recoveryOwnerEpochs.get(ledgerIndex));
+                    trace.freshOwnerRecoveryComplete(System.nanoTime() <= recoveryDeadlineNanos);
+                },
+                cleanupDeadlineNanos,
+                "allocator mass-takeover append-admission phase");
         cutTrace.cutEnd();
     }
 
@@ -190,6 +213,24 @@ final class M3AllocatorFaultRunner {
     }
 
     private void parallel(List<Integer> indices, IndexedOperation operation) throws Exception {
+        parallel(indices, operation, FAULT_BATCH_DRAIN_TIMEOUT_SECONDS, "allocator fault batch");
+    }
+
+    private void parallelUntil(
+            List<Integer> indices,
+            IndexedOperation operation,
+            long absoluteDeadlineNanos,
+            String label) throws Exception {
+        long remainingNanos = absoluteDeadlineNanos - System.nanoTime();
+        long remainingSeconds = Math.max(1, TimeUnit.NANOSECONDS.toSeconds(remainingNanos) + 1);
+        parallel(indices, operation, remainingSeconds, label);
+    }
+
+    private void parallel(
+            List<Integer> indices,
+            IndexedOperation operation,
+            long timeoutSeconds,
+            String label) throws Exception {
         CompletionService<Void> completions = new ExecutorCompletionService<>(workers);
         for (int index : indices) {
             completions.submit(() -> {
@@ -197,15 +238,23 @@ final class M3AllocatorFaultRunner {
                 return null;
             });
         }
-        await(completions, indices.size());
+        await(completions, indices.size(), timeoutSeconds, label);
     }
 
     private static void await(CompletionService<Void> completions, int count) throws Exception {
+        await(completions, count, FAULT_BATCH_DRAIN_TIMEOUT_SECONDS, "allocator fault batch");
+    }
+
+    private static void await(
+            CompletionService<Void> completions,
+            int count,
+            long timeoutSeconds,
+            String label) throws Exception {
         M3BoundedCompletionDrain.await(
                 completions,
                 count,
-                FAULT_BATCH_DRAIN_TIMEOUT_SECONDS,
-                "allocator fault batch");
+                timeoutSeconds,
+                label);
     }
 
     private M3AllocatorRequestTelemetry.RequestTrace trace(

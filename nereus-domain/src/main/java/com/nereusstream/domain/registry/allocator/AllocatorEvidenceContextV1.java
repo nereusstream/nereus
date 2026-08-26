@@ -28,6 +28,8 @@ public record AllocatorEvidenceContextV1(
     public static final List<Integer> POPULATIONS = List.of(10_000, 100_000);
     public static final List<Integer> LATENCIES_MILLIS = List.of(1, 5, 10, 25);
     public static final List<Integer> OFFERED_RATES = List.of(200, 250, 333, 500, 750, 1000);
+    public static final long MASS_TAKEOVER_10K_BOUND_MICROS = 30_000_000L;
+    public static final long MASS_TAKEOVER_100K_BOUND_MICROS = 60_000_000L;
     private static final int NATIVE_CONTEXTS = 48;
     private static final int CONTEXTS_PER_CANDIDATE = 48;
 
@@ -91,6 +93,14 @@ public record AllocatorEvidenceContextV1(
                 ? AllocatorEvidenceCandidateV1.strict()
                 : AllocatorEvidenceCandidateV1.range(AllocatorEvidenceCandidateV1.RANGE_SIZES.get(candidateIndex - 1));
         return candidateContext(candidate, population, latency, rate);
+    }
+
+    public static long massTakeoverRecoveryBoundMicros(int activeManagedLedgers) {
+        return switch (activeManagedLedgers) {
+            case 10_000 -> MASS_TAKEOVER_10K_BOUND_MICROS;
+            case 100_000 -> MASS_TAKEOVER_100K_BOUND_MICROS;
+            default -> throw new IllegalArgumentException("allocator mass-takeover population differs from ADR 0094");
+        };
     }
 
     private static int row(int population, int latency, int rate) {

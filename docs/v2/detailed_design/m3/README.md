@@ -179,6 +179,19 @@ failure/error/skip in 86.270 seconds; its external checksum-manifest SHA-256 is
 `e9e9a4dc5805daa71683658441540c256dfaa4b3876ed6df7b96a7804be3cb27`. It emits no receipt, covers neither RANGE
 nor 100k/throughput rows, selects no mode, and promotes no scenario. The complete raw matrix remains required.
 
+The next complete-matrix attempt at exact clean source `e4f376c63e1b8458c8798d5ea9ca56cf39364377` ran for 40 minutes
+4 seconds, completed the native matrix, and then failed in the STRICT 10k mass-takeover second phase because 2,500
+fresh-owner rollover completions did not drain within 120 seconds. Its JUnit is exactly one test, one failure, zero
+errors, and zero skips; external checksum-manifest SHA-256 is
+`e15ac54a7ef3e5b53cb98d034a6952dcf856d4ee84b9cf89b686a6c928e957bb`. It is diagnostic only, writes no selection,
+and promotes no scenario. The failure exposed a workload mismatch rather than permission to extend a threshold:
+ADR 0100 now fixes the mass-recovery endpoint as exact production Head takeover followed by no-allocation fresh-owner
+append admission, while normal intervals remain the allocator-rollover throughput authority. The runner retains the
+complete affected-ledger inventory, exact write/reread/typed-terminal proofs, frozen 30/60-second selection limits,
+typed late timeout, and a separate 120-second post-deadline cleanup cap. The fresh seven-test raw parser suite and
+ten-test allocator contract gate pass with zero failure/error/skip. A new real-Oxia diagnostic and complete raw matrix
+at the eventual exact source remain mandatory.
+
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
 `NEREUS_V2_M3_D1_LOCAL_CAP_RESULT_V1` payload with CREATE_NEW after the runner hashes the harness, its test, and all

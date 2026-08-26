@@ -15,6 +15,7 @@
 package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.nereusstream.domain.registry.allocator.AllocatorEvidenceContextV1;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
@@ -51,6 +52,10 @@ class M3AllocatorWorkloadPlanTest {
         assertThat(M3AllocatorWorkloadPlan.WORKER_THREADS).isEqualTo(96);
         assertThat(M3AllocatorWorkloadPlan.BYTE_PAYLOAD_BYTES).isEqualTo(65_536);
         assertThat(M3AllocatorWorkloadPlan.AGE_ADVANCE_NANOS).isEqualTo(1_000_000_000L);
+        assertThat(AllocatorEvidenceContextV1.massTakeoverRecoveryBoundMicros(10_000))
+                .isEqualTo(30_000_000L);
+        assertThat(AllocatorEvidenceContextV1.massTakeoverRecoveryBoundMicros(100_000))
+                .isEqualTo(60_000_000L);
     }
 
     @Test

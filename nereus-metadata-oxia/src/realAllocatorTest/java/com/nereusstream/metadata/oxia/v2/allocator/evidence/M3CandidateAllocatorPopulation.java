@@ -187,6 +187,28 @@ final class M3CandidateAllocatorPopulation {
         }
     }
 
+    void admitAppendUnderFreshOwner(
+            M3AllocatorRequestTelemetry.RequestTrace trace, int ledgerIndex, long expectedOwnerEpoch) {
+        requireActive(ledgerIndex);
+        if (expectedOwnerEpoch <= INITIAL_OWNER_EPOCH) {
+            throw new IllegalArgumentException("fresh-owner append admission requires a successor owner epoch");
+        }
+        ReentrantLock lock = headLocks[ledgerIndex];
+        lock.lock();
+        try {
+            VersionedManagedLedgerAllocatorHeadV1 exactHead = requireHead(ledgerIndex);
+            if (exactHead.value().ownerEpoch() != expectedOwnerEpoch) {
+                throw new IllegalStateException("fresh-owner append admission did not observe the exact takeover Head");
+            }
+            trace.setOwnerEpoch(expectedOwnerEpoch);
+            trace.admitted();
+            trace.appendAdmissionStart();
+            trace.appendAdmissionRelease();
+        } finally {
+            lock.unlock();
+        }
+    }
+
     Allocation rolloverWithSingleOwnerTakeover(
             M3AllocatorRequestTelemetry.RequestTrace trace, int ledgerIndex) {
         requireActive(ledgerIndex);

@@ -20,8 +20,10 @@ import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceAttachmentKindV1;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceCandidateV1;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceContextV1;
+import com.nereusstream.domain.registry.allocator.AllocatorFaultCutV1;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.EventKind;
+import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.EventOutcome;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.OxiaOperationKind;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
@@ -54,6 +56,42 @@ import org.junit.jupiter.api.io.TempDir;
 
 class M3AllocatorEvidenceWiringTest {
     private static final Pattern SELF_SHA = Pattern.compile("\\\"selfSha256\\\":\\\"([0-9a-f]{64})\\\"");
+
+    @Test
+    void recordsLateFreshOwnerAdmissionAsExactRecoveryProofAndTypedTimeout() {
+        List<AllocatorRawEvidenceEventV1> events = new java.util.ArrayList<>();
+        M3AllocatorRequestTelemetry telemetry = new M3AllocatorRequestTelemetry(events::add, System.nanoTime());
+        AllocatorEvidenceContextV1 context = AllocatorEvidenceContextV1.candidateContext(
+                AllocatorEvidenceCandidateV1.strict(), 10_000, 1, 200);
+        M3AllocatorRequestTelemetry.RequestTrace trace = telemetry.trace(
+                context,
+                new M3AllocatorWorkloadPlan.PlannedRequest(
+                        1_000_004,
+                        1,
+                        4,
+                        M3AllocatorWorkloadPlan.Trigger.ENTRY,
+                        M3AllocatorWorkloadPlan.Phase.MEASURED_STEADY,
+                        0),
+                AllocatorFaultCutV1.BROKER_SESSION_CRASH_MASS_TAKEOVER,
+                2);
+
+        trace.admitted();
+        trace.appendAdmissionStart();
+        trace.appendAdmissionRelease();
+        trace.freshOwnerRecoveryComplete(false);
+
+        assertThat(events)
+                .extracting(AllocatorRawEvidenceEventV1::kind)
+                .containsExactly(
+                        EventKind.ADMITTED,
+                        EventKind.APPEND_ADMISSION_START,
+                        EventKind.APPEND_ADMISSION_RELEASE,
+                        EventKind.FRESH_OWNER_APPEND_COMPLETE,
+                        EventKind.TIMED_OUT);
+        assertThat(events.get(3).ownerEpoch()).isEqualTo(2);
+        assertThat(events.get(3).outcome()).isEqualTo(EventOutcome.SUCCESS);
+        assertThat(events.get(4).outcome()).isEqualTo(EventOutcome.TIMED_OUT);
+    }
 
     @Test
     void freezesTheExactFiveFileNaeaInventoryAndFailClosedSealEntrypoint() {
