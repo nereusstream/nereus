@@ -68,11 +68,14 @@ valid:
 - the promotion-decision schema, raw artifact hashes, `PROMOTABLE` result, selected candidate, and the independently
   rederived source-lock mode.
 
-The Java promotion gate remains the authoritative full planner/disposition reproof: it strictly decodes NACP2,
+The Java promotion gate remains the production-protocol planner/disposition reproof: it strictly decodes NACP2,
 reconstructs the campaign, reruns the validator and selector, recreates exact NAEV2, rehashes the attachment set and
-both JUnit inputs, and only then emits the promotion decision. The governed Python sealer/checker reparses the fixed
-outer wires and exact identities and rejects a decision whose raw inputs or selected mode differ. A caller assertion
-that execution or disposition is unnecessary is never an input.
+both JUnit inputs, and only then emits the promotion decision. The governed Python sealer/checker independently
+transcribes and replays the same deterministic state machine from the raw ordered interval/fault observations. It
+recomputes native sustainable rates, the 80-percent candidate floor, fault qualification, candidate elimination,
+qualified candidates, every disposition kind and dependency, and the exact evaluation status before checking the
+fixed wires and promotion decision. A caller assertion that execution or disposition is unnecessary is never an
+input; changing a disposition and fully rehashing NACP2, NAEV2, the decision, and both wrapper layers still fails.
 
 ### Evaluation and source-lock boundary
 
@@ -105,3 +108,5 @@ the V2 profile.
 - Final can require one exact selected allocator mode while retaining M6 process activation and M8 parity exclusions.
 - A later formal campaign still requires separate execution authority and all pre-campaign prerequisites; this ADR is
   not that authority.
+- The implemented checker covers both a validator-derived 20-cell `STRICT_SELECTED` campaign and the minimum
+  promotable 17-cell `RANGE_16` campaign while retaining valid non-promotable Java outcomes outside the child profile.

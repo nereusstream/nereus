@@ -787,6 +787,11 @@ diagnostic-only rather than promotion authority: exact source `5d86b572...` pass
 `4/0/0/0`, with NADV2 `9694673...d6e3` and JUnit `a8b0f884...55f3e`. The promotion gate does not trust a
 caller-created canonical evaluation or diagnostic attestation: it rederives exact NAEV2 bytes and rehashes both the
 diagnostic and formal JUnit inputs. Formal V2 campaign/evaluation/selection remain open and prohibited.
+ADR 0106 closes the child/Final governance version boundary without changing that prohibition. The V2 child wrapper
+binds NACP2/NAEV2/NADV2, both JUnit inputs, source/executor/workload identity, and every external attachment; its Python
+checker independently replays planner/disposition/selector semantics rather than trusting a promotion JSON. Exact
+`cccf16c4...` governance covers validator-derived 20-cell STRICT and 17-cell RANGE_16 selections plus a fully rehashed
+disposition-forgery rejection as part of 100/0/0/0 local contract tests. No formal campaign has run.
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.
