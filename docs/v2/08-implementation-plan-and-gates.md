@@ -63,7 +63,15 @@ bounds without accessing Oxia. The production-neutral SPI workflow now runs the 
 chain with a stable request/descriptor identity, exact same-key rereads, typed CAS/create reconciliation, and one
 global retry bound; it contains no Java lock or worker pool. Eight focused tests cover all response-loss points,
 independent coordinator conflict, retry exhaustion, and owner/slice/descriptor fail-closed cuts. These are
-implementation conformance, not campaign evidence. No empty
+implementation conformance, not campaign evidence. The V2 evidence source now also contains the physically bounded
+four-actor Runner and candidate harness: queue capacity is exactly twice the offered rate, every actor lane admits at
+most one request, queued work receives only the pre-admission drop at the frozen cutoff, and admitted work has one
+fixed five-second cleanup deadline and one real terminal. The Runner exposes backlog/in-flight/waiter/terminal facts,
+and the harness revalidates both conservation equations while adapting four identity-distinct instances of the same
+production-neutral workflow. Seven focused contract tests cover Cell concurrency four with per-lane concurrency one,
+queue overflow/cutoff, completion/failure/timeout partitioning, warm-up separation, independent actor routing, and the
+absence of a Java correctness lock or worker pool. It is not yet wired to a V2 campaign/checkpoint/sealer and is not
+real-Oxia or promotion evidence. No empty
 task, documentation-only receipt, synthetic Root fixture, diagnostic
 real-service run, or focused local PASS may promote an M3 scenario.
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains

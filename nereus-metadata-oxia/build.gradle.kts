@@ -426,6 +426,7 @@ tasks.register<Test>("realAllocatorContractTest") {
     filter {
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3AllocatorWorkloadPlanTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3AllocatorEvidenceWiringTest")
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2BoundedActorLaneRunnerTest")
     }
 }
 

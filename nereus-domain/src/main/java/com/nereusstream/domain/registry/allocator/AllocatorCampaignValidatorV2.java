@@ -15,6 +15,7 @@
 package com.nereusstream.domain.registry.allocator;
 
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.Campaign;
+import com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.IntervalEvidence;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.Plan;
 import java.util.Objects;
 
@@ -30,5 +31,10 @@ public final class AllocatorCampaignValidatorV2 {
                     "allocator V2 caller dispositions differ from deterministic validator recomputation");
         }
         return recomputed;
+    }
+
+    /** Recomputes both ADR-0104 endpoint conservation equations from raw runner counters. */
+    public static void validateIntervalConservation(IntervalEvidence interval) {
+        AllocatorCampaignPlannerV2.validateConservation(Objects.requireNonNull(interval, "interval"));
     }
 }
