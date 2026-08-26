@@ -22,7 +22,6 @@ import com.nereusstream.domain.registry.allocator.AllocatorCampaignCheckpointV2.
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignCheckpointV2.SourceBinding;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignCheckpointV2.Status;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignPlannerV2;
-import com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.Campaign;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.Observation;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.Plan;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.RequiredAction;
