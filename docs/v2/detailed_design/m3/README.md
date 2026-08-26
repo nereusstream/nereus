@@ -189,8 +189,13 @@ ADR 0100 now fixes the mass-recovery endpoint as exact production Head takeover 
 append admission, while normal intervals remain the allocator-rollover throughput authority. The runner retains the
 complete affected-ledger inventory, exact write/reread/typed-terminal proofs, frozen 30/60-second selection limits,
 typed late timeout, and a separate 120-second post-deadline cleanup cap. The fresh seven-test raw parser suite and
-ten-test allocator contract gate pass with zero failure/error/skip. A new real-Oxia diagnostic and complete raw matrix
-at the eventual exact source remain mandatory.
+ten-test allocator contract gate pass with zero failure/error/skip. The exact-source replacement diagnostic at
+`023a2006f89e699ed621a61291c739d04d01dd54` then passed the complete STRICT 10k nine-cut batch as one test with zero
+failure/error/skip in 5.871 seconds. Its external checksum-manifest SHA-256 is
+`149a267fbdd29c1cc58c71a67db115f28ead75ce5599e0aa8f17c8390ee785d0`; every listed file rehashes exactly and the
+task-owned Oxia container was removed. This remains diagnostic only: it emits no receipt, covers neither RANGE nor
+100k/throughput rows, selects no mode, and promotes no scenario. The complete raw matrix at the eventual exact source
+remains mandatory.
 
 The D1 local half now has a separate formal execution chain. `v2M3LocalCapEvidenceTest` executes only the six
 source-governed capacity testcase identities, and `ObjectWalLocalCapacityHarnessV1` writes the exact six-record
