@@ -366,6 +366,7 @@ Accepted decisions:
 - [ADR 0103: M3 allocator population-construction batch scheduling amendment](../decisions/0103-v2-m3-allocator-population-construction-batch-scheduling-amendment.md)
 - [ADR 0104: M3 allocator validator-proof adaptive campaign amendment](../decisions/0104-v2-m3-allocator-validator-proof-adaptive-campaign-amendment.md)
 - [ADR 0105: M3 preselection evidence source-lock amendment](../decisions/0105-v2-m3-preselection-evidence-source-lock-amendment.md)
+- [ADR 0106: M3 allocator V2 child and Final evidence amendment](../decisions/0106-v2-m3-allocator-v2-child-final-evidence-amendment.md)
 
 ## Open design gates
 

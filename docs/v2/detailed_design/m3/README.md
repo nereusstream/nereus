@@ -366,6 +366,14 @@ SHA-256 `4bd6d4feefb7a6e3df05ee0a54b7ab996ad2faf6a158a734d9ac47056d26c0cc`; the 
 diagnostic prerequisite only and supplies no NACP2, NAEV2, campaign evaluation, mode selection, child receipt,
 scenario PASS, or authority to run a full formal campaign.
 
+[ADR 0106](../../../decisions/0106-v2-m3-allocator-v2-child-final-evidence-amendment.md) closes the governance-version
+gap without creating selection evidence. The existing `ALLOCATOR_SELECTION` child now owns mutually exclusive V1
+compatibility and V2 campaign attachment profiles. V1 NARS1/NAEA1/raw-recomputation parsing stays unchanged; the V2
+profile binds completed NACP2, exact NAEV2/NADV2, formal and diagnostic JUnit, the external execution-attachment
+inventory, the Java validator's promotion decision, and the selected-mode source lock. NONE/BOTH remain valid
+non-promotable evaluations, and interrupted/infrastructure-failed campaigns remain unable to produce an evaluation.
+The amendment itself authorizes no campaign, child, scenario promotion, or Final claim.
+
 [ADR 0105](../../../decisions/0105-v2-m3-preselection-evidence-source-lock-amendment.md) versions the typed-evidence
 source-lock contract as `NEREUS_V2_M3_EVIDENCE_SOURCE_LOCKS_V2`. Its `UNSELECTED` state permits exact non-allocator
 child evidence without fabricating a mode, while allocator sealing and Final still require the uniquely qualified
