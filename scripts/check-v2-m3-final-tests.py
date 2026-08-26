@@ -299,6 +299,10 @@ class FixtureBuilder:
             raw = CHILD.canonical_bytes(value)
         elif kind == "MUTATION_MANIFEST":
             raw = (SOURCE_ROOT / "docs/v2/wire/nwg1-v1-golden-manifest.json").read_bytes()
+        elif kind == "RECOVERY_MANIFEST":
+            raw = CHILD_TEST_SUPPORT.recovery_manifest_fixture()
+        elif kind == "PROTOCOL_FIXTURE":
+            raw = CHILD_TEST_SUPPORT.protocol_fixture_fixture()
         else:
             raw = f"attachment:{child_index}:{child_kind}:{kind}".encode()
         self._write(path, raw)

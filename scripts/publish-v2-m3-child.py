@@ -194,6 +194,10 @@ def _derive_summary(
                 raw, os.fspath(source_path), CONTRACT.MUTATION_MANIFEST_MAX_BYTES
             )
             CONTRACT.validate_mutation_manifest(value)
+        elif attachment_kind == "RECOVERY_MANIFEST":
+            CONTRACT.validate_recovery_manifest(raw)
+        elif attachment_kind == "PROTOCOL_FIXTURE":
+            CONTRACT.validate_protocol_fixture(raw)
         elif attachment_kind == "NATIVE_RESULT":
             value = CONTRACT.load_canonical_json(
                 raw, os.fspath(source_path), CONTRACT.SEALED_NATIVE_MAX_BYTES

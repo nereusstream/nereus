@@ -734,7 +734,11 @@ def write_native_source_fixture(root: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"// fixture source: {relative}\n")
     kafka = CONTRACT.NATIVE_PROFILES["U_KAFKA_OBJECT_WAL"]
-    listed = set(paths)
+    listed = set(paths) | {
+        path
+        for path in CONTRACT.GOVERNED_JUNIT_SOURCE_PATHS.values()
+        if path.startswith("nereus-kafka-bookkeeper/")
+    }
     missing = kafka["sourceArtifactCount"] - sum(
         1
         for path in listed
@@ -774,6 +778,51 @@ def write_governed_junit_source_fixture(root: Path) -> None:
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("\n".join(source) + "\n")
+
+
+def recovery_manifest_fixture() -> bytes:
+    rows = ["\t".join(CONTRACT.RECOVERY_MANIFEST_HEADER)]
+    rows.extend("\t".join(row) for row in CONTRACT.RECOVERY_MANIFEST_ROWS)
+    return ("\n".join(rows) + "\n").encode()
+
+
+def protocol_fixture_fixture() -> bytes:
+    root_sha = bytes([12]) * 32
+    object_body = bytearray(324)
+    object_body[:8] = CONTRACT.NWKCP1_MAGIC
+    object_body[8:12] = (64).to_bytes(4, "big")
+    object_body[16:24] = len(object_body).to_bytes(8, "big")
+    object_body[24:56] = root_sha
+    object_body[56:60] = (1).to_bytes(4, "big")
+    object_body[64:68] = (224).to_bytes(4, "big")
+    object_sha = CONTRACT.sha256(bytes(object_body))
+    object_key = (
+        f"{CONTRACT.PROTOCOL_FIXTURE_ROOT}/protocol/kafka/nwkcp1-v1/objects/"
+        f"sha256-v1-{object_sha}.nwkcp1"
+    )
+    head_key = f"{CONTRACT.PROTOCOL_FIXTURE_ROOT}/protocol/kafka/nwkcp1-v1/head"
+
+    def head(state: int) -> bytes:
+        value = bytearray(434)
+        value[:8] = CONTRACT.NWKCP1_HEAD_MAGIC
+        value[8:12] = len(value).to_bytes(4, "big")
+        value[12:44] = root_sha
+        value[44:52] = (9).to_bytes(8, "big")
+        value[52] = state
+        return bytes(value)
+
+    rows = ["\t".join(CONTRACT.PROTOCOL_FIXTURE_HEADER)]
+    for artifact_id, state, key, body in (
+        ("NWKCP1_OBJECT", "IMMUTABLE", object_key, bytes(object_body)),
+        ("KAFKA_PROTOCOL_CHECKPOINT_HEAD_OPEN", "OPEN", head_key, head(0)),
+        ("KAFKA_PROTOCOL_CHECKPOINT_HEAD_TERMINAL", "TERMINAL", head_key, head(1)),
+    ):
+        rows.append(
+            "\t".join(
+                (artifact_id, state, key, str(len(body)), CONTRACT.sha256(body), body.hex())
+            )
+        )
+    return ("\n".join(rows) + "\n").encode()
 
 
 def git(root: Path, *args: str) -> str:
@@ -908,6 +957,10 @@ class Fixture:
                 raw = allocator_raw
             elif attachment_kind == "LOCAL_CAP_RESULT":
                 raw = local_cap_result_fixture(self.root, self.tested)
+            elif attachment_kind == "RECOVERY_MANIFEST":
+                raw = recovery_manifest_fixture()
+            elif attachment_kind == "PROTOCOL_FIXTURE":
+                raw = protocol_fixture_fixture()
             elif attachment_kind in CONTRACT.NORMALIZED_TYPED_KINDS:
                 raw = self.typed(attachment_kind, kind)
             else:
@@ -1049,6 +1102,34 @@ class M3ChildCheckerTest(unittest.TestCase):
         with self.assertRaisesRegex(CONTRACT.ChildError, "bytes/SHA differ"):
             CONTRACT.build_final_child_identity(
                 self.fixture.root, output, "AB_NWG1_WIRE", self.fixture.tested
+            )
+
+    def test_rejects_fully_rehashed_recovery_manifest_substitution(self) -> None:
+        output, value = self.fixture.build("R_CONTROL_RECOVERY")
+        raw = recovery_manifest_fixture().replace(
+            b"strict canonical Root Pointer Seal checkpoint round trip",
+            b"caller substituted claim",
+        )
+        self.fixture.rebind_attachment(output, value, "RECOVERY_MANIFEST", raw)
+        with self.assertRaisesRegex(CONTRACT.ChildError, "closed row inventory differs"):
+            CONTRACT.build_final_child_identity(
+                self.fixture.root, output, "R_CONTROL_RECOVERY", self.fixture.tested
+            )
+
+    def test_rejects_fully_rehashed_protocol_fixture_state_substitution(self) -> None:
+        output, value = self.fixture.build("K_NWKCP1")
+        lines = protocol_fixture_fixture().decode().splitlines()
+        fields = lines[2].split("\t")
+        body = bytearray.fromhex(fields[5])
+        body[52] = 1
+        fields[4] = CONTRACT.sha256(bytes(body))
+        fields[5] = body.hex()
+        lines[2] = "\t".join(fields)
+        raw = ("\n".join(lines) + "\n").encode()
+        self.fixture.rebind_attachment(output, value, "PROTOCOL_FIXTURE", raw)
+        with self.assertRaisesRegex(CONTRACT.ChildError, "Head wire/context/state differs"):
+            CONTRACT.build_final_child_identity(
+                self.fixture.root, output, "K_NWKCP1", self.fixture.tested
             )
 
     def test_parses_closed_large_mutation_manifest_under_dedicated_cap(self) -> None:

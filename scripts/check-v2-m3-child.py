@@ -49,6 +49,8 @@ TYPED_SCHEMA = "NEREUS_V2_M3_NORMALIZED_TYPED_EVIDENCE_V1"
 CHILD_PREFIX = PurePosixPath("docs/v2/evidence/v2-m3/children")
 MAX_CANONICAL_BYTES = 131_072
 MUTATION_MANIFEST_MAX_BYTES = 1_048_576
+RECOVERY_MANIFEST_MAX_BYTES = 65_536
+PROTOCOL_FIXTURE_MAX_BYTES = 65_536
 MAX_SINGLE_ATTACHMENT_BYTES = FINAL.MAX_SINGLE_EVIDENCE_BYTES
 MAX_TOTAL_ATTACHMENT_BYTES = FINAL.MAX_TOTAL_EVIDENCE_BYTES
 MAX_SAFE_INTEGER = FINAL.MAX_SAFE_INTEGER
@@ -147,6 +149,74 @@ MUTATION_EXPECTED_COUNTS = {
     "resignOperations": 8,
     "validationStages": 16,
 }
+RECOVERY_MANIFEST_HEADER = ("recordId", "component", "testClass", "testMethod", "claim")
+RECOVERY_MANIFEST_ROWS = (
+    (
+        "R01_CONTROL_WIRE",
+        "CONTROL_WIRE",
+        "com.nereusstream.storage.object.control.WalRunControlCodecTest",
+        "rootPointerSealAndCheckpointRecordsRoundTripCanonically",
+        "strict canonical Root Pointer Seal checkpoint round trip",
+    ),
+    (
+        "R02_LAZY_LANES",
+        "LAZY_LANES",
+        "com.nereusstream.storage.object.control.WalRunRuntimeTest",
+        "lanesInstantiateLazilyAndResolveIndependently",
+        "three lazy lanes remain independently resolved",
+    ),
+    (
+        "R03_CHECKPOINT_PUBLISH",
+        "CHECKPOINT_PUBLISH",
+        "com.nereusstream.storage.object.control.WalCheckpointPublisherTest",
+        "takeoverPreservesCommittedHeadAndStaleEpochCannotRegress",
+        "checkpoint takeover preserves the committed Head",
+    ),
+    (
+        "R04_CHECKPOINT_RECOVERY",
+        "CHECKPOINT_RECOVERY",
+        "com.nereusstream.storage.object.control.WalCheckpointChainVerifierTest",
+        "streamingRecoveryWalksBackFromHeadAndChargesTheRootOwnedBudget",
+        "streaming chain recovery charges the Root budget",
+    ),
+    (
+        "R05_SEAL_SUCCESSOR",
+        "SEAL_SUCCESSOR",
+        "com.nereusstream.storage.object.control.WalRunLifecycleManagerTest",
+        "sealedPointerCrashNeedsCandidateThenAdvancesOrAdoptsOnlyExactLineage",
+        "sealed pointer recovery accepts only exact successor lineage",
+    ),
+    (
+        "R06_LINEAGE_RECOVERY",
+        "LINEAGE_RECOVERY",
+        "com.nereusstream.storage.object.recovery.WalRunLineageRecoveryTest",
+        "exactLineageWalkValidatesRootAndPredecessorSeal",
+        "bounded lineage walk verifies every Root and predecessor Seal",
+    ),
+    (
+        "R07_BOUNDED_TAIL",
+        "BOUNDED_TAIL",
+        "com.nereusstream.storage.object.recovery.BoundedObjectTailRecoveryTest",
+        "productionRootBoundInventoryParsesExactLeafAndRejectsRuntimeExpansion",
+        "Root bound inventory rejects runtime expansion",
+    ),
+    (
+        "R08_SESSION_LIFECYCLE",
+        "SESSION_LIFECYCLE",
+        "com.nereusstream.storage.object.control.WalRunObjectSessionTest",
+        "ownsProviderAndKmsLifecycleAndErasesRunKeysOnClose",
+        "Provider and KMS sessions close with run key erasure",
+    ),
+)
+PROTOCOL_FIXTURE_HEADER = ("artifactId", "state", "key", "length", "sha256", "hex")
+PROTOCOL_FIXTURE_IDS = (
+    ("NWKCP1_OBJECT", "IMMUTABLE"),
+    ("KAFKA_PROTOCOL_CHECKPOINT_HEAD_OPEN", "OPEN"),
+    ("KAFKA_PROTOCOL_CHECKPOINT_HEAD_TERMINAL", "TERMINAL"),
+)
+PROTOCOL_FIXTURE_ROOT = "cells/01/shards/0007/runs/0000000000000000001"
+NWKCP1_MAGIC = bytes.fromhex("4e574b4350310001")
+NWKCP1_HEAD_MAGIC = bytes.fromhex("4e574b4831000001")
 
 NATIVE_RESULT_SCHEMA = "nereus-v2-m3-native-result-v1"
 NATIVE_RESULT_MAX_BYTES = 256 * 1024
@@ -254,6 +324,26 @@ GOVERNED_JUNIT_REQUIRED_TESTS = {
     },
     "R_CONTROL_RECOVERY": {
         (
+            "com.nereusstream.storage.object.recovery.WalRunRecoveryManifestV1Test",
+            "closedInventoryBindsExactControlAndRecoveryCases",
+        ),
+        (
+            "com.nereusstream.storage.object.control.WalRunControlCodecTest",
+            "rootPointerSealAndCheckpointRecordsRoundTripCanonically",
+        ),
+        (
+            "com.nereusstream.storage.object.control.WalRunRuntimeTest",
+            "lanesInstantiateLazilyAndResolveIndependently",
+        ),
+        (
+            "com.nereusstream.storage.object.control.WalCheckpointPublisherTest",
+            "takeoverPreservesCommittedHeadAndStaleEpochCannotRegress",
+        ),
+        (
+            "com.nereusstream.storage.object.control.WalCheckpointChainVerifierTest",
+            "streamingRecoveryWalksBackFromHeadAndChargesTheRootOwnedBudget",
+        ),
+        (
             "com.nereusstream.storage.object.control.WalRunLifecycleManagerTest",
             "sealedPointerCrashNeedsCandidateThenAdvancesOrAdoptsOnlyExactLineage",
         ),
@@ -265,15 +355,31 @@ GOVERNED_JUNIT_REQUIRED_TESTS = {
             "com.nereusstream.storage.object.recovery.WalRunLineageRecoveryTest",
             "exactLineageWalkValidatesRootAndPredecessorSeal",
         ),
+        (
+            "com.nereusstream.storage.object.control.WalRunObjectSessionTest",
+            "ownsProviderAndKmsLifecycleAndErasesRunKeysOnClose",
+        ),
     },
     "K_NWKCP1": {
         (
-            "com.nereusstream.storage.object.control.WalRunControlCodecTest",
-            "rootPointerSealAndCheckpointRecordsRoundTripCanonically",
+            "com.nereusstream.kafka.bookkeeper.object.nwkcp1.Nwkcp1ProtocolFixtureV1Test",
+            "exactProtocolFixtureMatchesProductionCodecAndStrictRoundTrips",
         ),
         (
-            "com.nereusstream.storage.object.control.WalCheckpointChainVerifierTest",
-            "streamingRecoveryWalksBackFromHeadAndChargesTheRootOwnedBudget",
+            "com.nereusstream.kafka.bookkeeper.object.nwkcp1.Nwkcp1CodecV1Test",
+            "roundTripsStrictWireKeyAndHead",
+        ),
+        (
+            "com.nereusstream.kafka.bookkeeper.object.nwkcp1.ObjectKafkaProtocolCheckpointStoreV1Test",
+            "convergesResponseLossAdvancesOrdinalAndTakesOver",
+        ),
+        (
+            "com.nereusstream.kafka.bookkeeper.object.nwkcp1.StorageObjectNwkcp1BackendV1Test",
+            "terminalHeadRequiresExactPhysicalClosureAndFencesFurtherPublicationAndTakeover",
+        ),
+        (
+            "com.nereusstream.kafka.bookkeeper.object.nwkcp1.StorageObjectNwkcp1BackendV1Test",
+            "underboundStreamingCheckpointBudgetFailsBeforeAnyPageMetadataRead",
         ),
     },
     "ALLOCATOR_SELECTION": {
@@ -283,13 +389,18 @@ GOVERNED_JUNIT_REQUIRED_TESTS = {
         )
     },
 }
+def _governed_junit_source_path(test_class: str) -> str:
+    if test_class.startswith("com.nereusstream.metadata.oxia."):
+        root = "nereus-metadata-oxia/src/test/java/"
+    elif test_class.startswith("com.nereusstream.kafka.bookkeeper."):
+        root = "nereus-kafka-bookkeeper/src/test/java/"
+    else:
+        root = "nereus-storage-object/src/test/java/"
+    return root + test_class.replace(".", "/") + ".java"
+
+
 GOVERNED_JUNIT_SOURCE_PATHS = {
-    test_class: (
-        "nereus-metadata-oxia/src/test/java/" if test_class.startswith("com.nereusstream.metadata.oxia.")
-        else "nereus-storage-object/src/test/java/"
-    )
-    + test_class.replace(".", "/")
-    + ".java"
+    test_class: _governed_junit_source_path(test_class)
     for required in GOVERNED_JUNIT_REQUIRED_TESTS.values()
     for test_class, _ in required
 }
@@ -511,7 +622,7 @@ NATIVE_PROFILES = {
         "counters": KAFKA_NATIVE_COUNTERS,
         "junitRoot": "nereus-kafka-bookkeeper/build/test-results/test",
         "requiredTests": KAFKA_NATIVE_REQUIRED_TESTS,
-        "sourceArtifactCount": 51,
+        "sourceArtifactCount": 52,
         "exactNonJavaSources": ("nereus-kafka-bookkeeper/build.gradle.kts",),
         "sourceRoots": KAFKA_NATIVE_SOURCE_ROOTS,
         "suiteTestCounts": (4, 3, 17, 14, 3),
@@ -1620,6 +1731,102 @@ def validate_mutation_manifest(value: object) -> None:
         rows = manifest[name]
         if not isinstance(rows, list) or len(rows) != count or any(not isinstance(row, dict) for row in rows):
             raise ChildError(f"NWG1 mutation manifest {name} count/schema differs")
+
+
+def _closed_tsv_rows(
+    raw: bytes, label: str, maximum_bytes: int, header: tuple[str, ...]
+) -> list[tuple[str, ...]]:
+    if not raw or len(raw) > maximum_bytes or b"\r" in raw or b"\0" in raw or not raw.endswith(b"\n"):
+        raise ChildError(f"{label} byte envelope or line endings differ")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ChildError(f"{label} is not strict UTF-8") from error
+    lines = text[:-1].split("\n")
+    if not lines or tuple(lines[0].split("\t")) != header:
+        raise ChildError(f"{label} header differs")
+    rows = [tuple(line.split("\t")) for line in lines[1:]]
+    if any(len(row) != len(header) or any(not field for field in row) for row in rows):
+        raise ChildError(f"{label} row grammar differs")
+    return rows
+
+
+def validate_recovery_manifest(raw: bytes) -> None:
+    rows = _closed_tsv_rows(
+        raw,
+        "WalRun recovery manifest",
+        RECOVERY_MANIFEST_MAX_BYTES,
+        RECOVERY_MANIFEST_HEADER,
+    )
+    if tuple(rows) != RECOVERY_MANIFEST_ROWS:
+        raise ChildError("WalRun recovery manifest closed row inventory differs")
+    manifested_tests = {(row[2], row[3]) for row in rows}
+    governed_tests = set(GOVERNED_JUNIT_REQUIRED_TESTS["R_CONTROL_RECOVERY"])
+    governed_tests.remove(
+        (
+            "com.nereusstream.storage.object.recovery.WalRunRecoveryManifestV1Test",
+            "closedInventoryBindsExactControlAndRecoveryCases",
+        )
+    )
+    if manifested_tests != governed_tests:
+        raise ChildError("WalRun recovery manifest differs from the governed JUnit inventory")
+
+
+def validate_protocol_fixture(raw: bytes) -> None:
+    rows = _closed_tsv_rows(
+        raw,
+        "NWKCP1 protocol fixture",
+        PROTOCOL_FIXTURE_MAX_BYTES,
+        PROTOCOL_FIXTURE_HEADER,
+    )
+    if len(rows) != 3 or tuple((row[0], row[1]) for row in rows) != PROTOCOL_FIXTURE_IDS:
+        raise ChildError("NWKCP1 protocol fixture closed artifact/state inventory differs")
+
+    decoded: list[bytes] = []
+    for index, row in enumerate(rows):
+        try:
+            length = int(row[3])
+            body = bytes.fromhex(row[5])
+        except (ValueError, TypeError) as error:
+            raise ChildError("NWKCP1 protocol fixture length/hex is not canonical") from error
+        if row[3] != str(length) or length <= 0 or length != len(body):
+            raise ChildError("NWKCP1 protocol fixture declared length differs")
+        if row[5] != body.hex() or row[4] != sha256(body):
+            raise ChildError("NWKCP1 protocol fixture body SHA/hex differs")
+        decoded.append(body)
+
+    object_key = (
+        f"{PROTOCOL_FIXTURE_ROOT}/protocol/kafka/nwkcp1-v1/objects/"
+        f"sha256-v1-{rows[0][4]}.nwkcp1"
+    )
+    head_key = f"{PROTOCOL_FIXTURE_ROOT}/protocol/kafka/nwkcp1-v1/head"
+    if rows[0][2] != object_key or rows[1][2] != head_key or rows[2][2] != head_key:
+        raise ChildError("NWKCP1 protocol fixture key grammar or content identity differs")
+
+    object_body, open_head, terminal_head = decoded
+    if (
+        len(object_body) != 324
+        or object_body[:8] != NWKCP1_MAGIC
+        or int.from_bytes(object_body[8:12], "big") != 64
+        or object_body[12:16] != bytes(4)
+        or int.from_bytes(object_body[16:24], "big") != len(object_body)
+        or int.from_bytes(object_body[56:60], "big") != 1
+        or int.from_bytes(object_body[64:68], "big") != 224
+    ):
+        raise ChildError("NWKCP1 protocol fixture Object header/row envelope differs")
+    for head, expected_state in ((open_head, 0), (terminal_head, 1)):
+        if (
+            len(head) != 434
+            or head[:8] != NWKCP1_HEAD_MAGIC
+            or int.from_bytes(head[8:12], "big") != len(head)
+            or head[12:44] != object_body[24:56]
+            or int.from_bytes(head[44:52], "big") != 9
+            or head[52] != expected_state
+            or head[53:56] != bytes(3)
+        ):
+            raise ChildError("NWKCP1 protocol fixture Head wire/context/state differs")
+    if open_head[:52] != terminal_head[:52] or open_head[53:-4] != terminal_head[53:-4]:
+        raise ChildError("NWKCP1 OPEN to TERMINAL fixture changes fields outside state/CRC")
 
 
 def _validate_kms_raw_receipt(
@@ -3325,6 +3532,10 @@ def validate_generic_value(
             validate_mutation_manifest(
                 load_canonical_json(raw, str(path), MUTATION_MANIFEST_MAX_BYTES)
             )
+        elif row["kind"] == "RECOVERY_MANIFEST":
+            validate_recovery_manifest(raw)
+        elif row["kind"] == "PROTOCOL_FIXTURE":
+            validate_protocol_fixture(raw)
         elif row["kind"] == "NATIVE_RESULT":
             normalized.append(
                 validate_native_result(

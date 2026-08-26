@@ -269,6 +269,14 @@ WAL/source on which checkpoint replay depends. Unselected residue requires bound
 The Head/terminal lifecycle remains outside append ACK and cannot authorize physical recovery omission, protection
 release, or source GC. Exact Head wire, key grammar, vector caps, and backend mapping are M3 evidence outputs.
 
+M3 implementation evidence uses two closed, parser-checked TSV artifacts rather than an opaque receipt attachment.
+The WalRun recovery manifest binds the exact control wire, lazy-lane, checkpoint publication/recovery, Seal/successor,
+lineage, bounded-tail, and Provider/KMS-session test identities. The NWKCP1 protocol fixture is emitted by the
+production codecs and binds one 324-byte immutable Object plus 434-byte OPEN and TERMINAL Heads, including exact keys,
+body SHA-256 values, and wire hex. The child validator recomputes the TSV grammar, hashes, key/content relationship,
+Root binding, state byte, and OPEN-to-TERMINAL field stability. These fixtures do not promote a scenario, replace
+native Kafka evidence, or freeze a complete synthetic WalRun Root/Pointer wire contract.
+
 Every run root fixes hard aggregate extent-count, canonical-byte, age, and recoverable-predecessor limits. All lane
 builders, plaintext/compressed/ciphertext/request/retry copies and in-flight work charge shared Cell/host ceilings;
 lanes instantiate lazily and never receive duplicate full run budgets. Before any limit can be crossed, the owner stops

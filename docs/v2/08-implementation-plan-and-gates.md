@@ -101,6 +101,13 @@ Exact `1d181dc6...` common Object-WAL state evidence passes 7/0/0/0 and publishe
 `ed5b131e...2f4a`, binding all 50 deterministic traces and the closed 21-outcome/call-profile inventory. This child
 is common-kernel evidence only; it neither substitutes for Kafka/Pulsar native evidence nor promotes a scenario.
 
+R/K ordinary evidence inputs are now closed artifacts instead of opaque typed files. The eight-row WalRun recovery
+manifest and its self-test bind the control, lazy-lane, checkpoint, Seal/successor, lineage, bounded-tail, and session
+inventory. The production-codec NWKCP1 emitter binds a 324-byte immutable Object and 434-byte OPEN/TERMINAL Heads.
+The child validator recomputes their rows, keys, byte lengths, SHA-256 values, Root context and state transition, and
+rejects fully rehashed substitutions. Module checks pass 148/0/0/0 and 261/0/0/0; exact-source R/K receipts remain
+open and neither artifact promotes a scenario or substitutes for Kafka native evidence.
+
 ADR 0105 versions M3 typed-evidence source locks so the current preselection state is explicitly `UNSELECTED`.
 Non-allocator children may bind the exact M3 Kafka/Pulsar branches and fixed Provider/KMS artifacts in that state,
 but allocator sealing and M3 Final require a uniquely qualified `STRICT` or `RANGE` mode. The mode transition changes

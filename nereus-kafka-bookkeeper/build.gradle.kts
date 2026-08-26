@@ -170,3 +170,13 @@ tasks.register<JavaExec>("v2M3KafkaNativeReceiptCheck") {
         )
     }
 }
+
+tasks.register<JavaExec>("nwkcp1ProtocolFixtureEmitter") {
+    group = "verification"
+    description = "Emit the exact NWKCP1 Object and OPEN/TERMINAL Head protocol fixture."
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("com.nereusstream.kafka.bookkeeper.object.nwkcp1.Nwkcp1ProtocolFixtureV1Test")
+    args(providers.gradleProperty("nwkcp1ProtocolFixtureOutput").get())
+    outputs.upToDateWhen { false }
+}
