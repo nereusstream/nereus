@@ -430,6 +430,12 @@ these prerequisite gates are clean. Work therefore continues with the remaining 
 receipts; final-source Provider/KMS and M2 regression freshness, scenario synchronization, and M3 Final remain open.
 Each stable boundary must be committed and pushed before the next evidence-bearing boundary is evaluated.
 
+The authoritative `v2M3ModuleApiSourceCheck` now defaults to `v2M3PulsarEvidenceWorktree` (or
+`NEREUS_M3_PULSAR_EVIDENCE_WORKTREE`) and the dedicated `pulsar-worktrees/nereus-v2-m3` path. It no longer inherits
+the generic shared Pulsar checkout default that its own fail-closed script must reject. A governance test freezes this
+configuration boundary in both root build and settings; callers may still use the legacy explicit `pulsarCheckout`
+override, but the M3-specific property/environment has precedence.
+
 ## Current boundary
 
 | Slice | Design or output | Status at this documentation cut |

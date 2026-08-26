@@ -72,6 +72,11 @@ dependencyResolutionManagement {
 val configuredPulsarCheckout = providers.gradleProperty("pulsarCheckout").orNull
     ?: providers.environmentVariable("NEREUS_PULSAR_CHECKOUT").orNull
 val conventionalPulsarCheckout = file("../../nereusstream/pulsar")
+val configuredM3PulsarEvidenceWorktree =
+    providers.gradleProperty("v2M3PulsarEvidenceWorktree").orNull
+        ?: providers.environmentVariable("NEREUS_M3_PULSAR_EVIDENCE_WORKTREE").orNull
+        ?: configuredPulsarCheckout
+val conventionalM3PulsarEvidenceWorktree = file("../../nereusstream/pulsar-worktrees/nereus-v2-m3")
 val m3DedicatedPulsarRequired = gradle.startParameter.taskNames.any { requested ->
     val task = requested.substringAfterLast(':')
     task.startsWith("v2M3ModuleApi") || task == "v2M3Check"
@@ -86,14 +91,23 @@ val pulsarSourceRequired = gradle.startParameter.taskNames.any { requested ->
             || task in setOf("v2M3M2RegressionSourceCheck", "v2M3InputsCheck", "v2M3Check")
             || task == "v2M2Check"
 }
-val pulsarCheckout = configuredPulsarCheckout?.let(::file)
-    ?: conventionalPulsarCheckout.takeIf {
-        pulsarSourceRequired && !m3DedicatedPulsarRequired && it.resolve("settings.gradle.kts").isFile
+val m3PulsarEvidenceWorktree = configuredM3PulsarEvidenceWorktree?.let(::file)
+    ?: conventionalM3PulsarEvidenceWorktree.takeIf {
+        m3DedicatedPulsarRequired && it.resolve("settings.gradle.kts").isFile
     }
+val pulsarCheckout = if (m3DedicatedPulsarRequired) {
+    m3PulsarEvidenceWorktree
+} else {
+    configuredPulsarCheckout?.let(::file)
+        ?: conventionalPulsarCheckout.takeIf {
+            pulsarSourceRequired && it.resolve("settings.gradle.kts").isFile
+        }
+}
 
-require(!m3DedicatedPulsarRequired || configuredPulsarCheckout != null) {
-    "The M3 module/API gate requires an explicit dedicated Pulsar worktree via " +
-            "-PpulsarCheckout=/path/to/pulsar or NEREUS_PULSAR_CHECKOUT; it never falls back to the shared checkout."
+require(!m3DedicatedPulsarRequired || m3PulsarEvidenceWorktree != null) {
+    "The M3 module/API gate requires the dedicated Pulsar evidence worktree via " +
+            "-Pv2M3PulsarEvidenceWorktree=/path/to/pulsar, NEREUS_M3_PULSAR_EVIDENCE_WORKTREE, " +
+            "or the conventional pulsar-worktrees/nereus-v2-m3 path."
 }
 require(pulsarCheckout != null || !pulsarSourceRequired) {
     "The requested task requires the exact Pulsar source composite. Set -PpulsarCheckout=/path/to/pulsar " +

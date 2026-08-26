@@ -1309,11 +1309,17 @@ tasks.register("v2M3Nwg1WireCheck") {
     dependsOn("v2M3Nwg1WireSourceCheck", "v2M3Nwg1MutationCheck", "v2DocumentationCheck")
 }
 
+val v2M3PulsarEvidenceWorktree = providers.gradleProperty("v2M3PulsarEvidenceWorktree")
+    .orElse(providers.environmentVariable("NEREUS_M3_PULSAR_EVIDENCE_WORKTREE"))
+    .orElse(providers.gradleProperty("pulsarCheckout"))
+    .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
+    .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar-worktrees/nereus-v2-m3").asFile.absolutePath)
+
 tasks.register<Exec>("v2M3ModuleApiSourceCheck") {
     group = "verification"
     description = "Run the serialized clean M3 module/API publication, JUnit/style, and external-consumer closure gate."
     workingDir = layout.projectDirectory.asFile
-    commandLine("bash", "scripts/check-v2-m3-module-api.sh", pulsarCheckoutPath.get())
+    commandLine("bash", "scripts/check-v2-m3-module-api.sh", v2M3PulsarEvidenceWorktree.get())
     usesService(m3NestedGradleGate)
 }
 
@@ -1334,9 +1340,6 @@ val v2M3TestedCommit = providers.gradleProperty("v2M3TestedCommit")
 val v2M3KafkaEvidenceWorktree = providers.gradleProperty("v2M3KafkaEvidenceWorktree")
     .orElse(providers.environmentVariable("NEREUS_M3_KAFKA_EVIDENCE_WORKTREE"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/kafka-worktrees/nereus-v2-m3").asFile.absolutePath)
-val v2M3PulsarEvidenceWorktree = providers.gradleProperty("v2M3PulsarEvidenceWorktree")
-    .orElse(providers.environmentVariable("NEREUS_M3_PULSAR_EVIDENCE_WORKTREE"))
-    .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar-worktrees/nereus-v2-m3").asFile.absolutePath)
 val v2M3OxiaServerEvidenceWorktree = providers.gradleProperty("v2M3OxiaServerEvidenceWorktree")
     .orElse(providers.environmentVariable("NEREUS_M3_OXIA_SERVER_EVIDENCE_WORKTREE"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/oxia-worktrees/nereus-v2-m3").asFile.absolutePath)
@@ -1348,6 +1351,7 @@ val v2M3OxiaClientEvidenceWorktree = providers.gradleProperty("v2M3OxiaClientEvi
     )
 
 val v2M3GovernanceTaskProviders = linkedMapOf(
+    "v2M3ModuleApiContractTest" to "scripts/check-v2-m3-module-api-tests.py",
     "v2M3InputsContractTest" to "scripts/check-v2-m3-inputs-tests.py",
     "v2M3M2RegressionContractTest" to "scripts/check-v2-m3-m2-regression-tests.py",
     "v2M3M2RegressionPublisherContractTest" to "scripts/publish-v2-m3-m2-regression-tests.py",
