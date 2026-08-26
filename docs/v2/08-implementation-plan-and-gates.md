@@ -106,7 +106,9 @@ manifest and its self-test bind the control, lazy-lane, checkpoint, Seal/success
 inventory. The production-codec NWKCP1 emitter binds a 324-byte immutable Object and 434-byte OPEN/TERMINAL Heads.
 The child validator recomputes their rows, keys, byte lengths, SHA-256 values, Root context and state transition, and
 rejects fully rehashed substitutions. Module checks pass 148/0/0/0 and 261/0/0/0; exact-source R/K receipts remain
-open and neither artifact promotes a scenario or substitutes for Kafka native evidence.
+open at that implementation boundary and neither artifact promotes a scenario or substitutes for Kafka native
+evidence. Exact `35e6784d...` R evidence subsequently passes 9/0/0/0 and publishes non-promotable child
+`1863f293...8f90`; post-selection R freshness and the exact-source K child remain open.
 
 ADR 0105 versions M3 typed-evidence source locks so the current preselection state is explicitly `UNSELECTED`.
 Non-allocator children may bind the exact M3 Kafka/Pulsar branches and fixed Provider/KMS artifacts in that state,
