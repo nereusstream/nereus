@@ -476,15 +476,36 @@
     "promotionEligible": false,
     "evidenceStatus": "FOCUSED_EXACT_SOURCE_EVIDENCE"
   },
+  "m3NativeEvidenceBindings": {
+    "decision": "docs/decisions/0099-v2-m3-native-and-allocator-source-lock-separation.md",
+    "kafka": {
+      "repository": "https://github.com/nereusstream/kafka.git",
+      "branch": "nereus/v2-m3-object-wal-evidence",
+      "logicalRepository": "apache/kafka",
+      "sourceCommit": "323e035145d203f7e74e969341cb610f33e71b7d"
+    },
+    "pulsar": {
+      "repository": "https://github.com/nereusstream/pulsar.git",
+      "branch": "nereus/v2-m3-object-wal-evidence",
+      "logicalRepository": "apache/pulsar",
+      "sourceCommit": "7ff908330809f2e9bc5c69ead87bb85c566bc0a9"
+    },
+    "result": "ACCEPTED_M3_NATIVE_EVIDENCE_INPUT_ONLY",
+    "promotionEligible": false,
+    "evidenceStatus": "ACCEPTED_INPUT_ONLY"
+  },
   "m3AllocatorEvidenceBinding": {
     "decision": "docs/decisions/0097-v2-m3-reproducible-allocator-oxia-image-amendment.md",
     "pulsarRepository": "https://github.com/nereusstream/pulsar.git",
     "pulsarBranch": "nereus/v2-m3-object-wal-evidence",
+    "pulsarLogicalRepository": "apache/pulsar",
     "pulsarSourceCommit": "7ff908330809f2e9bc5c69ead87bb85c566bc0a9",
     "oxiaClientRepository": "https://github.com/nereusstream/oxia-client-java.git",
     "oxiaClientEvidenceCheckoutBranch": "nereus/v2-m3-object-wal-evidence",
     "oxiaClientPublishedRef": "refs/heads/nereus/v2-m1.1a-o1-notification-continuity",
     "oxiaClientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+    "oxiaClientJarBasename": "oxia-client-0.9.4.jar",
+    "oxiaClientJarBytes": 385309,
     "oxiaClientJarSha256": "0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5",
     "oxiaServerRepository": "https://github.com/nereusstream/oxia.git",
     "oxiaServerEvidenceCheckoutBranch": "nereus/v2-m3-object-wal-evidence",

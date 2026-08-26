@@ -734,61 +734,183 @@ def _required_string(value: object, label: str) -> str:
     return value
 
 
-def _find_by_id(value: object, expected_id: str, label: str) -> dict[str, Any]:
-    if not isinstance(value, list):
-        raise ChildError(f"source-lock list is absent: {label}")
-    rows = [row for row in value if isinstance(row, dict) and row.get("id") == expected_id]
-    if len(rows) != 1:
-        raise ChildError(f"source-lock ID is absent or duplicated: {label}/{expected_id}")
-    return rows[0]
+def _m3_native_source(locks: dict[str, Any], name: str) -> dict[str, Any]:
+    native = _exact_members(
+        locks.get("m3NativeEvidenceBindings"),
+        {
+            "decision",
+            "evidenceStatus",
+            "kafka",
+            "promotionEligible",
+            "pulsar",
+            "result",
+        },
+        "m3NativeEvidenceBindings",
+    )
+    if (
+        native["decision"]
+        != "docs/decisions/0099-v2-m3-native-and-allocator-source-lock-separation.md"
+        or native["result"] != "ACCEPTED_M3_NATIVE_EVIDENCE_INPUT_ONLY"
+        or native["promotionEligible"] is not False
+        or native["evidenceStatus"] != "ACCEPTED_INPUT_ONLY"
+    ):
+        raise ChildError("M3 native evidence source-lock identity/result differs")
+    row = _exact_members(
+        native[name],
+        {"branch", "logicalRepository", "repository", "sourceCommit"},
+        f"m3NativeEvidenceBindings.{name}",
+    )
+    if row["branch"] != M3_EXTERNAL_EVIDENCE_BRANCH:
+        raise ChildError(f"M3 native evidence branch differs: {name}")
+    _required_string(row["repository"], f"M3 native {name} repository")
+    _required_string(row["logicalRepository"], f"M3 native {name} logical repository")
+    if not COMMIT_PATTERN.fullmatch(
+        _required_string(row["sourceCommit"], f"M3 native {name} source commit")
+    ):
+        raise ChildError(f"M3 native evidence commit is not canonical: {name}")
+    return row
+
+
+def _m3_allocator_source(locks: dict[str, Any]) -> dict[str, Any]:
+    row = _exact_members(
+        locks.get("m3AllocatorEvidenceBinding"),
+        {
+            "decision",
+            "evidenceStatus",
+            "historicalM1ImageReplacement",
+            "oxiaClientEvidenceCheckoutBranch",
+            "oxiaClientJarBasename",
+            "oxiaClientJarBytes",
+            "oxiaClientJarSha256",
+            "oxiaClientPublishedRef",
+            "oxiaClientRepository",
+            "oxiaClientSourceCommit",
+            "oxiaImageBuildScript",
+            "oxiaImageBuildScriptSha256",
+            "oxiaImageRecipe",
+            "oxiaImageRecipeSha256",
+            "oxiaServerBinaryVersion",
+            "oxiaServerEvidenceCheckoutBranch",
+            "oxiaServerImageDigest",
+            "oxiaServerImagePlatform",
+            "oxiaServerImageReference",
+            "oxiaServerImageSourceEpoch",
+            "oxiaServerPublishedRef",
+            "oxiaServerRepository",
+            "oxiaServerSourceCommit",
+            "promotionEligible",
+            "pulsarBranch",
+            "pulsarLogicalRepository",
+            "pulsarRepository",
+            "pulsarSourceCommit",
+            "result",
+        },
+        "m3AllocatorEvidenceBinding",
+    )
+    if (
+        row.get("decision")
+        != "docs/decisions/0097-v2-m3-reproducible-allocator-oxia-image-amendment.md"
+        or row.get("result") != "ACCEPTED_M3_ALLOCATOR_EXECUTOR_INPUT_ONLY"
+        or row.get("promotionEligible") is not False
+        or row.get("evidenceStatus") != "ACCEPTED_INPUT_ONLY"
+    ):
+        raise ChildError("M3 allocator source-lock identity/result differs")
+    for field in ("pulsarSourceCommit", "oxiaClientSourceCommit", "oxiaServerSourceCommit"):
+        if not COMMIT_PATTERN.fullmatch(
+            _required_string(row[field], f"m3AllocatorEvidenceBinding.{field}")
+        ):
+            raise ChildError(f"M3 allocator source-lock commit is not canonical: {field}")
+    for field in (
+        "oxiaClientJarSha256",
+        "oxiaImageBuildScriptSha256",
+        "oxiaImageRecipeSha256",
+    ):
+        if not SHA256_PATTERN.fullmatch(
+            _required_string(row[field], f"m3AllocatorEvidenceBinding.{field}")
+        ):
+            raise ChildError(f"M3 allocator source-lock SHA is not canonical: {field}")
+    if (
+        row["pulsarBranch"] != M3_EXTERNAL_EVIDENCE_BRANCH
+        or row["oxiaClientEvidenceCheckoutBranch"] != M3_EXTERNAL_EVIDENCE_BRANCH
+        or row["oxiaServerEvidenceCheckoutBranch"] != M3_EXTERNAL_EVIDENCE_BRANCH
+        or row["historicalM1ImageReplacement"] is not False
+        or not isinstance(row["oxiaClientJarBytes"], int)
+        or isinstance(row["oxiaClientJarBytes"], bool)
+        or row["oxiaClientJarBytes"] <= 0
+        or not isinstance(row["oxiaServerImageSourceEpoch"], int)
+        or isinstance(row["oxiaServerImageSourceEpoch"], bool)
+        or row["oxiaServerImageSourceEpoch"] <= 0
+        or not re.fullmatch(
+            r"sha256:[0-9a-f]{64}",
+            _required_string(
+                row["oxiaServerImageDigest"],
+                "m3AllocatorEvidenceBinding.oxiaServerImageDigest",
+            ),
+        )
+    ):
+        raise ChildError("M3 allocator source-lock branch/artifact coordinates differ")
+    return row
 
 
 def _expected_locked_identity(
     locks: dict[str, Any], evidence_kind: str, backend: str, locked_identity: str
 ) -> str:
-    if evidence_kind == "NATIVE_RESULT" and backend == "KAFKA_NATIVE":
-        kafka = _required_object(locks.get("k1KafkaAuthorityBinding"), "k1KafkaAuthorityBinding")
+    if evidence_kind == "NATIVE_RESULT":
+        name = "kafka" if backend == "KAFKA_NATIVE" else "pulsar"
+        native = _m3_native_source(locks, name)
         return (
-            "KAFKA_NATIVE|repository=apache/kafka"
+            backend
+            + "|repository="
+            + _required_string(native["logicalRepository"], f"M3 native {name} logical repository")
             + "|commit="
-            + _required_string(kafka.get("finalForkCommit"), "k1KafkaAuthorityBinding.finalForkCommit")
+            + _required_string(native["sourceCommit"], f"M3 native {name} source commit")
         )
-    if evidence_kind in {"NATIVE_RESULT", "ALLOCATOR_NATIVE_RELATIVE_SUMMARY"}:
-        pulsar = _required_object(locks.get("m2PulsarNativeBinding"), "m2PulsarNativeBinding")
+    if evidence_kind == "ALLOCATOR_NATIVE_RELATIVE_SUMMARY":
+        allocator = _m3_allocator_source(locks)
         return (
-            "PULSAR_NATIVE|repository=apache/pulsar"
+            "PULSAR_NATIVE|repository="
+            + _required_string(
+                allocator.get("pulsarLogicalRepository"),
+                "m3AllocatorEvidenceBinding.pulsarLogicalRepository",
+            )
             + "|commit="
-            + _required_string(pulsar.get("finalForkCommit"), "m2PulsarNativeBinding.finalForkCommit")
+            + _required_string(
+                allocator.get("pulsarSourceCommit"),
+                "m3AllocatorEvidenceBinding.pulsarSourceCommit",
+            )
         )
     if evidence_kind in {
         "ALLOCATOR_FAULT_SUMMARY",
         "ALLOCATOR_SCALE_10000_SUMMARY",
         "ALLOCATOR_SCALE_100000_SUMMARY",
     }:
-        pulsar = _required_object(locks.get("m2PulsarNativeBinding"), "m2PulsarNativeBinding")
-        oxia_fork = _find_by_id(
-            locks.get("dependencyForkOutputs"),
-            "oxia-client-notification-continuity",
-            "dependencyForkOutputs",
-        )
-        dependency = _required_object(
-            locks.get("dependencyEvidenceBindings"), "dependencyEvidenceBindings"
-        )
-        client = _required_object(dependency.get("oxiaClientArtifacts"), "oxiaClientArtifacts")
-        artifacts = _required_object(client.get("artifacts"), "oxiaClientArtifacts.artifacts")
-        client_jar = _required_object(artifacts.get("clientJar"), "oxiaClientArtifacts.clientJar")
-        server = _required_object(dependency.get("oxiaServerRuntime"), "oxiaServerRuntime")
+        allocator = _m3_allocator_source(locks)
         return (
             "OXIA_AND_PULSAR|pulsarCommit="
-            + _required_string(pulsar.get("finalForkCommit"), "m2PulsarNativeBinding.finalForkCommit")
+            + _required_string(
+                allocator.get("pulsarSourceCommit"),
+                "m3AllocatorEvidenceBinding.pulsarSourceCommit",
+            )
             + "|oxiaClientCommit="
-            + _required_string(oxia_fork.get("finalForkCommit"), "oxia client finalForkCommit")
+            + _required_string(
+                allocator.get("oxiaClientSourceCommit"),
+                "m3AllocatorEvidenceBinding.oxiaClientSourceCommit",
+            )
             + "|oxiaClientJarSha256="
-            + _required_string(client_jar.get("sha256"), "oxia client jar SHA")
+            + _required_string(
+                allocator.get("oxiaClientJarSha256"),
+                "m3AllocatorEvidenceBinding.oxiaClientJarSha256",
+            )
             + "|oxiaServerCommit="
-            + _required_string(server.get("sourceCommit"), "oxia server sourceCommit")
+            + _required_string(
+                allocator.get("oxiaServerSourceCommit"),
+                "m3AllocatorEvidenceBinding.oxiaServerSourceCommit",
+            )
             + "|oxiaServerImageDigest="
-            + _required_string(server.get("imageDigest"), "oxia server imageDigest")
+            + _required_string(
+                allocator.get("oxiaServerImageDigest"),
+                "m3AllocatorEvidenceBinding.oxiaServerImageDigest",
+            )
         )
     if evidence_kind in {"PROVIDER_REAL_RECEIPT", "KMS_REAL_RECEIPT"}:
         if (
@@ -803,52 +925,87 @@ def _expected_locked_identity(
 def _expected_locked_provenance(
     locks: dict[str, Any], evidence_kind: str, backend: str, source_identity: str
 ) -> str:
-    if evidence_kind == "NATIVE_RESULT" and backend == "KAFKA_NATIVE":
-        kafka = _required_object(locks.get("k1KafkaAuthorityBinding"), "k1KafkaAuthorityBinding")
+    if evidence_kind == "NATIVE_RESULT":
+        name = "kafka" if backend == "KAFKA_NATIVE" else "pulsar"
+        native = _m3_native_source(locks, name)
+        prefix = "KAFKA_FORK" if name == "kafka" else "PULSAR_FORK"
         return (
-            "KAFKA_FORK|repository="
-            + _required_string(kafka.get("repository"), "k1KafkaAuthorityBinding.repository")
+            prefix
+            + "|repository="
+            + _required_string(native["repository"], f"M3 native {name} repository")
             + "|branch="
-            + M3_EXTERNAL_EVIDENCE_BRANCH
+            + _required_string(native["branch"], f"M3 native {name} branch")
             + "|commit="
-            + _required_string(kafka.get("finalForkCommit"), "k1KafkaAuthorityBinding.finalForkCommit")
-            + "|logicalRepository=apache/kafka"
+            + _required_string(native["sourceCommit"], f"M3 native {name} source commit")
+            + "|logicalRepository="
+            + _required_string(native["logicalRepository"], f"M3 native {name} logical repository")
         )
-    if evidence_kind in {"NATIVE_RESULT", "ALLOCATOR_NATIVE_RELATIVE_SUMMARY"}:
-        pulsar = _required_object(locks.get("m2PulsarNativeBinding"), "m2PulsarNativeBinding")
+    if evidence_kind == "ALLOCATOR_NATIVE_RELATIVE_SUMMARY":
+        allocator = _m3_allocator_source(locks)
         return (
             "PULSAR_FORK|repository="
-            + _required_string(pulsar.get("repository"), "m2PulsarNativeBinding.repository")
+            + _required_string(
+                allocator.get("pulsarRepository"),
+                "m3AllocatorEvidenceBinding.pulsarRepository",
+            )
             + "|branch="
-            + M3_EXTERNAL_EVIDENCE_BRANCH
+            + _required_string(
+                allocator.get("pulsarBranch"),
+                "m3AllocatorEvidenceBinding.pulsarBranch",
+            )
             + "|commit="
-            + _required_string(pulsar.get("finalForkCommit"), "m2PulsarNativeBinding.finalForkCommit")
-            + "|logicalRepository=apache/pulsar"
+            + _required_string(
+                allocator.get("pulsarSourceCommit"),
+                "m3AllocatorEvidenceBinding.pulsarSourceCommit",
+            )
+            + "|logicalRepository="
+            + _required_string(
+                allocator.get("pulsarLogicalRepository"),
+                "m3AllocatorEvidenceBinding.pulsarLogicalRepository",
+            )
         )
     if evidence_kind in {
         "ALLOCATOR_FAULT_SUMMARY",
         "ALLOCATOR_SCALE_10000_SUMMARY",
         "ALLOCATOR_SCALE_100000_SUMMARY",
     }:
-        pulsar = _required_object(locks.get("m2PulsarNativeBinding"), "m2PulsarNativeBinding")
-        oxia = _find_by_id(
-            locks.get("dependencyForkOutputs"),
-            "oxia-client-notification-continuity",
-            "dependencyForkOutputs",
-        )
+        allocator = _m3_allocator_source(locks)
         return (
             "ALLOCATOR_FORKS|pulsarRepository="
-            + _required_string(pulsar.get("repository"), "m2PulsarNativeBinding.repository")
+            + _required_string(
+                allocator.get("pulsarRepository"),
+                "m3AllocatorEvidenceBinding.pulsarRepository",
+            )
             + "|pulsarBranch="
-            + M3_EXTERNAL_EVIDENCE_BRANCH
+            + _required_string(
+                allocator.get("pulsarBranch"),
+                "m3AllocatorEvidenceBinding.pulsarBranch",
+            )
             + "|pulsarCommit="
-            + _required_string(pulsar.get("finalForkCommit"), "m2PulsarNativeBinding.finalForkCommit")
-            + "|pulsarLogicalRepository=apache/pulsar|oxiaClientRepository="
-            + _required_string(oxia.get("repository"), "oxia client repository")
+            + _required_string(
+                allocator.get("pulsarSourceCommit"),
+                "m3AllocatorEvidenceBinding.pulsarSourceCommit",
+            )
+            + "|pulsarLogicalRepository="
+            + _required_string(
+                allocator.get("pulsarLogicalRepository"),
+                "m3AllocatorEvidenceBinding.pulsarLogicalRepository",
+            )
+            + "|oxiaClientRepository="
+            + _required_string(
+                allocator.get("oxiaClientRepository"),
+                "m3AllocatorEvidenceBinding.oxiaClientRepository",
+            )
             + "|oxiaClientBranch="
-            + _required_string(oxia.get("branch"), "oxia client branch")
+            + _required_string(
+                allocator.get("oxiaClientEvidenceCheckoutBranch"),
+                "m3AllocatorEvidenceBinding.oxiaClientEvidenceCheckoutBranch",
+            )
             + "|oxiaClientCommit="
-            + _required_string(oxia.get("finalForkCommit"), "oxia client finalForkCommit")
+            + _required_string(
+                allocator.get("oxiaClientSourceCommit"),
+                "m3AllocatorEvidenceBinding.oxiaClientSourceCommit",
+            )
         )
     return source_identity
 
@@ -2328,21 +2485,7 @@ def _validate_java_allocator_verification(
     )
 
     locks = _source_locks(root, tested_commit)
-    pulsar = _required_object(locks.get("m2PulsarNativeBinding"), "m2PulsarNativeBinding")
-    oxia = _find_by_id(
-        locks.get("dependencyForkOutputs"),
-        "oxia-client-notification-continuity",
-        "dependencyForkOutputs",
-    )
-    dependencies = _required_object(
-        locks.get("dependencyEvidenceBindings"), "dependencyEvidenceBindings"
-    )
-    client = _required_object(dependencies.get("oxiaClientArtifacts"), "oxiaClientArtifacts")
-    client_jar = _required_object(
-        _required_object(client.get("artifacts"), "oxiaClientArtifacts.artifacts").get("clientJar"),
-        "oxiaClientArtifacts.clientJar",
-    )
-    server = _required_object(dependencies.get("oxiaServerRuntime"), "oxiaServerRuntime")
+    allocator = _m3_allocator_source(locks)
     source_locks_raw = git(root, "show", f"{tested_commit}:{FINAL.SOURCE_LOCKS_PATH}")
     assert isinstance(source_locks_raw, bytes)
     source = _exact_members(
@@ -2367,13 +2510,25 @@ def _validate_java_allocator_verification(
         or recomputation["sourceLocksSha256"] != sha256(source_locks_raw)
         or source["nereusCommit"] != tested_commit
         or source["pulsarCommit"]
-        != _required_string(pulsar.get("finalForkCommit"), "m2PulsarNativeBinding.finalForkCommit")
+        != _required_string(
+            allocator.get("pulsarSourceCommit"),
+            "m3AllocatorEvidenceBinding.pulsarSourceCommit",
+        )
         or source["oxiaClientCommit"]
-        != _required_string(oxia.get("finalForkCommit"), "oxia client finalForkCommit")
+        != _required_string(
+            allocator.get("oxiaClientSourceCommit"),
+            "m3AllocatorEvidenceBinding.oxiaClientSourceCommit",
+        )
         or source["oxiaServerCommit"]
-        != _required_string(server.get("sourceCommit"), "oxia server sourceCommit")
+        != _required_string(
+            allocator.get("oxiaServerSourceCommit"),
+            "m3AllocatorEvidenceBinding.oxiaServerSourceCommit",
+        )
         or source["oxiaClientJarSha256"]
-        != _required_string(client_jar.get("sha256"), "oxia client jar SHA")
+        != _required_string(
+            allocator.get("oxiaClientJarSha256"),
+            "m3AllocatorEvidenceBinding.oxiaClientJarSha256",
+        )
         or source["sourceLocksSha256"] != sha256(source_locks_raw)
     ):
         raise ChildError("allocator raw recomputation exact source tuple differs from source locks")
@@ -2437,13 +2592,14 @@ def _validate_java_allocator_verification(
         _positive(artifact["bytes"], f"allocator source artifact {name}.bytes")
         if artifact["sha256"] != source[digest_fields[name]]:
             raise ChildError(f"allocator source artifact {name} SHA differs from NAEA1 source tuple")
-    expected_client_basename = PurePosixPath(
-        _required_string(client_jar.get("relativePath"), "oxia client jar relativePath")
-    ).name
     if (
-        source_artifacts["oxiaClientJar"]["basename"] != expected_client_basename
+        source_artifacts["oxiaClientJar"]["basename"]
+        != _required_string(
+            allocator.get("oxiaClientJarBasename"),
+            "m3AllocatorEvidenceBinding.oxiaClientJarBasename",
+        )
         or source_artifacts["oxiaClientJar"]["bytes"]
-        != client_jar.get("bytes")
+        != allocator.get("oxiaClientJarBytes")
         or source_artifacts["sourceLocks"]
         != {
             "basename": FINAL.SOURCE_LOCKS_PATH.name,

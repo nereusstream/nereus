@@ -35,17 +35,16 @@ ALLOCATOR_FIXTURE_CLIENT_BYTES = b"governed allocator fixture Oxia client JAR\n"
 
 def source_lock_fixture() -> tuple[dict, dict[tuple[str, str], dict[str, str]]]:
     value = json.loads((SOURCE_ROOT / CONTRACT.FINAL.SOURCE_LOCKS_PATH).read_text())
-    kafka = value["k1KafkaAuthorityBinding"]
-    pulsar = value["m2PulsarNativeBinding"]
-    oxia = next(
-        row for row in value["dependencyForkOutputs"]
-        if row["id"] == "oxia-client-notification-continuity"
-    )
+    native = value["m3NativeEvidenceBindings"]
+    kafka = native["kafka"]
+    pulsar = native["pulsar"]
+    allocator = value["m3AllocatorEvidenceBinding"]
     dependencies = value["dependencyEvidenceBindings"]
     client = dependencies["oxiaClientArtifacts"]["artifacts"]["clientJar"]
     client["bytes"] = len(ALLOCATOR_FIXTURE_CLIENT_BYTES)
     client["sha256"] = CONTRACT.sha256(ALLOCATOR_FIXTURE_CLIENT_BYTES)
-    server = dependencies["oxiaServerRuntime"]
+    allocator["oxiaClientJarBytes"] = client["bytes"]
+    allocator["oxiaClientJarSha256"] = client["sha256"]
     identities = {
         "provider": (
             "MINIO_S3_COMPATIBLE|artifactReference=quay.io/minio/minio@sha256:"
@@ -59,12 +58,18 @@ def source_lock_fixture() -> tuple[dict, dict[tuple[str, str], dict[str, str]]]:
             "|artifactConfigDigest=sha256:"
             "ba5ade3c7f155978f41dbca62b16e5e08f5331f5d12f9be2d333698b49484457"
         ),
-        "kafka": f"KAFKA_NATIVE|repository=apache/kafka|commit={kafka['finalForkCommit']}",
-        "pulsar": f"PULSAR_NATIVE|repository=apache/pulsar|commit={pulsar['finalForkCommit']}",
+        "kafka": (
+            f"KAFKA_NATIVE|repository={kafka['logicalRepository']}|commit={kafka['sourceCommit']}"
+        ),
+        "pulsar": (
+            f"PULSAR_NATIVE|repository={pulsar['logicalRepository']}|commit={pulsar['sourceCommit']}"
+        ),
         "allocator": (
-            f"OXIA_AND_PULSAR|pulsarCommit={pulsar['finalForkCommit']}"
-            f"|oxiaClientCommit={oxia['finalForkCommit']}|oxiaClientJarSha256={client['sha256']}"
-            f"|oxiaServerCommit={server['sourceCommit']}|oxiaServerImageDigest={server['imageDigest']}"
+            f"OXIA_AND_PULSAR|pulsarCommit={allocator['pulsarSourceCommit']}"
+            f"|oxiaClientCommit={allocator['oxiaClientSourceCommit']}"
+            f"|oxiaClientJarSha256={allocator['oxiaClientJarSha256']}"
+            f"|oxiaServerCommit={allocator['oxiaServerSourceCommit']}"
+            f"|oxiaServerImageDigest={allocator['oxiaServerImageDigest']}"
         ),
     }
     specs = {
@@ -337,14 +342,9 @@ def java_allocator_verification_fixture(
     locks_raw = CONTRACT.git(root, "show", f"{tested_commit}:{CONTRACT.FINAL.SOURCE_LOCKS_PATH}")
     assert isinstance(locks_raw, bytes)
     locks = json.loads(locks_raw)
-    pulsar = locks["m2PulsarNativeBinding"]
-    oxia = next(
-        row for row in locks["dependencyForkOutputs"]
-        if row["id"] == "oxia-client-notification-continuity"
-    )
+    allocator = locks["m3AllocatorEvidenceBinding"]
     dependencies = locks["dependencyEvidenceBindings"]
     client_jar = dependencies["oxiaClientArtifacts"]["artifacts"]["clientJar"]
-    server = dependencies["oxiaServerRuntime"]
     source_locks_sha = CONTRACT.sha256(locks_raw)
     artifact_contents = {
         name: (f"governed allocator fixture artifact: {name}\n").encode()
@@ -420,9 +420,9 @@ def java_allocator_verification_fixture(
     }
     source = {
         "nereusCommit": tested_commit,
-        "pulsarCommit": pulsar["finalForkCommit"],
-        "oxiaClientCommit": oxia["finalForkCommit"],
-        "oxiaServerCommit": server["sourceCommit"],
+        "pulsarCommit": allocator["pulsarSourceCommit"],
+        "oxiaClientCommit": allocator["oxiaClientSourceCommit"],
+        "oxiaServerCommit": allocator["oxiaServerSourceCommit"],
         "oxiaClientJarSha256": client_jar["sha256"],
         "testedEvidenceArtifactSha256": digests["testedEvidenceArtifact"],
         "runtimeDomainArtifactSha256": digests["runtimeDomainArtifact"],
@@ -1286,6 +1286,21 @@ class M3ChildCheckerTest(unittest.TestCase):
                     CONTRACT.build_final_child_identity(
                         self.fixture.root, output, kind, self.fixture.tested
                     )
+
+    def test_rejects_unversioned_allocator_source_lock_member(self) -> None:
+        fixture = Fixture()
+        try:
+            lock_path = fixture.root / CONTRACT.FINAL.SOURCE_LOCKS_PATH
+            locks = json.loads(lock_path.read_bytes())
+            locks["m3AllocatorEvidenceBinding"]["unversionedCoordinate"] = "forbidden"
+            lock_path.write_text(json.dumps(locks, indent=2) + "\n")
+            git(fixture.root, "add", str(CONTRACT.FINAL.SOURCE_LOCKS_PATH))
+            git(fixture.root, "commit", "-m", "add unversioned allocator coordinate")
+            fixture.tested = git(fixture.root, "rev-parse", "HEAD")
+            with self.assertRaisesRegex(CONTRACT.ChildError, "member set differs"):
+                fixture.build("ALLOCATOR_SELECTION")
+        finally:
+            fixture.cleanup()
 
     def test_rejects_native_self_report_after_raw_wrapper_and_xml_hashes_are_resealed(self) -> None:
         for kind in ("U_KAFKA_OBJECT_WAL", "P_PULSAR_OBJECT_WAL"):

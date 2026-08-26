@@ -358,6 +358,7 @@ Accepted decisions:
 - [ADR 0096: M3 owner-open conservative rollover amendment](../decisions/0096-v2-m3-owner-open-conservative-rollover-amendment.md)
 - [ADR 0097: M3 reproducible allocator Oxia image amendment](../decisions/0097-v2-m3-reproducible-allocator-oxia-image-amendment.md)
 - [ADR 0098: M3 current-source M2 regression prerequisite projection](../decisions/0098-v2-m3-current-source-m2-regression-prerequisite-projection.md)
+- [ADR 0099: M3 native and allocator source-lock separation](../decisions/0099-v2-m3-native-and-allocator-source-lock-separation.md)
 
 ## Open design gates
 

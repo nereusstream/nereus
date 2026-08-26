@@ -17,7 +17,9 @@ from typing import Any
 
 K0_RECEIPT = Path("docs/v2/evidence/v2-m2/kafka/k0-inputs/kafka-inputs.json")
 SOURCE_LOCKS = Path("docs/v2/source-locks.json")
-CURRENT_ONLY_KEYS = frozenset({"m3AllocatorEvidenceBinding"})
+CURRENT_ONLY_KEYS = frozenset(
+    {"m3AllocatorEvidenceBinding", "m3EvidenceBindings", "m3NativeEvidenceBindings"}
+)
 COMMIT = re.compile(r"[0-9a-f]{40}")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 

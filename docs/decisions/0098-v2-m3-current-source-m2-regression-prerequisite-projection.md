@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-24
 - Refines: ADR 0088's current-source M2 regression execution profile
+- Amended by: ADR 0099's exact three-member M3-only source-lock projection
 - Preserves: the historical M2 Final, every historical M2 receipt, all M2 wire/provider/scenario semantics, and an
   empty M2 Amendment lineage
 
@@ -27,8 +28,10 @@ The M3 trusted runner owns an explicit prerequisite projection before it invokes
 2. Read `docs/v2/source-locks.json` from that exact Git commit and require its SHA to equal the receipt.
 3. Require the working file to equal the blob at the exact M3 tested commit.
 4. Require every historical top-level member and value to remain exactly equal.
-5. Require the exact current-only member set to be `{m3AllocatorEvidenceBinding}`. Missing, changed, removed, or any
-   other added member fails closed.
+5. As amended by ADR 0099, require the exact current-only member set to be
+   `{m3AllocatorEvidenceBinding,m3EvidenceBindings,m3NativeEvidenceBindings}`. Missing, changed, removed, or any
+   other added member fails closed. The native and aggregate-policy members are M3-only and cannot rewrite an M2
+   Kafka/Pulsar coordinate.
 6. Materialize the verified historical blob only in the external raw-run directory and pass that path to the legacy
    K1 through K8 K0-prerequisite comparison. Their ordinary/default invocation continues to hash the working
    `source-locks.json` exactly as before.
@@ -62,8 +65,9 @@ runner rejects such a change rather than expanding the current-only allowlist by
 
 - The historical M2 Final and K0 input receipt remain unchanged and continue to validate against their original
   whole-file source-lock SHA.
-- A future M3-only source-lock member requires an explicit runner/ADR revision and a fresh complete regression; it is
-  never admitted by a prefix or wildcard.
+- A future M3-only source-lock member requires an explicit runner/ADR revision and a fresh complete regression; ADR
+  0099 is that explicit revision for the M3 native-source and aggregate-policy members. No member is admitted by a
+  prefix or wildcard.
 - Failed or partial raw-run directories remain diagnostics outside the repository and cannot be published as trusted
   children.
 - The K2 Git-layout check no longer misclassifies linked worktrees as non-repositories; the M3 profile is stricter

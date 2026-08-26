@@ -17,7 +17,7 @@ fail() {
 [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]] || fail "Nereus source tree must be clean"
 
 expected_pulsar_commit="$(jq -er '.m3AllocatorEvidenceBinding.pulsarSourceCommit' docs/v2/source-locks.json)"
-expected_pulsar_remote="$(jq -er '.m2PulsarNativeBinding.repository' docs/v2/source-locks.json)"
+expected_pulsar_remote="$(jq -er '.m3AllocatorEvidenceBinding.pulsarRepository' docs/v2/source-locks.json)"
 expected_pulsar_branch="nereus/v2-m3-object-wal-evidence"
 [[ "$(git -C "$pulsar_checkout" rev-parse HEAD)" == "$expected_pulsar_commit" ]] ||
     fail "Pulsar source worktree does not match the exact source lock"

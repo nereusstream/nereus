@@ -142,6 +142,22 @@ generic child publisher and reparses the local result through the governed valid
 allocation-free analytical format-cap conformance, claims no Provider transfer, and cannot substitute for the
 separate fixed-digest C1 Provider/KMS evidence.
 
+An allocator formal-run audit found a cross-lineage source-lock defect before the three-hour matrix completed: the
+Java evidence source tuple correctly used the dedicated M3 Pulsar branch and ADR 0097 Oxia image, but the Python child
+validator still derived its expected identity from the M2 regression commit and historical M1 Oxia image. The run was
+interrupted because final sealing was deterministically impossible; its partial NAEA files are diagnostic only.
+[ADR 0099](../../../decisions/0099-v2-m3-native-and-allocator-source-lock-separation.md) now separates the dedicated
+Kafka/Pulsar M3 native refs and allocator executor tuple from all M2 members and explicitly versions ADR 0098's
+current-only projection. A complete raw diagnostic must still select the mode, followed by a fresh formal run at the
+exact commit containing that selected policy.
+
+The root `v2M3NativeEvidenceCheck` now owns one serial trusted runner for the two source-qualified native component
+results. It rejects a dirty or non-remote-exact Nereus tree, shared or drifting Kafka/Pulsar checkouts, and every
+historical M2 coordinate; executes the exact non-empty module JUnit/style commands; then seals both the raw native
+result and its exact JUnit bytes outside the repository. Its runner contract has five passing tests, but the gate is
+not evidence until it executes at the final production-source commit. It does not activate a native broker/controller
+path, which remains M6.
+
 Serial continuation order is formal exact-source Provider/KMS and allocator evidence, the remaining child receipts,
 then final-source M2 regression freshness, source locks, scenario synchronization, and M3 Final.
 Each stable boundary must be committed and pushed before the next evidence-bearing boundary is evaluated.

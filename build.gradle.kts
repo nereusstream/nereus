@@ -1352,6 +1352,7 @@ val v2M3GovernanceTaskProviders = linkedMapOf(
     "v2M3M2RegressionContractTest" to "scripts/check-v2-m3-m2-regression-tests.py",
     "v2M3M2RegressionPublisherContractTest" to "scripts/publish-v2-m3-m2-regression-tests.py",
     "v2M3M2RegressionRunnerContractTest" to "scripts/run-v2-m3-m2-regression-tests.py",
+    "v2M3NativeEvidenceRunnerContractTest" to "scripts/run-v2-m3-native-evidence-tests.py",
     "v2M3ChildCheckerContractTest" to "scripts/check-v2-m3-child-tests.py",
     "v2M3ChildPublisherContractTest" to "scripts/publish-v2-m3-child-tests.py",
     "v2M3FinalCheckerContractTest" to "scripts/check-v2-m3-final-tests.py",
@@ -1368,7 +1369,7 @@ val v2M3GovernanceTaskProviders = linkedMapOf(
 tasks.register("v2M3GovernanceCheck") {
     group = "verification"
     description =
-        "Run all eight M3 governance contracts; no source, Provider, allocator, or Final result is synthesized."
+        "Run all nine M3 governance contracts; no source, Provider, allocator, or Final result is synthesized."
     dependsOn(v2M3GovernanceTaskProviders)
 }
 
@@ -1412,6 +1413,26 @@ tasks.register<Exec>("v2M3M2RegressionSourceCheck") {
             v2M3PulsarEvidenceWorktree.get(),
             "--output-dir",
             v2M3M2RegressionOutputDirectory.get(),
+        )
+    }
+}
+
+val v2M3NativeEvidenceOutputDirectory = providers.gradleProperty("v2M3NativeEvidenceOutputDirectory")
+
+tasks.register<Exec>("v2M3NativeEvidenceCheck") {
+    group = "verification"
+    description =
+        "Execute and seal the exact-source Kafka/Pulsar Object-WAL native component receipts against dedicated refs."
+    workingDir = layout.projectDirectory.asFile
+    usesService(m3NestedGradleGate)
+    doFirst {
+        commandLine(
+            "bash",
+            "scripts/run-v2-m3-native-evidence.sh",
+            v2M3TestedCommit.get(),
+            v2M3KafkaEvidenceWorktree.get(),
+            v2M3PulsarEvidenceWorktree.get(),
+            v2M3NativeEvidenceOutputDirectory.get(),
         )
     }
 }
