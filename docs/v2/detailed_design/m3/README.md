@@ -370,6 +370,15 @@ generic child publisher and reparses the local result through the governed valid
 allocation-free analytical format-cap conformance, claims no Provider transfer, and cannot substitute for the
 separate fixed-digest C1 Provider/KMS evidence.
 
+At clean published source `f0a3310ddca57da63b6854d5b841db813f883269`, the governed A/B execution passes
+20/0/0/0 and publishes the exact-source, non-promotable
+[NWG1 child](../../evidence/v2-m3/children/01-AB_NWG1_WIRE/receipt.json) with SHA-256
+`26c5009843bcc69489882522d86ed7981c5a82484a039b3873fe064e6701e14b`. Its typed attachments bind the
+single canonical JCS manifest containing six positive vectors, two synthetic external fixtures, all 16 component
+kinds, 84 explicit mutation records, 240 paths, 25 rejection codes, 16 validation stages, and the fixed ZSTD 1.5.7
+frames, plus the separate exact 114-row TSV. This preselection checkpoint claims neither production ZSTD exact
+compressor output nor scenario promotion and must be rerun after a selected-mode source change for Final freshness.
+
 Serial continuation order completed the ADR-0104 V2 schema/planner/validator/selector, bounded CAS/reconcile workflow,
 bounded four-actor Runner, checkpoint/resume/sealer/promotion implementation, and required short real-Oxia diagnostic
 slices. The present execution authority still explicitly prohibits any full formal allocator campaign even though
@@ -383,8 +392,8 @@ Each stable boundary must be committed and pushed before the next evidence-beari
 | --- | --- | --- |
 | M3-I0 | [NWG1 implementation-input closure](m3-i0-nwg1-implementation-input-closure.md), [ADR 0089 Header amendment](../../../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and [ADR 0090 mutation-call profiles](../../../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md) | accepted documentation-only input with exact Header offsets and explicit X0/XU call caps; no codec, runner, trace harness, Provider evidence, receipt, or scenario PASS |
 | M3-W1 | current-source M2 regression plus M3 module/API input gate | M3 inputs and the eleven-module source-qualified API closure pass; historical M2 Final remains immutable; ADR 0098 closes the M3-only prerequisite projection; the exact-source `89a76612…` formal profile publishes 25/25 children and 687 zero-failure/error/skip tests as a non-promotable W1 checkpoint, while Final still requires a freshness rerun at its eventual exact tested source |
-| M3-W2 | NWG1 production encoder/decoder, projection, six-vector A corpus, and exact wire gate | common source implemented; local 17-test/114-row wire-source gate passes, but no exact-source child receipt exists |
-| M3-W3 | 84-record/240-path B mutation manifest and runner | common source implemented; local 3-test gate covers exactly 84 records/240 paths with no generated inventory, but no exact-source child receipt exists |
+| M3-W2 | NWG1 production encoder/decoder, projection, six-vector A corpus, and exact wire gate | exact `f0a3310d...` A/B evidence passes 20/0/0/0 and publishes non-promotable child `26c50098...e14b`, binding the six-vector/two-fixture canonical manifest and exact 114-row TSV; a fresh Final-source rerun remains required after allocator selection |
+| M3-W3 | 84-record/240-path B mutation manifest and runner | the same exact-source A/B child binds 84 authored records/240 paths, 25/25 rejection codes, and 16/16 validation stages with no generated inventory; a fresh Final-source rerun remains required after allocator selection |
 | M3-C1 | 50-trace Object-WAL kernel harness | common kernel and manifest implemented; local 7-test gate covers 50 traces/21 outcomes, but backend integration and exact-source receipt remain open |
 | M3-D1 | local capacity conformance and exact Provider C1/C2 evidence | exact `2b9636dd...` local-cap evidence publishes non-promotable 12/0/0/0 D1 child `6769769b...2a78` and explicitly claims no Provider/KMS execution; exact `e4d207e3...` real Provider/KMS plus ordinary session evidence passes 4/0/0/0 and publishes non-promotable C1 child `184fa0e2...a180`; fresh Final-source D1/C1 reruns remain required after allocator selection, and C2 remains non-promotable without independent benefit evidence |
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | common control/session/recovery source implemented and `:nereus-storage-object:check` passes 147 tests; Kafka/Pulsar backend integration and dedicated-fork compile checkpoints pass, while formal Provider/KMS receipts remain open |

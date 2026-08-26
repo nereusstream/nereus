@@ -46,7 +46,10 @@ regression checkpoint. D1 now has an exact-source six-test/six-record local-cap 
 the harness, test, and six component sources and explicitly claims no Provider transfer; it remains separate from C1
 real Provider/KMS evidence. Exact preselection D1 evidence passes 12/0/0/0 at `2b9636dd...` and publishes child
 `6769769b...2a78`; C1 passes 4/0/0/0 at `e4d207e3...` and publishes child `184fa0e2...a180`. Both are
-non-promotable. Formal post-selection D1/C1/allocator receipts, final-source W1 freshness,
+non-promotable. Exact `f0a3310d...` A/B evidence passes 20/0/0/0 and publishes non-promotable child
+`26c50098...e14b`, binding the canonical six-vector/two-fixture/84-record/240-path manifest, all 25 rejection codes
+and 16 validation stages, the fixed ZSTD interoperability frames, and the exact 114-row TSV. Formal post-selection
+A/B/D1/C1/allocator receipts, final-source W1 freshness,
 scenario promotion, and Final remain open. ADR 0101 now preserves exact Cell proofs under concurrent RANGE renewal after the
 failed `d819500f...` matrix selected no mode. ADR 0102 keeps the immutable 16-MiB JUnit cap after the
 `1ef4f108...` full matrix passed its one testcase but failed sealing because 970,241 identical expected native-harness
