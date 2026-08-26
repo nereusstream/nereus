@@ -1352,6 +1352,7 @@ val v2M3OxiaClientEvidenceWorktree = providers.gradleProperty("v2M3OxiaClientEvi
 
 val v2M3GovernanceTaskProviders = linkedMapOf(
     "v2M3ModuleApiContractTest" to "scripts/check-v2-m3-module-api-tests.py",
+    "v2M3AllocatorProtocolContractTest" to "scripts/check-v2-m3-allocator-protocol-tests.py",
     "v2M3InputsContractTest" to "scripts/check-v2-m3-inputs-tests.py",
     "v2M3M2RegressionContractTest" to "scripts/check-v2-m3-m2-regression-tests.py",
     "v2M3M2RegressionPublisherContractTest" to "scripts/publish-v2-m3-m2-regression-tests.py",
@@ -1372,7 +1373,7 @@ val v2M3GovernanceTaskProviders = linkedMapOf(
 tasks.register("v2M3GovernanceCheck") {
     group = "verification"
     description =
-        "Run all eight M3 governance contracts; no source, Provider, allocator, or Final result is synthesized."
+        "Run every M3 governance contract; no source, Provider, allocator, or Final result is synthesized."
     dependsOn(v2M3GovernanceTaskProviders)
 }
 

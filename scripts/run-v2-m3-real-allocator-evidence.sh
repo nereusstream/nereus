@@ -88,6 +88,7 @@ if [[ "${1:-}" == "--pre-campaign-check" ]]; then
   fi
   "$repo_root/gradlew" :nereus-metadata-oxia:realAllocatorV2PreCampaignCheck \
     "-PpulsarCheckout=$protocol_pulsar_checkout" \
+    --rerun-tasks \
     --console=plain \
     --no-configuration-cache
   exit 0

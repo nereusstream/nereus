@@ -79,7 +79,12 @@ val configuredM3PulsarEvidenceWorktree =
 val conventionalM3PulsarEvidenceWorktree = file("../../nereusstream/pulsar-worktrees/nereus-v2-m3")
 val m3DedicatedPulsarRequired = gradle.startParameter.taskNames.any { requested ->
     val task = requested.substringAfterLast(':')
-    task.startsWith("v2M3ModuleApi") || task == "v2M3Check"
+    task.startsWith("v2M3ModuleApi") ||
+        task == "v2M3Check" ||
+        task.startsWith("realAllocator") ||
+        task.contains("RealAllocator") ||
+        task.startsWith("validateRealAllocatorV2") ||
+        task.startsWith("sealRealAllocatorV2")
 }
 val pulsarSourceRequired = gradle.startParameter.taskNames.any { requested ->
     val task = requested.substringAfterLast(':')
@@ -105,7 +110,7 @@ val pulsarCheckout = if (m3DedicatedPulsarRequired) {
 }
 
 require(!m3DedicatedPulsarRequired || m3PulsarEvidenceWorktree != null) {
-    "The M3 module/API gate requires the dedicated Pulsar evidence worktree via " +
+    "The M3 module/API and allocator evidence gates require the dedicated Pulsar evidence worktree via " +
             "-Pv2M3PulsarEvidenceWorktree=/path/to/pulsar, NEREUS_M3_PULSAR_EVIDENCE_WORKTREE, " +
             "or the conventional pulsar-worktrees/nereus-v2-m3 path."
 }
