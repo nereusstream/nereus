@@ -187,12 +187,12 @@ final class M3CandidateAllocatorPopulation {
         });
     }
 
-    private static CompletionStage<Void> boundedBackoff(
+    static CompletionStage<Void> boundedBackoff(
             int retryNumber, BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
         return CompletableFuture.runAsync(
                 () -> {},
                 CompletableFuture.delayedExecutor(
-                        formalRetryBackoff().toMillis(), TimeUnit.MILLISECONDS));
+                        formalRetryBackoff().toMillis(), TimeUnit.MILLISECONDS, Runnable::run));
     }
 
     static Duration formalRetryBackoff() {

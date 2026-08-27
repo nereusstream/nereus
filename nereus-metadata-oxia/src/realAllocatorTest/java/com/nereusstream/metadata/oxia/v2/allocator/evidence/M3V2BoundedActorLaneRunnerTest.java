@@ -47,6 +47,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import org.junit.jupiter.api.Test;
 
@@ -299,6 +300,27 @@ class M3V2BoundedActorLaneRunnerTest {
         assertThat(M3CandidateAllocatorPopulation.formalRetryBackoff())
                 .isEqualTo(Duration.ofMillis(20))
                 .isLessThan(BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal().maximumRetryBackoff());
+    }
+
+    @Test
+    void formalRealActionRetryBackoffCompletesWithoutACommonPoolHandoff() throws Exception {
+        AtomicReference<String> completionThread = new AtomicReference<>();
+        AtomicReference<Throwable> completionFailure = new AtomicReference<>();
+        CountDownLatch completed = new CountDownLatch(1);
+
+        M3CandidateAllocatorPopulation.boundedBackoff(
+                        1, BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason.RESERVATION_BUSY)
+                .whenComplete((ignored, failure) -> {
+                    completionThread.set(Thread.currentThread().getName());
+                    completionFailure.set(failure);
+                    completed.countDown();
+                });
+
+        assertThat(completed.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(completionFailure.get()).isNull();
+        assertThat(completionThread.get())
+                .contains("CompletableFutureDelayScheduler")
+                .doesNotContain("ForkJoinPool");
     }
 
     @Test

@@ -124,7 +124,8 @@ cleanup boundary. A request-local lock-free guard wraps every store call, so a r
 deadline cannot dispatch the next metadata operation. Deadline and backoff exhaustion are separate typed failures.
 The real formal action runtime uses a 20-millisecond retry delay. The delay is long enough not to consume the 64-retry
 count prematurely under sustained four-coordinator STRICT Cell contention, and remains strictly below the
-25-millisecond retry-backoff guard so scheduler latency cannot race an equal delay against its own bound. An
+25-millisecond retry-backoff guard. Its delayed completion runs directly on the delay scheduler, without a second
+common-pool handoff that could reorder the 20-millisecond completion behind its 25-millisecond fail-closed guard. An
 infrastructure-invalid warm-up result also retains the first bounded failure type and protocol code in the campaign
 terminal detail; this diagnostic field cannot change its disposition.
 Smaller test bounds are allowed, but
