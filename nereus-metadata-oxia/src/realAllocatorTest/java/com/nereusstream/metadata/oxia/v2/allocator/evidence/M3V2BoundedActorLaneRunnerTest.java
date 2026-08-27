@@ -177,7 +177,7 @@ class M3V2BoundedActorLaneRunnerTest {
         M3V2AllocatorFormalHarness harness = M3V2AllocatorFormalHarness.forContractTest(
                 NO_WARMUP, MEASUREMENT, CLEANUP, endpoints);
         Request request = request();
-        List<M3V2BoundedActorLaneRunner.ScheduledOffer<Request>> schedule = List.of(
+        List<M3V2BoundedActorLaneRunner.ScheduledOffer<M3V2AllocatorFormalHarness.CandidateRequest>> schedule = List.of(
                 requestOffer(0, 0, request),
                 requestOffer(1, 1, request),
                 requestOffer(2, 2, request),
@@ -186,7 +186,7 @@ class M3V2BoundedActorLaneRunnerTest {
         var result = harness.runCandidate(
                 Cell.of(Candidate.STRICT, 10_000, 1, 200),
                 schedule,
-                M3V2AllocatorFormalHarness.SupplementaryMeasurements.empty());
+                M3V2AllocatorFormalHarness.SupplementaryMeasurements::empty);
 
         assertThat(calls).extracting(AtomicInteger::get).containsExactly(1, 1, 1, 1);
         assertThat(result.infrastructureValid()).isTrue();
@@ -238,9 +238,14 @@ class M3V2BoundedActorLaneRunnerTest {
         return new M3V2BoundedActorLaneRunner.ScheduledOffer<>(ordinal, actorId, offsetNanos, true, request);
     }
 
-    private static M3V2BoundedActorLaneRunner.ScheduledOffer<Request> requestOffer(
+    private static M3V2BoundedActorLaneRunner.ScheduledOffer<M3V2AllocatorFormalHarness.CandidateRequest> requestOffer(
             long ordinal, int actorId, Request request) {
-        return new M3V2BoundedActorLaneRunner.ScheduledOffer<>(ordinal, actorId, 0, true, request);
+        return new M3V2BoundedActorLaneRunner.ScheduledOffer<>(
+                ordinal,
+                actorId,
+                0,
+                true,
+                new M3V2AllocatorFormalHarness.CandidateRequest(ordinal, 0, request));
     }
 
     private static List<CompletableFuture<Void>> futures(int size) {

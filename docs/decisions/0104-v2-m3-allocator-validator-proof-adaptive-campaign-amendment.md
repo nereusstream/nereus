@@ -1,5 +1,9 @@
 # ADR 0104: V2 M3 allocator validator-proof adaptive campaign amendment
 
+> Amended by [ADR 0107](0107-v2-m3-allocator-bounded-adaptive-formal-entry-wiring-amendment.md): the unchanged
+> validator observation boundary now expands into a frozen 288 interval, 360 single-cut fault, and 32 RANGE-scale
+> physical-action inventory under a separate 680-action/48,000-second formal-entry envelope.
+
 - Status: Accepted
 - Date: 2026-08-26
 - Amends: ADR 0094's exhaustive execution order and canonical-evidence completeness rule; ADR 0101's use of a

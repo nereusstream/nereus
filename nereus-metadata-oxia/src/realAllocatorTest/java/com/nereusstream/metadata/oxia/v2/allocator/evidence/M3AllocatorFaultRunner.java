@@ -17,6 +17,7 @@ package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceContextV1;
 import com.nereusstream.domain.registry.allocator.AllocatorFaultCutV1;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorCompletionService;
@@ -53,40 +54,40 @@ final class M3AllocatorFaultRunner {
             throw new IllegalArgumentException("allocator fault context is not the exact 200-RPS candidate row");
         }
         for (AllocatorFaultCutV1 cut : AllocatorFaultCutV1.values()) {
-            switch (cut) {
-                case RESERVE_RESPONSE_LOSS -> responseLoss(
-                        context,
-                        population,
-                        cut,
-                        M3CandidateAllocatorPopulation.ResponseLossAt.RESERVE);
-                case MODE_GRANT_READY_RESPONSE_LOSS_OR_STRICT_NO_INSTALL -> responseLoss(
-                        context,
-                        population,
-                        cut,
-                        population.candidate().mode()
-                                        == com.nereusstream.domain.registry.allocator.AllocatorModeV1.RANGE_LEASED
-                                ? M3CandidateAllocatorPopulation.ResponseLossAt.RANGE_GRANT_INSTALL
-                                : M3CandidateAllocatorPopulation.ResponseLossAt.NONE);
-                case NODE_CREATE_RESPONSE_LOSS -> responseLoss(
-                        context,
-                        population,
-                        cut,
-                        M3CandidateAllocatorPopulation.ResponseLossAt.NODE_CREATE);
-                case HEAD_PUBLISH_RESPONSE_LOSS -> responseLoss(
-                        context,
-                        population,
-                        cut,
-                        M3CandidateAllocatorPopulation.ResponseLossAt.HEAD_PUBLISH);
-                case CELL_CLEAR_RESPONSE_LOSS -> responseLoss(
-                        context,
-                        population,
-                        cut,
-                        M3CandidateAllocatorPopulation.ResponseLossAt.CELL_CLEAR);
-                case SINGLE_OWNER_TAKEOVER -> singleOwnerTakeover(context, population, cut);
-                case LATE_OLD_OWNER_WRITE -> lateOldOwner(context, population, cut);
-                case BROKER_SESSION_CRASH_MASS_TAKEOVER -> brokerCrashMassTakeover(context, population, cut);
-                case SYNCHRONIZED_STORM -> synchronizedStorm(context, population, cut);
-            }
+            runOne(context, population, cut);
+        }
+    }
+
+    void runOne(
+            AllocatorEvidenceContextV1 context,
+            M3CandidateAllocatorPopulation population,
+            AllocatorFaultCutV1 cut) throws Exception {
+        if (context.nativePath()
+                || context.offeredRolloverRequestsPerSecond() != 200
+                || context.activeManagedLedgers() < 10_000) {
+            throw new IllegalArgumentException("allocator fault context is not the exact 200-RPS candidate row");
+        }
+        switch (Objects.requireNonNull(cut, "cut")) {
+            case RESERVE_RESPONSE_LOSS -> responseLoss(
+                    context, population, cut, M3CandidateAllocatorPopulation.ResponseLossAt.RESERVE);
+            case MODE_GRANT_READY_RESPONSE_LOSS_OR_STRICT_NO_INSTALL -> responseLoss(
+                    context,
+                    population,
+                    cut,
+                    population.candidate().mode()
+                                    == com.nereusstream.domain.registry.allocator.AllocatorModeV1.RANGE_LEASED
+                            ? M3CandidateAllocatorPopulation.ResponseLossAt.RANGE_GRANT_INSTALL
+                            : M3CandidateAllocatorPopulation.ResponseLossAt.NONE);
+            case NODE_CREATE_RESPONSE_LOSS -> responseLoss(
+                    context, population, cut, M3CandidateAllocatorPopulation.ResponseLossAt.NODE_CREATE);
+            case HEAD_PUBLISH_RESPONSE_LOSS -> responseLoss(
+                    context, population, cut, M3CandidateAllocatorPopulation.ResponseLossAt.HEAD_PUBLISH);
+            case CELL_CLEAR_RESPONSE_LOSS -> responseLoss(
+                    context, population, cut, M3CandidateAllocatorPopulation.ResponseLossAt.CELL_CLEAR);
+            case SINGLE_OWNER_TAKEOVER -> singleOwnerTakeover(context, population, cut);
+            case LATE_OLD_OWNER_WRITE -> lateOldOwner(context, population, cut);
+            case BROKER_SESSION_CRASH_MASS_TAKEOVER -> brokerCrashMassTakeover(context, population, cut);
+            case SYNCHRONIZED_STORM -> synchronizedStorm(context, population, cut);
         }
     }
 

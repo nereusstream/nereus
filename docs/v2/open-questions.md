@@ -798,6 +798,14 @@ budget is insufficient, rejects source/prefix drift and reordered observations, 
 offline tests bring the freshly rerun pre-campaign inventory to 254/0/0/0, while the separate plan/configuration
 contracts remain 5/5. No formal-run task or script path was enabled, no Oxia service was accessed, and no campaign
 evidence, selection, receipt, or scenario PASS exists.
+ADR 0107 now adds the missing formal-entry wiring while preserving that execution boundary. A pure frozen projection
+proves the 288 interval, 360 single-cut fault, 32 RANGE-row scale, and 680 total physical-action maxima, a 48,000-second
+process cap, and zero-decision plan SHA-256
+`4fbeb2d43bd5865cb6139277a5021ed1b0762223f4983fc8fa50f8edc975ff08`. Exactly one default-off Gradle task and
+matching explicit script mode bind one planned action to one adapter call and fail closed on authorization/source,
+lock/runtime, plan, worktree, and empty-output drift. This Phase-A wiring does not authorize or execute the task and
+does not create campaign evidence or selection. `V2-OPEN-PUL-OBJ-09` therefore remains open, allocator mode remains
+`UNSELECTED`, and its M3 scenarios remain `PLANNED` until a later exact-clean-SHA Phase-B authorization.
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

@@ -27,6 +27,9 @@ import com.nereusstream.domain.registry.allocator.AllocatorEvidenceCandidateV1;
 import com.nereusstream.domain.registry.allocator.AllocatorModeV1;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.OxiaOperationKind;
 import com.nereusstream.domain.registry.allocator.ManagedLedgerIncarnationIdV1;
+import com.nereusstream.metadata.spi.allocator.BoundedVirtualLedgerAllocatorWorkflowV2;
+import com.nereusstream.metadata.spi.allocator.BoundedVirtualLedgerAllocatorWorkflowV2.Request;
+import com.nereusstream.metadata.spi.allocator.BoundedVirtualLedgerAllocatorWorkflowV2.Result;
 import com.nereusstream.metadata.spi.allocator.ProductionVirtualLedgerAllocator;
 import com.nereusstream.metadata.spi.allocator.VersionedAllocatorCellStateV1;
 import com.nereusstream.metadata.spi.allocator.VersionedManagedLedgerAllocatorHeadV1;
@@ -42,6 +45,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -69,6 +73,7 @@ final class M3CandidateAllocatorPopulation {
     private final VersionedVirtualLedgerSliceViewV1 currentView;
     private final M3EvidenceAllocatorStore.TraceRegistry traces = new M3EvidenceAllocatorStore.TraceRegistry();
     private final List<ProductionVirtualLedgerAllocator> allocators;
+    private final List<BoundedVirtualLedgerAllocatorWorkflowV2> boundedWorkflows;
     private final AtomicReference<VersionedAllocatorCellStateV1> cell = new AtomicReference<>();
     private final AtomicReferenceArray<VersionedManagedLedgerAllocatorHeadV1> heads =
             new AtomicReferenceArray<>(100_000);
@@ -108,11 +113,83 @@ final class M3CandidateAllocatorPopulation {
             exactAllocators.add(allocator);
         }
         allocators = List.copyOf(exactAllocators);
+        boundedWorkflows = allocators.stream()
+                .map(allocator -> allocator.boundedWorkflow(
+                        BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal(),
+                        M3CandidateAllocatorPopulation::boundedBackoff))
+                .toList();
         cell.set(exactCreate(allocators.get(0).createCell(currentView)));
     }
 
     AllocatorEvidenceCandidateV1 candidate() {
         return candidate;
+    }
+
+    List<M3V2AllocatorFormalHarness.ActorEndpoint> formalActorEndpoints(
+            com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.Cell campaignCell,
+            FormalAllocationObserver observer) {
+        Objects.requireNonNull(campaignCell, "campaignCell");
+        Objects.requireNonNull(observer, "observer");
+        if (campaignCell.candidate().nativePath()
+                || campaignCell.activeManagedLedgers() > activePopulation.get()
+                || (candidate.mode() == AllocatorModeV1.STRICT_SERIALIZED) != campaignCell.candidate().strict()
+                || (candidate.mode() == AllocatorModeV1.RANGE_LEASED
+                        && candidate.rangeSize() != campaignCell.candidate().rangeSize())) {
+            throw new IllegalArgumentException("allocator formal campaign Cell differs from candidate population");
+        }
+        List<M3V2AllocatorFormalHarness.ActorEndpoint> endpoints = new ArrayList<>(boundedWorkflows.size());
+        for (int actorId = 0; actorId < boundedWorkflows.size(); actorId++) {
+            int exactActorId = actorId;
+            BoundedVirtualLedgerAllocatorWorkflowV2 workflow = boundedWorkflows.get(actorId);
+            endpoints.add(new M3V2AllocatorFormalHarness.ActorEndpoint(
+                    actorId,
+                    workflow,
+                    request -> boundedAllocate(exactActorId, campaignCell, request, workflow, observer)));
+        }
+        return List.copyOf(endpoints);
+    }
+
+    private CompletionStage<?> boundedAllocate(
+            int actorId,
+            com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.Cell campaignCell,
+            M3V2AllocatorFormalHarness.CandidateRequest request,
+            BoundedVirtualLedgerAllocatorWorkflowV2 workflow,
+            FormalAllocationObserver observer) {
+        if (!(request.payload() instanceof M3AllocatorWorkloadPlan.PlannedRequest planned)
+                || planned.requestOrdinal() != request.requestOrdinal()
+                || planned.ledgerIndex() != request.ledgerIndex()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("allocator formal candidate request payload differs"));
+        }
+        int ledgerIndex = planned.ledgerIndex();
+        VersionedManagedLedgerAllocatorHeadV1 predecessor = requireHead(ledgerIndex);
+        Request exactRequest = new Request(
+                digest("v2-request:" + campaignCell.contextId() + ':' + planned.requestOrdinal() + ':' + ledgerIndex),
+                digest("v2-descriptor:"
+                        + campaignCell.contextId()
+                        + ':'
+                        + planned.requestOrdinal()
+                        + ':'
+                        + ledgerIndex),
+                currentView,
+                predecessor);
+        long started = System.nanoTime();
+        return workflow.allocate(exactRequest).whenComplete((result, failure) -> {
+            long elapsedMicros = TimeUnit.NANOSECONDS.toMicros(System.nanoTime() - started);
+            if (failure == null) {
+                Result exact = Objects.requireNonNull(result, "bounded allocator result");
+                heads.compareAndSet(ledgerIndex, predecessor, exact.exactHead());
+                observer.completed(actorId, planned, exact, elapsedMicros);
+            } else {
+                observer.failed(actorId, planned, failure, elapsedMicros);
+            }
+        });
+    }
+
+    private static CompletionStage<Void> boundedBackoff(
+            int retryNumber, BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
+        return CompletableFuture.runAsync(
+                () -> {}, CompletableFuture.delayedExecutor(5, TimeUnit.MILLISECONDS));
     }
 
     long ensurePopulation(int requestedPopulation) throws Exception {
@@ -686,6 +763,12 @@ final class M3CandidateAllocatorPopulation {
         NODE_CREATE,
         HEAD_PUBLISH,
         CELL_CLEAR
+    }
+
+    interface FormalAllocationObserver {
+        void completed(int actorId, M3AllocatorWorkloadPlan.PlannedRequest request, Result result, long elapsedMicros);
+
+        void failed(int actorId, M3AllocatorWorkloadPlan.PlannedRequest request, Throwable failure, long elapsedMicros);
     }
 
     record Allocation(long ledgerId, long grantId) {}

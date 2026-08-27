@@ -1,5 +1,8 @@
 import org.gradle.api.tasks.JavaExec
 import org.gradle.jvm.tasks.Jar
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.security.MessageDigest
 
 /*
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -219,6 +222,12 @@ val realAllocatorEvidenceTest = tasks.register<Test>("realAllocatorEvidenceTest"
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3RealAllocatorEvidenceTest")
     }
     outputs.upToDateWhen { false }
+    doFirst {
+        error(
+            "legacy full allocator execution is disabled; use only the separately authorized " +
+                "realAllocatorV2BoundedAdaptiveFormalCampaign entry",
+        )
+    }
     systemProperty(
         "nereus.m3.allocator.outputDirectory",
         providers.gradleProperty("v2M3AllocatorOutputDirectory")
@@ -429,6 +438,221 @@ tasks.register<Test>("realAllocatorContractTest") {
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2BoundedActorLaneRunnerTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AllocatorProtocolMainTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AdaptiveCampaignExecutorTest")
+    }
+}
+
+val realAllocatorV2BoundedAdaptiveFormalCampaign = tasks.register<Test>(
+    "realAllocatorV2BoundedAdaptiveFormalCampaign",
+) {
+    group = "verification"
+    description =
+        "Explicitly authorized ADR-0104 bounded-adaptive campaign; never runs from build, check, or v2M3Check."
+    notCompatibleWithConfigurationCache("formal preflight inspects live Git and exact external worktrees")
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    testClassesDirs = realAllocatorTest.output.classesDirs
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    maxParallelForks = 1
+    maxHeapSize = "6144m"
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2BoundedAdaptiveFormalCampaignTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?.takeIf { it.isNotBlank() }
+            ?: error("$property is required for the bounded-adaptive formal campaign")
+        fun command(vararg command: String, directory: File = rootProject.projectDir): String {
+            val process = ProcessBuilder(*command)
+                .directory(directory)
+                .redirectErrorStream(true)
+                .start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+            check(process.waitFor() == 0) {
+                "allocator formal preflight command failed: ${command.joinToString(" ")}\n$output"
+            }
+            return output
+        }
+        fun git(directory: File, vararg arguments: String): String =
+            command("git", "-C", directory.absolutePath, *arguments)
+        fun sha256(path: File): String {
+            check(path.isFile) { "allocator formal hash input is absent: ${path.absolutePath}" }
+            val digest = MessageDigest.getInstance("SHA-256")
+            path.inputStream().use { input ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            return digest.digest().joinToString("") { "%02x".format(it) }
+        }
+        fun requireCheckout(pathProperty: String, commitProperty: String): File {
+            val checkout = file(required(pathProperty)).canonicalFile
+            val expectedCommit = required(commitProperty)
+            check(git(checkout, "rev-parse", "HEAD") == expectedCommit) {
+                "$pathProperty HEAD differs from $commitProperty"
+            }
+            check(git(checkout, "status", "--porcelain", "--untracked-files=all").isEmpty()) {
+                "$pathProperty worktree is not clean"
+            }
+            return checkout
+        }
+
+        val authorization = required("v2M3AllocatorV2FormalAuthorizationSha")
+        val head = git(rootProject.projectDir, "rev-parse", "HEAD")
+        check(head == authorization) { "allocator formal HEAD differs from the explicit authorization SHA" }
+        check(git(rootProject.projectDir, "branch", "--show-current") == "main") {
+            "allocator formal source is not on main"
+        }
+        check(git(rootProject.projectDir, "rev-parse", "refs/remotes/origin/main") == authorization) {
+            "allocator formal origin/main differs from the explicit authorization SHA"
+        }
+        check(git(rootProject.projectDir, "status", "--porcelain", "--untracked-files=all").isEmpty()) {
+            "allocator formal Nereus worktree is not clean"
+        }
+
+        val sourceLocks = rootProject.file("docs/v2/source-locks.json")
+        val expectedSourceLocks = required("v2M3AllocatorV2SourceLocksSha256")
+        check(sha256(sourceLocks) == expectedSourceLocks) {
+            "allocator formal source-lock SHA differs from the explicit authorization tuple"
+        }
+        val expectedDependencyLock = required("v2M3AllocatorV2DependencyLockSha256")
+        val planOutput = command("python3", rootProject.file("scripts/v2-m3-allocator-plan.py").absolutePath)
+        check(planOutput.contains("\"dependencyLockSha256\": \"$expectedDependencyLock\"")) {
+            "allocator formal dependency-lock SHA differs from the pure plan projection"
+        }
+        val expectedPlan = required("v2M3AllocatorV2ZeroDecisionPlanSha256")
+        check(planOutput.contains("\"zeroDecisionPlanSha256\": \"$expectedPlan\"")) {
+            "allocator formal frozen plan SHA differs from plan-only"
+        }
+        check(planOutput.contains("\"nereusCommit\": \"$authorization\"")) {
+            "allocator formal plan-only source tuple differs from the authorized commit"
+        }
+
+        val pulsar = requireCheckout(
+            "v2M3AllocatorV2PulsarCheckout",
+            "v2M3AllocatorV2PulsarCommit",
+        )
+        val oxiaServer = requireCheckout(
+            "v2M3AllocatorV2OxiaServerCheckout",
+            "v2M3AllocatorV2OxiaServerCommit",
+        )
+        val oxiaClient = requireCheckout(
+            "v2M3AllocatorV2OxiaClientCheckout",
+            "v2M3AllocatorV2OxiaClientCommit",
+        )
+        check(planOutput.contains("\"pulsarCommit\": \"${git(pulsar, "rev-parse", "HEAD")}\"")) {
+            "allocator formal Pulsar source differs from the source-lock tuple"
+        }
+        check(planOutput.contains("\"oxiaServerCommit\": \"${git(oxiaServer, "rev-parse", "HEAD")}\"")) {
+            "allocator formal Oxia-server source differs from the source-lock tuple"
+        }
+        check(planOutput.contains("\"oxiaClientCommit\": \"${git(oxiaClient, "rev-parse", "HEAD")}\"")) {
+            "allocator formal Oxia-client source differs from the source-lock tuple"
+        }
+
+        val oxiaClientJar = file(required("v2M3AllocatorV2OxiaClientJarPath")).canonicalFile
+        val expectedOxiaClientJar = required("v2M3AllocatorV2OxiaClientJarSha256")
+        check(sha256(oxiaClientJar) == expectedOxiaClientJar) {
+            "allocator formal Oxia-client JAR differs from the explicit source tuple"
+        }
+        check(planOutput.contains("\"oxiaClientJarSha256\": \"$expectedOxiaClientJar\"")) {
+            "allocator formal Oxia-client JAR differs from the source-lock tuple"
+        }
+        val expectedOxiaImage = required("v2M3AllocatorV2OxiaImageDigest")
+        check(planOutput.contains("\"oxiaServerImageDigest\": \"$expectedOxiaImage\"")) {
+            "allocator formal Oxia image differs from the source-lock tuple"
+        }
+        val oxiaContainer = required("v2M3AllocatorV2OxiaContainerName")
+        check(command("docker", "inspect", "--format", "{{.State.Running}}", oxiaContainer) == "true") {
+            "allocator formal Oxia container is not running"
+        }
+        check(command("docker", "inspect", "--format", "{{.Image}}", oxiaContainer) == expectedOxiaImage) {
+            "allocator formal Oxia container image differs from the source-lock tuple"
+        }
+        check(
+            command(
+                "docker",
+                "inspect",
+                "--format",
+                "{{index .Config.Labels \"com.nereusstream.evidence\"}}",
+                oxiaContainer,
+            ) == "v2-m3-bounded-adaptive-formal",
+        ) {
+            "allocator formal Oxia container is not owned by the bounded-adaptive launcher"
+        }
+        check(
+            command(
+                "docker",
+                "image",
+                "inspect",
+                expectedOxiaImage,
+                "--format",
+                "{{index .Config.Labels \"org.opencontainers.image.revision\"}}",
+            ) == git(oxiaServer, "rev-parse", "HEAD"),
+        ) {
+            "allocator formal Oxia image revision differs from the locked Oxia-server source"
+        }
+        val oxiaServiceAddress = required("v2M3AllocatorV2OxiaServiceAddress")
+        val oxiaBoundPort = command("docker", "port", oxiaContainer, "6648/tcp")
+            .lineSequence()
+            .single()
+            .substringAfterLast(':')
+        check(oxiaServiceAddress == "127.0.0.1:$oxiaBoundPort") {
+            "allocator formal Oxia service address differs from the task-owned container"
+        }
+        val evidenceArtifact = realAllocatorEvidenceArtifactJar.get().archiveFile.get().asFile
+        val executorSha = sha256(evidenceArtifact)
+        check(executorSha == required("v2M3AllocatorV2ExecutorSha256")) {
+            "allocator formal executor artifact differs from the explicit authorization tuple"
+        }
+
+        listOf(
+            "v2M3AllocatorV2InputAttachment",
+            "v2M3AllocatorV2ResumeAttachment",
+            "v2M3AllocatorV1EvidenceDirectory",
+            "v2M3AllocatorDiagnosticDirectory",
+        ).forEach { forbidden ->
+            check(!providers.gradleProperty(forbidden).isPresent) {
+                "$forbidden is forbidden for the V2 formal campaign"
+            }
+        }
+        val outputDirectory = file(required("v2M3AllocatorV2FormalOutputDirectory")).toPath()
+            .toAbsolutePath()
+            .normalize()
+        val unsafe = outputDirectory.toString().lowercase()
+        check(listOf("full-matrix", "diagnostic", "nare1", "naea1", "nars1").none(unsafe::contains)) {
+            "allocator formal output path aliases an old V1 or diagnostic directory"
+        }
+        if (Files.exists(outputDirectory, LinkOption.NOFOLLOW_LINKS)) {
+            check(Files.isDirectory(outputDirectory, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(outputDirectory)) {
+                "allocator formal output is not a real directory"
+            }
+            Files.list(outputDirectory).use { entries ->
+                check(entries.findAny().isEmpty) { "allocator formal output directory is not empty" }
+            }
+        } else {
+            Files.createDirectories(outputDirectory)
+        }
+
+        systemProperty("nereus.m3.allocator.v2.formal.authorizedCommit", authorization)
+        systemProperty("nereus.m3.allocator.v2.formal.zeroDecisionPlanSha256", expectedPlan)
+        systemProperty("nereus.m3.allocator.v2.formal.outputDirectory", outputDirectory.toString())
+        systemProperty(
+            "nereus.m3.allocator.v2.formal.oxiaServiceAddress",
+            oxiaServiceAddress,
+        )
+        systemProperty(
+            "nereus.m3.allocator.v2.formal.oxiaImageDigest",
+            expectedOxiaImage,
+        )
+        systemProperty("nereus.m3.allocator.v2.formal.dependencyLockSha256", expectedDependencyLock)
+        systemProperty("nereus.m3.allocator.v2.formal.executorSha256", executorSha)
     }
 }
 

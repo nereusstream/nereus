@@ -367,6 +367,7 @@ Accepted decisions:
 - [ADR 0104: M3 allocator validator-proof adaptive campaign amendment](../decisions/0104-v2-m3-allocator-validator-proof-adaptive-campaign-amendment.md)
 - [ADR 0105: M3 preselection evidence source-lock amendment](../decisions/0105-v2-m3-preselection-evidence-source-lock-amendment.md)
 - [ADR 0106: M3 allocator V2 child and Final evidence amendment](../decisions/0106-v2-m3-allocator-v2-child-final-evidence-amendment.md)
+- [ADR 0107: M3 allocator bounded-adaptive formal-entry wiring amendment](../decisions/0107-v2-m3-allocator-bounded-adaptive-formal-entry-wiring-amendment.md)
 
 ## Open design gates
 
@@ -447,6 +448,13 @@ clean source `520838a...`, a fresh 246-test offline pre-campaign rerun and the f
 with zero failure/error/skip; the latter seals diagnostic-only NADV2 `4bd6d4fe...c0cc`. Historical V1 Cell-proof and
 construction runs remain immutable diagnostics. None can select a mode or promote a scenario, and no full formal
 campaign is currently authorized.
+ADR 0107 now wires the bounded-adaptive formal entry without granting that authorization. Pure `--plan-only` freezes
+288 interval, 360 single-cut fault, 32 RANGE-row scale, and 680 maximum total physical actions, a 48,000-second
+process cap, stable zero-decision plan hash, and the exact source tuple without external-service access or evidence
+writes. One explicit default-off Gradle task and script mode execute exactly one planned action per adapter call and
+fail closed on authorization, source/runtime-lock, frozen-plan, dedicated-worktree, and new-empty-output drift. Phase A
+runs no campaign and leaves allocator mode `UNSELECTED`, every M3 scenario `PLANNED`, and all evaluation, selection,
+source-lock, child, scenario, and Final work open for separately authorized later phases.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

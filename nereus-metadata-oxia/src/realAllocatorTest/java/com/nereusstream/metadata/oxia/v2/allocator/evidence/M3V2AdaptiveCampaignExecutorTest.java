@@ -39,7 +39,13 @@ import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AdaptiveCampaign
 import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AdaptiveCampaignExecutor.BudgetCharge;
 import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AdaptiveCampaignExecutor.CampaignResult;
 import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AdaptiveCampaignExecutor.CheckpointSink;
+import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AdaptiveCampaignExecutor.PhysicalActionResult;
 import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AdaptiveCampaignExecutor.TerminalReason;
+import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2FormalActionExecutorAdapter.FaultActionResult;
+import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2FormalActionExecutorAdapter.IntervalActionResult;
+import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2FormalActionExecutorAdapter.RealActionRuntime;
+import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2FormalActionExecutorAdapter.ScaleActionResult;
+import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2FormalCampaignPlan.PlannedActionV2;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -48,12 +54,48 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class M3V2AdaptiveCampaignExecutorTest {
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void frozenPhysicalPlanHasExact680ActionInventoryAndStableDigest() {
+        List<PlannedActionV2> actions = M3V2FormalCampaignPlan.zeroDecisionActions();
+
+        assertThat(actions).hasSize(680);
+        assertThat(actions.stream().collect(Collectors.groupingBy(
+                        PlannedActionV2::kind, Collectors.counting())))
+                .containsEntry(M3V2FormalCampaignPlan.ActionKind.NATIVE_INTERVAL, 48L)
+                .containsEntry(M3V2FormalCampaignPlan.ActionKind.CANDIDATE_INTERVAL, 240L)
+                .containsEntry(M3V2FormalCampaignPlan.ActionKind.FAULT_ACTION, 360L)
+                .containsEntry(M3V2FormalCampaignPlan.ActionKind.SCALE_ACTION, 32L);
+        assertThat(M3V2FormalCampaignPlan.zeroDecisionPlanDigest().toHex())
+                .isEqualTo("4fbeb2d43bd5865cb6139277a5021ed1b0762223f4983fc8fa50f8edc975ff08");
+    }
+
+    @Test
+    void rangeRowExpandsToOneScaleThenOneIntervalAndFaultRowToNineCuts() {
+        Cell range = Cell.of(Candidate.RANGE_16, 10_000, 1, 1000);
+        List<PlannedActionV2> first = M3V2FormalCampaignPlan.actionsFor(
+                new ExecuteCell(range), List.of());
+        List<PlannedActionV2> later = M3V2FormalCampaignPlan.actionsFor(
+                new ExecuteCell(Cell.of(Candidate.RANGE_16, 10_000, 1, 750)), List.of(passing(range)));
+        List<PlannedActionV2> faults = M3V2FormalCampaignPlan.actionsFor(
+                new ExecuteFaultRow(range.row()), List.of(passing(range)));
+
+        assertThat(first).extracting(PlannedActionV2::kind)
+                .containsExactly(
+                        M3V2FormalCampaignPlan.ActionKind.SCALE_ACTION,
+                        M3V2FormalCampaignPlan.ActionKind.CANDIDATE_INTERVAL);
+        assertThat(later).extracting(PlannedActionV2::kind)
+                .containsExactly(M3V2FormalCampaignPlan.ActionKind.CANDIDATE_INTERVAL);
+        assertThat(faults).extracting(PlannedActionV2::faultCut)
+                .containsExactly(AllocatorFaultCutV1.values());
+    }
 
     @Test
     void strictCampaignPersistsEveryValidatorDerivedCheckpointWithoutSealingEvaluation() throws Exception {
@@ -73,7 +115,7 @@ class M3V2AdaptiveCampaignExecutorTest {
         assertThat(finalCheckpoint.dispositions()).hasSize(268);
         assertThat(finalCheckpoint.checkpointSequence()).isEqualTo(28);
         assertThat(sink.values).hasSize(29);
-        assertThat(actions.calls()).isEqualTo(28);
+        assertThat(actions.calls()).isEqualTo(96);
         assertThat(com.nereusstream.domain.registry.allocator.AllocatorCampaignValidatorV2
                         .validate(finalCheckpoint.campaign())
                         .qualifiedCandidates())
@@ -141,18 +183,13 @@ class M3V2AdaptiveCampaignExecutorTest {
     @Test
     void reorderedActionResultFailsInfrastructureWithoutBindingForgedObservation() throws Exception {
         CollectingSink sink = new CollectingSink();
-        ActionExecutor reordered = new ActionExecutor() {
+        ActionExecutor reordered = new M3V2FormalActionExecutorAdapter(new FakeRuntime() {
             @Override
-            public BudgetCharge budgetFor(RequiredAction action) {
-                return intervalCharge();
-            }
-
-            @Override
-            public ActionResult execute(RequiredAction action) {
+            public IntervalActionResult executeNativeInterval(Cell cell) {
                 Cell wrong = Cell.of(Candidate.NATIVE, 10_000, 1, 750);
-                return result(passing(wrong), true);
+                return intervalResult(passing(wrong), true);
             }
-        };
+        });
 
         CampaignResult result = executor(source("e"), budgets(), reordered, sink, () -> false).start();
         AllocatorCampaignCheckpointV2 failed = checkpoint(result);
@@ -169,17 +206,12 @@ class M3V2AdaptiveCampaignExecutorTest {
     @Test
     void infrastructureInvalidActionBindsRawObservationButCannotEvaluateOrResume() throws Exception {
         CollectingSink sink = new CollectingSink();
-        ActionExecutor invalidInfrastructure = new ActionExecutor() {
+        ActionExecutor invalidInfrastructure = new M3V2FormalActionExecutorAdapter(new FakeRuntime() {
             @Override
-            public BudgetCharge budgetFor(RequiredAction action) {
-                return intervalCharge();
+            public IntervalActionResult executeNativeInterval(Cell cell) {
+                return intervalResult(passing(cell), false);
             }
-
-            @Override
-            public ActionResult execute(RequiredAction action) {
-                return result(passing(((ExecuteCell) action).cell()), false);
-            }
-        };
+        });
 
         CampaignResult result = executor(source("f"), budgets(), invalidInfrastructure, sink, () -> false).start();
         AllocatorCampaignCheckpointV2 failed = checkpoint(result);
@@ -198,17 +230,12 @@ class M3V2AdaptiveCampaignExecutorTest {
     @Test
     void actionExceptionConsumesOnlyItsDeclaredBudgetAndPersistsNoObservation() throws Exception {
         CollectingSink sink = new CollectingSink();
-        ActionExecutor failing = new ActionExecutor() {
+        ActionExecutor failing = new M3V2FormalActionExecutorAdapter(new FakeRuntime() {
             @Override
-            public BudgetCharge budgetFor(RequiredAction action) {
-                return intervalCharge();
-            }
-
-            @Override
-            public ActionResult execute(RequiredAction action) throws Exception {
+            public IntervalActionResult executeNativeInterval(Cell cell) throws Exception {
                 throw new IOException("diagnostic action failure");
             }
-        };
+        });
 
         CampaignResult result = executor(source("1"), budgets(), failing, sink, () -> false).start();
         AllocatorCampaignCheckpointV2 failed = checkpoint(result);
@@ -225,13 +252,18 @@ class M3V2AdaptiveCampaignExecutorTest {
         CollectingSink sink = new CollectingSink();
         ActionExecutor failing = new ActionExecutor() {
             @Override
-            public BudgetCharge budgetFor(RequiredAction action) {
+            public BudgetCharge budgetFor(PlannedActionV2 action) {
                 throw new IllegalStateException("missing phase budget");
             }
 
             @Override
-            public ActionResult execute(RequiredAction action) {
+            public PhysicalActionResult execute(PlannedActionV2 action) {
                 throw new AssertionError("action must not execute without a validated budget charge");
+            }
+
+            @Override
+            public ActionResult complete(RequiredAction required, List<PhysicalActionResult> physicalResults) {
+                throw new AssertionError("an unexecuted action cannot complete");
             }
         };
 
@@ -293,13 +325,6 @@ class M3V2AdaptiveCampaignExecutorTest {
 
     private static BudgetCharge intervalCharge() {
         return new BudgetCharge(0, 0, 0, 0, 40, 0, 0);
-    }
-
-    private static ActionResult result(Observation observation, boolean infrastructureValid) {
-        return new ActionResult(
-                observation,
-                digest("attachment-" + identity(observation)),
-                infrastructureValid);
     }
 
     private static String identity(Observation observation) {
@@ -396,31 +421,84 @@ class M3V2AdaptiveCampaignExecutorTest {
 
     private static final class FakeActions implements ActionExecutor {
         private final AtomicInteger calls = new AtomicInteger();
+        private final M3V2FormalActionExecutorAdapter delegate =
+                new M3V2FormalActionExecutorAdapter(new FakeRuntime(calls));
 
         @Override
-        public BudgetCharge budgetFor(RequiredAction action) {
-            return action instanceof ExecuteCell
-                    ? intervalCharge()
-                    : new BudgetCharge(0, 0, 1, 0, 0, 0, 0);
+        public BudgetCharge budgetFor(PlannedActionV2 action) {
+            return delegate.budgetFor(action);
         }
 
         @Override
-        public ActionResult execute(RequiredAction action) {
-            calls.incrementAndGet();
-            Observation observation;
-            if (action instanceof ExecuteCell executeCell) {
-                Cell cell = executeCell.cell();
-                observation = cell.candidate().nativePath() || cell.candidate().strict()
-                        ? passing(cell)
-                        : relativeFailure(cell);
-            } else {
-                observation = passingFault(((ExecuteFaultRow) action).row());
-            }
-            return result(observation, true);
+        public PhysicalActionResult execute(PlannedActionV2 action) throws Exception {
+            return delegate.execute(action);
+        }
+
+        @Override
+        public ActionResult complete(RequiredAction required, List<PhysicalActionResult> physicalResults) {
+            return delegate.complete(required, physicalResults);
         }
 
         int calls() {
             return calls.get();
         }
+    }
+
+    private static class FakeRuntime implements RealActionRuntime {
+        private final AtomicInteger calls;
+
+        private FakeRuntime() {
+            this(new AtomicInteger());
+        }
+
+        private FakeRuntime(AtomicInteger calls) {
+            this.calls = calls;
+        }
+
+        @Override
+        public IntervalActionResult executeNativeInterval(Cell cell) throws Exception {
+            calls.incrementAndGet();
+            return intervalResult(passing(cell), true);
+        }
+
+        @Override
+        public IntervalActionResult executeCandidateInterval(Cell cell) throws Exception {
+            calls.incrementAndGet();
+            IntervalEvidence evidence = cell.candidate().strict() ? passing(cell) : relativeFailure(cell);
+            return intervalResult(evidence, true);
+        }
+
+        @Override
+        public FaultActionResult executeFaultAction(Row row, AllocatorFaultCutV1 cut) throws Exception {
+            calls.incrementAndGet();
+            return new FaultActionResult(
+                    row,
+                    cut,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    cut == AllocatorFaultCutV1.BROKER_SESSION_CRASH_MASS_TAKEOVER ? 1_000_000 : 0,
+                    digest("fault-" + row + '-' + cut),
+                    true);
+        }
+
+        @Override
+        public ScaleActionResult executeScaleAction(Row row) throws Exception {
+            calls.incrementAndGet();
+            return new ScaleActionResult(row, digest("scale-" + row), true);
+        }
+    }
+
+    private static IntervalActionResult intervalResult(IntervalEvidence evidence, boolean infrastructureValid) {
+        return new IntervalActionResult(
+                evidence,
+                digest("attachment-" + identity(evidence)),
+                infrastructureValid);
     }
 }

@@ -26,17 +26,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 
 /**
  * V2 performance harness boundary. Candidate actor endpoints are adapters over four distinct instances of the exact
  * production-neutral workflow; the harness adds only bounded local admission and measurement.
  */
 final class M3V2AllocatorFormalHarness {
-    private final M3V2BoundedActorLaneRunner<Request> candidateRunner;
+    private final M3V2BoundedActorLaneRunner<CandidateRequest> candidateRunner;
     private final List<ActorEndpoint> candidateActors;
 
     private M3V2AllocatorFormalHarness(
-            M3V2BoundedActorLaneRunner<Request> candidateRunner, List<ActorEndpoint> candidateActors) {
+            M3V2BoundedActorLaneRunner<CandidateRequest> candidateRunner, List<ActorEndpoint> candidateActors) {
         this.candidateRunner = Objects.requireNonNull(candidateRunner, "candidateRunner");
         this.candidateActors = requireIndependentActors(candidateActors);
     }
@@ -50,9 +51,25 @@ final class M3V2AllocatorFormalHarness {
             if (!workflow.bounds().equals(BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal())) {
                 throw new IllegalArgumentException("allocator V2 formal workflow bounds differ from source authority");
             }
-            endpoints.add(new ActorEndpoint(actorId, workflow, workflow::allocate));
+            endpoints.add(new ActorEndpoint(actorId, workflow, request -> {
+                if (!(request.payload() instanceof Request exact)) {
+                    throw new IllegalArgumentException("allocator candidate request payload is not a workflow Request");
+                }
+                return workflow.allocate(exact);
+            }));
         }
         return new M3V2AllocatorFormalHarness(M3V2BoundedActorLaneRunner.formal(), endpoints);
+    }
+
+    static M3V2AllocatorFormalHarness formalActors(List<ActorEndpoint> actors) {
+        for (ActorEndpoint actor : List.copyOf(Objects.requireNonNull(actors, "actors"))) {
+            if (!(actor.coordinatorIdentity() instanceof BoundedVirtualLedgerAllocatorWorkflowV2 workflow)
+                    || !workflow.bounds().equals(BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal())) {
+                throw new IllegalArgumentException(
+                        "allocator V2 formal actor is not an exact bounded production workflow");
+            }
+        }
+        return new M3V2AllocatorFormalHarness(M3V2BoundedActorLaneRunner.formal(), actors);
     }
 
     static M3V2AllocatorFormalHarness forContractTest(
@@ -63,8 +80,8 @@ final class M3V2AllocatorFormalHarness {
 
     HarnessResult runCandidate(
             Cell cell,
-            List<M3V2BoundedActorLaneRunner.ScheduledOffer<Request>> schedule,
-            SupplementaryMeasurements supplementary)
+            List<M3V2BoundedActorLaneRunner.ScheduledOffer<CandidateRequest>> schedule,
+            Supplier<SupplementaryMeasurements> supplementary)
             throws InterruptedException {
         Objects.requireNonNull(cell, "cell");
         if (cell.candidate().nativePath()) {
@@ -75,6 +92,8 @@ final class M3V2AllocatorFormalHarness {
                 cell.offeredRolloverRequestsPerSecond(),
                 schedule,
                 (actorId, request) -> candidateActors.get(actorId).operation().allocate(request));
+        SupplementaryMeasurements exactSupplementary =
+                Objects.requireNonNull(supplementary.get(), "supplementary measurements");
         IntervalEvidence evidence = new IntervalEvidence(
                 cell,
                 interval.offered(),
@@ -84,17 +103,17 @@ final class M3V2AllocatorFormalHarness {
                 interval.failedAfterAdmission(),
                 interval.timedOutAfterAdmission(),
                 interval.terminal(),
-                supplementary.failedAssertions(),
-                supplementary.unexpectedErrors(),
-                supplementary.skipped(),
-                supplementary.duplicateLedgerIds(),
-                supplementary.reusedLedgerIds(),
+                exactSupplementary.failedAssertions(),
+                exactSupplementary.unexpectedErrors(),
+                exactSupplementary.skipped(),
+                exactSupplementary.duplicateLedgerIds(),
+                exactSupplementary.reusedLedgerIds(),
                 interval.rolloverP99Micros(),
-                supplementary.oxiaOperationP99Micros(),
+                exactSupplementary.oxiaOperationP99Micros(),
                 interval.queueAgeP99Micros(),
                 interval.backlogMaximum(),
                 interval.starvationMaximumMicros(),
-                supplementary.appendStallP99Micros(),
+                exactSupplementary.appendStallP99Micros(),
                 interval.backlogAtEnd(),
                 interval.inFlightAtEnd(),
                 interval.waiterAtEnd());
@@ -131,7 +150,16 @@ final class M3V2AllocatorFormalHarness {
 
     @FunctionalInterface
     interface CandidateOperation {
-        CompletionStage<?> allocate(Request request);
+        CompletionStage<?> allocate(CandidateRequest request);
+    }
+
+    record CandidateRequest(long requestOrdinal, int ledgerIndex, Object payload) {
+        CandidateRequest {
+            if (requestOrdinal < 0 || ledgerIndex < 0) {
+                throw new IllegalArgumentException("allocator candidate request dimensions are negative");
+            }
+            Objects.requireNonNull(payload, "payload");
+        }
     }
 
     record SupplementaryMeasurements(

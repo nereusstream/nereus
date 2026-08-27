@@ -26,6 +26,7 @@ import com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.Observatio
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.Plan;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.RequiredAction;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignValidatorV2;
+import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2FormalCampaignPlan.PlannedActionV2;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -42,13 +43,12 @@ import java.util.Objects;
  * it never seals an evaluation or makes a promotion decision.
  */
 final class M3V2AdaptiveCampaignExecutor {
-    private static final int MAX_ACTIONS = 328;
-
     private final SourceBinding source;
     private final RemainingBudgets initialBudgets;
     private final ActionExecutor actions;
     private final CheckpointSink checkpoints;
     private final StopSignal stopSignal;
+    private final HardDeadline hardDeadline;
 
     M3V2AdaptiveCampaignExecutor(
             SourceBinding source,
@@ -56,11 +56,22 @@ final class M3V2AdaptiveCampaignExecutor {
             ActionExecutor actions,
             CheckpointSink checkpoints,
             StopSignal stopSignal) {
+        this(source, initialBudgets, actions, checkpoints, stopSignal, HardDeadline.never());
+    }
+
+    M3V2AdaptiveCampaignExecutor(
+            SourceBinding source,
+            RemainingBudgets initialBudgets,
+            ActionExecutor actions,
+            CheckpointSink checkpoints,
+            StopSignal stopSignal,
+            HardDeadline hardDeadline) {
         this.source = Objects.requireNonNull(source, "source");
         this.initialBudgets = Objects.requireNonNull(initialBudgets, "initialBudgets");
         this.actions = Objects.requireNonNull(actions, "actions");
         this.checkpoints = Objects.requireNonNull(checkpoints, "checkpoints");
         this.stopSignal = Objects.requireNonNull(stopSignal, "stopSignal");
+        this.hardDeadline = Objects.requireNonNull(hardDeadline, "hardDeadline");
     }
 
     CampaignResult start() throws IOException {
@@ -87,19 +98,30 @@ final class M3V2AdaptiveCampaignExecutor {
     private CampaignResult drive(CanonicalBytes startingBytes) throws IOException {
         CanonicalBytes currentBytes = startingBytes;
         AllocatorCampaignCheckpointV2 current = AllocatorCampaignCheckpointV2.decode(currentBytes);
+        int executedPhysicalActions = M3V2FormalCampaignPlan.completedPhysicalActions(
+                current.campaign().observations());
         while (true) {
             Plan currentPlan = AllocatorCampaignValidatorV2.validate(current.campaign());
             if (currentPlan.completed()) {
                 throw new IllegalStateException("allocator V2 resumable checkpoint is already complete");
             }
-            if (current.executionRecords().size() >= MAX_ACTIONS) {
+            if (executedPhysicalActions >= M3V2FormalCampaignPlan.MAXIMUM_TOTAL_EXECUTED_ACTIONS) {
                 return transition(
                         currentBytes,
                         current,
                         current.remainingBudgets(),
                         Status.INFRASTRUCTURE_FAILED,
                         TerminalReason.ACTION_CAP_EXCEEDED,
-                        "campaign reached the frozen 328-action observation cap before validator completion");
+                        "campaign reached the frozen 680-action cap before validator completion");
+            }
+            if (hardDeadline.exceeded()) {
+                return transition(
+                        currentBytes,
+                        current,
+                        current.remainingBudgets(),
+                        Status.INFRASTRUCTURE_FAILED,
+                        TerminalReason.WALL_CLOCK_CAP_EXCEEDED,
+                        "campaign exceeded the frozen 48000-second wall-clock cap");
             }
             if (stopSignal.stopRequested()) {
                 if (current.status() == Status.INTERRUPTED) {
@@ -114,55 +136,101 @@ final class M3V2AdaptiveCampaignExecutor {
                         "stop requested before next action");
             }
             RequiredAction action = currentPlan.nextAction().orElseThrow();
-            BudgetCharge charge;
+            List<PlannedActionV2> plannedActions = M3V2FormalCampaignPlan.actionsFor(
+                    action, current.campaign().observations());
+            List<PhysicalActionResult> physicalResults = new ArrayList<>(plannedActions.size());
+            RemainingBudgets afterCharge = current.remainingBudgets();
+            for (PlannedActionV2 plannedAction : plannedActions) {
+                if (executedPhysicalActions >= M3V2FormalCampaignPlan.MAXIMUM_TOTAL_EXECUTED_ACTIONS) {
+                    return transition(
+                            currentBytes,
+                            current,
+                            afterCharge,
+                            Status.INFRASTRUCTURE_FAILED,
+                            TerminalReason.ACTION_CAP_EXCEEDED,
+                            "campaign attempted a physical action outside the frozen 680-action inventory");
+                }
+                BudgetCharge charge;
+                try {
+                    charge = Objects.requireNonNull(
+                            actions.budgetFor(plannedAction), "allocator V2 physical action budget");
+                } catch (RuntimeException failure) {
+                    return transition(
+                            currentBytes,
+                            current,
+                            afterCharge,
+                            Status.INFRASTRUCTURE_FAILED,
+                            TerminalReason.BUDGET_ACCOUNTING_FAILED,
+                            failure.getClass().getSimpleName() + ": "
+                                    + Objects.toString(failure.getMessage(), ""));
+                }
+                if (!charge.fits(afterCharge)) {
+                    if (current.status() == Status.INTERRUPTED) {
+                        return result(
+                                currentBytes,
+                                current,
+                                TerminalReason.BUDGET_EXHAUSTED,
+                                "remaining independent phase budget cannot admit the next physical action");
+                    }
+                    return transition(
+                            currentBytes,
+                            current,
+                            afterCharge,
+                            Status.INTERRUPTED,
+                            TerminalReason.BUDGET_EXHAUSTED,
+                            "remaining independent phase budget cannot admit the next physical action");
+                }
+                afterCharge = charge.subtractFrom(afterCharge);
+                try {
+                    PhysicalActionResult result = Objects.requireNonNull(
+                            actions.execute(plannedAction), "allocator V2 physical action result");
+                    if (!result.action().equals(plannedAction)) {
+                        throw new IllegalArgumentException("allocator V2 physical result belongs to another action");
+                    }
+                    physicalResults.add(result);
+                    executedPhysicalActions++;
+                } catch (InterruptedException failure) {
+                    CampaignResult interrupted = transition(
+                            currentBytes,
+                            current,
+                            afterCharge,
+                            Status.INTERRUPTED,
+                            TerminalReason.ACTION_INTERRUPTED,
+                            failure.getClass().getSimpleName());
+                    Thread.currentThread().interrupt();
+                    return interrupted;
+                } catch (IllegalArgumentException failure) {
+                    return transition(
+                            currentBytes,
+                            current,
+                            afterCharge,
+                            Status.INFRASTRUCTURE_FAILED,
+                            TerminalReason.INVALID_ACTION_RESULT,
+                            failure.getClass().getSimpleName() + ": "
+                                    + Objects.toString(failure.getMessage(), ""));
+                } catch (Exception failure) {
+                    return transition(
+                            currentBytes,
+                            current,
+                            afterCharge,
+                            Status.INFRASTRUCTURE_FAILED,
+                            TerminalReason.INFRASTRUCTURE_FAILED,
+                            failure.getClass().getSimpleName() + ": "
+                                    + Objects.toString(failure.getMessage(), ""));
+                }
+            }
+
+            ActionResult actionResult;
             try {
-                charge = Objects.requireNonNull(actions.budgetFor(action), "allocator V2 action budget");
+                actionResult = Objects.requireNonNull(
+                        actions.complete(action, physicalResults), "allocator V2 completed action result");
             } catch (RuntimeException failure) {
                 return transition(
                         currentBytes,
                         current,
-                        current.remainingBudgets(),
-                        Status.INFRASTRUCTURE_FAILED,
-                        TerminalReason.BUDGET_ACCOUNTING_FAILED,
-                        failure.getClass().getSimpleName() + ": " + Objects.toString(failure.getMessage(), ""));
-            }
-            if (!charge.fits(current.remainingBudgets())) {
-                if (current.status() == Status.INTERRUPTED) {
-                    return result(
-                            currentBytes,
-                            current,
-                            TerminalReason.BUDGET_EXHAUSTED,
-                            "remaining independent phase budget cannot admit the next action");
-                }
-                return transition(
-                        currentBytes,
-                        current,
-                        current.remainingBudgets(),
-                        Status.INTERRUPTED,
-                        TerminalReason.BUDGET_EXHAUSTED,
-                        "remaining independent phase budget cannot admit the next action");
-            }
-            RemainingBudgets afterCharge = charge.subtractFrom(current.remainingBudgets());
-            ActionResult actionResult;
-            try {
-                actionResult = Objects.requireNonNull(actions.execute(action), "allocator V2 action result");
-            } catch (InterruptedException failure) {
-                CampaignResult interrupted = transition(
-                        currentBytes,
-                        current,
-                        afterCharge,
-                        Status.INTERRUPTED,
-                        TerminalReason.ACTION_INTERRUPTED,
-                        failure.getClass().getSimpleName());
-                Thread.currentThread().interrupt();
-                return interrupted;
-            } catch (Exception failure) {
-                return transition(
-                        currentBytes,
-                        current,
                         afterCharge,
                         Status.INFRASTRUCTURE_FAILED,
-                        TerminalReason.INFRASTRUCTURE_FAILED,
+                        TerminalReason.INVALID_ACTION_RESULT,
                         failure.getClass().getSimpleName() + ": " + Objects.toString(failure.getMessage(), ""));
             }
 
@@ -267,10 +335,21 @@ final class M3V2AdaptiveCampaignExecutor {
         }
     }
 
-    interface ActionExecutor {
-        BudgetCharge budgetFor(RequiredAction action);
+    @FunctionalInterface
+    interface HardDeadline {
+        boolean exceeded();
 
-        ActionResult execute(RequiredAction action) throws Exception;
+        static HardDeadline never() {
+            return () -> false;
+        }
+    }
+
+    interface ActionExecutor {
+        BudgetCharge budgetFor(PlannedActionV2 action);
+
+        PhysicalActionResult execute(PlannedActionV2 action) throws Exception;
+
+        ActionResult complete(RequiredAction required, List<PhysicalActionResult> physicalResults);
     }
 
     @FunctionalInterface
@@ -299,6 +378,15 @@ final class M3V2AdaptiveCampaignExecutor {
     record ActionResult(Observation observation, Sha256Digest attachmentDigest, boolean infrastructureValid) {
         ActionResult {
             Objects.requireNonNull(observation, "observation");
+            Objects.requireNonNull(attachmentDigest, "attachmentDigest");
+        }
+    }
+
+    record PhysicalActionResult(
+            PlannedActionV2 action, Object rawEvidence, Sha256Digest attachmentDigest, boolean infrastructureValid) {
+        PhysicalActionResult {
+            Objects.requireNonNull(action, "action");
+            Objects.requireNonNull(rawEvidence, "rawEvidence");
             Objects.requireNonNull(attachmentDigest, "attachmentDigest");
         }
     }
@@ -360,6 +448,7 @@ final class M3V2AdaptiveCampaignExecutor {
         BUDGET_ACCOUNTING_FAILED,
         ACTION_INTERRUPTED,
         ACTION_CAP_EXCEEDED,
+        WALL_CLOCK_CAP_EXCEEDED,
         INFRASTRUCTURE_FAILED,
         INVALID_ACTION_RESULT
     }
