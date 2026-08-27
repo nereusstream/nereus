@@ -200,6 +200,16 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn("hard-deadline supervisor", result.stderr)
         self.assertLess(time.monotonic() - started, 2.0)
 
+    def test_formal_entry_passes_a_literal_docker_label_template(self) -> None:
+        script = RUNNER.read_text()
+        block = script.split('if [[ "${1:-}" == "--bounded-adaptive-formal" ]]', 1)[1]
+        block = block.split('protocol_pulsar_checkout=', 1)[0]
+        self.assertIn(
+            "--format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}'",
+            block,
+        )
+        self.assertNotIn(r'\"org.opencontainers.image.revision\"', block)
+
     def test_formal_task_is_unique_and_not_reachable_from_ordinary_or_m3_gates(self) -> None:
         module = MODULE_BUILD.read_text()
         task = "realAllocatorV2BoundedAdaptiveFormalCampaign"

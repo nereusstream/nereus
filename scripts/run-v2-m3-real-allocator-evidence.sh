@@ -73,7 +73,7 @@ if [[ "${1:-}" == "--bounded-adaptive-formal" ]]; then
   done
   test "$(shasum -a 256 "$formal_oxia_client_jar" | awk '{print $1}')" = "$formal_oxia_client_jar_sha"
   test "$(docker image inspect "$formal_oxia_image" --format '{{.Id}}')" = "$formal_oxia_image_digest"
-  test "$(docker image inspect "$formal_oxia_image" --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}')" = \
+  test "$(docker image inspect "$formal_oxia_image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = \
     "$formal_oxia_server_commit"
 
   "$repo_root/gradlew" :nereus-metadata-oxia:realAllocatorEvidenceArtifactJar \
