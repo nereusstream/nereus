@@ -162,6 +162,7 @@ final class M3RealOxiaActors implements AutoCloseable {
         private final AtomicInteger controlledLatencyMillis = new AtomicInteger();
         private final AtomicBoolean loseNextMutationResponse = new AtomicBoolean();
         private final AtomicReference<CrashBarrier> crashBarrier = new AtomicReference<>();
+        private final AtomicReference<OperationDiagnostics> operationDiagnostics = new AtomicReference<>();
 
         private InstrumentedClient(int actorId, AsyncOxiaClient rawClient) {
             this(actorId, new Session(rawClient));
@@ -201,6 +202,20 @@ final class M3RealOxiaActors implements AutoCloseable {
             return controlledLatencyMillis.get();
         }
 
+        void beginDiagnosticCapture() {
+            if (!operationDiagnostics.compareAndSet(null, new OperationDiagnostics())) {
+                throw new IllegalStateException("allocator Oxia operation diagnostic capture is already active");
+            }
+        }
+
+        OperationDiagnosticSnapshot endDiagnosticCapture() {
+            OperationDiagnostics diagnostics = operationDiagnostics.getAndSet(null);
+            if (diagnostics == null) {
+                throw new IllegalStateException("allocator Oxia operation diagnostic capture is not active");
+            }
+            return diagnostics.snapshot();
+        }
+
         void loseNextMutationResponse() {
             if (!loseNextMutationResponse.compareAndSet(false, true)) {
                 throw new IllegalStateException("an Oxia response-loss cut is already armed");
@@ -222,6 +237,7 @@ final class M3RealOxiaActors implements AutoCloseable {
 
         private CompletionStage<Optional<AuthorityRecord>> read(OperationBinding binding, String key) {
             requireBindingKey(binding, key);
+            OperationCapture capture = startDiagnosticOperation("READ");
             M3AllocatorRequestTelemetry.OxiaOperation operation = binding == null
                     ? null
                     : binding.trace.startOxia(
@@ -232,7 +248,7 @@ final class M3RealOxiaActors implements AutoCloseable {
             } catch (RuntimeException failure) {
                 dispatched = CompletableFuture.failedFuture(failure);
             }
-            return delayed(dispatched, false).whenComplete((record, failure) -> {
+            return delayed(dispatched, false, capture).whenComplete((record, failure) -> {
                 if (binding != null) {
                     long responseBytes = record == null || record.isEmpty()
                             ? 0
@@ -249,7 +265,12 @@ final class M3RealOxiaActors implements AutoCloseable {
 
         @Override
         public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes storedBytes) {
-            return mutation(null, key, storedBytes, delegate -> delegate.createIfAbsent(key, storedBytes));
+            return mutation(
+                    null,
+                    "CREATE_IF_ABSENT",
+                    key,
+                    storedBytes,
+                    delegate -> delegate.createIfAbsent(key, storedBytes));
         }
 
         @Override
@@ -257,14 +278,20 @@ final class M3RealOxiaActors implements AutoCloseable {
                 String key, CanonicalBytes storedBytes, long expectedVersionId) {
             return mutation(
                     null,
+                    "COMPARE_AND_SET",
                     key,
                     storedBytes,
                     delegate -> delegate.compareAndSet(key, storedBytes, expectedVersionId));
         }
 
         private CompletionStage<Void> mutation(
-                OperationBinding binding, String key, CanonicalBytes storedBytes, MutationDispatch dispatch) {
+                OperationBinding binding,
+                String diagnosticKind,
+                String key,
+                CanonicalBytes storedBytes,
+                MutationDispatch dispatch) {
             requireBindingKey(binding, key);
+            OperationCapture capture = startDiagnosticOperation(diagnosticKind);
             M3AllocatorRequestTelemetry.OxiaOperation operation = binding == null
                     ? null
                     : binding.trace.startOxia(binding.mutationKind, storedBytes.length());
@@ -281,7 +308,7 @@ final class M3RealOxiaActors implements AutoCloseable {
                 dispatched = CompletableFuture.failedFuture(failure);
             }
             CompletionStage<Void> held = barrier == null ? dispatched : barrier.hold(dispatched);
-            return delayed(held, loseResponse).whenComplete((ignored, failure) -> {
+            return delayed(held, loseResponse, capture).whenComplete((ignored, failure) -> {
                 if (binding != null) {
                     binding.trace.endOxia(
                             operation, failure == null ? EventOutcome.SUCCESS : EventOutcome.FAILED, 0);
@@ -296,20 +323,43 @@ final class M3RealOxiaActors implements AutoCloseable {
             }
         }
 
-        private <T> CompletionStage<T> delayed(CompletionStage<T> source, boolean loseResponse) {
+        private OperationCapture startDiagnosticOperation(String kind) {
+            OperationDiagnostics diagnostics = operationDiagnostics.get();
+            return diagnostics == null ? null : diagnostics.start(kind, System.nanoTime());
+        }
+
+        private <T> CompletionStage<T> delayed(
+                CompletionStage<T> source, boolean loseResponse, OperationCapture capture) {
             CompletableFuture<T> output = new CompletableFuture<>();
-            source.whenComplete((value, failure) -> delayScheduler.schedule(
-                    () -> {
-                        if (failure != null) {
-                            output.completeExceptionally(failure);
-                        } else if (loseResponse) {
-                            output.completeExceptionally(new IOException("injected response loss after real apply"));
-                        } else {
-                            output.complete(value);
-                        }
-                    },
-                    controlledLatencyMillis.get(),
-                    TimeUnit.MILLISECONDS));
+            source.whenComplete((value, failure) -> {
+                long sourceCompletedNanos = System.nanoTime();
+                int delayMillis = controlledLatencyMillis.get();
+                long targetNanos = Math.addExact(
+                        sourceCompletedNanos, TimeUnit.MILLISECONDS.toNanos(delayMillis));
+                delayScheduler.schedule(
+                        () -> {
+                            long schedulerFiredNanos = System.nanoTime();
+                            if (failure != null) {
+                                output.completeExceptionally(failure);
+                            } else if (loseResponse) {
+                                output.completeExceptionally(
+                                        new IOException("injected response loss after real apply"));
+                            } else {
+                                output.complete(value);
+                            }
+                            if (capture != null) {
+                                capture.finish(
+                                        sourceCompletedNanos,
+                                        delayMillis,
+                                        targetNanos,
+                                        schedulerFiredNanos,
+                                        System.nanoTime(),
+                                        failure != null || loseResponse);
+                            }
+                        },
+                        delayMillis,
+                        TimeUnit.MILLISECONDS);
+            });
             return output;
         }
 
@@ -403,7 +453,11 @@ final class M3RealOxiaActors implements AutoCloseable {
             @Override
             public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes storedBytes) {
                 return client.mutation(
-                        binding, key, storedBytes, delegate -> delegate.createIfAbsent(key, storedBytes));
+                        binding,
+                        "CREATE_IF_ABSENT",
+                        key,
+                        storedBytes,
+                        delegate -> delegate.createIfAbsent(key, storedBytes));
             }
 
             @Override
@@ -411,6 +465,7 @@ final class M3RealOxiaActors implements AutoCloseable {
                     String key, CanonicalBytes storedBytes, long expectedVersionId) {
                 return client.mutation(
                         binding,
+                        "COMPARE_AND_SET",
                         key,
                         storedBytes,
                         delegate -> delegate.compareAndSet(key, storedBytes, expectedVersionId));
@@ -425,6 +480,83 @@ final class M3RealOxiaActors implements AutoCloseable {
 
         record WriteProof(
                 M3AllocatorRequestTelemetry.OxiaOperation operation, long writeToken, long canonicalBytes) {}
+
+        record OperationSample(
+                String kind,
+                long realRttMicros,
+                int injectedLatencyMillis,
+                long schedulerLagMicros,
+                long callbackLagMicros,
+                boolean failed) {
+            OperationSample {
+                Objects.requireNonNull(kind, "kind");
+                if (realRttMicros < 0
+                        || injectedLatencyMillis < 0
+                        || schedulerLagMicros < 0
+                        || callbackLagMicros < 0) {
+                    throw new IllegalArgumentException("allocator Oxia operation diagnostic sample is negative");
+                }
+            }
+        }
+
+        record OperationDiagnosticSnapshot(List<OperationSample> samples, int outstandingMaximum) {
+            OperationDiagnosticSnapshot {
+                samples = List.copyOf(samples);
+                if (samples.isEmpty() || outstandingMaximum <= 0) {
+                    throw new IllegalArgumentException("allocator Oxia operation diagnostic snapshot is empty");
+                }
+            }
+        }
+
+        private static final class OperationDiagnostics {
+            private final List<OperationSample> samples = new ArrayList<>();
+            private int outstanding;
+            private int outstandingMaximum;
+
+            private synchronized OperationCapture start(String kind, long dispatchedNanos) {
+                outstanding++;
+                outstandingMaximum = Math.max(outstandingMaximum, outstanding);
+                return new OperationCapture(this, kind, dispatchedNanos);
+            }
+
+            private synchronized void finish(OperationSample sample) {
+                samples.add(sample);
+                outstanding--;
+                if (outstanding < 0) {
+                    throw new IllegalStateException("allocator Oxia diagnostic outstanding became negative");
+                }
+            }
+
+            private synchronized OperationDiagnosticSnapshot snapshot() {
+                if (outstanding != 0) {
+                    throw new IllegalStateException("allocator Oxia diagnostic has in-flight operations");
+                }
+                return new OperationDiagnosticSnapshot(samples, outstandingMaximum);
+            }
+        }
+
+        private record OperationCapture(OperationDiagnostics owner, String kind, long dispatchedNanos) {
+            private OperationCapture {
+                Objects.requireNonNull(owner, "owner");
+                Objects.requireNonNull(kind, "kind");
+            }
+
+            private void finish(
+                    long sourceCompletedNanos,
+                    int injectedLatencyMillis,
+                    long targetNanos,
+                    long schedulerFiredNanos,
+                    long callbackReturnedNanos,
+                    boolean failed) {
+                owner.finish(new OperationSample(
+                        kind,
+                        TimeUnit.NANOSECONDS.toMicros(Math.max(0, sourceCompletedNanos - dispatchedNanos)),
+                        injectedLatencyMillis,
+                        TimeUnit.NANOSECONDS.toMicros(Math.max(0, schedulerFiredNanos - targetNanos)),
+                        TimeUnit.NANOSECONDS.toMicros(Math.max(0, callbackReturnedNanos - schedulerFiredNanos)),
+                        failed));
+            }
+        }
 
         @FunctionalInterface
         private interface MutationDispatch {

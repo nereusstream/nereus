@@ -139,7 +139,7 @@ class M3V2RealOxiaDiagnosticTest {
         }
     }
 
-    private static final class Fixture implements AutoCloseable {
+    static final class Fixture implements AutoCloseable {
         private final String root;
         private final Sha256Digest namespace;
         private final VirtualLedgerSliceAssignmentV1 assignment;
@@ -150,11 +150,20 @@ class M3V2RealOxiaDiagnosticTest {
         private final List<BoundedVirtualLedgerAllocatorWorkflowV2> workflows;
         private final long initialSliceLedgerId;
 
-        private Fixture(String scenario, AllocatorEvidenceCandidateV1 candidate, boolean conflictBarrier)
+        private Fixture(
+                String scenario,
+                AllocatorEvidenceCandidateV1 candidate,
+                boolean conflictBarrier,
+                int protocolVersion)
                 throws Exception {
-            String commit = requireProperty("nereus.m3.allocator.v2.nereusCommit");
-            String runId = requireProperty("nereus.m3.allocator.v2.diagnosticRunId");
-            root = "/nereus/m3/allocator-v2-diagnostic/" + commit + "/" + runId + "/" + scenario;
+            if (protocolVersion != 2 && protocolVersion != 3) {
+                throw new IllegalArgumentException("allocator diagnostic protocol version differs");
+            }
+            String propertyPrefix = "nereus.m3.allocator.v" + protocolVersion;
+            String commit = requireProperty(propertyPrefix + ".nereusCommit");
+            String runId = requireProperty(propertyPrefix + ".diagnosticRunId");
+            root = "/nereus/m3/allocator-v" + protocolVersion + "-diagnostic/" + commit + "/" + runId + "/"
+                    + scenario;
             namespace = digest(root + ":namespace");
             assignment = VirtualLedgerSliceAssignmentV1.create(
                     new DeploymentId(new Id128(1, 2)),
@@ -168,7 +177,7 @@ class M3V2RealOxiaDiagnosticTest {
                     version(1),
                     digest(root + ":registry"));
             initialSliceLedgerId = assignment.startInclusive();
-            actors = new M3RealOxiaActors(requireProperty("nereus.m3.allocator.v2.oxiaServiceAddress"));
+            actors = new M3RealOxiaActors(requireProperty(propertyPrefix + ".oxiaServiceAddress"));
             CellCasBarrier barrier = conflictBarrier ? new CellCasBarrier(4) : null;
             List<PulsarVirtualLedgerAllocatorStore> actorStores = new ArrayList<>();
             List<ProductionVirtualLedgerAllocator> actorAllocators = new ArrayList<>();
@@ -191,26 +200,35 @@ class M3V2RealOxiaDiagnosticTest {
             exactCreate(allocators.get(0).createCell(view));
         }
 
-        private static Fixture open(String scenario, AllocatorEvidenceCandidateV1 candidate) throws Exception {
-            return new Fixture(scenario, candidate, false);
+        static Fixture open(String scenario, AllocatorEvidenceCandidateV1 candidate) throws Exception {
+            return new Fixture(scenario, candidate, false, 2);
         }
 
-        private static Fixture openConflictStorm(String scenario, AllocatorEvidenceCandidateV1 candidate)
+        static Fixture openConflictStorm(String scenario, AllocatorEvidenceCandidateV1 candidate)
                 throws Exception {
-            return new Fixture(scenario, candidate, true);
+            return new Fixture(scenario, candidate, true, 2);
         }
 
-        private VersionedManagedLedgerAllocatorHeadV1 createHead(int actorId, String identity) {
+        static Fixture openV3(String scenario, AllocatorEvidenceCandidateV1 candidate) throws Exception {
+            return new Fixture(scenario, candidate, false, 3);
+        }
+
+        static Fixture openV3ConflictStorm(String scenario, AllocatorEvidenceCandidateV1 candidate)
+                throws Exception {
+            return new Fixture(scenario, candidate, true, 3);
+        }
+
+        VersionedManagedLedgerAllocatorHeadV1 createHead(int actorId, String identity) {
             VersionedAllocatorCellStateV1 cell = readCell();
             return exactCreate(allocators.get(actorId)
                     .createHead(cell, view, new ManagedLedgerIncarnationIdV1(digest(root + ":" + identity)), 1));
         }
 
-        private Result allocate(int actorId, VersionedManagedLedgerAllocatorHeadV1 head, String identity) {
+        Result allocate(int actorId, VersionedManagedLedgerAllocatorHeadV1 head, String identity) {
             return allocateAsync(actorId, head, identity).join();
         }
 
-        private CompletableFuture<Result> allocateAsync(
+        CompletableFuture<Result> allocateAsync(
                 int actorId, VersionedManagedLedgerAllocatorHeadV1 head, String identity) {
             Request request = new Request(
                     digest(root + ":request:" + identity),
@@ -220,7 +238,7 @@ class M3V2RealOxiaDiagnosticTest {
             return workflows.get(actorId).allocate(request).toCompletableFuture();
         }
 
-        private VersionedAllocatorCellStateV1 readCell() {
+        VersionedAllocatorCellStateV1 readCell() {
             return stores.get(0)
                     .readCell(namespace, assignment.sliceAssignmentId())
                     .toCompletableFuture()
@@ -228,8 +246,22 @@ class M3V2RealOxiaDiagnosticTest {
                     .orElseThrow();
         }
 
-        private long initialSliceLedgerId() {
+        long initialSliceLedgerId() {
             return initialSliceLedgerId;
+        }
+
+        void setControlledLatencyMillis(int latencyMillis) {
+            actors.setControlledLatencyMillis(latencyMillis);
+        }
+
+        void beginOperationCapture() {
+            actors.actors().forEach(actor -> actor.client().beginDiagnosticCapture());
+        }
+
+        List<M3RealOxiaActors.InstrumentedClient.OperationDiagnosticSnapshot> endOperationCapture() {
+            return actors.actors().stream()
+                    .map(actor -> actor.client().endDiagnosticCapture())
+                    .toList();
         }
 
         @Override

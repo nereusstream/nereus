@@ -682,6 +682,46 @@ val realAllocatorV2ShortDiagnosticTest = tasks.register<Test>("realAllocatorV2Sh
     }
 }
 
+val realAllocatorV3DiagnosticTest = tasks.register<Test>("realAllocatorV3DiagnosticTest") {
+    group = "verification"
+    description =
+        "Run diagnostic-only V3 runner, real-Oxia operation, allocator workflow, and native-path measurements."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    testClassesDirs = realAllocatorTest.output.classesDirs
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AsyncActorLaneRunnerTest")
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3RealOxiaOperationDiagnosticTest",
+        )
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AllocatorWorkflowDiagnosticTest",
+        )
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3NativePathDiagnosticTest")
+    }
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for the V3 allocator diagnostic")
+        val output = file(required("v2M3AllocatorV3DiagnosticOutput")).toPath().toAbsolutePath().normalize()
+        require(!Files.exists(output, LinkOption.NOFOLLOW_LINKS)) {
+            "V3 allocator diagnostic output already exists: $output"
+        }
+        val parent = output.parent
+        require(parent != null && Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(parent)) {
+            "V3 allocator diagnostic output parent is absent or nonregular: $parent"
+        }
+        Files.createDirectory(output)
+        systemProperty("nereus.m3.allocator.v3.oxiaServiceAddress", required("v2M3AllocatorOxiaServiceAddress"))
+        systemProperty("nereus.m3.allocator.v3.nereusCommit", required("v2M3AllocatorV3NereusCommit"))
+        systemProperty("nereus.m3.allocator.v3.diagnosticRunId", required("v2M3AllocatorV3DiagnosticRunId"))
+        systemProperty("nereus.m3.allocator.v3.diagnosticOutput", output.toString())
+    }
+}
+
 val realAllocatorV2DiagnosticJUnitXml = layout.buildDirectory.file(
     "test-results/realAllocatorV2ShortDiagnosticTest/" +
         "TEST-com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2RealOxiaDiagnosticTest.xml",

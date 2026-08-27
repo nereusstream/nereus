@@ -71,6 +71,7 @@ class M3V3AsyncActorLaneRunnerTest {
     void controlledLatencyFuturesCoverFrozenAndDerivedRatesIncludingTwoHundredFiftyMillis() throws Exception {
         List<Integer> rates = List.of(1000, 800, 750, 600, 500, 400, 333, 267, 250, 200);
         List<Integer> latencies = List.of(1, 5, 10, 25, 250);
+        List<String> diagnosticRows = new ArrayList<>();
         for (int rate : rates) {
             for (int latency : latencies) {
                 M3V3AsyncActorLaneRunner<String> runner =
@@ -88,7 +89,29 @@ class M3V3AsyncActorLaneRunnerTest {
                 assertThat(result.failedAfterAdmission()).isZero();
                 assertThat(result.timedOutAfterAdmission()).isZero();
                 assertConservation(result);
+                diagnosticRows.add("{\"rate\":" + rate + ",\"latencyMillis\":" + latency
+                        + ",\"actorOutstandingMax\":"
+                        + result.perActorOutstandingMaximum().stream()
+                                .mapToInt(Integer::intValue)
+                                .max()
+                                .orElse(0)
+                        + ",\"globalOutstandingMax\":" + result.globalOutstandingMaximum()
+                        + ",\"queueDepthMax\":" + result.queueDepthMaximum()
+                        + ",\"bindingBusyMax\":" + result.bindingBusyMaximum()
+                        + ",\"pendingPermitMax\":" + result.pendingPermitMaximum()
+                        + ",\"schedulerLagP99Micros\":" + result.schedulerFiringLagP99Micros()
+                        + ",\"callbackLagP99Micros\":" + result.callbackLagP99Micros() + '}');
             }
+        }
+        if (System.getProperty("nereus.m3.allocator.v3.diagnosticOutput") != null) {
+            M3V3DiagnosticOutput.writeNew(
+                    "runner-only-diagnostic.json",
+                    "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_RUNNER_DIAGNOSTIC_V3\","
+                            + "\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false,"
+                            + "\"admission\":{\"actors\":4,\"perActor\":64,\"global\":256,"
+                            + "\"perBinding\":1},\"rows\":["
+                            + String.join(",", diagnosticRows)
+                            + "]}\n");
         }
     }
 
