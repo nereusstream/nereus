@@ -161,7 +161,7 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
     }
 
     @Test
-    void independentCoordinatorsUseCellCasAndOnlyOneConsumesTheStrictLedgerId() {
+    void independentCoordinatorsRebaseAConcurrentHeadBeforeEitherRequestHasCandidateState() {
         store.barrierCellCasCount = 2;
         var firstWorkflow =
                 strictAllocator.boundedWorkflow(8, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler.immediate());
@@ -172,20 +172,17 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
                 firstWorkflow.allocate(request(head, "actor-one")).toCompletableFuture();
         CompletableFuture<Result> second =
                 secondWorkflow.allocate(request(head, "actor-two")).toCompletableFuture();
-        CompletableFuture.allOf(first.handle((value, failure) -> null), second.handle((value, failure) -> null))
-                .join();
+        Result firstResult = first.join();
+        Result secondResult = second.join();
 
-        assertThat(List.of(first, second).stream().filter(future -> !future.isCompletedExceptionally()))
-                .hasSize(1);
-        CompletableFuture<Result> failed = first.isCompletedExceptionally() ? first : second;
-        assertThatThrownBy(failed::join)
-                .hasRootCauseInstanceOf(AllocatorProtocolException.class)
-                .rootCause()
-                .extracting(value -> ((AllocatorProtocolException) value).code())
-                .isEqualTo(AllocatorProtocolException.Code.HEAD_STATE_DRIFT);
+        assertThat(firstResult.exactNode()).isNotEqualTo(secondResult.exactNode());
+        assertThat(List.of(firstResult.reconcileRetries(), secondResult.reconcileRetries()))
+                .anyMatch(retries -> retries > 0);
+        assertThat(new HashSet<>(store.reservationRequestIds))
+                .containsExactlyInAnyOrder(digest("request-actor-one"), digest("request-actor-two"));
         assertThat(store.cell.value().nextSliceLedgerId())
-                .isEqualTo(cell.value().nextSliceLedgerId() + 1);
-        assertThat(store.nodes).hasSize(1);
+                .isEqualTo(cell.value().nextSliceLedgerId() + 2);
+        assertThat(store.nodes).hasSize(2);
     }
 
     @Test

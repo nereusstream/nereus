@@ -113,9 +113,12 @@ the same four-lane boundary. Cross-actor serialization comes only from Oxia CAS,
 and bounded retry. The one-JVM `cellProofLock` remains permitted only in deterministic correctness tests and explicitly
 named diagnostics; it is not formal performance or selection authority.
 
-The request ID and candidate identity are stable across retry. A retry may not consume a second ledger ID. Stale
-owner, slice or context change, or descriptor mismatch fails closed. Every actor owns an independent production
-coordinator; the formal harness and production-neutral workflow use the same reconcile path.
+The request ID and candidate identity are stable across retry. A retry may not consume a second ledger ID. Before a
+request has formed any reservation or candidate state, an exact Head-version change with the same incarnation,
+owner, slice and context is a bounded same-key reread: the request rebinds that current predecessor while retaining
+the same request and descriptor identity. Once request-bound candidate state exists, Head drift remains fail-closed.
+Stale owner, slice or context change, or descriptor mismatch always fails closed. Every actor owns an independent
+production coordinator; the formal harness and production-neutral workflow use the same reconcile path.
 
 Every formal coordinator uses one source-governed envelope: at most 64 reconcile retries, a four-second total elapsed
 deadline, and a maximum 25-millisecond retry backoff. The elapsed bound is shorter than the Runner's five-second

@@ -76,7 +76,20 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
 
     private CompletionStage<Result> acquireGrant(Request request, State state) {
         return readAuthorities(request).thenCompose(authorities -> {
-            requireOriginalHead(request, authorities.head());
+            try {
+                requireOriginalHead(request, authorities.head());
+            } catch (AllocatorProtocolException failure) {
+                if (failure.code() == AllocatorProtocolException.Code.HEAD_STATE_DRIFT
+                        && state.canRebaseExpectedHead()) {
+                    Request rebased = new Request(
+                            request.requestId(),
+                            request.descriptorDigest(),
+                            request.currentView(),
+                            authorities.head());
+                    return retry(state, RetryReason.HEAD_REREAD, () -> acquireGrant(rebased, state));
+                }
+                return failed(failure);
+            }
             Optional<CellAllocatorReservationV1> reservation =
                     authorities.cell().value().reservation();
             if (reservation.isPresent()) {
@@ -838,6 +851,7 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
 
     public enum RetryReason {
         RESERVATION_BUSY,
+        HEAD_REREAD,
         CELL_REREAD,
         CELL_CAS_UNRESOLVED,
         CELL_CAS_CONFLICT,
@@ -898,6 +912,10 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
 
         private long remainingNanos() {
             return deadlineNanos - System.nanoTime();
+        }
+
+        private boolean canRebaseExpectedHead() {
+            return candidateValue == null && exactNode == null;
         }
 
         private void requireAuthorized() {
