@@ -116,6 +116,12 @@ all of the following hold:
 The formal task writes action attachments and `NACP2` checkpoints only. Evaluation sealing and promotion remain
 separate explicit gates. Registering the task is not authorization to run it.
 
+The script runs the complete Gradle formal invocation in an isolated process group. A fixed supervisor sends `TERM`
+before the 48,000-second boundary and sends `KILL` at the boundary if cleanup does not finish; the Gradle task also has
+the same fixed timeout for direct invocation. A process-level timeout returns exit code 124, preserves already-written
+raw actions and the last durable checkpoint, and cannot create an evaluation or selection. The executor's internal
+deadline still records `WALL_CLOCK_CAP_EXCEEDED` when it reaches a safe action boundary before the supervisor fires.
+
 ## Consequences
 
 - The planner/evaluator contracts remain unchanged while every external action becomes bounded, countable, and
@@ -123,6 +129,7 @@ separate explicit gates. Registering the task is not authorization to run it.
 - Plan-only can prove the 288/360/32/680 inventory and exact source tuple without touching real services.
 - A missing authorization parameter fails before an Oxia container, population, output directory, or evidence is
   created.
+- A blocked external action cannot extend the formal process beyond the frozen campaign wall-clock cap.
 - Phase A accepts the wiring and its offline tests only. It creates no formal `NACP2`, `NAEV2`, `NARS2`, selection
   child, source-lock change, scenario PASS, or Final receipt. A later instruction must authorize Phase B against the
   exact clean commit produced by this wiring change.

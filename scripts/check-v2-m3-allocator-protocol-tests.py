@@ -8,6 +8,8 @@ import hashlib
 import os
 from pathlib import Path
 import subprocess
+import sys
+import time
 import unittest
 
 
@@ -16,6 +18,7 @@ RUNNER = ROOT / "scripts" / "run-v2-m3-real-allocator-evidence.sh"
 SETTINGS = ROOT / "settings.gradle.kts"
 ROOT_BUILD = ROOT / "build.gradle.kts"
 MODULE_BUILD = ROOT / "nereus-metadata-oxia" / "build.gradle.kts"
+HARD_DEADLINE = ROOT / "scripts" / "run-v2-m3-with-hard-deadline.py"
 
 
 class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
@@ -158,6 +161,44 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("separately authorized exact SHA", result.stderr)
         self.assertFalse((ROOT / "build/never-created-formal").exists())
+
+    def test_formal_entry_has_process_and_task_hard_deadlines(self) -> None:
+        script = RUNNER.read_text()
+        block = script.split('if [[ "${1:-}" == "--bounded-adaptive-formal" ]]', 1)[1]
+        block = block.split('protocol_pulsar_checkout=', 1)[0]
+        self.assertIn('scripts/run-v2-m3-with-hard-deadline.py', block)
+        self.assertIn('--hard-deadline-seconds 48000', block)
+        self.assertIn('--termination-grace-seconds 30', block)
+
+        module = MODULE_BUILD.read_text()
+        task = module.split(
+            'val realAllocatorV2BoundedAdaptiveFormalCampaign = tasks.register<Test>(', 1
+        )[1]
+        task = task.split('val realAllocatorV2ShortDiagnosticTest', 1)[0]
+        self.assertIn('timeout.set(Duration.ofSeconds(48_000))', task)
+
+        started = time.monotonic()
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(HARD_DEADLINE),
+                "--hard-deadline-seconds",
+                "0.4",
+                "--termination-grace-seconds",
+                "0.2",
+                "--",
+                sys.executable,
+                "-c",
+                "import time; time.sleep(30)",
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(124, result.returncode)
+        self.assertIn("hard-deadline supervisor", result.stderr)
+        self.assertLess(time.monotonic() - started, 2.0)
 
     def test_formal_task_is_unique_and_not_reachable_from_ordinary_or_m3_gates(self) -> None:
         module = MODULE_BUILD.read_text()

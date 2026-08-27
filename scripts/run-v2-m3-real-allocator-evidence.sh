@@ -109,7 +109,11 @@ if [[ "${1:-}" == "--bounded-adaptive-formal" ]]; then
   done
 
   mkdir -p "$formal_output"
-  "$repo_root/gradlew" :nereus-metadata-oxia:realAllocatorV2BoundedAdaptiveFormalCampaign \
+  python3 "$repo_root/scripts/run-v2-m3-with-hard-deadline.py" \
+    --hard-deadline-seconds 48000 \
+    --termination-grace-seconds 30 \
+    -- \
+    "$repo_root/gradlew" :nereus-metadata-oxia:realAllocatorV2BoundedAdaptiveFormalCampaign \
     "-PpulsarCheckout=$formal_pulsar_checkout" \
     "-Pv2M3AllocatorV2FormalAuthorizationSha=$formal_authorization" \
     "-Pv2M3AllocatorV2ZeroDecisionPlanSha256=$formal_plan_sha" \

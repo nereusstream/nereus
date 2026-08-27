@@ -3,6 +3,7 @@ import org.gradle.jvm.tasks.Jar
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.security.MessageDigest
+import java.time.Duration
 
 /*
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -453,6 +454,7 @@ val realAllocatorV2BoundedAdaptiveFormalCampaign = tasks.register<Test>(
     classpath = realAllocatorEvidenceRuntimeClasspath
     maxParallelForks = 1
     maxHeapSize = "6144m"
+    timeout.set(Duration.ofSeconds(48_000))
     useJUnitPlatform()
     filter {
         includeTestsMatching(
