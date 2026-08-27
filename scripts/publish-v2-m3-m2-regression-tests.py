@@ -46,6 +46,7 @@ class PublisherTest(unittest.TestCase):
         git(self.root, "init", "-b", "main")
         git(self.root, "config", "user.name", "M3 M2 Publisher Test")
         git(self.root, "config", "user.email", "m3-m2-publisher@example.invalid")
+        git(self.root, "config", "commit.gpgsign", "false")
         historical = self.root.joinpath(*CONTRACT.HISTORICAL_FINAL_PATH.parts)
         historical.parent.mkdir(parents=True)
         historical.write_bytes(SOURCE_ROOT.joinpath(*CONTRACT.HISTORICAL_FINAL_PATH.parts).read_bytes())
