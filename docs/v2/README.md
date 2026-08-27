@@ -466,6 +466,13 @@ the old four-by-one runner is structurally capped at 160 requests/second for the
 all thresholds and V2 bytes while requiring a distinct V3 protocol, bounded four-by-64 asynchronous admission,
 native-baseline-unavailable evaluation, exact derived-rate slots, offline feasibility proof, and diagnostic-only
 investigation before any later formal authorization.
+The accepted V3 implementation freezes zero-decision plan digest `019fcac7...35e9`: 328 logical/interval slots,
+360 fault actions, 32 scale actions, 720 maximum total actions, and a 34,260-second budget sum inside the unchanged
+48,000-second cap. Exact source `baae2625...326` completed the first three-layer diagnostic-only run with 13/0/0/0.
+Native and direct real-Oxia rows did not identify the runner scheduler or Oxia RTT as the primary limiter; bounded
+STRICT and smaller-RANGE workflow rows instead exposed CAS/reconcile contention, while installed RANGE-64 sustained
+the strongest short row. These outputs have `authority=false` and `selectionEligible=false`; they are not NAEV3,
+NARS3, formal campaign evidence, or permission to optimize by weakening a contract.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

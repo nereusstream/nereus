@@ -540,6 +540,14 @@ Any later campaign therefore uses distinct NACP3/NAEV3/NARS3/NADV3 semantics, fo
 admission, 328 logical interval slots, exact derived floors, and a first-class non-promotable
 `NATIVE_BASELINE_UNAVAILABLE` status. Stage B.1 implements offline proof and diagnostic-only investigation but grants
 no V3 formal execution, selection, child, source-lock change, scenario PASS, or Final receipt.
+The accepted implementation binds plan digest `019fcac7...35e9`, 328/360/32/720 action maxima, a 34,260-second summed
+budget, and the `4/64/256/1` admission tuple. It preserves canonical request ordinals across out-of-order completion,
+exactly-once permit and binding release, cutoff conservation, and the fixed five-second cleanup terminal inventory.
+At exact source `baae2625...326`, the first diagnostic-only execution passed 13/0/0/0. Native and real-Oxia operation
+rows were healthy relative to the short diagnostic load; the allocator rows localized loss to bounded CAS/reconcile
+contention. Diagnostic stage attribution covers Cell read/reserve/clear, node creation, Head publication, retry reason,
+operation outstanding, scheduler/callback lag, and terminal failure code without adding a shared Java Cell lock or
+changing production correctness.
 
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0

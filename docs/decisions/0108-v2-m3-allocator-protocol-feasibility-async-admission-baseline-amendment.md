@@ -200,6 +200,26 @@ Workflow optimization is allowed only when those measurements identify a concret
 one-ID consumption, exact conflict/reconcile proof, and the post-timeout no-next-dispatch guard. Passing the structural
 feasibility gate alone is not evidence that an allocator meets the frozen SLOs.
 
+### Accepted Stage B.1 implementation record
+
+The distinct V3 zero-decision plan has canonical SHA-256
+`019fcac748460c9cb72ac953d4afbb5e71ecb15d7199310ecf616b9f12eb35e9`. It reconstructs 48 native plus 280
+candidate logical slots, 328 maximum interval actions, 360 fault actions, 32 scale actions, and 720 maximum total
+actions. Its independent 900/5,400/7,200/5,400/13,120/1,640/600-second budgets sum to 34,260 seconds, leaving the
+unchanged 48,000-second hard envelope with 13,740 seconds of margin. The executable admission tuple is `4/64/256/1`;
+the legacy `4/1/4/1` tuple is rejected before output or service construction.
+
+The first complete diagnostic-only execution at exact source `baae2625bb9ed0b063b847a45d7194ca16529326` produced
+13 tests with zero failure, error, or skip under
+`nereus-metadata-oxia/build/m3-allocator-evidence/diagnostic-only/baae2625bb9ed0b063b847a45d7194ca16529326-r1`.
+Native 1/25-millisecond rows at 200/500 requests per second completed without drop or failure. Real-Oxia operation
+rows kept real RTT p99 below 5 milliseconds and callback-lag p99 below 70 microseconds. In contrast, STRICT and
+RANGE-16/64 workflow rows exposed bounded CAS/reconcile contention, while RANGE-64's installed-grant path completed
+3,936 of 4,000 requests at 500 requests per second with zero CAS conflict. This observation is diagnostic, not a
+throughput qualification. Follow-up telemetry preserves terminal protocol failure codes and attributes Cell
+read/reserve/clear, node create, Head publish, retry reason, permit, callback, and terminal counts. No allocator
+workflow optimization is admitted merely from the structural correction or this short sample.
+
 ## Consequences
 
 - The completed V2 `NONE_QUALIFIED` result remains valid, immutable, and permanently non-promotable.

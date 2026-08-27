@@ -23,10 +23,13 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
 class M3V3AsyncActorLaneRunnerTest {
     private static final Duration NO_WARMUP = Duration.ZERO;
+    private static final List<String> OUTSTANDING_ROWS = new ArrayList<>();
+    private static final List<String> RATE_LATENCY_ROWS = new ArrayList<>();
 
     @Test
     void evidenceAdmissionCapIsDerivedFromFrozenRateLatencyAndActorCount() {
@@ -64,6 +67,14 @@ class M3V3AsyncActorLaneRunnerTest {
                     .extracting(M3V3AsyncActorLaneRunner.TerminalRecord::ordinal)
                     .containsExactlyElementsOf(longRange(total));
             assertConservation(result);
+            OUTSTANDING_ROWS.add("{\"outstandingPerActor\":" + outstandingPerActor
+                    + ",\"actorOutstandingMax\":"
+                    + result.perActorOutstandingMaximum().stream()
+                            .mapToInt(Integer::intValue)
+                            .max()
+                            .orElse(0)
+                    + ",\"globalOutstandingMax\":" + result.globalOutstandingMaximum()
+                    + ",\"completed\":" + result.completed() + '}');
         }
     }
 
@@ -90,6 +101,12 @@ class M3V3AsyncActorLaneRunnerTest {
                 assertThat(result.timedOutAfterAdmission()).isZero();
                 assertConservation(result);
                 diagnosticRows.add("{\"rate\":" + rate + ",\"latencyMillis\":" + latency
+                        + ",\"offered\":" + result.offered()
+                        + ",\"admitted\":" + result.admitted()
+                        + ",\"completed\":" + result.completed()
+                        + ",\"failed\":" + result.failedAfterAdmission()
+                        + ",\"timedOut\":" + result.timedOutAfterAdmission()
+                        + ",\"dropped\":" + result.overloadDroppedBeforeAdmission()
                         + ",\"actorOutstandingMax\":"
                         + result.perActorOutstandingMaximum().stream()
                                 .mapToInt(Integer::intValue)
@@ -103,14 +120,47 @@ class M3V3AsyncActorLaneRunnerTest {
                         + ",\"callbackLagP99Micros\":" + result.callbackLagP99Micros() + '}');
             }
         }
+        RATE_LATENCY_ROWS.addAll(diagnosticRows);
+    }
+
+    @Test
+    void twoHundredFiftyMillisAtOneThousandRpsReachesTheDerivedAsyncCap() throws Exception {
+        int total = AllocatorEvidenceAdmissionPolicyV3.MAX_GLOBAL_OUTSTANDING;
+        M3V3AsyncActorLaneRunner<String> runner = runner(Duration.ofMillis(400), Duration.ofSeconds(1));
+        var result = runner.run(1000, uniqueSchedule(total), (actor, request, context) -> {
+            CompletableFuture<Void> completion = new CompletableFuture<>();
+            CompletableFuture.delayedExecutor(250, TimeUnit.MILLISECONDS).execute(() -> completion.complete(null));
+            return completion;
+        });
+
+        assertThat(result.perActorOutstandingMaximum()).containsExactly(64, 64, 64, 64);
+        assertThat(result.globalOutstandingMaximum()).isEqualTo(256);
+        assertThat(result.completed()).isEqualTo(256);
+        assertConservation(result);
+        RATE_LATENCY_ROWS.add("{\"rate\":1000,\"latencyMillis\":250,\"proofKind\":"
+                + "\"DERIVED_CAPACITY\",\"offered\":256,\"admitted\":256,\"completed\":256,"
+                + "\"failed\":0,\"timedOut\":0,\"dropped\":0,\"actorOutstandingMax\":64,"
+                + "\"globalOutstandingMax\":256,\"queueDepthMax\":" + result.queueDepthMaximum()
+                + ",\"bindingBusyMax\":" + result.bindingBusyMaximum()
+                + ",\"pendingPermitMax\":" + result.pendingPermitMaximum()
+                + ",\"schedulerLagP99Micros\":" + result.schedulerFiringLagP99Micros()
+                + ",\"callbackLagP99Micros\":" + result.callbackLagP99Micros() + '}');
+    }
+
+    @AfterAll
+    static void writeDiagnostic() throws Exception {
+        assertThat(OUTSTANDING_ROWS).hasSize(4);
+        assertThat(RATE_LATENCY_ROWS).hasSize(51);
         if (System.getProperty("nereus.m3.allocator.v3.diagnosticOutput") != null) {
             M3V3DiagnosticOutput.writeNew(
                     "runner-only-diagnostic.json",
                     "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_RUNNER_DIAGNOSTIC_V3\","
                             + "\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false,"
                             + "\"admission\":{\"actors\":4,\"perActor\":64,\"global\":256,"
-                            + "\"perBinding\":1},\"rows\":["
-                            + String.join(",", diagnosticRows)
+                            + "\"perBinding\":1},\"outstandingRows\":["
+                            + String.join(",", OUTSTANDING_ROWS)
+                            + "],\"rateLatencyRows\":["
+                            + String.join(",", RATE_LATENCY_ROWS)
                             + "]}\n");
         }
     }

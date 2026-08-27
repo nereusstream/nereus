@@ -813,6 +813,11 @@ below the 25-millisecond/200-request row; it does not reopen or relabel the evid
 the separately versioned V3 four-by-64 asynchronous model and exact native-derived floors meet the unchanged SLOs.
 Stage B.1 may answer only protocol feasibility and diagnostic performance. Formal execution, mode selection, source
 lock, child, current-source M2, scenario, and Final remain separately authorized work.
+The V3 implementation now has stable plan digest `019fcac7...35e9`, 328/360/32/720 action maxima, and a 34,260-second
+budget sum. The first exact-source `baae2625...326` diagnostic-only run passed 13/0/0/0 and separated healthy native,
+runner-scheduler, and direct Oxia behavior from bounded allocator CAS/reconcile contention. This narrows the question;
+it does not answer whether any candidate meets every formal SLO, and it does not make the installed RANGE-64 short-row
+observation selectable.
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

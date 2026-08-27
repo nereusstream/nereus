@@ -50,7 +50,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
@@ -148,6 +150,7 @@ class M3V2RealOxiaDiagnosticTest {
         private final List<PulsarVirtualLedgerAllocatorStore> stores;
         private final List<ProductionVirtualLedgerAllocator> allocators;
         private final List<BoundedVirtualLedgerAllocatorWorkflowV2> workflows;
+        private final StageDiagnostics stageDiagnostics = new StageDiagnostics();
         private final long initialSliceLedgerId;
 
         private Fixture(
@@ -184,6 +187,9 @@ class M3V2RealOxiaDiagnosticTest {
             List<BoundedVirtualLedgerAllocatorWorkflowV2> actorWorkflows = new ArrayList<>();
             for (int actorId = 0; actorId < 4; actorId++) {
                 PulsarVirtualLedgerAllocatorStore store = productionStore(root, actors.actor(actorId));
+                if (protocolVersion == 3) {
+                    store = new DiagnosticStageStore(store, stageDiagnostics);
+                }
                 if (barrier != null) {
                     store = new FirstCellCasBarrierStore(store, barrier);
                 }
@@ -192,7 +198,8 @@ class M3V2RealOxiaDiagnosticTest {
                 actorStores.add(store);
                 actorAllocators.add(allocator);
                 actorWorkflows.add(allocator.boundedWorkflow(
-                        BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal(), Fixture::boundedBackoff));
+                        BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal(),
+                        protocolVersion == 3 ? this::diagnosticBackoff : Fixture::boundedBackoff));
             }
             stores = List.copyOf(actorStores);
             allocators = List.copyOf(actorAllocators);
@@ -264,6 +271,14 @@ class M3V2RealOxiaDiagnosticTest {
                     .toList();
         }
 
+        void beginStageCapture() {
+            stageDiagnostics.begin();
+        }
+
+        StageSnapshot endStageCapture() {
+            return stageDiagnostics.end();
+        }
+
         @Override
         public void close() throws Exception {
             actors.close();
@@ -275,6 +290,56 @@ class M3V2RealOxiaDiagnosticTest {
                 BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
             return CompletableFuture.runAsync(
                     () -> {}, CompletableFuture.delayedExecutor(5, TimeUnit.MILLISECONDS));
+        }
+
+        private CompletionStage<Void> diagnosticBackoff(
+                Sha256Digest requestId,
+                int retryNumber,
+                BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
+            stageDiagnostics.recordRetry(reason.name());
+            return boundedBackoff(requestId, retryNumber, reason);
+        }
+    }
+
+    record StageSnapshot(Map<String, Long> workflowStages, Map<String, Long> retryReasons) {
+        StageSnapshot {
+            workflowStages = Map.copyOf(workflowStages);
+            retryReasons = Map.copyOf(retryReasons);
+        }
+    }
+
+    private static final class StageDiagnostics {
+        private final Map<String, Long> workflowStages = new TreeMap<>();
+        private final Map<String, Long> retryReasons = new TreeMap<>();
+        private boolean active;
+
+        private synchronized void begin() {
+            if (active) {
+                throw new IllegalStateException("allocator stage diagnostic capture already active");
+            }
+            workflowStages.clear();
+            retryReasons.clear();
+            active = true;
+        }
+
+        private synchronized void record(String stage) {
+            if (active) {
+                workflowStages.merge(stage, 1L, Math::addExact);
+            }
+        }
+
+        private synchronized void recordRetry(String reason) {
+            if (active) {
+                retryReasons.merge(reason, 1L, Math::addExact);
+            }
+        }
+
+        private synchronized StageSnapshot end() {
+            if (!active) {
+                throw new IllegalStateException("allocator stage diagnostic capture is not active");
+            }
+            active = false;
+            return new StageSnapshot(workflowStages, retryReasons);
         }
     }
 
@@ -408,6 +473,92 @@ class M3V2RealOxiaDiagnosticTest {
                 Sha256Digest namespaceId,
                 Sha256Digest sliceAssignmentId,
                 VirtualLedgerCandidateNodeV1 candidate) {
+            return delegate.createNode(namespaceId, sliceAssignmentId, candidate);
+        }
+    }
+
+    private static final class DiagnosticStageStore implements PulsarVirtualLedgerAllocatorStore {
+        private final PulsarVirtualLedgerAllocatorStore delegate;
+        private final StageDiagnostics diagnostics;
+
+        private DiagnosticStageStore(PulsarVirtualLedgerAllocatorStore delegate, StageDiagnostics diagnostics) {
+            this.delegate = delegate;
+            this.diagnostics = diagnostics;
+        }
+
+        @Override
+        public CompletionStage<Optional<VersionedAllocatorCellStateV1>> readCell(
+                Sha256Digest namespaceId, Sha256Digest sliceAssignmentId) {
+            diagnostics.record("CELL_READ");
+            return delegate.readCell(namespaceId, sliceAssignmentId);
+        }
+
+        @Override
+        public CompletionStage<CreateMutationResult<VersionedAllocatorCellStateV1>> createCell(
+                VirtualLedgerCellAllocatorStateV1 candidate) {
+            diagnostics.record("CELL_CREATE");
+            return delegate.createCell(candidate);
+        }
+
+        @Override
+        public CompletionStage<ConditionalCasResult<VersionedAllocatorCellStateV1>> compareAndSetCell(
+                VersionedAllocatorCellStateV1 predecessor, VirtualLedgerCellAllocatorStateV1 candidate) {
+            boolean predecessorReserved = predecessor.value().reservation().isPresent();
+            boolean candidateReserved = candidate.reservation().isPresent();
+            if (!predecessorReserved && candidateReserved) {
+                diagnostics.record("CELL_RESERVE");
+            } else if (predecessorReserved && !candidateReserved) {
+                diagnostics.record("CELL_CLEAR");
+            } else {
+                diagnostics.record("CELL_CAS");
+            }
+            return delegate.compareAndSetCell(predecessor, candidate);
+        }
+
+        @Override
+        public CompletionStage<Optional<VersionedManagedLedgerAllocatorHeadV1>> readHead(
+                Sha256Digest namespaceId,
+                Sha256Digest sliceAssignmentId,
+                ManagedLedgerIncarnationIdV1 managedLedgerIncarnation) {
+            diagnostics.record("HEAD_READ");
+            return delegate.readHead(namespaceId, sliceAssignmentId, managedLedgerIncarnation);
+        }
+
+        @Override
+        public CompletionStage<CreateMutationResult<VersionedManagedLedgerAllocatorHeadV1>> createHead(
+                Sha256Digest namespaceId,
+                Sha256Digest sliceAssignmentId,
+                ManagedLedgerAllocatorHeadV1 candidate) {
+            diagnostics.record("HEAD_CREATE");
+            return delegate.createHead(namespaceId, sliceAssignmentId, candidate);
+        }
+
+        @Override
+        public CompletionStage<ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1>> compareAndSetHead(
+                Sha256Digest namespaceId,
+                Sha256Digest sliceAssignmentId,
+                VersionedManagedLedgerAllocatorHeadV1 predecessor,
+                ManagedLedgerAllocatorHeadV1 candidate) {
+            diagnostics.record("HEAD_PUBLISH");
+            return delegate.compareAndSetHead(namespaceId, sliceAssignmentId, predecessor, candidate);
+        }
+
+        @Override
+        public CompletionStage<Optional<VersionedVirtualLedgerCandidateNodeV1>> readNode(
+                Sha256Digest namespaceId,
+                Sha256Digest sliceAssignmentId,
+                ManagedLedgerIncarnationIdV1 managedLedgerIncarnation,
+                long ledgerId) {
+            diagnostics.record("NODE_READ");
+            return delegate.readNode(namespaceId, sliceAssignmentId, managedLedgerIncarnation, ledgerId);
+        }
+
+        @Override
+        public CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>> createNode(
+                Sha256Digest namespaceId,
+                Sha256Digest sliceAssignmentId,
+                VirtualLedgerCandidateNodeV1 candidate) {
+            diagnostics.record("NODE_CREATE");
             return delegate.createNode(namespaceId, sliceAssignmentId, candidate);
         }
     }

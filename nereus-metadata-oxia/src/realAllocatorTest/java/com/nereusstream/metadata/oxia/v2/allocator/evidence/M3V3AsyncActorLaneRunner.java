@@ -298,7 +298,13 @@ final class M3V3AsyncActorLaneRunner<T> {
         TIMED_OUT_AFTER_ADMISSION
     }
 
-    record TerminalRecord(long ordinal, int actorId, long bindingOrdinal, TerminalOutcome outcome) {}
+    record TerminalRecord(
+            long ordinal, int actorId, long bindingOrdinal, TerminalOutcome outcome, String failureSummary) {
+        TerminalRecord {
+            Objects.requireNonNull(outcome, "outcome");
+            Objects.requireNonNull(failureSummary, "failureSummary");
+        }
+    }
 
     record RequestTelemetry(
             long ordinal,
@@ -308,7 +314,13 @@ final class M3V3AsyncActorLaneRunner<T> {
             long queueWaitMicros,
             long operationMicros,
             long callbackLagMicros,
-            TerminalOutcome outcome) {}
+            TerminalOutcome outcome,
+            String failureSummary) {
+        RequestTelemetry {
+            Objects.requireNonNull(outcome, "outcome");
+            Objects.requireNonNull(failureSummary, "failureSummary");
+        }
+    }
 
     record IntervalResult(
             int queueCapacity,
@@ -677,7 +689,8 @@ final class M3V3AsyncActorLaneRunner<T> {
                         offer.ordinal(),
                         offer.actorId(),
                         offer.bindingOrdinal(),
-                        TerminalOutcome.OVERLOAD_DROPPED_BEFORE_ADMISSION));
+                        TerminalOutcome.OVERLOAD_DROPPED_BEFORE_ADMISSION,
+                        "PRE_ADMISSION_CUTOFF"));
                 measuredTelemetry.add(new RequestTelemetry(
                         offer.ordinal(),
                         offer.actorId(),
@@ -686,7 +699,8 @@ final class M3V3AsyncActorLaneRunner<T> {
                         0,
                         0,
                         0,
-                        TerminalOutcome.OVERLOAD_DROPPED_BEFORE_ADMISSION));
+                        TerminalOutcome.OVERLOAD_DROPPED_BEFORE_ADMISSION,
+                        "PRE_ADMISSION_CUTOFF"));
             } else {
                 warmupDropped++;
             }
@@ -717,11 +731,19 @@ final class M3V3AsyncActorLaneRunner<T> {
                     case OVERLOAD_DROPPED_BEFORE_ADMISSION ->
                         throw new IllegalArgumentException("admitted request cannot receive a pre-admission drop");
                 }
+                String failure = switch (outcome) {
+                    case COMPLETED -> "";
+                    case FAILED_AFTER_ADMISSION -> failureSummary(terminalFailure);
+                    case TIMED_OUT_AFTER_ADMISSION -> "CLEANUP_DEADLINE";
+                    case OVERLOAD_DROPPED_BEFORE_ADMISSION ->
+                        throw new IllegalArgumentException("admitted request cannot receive a pre-admission drop");
+                };
                 measuredTerminals.add(new TerminalRecord(
                         request.offer().ordinal(),
                         request.offer().actorId(),
                         request.offer().bindingOrdinal(),
-                        outcome));
+                        outcome,
+                        failure));
                 measuredTelemetry.add(new RequestTelemetry(
                         request.offer().ordinal(),
                         request.offer().actorId(),
@@ -730,7 +752,8 @@ final class M3V3AsyncActorLaneRunner<T> {
                         TimeUnit.NANOSECONDS.toMicros(request.admittedNanos() - request.queued().enqueuedNanos()),
                         TimeUnit.NANOSECONDS.toMicros(operationNanos),
                         TimeUnit.NANOSECONDS.toMicros(callbackLag),
-                        outcome));
+                        outcome,
+                        failure));
             } else {
                 switch (outcome) {
                     case COMPLETED -> warmupCompleted++;

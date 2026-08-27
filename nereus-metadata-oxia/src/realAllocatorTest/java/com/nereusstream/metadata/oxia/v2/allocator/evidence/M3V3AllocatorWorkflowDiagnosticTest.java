@@ -13,11 +13,14 @@ import com.nereusstream.domain.registry.allocator.AllocatorEvidenceCandidateV1;
 import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3RealOxiaActors.InstrumentedClient.OperationDiagnosticSnapshot;
 import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3RealOxiaActors.InstrumentedClient.OperationSample;
 import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2RealOxiaDiagnosticTest.Fixture;
+import com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2RealOxiaDiagnosticTest.StageSnapshot;
 import com.nereusstream.metadata.spi.allocator.BoundedVirtualLedgerAllocatorWorkflowV2.Result;
 import com.nereusstream.metadata.spi.allocator.VersionedManagedLedgerAllocatorHeadV1;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -58,18 +61,25 @@ class M3V3AllocatorWorkflowDiagnosticTest {
                 heads.add(fixture.createHead(actor, "v3-conflict-" + actor));
             }
             fixture.beginOperationCapture();
+            fixture.beginStageCapture();
             List<CompletableFuture<Result>> futures = new ArrayList<>();
             for (int actor = 0; actor < 4; actor++) {
                 futures.add(fixture.allocateAsync(actor, heads.get(actor), "v3-conflict-request-" + actor));
             }
             CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).get(15, TimeUnit.SECONDS);
             List<Result> results = futures.stream().map(CompletableFuture::join).toList();
-            List<OperationSample> samples = flatten(fixture.endOperationCapture());
+            List<OperationDiagnosticSnapshot> snapshots = fixture.endOperationCapture();
+            StageSnapshot stages = fixture.endStageCapture();
+            List<OperationSample> samples = flatten(snapshots);
 
             assertThat(results.stream().map(result -> result.exactNode().value().ledgerId()))
                     .doesNotHaveDuplicates();
             assertThat(results.stream().mapToInt(Result::reconcileRetries).sum()).isPositive();
-            ROWS.add(Row.conflictStorm(samples, results.stream().mapToInt(Result::reconcileRetries).sum()));
+            ROWS.add(Row.conflictStorm(
+                    samples,
+                    outstandingMaximum(snapshots),
+                    results.stream().mapToInt(Result::reconcileRetries).sum(),
+                    stages));
         }
     }
 
@@ -86,6 +96,7 @@ class M3V3AllocatorWorkflowDiagnosticTest {
         AtomicLong installedGrantUses = new AtomicLong();
         AtomicLong renewals = new AtomicLong();
         fixture.beginOperationCapture();
+        fixture.beginStageCapture();
         M3V3AsyncActorLaneRunner<Integer> runner =
                 new M3V3AsyncActorLaneRunner<>(WARMUP, MEASUREMENT, CLEANUP);
         List<M3V3AsyncActorLaneRunner.ScheduledOffer<Integer>> schedule = schedule(rate, bindings.size());
@@ -106,7 +117,9 @@ class M3V3AllocatorWorkflowDiagnosticTest {
                         binding.head = exact.exactHead();
                     });
         });
-        List<OperationSample> samples = flatten(fixture.endOperationCapture());
+        List<OperationDiagnosticSnapshot> snapshots = fixture.endOperationCapture();
+        StageSnapshot stages = fixture.endStageCapture();
+        List<OperationSample> samples = flatten(snapshots);
         assertConservation(result);
         assertThat(samples).isNotEmpty();
         return Row.workflow(
@@ -115,9 +128,11 @@ class M3V3AllocatorWorkflowDiagnosticTest {
                 latencyMillis,
                 result,
                 samples,
+                outstandingMaximum(snapshots),
                 reconcileRetries.get(),
                 installedGrantUses.get(),
-                renewals.get());
+                renewals.get(),
+                stages);
     }
 
     private static List<Binding> createBindings(Fixture fixture) {
@@ -143,6 +158,10 @@ class M3V3AllocatorWorkflowDiagnosticTest {
 
     private static List<OperationSample> flatten(List<OperationDiagnosticSnapshot> snapshots) {
         return snapshots.stream().flatMap(snapshot -> snapshot.samples().stream()).toList();
+    }
+
+    private static long outstandingMaximum(List<OperationDiagnosticSnapshot> snapshots) {
+        return snapshots.stream().mapToLong(OperationDiagnosticSnapshot::outstandingMaximum).sum();
     }
 
     private static void assertConservation(M3V3AsyncActorLaneRunner.IntervalResult result) {
@@ -206,18 +225,32 @@ class M3V3AllocatorWorkflowDiagnosticTest {
             long queueDepthMaximum,
             long bindingBusyMaximum,
             long pendingPermitMaximum,
+            long operationOutstandingMaximum,
             long schedulerLagP99Micros,
             long callbackLagP99Micros,
-            long realRttP99Micros) {
+            long realRttP99Micros,
+            Map<String, Long> metadataOperationKinds,
+            Map<String, Long> failureKinds,
+            Map<String, Long> workflowStages,
+            Map<String, Long> retryReasons) {
+        private Row {
+            metadataOperationKinds = Map.copyOf(metadataOperationKinds);
+            failureKinds = Map.copyOf(failureKinds);
+            workflowStages = Map.copyOf(workflowStages);
+            retryReasons = Map.copyOf(retryReasons);
+        }
+
         private static Row workflow(
                 String scenario,
                 int rate,
                 int latency,
                 M3V3AsyncActorLaneRunner.IntervalResult result,
                 List<OperationSample> samples,
+                long operationOutstanding,
                 long retries,
                 long installedGrantUses,
-                long renewals) {
+                long renewals,
+                StageSnapshot stages) {
             return new Row(
                     scenario,
                     rate,
@@ -241,12 +274,21 @@ class M3V3AllocatorWorkflowDiagnosticTest {
                     result.queueDepthMaximum(),
                     result.bindingBusyMaximum(),
                     result.pendingPermitMaximum(),
+                    operationOutstanding,
                     result.schedulerFiringLagP99Micros(),
                     result.callbackLagP99Micros(),
-                    percentile99(samples.stream().map(OperationSample::realRttMicros).toList()));
+                    percentile99(samples.stream().map(OperationSample::realRttMicros).toList()),
+                    operationKinds(samples),
+                    failureKinds(result),
+                    stages.workflowStages(),
+                    stages.retryReasons());
         }
 
-        private static Row conflictStorm(List<OperationSample> samples, long retries) {
+        private static Row conflictStorm(
+                List<OperationSample> samples,
+                long operationOutstanding,
+                long retries,
+                StageSnapshot stages) {
             return new Row(
                     "CONFLICT_STORM",
                     0,
@@ -270,9 +312,14 @@ class M3V3AllocatorWorkflowDiagnosticTest {
                     0,
                     1,
                     0,
+                    operationOutstanding,
                     0,
                     0,
-                    percentile99(samples.stream().map(OperationSample::realRttMicros).toList()));
+                    percentile99(samples.stream().map(OperationSample::realRttMicros).toList()),
+                    operationKinds(samples),
+                    Map.of(),
+                    stages.workflowStages(),
+                    stages.retryReasons());
         }
 
         private void appendJson(StringBuilder json) {
@@ -290,6 +337,15 @@ class M3V3AllocatorWorkflowDiagnosticTest {
                     .append(admitted == 0 ? 0 : metadataOperations * 1_000_000L / admitted)
                     .append(",\"sequentialStagesPerRequestMicros\":")
                     .append(admitted == 0 ? 0 : metadataOperations * 1_000_000L / admitted)
+                    .append(",\"metadataOperationKinds\":");
+            appendCounts(json, metadataOperationKinds);
+            json.append(",\"failureKinds\":");
+            appendCounts(json, failureKinds);
+            json.append(",\"workflowStages\":");
+            appendCounts(json, workflowStages);
+            json.append(",\"retryReasons\":");
+            appendCounts(json, retryReasons);
+            json
                     .append(",\"casAttempts\":").append(casAttempts)
                     .append(",\"casConflicts\":").append(casConflicts)
                     .append(",\"reconcileRetries\":").append(reconcileRetries)
@@ -300,10 +356,51 @@ class M3V3AllocatorWorkflowDiagnosticTest {
                     .append(",\"queueDepthMax\":").append(queueDepthMaximum)
                     .append(",\"bindingBusyMax\":").append(bindingBusyMaximum)
                     .append(",\"pendingPermitMax\":").append(pendingPermitMaximum)
+                    .append(",\"operationOutstandingMax\":").append(operationOutstandingMaximum)
                     .append(",\"schedulerLagP99Micros\":").append(schedulerLagP99Micros)
                     .append(",\"callbackLagP99Micros\":").append(callbackLagP99Micros)
                     .append(",\"realRttP99Micros\":").append(realRttP99Micros)
                     .append('}');
+        }
+
+        private static Map<String, Long> operationKinds(List<OperationSample> samples) {
+            Map<String, Long> counts = new TreeMap<>();
+            samples.forEach(sample -> counts.merge(sample.kind(), 1L, Math::addExact));
+            return Map.copyOf(counts);
+        }
+
+        private static Map<String, Long> failureKinds(M3V3AsyncActorLaneRunner.IntervalResult result) {
+            Map<String, Long> counts = new TreeMap<>();
+            result.measuredTelemetry().stream()
+                    .map(M3V3AsyncActorLaneRunner.RequestTelemetry::failureSummary)
+                    .filter(value -> !value.isEmpty())
+                    .map(Row::failureKind)
+                    .forEach(kind -> counts.merge(kind, 1L, Math::addExact));
+            return Map.copyOf(counts);
+        }
+
+        private static String failureKind(String summary) {
+            int bracket = summary.indexOf('[');
+            int bracketEnd = summary.indexOf(']', bracket + 1);
+            if (bracket >= 0 && bracketEnd > bracket) {
+                return summary.substring(0, bracketEnd + 1);
+            }
+            int colon = summary.indexOf(':');
+            return colon < 0 ? summary : summary.substring(0, colon);
+        }
+
+        private static void appendCounts(StringBuilder json, Map<String, Long> counts) {
+            json.append('{');
+            int index = 0;
+            for (Map.Entry<String, Long> entry : new TreeMap<>(counts).entrySet()) {
+                if (index++ > 0) {
+                    json.append(',');
+                }
+                json.append(M3V3DiagnosticOutput.jsonString(entry.getKey()))
+                        .append(':')
+                        .append(entry.getValue());
+            }
+            json.append('}');
         }
 
         private static long percentile99(List<Long> values) {
