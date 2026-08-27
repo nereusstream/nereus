@@ -122,10 +122,11 @@ deadline, and a maximum 25-millisecond retry backoff. The elapsed bound is short
 cleanup grace, so a terminally timed-out lane cannot leave the workflow authorized to continue beyond the interval
 cleanup boundary. A request-local lock-free guard wraps every store call, so a read/CAS completion arriving after the
 deadline cannot dispatch the next metadata operation. Deadline and backoff exhaustion are separate typed failures.
-The real formal action runtime uses the full 25-millisecond retry backoff. A shorter harness-only delay may consume the
-64-retry count under sustained four-coordinator STRICT Cell contention before the four-second elapsed envelope, so it
-is not an equivalent formal entry wiring. An infrastructure-invalid warm-up result also retains the first bounded
-failure type and protocol code in the campaign terminal detail; this diagnostic field cannot change its disposition.
+The real formal action runtime uses a 20-millisecond retry delay. The delay is long enough not to consume the 64-retry
+count prematurely under sustained four-coordinator STRICT Cell contention, and remains strictly below the
+25-millisecond retry-backoff guard so scheduler latency cannot race an equal delay against its own bound. An
+infrastructure-invalid warm-up result also retains the first bounded failure type and protocol code in the campaign
+terminal detail; this diagnostic field cannot change its disposition.
 Smaller test bounds are allowed, but
 the formal harness rejects a coordinator whose envelope differs from the exact formal constants.
 

@@ -295,10 +295,10 @@ class M3V2BoundedActorLaneRunnerTest {
     }
 
     @Test
-    void formalRealActionRetryBackoffUsesTheSourceGovernedMaximum() {
+    void formalRealActionRetryBackoffUsesSustainedContentionDelayBelowItsGuard() {
         assertThat(M3CandidateAllocatorPopulation.formalRetryBackoff())
-                .isEqualTo(BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal().maximumRetryBackoff())
-                .isEqualTo(Duration.ofMillis(25));
+                .isEqualTo(Duration.ofMillis(20))
+                .isLessThan(BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal().maximumRetryBackoff());
     }
 
     @Test

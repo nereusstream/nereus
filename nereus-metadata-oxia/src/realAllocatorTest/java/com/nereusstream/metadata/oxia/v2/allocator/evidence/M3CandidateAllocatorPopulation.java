@@ -66,6 +66,7 @@ final class M3CandidateAllocatorPopulation {
     private static final long INITIAL_OWNER_EPOCH = 1;
     private static final long OPERATION_TIMEOUT_SECONDS = 120;
     private static final long POPULATION_DRAIN_TIMEOUT_SECONDS = 600;
+    private static final Duration FORMAL_RETRY_BACKOFF = Duration.ofMillis(20);
 
     private final AllocatorEvidenceCandidateV1 candidate;
     private final M3RealOxiaActors actors;
@@ -194,8 +195,8 @@ final class M3CandidateAllocatorPopulation {
                         formalRetryBackoff().toMillis(), TimeUnit.MILLISECONDS));
     }
 
-    static java.time.Duration formalRetryBackoff() {
-        return BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal().maximumRetryBackoff();
+    static Duration formalRetryBackoff() {
+        return FORMAL_RETRY_BACKOFF;
     }
 
     long ensurePopulation(int requestedPopulation) throws Exception {
