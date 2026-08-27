@@ -71,24 +71,21 @@ class M3V3AllocatorProtocolMainTest {
     }
 
     @Test
-    void diagnosticSealerRequiresTheExactFourTestZeroSkipJUnitInventory() throws Exception {
+    void diagnosticSealerRequiresTheCompleteZeroSkipJUnitInventory() throws Exception {
         SourceBinding source = source();
-        Path junit = temporaryDirectory.resolve("diagnostic.xml");
+        Path junit = diagnosticJUnitDirectory("diagnostic");
         Path output = temporaryDirectory.resolve("diagnostic.nadv");
-        Files.writeString(junit, diagnosticJUnit());
 
         M3V3AllocatorProtocolMain.main(arguments("seal-diagnostic", junit, output, source));
+        M3V3AllocatorProtocolMain.main(arguments("validate-diagnostic", output, junit, source));
 
         DiagnosticAttestation diagnostic = AllocatorCampaignPromotionGateV3.decodeDiagnostic(
                 CanonicalBytes.copyOf(Files.readAllBytes(output)));
         assertThat(diagnostic.source()).isEqualTo(source);
         assertThat(diagnostic.scenarios()).containsExactlyInAnyOrderElementsOf(EnumSet.allOf(DiagnosticScenario.class));
 
-        Files.writeString(
-                junit,
-                diagnosticJUnit().replace(
-                        "<testcase name=\"strictWorkflowUsesRealOxia()\"/>",
-                        "<testcase name=\"strictWorkflowUsesRealOxia()\"><failure/></testcase>"));
+        Path first = junit.resolve("TEST-" + M3V3AsyncActorLaneRunnerTest.class.getName() + ".xml");
+        Files.writeString(first, Files.readString(first).replaceFirst("/>", "><failure/></testcase>"));
         assertThatThrownBy(() -> M3V3AllocatorProtocolMain.main(arguments(
                         "seal-diagnostic", junit, temporaryDirectory.resolve("forged.nadv"), source)))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -101,24 +98,17 @@ class M3V3AllocatorProtocolMainTest {
         Path checkpoint = temporaryDirectory.resolve("campaign.nacp");
         Path evaluation = temporaryDirectory.resolve("evaluation.naev");
         Path diagnostic = temporaryDirectory.resolve("diagnostic.nadv");
-        Path diagnosticJunit = temporaryDirectory.resolve("diagnostic.xml");
+        Path diagnosticJunit = diagnosticJUnitDirectory("promotion-diagnostic");
         Path formalJunit = temporaryDirectory.resolve("formal.xml");
         Path attachments = Files.createDirectory(temporaryDirectory.resolve("attachments"));
         Path decision = temporaryDirectory.resolve("decision.json");
         Files.write(checkpoint, fixture.checkpointBytes().toByteArray());
         Files.write(evaluation, AllocatorCampaignEvaluationSealV3.seal(fixture.checkpointBytes()).toByteArray());
-        Files.write(
-                diagnostic,
-                AllocatorCampaignPromotionGateV3.encodeDiagnostic(new DiagnosticAttestation(
-                                fixture.source(),
-                                EnumSet.allOf(DiagnosticScenario.class),
-                                digest(diagnosticJUnit())))
-                        .toByteArray());
-        Files.writeString(diagnosticJunit, diagnosticJUnit());
+        M3V3AllocatorProtocolMain.main(arguments("seal-diagnostic", diagnosticJunit, diagnostic, fixture.source()));
         Files.writeString(
                 formalJunit,
-                "<testsuite tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"0\">"
-                        + "<testcase name=\"formal\"/></testsuite>");
+                "<testsuite name=\"formal\" tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"0\">"
+                        + "<testcase classname=\"formal\" name=\"formal\"/></testsuite>");
         for (int index = 0; index < fixture.attachmentBytes().size(); index++) {
             Files.write(attachments.resolve("attachment-" + index + ".bin"), fixture.attachmentBytes().get(index));
         }
@@ -147,7 +137,9 @@ class M3V3AllocatorProtocolMainTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("non-promotable");
 
-        Files.writeString(diagnosticJunit, Files.readString(formalJunit));
+        Path tamperedDiagnostic = Files.createDirectory(temporaryDirectory.resolve("tampered-diagnostic"));
+        Files.writeString(tamperedDiagnostic.resolve("TEST-formal.xml"), Files.readString(formalJunit));
+        args.set(4, tamperedDiagnostic.toString());
         args.set(0, "promotion-check");
         args.set(7, temporaryDirectory.resolve("tampered-decision.json").toString());
         assertThatThrownBy(() -> M3V3AllocatorProtocolMain.main(args.toArray(String[]::new)))
@@ -281,13 +273,56 @@ class M3V3AllocatorProtocolMainTest {
         return Sha256Digest.hash(CanonicalBytes.copyOf(value.getBytes(StandardCharsets.UTF_8)));
     }
 
-    private static String diagnosticJUnit() {
-        return "<testsuite tests=\"4\" failures=\"0\" errors=\"0\" skipped=\"0\">"
-                + "<testcase name=\"strictWorkflowUsesRealOxia()\"/>"
-                + "<testcase name=\"installedRangeReusesGrant()\"/>"
-                + "<testcase name=\"rangeRenewalUsesCellCas()\"/>"
-                + "<testcase name=\"conflictStormUsesFourIndependentCoordinators()\"/>"
-                + "</testsuite>";
+    private Path diagnosticJUnitDirectory(String name) throws Exception {
+        Path directory = Files.createDirectory(temporaryDirectory.resolve(name));
+        writeSuite(
+                directory,
+                M3V3AsyncActorLaneRunnerTest.class,
+                List.of(
+                        "evidenceAdmissionCapIsDerivedFromFrozenRateLatencyAndActorCount()",
+                        "dispatcherReachesEveryFrozenOutstandingLevelWithoutBlockingOnCompletion()",
+                        "controlledLatencyFuturesCoverFrozenAndDerivedRatesIncludingTwoHundredFiftyMillis()",
+                        "twoHundredFiftyMillisAtOneThousandRpsReachesTheDerivedAsyncCap()",
+                        "callbackReorderingStillProducesOneCanonicalTerminalPerOrdinal()",
+                        "cutoffKeepsUndispatchedRequestsInThePreAdmissionDropPartition()",
+                        "cleanupTimeoutClosesTheWorkflowGuardAndLateCompletionCannotDispatchNextOperation()",
+                        "normalIntervalsSingleFlightBindingsWhileConflictProofRetainsSameKeyConcurrency()",
+                        "everyFrozenRateRetainsOneOrdinalAuthoritativeMeasurementTransition()",
+                        "scheduleRejectsWarmupAfterMeasurementAndRunnerContainsNoCorrectnessLockOrWorkerPool()"));
+        writeSuite(
+                directory,
+                M3V3RealOxiaOperationDiagnosticTest.class,
+                List.of("realOxiaOperationsRemainNonzeroAcrossEveryFrozenLatency()"));
+        writeSuite(
+                directory,
+                M3V3AllocatorWorkflowDiagnosticTest.class,
+                List.of(
+                        "strictAndRangeRowsUseAsyncAdmissionAtTwoHundredAndFiveHundred()",
+                        "fourActorSameCellConflictStormPreservesUniqueLedgerIds()"));
+        writeSuite(
+                directory,
+                M3V3NativePathDiagnosticTest.class,
+                List.of("formalAndDiagnosticUseOneNonBlockingRuntimeAndFrozenSchedule()"));
+        writeSuite(
+                directory,
+                M3V3NativeBaselineCanaryTest.class,
+                List.of("exactFormalScheduleClearsAllNativeBaselinesAndRepresentativeRows()"));
+        return directory;
+    }
+
+    private static void writeSuite(Path directory, Class<?> suite, List<String> tests) throws Exception {
+        StringBuilder xml = new StringBuilder("<testsuite name=\"")
+                .append(suite.getName())
+                .append("\" tests=\"")
+                .append(tests.size())
+                .append("\" failures=\"0\" errors=\"0\" skipped=\"0\">");
+        tests.forEach(test -> xml.append("<testcase classname=\"")
+                .append(suite.getName())
+                .append("\" name=\"")
+                .append(test)
+                .append("\"/>"));
+        xml.append("</testsuite>");
+        Files.writeString(directory.resolve("TEST-" + suite.getName() + ".xml"), xml);
     }
 
     private record Fixture(SourceBinding source, CanonicalBytes checkpointBytes, List<byte[]> attachmentBytes) {}

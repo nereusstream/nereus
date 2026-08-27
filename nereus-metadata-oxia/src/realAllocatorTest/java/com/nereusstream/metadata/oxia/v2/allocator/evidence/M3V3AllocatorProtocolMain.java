@@ -32,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -49,11 +50,55 @@ import org.w3c.dom.NodeList;
 /** Offline NACP3/NAEV3/NADV3 validation, sealing, and promotion-gate CLI. It never accesses Oxia. */
 public final class M3V3AllocatorProtocolMain {
     private static final Pattern SHA256_HEX = Pattern.compile("[0-9a-f]{64}");
+    private static final String PACKAGE = "com.nereusstream.metadata.oxia.v2.allocator.evidence.";
+    private static final Set<String> DIAGNOSTIC_SUITES = Set.of(
+            PACKAGE + "M3V3AsyncActorLaneRunnerTest",
+            PACKAGE + "M3V3RealOxiaOperationDiagnosticTest",
+            PACKAGE + "M3V3AllocatorWorkflowDiagnosticTest",
+            PACKAGE + "M3V3NativePathDiagnosticTest",
+            PACKAGE + "M3V3NativeBaselineCanaryTest");
     private static final Set<String> DIAGNOSTIC_TESTS = Set.of(
-            "strictWorkflowUsesRealOxia()",
-            "installedRangeReusesGrant()",
-            "rangeRenewalUsesCellCas()",
-            "conflictStormUsesFourIndependentCoordinators()");
+            identity(
+                    "M3V3AsyncActorLaneRunnerTest",
+                    "evidenceAdmissionCapIsDerivedFromFrozenRateLatencyAndActorCount()"),
+            identity(
+                    "M3V3AsyncActorLaneRunnerTest",
+                    "dispatcherReachesEveryFrozenOutstandingLevelWithoutBlockingOnCompletion()"),
+            identity(
+                    "M3V3AsyncActorLaneRunnerTest",
+                    "controlledLatencyFuturesCoverFrozenAndDerivedRatesIncludingTwoHundredFiftyMillis()"),
+            identity(
+                    "M3V3AsyncActorLaneRunnerTest",
+                    "twoHundredFiftyMillisAtOneThousandRpsReachesTheDerivedAsyncCap()"),
+            identity(
+                    "M3V3AsyncActorLaneRunnerTest",
+                    "callbackReorderingStillProducesOneCanonicalTerminalPerOrdinal()"),
+            identity(
+                    "M3V3AsyncActorLaneRunnerTest",
+                    "cutoffKeepsUndispatchedRequestsInThePreAdmissionDropPartition()"),
+            identity(
+                    "M3V3AsyncActorLaneRunnerTest",
+                    "cleanupTimeoutClosesTheWorkflowGuardAndLateCompletionCannotDispatchNextOperation()"),
+            identity(
+                    "M3V3AsyncActorLaneRunnerTest",
+                    "normalIntervalsSingleFlightBindingsWhileConflictProofRetainsSameKeyConcurrency()"),
+            identity(
+                    "M3V3AsyncActorLaneRunnerTest",
+                    "everyFrozenRateRetainsOneOrdinalAuthoritativeMeasurementTransition()"),
+            identity(
+                    "M3V3AsyncActorLaneRunnerTest",
+                    "scheduleRejectsWarmupAfterMeasurementAndRunnerContainsNoCorrectnessLockOrWorkerPool()"),
+            identity(
+                    "M3V3RealOxiaOperationDiagnosticTest",
+                    "realOxiaOperationsRemainNonzeroAcrossEveryFrozenLatency()"),
+            identity(
+                    "M3V3AllocatorWorkflowDiagnosticTest",
+                    "strictAndRangeRowsUseAsyncAdmissionAtTwoHundredAndFiveHundred()"),
+            identity("M3V3AllocatorWorkflowDiagnosticTest", "fourActorSameCellConflictStormPreservesUniqueLedgerIds()"),
+            identity("M3V3NativePathDiagnosticTest", "formalAndDiagnosticUseOneNonBlockingRuntimeAndFrozenSchedule()"),
+            identity(
+                    "M3V3NativeBaselineCanaryTest",
+                    "exactFormalScheduleClearsAllNativeBaselinesAndRepresentativeRows()"));
 
     private M3V3AllocatorProtocolMain() {}
 
@@ -65,6 +110,7 @@ public final class M3V3AllocatorProtocolMain {
             case "validate-checkpoint" -> validateCheckpoint(args);
             case "seal-evaluation" -> sealEvaluation(args);
             case "seal-diagnostic" -> sealDiagnostic(args);
+            case "validate-diagnostic" -> validateDiagnostic(args);
             case "promotion-check" -> promotionCheck(args);
             case "seal-selection" -> sealSelection(args);
             default -> throw new IllegalArgumentException("unknown allocator V3 protocol command: " + args[0]);
@@ -106,18 +152,33 @@ public final class M3V3AllocatorProtocolMain {
         Path junitPath = Path.of(args[1]);
         Path output = Path.of(args[2]);
         SourceBinding source = source(args, 3);
-        byte[] junitBytes = readRegular(junitPath, 16 * 1024 * 1024);
-        ParsedJUnit junit = parseJUnit(junitBytes);
+        DiagnosticSuite junit = readDiagnosticSuite(junitPath);
         requireExactDiagnosticJUnit(junit);
         DiagnosticAttestation diagnostic = new DiagnosticAttestation(
                 source,
                 EnumSet.allOf(DiagnosticScenario.class),
-                Sha256Digest.hash(CanonicalBytes.copyOf(junitBytes)));
+                junit.manifestDigest());
         writeCreateNew(
                 output,
                 AllocatorCampaignPromotionGateV3.encodeDiagnostic(diagnostic).toByteArray());
         System.out.printf(
                 "allocator V3 diagnostic sealed: tests=%d failures=0 errors=0 skips=0 junitSha256=%s%n",
+                junit.summary().tests(), diagnostic.receiptDigest().toHex());
+    }
+
+    private static void validateDiagnostic(String[] args) throws Exception {
+        requireLength(args, 8);
+        CanonicalBytes encoded = readBounded(Path.of(args[1]), 4_096);
+        DiagnosticAttestation diagnostic = AllocatorCampaignPromotionGateV3.decodeDiagnostic(encoded);
+        DiagnosticSuite junit = readDiagnosticSuite(Path.of(args[2]));
+        requireExactDiagnosticJUnit(junit);
+        requireSource(diagnostic.source(), source(args, 3));
+        if (!diagnostic.scenarios().equals(EnumSet.allOf(DiagnosticScenario.class))
+                || !diagnostic.receiptDigest().equals(junit.manifestDigest())) {
+            throw new IllegalArgumentException("allocator V3 diagnostic attestation differs from its JUnit suite");
+        }
+        System.out.printf(
+                "allocator V3 diagnostic canonical: tests=%d failures=0 errors=0 skips=0 junitSha256=%s%n",
                 junit.summary().tests(), diagnostic.receiptDigest().toHex());
     }
 
@@ -136,8 +197,8 @@ public final class M3V3AllocatorProtocolMain {
                 checkpointPath, AllocatorCampaignCheckpointV3.MAX_ENCODED_BYTES);
         CanonicalBytes diagnosticBytes = readBounded(diagnosticPath, 4_096);
         DiagnosticAttestation diagnostic = AllocatorCampaignPromotionGateV3.decodeDiagnostic(diagnosticBytes);
-        byte[] diagnosticJUnitBytes = readRegular(diagnosticJUnitPath, 16 * 1024 * 1024);
-        requireExactDiagnosticJUnit(parseJUnit(diagnosticJUnitBytes));
+        DiagnosticSuite diagnosticJUnit = readDiagnosticSuite(diagnosticJUnitPath);
+        requireExactDiagnosticJUnit(diagnosticJUnit);
         byte[] formalJUnitBytes = readRegular(formalJUnitPath, 16 * 1024 * 1024);
         ParsedJUnit formalJUnit = parseJUnit(formalJUnitBytes);
         Set<Sha256Digest> attachments = attachmentDigests(attachmentDirectory);
@@ -147,7 +208,7 @@ public final class M3V3AllocatorProtocolMain {
                 currentSource,
                 attachments,
                 diagnostic,
-                Sha256Digest.hash(CanonicalBytes.copyOf(diagnosticJUnitBytes)),
+                diagnosticJUnit.manifestDigest(),
                 formalJUnit.summary());
         if (decision.status() != DecisionStatus.PROMOTABLE
                 && decision.status() != DecisionStatus.NON_PROMOTABLE_EVALUATION) {
@@ -166,7 +227,7 @@ public final class M3V3AllocatorProtocolMain {
                 + "\",\"diagnosticSha256\":\""
                 + AllocatorCampaignCheckpointV3.digest(diagnosticBytes).toHex()
                 + "\",\"diagnosticJUnitSha256\":\""
-                + Sha256Digest.hash(CanonicalBytes.copyOf(diagnosticJUnitBytes)).toHex()
+                + diagnosticJUnit.manifestDigest().toHex()
                 + "\",\"formalJUnitSha256\":\""
                 + Sha256Digest.hash(CanonicalBytes.copyOf(formalJUnitBytes)).toHex()
                 + "\"}\n";
@@ -183,8 +244,8 @@ public final class M3V3AllocatorProtocolMain {
                 Path.of(args[2]), AllocatorCampaignCheckpointV3.MAX_ENCODED_BYTES);
         CanonicalBytes diagnosticBytes = readBounded(Path.of(args[3]), 4_096);
         DiagnosticAttestation diagnostic = AllocatorCampaignPromotionGateV3.decodeDiagnostic(diagnosticBytes);
-        byte[] diagnosticJUnitBytes = readRegular(Path.of(args[4]), 16 * 1024 * 1024);
-        requireExactDiagnosticJUnit(parseJUnit(diagnosticJUnitBytes));
+        DiagnosticSuite diagnosticJUnit = readDiagnosticSuite(Path.of(args[4]));
+        requireExactDiagnosticJUnit(diagnosticJUnit);
         ParsedJUnit formalJUnit = parseJUnit(readRegular(Path.of(args[5]), 16 * 1024 * 1024));
         SourceBinding currentSource = source(args, 8);
         CanonicalBytes selection = AllocatorCampaignSelectionV3.seal(
@@ -193,7 +254,7 @@ public final class M3V3AllocatorProtocolMain {
                 currentSource,
                 attachmentDigests(Path.of(args[6])),
                 diagnostic,
-                Sha256Digest.hash(CanonicalBytes.copyOf(diagnosticJUnitBytes)),
+                diagnosticJUnit.manifestDigest(),
                 formalJUnit.summary());
         AllocatorCampaignSelectionV3.decode(selection);
         writeCreateNew(Path.of(args[7]), selection.toByteArray());
@@ -203,14 +264,67 @@ public final class M3V3AllocatorProtocolMain {
                 Sha256Digest.hash(selection).toHex());
     }
 
-    private static void requireExactDiagnosticJUnit(ParsedJUnit junit) {
+    private static void requireExactDiagnosticJUnit(DiagnosticSuite junit) {
         if (junit.summary().failures() != 0
                 || junit.summary().errors() != 0
                 || junit.summary().skips() != 0
                 || junit.summary().tests() != DIAGNOSTIC_TESTS.size()
-                || !junit.testcaseNames().equals(DIAGNOSTIC_TESTS)) {
+                || !junit.suiteNames().equals(DIAGNOSTIC_SUITES)
+                || !junit.testcaseIdentities().equals(DIAGNOSTIC_TESTS)) {
             throw new IllegalArgumentException("allocator V3 diagnostic JUnit inventory or result differs");
         }
+    }
+
+    private static DiagnosticSuite readDiagnosticSuite(Path directory) throws Exception {
+        if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(directory)) {
+            throw new IllegalArgumentException("allocator V3 diagnostic JUnit directory is absent or a link");
+        }
+        List<Path> files;
+        try (var stream = Files.list(directory)) {
+            files = stream.filter(path -> path.getFileName().toString().matches("TEST-[A-Za-z0-9_.]+\\.xml"))
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                    .toList();
+        }
+        if (files.size() != DIAGNOSTIC_SUITES.size()) {
+            throw new IllegalArgumentException("allocator V3 diagnostic JUnit file inventory differs");
+        }
+        Set<String> fileNames = files.stream()
+                .map(path -> path.getFileName().toString())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        Set<String> expectedFileNames = DIAGNOSTIC_SUITES.stream()
+                .map(suite -> "TEST-" + suite + ".xml")
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        if (!fileNames.equals(expectedFileNames)) {
+            throw new IllegalArgumentException("allocator V3 diagnostic JUnit file identity differs");
+        }
+        long tests = 0;
+        long failures = 0;
+        long errors = 0;
+        long skips = 0;
+        Set<String> suites = new HashSet<>();
+        Set<String> testsSeen = new HashSet<>();
+        StringBuilder manifest = new StringBuilder("NEREUS_V2_M3_ALLOCATOR_DIAGNOSTIC_JUNIT_MANIFEST_V3\n");
+        for (Path file : files) {
+            byte[] bytes = readRegular(file, 16 * 1024 * 1024);
+            ParsedJUnit parsed = parseJUnit(bytes);
+            tests = Math.addExact(tests, parsed.summary().tests());
+            failures = Math.addExact(failures, parsed.summary().failures());
+            errors = Math.addExact(errors, parsed.summary().errors());
+            skips = Math.addExact(skips, parsed.summary().skips());
+            if (!suites.addAll(parsed.suiteNames()) || !testsSeen.addAll(parsed.testcaseIdentities())) {
+                throw new IllegalArgumentException("allocator V3 diagnostic JUnit identities alias");
+            }
+            manifest.append(file.getFileName())
+                    .append('\0')
+                    .append(bytes.length)
+                    .append('\0')
+                    .append(Sha256Digest.hash(CanonicalBytes.copyOf(bytes)).toHex())
+                    .append('\n');
+        }
+        Sha256Digest manifestDigest = Sha256Digest.hash(
+                CanonicalBytes.copyOf(manifest.toString().getBytes(StandardCharsets.UTF_8)));
+        return new DiagnosticSuite(
+                new JUnitSummary(tests, failures, errors, skips), suites, testsSeen, manifestDigest);
     }
 
     private static Set<Sha256Digest> attachmentDigests(Path directory) throws IOException {
@@ -261,11 +375,16 @@ public final class M3V3AllocatorProtocolMain {
         NodeList suites = root.getTagName().equals("testsuite")
                 ? new SingletonNodeList(root)
                 : root.getElementsByTagName("testsuite");
-        Set<String> testcaseNames = new HashSet<>();
+        Set<String> suiteNames = new HashSet<>();
+        Set<String> testcaseIdentities = new HashSet<>();
         for (int index = 0; index < suites.getLength(); index++) {
             Element suite = (Element) suites.item(index);
             if (suite.getElementsByTagName("testsuite").getLength() != 0) {
                 throw new IllegalArgumentException("allocator V3 JUnit suite nesting differs");
+            }
+            String suiteName = suite.getAttribute("name");
+            if (suiteName.isBlank() || !suiteNames.add(suiteName)) {
+                throw new IllegalArgumentException("allocator V3 JUnit suite identity differs");
             }
             tests += attribute(suite, "tests");
             failures += attribute(suite, "failures");
@@ -275,10 +394,12 @@ public final class M3V3AllocatorProtocolMain {
             for (int testcase = 0; testcase < testcases.getLength(); testcase++) {
                 Element testcaseElement = (Element) testcases.item(testcase);
                 String testcaseName = testcaseElement.getAttribute("name");
-                if (testcaseName.isBlank()) {
+                String testcaseClass = testcaseElement.getAttribute("classname");
+                if (testcaseName.isBlank()
+                        || testcaseClass.isBlank()
+                        || !testcaseIdentities.add(testcaseClass + '#' + testcaseName)) {
                     throw new IllegalArgumentException("allocator V3 JUnit testcase name differs");
                 }
-                testcaseNames.add(testcaseName);
                 observedTests++;
                 observedFailures += testcaseElement.getElementsByTagName("failure").getLength();
                 observedErrors += testcaseElement.getElementsByTagName("error").getLength();
@@ -291,7 +412,10 @@ public final class M3V3AllocatorProtocolMain {
                 || skips != observedSkips) {
             throw new IllegalArgumentException("allocator V3 JUnit summary differs from testcase outcomes");
         }
-        return new ParsedJUnit(new JUnitSummary(tests, failures, errors, skips), Set.copyOf(testcaseNames));
+        return new ParsedJUnit(
+                new JUnitSummary(tests, failures, errors, skips),
+                Set.copyOf(suiteNames),
+                Set.copyOf(testcaseIdentities));
     }
 
     private static long attribute(Element element, String name) {
@@ -367,7 +491,18 @@ public final class M3V3AllocatorProtocolMain {
         }
     }
 
-    private record ParsedJUnit(JUnitSummary summary, Set<String> testcaseNames) {}
+    private static String identity(String className, String testName) {
+        return PACKAGE + className + '#' + testName;
+    }
+
+    private record ParsedJUnit(
+            JUnitSummary summary, Set<String> suiteNames, Set<String> testcaseIdentities) {}
+
+    private record DiagnosticSuite(
+            JUnitSummary summary,
+            Set<String> suiteNames,
+            Set<String> testcaseIdentities,
+            Sha256Digest manifestDigest) {}
 
     private static final class SingletonNodeList implements NodeList {
         private final Node value;

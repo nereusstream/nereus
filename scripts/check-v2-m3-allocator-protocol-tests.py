@@ -21,6 +21,23 @@ ROOT_BUILD = ROOT / "build.gradle.kts"
 MODULE_BUILD = ROOT / "nereus-metadata-oxia" / "build.gradle.kts"
 HARD_DEADLINE = ROOT / "scripts" / "run-v2-m3-with-hard-deadline.py"
 FORMAL_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-formal.py"
+V3_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v3.py"
+V3_FORMAL_RUNTIME = (
+    ROOT
+    / "nereus-metadata-oxia"
+    / "src"
+    / "realAllocatorTest"
+    / "java"
+    / "com"
+    / "nereusstream"
+    / "metadata"
+    / "oxia"
+    / "v2"
+    / "allocator"
+    / "evidence"
+    / "M3V3RealFormalActionRuntime.java"
+)
+V3_NATIVE_RUNTIME = V3_FORMAL_RUNTIME.with_name("M3V3NativeIntervalRuntime.java")
 FORMAL_CAMPAIGN = (
     ROOT
     / "nereus-metadata-oxia"
@@ -39,6 +56,82 @@ FORMAL_CAMPAIGN = (
 
 
 class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
+    def test_v3_native_execution_plan_is_stable_source_bound_and_feasible(self) -> None:
+        first = subprocess.run(
+            [sys.executable, str(V3_PLAN)],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        second = subprocess.run(
+            [sys.executable, str(V3_PLAN)],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        self.assertEqual(first, second)
+        plan = json.loads(first)
+        self.assertEqual(
+            "5f94079eb0d41739e4da32c0d4170a837ca2a63b33a6a8ad71b25a87ca49b283",
+            plan["zeroDecisionPlanSha256"],
+        )
+        self.assertEqual(328, plan["maximumExecutedIntervalCells"])
+        self.assertEqual(360, plan["maximumExecutedFaultActions"])
+        self.assertEqual(32, plan["maximumExecutedScaleActions"])
+        self.assertEqual(720, plan["maximumTotalExecutedActions"])
+        self.assertEqual(48_000, plan["campaignWallClockCapSeconds"])
+        self.assertEqual("PLAN_FEASIBLE", plan["feasibilityStatus"])
+        self.assertEqual(
+            {
+                "nativeExecutionModel": "PINNED_MANAGED_LEDGER_ASYNC_CHAIN_V1",
+                "nativeBridgeWorkers": 0,
+                "nativeBridgeQueueCapacity": 0,
+                "hiddenDispatchQueue": 0,
+                "nativeExecutionProfileSha256": (
+                    "4b11530bd3627feba731f3c59026012dce95b35c1434b0e2b71d5effbe18d751"
+                ),
+                "workloadScheduleSha256": (
+                    "b0e923a08ea26a9638f6722698a88a8f20a4d11cbf58126fe4d03b28b4e0e798"
+                ),
+            },
+            plan["nativeExecution"],
+        )
+        self.assertEqual(
+            subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip(),
+            plan["exactSourceTuple"]["nereusCommit"],
+        )
+
+    def test_v3_formal_and_diagnostic_share_one_nonblocking_native_runtime(self) -> None:
+        formal = V3_FORMAL_RUNTIME.read_text()
+        shared = V3_NATIVE_RUNTIME.read_text()
+        module = MODULE_BUILD.read_text()
+        self.assertIn("nativeIntervalRuntime().run(", formal)
+        for forbidden in (
+            "nativeDispatchWorkers",
+            "boundedNativeDispatchWorkers",
+            "ArrayBlockingQueue",
+            "CompletableFuture.runAsync",
+        ):
+            self.assertNotIn(forbidden, formal)
+        self.assertIn("rolloverAsync(", shared)
+        self.assertIn("operationContext::allowsNextMetadataOperation", shared)
+        self.assertNotIn("ExecutorService", shared)
+        self.assertNotIn(".join()", shared)
+        self.assertNotIn("toCompletableFuture()", shared)
+        self.assertIn("realAllocatorV3NativeCanaryTest", module)
+        diagnostic = module.split(
+            'val realAllocatorV3DiagnosticTest = tasks.register<Test>("realAllocatorV3DiagnosticTest")',
+            1,
+        )[1].split("val realAllocatorV3NativeCanaryTest", 1)[0]
+        self.assertIn("M3V3NativeBaselineCanaryTest", diagnostic)
+        self.assertIn("validateRealAllocatorV3Diagnostic", module)
+
     def test_formal_archiver_is_create_new_byte_exact_and_collision_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

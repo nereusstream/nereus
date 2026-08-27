@@ -825,6 +825,8 @@ Native executor queue is removed, formal and diagnostic share one non-blocking M
 exact-schedule canary must clear all eight minimum baseline rows, and NADV3 must cover the full diagnostic suite. The
 remaining open question is still formal candidate qualification on the later explicitly authorized exact SHA; Stage
 B.2 diagnostic conformance cannot select a mode or promote a scenario.
+The Stage B.2 profile is closed at schedule digest `b0e923a0...e798`, execution digest `4b11530b...d751`, and plan
+digest `5f94079e...b283`; only a later exact-SHA formal authorization may answer that remaining qualification question.
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

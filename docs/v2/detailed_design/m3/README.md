@@ -558,6 +558,9 @@ state: formal Native requests were admitted at 4/64/256 but then entered a four-
 diagnostic used another executor. Stage B.2 replaces both compositions with one source-bound non-blocking
 ManagedLedger async chain, rejects the old hidden-queue profile, runs an exact-schedule Native-only canary, and seals
 the complete diagnostic JUnit inventory. It does not authorize a formal rerun or any downstream promotion.
+The schedule/profile hashes are `b0e923a0...e798` and `4b11530b...d751`; the resulting amended zero-decision plan is
+`5f94079e...b283`. Formal and diagnostic construct `M3V3NativeIntervalRuntime` directly, and the NADV3 validator
+requires the exact five-XML/15-test suite manifest rather than accepting one selected test result.
 
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0

@@ -62,6 +62,14 @@ identity. A changed profile therefore requires a new exact source and plan diges
 old checkpoint or evaluation. The V3 wire, logical slots, rate catalog, dispositions, evaluation status ordinals,
 selection rules, and parser goldens do not change, so no V4 is introduced.
 
+The accepted canonical schedule digest is
+`b0e923a08ea26a9638f6722698a88a8f20a4d11cbf58126fe4d03b28b4e0e798`; the Native execution-profile digest is
+`4b11530bd3627feba731f3c59026012dce95b35c1434b0e2b71d5effbe18d751`. Adding those identities to the otherwise
+unchanged 328/360/32/720 projection produces Stage B.2 zero-decision plan digest
+`5f94079eb0d41739e4da32c0d4170a837ca2a63b33a6a8ad71b25a87ca49b283`. The earlier
+`019fcac748460c9cb72ac953d4afbb5e71ecb15d7199310ecf616b9f12eb35e9` remains the immutable identity of the first
+V3 formal campaign; no bytes in that campaign are migrated to the amended plan.
+
 ### True asynchronous rollover chain
 
 Each admitted request acquires only its request-owned per-binding token and then runs this ordered chain:

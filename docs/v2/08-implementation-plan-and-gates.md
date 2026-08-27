@@ -128,6 +128,9 @@ queue, and makes formal plus diagnostic call one true async ManagedLedger interv
 old profile to fail `NATIVE_EXECUTOR_INFEASIBLE`, all eight 200-request/second Native baselines and two representative
 rows to pass one exact-schedule diagnostic canary with actual operation concurrency above four, and current-source
 NADV3 to bind the complete diagnostic JUnit XML inventory. Stage B.2 stops before any new formal campaign.
+The shared schedule/profile digests are `b0e923a0...e798` and `4b11530b...d751`; their source-bound V3 plan digest is
+`5f94079e...b283`, with the existing 328/360/32/720 action limits and 48,000-second hard cap unchanged. Publication
+also requires canonical revalidation of the complete five-suite, 15-test NADV3 JUnit inventory.
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.
