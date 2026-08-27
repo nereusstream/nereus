@@ -121,6 +121,13 @@ budget sum inside the unchanged 48,000-second envelope, and `4/64/256/1` admissi
 load, while bounded allocator rows identified CAS/reconcile contention and the installed RANGE-64 path as materially
 cheaper. Stage B.1 therefore closes protocol feasibility and diagnostic observability only; it does not claim a formal
 candidate qualification or authorize a workflow change that would weaken proof or SLOs.
+
+Stage B.2 is governed by ADR 0109. It preserves the first exact-source V3 terminal
+`NATIVE_BASELINE_UNAVAILABLE` and its immutable external archive, removes the four-worker admission-after Native
+queue, and makes formal plus diagnostic call one true async ManagedLedger interval runtime. Publication requires the
+old profile to fail `NATIVE_EXECUTOR_INFEASIBLE`, all eight 200-request/second Native baselines and two representative
+rows to pass one exact-schedule diagnostic canary with actual operation concurrency above four, and current-source
+NADV3 to bind the complete diagnostic JUnit XML inventory. Stage B.2 stops before any new formal campaign.
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

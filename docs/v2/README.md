@@ -369,6 +369,7 @@ Accepted decisions:
 - [ADR 0106: M3 allocator V2 child and Final evidence amendment](../decisions/0106-v2-m3-allocator-v2-child-final-evidence-amendment.md)
 - [ADR 0107: M3 allocator bounded-adaptive formal-entry wiring amendment](../decisions/0107-v2-m3-allocator-bounded-adaptive-formal-entry-wiring-amendment.md)
 - [ADR 0108: M3 allocator protocol feasibility, asynchronous admission, and baseline amendment](../decisions/0108-v2-m3-allocator-protocol-feasibility-async-admission-baseline-amendment.md)
+- [ADR 0109: M3 Native baseline executor composition and formal-diagnostic equivalence amendment](../decisions/0109-v2-m3-native-baseline-executor-composition-formal-diagnostic-equivalence-amendment.md)
 
 ## Open design gates
 
@@ -473,6 +474,13 @@ Native and direct real-Oxia rows did not identify the runner scheduler or Oxia R
 STRICT and smaller-RANGE workflow rows instead exposed CAS/reconcile contention, while installed RANGE-64 sustained
 the strongest short row. These outputs have `authority=false` and `selectionEligible=false`; they are not NAEV3,
 NARS3, formal campaign evidence, or permission to optimize by weakening a contract.
+
+The first V3 formal campaign later completed at exact source `4bf51a38...e360` with 36 actions and 37 checkpoints.
+Its canonical NAEV3 `37cb5e2c...1e09d` is the legal non-promotable state `NATIVE_BASELINE_UNAVAILABLE`; no NARS3
+exists and allocator mode remains `UNSELECTED`. [ADR 0109](../decisions/0109-v2-m3-native-baseline-executor-composition-formal-diagnostic-equivalence-amendment.md)
+preserves that result and corrects the Native executor composition: formal and diagnostic use one source-bound true
+async ManagedLedger runtime with no admission-after hidden queue. Stage B.2 is diagnostic-only and grants no formal
+rerun, source-lock, child, current-source M2, scenario, or Final update.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

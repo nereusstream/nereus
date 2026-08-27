@@ -549,6 +549,16 @@ contention. Diagnostic stage attribution covers Cell read/reserve/clear, node cr
 operation outstanding, scheduler/callback lag, and terminal failure code without adding a shared Java Cell lock or
 changing production correctness.
 
+[ADR 0109](../../../decisions/0109-v2-m3-native-baseline-executor-composition-formal-diagnostic-equivalence-amendment.md)
+records the next conformance correction after the first V3 formal campaign. Exact source `4bf51a38...e360` completed
+36 actions and 37 checkpoints and sealed legal non-promotable NAEV3 `37cb5e2c...1e09d` as
+`NATIVE_BASELINE_UNAVAILABLE`. Its 75-file/228,698-byte source directory remains unchanged; a byte-identical external
+archive has manifest digest `9515c574...bd19` and identity digest `682b3818...e45`. The defect is not the evaluation
+state: formal Native requests were admitted at 4/64/256 but then entered a four-worker secondary queue, while the
+diagnostic used another executor. Stage B.2 replaces both compositions with one source-bound non-blocking
+ManagedLedger async chain, rejects the old hidden-queue profile, runs an exact-schedule Native-only canary, and seals
+the complete diagnostic JUnit inventory. It does not authorize a formal rerun or any downstream promotion.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

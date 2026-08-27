@@ -818,6 +818,13 @@ budget sum. The first exact-source `baae2625...326` diagnostic-only run passed 1
 runner-scheduler, and direct Oxia behavior from bounded allocator CAS/reconcile contention. This narrows the question;
 it does not answer whether any candidate meets every formal SLO, and it does not make the installed RANGE-64 short-row
 observation selectable.
+
+The first exact-source V3 formal later returned legal `NATIVE_BASELINE_UNAVAILABLE` rather than a comparable
+candidate result. ADR 0109 closes the discovered composition mismatch before another run: the four-worker hidden
+Native executor queue is removed, formal and diagnostic share one non-blocking ManagedLedger chain, a Native-only
+exact-schedule canary must clear all eight minimum baseline rows, and NADV3 must cover the full diagnostic suite. The
+remaining open question is still formal candidate qualification on the later explicitly authorized exact SHA; Stage
+B.2 diagnostic conformance cannot select a mode or promote a scenario.
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

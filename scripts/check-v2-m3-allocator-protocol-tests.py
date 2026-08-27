@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 
@@ -19,6 +20,7 @@ SETTINGS = ROOT / "settings.gradle.kts"
 ROOT_BUILD = ROOT / "build.gradle.kts"
 MODULE_BUILD = ROOT / "nereus-metadata-oxia" / "build.gradle.kts"
 HARD_DEADLINE = ROOT / "scripts" / "run-v2-m3-with-hard-deadline.py"
+FORMAL_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-formal.py"
 FORMAL_CAMPAIGN = (
     ROOT
     / "nereus-metadata-oxia"
@@ -37,6 +39,74 @@ FORMAL_CAMPAIGN = (
 
 
 class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
+    def test_formal_archiver_is_create_new_byte_exact_and_collision_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "formal"
+            source.mkdir()
+            campaign = source / "campaign-result.json"
+            campaign.write_text(
+                '{"status":"COMPLETED","terminalReason":"COMPLETED"}\n',
+                encoding="utf-8",
+            )
+            evaluation = source / "evaluation.naev"
+            evaluation.write_bytes(b"canonical-naev3")
+            checkpoints = source / "checkpoints"
+            checkpoints.mkdir()
+            checkpoint = checkpoints / "final.nacp"
+            checkpoint.write_bytes(b"canonical-nacp3")
+            attachment = source / "attachments"
+            attachment.mkdir()
+            (attachment / "one.json").write_bytes(b"{}\n")
+            files = sorted(path for path in source.rglob("*") if path.is_file())
+            archive = root / "archive"
+            command = [
+                sys.executable,
+                str(FORMAL_ARCHIVER),
+                "--source",
+                str(source),
+                "--archive",
+                str(archive),
+                "--archived-on",
+                "2026-08-28",
+                "--source-commit",
+                "a" * 40,
+                "--plan-sha256",
+                "b" * 64,
+                "--campaign-result-sha256",
+                hashlib.sha256(campaign.read_bytes()).hexdigest(),
+                "--final-checkpoint-relative-path",
+                checkpoint.relative_to(source).as_posix(),
+                "--final-checkpoint-sha256",
+                hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
+                "--evaluation-sha256",
+                hashlib.sha256(evaluation.read_bytes()).hexdigest(),
+                "--attachment-root-sha256",
+                "c" * 64,
+                "--formal-junit-sha256",
+                "d" * 64,
+                "--expected-file-count",
+                str(len(files)),
+                "--expected-total-bytes",
+                str(sum(path.stat().st_size for path in files)),
+                "--evaluation-status",
+                "NATIVE_BASELINE_UNAVAILABLE",
+            ]
+            first = subprocess.run(command, check=True, capture_output=True, text=True)
+            identity = json.loads((archive / "archive-identity.json").read_bytes())
+            self.assertTrue(identity["sourceAndPayloadByteIdentical"])
+            self.assertFalse(identity["promotableInput"])
+            self.assertFalse(identity["futureCampaignInput"])
+            for source_file in files:
+                relative = source_file.relative_to(source)
+                self.assertEqual(source_file.read_bytes(), (archive / "payload" / relative).read_bytes())
+            manifest_before = (archive / "SHA256SUMS").read_bytes()
+            second = subprocess.run(command, check=False, capture_output=True, text=True)
+            self.assertNotEqual(0, second.returncode)
+            self.assertIn("archive target already exists", second.stderr)
+            self.assertEqual(manifest_before, (archive / "SHA256SUMS").read_bytes())
+            self.assertIn('"sourceAndPayloadByteIdentical": true', first.stdout)
+
     def test_plan_only_is_byte_stable_and_freezes_all_independent_budgets(self) -> None:
         first = subprocess.run(
             [str(RUNNER), "--plan-only"],

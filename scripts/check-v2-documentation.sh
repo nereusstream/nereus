@@ -201,6 +201,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0086-v2-kafka-bookkeeper-run-range-index-and-ordered-pipeline.md"
     "$repo_root/docs/decisions/0087-v2-kafka-produce-fetch-frontiers-isr-and-recovery.md"
     "$repo_root/docs/decisions/0088-v2-m3-nwg1-implementation-input-closure.md"
+    "$repo_root/docs/decisions/0109-v2-m3-native-baseline-executor-composition-formal-diagnostic-equivalence-amendment.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
