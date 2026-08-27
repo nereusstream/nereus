@@ -422,29 +422,8 @@ class AllocatorCampaignProtocolV3Test {
         int rate = cell.rateSlot().derivedFloor() ? 800 : cell.rateSlot().fixedRate();
         long offered = (long) rate * AllocatorCampaignV3.MEASURED_SECONDS;
         return new IntervalEvidence(
-                cell,
-                rate,
-                offered,
-                offered,
-                0,
-                offered,
-                0,
-                0,
-                offered,
-                0,
-                0,
-                0,
-                0,
-                0,
-                100_000,
-                100_000,
-                100_000,
-                rate,
-                100_000,
-                100_000,
-                0,
-                0,
-                0);
+                cell, rate, offered, offered, 0, offered, 0, 0, offered, 0, 0, 0, 0, 0, 100_000, 100_000, 100_000, rate,
+                100_000, 100_000, 0, 0, 0);
     }
 
     private static IntervalEvidence relativeFailure(Cell cell) {

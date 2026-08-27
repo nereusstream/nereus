@@ -60,9 +60,8 @@ class AllocatorCampaignV3Test {
 
     @Test
     void noneQualifiedIsValidAndDerivesMinimumValidCount() {
-        Completed completed = drive(cell -> cell.candidate().nativePath()
-                ? passing(cell, cell.rateSlot().fixedRate())
-                : relativeFailure(cell));
+        Completed completed = drive(cell ->
+                cell.candidate().nativePath() ? passing(cell, cell.rateSlot().fixedRate()) : relativeFailure(cell));
 
         assertThat(completed.plan().executedPerformanceCells()).isEqualTo(13);
         assertThat(completed.plan().dispositions()).hasSize(315);
@@ -86,8 +85,8 @@ class AllocatorCampaignV3Test {
 
     @Test
     void smallestQualifiedRangeIsSelectedAndLargerRangesAreDispositioned() {
-        for (Candidate selected : List.of(
-                Candidate.RANGE_16, Candidate.RANGE_64, Candidate.RANGE_256, Candidate.RANGE_1024)) {
+        for (Candidate selected :
+                List.of(Candidate.RANGE_16, Candidate.RANGE_64, Candidate.RANGE_256, Candidate.RANGE_1024)) {
             Completed completed = drive(cell -> {
                 if (cell.candidate().nativePath() || cell.candidate() == selected) {
                     return passing(cell, actionRate(cell));
@@ -153,7 +152,8 @@ class AllocatorCampaignV3Test {
                 .hasSize(5);
         assertThat(completed.plan().dispositions())
                 .filteredOn(disposition -> disposition.kind() == DispositionKind.DUPLICATE_DERIVED_FLOOR)
-                .allSatisfy(disposition -> assertThat(disposition.cell().rateSlot().fixedRate()).isEqualTo(200));
+                .allSatisfy(disposition ->
+                        assertThat(disposition.cell().rateSlot().fixedRate()).isEqualTo(200));
     }
 
     @Test
@@ -180,14 +180,12 @@ class AllocatorCampaignV3Test {
 
     @Test
     void forgedDispositionAndConservationAreRejected() {
-        Completed completed = drive(cell ->
-                cell.candidate().nativePath() ? passing(cell, actionRate(cell)) : relativeFailure(cell));
+        Completed completed =
+                drive(cell -> cell.candidate().nativePath() ? passing(cell, actionRate(cell)) : relativeFailure(cell));
         List<Disposition> forged = new ArrayList<>(completed.plan().dispositions());
         Disposition first = forged.get(0);
         forged.set(
-                0,
-                new Disposition(
-                        first.cell(), DispositionKind.CANDIDATE_ELIMINATED, first.dependencyContextIds()));
+                0, new Disposition(first.cell(), DispositionKind.CANDIDATE_ELIMINATED, first.dependencyContextIds()));
 
         assertThatThrownBy(() -> AllocatorCampaignValidatorV3.validate(new Campaign(completed.observations(), forged)))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -263,29 +261,8 @@ class AllocatorCampaignV3Test {
     private static IntervalEvidence passing(Cell cell, int rate) {
         long offered = (long) rate * AllocatorCampaignV3.MEASURED_SECONDS;
         return new IntervalEvidence(
-                cell,
-                rate,
-                offered,
-                offered,
-                0,
-                offered,
-                0,
-                0,
-                offered,
-                0,
-                0,
-                0,
-                0,
-                0,
-                100_000,
-                100_000,
-                100_000,
-                rate,
-                100_000,
-                100_000,
-                0,
-                0,
-                0);
+                cell, rate, offered, offered, 0, offered, 0, 0, offered, 0, 0, 0, 0, 0, 100_000, 100_000, 100_000, rate,
+                100_000, 100_000, 0, 0, 0);
     }
 
     private static IntervalEvidence zeroFailureMiss(Cell cell, int rate) {

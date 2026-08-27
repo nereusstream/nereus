@@ -41,13 +41,15 @@ class AllocatorCampaignFeasibilityV3Test {
         assertThat(result.structuralBounds())
                 .filteredOn(bound -> bound.latencyMillis() == 250 && bound.offeredRate() == 1000)
                 .singleElement()
-                .satisfies(bound -> assertThat(bound.optimisticRequestsPerSecond()).isEqualTo(1024));
+                .satisfies(
+                        bound -> assertThat(bound.optimisticRequestsPerSecond()).isEqualTo(1024));
         assertThat(result.logicalCells()).isEqualTo(328);
         assertThat(result.minimumExecutedCells()).isEqualTo(13);
         assertThat(result.minimumPromotableExecutedCells()).isEqualTo(17);
         assertThat(result.maximumTotalActions()).isEqualTo(720);
         assertThat(result.phaseBudgets().totalSeconds()).isEqualTo(34_260);
-        assertThat(result.hardCapSeconds() - result.phaseBudgets().totalSeconds()).isEqualTo(13_740);
+        assertThat(result.hardCapSeconds() - result.phaseBudgets().totalSeconds())
+                .isEqualTo(13_740);
     }
 
     @Test

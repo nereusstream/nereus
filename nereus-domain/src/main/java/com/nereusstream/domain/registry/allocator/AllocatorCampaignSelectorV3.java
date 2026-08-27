@@ -53,6 +53,10 @@ public final class AllocatorCampaignSelectorV3 {
             selected = Optional.empty();
         }
         return new AllocatorCampaignEvaluationV3(
-                status, qualified, selected, plan.executedPerformanceCells(), plan.dispositions().size());
+                status,
+                qualified,
+                selected,
+                plan.executedPerformanceCells(),
+                plan.dispositions().size());
     }
 }

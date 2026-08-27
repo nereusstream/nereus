@@ -137,7 +137,8 @@ public final class AllocatorCampaignSelectionV3 {
                     readDigest(input),
                     readDigest(input),
                     readDigest(input));
-            if (input.available() != 0 || !Arrays.equals(bytes, encode(selection).toByteArray())) {
+            if (input.available() != 0
+                    || !Arrays.equals(bytes, encode(selection).toByteArray())) {
                 throw invalid("allocator V3 selection is not canonical NARS3");
             }
             return selection;

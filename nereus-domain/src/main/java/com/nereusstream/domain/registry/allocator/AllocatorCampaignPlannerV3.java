@@ -424,9 +424,7 @@ public final class AllocatorCampaignPlannerV3 {
                 for (Row row : rows(candidate)) {
                     for (Cell cell : cells(row)) {
                         disposition(
-                                cell,
-                                DispositionKind.SMALLER_RANGE_QUALIFIED,
-                                currentCandidateQualificationContextIds);
+                                cell, DispositionKind.SMALLER_RANGE_QUALIFIED, currentCandidateQualificationContextIds);
                     }
                 }
             }
@@ -460,8 +458,7 @@ public final class AllocatorCampaignPlannerV3 {
     private static List<Cell> cells(Row row) {
         List<Cell> cells = new ArrayList<>(row.candidate().nativePath() ? 6 : 7);
         for (int ordinal = 0; ordinal < AllocatorCampaignV3.DESCENDING_FIXED_RATES.size(); ordinal++) {
-            cells.add(Cell.fixed(
-                    row.candidate(), row.activeManagedLedgers(), row.metadataLatencyP99Millis(), ordinal));
+            cells.add(Cell.fixed(row.candidate(), row.activeManagedLedgers(), row.metadataLatencyP99Millis(), ordinal));
         }
         if (!row.candidate().nativePath()) {
             cells.add(Cell.derived(row.candidate(), row.activeManagedLedgers(), row.metadataLatencyP99Millis()));
@@ -475,8 +472,7 @@ public final class AllocatorCampaignPlannerV3 {
         for (int ordinal = 0; ordinal < AllocatorCampaignV3.DESCENDING_FIXED_RATES.size(); ordinal++) {
             int rate = AllocatorCampaignV3.DESCENDING_FIXED_RATES.get(ordinal);
             if (rate > floor) {
-                Cell cell =
-                        Cell.fixed(candidate, row.activeManagedLedgers(), row.metadataLatencyP99Millis(), ordinal);
+                Cell cell = Cell.fixed(candidate, row.activeManagedLedgers(), row.metadataLatencyP99Millis(), ordinal);
                 executions.add(new SlotExecution(cell, rate));
             }
         }

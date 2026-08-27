@@ -134,8 +134,8 @@ public final class AllocatorCampaignV3 {
                     || (candidate.nativePath() && rateSlot.derivedFloor())) {
                 throw new IllegalArgumentException("allocator V3 cell is outside the frozen ADR-0108 matrix");
             }
-            int expectedContextId = AllocatorCampaignV3.contextId(
-                    candidate, activeManagedLedgers, metadataLatencyP99Millis, rateSlot);
+            int expectedContextId =
+                    AllocatorCampaignV3.contextId(candidate, activeManagedLedgers, metadataLatencyP99Millis, rateSlot);
             if (contextId != expectedContextId) {
                 throw new IllegalArgumentException("allocator V3 context ID aliases different logical dimensions");
             }
@@ -208,7 +208,8 @@ public final class AllocatorCampaignV3 {
             if (offeredRate < ABSOLUTE_FLOOR || offeredRate > DESCENDING_FIXED_RATES.get(0)) {
                 throw new IllegalArgumentException("allocator V3 offered rate is outside the frozen envelope");
             }
-            if (!cell.rateSlot().derivedFloor() && offeredRate != cell.rateSlot().fixedRate()) {
+            if (!cell.rateSlot().derivedFloor()
+                    && offeredRate != cell.rateSlot().fixedRate()) {
                 throw new IllegalArgumentException("allocator V3 fixed slot and offered rate differ");
             }
             requireNonNegative(
@@ -303,7 +304,8 @@ public final class AllocatorCampaignV3 {
             if (offeredRate < ABSOLUTE_FLOOR || offeredRate > DESCENDING_FIXED_RATES.get(0)) {
                 throw new IllegalArgumentException("allocator V3 action offered rate is outside the frozen envelope");
             }
-            if (!cell.rateSlot().derivedFloor() && offeredRate != cell.rateSlot().fixedRate()) {
+            if (!cell.rateSlot().derivedFloor()
+                    && offeredRate != cell.rateSlot().fixedRate()) {
                 throw new IllegalArgumentException("allocator V3 fixed action slot and rate differ");
             }
         }
@@ -402,9 +404,7 @@ public final class AllocatorCampaignV3 {
         } else {
             int candidateOffset = candidate.ordinal() - 1;
             int nativeCells = POPULATIONS.size() * LATENCIES_MILLIS.size() * DESCENDING_FIXED_RATES.size();
-            int candidateCells = POPULATIONS.size()
-                    * LATENCIES_MILLIS.size()
-                    * (DESCENDING_FIXED_RATES.size() + 1);
+            int candidateCells = POPULATIONS.size() * LATENCIES_MILLIS.size() * (DESCENDING_FIXED_RATES.size() + 1);
             logicalOrdinal = nativeCells
                     + candidateOffset * candidateCells
                     + rowIndex * (DESCENDING_FIXED_RATES.size() + 1)
