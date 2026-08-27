@@ -10,6 +10,7 @@ package com.nereusstream.domain.registry.allocator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignFeasibilityV3.AdmissionTuple;
+import com.nereusstream.domain.registry.allocator.AllocatorCampaignFeasibilityV3.NativeExecutionTuple;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignFeasibilityV3.Result;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignFeasibilityV3.Status;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,8 @@ class AllocatorCampaignFeasibilityV3Test {
 
         assertThat(result.status()).isEqualTo(Status.PLAN_FEASIBLE);
         assertThat(result.admission()).isEqualTo(new AdmissionTuple(4, 64, 256, 1));
+        assertThat(result.nativeExecution()).isEqualTo(AllocatorCampaignFeasibilityV3.FORMAL_NATIVE_EXECUTION);
+        assertThat(result.nativeExecution().hiddenDispatchQueue()).isZero();
         assertThat(result.structuralBounds())
                 .filteredOn(bound -> bound.latencyMillis() <= 25)
                 .allMatch(bound -> bound.structurallyFeasible());
@@ -50,6 +53,14 @@ class AllocatorCampaignFeasibilityV3Test {
         assertThat(result.phaseBudgets().totalSeconds()).isEqualTo(34_260);
         assertThat(result.hardCapSeconds() - result.phaseBudgets().totalSeconds())
                 .isEqualTo(13_740);
+    }
+
+    @Test
+    void legacyFourWorkerHiddenQueueIsNativeExecutorInfeasible() {
+        Result result = AllocatorCampaignFeasibilityV3.evaluate(
+                new AdmissionTuple(4, 64, 256, 1), new NativeExecutionTuple("BOUNDED_BLOCKING_BRIDGE", 4, 256, 256));
+
+        assertThat(result.status()).isEqualTo(Status.NATIVE_EXECUTOR_INFEASIBLE);
     }
 
     @Test

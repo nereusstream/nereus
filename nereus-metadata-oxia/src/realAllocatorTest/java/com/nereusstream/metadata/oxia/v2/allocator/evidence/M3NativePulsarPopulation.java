@@ -14,6 +14,7 @@
 
 package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 
+import io.netty.buffer.ByteBuf;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -22,18 +23,22 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionService;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReferenceArray;
-import java.util.concurrent.locks.ReentrantLock;
 import org.apache.bookkeeper.client.M3PayloadReleasingPulsarMockBookKeeper;
 import org.apache.bookkeeper.common.util.OrderedScheduler;
+import org.apache.bookkeeper.mledger.AsyncCallbacks.AddEntryCallback;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
+import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.ManagedLedgerFactory;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerFactoryImpl;
@@ -110,74 +115,158 @@ final class M3NativePulsarPopulation implements AutoCloseable {
             M3AllocatorRequestTelemetry.RequestTrace trace,
             int ledgerIndex,
             M3AllocatorWorkloadPlan.Trigger trigger) throws Exception {
+        try {
+            return rolloverAsync(trace, ledgerIndex, trigger, () -> true, NativeOperationObserver.NOOP)
+                    .toCompletableFuture()
+                    .get();
+        } catch (ExecutionException failure) {
+            Throwable cause = failure.getCause();
+            if (cause instanceof Exception exception) {
+                throw exception;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new RuntimeException(cause);
+        }
+    }
+
+    CompletionStage<NativeRollover> rolloverAsync(
+            M3AllocatorRequestTelemetry.RequestTrace trace,
+            int ledgerIndex,
+            M3AllocatorWorkloadPlan.Trigger trigger,
+            OperationGuard guard,
+            NativeOperationObserver observer) {
         if (ledgerIndex < 0 || ledgerIndex >= activePopulation.get()) {
-            throw new IllegalArgumentException("native request selected a non-active ManagedLedger");
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("native request selected a non-active ManagedLedger"));
         }
         NativeLedger nativeLedger = ledgers.get(ledgerIndex);
-        nativeLedger.lock.lock();
+        if (!nativeLedger.requestOwned.compareAndSet(false, true)) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("native ManagedLedger binding already has an outstanding request"));
+        }
+        CompletionStage<NativeRollover> chain;
         try {
+            trace.admitted();
+            observer.requestAdmitted(trigger, System.nanoTime());
             long predecessorLedgerId = nativeLedger.currentLedgerId;
+            CompletionStage<Position> prepared = CompletableFuture.completedFuture(null);
             if (trigger == M3AllocatorWorkloadPlan.Trigger.BYTE) {
                 configureUnlimited(nativeLedger);
                 if (nativeLedger.ledger.getCurrentLedgerSize() != M3AllocatorWorkloadPlan.BYTE_PAYLOAD_BYTES) {
-                    throw new AssertionError("native BYTE invariant must start with one exact 64-KiB entry");
+                    throw new IllegalStateException("native BYTE invariant must start with one exact 64-KiB entry");
                 }
                 for (int index = 0; index < BYTE_PREFILL_ENTRIES; index++) {
-                    Position prefill = nativeLedger.ledger.addEntry(PAYLOAD_64_KIB);
-                    if (prefill.getLedgerId() != predecessorLedgerId) {
-                        throw new AssertionError("native BYTE prefill rolled before reaching exact 1 MiB");
+                    prepared = prepared.thenCompose(ignored -> asyncAdd(
+                            nativeLedger,
+                            guard,
+                            observer,
+                            trigger,
+                            NativeOperationStage.BYTE_PREFILL));
+                }
+                prepared = prepared.thenApply(lastPrefill -> {
+                    if (lastPrefill == null || lastPrefill.getLedgerId() != predecessorLedgerId) {
+                        throw new IllegalStateException("native BYTE prefill rolled before reaching exact 1 MiB");
                     }
-                }
-                if (nativeLedger.ledger.getCurrentLedgerSize() != ONE_MIB
-                        || nativeLedger.ledger.getCurrentLedgerEntries() != 16) {
-                    throw new AssertionError("native BYTE sixteenth 64-KiB entry did not reach exact 1 MiB");
-                }
+                    if (nativeLedger.ledger.getCurrentLedgerSize() != ONE_MIB
+                            || nativeLedger.ledger.getCurrentLedgerEntries() != 16) {
+                        throw new IllegalStateException(
+                                "native BYTE sixteenth 64-KiB entry did not reach exact 1 MiB");
+                    }
+                    return lastPrefill;
+                });
+            }
+            chain = prepared.thenCompose(ignored -> {
                 configureTrigger(nativeLedger, trigger);
-            } else {
-                configureTrigger(nativeLedger, trigger);
-            }
-            if (trigger == M3AllocatorWorkloadPlan.Trigger.AGE) {
-                nativeLedger.clock.advanceExactlyOneSecond();
-            }
-
-            long predecessorEntriesBeforeTrigger = nativeLedger.ledger.getCurrentLedgerEntries();
-            long predecessorBytesBeforeTrigger = nativeLedger.ledger.getCurrentLedgerSize();
-            trace.admitted();
-            // The pinned ManagedLedger implementation first counts this append against the open
-            // predecessor and only then invokes currentLedgerIsFull(). Its synchronous callback is
-            // released after predecessor close. Keep that actual append stall distinct from the
-            // longer rollover interval, which ends only after successor entry 0 is established.
-            trace.appendAdmissionStart();
-            Position triggerAppend = nativeLedger.ledger.addEntry(PAYLOAD_64_KIB);
-            if (triggerAppend.getLedgerId() != predecessorLedgerId) {
-                throw new AssertionError("native production trigger append did not close its exact predecessor");
-            }
-            trace.appendAdmissionRelease();
-            // ManagedLedger applies the entry/byte/age decision after admitting the trigger append.
-            // A following append waits for native close/create and establishes the one-entry invariant
-            // for the next offered rollover without changing the measured trigger decision.
-            configureUnlimited(nativeLedger);
-            Position successorAppend = nativeLedger.ledger.addEntry(PAYLOAD_64_KIB);
-            if (successorAppend.getLedgerId() == predecessorLedgerId
-                    || successorAppend.getEntryId() != 0
-                    || nativeLedger.ledger.getCurrentLedgerEntries() != 1
-                    || nativeLedger.ledger.getCurrentLedgerSize() != M3AllocatorWorkloadPlan.BYTE_PAYLOAD_BYTES) {
-                throw new AssertionError("native production trigger did not establish one fresh 64-KiB entry");
-            }
-            nativeLedger.currentLedgerId = successorAppend.getLedgerId();
-            trace.allocatedLedgerId(successorAppend.getLedgerId());
-            bookKeeper.discardClosedLedger(predecessorLedgerId);
-            return new NativeRollover(
-                    predecessorLedgerId,
-                    predecessorEntriesBeforeTrigger,
-                    predecessorBytesBeforeTrigger,
-                    triggerAppend.getLedgerId(),
-                    triggerAppend.getEntryId(),
-                    successorAppend.getLedgerId(),
-                    successorAppend.getEntryId());
-        } finally {
-            nativeLedger.lock.unlock();
+                if (trigger == M3AllocatorWorkloadPlan.Trigger.AGE) {
+                    nativeLedger.clock.advanceExactlyOneSecond();
+                }
+                long predecessorEntriesBeforeTrigger = nativeLedger.ledger.getCurrentLedgerEntries();
+                long predecessorBytesBeforeTrigger = nativeLedger.ledger.getCurrentLedgerSize();
+                trace.appendAdmissionStart();
+                return asyncAdd(nativeLedger, guard, observer, trigger, NativeOperationStage.TRIGGER_APPEND)
+                        .thenCompose(triggerAppend -> {
+                            if (triggerAppend.getLedgerId() != predecessorLedgerId) {
+                                throw new IllegalStateException(
+                                        "native production trigger append did not close its exact predecessor");
+                            }
+                            trace.appendAdmissionRelease();
+                            observer.triggerAppendCompleted(trigger, System.nanoTime());
+                            configureUnlimited(nativeLedger);
+                            return asyncAdd(
+                                            nativeLedger,
+                                            guard,
+                                            observer,
+                                            trigger,
+                                            NativeOperationStage.SUCCESSOR_APPEND)
+                                    .thenApply(successorAppend -> {
+                                        if (successorAppend.getLedgerId() == predecessorLedgerId
+                                                || successorAppend.getEntryId() != 0
+                                                || nativeLedger.ledger.getCurrentLedgerEntries() != 1
+                                                || nativeLedger.ledger.getCurrentLedgerSize()
+                                                        != M3AllocatorWorkloadPlan.BYTE_PAYLOAD_BYTES) {
+                                            throw new IllegalStateException("native production trigger did not "
+                                                    + "establish one fresh 64-KiB entry");
+                                        }
+                                        nativeLedger.currentLedgerId = successorAppend.getLedgerId();
+                                        trace.allocatedLedgerId(successorAppend.getLedgerId());
+                                        observer.successorEstablished(trigger, System.nanoTime());
+                                        bookKeeper.discardClosedLedger(predecessorLedgerId);
+                                        return new NativeRollover(
+                                                predecessorLedgerId,
+                                                predecessorEntriesBeforeTrigger,
+                                                predecessorBytesBeforeTrigger,
+                                                triggerAppend.getLedgerId(),
+                                                triggerAppend.getEntryId(),
+                                                successorAppend.getLedgerId(),
+                                                successorAppend.getEntryId());
+                                    });
+                        });
+            });
+        } catch (Throwable failure) {
+            nativeLedger.requestOwned.set(false);
+            return CompletableFuture.failedFuture(failure);
         }
+        return chain.whenComplete((ignored, failure) -> {
+            if (!nativeLedger.requestOwned.compareAndSet(true, false)) {
+                throw new IllegalStateException("native ManagedLedger binding ownership was not released exactly once");
+            }
+        });
+    }
+
+    private CompletionStage<Position> asyncAdd(
+            NativeLedger nativeLedger,
+            OperationGuard guard,
+            NativeOperationObserver observer,
+            M3AllocatorWorkloadPlan.Trigger trigger,
+            NativeOperationStage stage) {
+        if (!guard.allowsNextMetadataOperation()) {
+            return CompletableFuture.failedFuture(
+                    new java.util.concurrent.TimeoutException("allocator V3 cleanup deadline elapsed"));
+        }
+        CompletableFuture<Position> result = new CompletableFuture<>();
+        long startedNanos = System.nanoTime();
+        observer.operationDispatched(stage, trigger, startedNanos);
+        try {
+            nativeLedger.ledger.asyncAddEntry(PAYLOAD_64_KIB, new AddEntryCallback() {
+                @Override
+                public void addComplete(Position position, ByteBuf entryData, Object context) {
+                    observer.operationCompleted(stage, trigger, startedNanos, System.nanoTime(), null);
+                    result.complete(position);
+                }
+
+                @Override
+                public void addFailed(ManagedLedgerException failure, Object context) {
+                    observer.operationCompleted(stage, trigger, startedNanos, System.nanoTime(), failure);
+                    result.completeExceptionally(failure);
+                }
+            }, null);
+        } catch (Throwable failure) {
+            observer.operationCompleted(stage, trigger, startedNanos, System.nanoTime(), failure);
+            result.completeExceptionally(failure);
+        }
+        return result;
     }
 
     /**
@@ -366,11 +455,42 @@ final class M3NativePulsarPopulation implements AutoCloseable {
             long successorLedgerId,
             long successorEntryId) {}
 
+    enum NativeOperationStage {
+        BYTE_PREFILL,
+        TRIGGER_APPEND,
+        SUCCESSOR_APPEND
+    }
+
+    @FunctionalInterface
+    interface OperationGuard {
+        boolean allowsNextMetadataOperation();
+    }
+
+    interface NativeOperationObserver {
+        NativeOperationObserver NOOP = new NativeOperationObserver() {};
+
+        default void requestAdmitted(M3AllocatorWorkloadPlan.Trigger trigger, long admittedNanos) {}
+
+        default void operationDispatched(
+                NativeOperationStage stage, M3AllocatorWorkloadPlan.Trigger trigger, long startedNanos) {}
+
+        default void operationCompleted(
+                NativeOperationStage stage,
+                M3AllocatorWorkloadPlan.Trigger trigger,
+                long startedNanos,
+                long completedNanos,
+                Throwable failure) {}
+
+        default void triggerAppendCompleted(M3AllocatorWorkloadPlan.Trigger trigger, long completedNanos) {}
+
+        default void successorEstablished(M3AllocatorWorkloadPlan.Trigger trigger, long completedNanos) {}
+    }
+
     private static final class NativeLedger {
         private final ManagedLedgerImpl ledger;
         private final ManagedLedgerConfig config;
         private final MutableClock clock;
-        private final ReentrantLock lock = new ReentrantLock();
+        private final AtomicBoolean requestOwned = new AtomicBoolean();
         private long currentLedgerId;
 
         private NativeLedger(

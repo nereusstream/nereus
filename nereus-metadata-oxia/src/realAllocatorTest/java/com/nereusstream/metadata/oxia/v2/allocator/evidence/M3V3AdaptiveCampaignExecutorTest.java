@@ -74,7 +74,7 @@ class M3V3AdaptiveCampaignExecutorTest {
                 .containsEntry(M3V3FormalCampaignPlan.ActionKind.FAULT_ACTION, 360L)
                 .containsEntry(M3V3FormalCampaignPlan.ActionKind.SCALE_ACTION, 32L);
         assertThat(M3V3FormalCampaignPlan.zeroDecisionPlanDigest().toHex())
-                .isEqualTo("019fcac748460c9cb72ac953d4afbb5e71ecb15d7199310ecf616b9f12eb35e9");
+                .isEqualTo("5f94079eb0d41739e4da32c0d4170a837ca2a63b33a6a8ad71b25a87ca49b283");
     }
 
     @Test

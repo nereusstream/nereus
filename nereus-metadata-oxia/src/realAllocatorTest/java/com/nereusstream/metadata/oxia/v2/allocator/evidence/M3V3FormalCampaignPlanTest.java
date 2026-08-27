@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 
 class M3V3FormalCampaignPlanTest {
     private static final String PLAN_DIGEST =
-            "019fcac748460c9cb72ac953d4afbb5e71ecb15d7199310ecf616b9f12eb35e9";
+            "5f94079eb0d41739e4da32c0d4170a837ca2a63b33a6a8ad71b25a87ca49b283";
 
     @Test
     void zeroDecisionInventoryAndDigestMatchTheIndependentPlanProjection() {
@@ -46,5 +46,8 @@ class M3V3FormalCampaignPlanTest {
         assertThat(feasibility.maximumTotalActions()).isEqualTo(720);
         assertThat(feasibility.phaseBudgets().totalSeconds()).isEqualTo(34_260);
         assertThat(feasibility.hardCapSeconds()).isEqualTo(48_000);
+        assertThat(feasibility.nativeExecution().model())
+                .isEqualTo("PINNED_MANAGED_LEDGER_ASYNC_CHAIN_V1");
+        assertThat(feasibility.nativeExecution().hiddenDispatchQueue()).isZero();
     }
 }

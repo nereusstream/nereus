@@ -26,6 +26,7 @@ import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.Observatio
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.RequiredAction;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.Row;
 import com.nereusstream.domain.registry.allocator.AllocatorFaultCutV1;
+import com.nereusstream.domain.registry.allocator.AllocatorNativeExecutionProfileV3;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,7 +111,23 @@ final class M3V3FormalCampaignPlan {
                 .append("maximumExecutedFaultActions=").append(MAXIMUM_EXECUTED_FAULT_ACTIONS).append('\n')
                 .append("maximumExecutedScaleActions=").append(MAXIMUM_EXECUTED_SCALE_ACTIONS).append('\n')
                 .append("maximumTotalExecutedActions=").append(MAXIMUM_TOTAL_EXECUTED_ACTIONS).append('\n')
-                .append("campaignWallClockCapSeconds=").append(CAMPAIGN_WALL_CLOCK_CAP_SECONDS).append('\n');
+                .append("campaignWallClockCapSeconds=").append(CAMPAIGN_WALL_CLOCK_CAP_SECONDS).append('\n')
+                .append("nativeExecutionModel=").append(AllocatorNativeExecutionProfileV3.MODEL).append('\n')
+                .append("nativeBridgeWorkers=")
+                .append(AllocatorNativeExecutionProfileV3.NATIVE_BRIDGE_WORKERS)
+                .append('\n')
+                .append("nativeBridgeQueueCapacity=")
+                .append(AllocatorNativeExecutionProfileV3.NATIVE_BRIDGE_QUEUE_CAPACITY)
+                .append('\n')
+                .append("hiddenDispatchQueue=")
+                .append(AllocatorNativeExecutionProfileV3.HIDDEN_DISPATCH_QUEUE)
+                .append('\n')
+                .append("nativeExecutionProfileSha256=")
+                .append(AllocatorNativeExecutionProfileV3.executionProfileDigest().toHex())
+                .append('\n')
+                .append("workloadScheduleSha256=")
+                .append(AllocatorNativeExecutionProfileV3.scheduleDigest().toHex())
+                .append('\n');
         for (PlannedActionV3 action : zeroDecisionActions()) {
             canonical.append(action.identity()).append('\n');
         }

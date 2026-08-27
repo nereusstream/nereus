@@ -44,12 +44,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** Real native-Pulsar/Oxia action runtime used only by the explicitly authorized formal task. */
@@ -57,11 +54,11 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
     private final Path actionDirectory;
     private final String executionDiscriminator;
     private final ThreadPoolExecutor constructionAndFaultWorkers;
-    private final ThreadPoolExecutor nativeDispatchWorkers;
     private final M3RealOxiaActors actors;
     private final Map<Candidate, M3CandidateAllocatorPopulation> candidatePopulations = new EnumMap<>(Candidate.class);
     private final Map<Candidate, Set<Long>> candidateAllocatedLedgerIds = new EnumMap<>(Candidate.class);
     private M3NativePulsarPopulation nativePopulation;
+    private M3V3NativeIntervalRuntime nativeIntervalRuntime;
 
     M3V3RealFormalActionRuntime(Path outputDirectory, String oxiaServiceAddress, String executionDiscriminator)
             throws Exception {
@@ -73,8 +70,6 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
         actionDirectory = Files.createDirectory(exactOutput.resolve("actions"));
         constructionAndFaultWorkers = M3RealAllocatorEvidenceTest.exactWorkers();
         constructionAndFaultWorkers.prestartAllCoreThreads();
-        nativeDispatchWorkers = boundedNativeDispatchWorkers();
-        nativeDispatchWorkers.prestartAllCoreThreads();
         actors = new M3RealOxiaActors(oxiaServiceAddress);
     }
 
@@ -83,69 +78,15 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
         if (!cell.candidate().nativePath()) {
             throw new IllegalArgumentException("allocator native action received a candidate Cell");
         }
-        M3NativePulsarPopulation population = nativePopulation();
-        population.ensurePopulation(cell.activeManagedLedgers());
-        population.setMetadataLatencyMillis(cell.metadataLatencyP99Millis());
         List<AllocatorRawEvidenceEventV1> raw = Collections.synchronizedList(new ArrayList<>());
-        M3AllocatorRequestTelemetry telemetry = new M3AllocatorRequestTelemetry(raw::add, System.nanoTime());
-        AllocatorEvidenceContextV1 context = AllocatorEvidenceContextV1.nativeContext(
-                cell.activeManagedLedgers(),
-                cell.metadataLatencyP99Millis(),
-                offeredRate);
-        List<M3V3AsyncActorLaneRunner.ScheduledOffer<NativeOffer>> schedule = new ArrayList<>();
-        for (M3AllocatorWorkloadPlan.PlannedRequest request : M3AllocatorWorkloadPlan.requests(
-                cell.activeManagedLedgers(), offeredRate)) {
-            schedule.add(new M3V3AsyncActorLaneRunner.ScheduledOffer<>(
-                    request.requestOrdinal(),
-                    request.actorId(),
-                    request.ledgerIndex(),
-                    TimeUnit.MICROSECONDS.toNanos(request.arrivalOffsetMicros()),
-                    request.phase() != M3AllocatorWorkloadPlan.Phase.WARM_UP,
-                    new NativeOffer(request)));
-        }
-        M3V3AsyncActorLaneRunner<NativeOffer> runner = M3V3AsyncActorLaneRunner.formal();
-        M3V3AsyncActorLaneRunner.IntervalResult interval;
-        try {
-            interval = runner.run(offeredRate, schedule, (actorId, offer, operationContext) -> {
-                M3AllocatorWorkloadPlan.PlannedRequest request = offer.request();
-                M3AllocatorRequestTelemetry.RequestTrace trace = telemetry.trace(context, request, null, 1);
-                trace.offered();
-                trace.enqueued();
-                trace.dispatched();
-                return java.util.concurrent.CompletableFuture.runAsync(() -> {
-                    if (!operationContext.allowsNextMetadataOperation()) {
-                        throw new java.util.concurrent.CompletionException(
-                                new java.util.concurrent.TimeoutException(
-                                        "allocator V3 cleanup deadline elapsed"));
-                    }
-                    try {
-                        M3NativePulsarPopulation.NativeRollover rollover = population.rollover(
-                                trace, request.ledgerIndex(), request.trigger());
-                        trace.completed();
-                        offer.allocatedLedgerId().set(rollover.successorLedgerId());
-                    } catch (Throwable failure) {
-                        trace.completeFailureLifecycle();
-                        trace.failed();
-                        throw new java.util.concurrent.CompletionException(failure);
-                    }
-                }, nativeDispatchWorkers);
-            });
-        } finally {
-            population.setMetadataLatencyMillis(0);
-        }
-        Set<Long> allocated = new HashSet<>();
-        long duplicate = 0;
-        for (M3V3AsyncActorLaneRunner.ScheduledOffer<NativeOffer> offer : schedule) {
-            long ledgerId = offer.request().allocatedLedgerId().get();
-            if (ledgerId > 0 && !allocated.add(ledgerId)) {
-                duplicate++;
-            }
-        }
+        M3V3NativeIntervalRuntime.Result nativeResult = nativeIntervalRuntime().run(
+                cell.activeManagedLedgers(), cell.metadataLatencyP99Millis(), offeredRate, raw::add);
+        M3V3AsyncActorLaneRunner.IntervalResult interval = nativeResult.interval();
         IntervalEvidence evidence = intervalEvidence(
                 cell,
                 offeredRate,
                 interval,
-                duplicate,
+                nativeResult.duplicateLedgerIds(),
                 0,
                 0,
                 interval.rolloverP99Micros());
@@ -263,6 +204,13 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
             nativePopulation = new M3NativePulsarPopulation(constructionAndFaultWorkers);
         }
         return nativePopulation;
+    }
+
+    private M3V3NativeIntervalRuntime nativeIntervalRuntime() throws Exception {
+        if (nativeIntervalRuntime == null) {
+            nativeIntervalRuntime = new M3V3NativeIntervalRuntime(nativePopulation());
+        }
+        return nativeIntervalRuntime;
     }
 
     private M3CandidateAllocatorPopulation candidatePopulation(Candidate candidate) {
@@ -394,18 +342,8 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
             }
         }
         constructionAndFaultWorkers.shutdownNow();
-        nativeDispatchWorkers.shutdownNow();
         if (!constructionAndFaultWorkers.awaitTermination(5, TimeUnit.MINUTES)) {
             IllegalStateException termination = new IllegalStateException("allocator formal worker pool did not stop");
-            if (failure == null) {
-                failure = termination;
-            } else {
-                failure.addSuppressed(termination);
-            }
-        }
-        if (!nativeDispatchWorkers.awaitTermination(5, TimeUnit.MINUTES)) {
-            IllegalStateException termination =
-                    new IllegalStateException("allocator V3 native dispatch worker pool did not stop");
             if (failure == null) {
                 failure = termination;
             } else {
@@ -415,29 +353,6 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
         if (failure != null) {
             throw failure;
         }
-    }
-
-    private record NativeOffer(M3AllocatorWorkloadPlan.PlannedRequest request, AtomicLong allocatedLedgerId) {
-        private NativeOffer(M3AllocatorWorkloadPlan.PlannedRequest request) {
-            this(request, new AtomicLong());
-        }
-    }
-
-    private static ThreadPoolExecutor boundedNativeDispatchWorkers() {
-        AtomicInteger threadId = new AtomicInteger();
-        ThreadFactory factory = runnable -> {
-            Thread thread = new Thread(runnable, "m3-v3-native-dispatch-" + threadId.getAndIncrement());
-            thread.setDaemon(false);
-            return thread;
-        };
-        return new ThreadPoolExecutor(
-                M3V3AsyncActorLaneRunner.ACTOR_COUNT,
-                M3V3AsyncActorLaneRunner.ACTOR_COUNT,
-                0,
-                TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(M3V3AsyncActorLaneRunner.MAX_GLOBAL_OUTSTANDING),
-                factory,
-                new ThreadPoolExecutor.AbortPolicy());
     }
 
     private static final class IntervalMeasurements implements FormalAllocationObserver {

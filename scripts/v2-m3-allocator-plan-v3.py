@@ -58,6 +58,12 @@ MAXIMUM_EXECUTED_FAULT_ACTIONS = 360
 MAXIMUM_EXECUTED_SCALE_ACTIONS = 32
 MAXIMUM_TOTAL_EXECUTED_ACTIONS = 720
 CAMPAIGN_WALL_CLOCK_CAP_SECONDS = 48_000
+NATIVE_EXECUTION_MODEL = "PINNED_MANAGED_LEDGER_ASYNC_CHAIN_V1"
+NATIVE_BRIDGE_WORKERS = 0
+NATIVE_BRIDGE_QUEUE_CAPACITY = 0
+HIDDEN_DISPATCH_QUEUE = 0
+SCHEDULE_SCHEMA = "NEREUS_V2_M3_ALLOCATOR_WORKLOAD_SCHEDULE_V3"
+EXECUTION_PROFILE_SCHEMA = "NEREUS_V2_M3_ALLOCATOR_NATIVE_EXECUTION_PROFILE_V3"
 
 
 def sha256(path: Path) -> str:
@@ -131,9 +137,60 @@ def zero_decision_plan_sha256() -> str:
         f"maximumExecutedScaleActions={MAXIMUM_EXECUTED_SCALE_ACTIONS}",
         f"maximumTotalExecutedActions={MAXIMUM_TOTAL_EXECUTED_ACTIONS}",
         f"campaignWallClockCapSeconds={CAMPAIGN_WALL_CLOCK_CAP_SECONDS}",
+        f"nativeExecutionModel={NATIVE_EXECUTION_MODEL}",
+        f"nativeBridgeWorkers={NATIVE_BRIDGE_WORKERS}",
+        f"nativeBridgeQueueCapacity={NATIVE_BRIDGE_QUEUE_CAPACITY}",
+        f"hiddenDispatchQueue={HIDDEN_DISPATCH_QUEUE}",
+        f"nativeExecutionProfileSha256={native_execution_profile_sha256()}",
+        f"workloadScheduleSha256={workload_schedule_sha256()}",
         *zero_decision_actions(),
     )
     return hashlib.sha256(("\n".join(fields) + "\n").encode()).hexdigest()
+
+
+def workload_schedule_canonical() -> str:
+    fields = (
+        SCHEDULE_SCHEMA,
+        "actorCount=4",
+        "warmupSeconds=10",
+        "steadyMeasuredSeconds=20",
+        "stormMeasuredSeconds=10",
+        "steadyRateNumerator=1",
+        "steadyRateDenominator=2",
+        "stormRateNumerator=2",
+        "entryTriggerPerTen=5",
+        "byteTriggerPerTen=3",
+        "ageTriggerPerTen=2",
+        "arrivalJitterMicros=0,125,-125,250,-250,500,-500,0",
+        "populations=10000,100000",
+        "latenciesMillis=1,5,10,25",
+        "fixedRatesDescending=1000,750,500,333,250,200",
+    )
+    return "\n".join(fields) + "\n"
+
+
+def workload_schedule_sha256() -> str:
+    return hashlib.sha256(workload_schedule_canonical().encode()).hexdigest()
+
+
+def native_execution_profile_canonical() -> str:
+    fields = (
+        EXECUTION_PROFILE_SCHEMA,
+        f"nativeExecutionModel={NATIVE_EXECUTION_MODEL}",
+        f"nativeBridgeWorkers={NATIVE_BRIDGE_WORKERS}",
+        f"nativeBridgeQueueCapacity={NATIVE_BRIDGE_QUEUE_CAPACITY}",
+        f"hiddenDispatchQueue={HIDDEN_DISPATCH_QUEUE}",
+        "actorCount=4",
+        "maxOutstandingPerActor=64",
+        "maxGlobalOutstanding=256",
+        "maxOutstandingPerBinding=1",
+        f"scheduleProfileSha256={workload_schedule_sha256()}",
+    )
+    return "\n".join(fields) + "\n"
+
+
+def native_execution_profile_sha256() -> str:
+    return hashlib.sha256(native_execution_profile_canonical().encode()).hexdigest()
 
 
 def dependency_lock_sha256() -> str:
@@ -213,6 +270,14 @@ def plan() -> dict[str, object]:
             "maxRolloverOutstandingPerBinding": 1,
             "preAdmissionQueueRateMultiplier": 2,
             "derivedOutstandingPerActor": 63,
+        },
+        "nativeExecution": {
+            "nativeExecutionModel": NATIVE_EXECUTION_MODEL,
+            "nativeBridgeWorkers": NATIVE_BRIDGE_WORKERS,
+            "nativeBridgeQueueCapacity": NATIVE_BRIDGE_QUEUE_CAPACITY,
+            "hiddenDispatchQueue": HIDDEN_DISPATCH_QUEUE,
+            "nativeExecutionProfileSha256": native_execution_profile_sha256(),
+            "workloadScheduleSha256": workload_schedule_sha256(),
         },
         "derivedFloors": {str(rate): derived_rate(rate) for rate in DESCENDING_RATES},
         "optimisticStructuralBounds": {
