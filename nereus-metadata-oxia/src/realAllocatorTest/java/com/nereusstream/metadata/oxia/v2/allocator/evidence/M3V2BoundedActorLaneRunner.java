@@ -14,6 +14,7 @@
 
 package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 
+import com.nereusstream.domain.registry.allocator.AllocatorProtocolException;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -150,6 +151,7 @@ final class M3V2BoundedActorLaneRunner<T> {
                 return;
             }
             TerminalOutcome outcome;
+            Throwable terminalFailure = null;
             try {
                 CompletionStage<?> stage = Objects.requireNonNull(
                         operation.execute(actorId, admitted.offer().request()),
@@ -178,10 +180,12 @@ final class M3V2BoundedActorLaneRunner<T> {
                 outcome = TerminalOutcome.TIMED_OUT_AFTER_ADMISSION;
             } catch (ExecutionException | RuntimeException failure) {
                 outcome = TerminalOutcome.FAILED_AFTER_ADMISSION;
+                terminalFailure = unwrap(failure);
             } catch (Error failure) {
                 outcome = TerminalOutcome.FAILED_AFTER_ADMISSION;
+                terminalFailure = failure;
             }
-            state.finish(actorId, admitted, outcome);
+            state.finish(actorId, admitted, outcome, terminalFailure);
         }
     }
 
@@ -304,12 +308,14 @@ final class M3V2BoundedActorLaneRunner<T> {
             long warmupCompleted,
             long warmupFailedAfterAdmission,
             long warmupTimedOutAfterAdmission,
+            String warmupFirstFailure,
             boolean actorLanesStoppedAtCleanupDeadline,
             List<TerminalRecord> measuredTerminals) {
         IntervalResult {
             laneQueueCapacities = List.copyOf(laneQueueCapacities);
             perActorInFlightMaximum = List.copyOf(perActorInFlightMaximum);
             measuredTerminals = List.copyOf(measuredTerminals);
+            Objects.requireNonNull(warmupFirstFailure, "warmupFirstFailure");
             long measuredTerminal = Math.addExact(
                     completed, Math.addExact(failedAfterAdmission, timedOutAfterAdmission));
             long warmupTerminal = Math.addExact(
@@ -321,7 +327,8 @@ final class M3V2BoundedActorLaneRunner<T> {
                     || admitted != measuredTerminal
                     || terminal != measuredTerminal
                     || measuredTerminals.size() != Math.toIntExact(offered)
-                    || warmupOffered != Math.addExact(warmupDroppedBeforeAdmission, warmupTerminal)) {
+                    || warmupOffered != Math.addExact(warmupDroppedBeforeAdmission, warmupTerminal)
+                    || (warmupFailedAfterAdmission == 0) != warmupFirstFailure.isEmpty()) {
                 throw new IllegalArgumentException("allocator V2 physical lane inventory differs");
             }
         }
@@ -396,13 +403,14 @@ final class M3V2BoundedActorLaneRunner<T> {
             }
         }
 
-        private synchronized void finish(int actorId, AdmittedRequest<T> admitted, TerminalOutcome outcome) {
+        private synchronized void finish(
+                int actorId, AdmittedRequest<T> admitted, TerminalOutcome outcome, Throwable terminalFailure) {
             if (admitted.terminal().compareAndSet(false, true)) {
                 if (active.get(actorId) != admitted) {
                     throw new IllegalStateException("allocator V2 actor terminal does not match its active request");
                 }
                 active.set(actorId, null);
-                metrics.finished(admitted, outcome, System.nanoTime());
+                metrics.finished(admitted, outcome, terminalFailure, System.nanoTime());
             }
             notifyAll();
         }
@@ -427,7 +435,7 @@ final class M3V2BoundedActorLaneRunner<T> {
                 AdmittedRequest<T> admitted = active.get(actorId);
                 if (admitted != null && admitted.terminal().compareAndSet(false, true)) {
                     active.set(actorId, null);
-                    metrics.finished(admitted, TerminalOutcome.TIMED_OUT_AFTER_ADMISSION, System.nanoTime());
+                    metrics.finished(admitted, TerminalOutcome.TIMED_OUT_AFTER_ADMISSION, null, System.nanoTime());
                 }
             }
             notifyAll();
@@ -469,6 +477,7 @@ final class M3V2BoundedActorLaneRunner<T> {
         private long warmupCompleted;
         private long warmupFailed;
         private long warmupTimedOut;
+        private String warmupFirstFailure = "";
 
         private void beginMeasurement() {
             if (measuring) {
@@ -533,7 +542,8 @@ final class M3V2BoundedActorLaneRunner<T> {
             }
         }
 
-        private void finished(AdmittedRequest<?> request, TerminalOutcome outcome, long terminalNanos) {
+        private void finished(
+                AdmittedRequest<?> request, TerminalOutcome outcome, Throwable terminalFailure, long terminalNanos) {
             int actorId = request.offer().actorId();
             inFlight--;
             perActorInFlight[actorId]--;
@@ -553,7 +563,12 @@ final class M3V2BoundedActorLaneRunner<T> {
             } else {
                 switch (outcome) {
                     case COMPLETED -> warmupCompleted++;
-                    case FAILED_AFTER_ADMISSION -> warmupFailed++;
+                    case FAILED_AFTER_ADMISSION -> {
+                        warmupFailed++;
+                        if (warmupFirstFailure.isEmpty()) {
+                            warmupFirstFailure = failureSummary(terminalFailure);
+                        }
+                    }
                     case TIMED_OUT_AFTER_ADMISSION -> warmupTimedOut++;
                     case OVERLOAD_DROPPED_BEFORE_ADMISSION ->
                         throw new IllegalArgumentException("an admitted warmup cannot receive a pre-admission drop");
@@ -595,8 +610,21 @@ final class M3V2BoundedActorLaneRunner<T> {
                     warmupCompleted,
                     warmupFailed,
                     warmupTimedOut,
+                    warmupFirstFailure,
                     lanesStopped,
                     terminals);
+        }
+
+        private static String failureSummary(Throwable failure) {
+            Throwable exact = unwrap(Objects.requireNonNull(failure, "terminalFailure"));
+            String type = exact.getClass().getSimpleName();
+            if (exact instanceof AllocatorProtocolException protocolFailure) {
+                type += '[' + protocolFailure.code().name() + ']';
+            }
+            String message = exact.getMessage();
+            String summary = message == null || message.isBlank() ? type : type + ':' + message;
+            String printable = summary.replaceAll("[^\\x20-\\x7E]", "?");
+            return printable.substring(0, Math.min(printable.length(), 512));
         }
 
         private void requireMeasuring() {

@@ -136,7 +136,9 @@ final class M3V2AllocatorFormalHarness {
                 + ",warmupDroppedBeforeAdmission=" + interval.warmupDroppedBeforeAdmission()
                 + ",warmupCompleted=" + interval.warmupCompleted()
                 + ",warmupFailedAfterAdmission=" + interval.warmupFailedAfterAdmission()
-                + ",warmupTimedOutAfterAdmission=" + interval.warmupTimedOutAfterAdmission();
+                + ",warmupTimedOutAfterAdmission=" + interval.warmupTimedOutAfterAdmission()
+                + ",warmupFirstFailure="
+                + (interval.warmupFirstFailure().isEmpty() ? "NONE" : interval.warmupFirstFailure());
     }
 
     private static List<ActorEndpoint> requireIndependentActors(List<ActorEndpoint> actors) {

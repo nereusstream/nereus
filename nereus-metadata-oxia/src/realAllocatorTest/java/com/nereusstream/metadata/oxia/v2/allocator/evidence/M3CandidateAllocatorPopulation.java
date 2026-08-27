@@ -189,7 +189,13 @@ final class M3CandidateAllocatorPopulation {
     private static CompletionStage<Void> boundedBackoff(
             int retryNumber, BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
         return CompletableFuture.runAsync(
-                () -> {}, CompletableFuture.delayedExecutor(5, TimeUnit.MILLISECONDS));
+                () -> {},
+                CompletableFuture.delayedExecutor(
+                        formalRetryBackoff().toMillis(), TimeUnit.MILLISECONDS));
+    }
+
+    static java.time.Duration formalRetryBackoff() {
+        return BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal().maximumRetryBackoff();
     }
 
     long ensurePopulation(int requestedPopulation) throws Exception {

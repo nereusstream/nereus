@@ -39,6 +39,7 @@ class Fixture:
         git(self.repo, "init", "-b", "main")
         git(self.repo, "config", "user.name", "M3 M2 Runner Test")
         git(self.repo, "config", "user.email", "m3-m2-runner@example.invalid")
+        git(self.repo, "config", "commit.gpgsign", "false")
         scripts = self.repo / "scripts"
         scripts.mkdir()
         shutil.copy2(CONTRACT, scripts / CONTRACT.name)
@@ -124,6 +125,7 @@ class Fixture:
         git(seed, "init", "-b", branch)
         git(seed, "config", "user.name", "M3 M2 Runner Test")
         git(seed, "config", "user.email", "m3-m2-runner@example.invalid")
+        git(seed, "config", "commit.gpgsign", "false")
         (seed / "source.txt").write_text(name + "\n")
         git(seed, "add", ".")
         git(seed, "commit", "-m", "source")

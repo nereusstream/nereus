@@ -27,8 +27,10 @@ import com.nereusstream.domain.registry.VirtualLedgerSliceLifecycleV1;
 import com.nereusstream.domain.registry.VirtualLedgerSliceViewV1;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.Candidate;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.Cell;
+import com.nereusstream.domain.registry.allocator.AllocatorProtocolException;
 import com.nereusstream.domain.registry.allocator.ManagedLedgerAllocatorHeadV1;
 import com.nereusstream.domain.registry.allocator.ManagedLedgerIncarnationIdV1;
+import com.nereusstream.metadata.spi.allocator.BoundedVirtualLedgerAllocatorWorkflowV2;
 import com.nereusstream.metadata.spi.allocator.BoundedVirtualLedgerAllocatorWorkflowV2.Request;
 import com.nereusstream.metadata.spi.allocator.VersionedManagedLedgerAllocatorHeadV1;
 import com.nereusstream.metadata.spi.model.MetadataVersion;
@@ -275,7 +277,9 @@ class M3V2BoundedActorLaneRunnerTest {
                         1, 1, TimeUnit.MILLISECONDS.toNanos(20), true, "measured"));
 
         var result = runner.run(2, schedule, (actorId, request) -> request.equals("warmup")
-                ? CompletableFuture.failedFuture(new IllegalStateException("warmup failure"))
+                ? CompletableFuture.failedFuture(new AllocatorProtocolException(
+                        AllocatorProtocolException.Code.RECONCILE_RETRY_EXHAUSTED,
+                        "allocator bounded reconcile retry budget exhausted"))
                 : CompletableFuture.completedFuture(null));
 
         assertThat(result.warmupFailedAfterAdmission()).isEqualTo(1);
@@ -283,9 +287,18 @@ class M3V2BoundedActorLaneRunnerTest {
         assertThat(M3V2AllocatorFormalHarness.infrastructureDetail(result))
                 .contains("actorLanesStoppedAtCleanupDeadline=true")
                 .contains("warmupFailedAfterAdmission=1")
-                .contains("warmupTimedOutAfterAdmission=0");
+                .contains("warmupTimedOutAfterAdmission=0")
+                .contains("warmupFirstFailure=AllocatorProtocolException[RECONCILE_RETRY_EXHAUSTED]:"
+                        + "allocator bounded reconcile retry budget exhausted");
         assertWarmupConservation(result);
         assertConservation(result);
+    }
+
+    @Test
+    void formalRealActionRetryBackoffUsesTheSourceGovernedMaximum() {
+        assertThat(M3CandidateAllocatorPopulation.formalRetryBackoff())
+                .isEqualTo(BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal().maximumRetryBackoff())
+                .isEqualTo(Duration.ofMillis(25));
     }
 
     @Test
