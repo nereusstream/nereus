@@ -117,7 +117,13 @@ The request ID and candidate identity are stable across retry. A retry may not c
 request has formed any reservation or candidate state, an exact Head-version change with the same incarnation,
 owner, slice and context is a bounded same-key reread: the request rebinds that current predecessor while retaining
 the same request and descriptor identity. Once request-bound candidate state exists, Head drift remains fail-closed.
-Stale owner, slice or context change, or descriptor mismatch always fails closed. Every actor owns an independent
+An exact RANGE node-create conflict does not bind the losing request to the other request's candidate. The loser never
+accepts that node: it first proves that the node is the exact structurally publishable successor of its predecessor and
+that a same-key Head reread equals that exact successor, with at most one bounded publication reread while the Head is
+still the predecessor. Only that proof permits the losing request to discard its unpersisted local candidate value and
+re-enter the pre-candidate Head-rebase path with the original request and descriptor identity. An orphan or malformed
+competing node, a different Head transition, a STRICT node conflict, stale owner/slice/context, or any mismatch after
+request-bound candidate state exists remains fail-closed as `DESCRIPTOR_MISMATCH`. Every actor owns an independent
 production coordinator; the formal harness and production-neutral workflow use the same reconcile path.
 
 Every formal coordinator uses one source-governed envelope: at most 64 reconcile retries, a four-second total elapsed

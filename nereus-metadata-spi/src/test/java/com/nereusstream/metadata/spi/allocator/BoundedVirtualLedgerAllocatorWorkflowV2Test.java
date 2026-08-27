@@ -186,6 +186,41 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
     }
 
     @Test
+    void rangeCoordinatorRebasesOnlyAfterCompetingNodeIsExactlyPublished() {
+        store = new ReconcileStore();
+        ProductionVirtualLedgerAllocator range =
+                ProductionVirtualLedgerAllocator.forEvidenceCandidate(AllocatorEvidenceCandidateV1.range(16), store);
+        cell = createCell(AllocatorModeV1.RANGE_LEASED);
+        head = createHead(cell, incarnation("range-concurrent"));
+        cell = exact(range.reserve(cell, head, activeView(), digest("range-concurrent-grant")));
+        head = exact(range.installRangeReservedGrant(cell, head, activeView()));
+        cell = exact(range.clearReservation(cell, head));
+        long firstLedgerId = head.value().nextLedgerId();
+        store.barrierNodeCreateCount = 2;
+
+        CompletableFuture<Result> first = range.boundedWorkflow(
+                        8, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler.immediate())
+                .allocate(request(head, "range-actor-one"))
+                .toCompletableFuture();
+        CompletableFuture<Result> second = range.boundedWorkflow(
+                        8, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler.immediate())
+                .allocate(request(head, "range-actor-two"))
+                .toCompletableFuture();
+        Result firstResult = first.join();
+        Result secondResult = second.join();
+
+        assertThat(firstResult.exactNode().value().ledgerDescriptorDigest())
+                .isEqualTo(digest("descriptor-range-actor-one"));
+        assertThat(secondResult.exactNode().value().ledgerDescriptorDigest())
+                .isEqualTo(digest("descriptor-range-actor-two"));
+        assertThat(firstResult.exactNode().value().ledgerId())
+                .isNotEqualTo(secondResult.exactNode().value().ledgerId());
+        assertThat(secondResult.reconcileRetries()).isGreaterThanOrEqualTo(2);
+        assertThat(store.head.value().nextLedgerId()).isEqualTo(firstLedgerId + 2);
+        assertThat(store.nodes).hasSize(2);
+    }
+
+    @Test
     void staleOwnerAndSliceContextDriftFailClosedBeforeAllocation() {
         VersionedManagedLedgerAllocatorHeadV1 original = head;
         store.head = versionedHead(AllocatorProtocolV1.takeover(head.value(), 11));
@@ -381,11 +416,13 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         private final List<Sha256Digest> reservationRequestIds = new ArrayList<>();
         private final List<VirtualLedgerCandidateNodeV1> candidateValues = new ArrayList<>();
         private final List<PendingCellCas> pendingCellCas = new ArrayList<>();
+        private final List<PendingNodeCreate> pendingNodeCreates = new ArrayList<>();
         private long version = 1;
         private int loseCellCasResponses;
         private int loseHeadCasResponses;
         private int loseNodeCreateResponses;
         private int barrierCellCasCount;
+        private int barrierNodeCreateCount;
         private boolean cellCasPredecessorUnchanged;
         private boolean readCellNeverCompletes;
         private int delayReadCellCall;
@@ -527,6 +564,27 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
                                 ? CreateMutationResult.existingExact(existing)
                                 : CreateMutationResult.definitiveConflict());
             }
+            if (barrierNodeCreateCount > 0 && pendingNodeCreates.size() < barrierNodeCreateCount) {
+                CompletableFuture<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>> future =
+                        new CompletableFuture<>();
+                pendingNodeCreates.add(new PendingNodeCreate(namespaceId, sliceAssignmentId, candidate, future));
+                if (pendingNodeCreates.size() == barrierNodeCreateCount) {
+                    PendingNodeCreate winner = pendingNodeCreates.get(0);
+                    VersionedVirtualLedgerCandidateNodeV1 exact = new VersionedVirtualLedgerCandidateNodeV1(
+                            winner.namespaceId(),
+                            winner.sliceAssignmentId(),
+                            "/allocator/nodes/" + winner.candidate().ledgerId(),
+                            winner.candidate(),
+                            nextVersion());
+                    nodes.put(winner.candidate().ledgerId(), exact);
+                    winner.future().complete(CreateMutationResult.created(exact));
+                    for (int index = 1; index < pendingNodeCreates.size(); index++) {
+                        pendingNodeCreates.get(index).future().complete(CreateMutationResult.definitiveConflict());
+                    }
+                    barrierNodeCreateCount = 0;
+                }
+                return future;
+            }
             VersionedVirtualLedgerCandidateNodeV1 exact = new VersionedVirtualLedgerCandidateNodeV1(
                     namespaceId,
                     sliceAssignmentId,
@@ -545,5 +603,11 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
                 VersionedAllocatorCellStateV1 predecessor,
                 VirtualLedgerCellAllocatorStateV1 candidate,
                 CompletableFuture<ConditionalCasResult<VersionedAllocatorCellStateV1>> future) {}
+
+        private record PendingNodeCreate(
+                Sha256Digest namespaceId,
+                Sha256Digest sliceAssignmentId,
+                VirtualLedgerCandidateNodeV1 candidate,
+                CompletableFuture<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>> future) {}
     }
 }

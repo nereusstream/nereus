@@ -433,8 +433,52 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
                     if (observed.isEmpty()) {
                         return retry(state, RetryReason.NODE_REREAD, () -> createCandidate(request, state, cell, head));
                     }
-                    VersionedVirtualLedgerCandidateNodeV1 exact = requireExactNode(observed, expected);
+                    VersionedVirtualLedgerCandidateNodeV1 exact = observed.orElseThrow();
+                    if (!exact.value().equals(expected)) {
+                        if (cell.value().mode() != AllocatorModeV1.RANGE_LEASED) {
+                            return failed(descriptorMismatch());
+                        }
+                        return reconcileCompetingRangeCandidate(request, state, cell, head, exact, false);
+                    }
                     return publishCandidate(request, state, cell, head, exact);
+                });
+    }
+
+    private CompletionStage<Result> reconcileCompetingRangeCandidate(
+            Request request,
+            State state,
+            VersionedAllocatorCellStateV1 cell,
+            VersionedManagedLedgerAllocatorHeadV1 predecessor,
+            VersionedVirtualLedgerCandidateNodeV1 competingNode,
+            boolean publicationRereadUsed) {
+        ManagedLedgerAllocatorHeadV1 competingSuccessor;
+        try {
+            competingSuccessor = AllocatorProtocolV1.publish(predecessor.value(), competingNode.value());
+        } catch (RuntimeException invalidCompetingNode) {
+            return failed(descriptorMismatch());
+        }
+        return store.readHead(
+                        cell.value().ledgerIdCompatibilityNamespaceId(),
+                        cell.value().sliceAssignmentId(),
+                        predecessor.value().managedLedgerIncarnation())
+                .thenCompose(observed -> {
+                    VersionedManagedLedgerAllocatorHeadV1 current = observed.orElseThrow(() -> failure(
+                            AllocatorProtocolException.Code.HEAD_STATE_DRIFT,
+                            "allocator Head disappeared while reconciling a competing RANGE candidate"));
+                    if (current.value().equals(competingSuccessor)) {
+                        state.abandonUnpersistedCandidate();
+                        Request rebased = new Request(
+                                request.requestId(), request.descriptorDigest(), request.currentView(), current);
+                        return retry(state, RetryReason.HEAD_REREAD, () -> acquireGrant(rebased, state));
+                    }
+                    if (!publicationRereadUsed && current.value().equals(predecessor.value())) {
+                        return retry(
+                                state,
+                                RetryReason.HEAD_REREAD,
+                                () -> reconcileCompetingRangeCandidate(
+                                        request, state, cell, predecessor, competingNode, true));
+                    }
+                    return failed(descriptorMismatch());
                 });
     }
 
@@ -703,11 +747,15 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
             Optional<VersionedVirtualLedgerCandidateNodeV1> snapshot, VirtualLedgerCandidateNodeV1 expected) {
         VersionedVirtualLedgerCandidateNodeV1 exact = requireExact(snapshot, "candidate node");
         if (!exact.value().equals(expected)) {
-            throw failure(
-                    AllocatorProtocolException.Code.DESCRIPTOR_MISMATCH,
-                    "allocator existing candidate has another descriptor or request identity");
+            throw descriptorMismatch();
         }
         return exact;
+    }
+
+    private static AllocatorProtocolException descriptorMismatch() {
+        return failure(
+                AllocatorProtocolException.Code.DESCRIPTOR_MISMATCH,
+                "allocator existing candidate has another descriptor or request identity");
     }
 
     private static VersionedManagedLedgerAllocatorHeadV1 requireExactHead(
@@ -915,6 +963,13 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
 
         private boolean canRebaseExpectedHead() {
             return candidateValue == null && exactNode == null;
+        }
+
+        private void abandonUnpersistedCandidate() {
+            if (candidateValue == null || exactNode != null) {
+                throw new IllegalStateException("allocator candidate rebase did not prove an unpersisted request");
+            }
+            candidateValue = null;
         }
 
         private void requireAuthorized() {
