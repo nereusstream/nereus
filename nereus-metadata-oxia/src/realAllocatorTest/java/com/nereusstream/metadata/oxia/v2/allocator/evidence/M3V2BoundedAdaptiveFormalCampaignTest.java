@@ -68,16 +68,24 @@ class M3V2BoundedAdaptiveFormalCampaignTest {
             AllocatorCampaignCheckpointV2 checkpoint = AllocatorCampaignCheckpointV2.decode(result.checkpointBytes());
             writeResult(output.resolve("campaign-result.json"), result, checkpoint);
 
-            assertThat(result.status()).isEqualTo(Status.COMPLETED);
-            assertThat(result.completed()).isTrue();
+            assertThat(result.status())
+                    .withFailMessage(
+                            "allocator V2 campaign failed: reason=%s detail=%s", result.reason(), result.detail())
+                    .isEqualTo(Status.COMPLETED);
+            assertThat(result.completed())
+                    .withFailMessage(
+                            "allocator V2 campaign did not complete: reason=%s detail=%s",
+                            result.reason(), result.detail())
+                    .isTrue();
         }
     }
 
-    private static void writeResult(
+    static void writeResult(
             Path output, CampaignResult result, AllocatorCampaignCheckpointV2 checkpoint) throws Exception {
         String json = "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_CAMPAIGN_EXECUTION_V2\","
                 + "\"status\":\"" + result.status() + "\",\"terminalReason\":\"" + result.reason()
-                + "\",\"checkpointSequence\":" + checkpoint.checkpointSequence()
+                + "\",\"terminalDetail\":" + jsonString(result.detail())
+                + ",\"checkpointSequence\":" + checkpoint.checkpointSequence()
                 + ",\"checkpointSha256\":\"" + AllocatorCampaignCheckpointV2.digest(result.checkpointBytes()).toHex()
                 + "\",\"evaluationCreated\":false,\"selectionCreated\":false}\n";
         Files.writeString(
@@ -87,6 +95,30 @@ class M3V2BoundedAdaptiveFormalCampaignTest {
                 StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.WRITE,
                 StandardOpenOption.DSYNC);
+    }
+
+    static String jsonString(String value) {
+        StringBuilder escaped = new StringBuilder(value.length() + 2).append('"');
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            switch (character) {
+                case '"' -> escaped.append("\\\"");
+                case '\\' -> escaped.append("\\\\");
+                case '\b' -> escaped.append("\\b");
+                case '\f' -> escaped.append("\\f");
+                case '\n' -> escaped.append("\\n");
+                case '\r' -> escaped.append("\\r");
+                case '\t' -> escaped.append("\\t");
+                default -> {
+                    if (character < 0x20) {
+                        escaped.append(String.format("\\u%04x", (int) character));
+                    } else {
+                        escaped.append(character);
+                    }
+                }
+            }
+        }
+        return escaped.append('"').toString();
     }
 
     private static long elapsedSeconds(long started) {

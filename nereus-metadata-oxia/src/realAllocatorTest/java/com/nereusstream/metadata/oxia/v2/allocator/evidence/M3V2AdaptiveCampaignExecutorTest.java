@@ -248,6 +248,28 @@ class M3V2AdaptiveCampaignExecutorTest {
     }
 
     @Test
+    void failedCampaignResultPreservesAndEscapesDiagnosticDetail() throws Exception {
+        CollectingSink sink = new CollectingSink();
+        ActionExecutor failing = new M3V2FormalActionExecutorAdapter(new FakeRuntime() {
+            @Override
+            public IntervalActionResult executeNativeInterval(Cell cell) throws Exception {
+                throw new IOException("diagnostic \"quoted\" \\ path\nnext");
+            }
+        });
+        CampaignResult result = executor(source("4"), budgets(), failing, sink, () -> false).start();
+        Path output = temporaryDirectory.resolve("campaign-result.json");
+
+        M3V2BoundedAdaptiveFormalCampaignTest.writeResult(output, result, checkpoint(result));
+
+        String json = Files.readString(output, StandardCharsets.UTF_8);
+        assertThat(result.status()).isEqualTo(Status.INFRASTRUCTURE_FAILED);
+        assertThat(json).contains(
+                "\"terminalDetail\":" + M3V2BoundedAdaptiveFormalCampaignTest.jsonString(result.detail()));
+        assertThat(json).contains("diagnostic \\\"quoted\\\" \\\\ path\\nnext");
+        assertThat(json.lines()).hasSize(1);
+    }
+
+    @Test
     void budgetAccountingFailureConsumesNothingAndFailsClosed() throws Exception {
         CollectingSink sink = new CollectingSink();
         ActionExecutor failing = new ActionExecutor() {

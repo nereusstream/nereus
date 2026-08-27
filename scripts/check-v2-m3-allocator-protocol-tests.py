@@ -19,6 +19,21 @@ SETTINGS = ROOT / "settings.gradle.kts"
 ROOT_BUILD = ROOT / "build.gradle.kts"
 MODULE_BUILD = ROOT / "nereus-metadata-oxia" / "build.gradle.kts"
 HARD_DEADLINE = ROOT / "scripts" / "run-v2-m3-with-hard-deadline.py"
+FORMAL_CAMPAIGN = (
+    ROOT
+    / "nereus-metadata-oxia"
+    / "src"
+    / "realAllocatorTest"
+    / "java"
+    / "com"
+    / "nereusstream"
+    / "metadata"
+    / "oxia"
+    / "v2"
+    / "allocator"
+    / "evidence"
+    / "M3V2BoundedAdaptiveFormalCampaignTest.java"
+)
 
 
 class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
@@ -209,6 +224,13 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             block,
         )
         self.assertNotIn(r'\"org.opencontainers.image.revision\"', block)
+
+    def test_formal_failure_result_and_junit_preserve_campaign_detail(self) -> None:
+        source = FORMAL_CAMPAIGN.read_text()
+        self.assertIn(r'\"terminalDetail\"', source)
+        self.assertIn("jsonString(result.detail())", source)
+        self.assertIn(".withFailMessage(", source)
+        self.assertGreaterEqual(source.count("result.detail()"), 3)
 
     def test_formal_task_is_unique_and_not_reachable_from_ordinary_or_m3_gates(self) -> None:
         module = MODULE_BUILD.read_text()

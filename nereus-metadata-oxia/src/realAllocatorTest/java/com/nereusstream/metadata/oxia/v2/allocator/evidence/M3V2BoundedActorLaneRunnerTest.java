@@ -40,6 +40,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -149,16 +150,75 @@ class M3V2BoundedActorLaneRunnerTest {
                 Duration.ofMillis(50), Duration.ofMillis(100), Duration.ofMillis(100));
         List<M3V2BoundedActorLaneRunner.ScheduledOffer<String>> schedule = List.of(
                 new M3V2BoundedActorLaneRunner.ScheduledOffer<>(0, 0, 0, false, "warmup"),
-                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(1, 1, TimeUnit.MILLISECONDS.toNanos(50), true, "one"),
-                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(2, 2, TimeUnit.MILLISECONDS.toNanos(51), true, "two"));
+                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(
+                        1, 1, TimeUnit.MICROSECONDS.toNanos(49_875), true, "one"),
+                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(
+                        2, 2, TimeUnit.MICROSECONDS.toNanos(149_875), true, "two"));
 
         var result = runner.run(2, schedule, (actorId, request) -> CompletableFuture.completedFuture(null));
 
         assertThat(result.warmupOffered()).isEqualTo(1);
         assertThat(result.warmupCompleted()).isEqualTo(1);
         assertThat(result.offered()).isEqualTo(2);
-        assertThat(result.completed()).isEqualTo(2);
+        assertThat(result.terminal() + result.overloadDroppedBeforeAdmission()).isEqualTo(2);
+        assertThat(result.backlogAtEnd()).isZero();
+        assertThat(result.inFlightAtEnd()).isZero();
         assertConservation(result);
+    }
+
+    @Test
+    void allSixFrozenRatesHaveOneOrdinalAuthoritativeTransitionBeforeCutoff() {
+        Map<Integer, Long> firstMeasuredMicros = Map.of(
+                200, 10_000_000L,
+                250, 9_999_750L,
+                333, 9_999_875L,
+                500, 10_000_000L,
+                750, 9_999_750L,
+                1000, 10_000_000L);
+
+        for (int rate : M3AllocatorWorkloadPlan.OFFERED_RATES) {
+            List<M3V2BoundedActorLaneRunner.ScheduledOffer<String>> schedule = frozenSchedule(rate);
+            M3V2BoundedActorLaneRunner.<String>formal().validateSchedule(schedule);
+            int warmupRequests = Math.multiplyExact(M3AllocatorWorkloadPlan.WARM_UP_SECONDS, rate);
+            int measuredRequests = M3AllocatorWorkloadPlan.measuredRequestCount(rate);
+            long transitions = 0;
+            boolean priorMeasured = false;
+            for (M3V2BoundedActorLaneRunner.ScheduledOffer<String> offer : schedule) {
+                if (!priorMeasured && offer.measured()) {
+                    transitions++;
+                }
+                priorMeasured = offer.measured();
+            }
+
+            assertThat(schedule).hasSize(Math.addExact(warmupRequests, measuredRequests));
+            assertThat(schedule.subList(0, warmupRequests)).noneMatch(
+                    M3V2BoundedActorLaneRunner.ScheduledOffer::measured);
+            assertThat(schedule.subList(warmupRequests, schedule.size())).allMatch(
+                    M3V2BoundedActorLaneRunner.ScheduledOffer::measured);
+            assertThat(transitions).as("rate %s measurement transitions", rate).isEqualTo(1);
+            assertThat(TimeUnit.NANOSECONDS.toMicros(schedule.get(warmupRequests).arrivalOffsetNanos()))
+                    .isEqualTo(firstMeasuredMicros.get(rate));
+            assertThat(TimeUnit.NANOSECONDS.toMicros(schedule.get(schedule.size() - 1).arrivalOffsetNanos()))
+                    .isLessThan(TimeUnit.SECONDS.toMicros(40));
+        }
+
+        assertThat(firstMeasuredMicros)
+                .containsEntry(250, 9_999_750L)
+                .containsEntry(333, 9_999_875L)
+                .containsEntry(750, 9_999_750L);
+    }
+
+    @Test
+    void scheduleRejectsWarmupAfterTheMeasuredTransition() {
+        M3V2BoundedActorLaneRunner<String> formal = M3V2BoundedActorLaneRunner.formal();
+        List<M3V2BoundedActorLaneRunner.ScheduledOffer<String>> schedule = List.of(
+                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(0, 0, 0, false, "warmup"),
+                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(1, 1, 1, true, "measured"),
+                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(2, 2, 2, false, "repeated-warmup"));
+
+        assertThatThrownBy(() -> formal.validateSchedule(schedule))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("returned to warmup");
     }
 
     @Test
@@ -231,6 +291,20 @@ class M3V2BoundedActorLaneRunnerTest {
                 offer(1, 1, 0, "one"),
                 offer(2, 2, 0, "two"),
                 offer(3, 3, 0, "three"));
+    }
+
+    private static List<M3V2BoundedActorLaneRunner.ScheduledOffer<String>> frozenSchedule(int rate) {
+        List<M3V2BoundedActorLaneRunner.ScheduledOffer<String>> schedule =
+                new ArrayList<>(M3AllocatorWorkloadPlan.requestCount(rate));
+        for (M3AllocatorWorkloadPlan.PlannedRequest request : M3AllocatorWorkloadPlan.requests(10_000, rate)) {
+            schedule.add(new M3V2BoundedActorLaneRunner.ScheduledOffer<>(
+                    request.requestOrdinal(),
+                    request.actorId(),
+                    TimeUnit.MICROSECONDS.toNanos(request.arrivalOffsetMicros()),
+                    request.phase() != M3AllocatorWorkloadPlan.Phase.WARM_UP,
+                    "request-" + request.requestOrdinal()));
+        }
+        return List.copyOf(schedule);
     }
 
     private static M3V2BoundedActorLaneRunner.ScheduledOffer<String> offer(

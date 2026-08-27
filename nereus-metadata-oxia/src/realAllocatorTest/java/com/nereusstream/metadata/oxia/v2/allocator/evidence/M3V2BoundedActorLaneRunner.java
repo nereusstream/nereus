@@ -83,12 +83,11 @@ final class M3V2BoundedActorLaneRunner<T> {
             }
             for (ScheduledOffer<T> offer : exactSchedule) {
                 long target = Math.addExact(startNanos, offer.arrivalOffsetNanos());
-                if (!measurementStarted && target >= measurementStartNanos) {
-                    waitUntil(measurementStartNanos);
+                waitUntil(target);
+                if (!measurementStarted && offer.measured()) {
                     state.beginMeasurement();
                     measurementStarted = true;
                 }
-                waitUntil(target);
                 state.offer(offer);
             }
             if (!measurementStarted) {
@@ -186,7 +185,7 @@ final class M3V2BoundedActorLaneRunner<T> {
         }
     }
 
-    private List<ScheduledOffer<T>> validateSchedule(List<ScheduledOffer<T>> schedule) {
+    List<ScheduledOffer<T>> validateSchedule(List<ScheduledOffer<T>> schedule) {
         List<ScheduledOffer<T>> exact = List.copyOf(Objects.requireNonNull(schedule, "schedule"));
         long intervalNanos = Math.addExact(warmup.toNanos(), measurement.toNanos());
         long previousOffset = -1;
@@ -200,13 +199,23 @@ final class M3V2BoundedActorLaneRunner<T> {
                     || !ordinals.add(offer.ordinal())) {
                 throw new IllegalArgumentException("allocator V2 schedule is not ordered, unique, and in bounds");
             }
-            boolean expectedMeasured = offer.arrivalOffsetNanos() >= warmup.toNanos();
-            if (offer.measured() != expectedMeasured) {
-                throw new IllegalArgumentException("allocator V2 schedule phase differs from the frozen boundary");
-            }
             previousOffset = offer.arrivalOffsetNanos();
         }
+        validatePhaseTransitions(exact, warmup.isZero());
         return exact;
+    }
+
+    static void validatePhaseTransitions(
+            List<? extends ScheduledOffer<?>> schedule, boolean measurementStartsImmediately) {
+        boolean measuredSeen = measurementStartsImmediately;
+        for (ScheduledOffer<?> offer : Objects.requireNonNull(schedule, "schedule")) {
+            Objects.requireNonNull(offer, "scheduled offer");
+            if (!offer.measured() && measuredSeen) {
+                throw new IllegalArgumentException(
+                        "allocator V2 schedule returned to warmup after measurement began");
+            }
+            measuredSeen |= offer.measured();
+        }
     }
 
     private static void waitUntil(long targetNanos) throws InterruptedException {
