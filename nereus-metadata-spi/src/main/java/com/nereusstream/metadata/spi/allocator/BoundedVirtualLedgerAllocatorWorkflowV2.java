@@ -82,10 +82,7 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
                 if (failure.code() == AllocatorProtocolException.Code.HEAD_STATE_DRIFT
                         && state.canRebaseExpectedHead()) {
                     Request rebased = new Request(
-                            request.requestId(),
-                            request.descriptorDigest(),
-                            request.currentView(),
-                            authorities.head());
+                            request.requestId(), request.descriptorDigest(), request.currentView(), authorities.head());
                     return retry(state, RetryReason.HEAD_REREAD, () -> acquireGrant(rebased, state));
                 }
                 return failed(failure);
