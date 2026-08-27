@@ -109,6 +109,12 @@ the exact source tuple without touching external services or evidence. The sole 
 and a clean, fully locked source/runtime tuple and new empty output before it can start. Phase A registers and tests
 this path but does not invoke it. It therefore creates no NACP2/NAEV2/NARS2, allocator child, source-lock update,
 scenario promotion, or Final, and allocator state remains `UNSELECTED`.
+The authorized V2 Stage-B campaign later completed at exact source `6c92d937...` with final NACP2
+`2a500526...e33c` and valid non-promotable NAEV2 `10fa2033...a7e5d` status `NONE_QUALIFIED`; no selection was
+created. ADR 0108 preserves that evidence and corrects the next protocol's feasibility model rather than lowering any
+threshold. Stage B.1 owns distinct V3 codecs/planner/proof, four-by-64 bounded async admission, native-baseline
+unavailability, and diagnostic-only investigation. Its stop point is a new exact clean implementation SHA before any
+V3 formal campaign; source locks, children, M2 freshness, scenarios, and Final remain unchanged.
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

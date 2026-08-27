@@ -1,5 +1,10 @@
 # ADR 0107: V2 M3 allocator bounded-adaptive formal-entry wiring amendment
 
+> The V2 entry was executed once and completed `NONE_QUALIFIED` at exact source `6c92d937...`.
+> [ADR 0108](0108-v2-m3-allocator-protocol-feasibility-async-admission-baseline-amendment.md) preserves that evidence
+> and defines a separately versioned V3 feasibility/admission/baseline protocol. This ADR and its V2 bytes are not
+> rewritten.
+
 - Status: Accepted
 - Date: 2026-08-27
 - Amends: ADR 0104's formal-entry action granularity and outer wall-clock admission boundary

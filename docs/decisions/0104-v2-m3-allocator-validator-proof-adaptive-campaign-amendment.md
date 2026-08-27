@@ -3,6 +3,10 @@
 > Amended by [ADR 0107](0107-v2-m3-allocator-bounded-adaptive-formal-entry-wiring-amendment.md): the unchanged
 > validator observation boundary now expands into a frozen 288 interval, 360 single-cut fault, and 32 RANGE-scale
 > physical-action inventory under a separate 680-action/48,000-second formal-entry envelope.
+>
+> The completed V2 campaign remains governed by this ADR. [ADR 0108](0108-v2-m3-allocator-protocol-feasibility-async-admission-baseline-amendment.md)
+> preserves its `NONE_QUALIFIED` result and every V2 byte while defining a separate V3 successor protocol for any
+> later campaign.
 
 - Status: Accepted
 - Date: 2026-08-26

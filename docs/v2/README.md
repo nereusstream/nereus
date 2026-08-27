@@ -368,6 +368,7 @@ Accepted decisions:
 - [ADR 0105: M3 preselection evidence source-lock amendment](../decisions/0105-v2-m3-preselection-evidence-source-lock-amendment.md)
 - [ADR 0106: M3 allocator V2 child and Final evidence amendment](../decisions/0106-v2-m3-allocator-v2-child-final-evidence-amendment.md)
 - [ADR 0107: M3 allocator bounded-adaptive formal-entry wiring amendment](../decisions/0107-v2-m3-allocator-bounded-adaptive-formal-entry-wiring-amendment.md)
+- [ADR 0108: M3 allocator protocol feasibility, asynchronous admission, and baseline amendment](../decisions/0108-v2-m3-allocator-protocol-feasibility-async-admission-baseline-amendment.md)
 
 ## Open design gates
 
@@ -455,6 +456,16 @@ writes. One explicit default-off Gradle task and script mode execute exactly one
 fail closed on authorization, source/runtime-lock, frozen-plan, dedicated-worktree, and new-empty-output drift. Phase A
 runs no campaign and leaves allocator mode `UNSELECTED`, every M3 scenario `PLANNED`, and all evaluation, selection,
 source-lock, child, scenario, and Final work open for separately authorized later phases.
+The separately authorized V2 campaign subsequently completed at exact source `6c92d937...`; validator-reproved final
+NACP2 `2a500526...e33c` sealed the valid non-promotable NAEV2 `10fa2033...a7e5d` as `NONE_QUALIFIED`. The immutable
+119-file/461,226-byte payload is archived under
+`/Users/liusinan/Documents/Codex/2026-08-27/nereus-v2-m3-allocator/bounded-adaptive-formal-6c92d937-r1-none-qualified`
+with `SHA256SUMS` digest `39eb6e70...aca18e`. It produced no NARS2 and leaves allocator mode `UNSELECTED`.
+[ADR 0108](../decisions/0108-v2-m3-allocator-protocol-feasibility-async-admission-baseline-amendment.md) records that
+the old four-by-one runner is structurally capped at 160 requests/second for the frozen 25-millisecond row. It preserves
+all thresholds and V2 bytes while requiring a distinct V3 protocol, bounded four-by-64 asynchronous admission,
+native-baseline-unavailable evaluation, exact derived-rate slots, offline feasibility proof, and diagnostic-only
+investigation before any later formal authorization.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

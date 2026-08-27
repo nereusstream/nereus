@@ -525,6 +525,22 @@ Phase-A slice runs no formal campaign and creates no NACP2, NAEV2, NARS2, select
 scenario PASS, or Final receipt. `allocatorMode` therefore remains `UNSELECTED` and every M3 scenario remains
 `PLANNED` pending a separate Phase-B authorization against the resulting exact clean commit.
 
+That Phase-B V2 campaign completed once at exact clean source `6c92d93784b573bcbf91ade8e7ec7f42aec21b70`.
+Validator-reproved final NACP2 `2a500526...e33c` has 56 executed cells and 232 dispositions; its fixed 284-byte NAEV2
+`10fa2033...a7e5d` is `NONE_QUALIFIED`, valid, and non-promotable. No NARS2 exists and `allocatorMode` remains
+`UNSELECTED`. The original 119-file/461,226-byte formal directory remains immutable. A byte-identical payload and
+root-level manifest are archived at
+`/Users/liusinan/Documents/Codex/2026-08-27/nereus-v2-m3-allocator/bounded-adaptive-formal-6c92d937-r1-none-qualified`;
+`SHA256SUMS` is `39eb6e70...aca18e` and `archive-identity.json` is `5500b1ad...eedf`.
+
+[ADR 0108](../../../decisions/0108-v2-m3-allocator-protocol-feasibility-async-admission-baseline-amendment.md) accepts
+the feasibility correction without reinterpreting that result. The old four-actor/one-outstanding runner has an
+optimistic 160-request/second ceiling at 25 milliseconds and structurally excludes the unchanged 200-request floor.
+Any later campaign therefore uses distinct NACP3/NAEV3/NARS3/NADV3 semantics, four-by-64 bounded asynchronous
+admission, 328 logical interval slots, exact derived floors, and a first-class non-promotable
+`NATIVE_BASELINE_UNAVAILABLE` status. Stage B.1 implements offline proof and diagnostic-only investigation but grants
+no V3 formal execution, selection, child, source-lock change, scenario PASS, or Final receipt.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

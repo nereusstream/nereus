@@ -806,6 +806,13 @@ matching explicit script mode bind one planned action to one adapter call and fa
 lock/runtime, plan, worktree, and empty-output drift. This Phase-A wiring does not authorize or execute the task and
 does not create campaign evidence or selection. `V2-OPEN-PUL-OBJ-09` therefore remains open, allocator mode remains
 `UNSELECTED`, and its M3 scenarios remain `PLANNED` until a later exact-clean-SHA Phase-B authorization.
+That V2 Phase-B authorization was exercised exactly once at clean source `6c92d937...`. The completed campaign sealed
+validator-reproved NACP2 `2a500526...e33c` as valid non-promotable NAEV2 `10fa2033...a7e5d`, status
+`NONE_QUALIFIED`, with no NARS2. ADR 0108 records that the V2 runner's four-by-one admission is structurally capped
+below the 25-millisecond/200-request row; it does not reopen or relabel the evidence. The active question is now whether
+the separately versioned V3 four-by-64 asynchronous model and exact native-derived floors meet the unchanged SLOs.
+Stage B.1 may answer only protocol feasibility and diagnostic performance. Formal execution, mode selection, source
+lock, child, current-source M2, scenario, and Final remain separately authorized work.
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.
