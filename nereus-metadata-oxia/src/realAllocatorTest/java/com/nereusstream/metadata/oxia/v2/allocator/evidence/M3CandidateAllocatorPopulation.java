@@ -150,6 +150,73 @@ final class M3CandidateAllocatorPopulation {
         return List.copyOf(endpoints);
     }
 
+    List<M3V3AllocatorFormalHarness.ActorEndpoint> formalActorEndpointsV3(
+            com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.Cell campaignCell,
+            FormalAllocationObserver observer) {
+        Objects.requireNonNull(campaignCell, "campaignCell");
+        Objects.requireNonNull(observer, "observer");
+        if (campaignCell.candidate().nativePath()
+                || campaignCell.activeManagedLedgers() > activePopulation.get()
+                || (candidate.mode() == AllocatorModeV1.STRICT_SERIALIZED) != campaignCell.candidate().strict()
+                || (candidate.mode() == AllocatorModeV1.RANGE_LEASED
+                        && candidate.rangeSize() != campaignCell.candidate().rangeSize())) {
+            throw new IllegalArgumentException("allocator V3 formal campaign Cell differs from candidate population");
+        }
+        List<M3V3AllocatorFormalHarness.ActorEndpoint> endpoints = new ArrayList<>(boundedWorkflows.size());
+        for (int actorId = 0; actorId < boundedWorkflows.size(); actorId++) {
+            int exactActorId = actorId;
+            BoundedVirtualLedgerAllocatorWorkflowV2 workflow = boundedWorkflows.get(actorId);
+            endpoints.add(new M3V3AllocatorFormalHarness.ActorEndpoint(
+                    actorId,
+                    workflow,
+                    (request, context) -> boundedAllocateV3(
+                            exactActorId, campaignCell, request, workflow, observer, context)));
+        }
+        return List.copyOf(endpoints);
+    }
+
+    private CompletionStage<?> boundedAllocateV3(
+            int actorId,
+            com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.Cell campaignCell,
+            M3V3AllocatorFormalHarness.CandidateRequest request,
+            BoundedVirtualLedgerAllocatorWorkflowV2 workflow,
+            FormalAllocationObserver observer,
+            M3V3AsyncActorLaneRunner.OperationContext context) {
+        if (!context.allowsNextMetadataOperation()) {
+            return CompletableFuture.failedFuture(
+                    new java.util.concurrent.TimeoutException("allocator V3 cleanup deadline elapsed"));
+        }
+        if (!(request.payload() instanceof M3AllocatorWorkloadPlan.PlannedRequest planned)
+                || planned.requestOrdinal() != request.requestOrdinal()
+                || planned.ledgerIndex() != request.ledgerIndex()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalArgumentException("allocator V3 formal candidate request payload differs"));
+        }
+        int ledgerIndex = planned.ledgerIndex();
+        VersionedManagedLedgerAllocatorHeadV1 predecessor = requireHead(ledgerIndex);
+        Request exactRequest = new Request(
+                digest("v3-request:" + campaignCell.contextId() + ':' + planned.requestOrdinal() + ':' + ledgerIndex),
+                digest("v3-descriptor:"
+                        + campaignCell.contextId()
+                        + ':'
+                        + planned.requestOrdinal()
+                        + ':'
+                        + ledgerIndex),
+                currentView,
+                predecessor);
+        long started = System.nanoTime();
+        return workflow.allocate(exactRequest).whenComplete((result, failure) -> {
+            long elapsedMicros = TimeUnit.NANOSECONDS.toMicros(System.nanoTime() - started);
+            if (failure == null) {
+                Result exact = Objects.requireNonNull(result, "bounded allocator result");
+                heads.compareAndSet(ledgerIndex, predecessor, exact.exactHead());
+                observer.completed(actorId, planned, exact, elapsedMicros);
+            } else {
+                observer.failed(actorId, planned, failure, elapsedMicros);
+            }
+        });
+    }
+
     private CompletionStage<?> boundedAllocate(
             int actorId,
             com.nereusstream.domain.registry.allocator.AllocatorCampaignV2.Cell campaignCell,

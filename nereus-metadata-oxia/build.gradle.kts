@@ -438,6 +438,9 @@ tasks.register<Test>("realAllocatorContractTest") {
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3AllocatorEvidenceWiringTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2BoundedActorLaneRunnerTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AsyncActorLaneRunnerTest")
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3FormalCampaignPlanTest")
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AllocatorProtocolMainTest")
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AdaptiveCampaignExecutorTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AllocatorProtocolMainTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AdaptiveCampaignExecutorTest")
     }
@@ -659,6 +662,133 @@ val realAllocatorV2BoundedAdaptiveFormalCampaign = tasks.register<Test>(
     }
 }
 
+val realAllocatorV3BoundedAdaptiveFormalCampaign = tasks.register<Test>(
+    "realAllocatorV3BoundedAdaptiveFormalCampaign",
+) {
+    group = "verification"
+    description =
+        "Separately authorized ADR-0108 bounded-adaptive V3 campaign; never runs from build, check, or v2M3Check."
+    notCompatibleWithConfigurationCache("formal preflight inspects live Git and the task-owned Oxia container")
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    testClassesDirs = realAllocatorTest.output.classesDirs
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    maxParallelForks = 1
+    maxHeapSize = "6144m"
+    timeout.set(Duration.ofSeconds(48_000))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3BoundedAdaptiveFormalCampaignTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?.takeIf { it.isNotBlank() }
+            ?: error("$property is required for the V3 bounded-adaptive formal campaign")
+        fun command(vararg command: String): String {
+            val process = ProcessBuilder(*command)
+                .directory(rootProject.projectDir)
+                .redirectErrorStream(true)
+                .start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+            check(process.waitFor() == 0) {
+                "allocator V3 formal preflight command failed: ${command.joinToString(" ")}\n$output"
+            }
+            return output
+        }
+        fun git(vararg arguments: String): String =
+            command("git", "-C", rootProject.projectDir.absolutePath, *arguments)
+        fun sha256(path: File): String {
+            check(path.isFile) { "allocator V3 formal hash input is absent: ${path.absolutePath}" }
+            val digest = MessageDigest.getInstance("SHA-256")
+            path.inputStream().use { input ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            return digest.digest().joinToString("") { "%02x".format(it) }
+        }
+
+        val authorization = required("v2M3AllocatorV3FormalAuthorizationSha")
+        check(git("rev-parse", "HEAD") == authorization) { "allocator V3 formal HEAD differs" }
+        check(git("branch", "--show-current") == "main") { "allocator V3 formal source is not main" }
+        check(git("rev-parse", "refs/remotes/origin/main") == authorization) {
+            "allocator V3 formal origin/main differs"
+        }
+        check(git("status", "--porcelain", "--untracked-files=all").isEmpty()) {
+            "allocator V3 formal Nereus worktree is not clean"
+        }
+        val planOutput = command("python3", rootProject.file("scripts/v2-m3-allocator-plan-v3.py").absolutePath)
+        val expectedPlan = required("v2M3AllocatorV3ZeroDecisionPlanSha256")
+        check(planOutput.contains("\"feasibilityStatus\": \"PLAN_FEASIBLE\"")) {
+            "allocator V3 formal feasibility gate did not pass"
+        }
+        check(planOutput.contains("\"zeroDecisionPlanSha256\": \"$expectedPlan\"")) {
+            "allocator V3 formal plan digest differs"
+        }
+        check(planOutput.contains("\"nereusCommit\": \"$authorization\"")) {
+            "allocator V3 formal plan source tuple differs"
+        }
+        val expectedDependencyLock = required("v2M3AllocatorV3DependencyLockSha256")
+        check(planOutput.contains("\"dependencyLockSha256\": \"$expectedDependencyLock\"")) {
+            "allocator V3 formal dependency-lock digest differs"
+        }
+        val expectedOxiaImage = required("v2M3AllocatorV3OxiaImageDigest")
+        val oxiaContainer = required("v2M3AllocatorV3OxiaContainerName")
+        check(command("docker", "inspect", "--format", "{{.State.Running}}", oxiaContainer) == "true") {
+            "allocator V3 formal Oxia container is not running"
+        }
+        check(command("docker", "inspect", "--format", "{{.Image}}", oxiaContainer) == expectedOxiaImage) {
+            "allocator V3 formal Oxia image differs"
+        }
+        check(
+            command(
+                "docker",
+                "inspect",
+                "--format",
+                "{{index .Config.Labels \"com.nereusstream.evidence\"}}",
+                oxiaContainer,
+            ) == "v3-m3-bounded-adaptive-formal",
+        ) { "allocator V3 formal Oxia container ownership differs" }
+        val oxiaServiceAddress = required("v2M3AllocatorV3OxiaServiceAddress")
+        val oxiaBoundPort = command("docker", "port", oxiaContainer, "6648/tcp")
+            .lineSequence()
+            .single()
+            .substringAfterLast(':')
+        check(oxiaServiceAddress == "127.0.0.1:$oxiaBoundPort") {
+            "allocator V3 formal Oxia service address differs"
+        }
+        val evidenceArtifact = realAllocatorEvidenceArtifactJar.get().archiveFile.get().asFile
+        val executorSha = sha256(evidenceArtifact)
+        check(executorSha == required("v2M3AllocatorV3ExecutorSha256")) {
+            "allocator V3 formal executor artifact differs"
+        }
+        val outputDirectory = file(required("v2M3AllocatorV3FormalOutputDirectory")).toPath()
+            .toAbsolutePath()
+            .normalize()
+        check(Files.isDirectory(outputDirectory, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(outputDirectory)) {
+            "allocator V3 formal output is absent or nonregular"
+        }
+        Files.list(outputDirectory).use { entries ->
+            check(entries.findAny().isEmpty) { "allocator V3 formal output is not empty"
+            }
+        }
+
+        systemProperty("nereus.m3.allocator.v3.formal.authorizedCommit", authorization)
+        systemProperty("nereus.m3.allocator.v3.formal.zeroDecisionPlanSha256", expectedPlan)
+        systemProperty("nereus.m3.allocator.v3.formal.outputDirectory", outputDirectory.toString())
+        systemProperty("nereus.m3.allocator.v3.formal.oxiaServiceAddress", oxiaServiceAddress)
+        systemProperty("nereus.m3.allocator.v3.formal.oxiaImageDigest", expectedOxiaImage)
+        systemProperty("nereus.m3.allocator.v3.formal.dependencyLockSha256", expectedDependencyLock)
+        systemProperty("nereus.m3.allocator.v3.formal.executorSha256", executorSha)
+    }
+}
+
 val realAllocatorV2ShortDiagnosticTest = tasks.register<Test>("realAllocatorV2ShortDiagnosticTest") {
     group = "verification"
     description =
@@ -838,6 +968,110 @@ tasks.register<JavaExec>("realAllocatorV2PromotionCheck") {
 tasks.register("realAllocatorV2PreCampaignCheck") {
     group = "verification"
     description = "Run every offline V2 allocator prerequisite; this task never starts a formal campaign."
+    dependsOn(
+        project(":nereus-domain").tasks.named("test"),
+        project(":nereus-metadata-spi").tasks.named("test"),
+        tasks.named("realAllocatorContractTest"),
+        tasks.named("checkstyleRealAllocatorTest"),
+    )
+}
+
+tasks.register<JavaExec>("validateRealAllocatorV3Checkpoint") {
+    group = "verification"
+    description = "Offline strict NACP3 checkpoint/resume validation; accesses no Oxia service."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    mainClass.set("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AllocatorProtocolMain")
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for V3 allocator checkpoint validation")
+        setArgs(
+            listOf(
+                "validate-checkpoint",
+                file(required("v2M3AllocatorV3CheckpointPath")).absolutePath,
+                required("v2M3AllocatorV3NereusCommit"),
+                required("v2M3AllocatorV3OxiaImageDigest"),
+                required("v2M3AllocatorV3DependencyLockDigest"),
+                required("v2M3AllocatorV3ExecutorDigest"),
+                required("v2M3AllocatorV3WorkloadDigest"),
+            ),
+        )
+    }
+}
+
+tasks.register<JavaExec>("sealRealAllocatorV3Evaluation") {
+    group = "verification"
+    description =
+        "Seal one complete validator-reproved NACP3 as NAEV3; baseline-unavailable/NONE/BOTH stay non-promotable."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    mainClass.set("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AllocatorProtocolMain")
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for V3 allocator evaluation sealing")
+        setArgs(
+            listOf(
+                "seal-evaluation",
+                file(required("v2M3AllocatorV3CheckpointPath")).absolutePath,
+                file(required("v2M3AllocatorV3EvaluationOutput")).absolutePath,
+                required("v2M3AllocatorV3NereusCommit"),
+                required("v2M3AllocatorV3OxiaImageDigest"),
+                required("v2M3AllocatorV3DependencyLockDigest"),
+                required("v2M3AllocatorV3ExecutorDigest"),
+                required("v2M3AllocatorV3WorkloadDigest"),
+            ),
+        )
+    }
+}
+
+fun JavaExec.configureAllocatorV3PromotionCommand(command: String, outputProperty: String) {
+    group = "verification"
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    mainClass.set("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AllocatorProtocolMain")
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for the V3 allocator promotion/selection command")
+        setArgs(
+            listOf(
+                command,
+                file(required("v2M3AllocatorV3EvaluationPath")).absolutePath,
+                file(required("v2M3AllocatorV3CheckpointPath")).absolutePath,
+                file(required("v2M3AllocatorV3DiagnosticPath")).absolutePath,
+                file(required("v2M3AllocatorV3DiagnosticJUnitPath")).absolutePath,
+                file(required("v2M3AllocatorV3FormalJUnitPath")).absolutePath,
+                file(required("v2M3AllocatorV3AttachmentDirectory")).absolutePath,
+                file(required(outputProperty)).absolutePath,
+                required("v2M3AllocatorV3NereusCommit"),
+                required("v2M3AllocatorV3OxiaImageDigest"),
+                required("v2M3AllocatorV3DependencyLockDigest"),
+                required("v2M3AllocatorV3ExecutorDigest"),
+                required("v2M3AllocatorV3WorkloadDigest"),
+            ),
+        )
+    }
+}
+
+tasks.register<JavaExec>("realAllocatorV3PromotionCheck") {
+    description = "Verify exact NAEV3/NACP3/NADV3/JUnit/attachment freshness and emit one promotion decision."
+    configureAllocatorV3PromotionCommand("promotion-check", "v2M3AllocatorV3PromotionOutput")
+}
+
+tasks.register<JavaExec>("sealRealAllocatorV3Selection") {
+    description = "Seal canonical NARS3 only after a unique V3 promotion decision."
+    configureAllocatorV3PromotionCommand("seal-selection", "v2M3AllocatorV3SelectionOutput")
+}
+
+tasks.register("realAllocatorV3PreCampaignCheck") {
+    group = "verification"
+    description =
+        "Run every offline ADR-0108 V3 feasibility, protocol, async-runner, and compatibility prerequisite."
     dependsOn(
         project(":nereus-domain").tasks.named("test"),
         project(":nereus-metadata-spi").tasks.named("test"),
