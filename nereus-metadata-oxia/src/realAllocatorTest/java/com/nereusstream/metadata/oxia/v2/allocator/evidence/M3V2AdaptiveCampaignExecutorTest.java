@@ -217,6 +217,7 @@ class M3V2AdaptiveCampaignExecutorTest {
         AllocatorCampaignCheckpointV2 failed = checkpoint(result);
 
         assertThat(result.reason()).isEqualTo(TerminalReason.INFRASTRUCTURE_FAILED);
+        assertThat(result.detail()).contains("fake interval infrastructure invalid");
         assertThat(failed.status()).isEqualTo(Status.INFRASTRUCTURE_FAILED);
         assertThat(failed.executionRecords()).hasSize(1);
         assertThatThrownBy(() -> AllocatorCampaignEvaluationSealV2.seal(result.checkpointBytes()))
@@ -521,6 +522,7 @@ class M3V2AdaptiveCampaignExecutorTest {
         return new IntervalActionResult(
                 evidence,
                 digest("attachment-" + identity(evidence)),
-                infrastructureValid);
+                infrastructureValid,
+                infrastructureValid ? "" : "fake interval infrastructure invalid");
     }
 }

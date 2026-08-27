@@ -121,7 +121,8 @@ final class M3V2FormalActionExecutorAdapter implements ActionExecutor {
         return new ActionResult(
                 runtimeResult.evidence(),
                 aggregateDigest(results),
-                results.stream().allMatch(PhysicalActionResult::infrastructureValid));
+                results.stream().allMatch(PhysicalActionResult::infrastructureValid),
+                infrastructureDetail(results));
     }
 
     private static ActionResult completeFault(Row row, List<PhysicalActionResult> results) {
@@ -179,7 +180,8 @@ final class M3V2FormalActionExecutorAdapter implements ActionExecutor {
         return new ActionResult(
                 evidence,
                 aggregateDigest(results),
-                results.stream().allMatch(PhysicalActionResult::infrastructureValid));
+                results.stream().allMatch(PhysicalActionResult::infrastructureValid),
+                infrastructureDetail(results));
     }
 
     private static void validateRuntimeResult(PlannedActionV2 action, RuntimeActionResult result) {
@@ -213,6 +215,22 @@ final class M3V2FormalActionExecutorAdapter implements ActionExecutor {
         ByteBuffer bytes = ByteBuffer.allocate(Math.multiplyExact(results.size(), Sha256Digest.LENGTH));
         results.forEach(result -> bytes.put(result.attachmentDigest().bytes().toByteArray()));
         return Sha256Digest.hash(CanonicalBytes.copyOf(bytes.array()));
+    }
+
+    private static String infrastructureDetail(List<PhysicalActionResult> results) {
+        StringBuilder detail = new StringBuilder();
+        for (PhysicalActionResult result : results) {
+            if (!result.infrastructureValid()) {
+                if (!detail.isEmpty()) {
+                    detail.append("; ");
+                }
+                RuntimeActionResult runtimeResult = (RuntimeActionResult) result.rawEvidence();
+                detail.append(result.action().kind())
+                        .append(':')
+                        .append(runtimeResult.infrastructureDetail());
+            }
+        }
+        return detail.toString();
     }
 
     private static PopulationKey populationKey(PlannedActionV2 action) {
@@ -256,14 +274,22 @@ final class M3V2FormalActionExecutorAdapter implements ActionExecutor {
         Sha256Digest attachmentDigest();
 
         boolean infrastructureValid();
+
+        default String infrastructureDetail() {
+            return infrastructureValid() ? "" : "runtime action returned infrastructure-invalid evidence";
+        }
     }
 
     record IntervalActionResult(
-            IntervalEvidence evidence, Sha256Digest attachmentDigest, boolean infrastructureValid)
+            IntervalEvidence evidence,
+            Sha256Digest attachmentDigest,
+            boolean infrastructureValid,
+            String infrastructureDetail)
             implements RuntimeActionResult {
         IntervalActionResult {
             Objects.requireNonNull(evidence, "evidence");
             Objects.requireNonNull(attachmentDigest, "attachmentDigest");
+            Objects.requireNonNull(infrastructureDetail, "infrastructureDetail");
         }
     }
 

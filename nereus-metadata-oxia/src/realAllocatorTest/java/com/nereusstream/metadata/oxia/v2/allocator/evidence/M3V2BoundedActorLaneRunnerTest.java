@@ -222,6 +222,73 @@ class M3V2BoundedActorLaneRunnerTest {
     }
 
     @Test
+    void boundedWarmupOverloadIsConservedWithoutBecomingInfrastructureFailure() throws Exception {
+        M3V2BoundedActorLaneRunner<String> runner = new M3V2BoundedActorLaneRunner<>(
+                Duration.ofMillis(60), Duration.ofMillis(60), Duration.ofMillis(100));
+        CompletableFuture<Void> warmupGate = new CompletableFuture<>();
+        CountDownLatch warmupStarted = new CountDownLatch(1);
+        Thread release = new Thread(() -> {
+            try {
+                if (!warmupStarted.await(1, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("warmup request did not start");
+                }
+                Thread.sleep(20);
+                warmupGate.complete(null);
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        release.start();
+        List<M3V2BoundedActorLaneRunner.ScheduledOffer<String>> schedule = new ArrayList<>();
+        for (int ordinal = 0; ordinal < 5; ordinal++) {
+            schedule.add(new M3V2BoundedActorLaneRunner.ScheduledOffer<>(
+                    ordinal, 0, 0, false, "warmup-" + ordinal));
+        }
+        schedule.add(new M3V2BoundedActorLaneRunner.ScheduledOffer<>(
+                5, 1, TimeUnit.MILLISECONDS.toNanos(60), true, "measured"));
+
+        var result = runner.run(2, schedule, (actorId, request) -> {
+            if (request.startsWith("warmup")) {
+                warmupStarted.countDown();
+                return warmupGate;
+            }
+            return CompletableFuture.completedFuture(null);
+        });
+        release.join();
+
+        assertThat(result.warmupOffered()).isEqualTo(5);
+        assertThat(result.warmupDroppedBeforeAdmission()).isGreaterThanOrEqualTo(3);
+        assertThat(result.offered()).isEqualTo(1);
+        assertThat(result.completed()).isEqualTo(1);
+        assertThat(M3V2AllocatorFormalHarness.infrastructureValid(result)).isTrue();
+        assertWarmupConservation(result);
+        assertConservation(result);
+    }
+
+    @Test
+    void admittedWarmupFailureRemainsInfrastructureInvalidWithExactDetail() throws Exception {
+        M3V2BoundedActorLaneRunner<String> runner = new M3V2BoundedActorLaneRunner<>(
+                Duration.ofMillis(20), Duration.ofMillis(30), Duration.ofMillis(50));
+        List<M3V2BoundedActorLaneRunner.ScheduledOffer<String>> schedule = List.of(
+                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(0, 0, 0, false, "warmup"),
+                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(
+                        1, 1, TimeUnit.MILLISECONDS.toNanos(20), true, "measured"));
+
+        var result = runner.run(2, schedule, (actorId, request) -> request.equals("warmup")
+                ? CompletableFuture.failedFuture(new IllegalStateException("warmup failure"))
+                : CompletableFuture.completedFuture(null));
+
+        assertThat(result.warmupFailedAfterAdmission()).isEqualTo(1);
+        assertThat(M3V2AllocatorFormalHarness.infrastructureValid(result)).isFalse();
+        assertThat(M3V2AllocatorFormalHarness.infrastructureDetail(result))
+                .contains("actorLanesStoppedAtCleanupDeadline=true")
+                .contains("warmupFailedAfterAdmission=1")
+                .contains("warmupTimedOutAfterAdmission=0");
+        assertWarmupConservation(result);
+        assertConservation(result);
+    }
+
+    @Test
     void harnessRoutesEveryActorToAnIndependentCoordinatorAndRevalidatesConservation() throws Exception {
         List<AtomicInteger> calls = List.of(
                 new AtomicInteger(), new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
@@ -355,6 +422,14 @@ class M3V2BoundedActorLaneRunnerTest {
                 .isEqualTo(result.completed() + result.failedAfterAdmission() + result.timedOutAfterAdmission());
         assertThat(result.terminal()).isEqualTo(result.admitted());
         assertThat(result.measuredTerminals()).hasSize(Math.toIntExact(result.offered()));
+    }
+
+    private static void assertWarmupConservation(M3V2BoundedActorLaneRunner.IntervalResult result) {
+        assertThat(result.warmupOffered())
+                .isEqualTo(result.warmupDroppedBeforeAdmission()
+                        + result.warmupCompleted()
+                        + result.warmupFailedAfterAdmission()
+                        + result.warmupTimedOutAfterAdmission());
     }
 
     private static Request request() {

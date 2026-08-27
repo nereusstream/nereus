@@ -118,11 +118,25 @@ final class M3V2AllocatorFormalHarness {
                 interval.inFlightAtEnd(),
                 interval.waiterAtEnd());
         AllocatorCampaignValidatorV2.validateIntervalConservation(evidence);
-        boolean infrastructureValid = interval.actorLanesStoppedAtCleanupDeadline()
-                && interval.warmupDroppedBeforeAdmission() == 0
+        boolean infrastructureValid = infrastructureValid(interval);
+        return new HarnessResult(evidence, interval, infrastructureValid);
+    }
+
+    static boolean infrastructureValid(M3V2BoundedActorLaneRunner.IntervalResult interval) {
+        Objects.requireNonNull(interval, "interval");
+        return interval.actorLanesStoppedAtCleanupDeadline()
                 && interval.warmupFailedAfterAdmission() == 0
                 && interval.warmupTimedOutAfterAdmission() == 0;
-        return new HarnessResult(evidence, interval, infrastructureValid);
+    }
+
+    static String infrastructureDetail(M3V2BoundedActorLaneRunner.IntervalResult interval) {
+        Objects.requireNonNull(interval, "interval");
+        return "actorLanesStoppedAtCleanupDeadline=" + interval.actorLanesStoppedAtCleanupDeadline()
+                + ",warmupOffered=" + interval.warmupOffered()
+                + ",warmupDroppedBeforeAdmission=" + interval.warmupDroppedBeforeAdmission()
+                + ",warmupCompleted=" + interval.warmupCompleted()
+                + ",warmupFailedAfterAdmission=" + interval.warmupFailedAfterAdmission()
+                + ",warmupTimedOutAfterAdmission=" + interval.warmupTimedOutAfterAdmission();
     }
 
     private static List<ActorEndpoint> requireIndependentActors(List<ActorEndpoint> actors) {

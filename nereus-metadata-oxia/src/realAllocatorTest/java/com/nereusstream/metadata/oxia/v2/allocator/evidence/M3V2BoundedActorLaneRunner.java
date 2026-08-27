@@ -310,9 +310,18 @@ final class M3V2BoundedActorLaneRunner<T> {
             laneQueueCapacities = List.copyOf(laneQueueCapacities);
             perActorInFlightMaximum = List.copyOf(perActorInFlightMaximum);
             measuredTerminals = List.copyOf(measuredTerminals);
+            long measuredTerminal = Math.addExact(
+                    completed, Math.addExact(failedAfterAdmission, timedOutAfterAdmission));
+            long warmupTerminal = Math.addExact(
+                    warmupCompleted, Math.addExact(warmupFailedAfterAdmission, warmupTimedOutAfterAdmission));
             if (laneQueueCapacities.size() != ACTOR_COUNT
                     || perActorInFlightMaximum.size() != ACTOR_COUNT
-                    || laneQueueCapacities.stream().mapToInt(Integer::intValue).sum() != queueCapacity) {
+                    || laneQueueCapacities.stream().mapToInt(Integer::intValue).sum() != queueCapacity
+                    || offered != Math.addExact(overloadDroppedBeforeAdmission, measuredTerminal)
+                    || admitted != measuredTerminal
+                    || terminal != measuredTerminal
+                    || measuredTerminals.size() != Math.toIntExact(offered)
+                    || warmupOffered != Math.addExact(warmupDroppedBeforeAdmission, warmupTerminal)) {
                 throw new IllegalArgumentException("allocator V2 physical lane inventory differs");
             }
         }

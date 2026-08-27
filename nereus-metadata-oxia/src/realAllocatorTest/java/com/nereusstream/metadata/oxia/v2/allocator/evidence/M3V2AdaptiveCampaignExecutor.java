@@ -282,7 +282,7 @@ final class M3V2AdaptiveCampaignExecutor {
                         nextBytes,
                         next,
                         TerminalReason.INFRASTRUCTURE_FAILED,
-                        "action returned infrastructure-invalid raw evidence");
+                        actionResult.infrastructureDetail());
             }
             if (nextStatus == Status.COMPLETED) {
                 return result(nextBytes, next, TerminalReason.COMPLETED, "validator-complete campaign");
@@ -375,10 +375,18 @@ final class M3V2AdaptiveCampaignExecutor {
         }
     }
 
-    record ActionResult(Observation observation, Sha256Digest attachmentDigest, boolean infrastructureValid) {
+    record ActionResult(
+            Observation observation,
+            Sha256Digest attachmentDigest,
+            boolean infrastructureValid,
+            String infrastructureDetail) {
         ActionResult {
             Objects.requireNonNull(observation, "observation");
             Objects.requireNonNull(attachmentDigest, "attachmentDigest");
+            Objects.requireNonNull(infrastructureDetail, "infrastructureDetail");
+            if (!infrastructureValid && infrastructureDetail.isBlank()) {
+                throw new IllegalArgumentException("allocator V2 infrastructure failure detail is absent");
+            }
         }
     }
 

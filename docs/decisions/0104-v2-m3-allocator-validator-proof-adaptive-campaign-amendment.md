@@ -139,6 +139,13 @@ admitted = completed + failedAfterAdmission + timedOutAfterAdmission
 Any drop, failure, timeout, nonzero waiter residue, nonzero in-flight residue, or conservation mismatch makes the
 interval incomplete and prevents it from establishing a sustainable rate.
 
+Warm-up offers use the same physical lanes and are conserved separately from measured offers. Because the adaptive
+planner deliberately probes higher unsustainable rates before descending, a bounded warm-up pre-admission overload
+drop is not an infrastructure failure and cannot populate or excuse the measured interval. A warm-up admitted request
+that fails or times out, or an actor lane that does not stop by the cleanup deadline, remains infrastructure-invalid.
+Every measured drop remains in the raw interval, makes that rate incomplete, and forces the validator-controlled
+descent; this distinction cannot turn overload into a passing rate.
+
 ### Frozen hard budgets and plan-only projection
 
 `scripts/run-v2-m3-real-allocator-evidence.sh --plan-only` is an offline, byte-stable projection. It starts no

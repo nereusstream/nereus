@@ -136,13 +136,12 @@ final class M3V2RealFormalActionRuntime implements RealActionRuntime, AutoClosea
                 0,
                 interval.rolloverP99Micros());
         Attachment attachment = writeJsonAttachment("interval-" + cell.contextId(), intervalJson(evidence));
+        boolean infrastructureValid = M3V2AllocatorFormalHarness.infrastructureValid(interval);
         return new IntervalActionResult(
                 evidence,
                 attachment.digest(),
-                interval.actorLanesStoppedAtCleanupDeadline()
-                        && interval.warmupDroppedBeforeAdmission() == 0
-                        && interval.warmupFailedAfterAdmission() == 0
-                        && interval.warmupTimedOutAfterAdmission() == 0);
+                infrastructureValid,
+                M3V2AllocatorFormalHarness.infrastructureDetail(interval));
     }
 
     @Override
@@ -177,7 +176,11 @@ final class M3V2RealFormalActionRuntime implements RealActionRuntime, AutoClosea
             actors.setControlledLatencyMillis(0);
         }
         Attachment attachment = writeJsonAttachment("interval-" + cell.contextId(), intervalJson(result.evidence()));
-        return new IntervalActionResult(result.evidence(), attachment.digest(), result.infrastructureValid());
+        return new IntervalActionResult(
+                result.evidence(),
+                attachment.digest(),
+                result.infrastructureValid(),
+                M3V2AllocatorFormalHarness.infrastructureDetail(result.runnerResult()));
     }
 
     @Override
