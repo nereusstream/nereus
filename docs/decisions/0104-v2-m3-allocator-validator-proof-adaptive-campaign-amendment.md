@@ -125,10 +125,13 @@ deadline, and a maximum 25-millisecond retry backoff. The elapsed bound is short
 cleanup grace, so a terminally timed-out lane cannot leave the workflow authorized to continue beyond the interval
 cleanup boundary. A request-local lock-free guard wraps every store call, so a read/CAS completion arriving after the
 deadline cannot dispatch the next metadata operation. Deadline and backoff exhaustion are separate typed failures.
-The real formal action runtime uses a 20-millisecond retry delay. The delay is long enough not to consume the 64-retry
-count prematurely under sustained four-coordinator STRICT Cell contention, and remains strictly below the
-25-millisecond retry-backoff guard. Its delayed completion runs directly on the delay scheduler, without a second
-common-pool handoff that could reorder the 20-millisecond completion behind its 25-millisecond fail-closed guard. An
+The real formal action runtime gives its four independent coordinators a deterministic rotating 20-, 21-, 22-, and
+23-millisecond retry phase. Every retry ordinal uses that exact permutation and every coordinator visits every phase;
+this prevents a single delay-scheduler FIFO from permanently phase-locking the same coordinator under sustained
+STRICT Cell contention without adding a shared Java correctness lock. All four phases remain strictly below the
+25-millisecond retry-backoff guard, while the 64-retry and four-second envelopes are unchanged. Delayed completion
+runs directly on the delay scheduler, without a second common-pool handoff that could reorder it behind its
+fail-closed guard. An
 infrastructure-invalid warm-up result also retains the first bounded failure type and protocol code in the campaign
 terminal detail; this diagnostic field cannot change its disposition.
 Smaller test bounds are allowed, but

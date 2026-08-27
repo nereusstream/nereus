@@ -66,7 +66,7 @@ final class M3CandidateAllocatorPopulation {
     private static final long INITIAL_OWNER_EPOCH = 1;
     private static final long OPERATION_TIMEOUT_SECONDS = 120;
     private static final long POPULATION_DRAIN_TIMEOUT_SECONDS = 600;
-    private static final Duration FORMAL_RETRY_BACKOFF = Duration.ofMillis(20);
+    private static final Duration FORMAL_RETRY_BACKOFF_BASE = Duration.ofMillis(20);
 
     private final AllocatorEvidenceCandidateV1 candidate;
     private final M3RealOxiaActors actors;
@@ -114,11 +114,15 @@ final class M3CandidateAllocatorPopulation {
             exactAllocators.add(allocator);
         }
         allocators = List.copyOf(exactAllocators);
-        boundedWorkflows = allocators.stream()
-                .map(allocator -> allocator.boundedWorkflow(
-                        BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal(),
-                        M3CandidateAllocatorPopulation::boundedBackoff))
-                .toList();
+        List<BoundedVirtualLedgerAllocatorWorkflowV2> exactWorkflows = new ArrayList<>(allocators.size());
+        for (int actorId = 0; actorId < allocators.size(); actorId++) {
+            int exactActorId = actorId;
+            exactWorkflows.add(allocators.get(actorId)
+                    .boundedWorkflow(
+                            BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal(),
+                            (retryNumber, reason) -> boundedBackoff(exactActorId, retryNumber, reason)));
+        }
+        boundedWorkflows = List.copyOf(exactWorkflows);
         cell.set(exactCreate(allocators.get(0).createCell(currentView)));
     }
 
@@ -188,15 +192,21 @@ final class M3CandidateAllocatorPopulation {
     }
 
     static CompletionStage<Void> boundedBackoff(
-            int retryNumber, BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
+            int actorId, int retryNumber, BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
         return CompletableFuture.runAsync(
                 () -> {},
                 CompletableFuture.delayedExecutor(
-                        formalRetryBackoff().toMillis(), TimeUnit.MILLISECONDS, Runnable::run));
+                        formalRetryBackoff(actorId, retryNumber).toMillis(),
+                        TimeUnit.MILLISECONDS,
+                        Runnable::run));
     }
 
-    static Duration formalRetryBackoff() {
-        return FORMAL_RETRY_BACKOFF;
+    static Duration formalRetryBackoff(int actorId, int retryNumber) {
+        if (actorId < 0 || actorId >= M3V2BoundedActorLaneRunner.ACTOR_COUNT || retryNumber <= 0) {
+            throw new IllegalArgumentException("allocator formal retry phase is outside the actor/retry inventory");
+        }
+        int phase = Math.floorMod(actorId + retryNumber - 1, M3V2BoundedActorLaneRunner.ACTOR_COUNT);
+        return FORMAL_RETRY_BACKOFF_BASE.plusMillis(phase);
     }
 
     long ensurePopulation(int requestedPopulation) throws Exception {

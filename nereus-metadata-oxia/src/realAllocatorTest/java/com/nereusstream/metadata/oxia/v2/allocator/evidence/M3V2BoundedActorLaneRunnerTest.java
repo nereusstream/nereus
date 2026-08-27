@@ -41,8 +41,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -296,10 +298,28 @@ class M3V2BoundedActorLaneRunnerTest {
     }
 
     @Test
-    void formalRealActionRetryBackoffUsesSustainedContentionDelayBelowItsGuard() {
-        assertThat(M3CandidateAllocatorPopulation.formalRetryBackoff())
-                .isEqualTo(Duration.ofMillis(20))
-                .isLessThan(BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal().maximumRetryBackoff());
+    void formalRealActionRetryBackoffRotatesFourDistinctPhasesBelowItsGuard() {
+        Duration maximum = BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal().maximumRetryBackoff();
+        for (int retryNumber = 1; retryNumber <= 4; retryNumber++) {
+            List<Duration> round = new ArrayList<>();
+            for (int actorId = 0; actorId < M3V2BoundedActorLaneRunner.ACTOR_COUNT; actorId++) {
+                round.add(M3CandidateAllocatorPopulation.formalRetryBackoff(actorId, retryNumber));
+            }
+            assertThat(round)
+                    .containsExactlyInAnyOrder(
+                            Duration.ofMillis(20),
+                            Duration.ofMillis(21),
+                            Duration.ofMillis(22),
+                            Duration.ofMillis(23))
+                    .allMatch(delay -> delay.compareTo(maximum) < 0);
+        }
+        for (int actorId = 0; actorId < M3V2BoundedActorLaneRunner.ACTOR_COUNT; actorId++) {
+            Set<Duration> actorPhases = new HashSet<>();
+            for (int retryNumber = 1; retryNumber <= 4; retryNumber++) {
+                actorPhases.add(M3CandidateAllocatorPopulation.formalRetryBackoff(actorId, retryNumber));
+            }
+            assertThat(actorPhases).hasSize(4);
+        }
     }
 
     @Test
@@ -309,7 +329,7 @@ class M3V2BoundedActorLaneRunnerTest {
         CountDownLatch completed = new CountDownLatch(1);
 
         M3CandidateAllocatorPopulation.boundedBackoff(
-                        1, BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason.RESERVATION_BUSY)
+                        0, 1, BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason.RESERVATION_BUSY)
                 .whenComplete((ignored, failure) -> {
                     completionThread.set(Thread.currentThread().getName());
                     completionFailure.set(failure);
