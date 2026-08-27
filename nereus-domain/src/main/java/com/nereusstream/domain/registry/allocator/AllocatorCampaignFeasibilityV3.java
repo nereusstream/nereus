@@ -17,7 +17,11 @@ import java.util.Objects;
 /** Pure offline ADR-0108 structural feasibility gate. Its optimistic bound is not a throughput promise. */
 public final class AllocatorCampaignFeasibilityV3 {
     public static final String PROTOCOL_VERSION = "ADR-0108-NACP3";
-    public static final AdmissionTuple FORMAL_ADMISSION = new AdmissionTuple(4, 64, 256, 1);
+    public static final AdmissionTuple FORMAL_ADMISSION = new AdmissionTuple(
+            AllocatorEvidenceAdmissionPolicyV3.ACTOR_COUNT,
+            AllocatorEvidenceAdmissionPolicyV3.MAX_ASYNC_OUTSTANDING_PER_ACTOR,
+            AllocatorEvidenceAdmissionPolicyV3.MAX_GLOBAL_OUTSTANDING,
+            AllocatorEvidenceAdmissionPolicyV3.MAX_ROLLOVER_OUTSTANDING_PER_BINDING);
     public static final int FAULT_ACTIONS_MAX = 360;
     public static final int SCALE_ACTIONS_MAX = 32;
     public static final int TOTAL_ACTIONS_MAX = 720;
