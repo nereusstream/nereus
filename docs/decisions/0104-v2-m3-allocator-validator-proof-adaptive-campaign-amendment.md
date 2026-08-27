@@ -117,6 +117,10 @@ The request ID and candidate identity are stable across retry. A retry may not c
 request has formed any reservation or candidate state, an exact Head-version change with the same incarnation,
 owner, slice and context is a bounded same-key reread: the request rebinds that current predecessor while retaining
 the same request and descriptor identity. Once request-bound candidate state exists, Head drift remains fail-closed.
+This pre-candidate rule includes an exact stored-Head guard that observes drift before node-create dispatch. The
+workflow records whether any node mutation result could have persisted; only a guard failure before such a result may
+discard the local candidate value and re-enter Head rebase. An indeterminate or successful node mutation permanently
+closes that path for the request, so a retry cannot consume a second ledger ID.
 An exact RANGE node-create conflict does not bind the losing request to the other request's candidate. The loser never
 accepts that node: it first proves that the node is the exact structurally publishable successor of its predecessor and
 that a same-key Head reread equals that exact successor, with at most one bounded publication reread while the Head is

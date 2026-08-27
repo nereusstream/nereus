@@ -367,6 +367,12 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
                     if (failure != null) {
                         Throwable exactFailure = unwrap(failure);
                         if (cell.value().mode() == AllocatorModeV1.RANGE_LEASED
+                                && isCode(exactFailure, AllocatorProtocolException.Code.HEAD_STATE_DRIFT)
+                                && state.canAbandonUnpersistedCandidate()) {
+                            state.abandonUnpersistedCandidate();
+                            return retry(state, RetryReason.HEAD_REREAD, () -> acquireGrant(request, state));
+                        }
+                        if (cell.value().mode() == AllocatorModeV1.RANGE_LEASED
                                 && isCode(exactFailure, AllocatorProtocolException.Code.CELL_STATE_DRIFT)) {
                             return retry(
                                     state,
@@ -376,15 +382,18 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
                         return failed(exactFailure);
                     }
                     return switch (result.outcome()) {
-                        case CREATED, EXISTING_EXACT ->
-                            publishCandidate(
+                        case CREATED, EXISTING_EXACT -> {
+                            state.candidateMutationMayHavePersisted();
+                            yield publishCandidate(
                                     request,
                                     state,
                                     cell,
                                     head,
                                     requireExactNode(result.exactSnapshot(), state.candidateValue));
-                        case INDETERMINATE ->
-                            retry(
+                        }
+                        case INDETERMINATE -> {
+                            state.candidateMutationMayHavePersisted();
+                            yield retry(
                                     state,
                                     RetryReason.NODE_CREATE_UNRESOLVED,
                                     () -> createCandidate(
@@ -394,11 +403,14 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
                                             head,
                                             invoke(() -> allocator.createCandidate(
                                                     cell, head, request.currentView(), request.descriptorDigest()))));
-                        case DEFINITIVE_CONFLICT ->
-                            retry(
+                        }
+                        case DEFINITIVE_CONFLICT -> {
+                            state.candidateMutationDefinitivelyDidNotPersist();
+                            yield retry(
                                     state,
                                     RetryReason.NODE_CREATE_CONFLICT,
                                     () -> reconcileNode(request, state, cell, head));
+                        }
                     };
                 })
                 .thenCompose(value -> value);
@@ -950,6 +962,7 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
         private int reconcileRetries;
         private VirtualLedgerCandidateNodeV1 candidateValue;
         private VersionedVirtualLedgerCandidateNodeV1 exactNode;
+        private boolean candidateMutationMayHavePersisted;
 
         private State(Bounds bounds, Sha256Digest requestId) {
             this.requestId = Objects.requireNonNull(requestId, "requestId");
@@ -965,8 +978,20 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
             return candidateValue == null && exactNode == null;
         }
 
+        private boolean canAbandonUnpersistedCandidate() {
+            return candidateValue != null && exactNode == null && !candidateMutationMayHavePersisted;
+        }
+
+        private void candidateMutationMayHavePersisted() {
+            candidateMutationMayHavePersisted = true;
+        }
+
+        private void candidateMutationDefinitivelyDidNotPersist() {
+            candidateMutationMayHavePersisted = false;
+        }
+
         private void abandonUnpersistedCandidate() {
-            if (candidateValue == null || exactNode != null) {
+            if (!canAbandonUnpersistedCandidate()) {
                 throw new IllegalStateException("allocator candidate rebase did not prove an unpersisted request");
             }
             candidateValue = null;

@@ -221,6 +221,40 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
     }
 
     @Test
+    void rangeCoordinatorRebasesWhenExactHeadDriftsBeforeNodeCreateDispatch() {
+        store = new ReconcileStore();
+        ProductionVirtualLedgerAllocator range =
+                ProductionVirtualLedgerAllocator.forEvidenceCandidate(AllocatorEvidenceCandidateV1.range(64), store);
+        cell = createCell(AllocatorModeV1.RANGE_LEASED);
+        head = createHead(cell, incarnation("range-predispatch"));
+        cell = exact(range.reserve(cell, head, activeView(), digest("range-predispatch-grant")));
+        head = exact(range.installRangeReservedGrant(cell, head, activeView()));
+        cell = exact(range.clearReservation(cell, head));
+        long firstLedgerId = head.value().nextLedgerId();
+        store.delayReadHeadCall = 2;
+
+        CompletableFuture<Result> delayed = range.boundedWorkflow(
+                        8, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler.immediate())
+                .allocate(request(head, "range-delayed"))
+                .toCompletableFuture();
+        Result winner = range.boundedWorkflow(8, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler.immediate())
+                .allocate(request(head, "range-winner"))
+                .toCompletableFuture()
+                .join();
+        assertThat(delayed).isNotDone();
+
+        store.delayedReadHead.complete(Optional.of(store.head));
+        Result rebased = delayed.join();
+
+        assertThat(winner.exactNode().value().ledgerDescriptorDigest()).isEqualTo(digest("descriptor-range-winner"));
+        assertThat(rebased.exactNode().value().ledgerDescriptorDigest()).isEqualTo(digest("descriptor-range-delayed"));
+        assertThat(winner.exactNode().value().ledgerId()).isEqualTo(firstLedgerId);
+        assertThat(rebased.exactNode().value().ledgerId()).isEqualTo(firstLedgerId + 1);
+        assertThat(rebased.reconcileRetries()).isGreaterThanOrEqualTo(1);
+        assertThat(store.nodes).hasSize(2);
+    }
+
+    @Test
     void staleOwnerAndSliceContextDriftFailClosedBeforeAllocation() {
         VersionedManagedLedgerAllocatorHeadV1 original = head;
         store.head = versionedHead(AllocatorProtocolV1.takeover(head.value(), 11));
@@ -426,10 +460,12 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         private boolean cellCasPredecessorUnchanged;
         private boolean readCellNeverCompletes;
         private int delayReadCellCall;
+        private int delayReadHeadCall;
         private int readCellCalls;
         private int readHeadCalls;
         private int createNodeCalls;
         private CompletableFuture<Optional<VersionedAllocatorCellStateV1>> delayedReadCell;
+        private CompletableFuture<Optional<VersionedManagedLedgerAllocatorHeadV1>> delayedReadHead;
 
         private MetadataVersion nextVersion() {
             return version(version++);
@@ -504,6 +540,10 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
                 Sha256Digest sliceAssignmentId,
                 ManagedLedgerIncarnationIdV1 managedLedgerIncarnation) {
             readHeadCalls++;
+            if (readHeadCalls == delayReadHeadCall) {
+                delayedReadHead = new CompletableFuture<>();
+                return delayedReadHead;
+            }
             return CompletableFuture.completedFuture(Optional.ofNullable(head));
         }
 
