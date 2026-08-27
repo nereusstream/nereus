@@ -130,6 +130,8 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             1,
         )[1].split("val realAllocatorV3NativeCanaryTest", 1)[0]
         self.assertIn("M3V3NativeBaselineCanaryTest", diagnostic)
+        self.assertIn('maxHeapSize = "6144m"', diagnostic)
+        self.assertIn("timeout.set(Duration.ofMinutes(60))", diagnostic)
         self.assertIn("validateRealAllocatorV3Diagnostic", module)
 
     def test_formal_archiver_is_create_new_byte_exact_and_collision_closed(self) -> None:

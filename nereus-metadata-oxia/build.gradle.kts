@@ -350,8 +350,6 @@ val realAllocatorRawVerificationTest = tasks.register<Test>("realAllocatorRawVer
     testClassesDirs = realAllocatorTest.output.classesDirs
     classpath = realAllocatorEvidenceRuntimeClasspath
     maxParallelForks = 1
-    maxHeapSize = "6144m"
-    timeout.set(Duration.ofMinutes(60))
     useJUnitPlatform()
     filter {
         includeTestsMatching(
@@ -822,6 +820,8 @@ val realAllocatorV3DiagnosticTest = tasks.register<Test>("realAllocatorV3Diagnos
     testClassesDirs = realAllocatorTest.output.classesDirs
     classpath = realAllocatorEvidenceRuntimeClasspath
     maxParallelForks = 1
+    maxHeapSize = "6144m"
+    timeout.set(Duration.ofMinutes(60))
     useJUnitPlatform()
     filter {
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AsyncActorLaneRunnerTest")
