@@ -238,7 +238,9 @@ class M3V2RealOxiaDiagnosticTest {
         }
 
         private static CompletionStage<Void> boundedBackoff(
-                int retryNumber, BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
+                Sha256Digest requestId,
+                int retryNumber,
+                BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
             return CompletableFuture.runAsync(
                     () -> {}, CompletableFuture.delayedExecutor(5, TimeUnit.MILLISECONDS));
         }

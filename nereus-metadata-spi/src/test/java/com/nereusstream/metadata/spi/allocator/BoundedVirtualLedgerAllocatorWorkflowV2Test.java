@@ -235,7 +235,9 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
     void retryBudgetExhaustionIsTypedAndCannotCreateADispositionOrConsumeAnId() {
         store.cellCasPredecessorUnchanged = true;
         List<RetryReason> reasons = new ArrayList<>();
-        var scheduler = (BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler) (number, reason) -> {
+        List<Sha256Digest> retryRequestIds = new ArrayList<>();
+        var scheduler = (BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler) (requestId, number, reason) -> {
+            retryRequestIds.add(requestId);
             reasons.add(reason);
             return CompletableFuture.completedFuture(null);
         };
@@ -243,6 +245,7 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         assertCode(
                 strictAllocator.boundedWorkflow(2, scheduler).allocate(request(head, "exhaust")),
                 AllocatorProtocolException.Code.RECONCILE_RETRY_EXHAUSTED);
+        assertThat(new HashSet<>(retryRequestIds)).containsExactly(digest("request-exhaust"));
         assertThat(reasons).containsExactly(RetryReason.CELL_CAS_UNRESOLVED, RetryReason.CELL_CAS_UNRESOLVED);
         assertThat(store.cell).isEqualTo(cell);
         assertThat(store.nodes).isEmpty();
@@ -255,7 +258,7 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
                 new BoundedVirtualLedgerAllocatorWorkflowV2.Bounds(2, Duration.ofMillis(100), Duration.ofMillis(10));
         assertCode(
                 strictAllocator
-                        .boundedWorkflow(boundedBackoff, (number, reason) -> new CompletableFuture<>())
+                        .boundedWorkflow(boundedBackoff, (requestId, number, reason) -> new CompletableFuture<>())
                         .allocate(request(head, "backoff-timeout")),
                 AllocatorProtocolException.Code.RETRY_BACKOFF_EXCEEDED);
 

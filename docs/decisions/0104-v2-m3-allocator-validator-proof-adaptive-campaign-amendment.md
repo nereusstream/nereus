@@ -125,13 +125,12 @@ deadline, and a maximum 25-millisecond retry backoff. The elapsed bound is short
 cleanup grace, so a terminally timed-out lane cannot leave the workflow authorized to continue beyond the interval
 cleanup boundary. A request-local lock-free guard wraps every store call, so a read/CAS completion arriving after the
 deadline cannot dispatch the next metadata operation. Deadline and backoff exhaustion are separate typed failures.
-The real formal action runtime gives its four independent coordinators a deterministic rotating 20-, 21-, 22-, and
-23-millisecond retry phase. Every retry ordinal uses that exact permutation and every coordinator visits every phase;
-this prevents a single delay-scheduler FIFO from permanently phase-locking the same coordinator under sustained
-STRICT Cell contention without adding a shared Java correctness lock. All four phases remain strictly below the
-25-millisecond retry-backoff guard, while the 64-retry and four-second envelopes are unchanged. Delayed completion
-runs directly on the delay scheduler, without a second common-pool handoff that could reorder it behind its
-fail-closed guard. An
+The real formal action runtime uses a request-bound deterministic 20- through 23-millisecond retry phase derived from
+the stable request ID, retry ordinal, and reason. This decorrelates successive contenders from a single
+delay-scheduler FIFO without adding actor-shared Java state or changing request identity. All four phases remain
+strictly below the 25-millisecond retry-backoff guard, while the 64-retry and four-second envelopes are unchanged.
+Delayed completion runs directly on the delay scheduler, without a second common-pool handoff that could reorder it
+behind its fail-closed guard. An
 infrastructure-invalid warm-up result also retains the first bounded failure type and protocol code in the campaign
 terminal detail; this diagnostic field cannot change its disposition.
 Smaller test bounds are allowed, but
@@ -151,10 +150,13 @@ admitted = completed + failedAfterAdmission + timedOutAfterAdmission
 Any drop, failure, timeout, nonzero waiter residue, nonzero in-flight residue, or conservation mismatch makes the
 interval incomplete and prevents it from establishing a sustainable rate.
 
-Warm-up offers use the same physical lanes and are conserved separately from measured offers. Because the adaptive
-planner deliberately probes higher unsustainable rates before descending, a bounded warm-up pre-admission overload
-drop is not an infrastructure failure and cannot populate or excuse the measured interval. A warm-up admitted request
-that fails or times out, or an actor lane that does not stop by the cleanup deadline, remains infrastructure-invalid.
+Warm-up offers use the same physical lanes and are conserved separately from measured offers. At the one-way measured
+transition, every still-queued, never-admitted warm-up offer receives its existing warm-up pre-admission overload-drop
+terminal; only an already-admitted warm-up request may finish on its lane. This keeps warm-up backlog from populating
+or excusing the measured interval without changing any frozen offer, arrival, queue-capacity, or workload byte.
+Because the adaptive planner deliberately probes higher unsustainable rates before descending, a bounded warm-up
+pre-admission overload drop is not an infrastructure failure. A warm-up admitted request that fails or times out, or
+an actor lane that does not stop by the cleanup deadline, remains infrastructure-invalid.
 Every measured drop remains in the raw interval, makes that rate incomplete, and forces the validator-controlled
 descent; this distinction cannot turn overload into a passing rate.
 

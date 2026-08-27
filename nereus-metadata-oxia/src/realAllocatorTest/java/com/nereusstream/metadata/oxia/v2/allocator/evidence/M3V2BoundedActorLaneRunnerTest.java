@@ -172,6 +172,54 @@ class M3V2BoundedActorLaneRunnerTest {
     }
 
     @Test
+    void measuredTransitionDropsQueuedWarmupWithoutAdmittingItIntoMeasurement() throws Exception {
+        M3V2BoundedActorLaneRunner<String> runner = new M3V2BoundedActorLaneRunner<>(
+                Duration.ofMillis(80), Duration.ofMillis(100), Duration.ofMillis(100));
+        CompletableFuture<Void> activeWarmup = new CompletableFuture<>();
+        CountDownLatch warmupStarted = new CountDownLatch(1);
+        AtomicInteger warmupCalls = new AtomicInteger();
+        Thread release = new Thread(() -> {
+            try {
+                if (!warmupStarted.await(1, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("active warmup did not start");
+                }
+                Thread.sleep(100);
+                activeWarmup.complete(null);
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        release.start();
+        List<M3V2BoundedActorLaneRunner.ScheduledOffer<String>> schedule = List.of(
+                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(0, 0, 0, false, "warmup-active"),
+                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(
+                        1, 0, TimeUnit.MILLISECONDS.toNanos(20), false, "warmup-queued"),
+                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(
+                        2, 0, TimeUnit.MILLISECONDS.toNanos(30), false, "warmup-overflow"),
+                new M3V2BoundedActorLaneRunner.ScheduledOffer<>(
+                        3, 1, TimeUnit.MICROSECONDS.toNanos(79_875), true, "measured"));
+
+        var result = runner.run(2, schedule, (actorId, request) -> {
+            if (request.startsWith("warmup")) {
+                warmupCalls.incrementAndGet();
+                warmupStarted.countDown();
+                return activeWarmup;
+            }
+            return CompletableFuture.completedFuture(null);
+        });
+        release.join();
+
+        assertThat(warmupCalls).hasValue(1);
+        assertThat(result.warmupOffered()).isEqualTo(3);
+        assertThat(result.warmupDroppedBeforeAdmission()).isEqualTo(2);
+        assertThat(result.warmupCompleted()).isEqualTo(1);
+        assertThat(result.offered()).isEqualTo(1);
+        assertThat(result.completed()).isEqualTo(1);
+        assertWarmupConservation(result);
+        assertConservation(result);
+    }
+
+    @Test
     void allSixFrozenRatesHaveOneOrdinalAuthoritativeTransitionBeforeCutoff() {
         Map<Integer, Long> firstMeasuredMicros = Map.of(
                 200, 10_000_000L,
@@ -298,27 +346,26 @@ class M3V2BoundedActorLaneRunnerTest {
     }
 
     @Test
-    void formalRealActionRetryBackoffRotatesFourDistinctPhasesBelowItsGuard() {
+    void formalRealActionRetryBackoffIsRequestBoundAndDecorrelatedBelowItsGuard() {
         Duration maximum = BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal().maximumRetryBackoff();
-        for (int retryNumber = 1; retryNumber <= 4; retryNumber++) {
-            List<Duration> round = new ArrayList<>();
-            for (int actorId = 0; actorId < M3V2BoundedActorLaneRunner.ACTOR_COUNT; actorId++) {
-                round.add(M3CandidateAllocatorPopulation.formalRetryBackoff(actorId, retryNumber));
+        for (String identity : List.of("retry-request-one", "retry-request-two")) {
+            Set<Duration> phases = new HashSet<>();
+            for (int retryNumber = 1; retryNumber <= 64; retryNumber++) {
+                Duration delay = M3CandidateAllocatorPopulation.formalRetryBackoff(
+                        digest(identity),
+                        retryNumber,
+                        BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason.RESERVATION_BUSY);
+                phases.add(delay);
+                assertThat(delay)
+                        .isBetween(Duration.ofMillis(20), Duration.ofMillis(23))
+                        .isLessThan(maximum);
             }
-            assertThat(round)
+            assertThat(phases)
                     .containsExactlyInAnyOrder(
                             Duration.ofMillis(20),
                             Duration.ofMillis(21),
                             Duration.ofMillis(22),
-                            Duration.ofMillis(23))
-                    .allMatch(delay -> delay.compareTo(maximum) < 0);
-        }
-        for (int actorId = 0; actorId < M3V2BoundedActorLaneRunner.ACTOR_COUNT; actorId++) {
-            Set<Duration> actorPhases = new HashSet<>();
-            for (int retryNumber = 1; retryNumber <= 4; retryNumber++) {
-                actorPhases.add(M3CandidateAllocatorPopulation.formalRetryBackoff(actorId, retryNumber));
-            }
-            assertThat(actorPhases).hasSize(4);
+                            Duration.ofMillis(23));
         }
     }
 
@@ -329,7 +376,9 @@ class M3V2BoundedActorLaneRunnerTest {
         CountDownLatch completed = new CountDownLatch(1);
 
         M3CandidateAllocatorPopulation.boundedBackoff(
-                        0, 1, BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason.RESERVATION_BUSY)
+                        digest("completion-thread"),
+                        1,
+                        BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason.RESERVATION_BUSY)
                 .whenComplete((ignored, failure) -> {
                     completionThread.set(Thread.currentThread().getName());
                     completionFailure.set(failure);

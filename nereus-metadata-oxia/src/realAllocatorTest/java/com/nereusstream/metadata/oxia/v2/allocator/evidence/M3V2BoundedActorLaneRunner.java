@@ -359,7 +359,19 @@ final class M3V2BoundedActorLaneRunner<T> {
         }
 
         private synchronized void beginMeasurement() {
+            for (ArrayDeque<QueuedRequest<T>> queue : queues) {
+                while (!queue.isEmpty()) {
+                    QueuedRequest<T> queued = queue.removeFirst();
+                    if (queued.offer().measured()) {
+                        throw new IllegalStateException(
+                                "allocator V2 measured request was queued before its phase began");
+                    }
+                    metrics.dequeued();
+                    metrics.dropped(queued.offer());
+                }
+            }
             metrics.beginMeasurement();
+            notifyAll();
         }
 
         private synchronized void offer(ScheduledOffer<T> offer) {

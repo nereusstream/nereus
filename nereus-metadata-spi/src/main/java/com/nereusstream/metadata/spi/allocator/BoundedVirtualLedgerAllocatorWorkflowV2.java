@@ -59,7 +59,7 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
 
     public CompletionStage<Result> allocate(Request request) {
         Objects.requireNonNull(request, "request");
-        State state = new State(bounds);
+        State state = new State(bounds, request.requestId());
         PulsarVirtualLedgerAllocatorStore guardedStore = new DeadlineGuardedStore(store, state);
         BoundedVirtualLedgerAllocatorWorkflowV2 execution = new BoundedVirtualLedgerAllocatorWorkflowV2(
                 allocator.withStore(guardedStore), guardedStore, bounds, retryScheduler);
@@ -590,7 +590,7 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
         long backoffNanos =
                 Math.min(remainingNanos, bounds.maximumRetryBackoff().toNanos());
         return withinDeadline(
-                        invoke(() -> retryScheduler.beforeRetry(state.reconcileRetries, reason)),
+                        invoke(() -> retryScheduler.beforeRetry(state.requestId, state.reconcileRetries, reason)),
                         backoffNanos,
                         AllocatorProtocolException.Code.RETRY_BACKOFF_EXCEEDED,
                         "allocator retry backoff exceeded its source-governed bound at " + reason)
@@ -861,10 +861,10 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
 
     @FunctionalInterface
     public interface RetryScheduler {
-        CompletionStage<Void> beforeRetry(int retryNumber, RetryReason reason);
+        CompletionStage<Void> beforeRetry(Sha256Digest requestId, int retryNumber, RetryReason reason);
 
         static RetryScheduler immediate() {
-            return (retryNumber, reason) -> CompletableFuture.completedFuture(null);
+            return (requestId, retryNumber, reason) -> CompletableFuture.completedFuture(null);
         }
     }
 
@@ -896,13 +896,15 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
     private record Authorities(VersionedAllocatorCellStateV1 cell, VersionedManagedLedgerAllocatorHeadV1 head) {}
 
     private static final class State {
+        private final Sha256Digest requestId;
         private final long deadlineNanos;
         private final AtomicBoolean terminal = new AtomicBoolean();
         private int reconcileRetries;
         private VirtualLedgerCandidateNodeV1 candidateValue;
         private VersionedVirtualLedgerCandidateNodeV1 exactNode;
 
-        private State(Bounds bounds) {
+        private State(Bounds bounds, Sha256Digest requestId) {
+            this.requestId = Objects.requireNonNull(requestId, "requestId");
             deadlineNanos = Math.addExact(
                     System.nanoTime(), bounds.totalElapsedDeadline().toNanos());
         }

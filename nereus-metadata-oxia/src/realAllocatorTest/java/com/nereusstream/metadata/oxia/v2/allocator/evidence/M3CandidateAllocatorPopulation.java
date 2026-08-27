@@ -114,15 +114,11 @@ final class M3CandidateAllocatorPopulation {
             exactAllocators.add(allocator);
         }
         allocators = List.copyOf(exactAllocators);
-        List<BoundedVirtualLedgerAllocatorWorkflowV2> exactWorkflows = new ArrayList<>(allocators.size());
-        for (int actorId = 0; actorId < allocators.size(); actorId++) {
-            int exactActorId = actorId;
-            exactWorkflows.add(allocators.get(actorId)
-                    .boundedWorkflow(
-                            BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal(),
-                            (retryNumber, reason) -> boundedBackoff(exactActorId, retryNumber, reason)));
-        }
-        boundedWorkflows = List.copyOf(exactWorkflows);
+        boundedWorkflows = allocators.stream()
+                .map(allocator -> allocator.boundedWorkflow(
+                        BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal(),
+                        M3CandidateAllocatorPopulation::boundedBackoff))
+                .toList();
         cell.set(exactCreate(allocators.get(0).createCell(currentView)));
     }
 
@@ -192,20 +188,30 @@ final class M3CandidateAllocatorPopulation {
     }
 
     static CompletionStage<Void> boundedBackoff(
-            int actorId, int retryNumber, BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
+            Sha256Digest requestId,
+            int retryNumber,
+            BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
         return CompletableFuture.runAsync(
                 () -> {},
                 CompletableFuture.delayedExecutor(
-                        formalRetryBackoff(actorId, retryNumber).toMillis(),
+                        formalRetryBackoff(requestId, retryNumber, reason).toMillis(),
                         TimeUnit.MILLISECONDS,
                         Runnable::run));
     }
 
-    static Duration formalRetryBackoff(int actorId, int retryNumber) {
-        if (actorId < 0 || actorId >= M3V2BoundedActorLaneRunner.ACTOR_COUNT || retryNumber <= 0) {
-            throw new IllegalArgumentException("allocator formal retry phase is outside the actor/retry inventory");
+    static Duration formalRetryBackoff(
+            Sha256Digest requestId,
+            int retryNumber,
+            BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
+        Objects.requireNonNull(requestId, "requestId");
+        Objects.requireNonNull(reason, "reason");
+        if (retryNumber <= 0) {
+            throw new IllegalArgumentException("allocator formal retry ordinal must be positive");
         }
-        int phase = Math.floorMod(actorId + retryNumber - 1, M3V2BoundedActorLaneRunner.ACTOR_COUNT);
+        byte[] requestBytes = requestId.bytes().toByteArray();
+        int requestByte = Byte.toUnsignedInt(requestBytes[(retryNumber - 1) % requestBytes.length]);
+        int mixed = requestByte ^ Integer.rotateLeft(retryNumber * 0x9e3779b9, reason.ordinal() & 15);
+        int phase = Math.floorMod(mixed, M3V2BoundedActorLaneRunner.ACTOR_COUNT);
         return FORMAL_RETRY_BACKOFF_BASE.plusMillis(phase);
     }
 
