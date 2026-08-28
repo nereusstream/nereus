@@ -140,6 +140,17 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             1,
         )[1].split("val realAllocatorV3NativeCanaryTest", 1)[0]
         self.assertIn("M3V3NativeBaselineCanaryTest", diagnostic)
+        canary = V3_FORMAL_RUNTIME.with_name("M3V3NativeBaselineCanaryTest.java").read_text()
+        for diagnostic_field in (
+            "firstDroppedOrdinal",
+            "firstDroppedSchedulerLagMicros",
+            "firstDroppedFailureSummary",
+            "queueDepthMaximum",
+            "queueWaitMaximumMicros",
+            "bindingBusyMaximum",
+            "pendingPermitMaximum",
+        ):
+            self.assertIn(diagnostic_field, canary)
         self.assertIn('maxHeapSize = "6144m"', diagnostic)
         self.assertIn("timeout.set(Duration.ofMinutes(60))", diagnostic)
         self.assertIn("validateRealAllocatorV3Diagnostic", module)

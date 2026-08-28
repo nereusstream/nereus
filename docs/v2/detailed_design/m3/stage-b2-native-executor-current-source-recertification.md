@@ -67,6 +67,19 @@ Runner and actual ManagedLedger-operation outstanding maxima must both exceed fo
 zero. The full six-suite diagnostic task must then seal and parse-canonically validate its exact 18-test JUnit XML
 inventory as NADV3 with zero failure, error, or skip.
 
+A failed canary row must retain the first dropped request ordinal, scheduler lag, terminal reason, queue-depth and
+queue-wait maxima, binding-busy maximum, and pending-permit maximum before the attempt stops. These fields improve
+diagnosis only; they do not reclassify a drop or change the zero-drop gate.
+
+The first current-source replay at exact source `864ac1311b7c171618bf6314c5bf7bb34b7feea5` stopped after the
+10k/5ms/200 baseline reported one measured pre-admission drop beside 5,999 completed requests, zero failure/timeout,
+complete drain, and ManagedLedger operation concurrency 13. Its three-file/3,167-byte diagnostic-only archive is
+`/Users/liusinan/Documents/Codex/2026-08-28/nereus-v2-m3-allocator/diagnostic-864ac131-stage-b2-recert-native-canary-r1-measured-drop`;
+the manifest and identity SHA-256 values are `90ca9ec25f67aa706c3680dc83e7685ff7d456b6ca1b990a09ada22860467be9`
+and `f30b13d5971ca75f1b3142616167ca76de20e6084e56450804f2ea03fb8de0f6`. The attempt remains failed and does not
+satisfy the canary. The following source adds only the missing drop-attribution telemetry before replaying the same
+unchanged gate.
+
 Every canary, diagnostic attachment, JUnit file, and NADV3 remains `diagnosticOnly=true`, `authority=false`, and
 `selectionEligible=false`. Current-source output uses fresh create-new paths containing the exact source and cannot be
 placed under `bounded-adaptive-formal/<source>-r1`.

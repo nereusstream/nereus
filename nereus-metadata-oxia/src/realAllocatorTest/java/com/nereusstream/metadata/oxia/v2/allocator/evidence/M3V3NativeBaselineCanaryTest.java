@@ -69,6 +69,11 @@ class M3V3NativeBaselineCanaryTest {
                 runtime.run(activePopulation, latencyMillis, offeredRate, ignored -> {});
         M3V3AsyncActorLaneRunner.IntervalResult interval = result.interval();
         M3V3NativeIntervalRuntime.NativeTelemetry telemetry = result.telemetry();
+        M3V3AsyncActorLaneRunner.RequestTelemetry firstDrop = interval.measuredTelemetry().stream()
+                .filter(sample -> sample.outcome()
+                        == M3V3AsyncActorLaneRunner.TerminalOutcome.OVERLOAD_DROPPED_BEFORE_ADMISSION)
+                .findFirst()
+                .orElse(null);
         return new Row(
                 activePopulation,
                 latencyMillis,
@@ -82,7 +87,14 @@ class M3V3NativeBaselineCanaryTest {
                 interval.warmupDroppedBeforeAdmission(),
                 interval.warmupFailedAfterAdmission(),
                 interval.warmupTimedOutAfterAdmission(),
+                firstDrop == null ? -1 : firstDrop.ordinal(),
+                firstDrop == null ? 0 : firstDrop.schedulerFiringLagMicros(),
+                firstDrop == null ? "" : firstDrop.failureSummary(),
                 interval.globalOutstandingMaximum(),
+                interval.queueDepthMaximum(),
+                interval.queueWaitMaximumMicros(),
+                interval.bindingBusyMaximum(),
+                interval.pendingPermitMaximum(),
                 interval.queueDepthAtEnd(),
                 interval.globalOutstandingAtEnd(),
                 interval.bindingBusyAtEnd(),
@@ -166,7 +178,14 @@ class M3V3NativeBaselineCanaryTest {
             long warmupDropped,
             long warmupFailed,
             long warmupTimedOut,
+            long firstDroppedOrdinal,
+            long firstDroppedSchedulerLagMicros,
+            String firstDroppedFailureSummary,
             long globalOutstandingMaximum,
+            long queueDepthMaximum,
+            long queueWaitMaximumMicros,
+            long bindingBusyMaximum,
+            long pendingPermitMaximum,
             long queueDepthAtEnd,
             long globalOutstandingAtEnd,
             long bindingBusyAtEnd,
@@ -193,7 +212,14 @@ class M3V3NativeBaselineCanaryTest {
                     + ",\"completed\":" + completed + ",\"failed\":" + failed
                     + ",\"timedOut\":" + timedOut + ",\"warmupDropped\":" + warmupDropped
                     + ",\"warmupFailed\":" + warmupFailed + ",\"warmupTimedOut\":" + warmupTimedOut
+                    + ",\"firstDroppedOrdinal\":" + firstDroppedOrdinal
+                    + ",\"firstDroppedSchedulerLagMicros\":" + firstDroppedSchedulerLagMicros
+                    + ",\"firstDroppedFailureSummary\":\"" + firstDroppedFailureSummary + "\""
                     + ",\"globalOutstandingMaximum\":" + globalOutstandingMaximum
+                    + ",\"queueDepthMaximum\":" + queueDepthMaximum
+                    + ",\"queueWaitMaximumMicros\":" + queueWaitMaximumMicros
+                    + ",\"bindingBusyMaximum\":" + bindingBusyMaximum
+                    + ",\"pendingPermitMaximum\":" + pendingPermitMaximum
                     + ",\"managedLedgerOperations\":" + managedLedgerOperations
                     + ",\"managedLedgerOperationOutstandingMaximum\":"
                     + managedLedgerOperationOutstandingMaximum
