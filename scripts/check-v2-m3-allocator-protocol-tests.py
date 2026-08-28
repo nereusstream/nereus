@@ -140,7 +140,11 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn("publishCandidateAfterStoreObservedRangeNode", allocator)
         self.assertIn("store-observed candidate fast path requires RANGE mode", allocator)
         self.assertIn("store-observed publish fast path requires RANGE mode", allocator)
-        self.assertIn("hasUsableGrant(authorities.head().value())", workflow)
+        self.assertIn("canUseIndependentInstalledRangeGrant(authorities, reservation)", workflow)
+        self.assertLess(
+            workflow.index("canUseIndependentInstalledRangeGrant(authorities, reservation)"),
+            workflow.index("if (reservation.isPresent())"),
+        )
         self.assertIn(
             "createCandidate(request, state, authorities.cell(), authorities.head(), true)",
             workflow,
@@ -152,6 +156,9 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             workflow_test,
         )
         self.assertIn("directAllocatorApiRetainsIndependentCellHeadAndNodeProofReads", workflow_test)
+        self.assertIn("installedRangeGrantProceedsPastAnotherHeadsCellReservation", workflow_test)
+        self.assertIn("installedRangeGrantStillWaitsForItsOwnUnclearedReservation", workflow_test)
+        self.assertIn("rangeWithoutUsableGrantStillWaitsForAnotherHeadsCellReservation", workflow_test)
         self.assertIn("createNodeAfterStoreObservedRangeAuthorities", allocator_store)
         self.assertIn("compareAndSetHeadAfterStoreObservedRangeNode", allocator_store)
         self.assertIn("createUsingAcknowledgedSuccess", oxia_store)

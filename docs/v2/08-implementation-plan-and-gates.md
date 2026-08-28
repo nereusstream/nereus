@@ -293,6 +293,11 @@ ADR 0133 records that exact `792c77de...` proves the four-operation derived-800 
 still drops 1,999 offers and reports 25,780 retries. The diagnostic now counts the exact closed retry-reason enum at
 the unchanged source-governed backoff boundary and requires its total to match completed Result accounting. Both rows
 must still reach zero drop before canonical NADV4 or formal execution.
+ADR 0134 records that exact `026dfddf...` attributes 25,814 of 25,890 fixed-row retries to `RESERVATION_BUSY`, with
+only 26 real Cell CAS conflicts. The workflow must consume a target Head's exact installed unconsumed RANGE grant
+before interpreting another Head's Cell reservation, while Heads needing a new grant retain the bounded reservation
+path. Deterministic dual-path contracts, both zero-drop 25ms rows, canonical NADV4, and all source gates remain required
+before formal execution.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

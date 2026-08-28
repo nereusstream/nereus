@@ -226,6 +226,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0131-v2-m3-allocator-v4-applied-mutation-instrumentation-forwarding-amendment.md"
     "$repo_root/docs/decisions/0132-v2-m3-allocator-v4-evidence-store-specialized-mutation-forwarding-amendment.md"
     "$repo_root/docs/decisions/0133-v2-m3-allocator-v4-fixed-storm-retry-attribution-amendment.md"
+    "$repo_root/docs/decisions/0134-v2-m3-allocator-v4-independent-installed-range-reservation-amendment.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b2-native-executor-current-source-recertification.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-terminal-drain-formal-entry.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-range-latency-attribution.md"
@@ -236,6 +237,7 @@ required_domain_docs=(
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-applied-mutation-instrumentation-forwarding.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-evidence-store-specialized-mutation-forwarding.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-fixed-storm-retry-attribution.md"
+    "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-independent-installed-range-reservation.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"

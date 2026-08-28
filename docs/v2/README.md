@@ -394,6 +394,7 @@ Accepted decisions:
 - [ADR 0131: M3 V4 applied-mutation instrumentation forwarding amendment](../decisions/0131-v2-m3-allocator-v4-applied-mutation-instrumentation-forwarding-amendment.md)
 - [ADR 0132: M3 V4 evidence-store specialized mutation forwarding amendment](../decisions/0132-v2-m3-allocator-v4-evidence-store-specialized-mutation-forwarding-amendment.md)
 - [ADR 0133: M3 V4 fixed-storm retry attribution amendment](../decisions/0133-v2-m3-allocator-v4-fixed-storm-retry-attribution-amendment.md)
+- [ADR 0134: M3 V4 independent installed-RANGE reservation amendment](../decisions/0134-v2-m3-allocator-v4-independent-installed-range-reservation-amendment.md)
 
 ## Open design gates
 
@@ -674,6 +675,12 @@ semantics, V4 plan, and every threshold stay unchanged.
 `792c77de...` diagnostic. Derived-800 now passes with four operations and zero drop, but fixed-1000 still drops 1,999
 offers and reports 25,780 retries. A diagnostic-only closed retry-reason inventory now binds those retries before the
 next proof-preserving correction; formal bytes and all V4 thresholds remain unchanged.
+
+[ADR 0134](../decisions/0134-v2-m3-allocator-v4-independent-installed-range-reservation-amendment.md) preserves the
+exact `026dfddf...` diagnostic and attributes 25,814 of 25,890 fixed-row retries to a foreign Cell reservation. The
+bounded workflow now permits an exact Head to consume its own installed RANGE grant before interpreting another
+Head's grant-renewal reservation; Heads without a usable grant retain the same bounded reservation path. V4 protocol,
+plan, workload, thresholds, and evidence bytes remain unchanged.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

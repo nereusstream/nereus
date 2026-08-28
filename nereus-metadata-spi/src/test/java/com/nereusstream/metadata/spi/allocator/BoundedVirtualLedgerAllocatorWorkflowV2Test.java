@@ -292,6 +292,84 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
     }
 
     @Test
+    void installedRangeGrantProceedsPastAnotherHeadsCellReservation() {
+        store = new ReconcileStore();
+        ProductionVirtualLedgerAllocator range =
+                ProductionVirtualLedgerAllocator.forEvidenceCandidate(AllocatorEvidenceCandidateV1.range(64), store);
+        cell = createCell(AllocatorModeV1.RANGE_LEASED);
+        head = createHead(cell, incarnation("range-independent-head"));
+        cell = exact(range.reserve(cell, head, activeView(), digest("range-independent-head-grant")));
+        head = exact(range.installRangeReservedGrant(cell, head, activeView()));
+        cell = exact(range.clearReservation(cell, head));
+        VersionedAllocatorCellStateV1 foreignReservation = reserveForAnotherHead("range-foreign-renewal", 64);
+        int cellCasBefore = store.compareAndSetCellCalls;
+
+        Result result = range.boundedWorkflow(2, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler.immediate())
+                .allocate(request(head, "range-independent-head"))
+                .toCompletableFuture()
+                .join();
+
+        assertThat(result.reconcileRetries()).isZero();
+        assertThat(result.exactCell()).isEqualTo(foreignReservation);
+        assertThat(result.exactCell().value().reservation()).isPresent();
+        assertThat(result.exactHead().value().nextLedgerId())
+                .isEqualTo(head.value().nextLedgerId() + 1);
+        assertThat(store.compareAndSetCellCalls).isEqualTo(cellCasBefore);
+        assertThat(store.rangeAcknowledgedNodeCreateCalls).isOne();
+        assertThat(store.rangeAcknowledgedHeadCasCalls).isOne();
+    }
+
+    @Test
+    void installedRangeGrantStillWaitsForItsOwnUnclearedReservation() {
+        store = new ReconcileStore();
+        ProductionVirtualLedgerAllocator range =
+                ProductionVirtualLedgerAllocator.forEvidenceCandidate(AllocatorEvidenceCandidateV1.range(64), store);
+        cell = createCell(AllocatorModeV1.RANGE_LEASED);
+        head = createHead(cell, incarnation("range-own-reservation"));
+        cell = exact(range.reserve(cell, head, activeView(), digest("request-range-own-reservation")));
+        head = exact(range.installRangeReservedGrant(cell, head, activeView()));
+        List<RetryReason> reasons = new ArrayList<>();
+
+        assertCode(
+                range.boundedWorkflow(2, (requestId, number, reason) -> {
+                            reasons.add(reason);
+                            return CompletableFuture.completedFuture(null);
+                        })
+                        .allocate(request(head, "range-own-reservation")),
+                AllocatorProtocolException.Code.RECONCILE_RETRY_EXHAUSTED);
+
+        assertThat(reasons).containsExactly(RetryReason.RESERVATION_BUSY, RetryReason.RESERVATION_BUSY);
+        assertThat(store.cell.value().reservation()).isPresent();
+        assertThat(store.nodes).isEmpty();
+        assertThat(store.rangeAcknowledgedNodeCreateCalls).isZero();
+        assertThat(store.rangeAcknowledgedHeadCasCalls).isZero();
+    }
+
+    @Test
+    void rangeWithoutUsableGrantStillWaitsForAnotherHeadsCellReservation() {
+        store = new ReconcileStore();
+        ProductionVirtualLedgerAllocator range =
+                ProductionVirtualLedgerAllocator.forEvidenceCandidate(AllocatorEvidenceCandidateV1.range(64), store);
+        cell = createCell(AllocatorModeV1.RANGE_LEASED);
+        head = createHead(cell, incarnation("range-await-foreign-renewal"));
+        reserveForAnotherHead("range-foreign-renewal-blocking", 64);
+        List<RetryReason> reasons = new ArrayList<>();
+
+        assertCode(
+                range.boundedWorkflow(2, (requestId, number, reason) -> {
+                            reasons.add(reason);
+                            return CompletableFuture.completedFuture(null);
+                        })
+                        .allocate(request(head, "range-await-foreign-renewal")),
+                AllocatorProtocolException.Code.RECONCILE_RETRY_EXHAUSTED);
+
+        assertThat(reasons).containsExactly(RetryReason.RESERVATION_BUSY, RetryReason.RESERVATION_BUSY);
+        assertThat(store.nodes).isEmpty();
+        assertThat(store.rangeAcknowledgedNodeCreateCalls).isZero();
+        assertThat(store.rangeAcknowledgedHeadCasCalls).isZero();
+    }
+
+    @Test
     void directAllocatorApiRetainsIndependentCellHeadAndNodeProofReads() {
         store = new ReconcileStore();
         ProductionVirtualLedgerAllocator range =
@@ -445,6 +523,16 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
                         incarnation, 10, exactCell.value().nextSliceLedgerId())));
     }
 
+    private VersionedAllocatorCellStateV1 reserveForAnotherHead(String identity, long rangeSize) {
+        ManagedLedgerAllocatorHeadV1 foreignHead = ManagedLedgerAllocatorHeadV1.initial(
+                incarnation(identity), 10, cell.value().nextSliceLedgerId());
+        VirtualLedgerCellAllocatorStateV1 reserved =
+                AllocatorProtocolV1.reserve(cell.value(), foreignHead, digest(identity), rangeSize);
+        cell = new VersionedAllocatorCellStateV1(reserved, store.nextVersion());
+        store.cell = cell;
+        return cell;
+    }
+
     private static Request request(VersionedManagedLedgerAllocatorHeadV1 exactHead, String identity) {
         return new Request(digest("request-" + identity), digest("descriptor-" + identity), activeView(), exactHead);
     }
@@ -530,6 +618,7 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         private int readHeadCalls;
         private int readNodeCalls;
         private int createNodeCalls;
+        private int compareAndSetCellCalls;
         private int rangeAcknowledgedNodeCreateCalls;
         private int rangeAcknowledgedHeadCasCalls;
         private CompletableFuture<Optional<VersionedAllocatorCellStateV1>> delayedReadCell;
@@ -569,6 +658,7 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         @Override
         public synchronized CompletionStage<ConditionalCasResult<VersionedAllocatorCellStateV1>> compareAndSetCell(
                 VersionedAllocatorCellStateV1 predecessor, VirtualLedgerCellAllocatorStateV1 candidate) {
+            compareAndSetCellCalls++;
             candidate.reservation().ifPresent(value -> reservationRequestIds.add(value.requestId()));
             if (cell != null && cell.value().equals(candidate)) {
                 return CompletableFuture.completedFuture(ConditionalCasResult.appliedExact(cell));

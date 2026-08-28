@@ -89,15 +89,17 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
             }
             Optional<CellAllocatorReservationV1> reservation =
                     authorities.cell().value().reservation();
+            if (canUseIndependentInstalledRangeGrant(authorities, reservation)) {
+                // One Cell reservation installs or renews exactly one Head grant. It must not serialize
+                // independent Heads that already own an unconsumed RANGE grant. The exact Cell and Head read above,
+                // followed by the request-bound node create and Head CAS, remain the allocation authority proofs.
+                return createCandidate(request, state, authorities.cell(), authorities.head(), true);
+            }
             if (reservation.isPresent()) {
                 if (!reservationMatches(request, reservation.orElseThrow())) {
                     return retry(state, RetryReason.RESERVATION_BUSY, () -> acquireGrant(request, state));
                 }
                 return afterReserved(request, state, authorities.cell(), authorities.head());
-            }
-            if (authorities.cell().value().mode() == AllocatorModeV1.RANGE_LEASED
-                    && hasUsableGrant(authorities.head().value())) {
-                return createCandidate(request, state, authorities.cell(), authorities.head(), true);
             }
             return handleReserve(
                     request,
@@ -747,6 +749,16 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
 
     private static boolean hasUsableGrant(ManagedLedgerAllocatorHeadV1 head) {
         return head.grantId() != 0 && head.nextLedgerId() < head.rangeEndExclusive();
+    }
+
+    private static boolean canUseIndependentInstalledRangeGrant(
+            Authorities authorities, Optional<CellAllocatorReservationV1> reservation) {
+        return authorities.cell().value().mode() == AllocatorModeV1.RANGE_LEASED
+                && hasUsableGrant(authorities.head().value())
+                && reservation
+                        .map(value -> !value.managedLedgerIncarnation()
+                                .equals(authorities.head().value().managedLedgerIncarnation()))
+                        .orElse(true);
     }
 
     private static boolean headContainsGrant(
