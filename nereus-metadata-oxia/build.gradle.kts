@@ -820,6 +820,7 @@ val realAllocatorV3DiagnosticTest = tasks.register<Test>("realAllocatorV3Diagnos
     testClassesDirs = realAllocatorTest.output.classesDirs
     classpath = realAllocatorEvidenceRuntimeClasspath
     maxParallelForks = 1
+    forkEvery = 1
     maxHeapSize = "6144m"
     timeout.set(Duration.ofMinutes(60))
     useJUnitPlatform()

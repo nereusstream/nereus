@@ -591,6 +591,11 @@ late/full/busy requests still receive the same pre-admission drop.
 pre-admission requests. The independent cutoff run showed first-drop scheduler lag zero, so diagnostic attachments now
 retain binding identity, queue wait, and rollover p99 before the unchanged zero-drop assertion. This is observability,
 not a cutoff, qualification, workload, or formal-authorization change.
+[ADR 0124](../decisions/0124-v2-m3-allocator-v3-diagnostic-suite-worker-isolation-amendment.md) preserves the following
+`704056b7...` full diagnostic at 18/1/0/0: its eight Native baselines passed, but five final offers in the first 500-rps
+representative row fired late after unrelated RANGE/STRICT/workflow classes had run in the same worker. The full task
+remains serial and one canonical inventory but now forks once per test class; the Native class still runs all ten rows
+in one shared runtime and formal execution is unchanged.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

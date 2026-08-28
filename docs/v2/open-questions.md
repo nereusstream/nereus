@@ -887,6 +887,10 @@ question or permit post-cutoff admission.
 ADR 0123 retains the later `c1ba429b...` fixed-1000 reproduction where the first dropped request had zero scheduler
 lag and waited behind per-binding admission. It adds failure-time binding/queue/rollover telemetry while preserving
 the zero-drop gate. No diagnostic outcome selects a mode or authorizes another formal campaign.
+ADR 0124 isolates each full-diagnostic class in a fresh serial worker after the standalone Native class passed but the
+same class inherited unrelated suite state inside the complete task and lost five final representative offers. The
+ten Native rows remain one shared-runtime class, and the allocator qualification question remains open for a later
+explicitly authorized formal campaign.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

@@ -226,6 +226,8 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             1,
         )[1].split("val realAllocatorV3NativeCanaryTest", 1)[0]
         self.assertIn("M3RealAllocatorStrictIntervalDiagnosticTest", full_diagnostic)
+        self.assertIn("maxParallelForks = 1", full_diagnostic)
+        self.assertIn("forkEvery = 1", full_diagnostic)
         protocol_main = V3_PROTOCOL_MAIN.read_text()
         self.assertIn('PACKAGE + "M3RealAllocatorStrictIntervalDiagnosticTest"', protocol_main)
         self.assertIn(

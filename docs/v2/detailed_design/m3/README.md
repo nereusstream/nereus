@@ -664,6 +664,12 @@ dropped request with zero scheduler lag but left 15 requests behind per-binding 
 diagnostics now write exact terminal/binding/queue/rollover telemetry before the unchanged ADR-0117 zero-drop gate;
 they do not add a grace period, reclassify a drop, or authorize formal execution.
 
+[ADR 0124](../../../decisions/0124-v2-m3-allocator-v3-diagnostic-suite-worker-isolation-amendment.md) makes the
+complete six-suite task serial but class-worker isolated. It follows a `704056b7...` attempt where the standalone
+ten-row Native canary passed, while the same class later in a shared full-task JVM lost five final representative
+offers after unrelated suites. The Native class itself still runs all ten rows in one worker/shared runtime; the exact
+18-test XML inventory, zero failure/error/skip NADV3 gate, and formal runtime remain unchanged.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

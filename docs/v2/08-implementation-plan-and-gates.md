@@ -231,6 +231,12 @@ workflow completion rather than change offer timing. RANGE sequence attachments 
 include first dropped binding, queue wait, and rollover p99. The 30,000-completion gate and six-suite/18-test NADV3
 inventory remain unchanged.
 
+ADR 0124 preserves the exact `704056b7...` 18/1/0/0 full diagnostic. Its eight Native baseline rows passed, but five
+final offers in the 1ms/500 representative row fired late only after unrelated diagnostic classes had occupied the
+same Gradle worker; the standalone canary at that source passed all ten rows. The full task now remains
+`maxParallelForks=1` while using `forkEvery=1`, retaining one serial 18-test XML inventory and one shared-runtime
+ten-row Native class without making cross-suite JVM state a formal-equivalence prerequisite.
+
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

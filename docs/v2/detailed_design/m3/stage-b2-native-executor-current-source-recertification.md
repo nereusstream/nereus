@@ -156,3 +156,14 @@ ordinal 39,943 had scheduler lag zero, while queue wait reached 40,252 microseco
 correction and locates the remaining boundary at per-binding wait versus workflow completion before cutoff. ADR 0123
 therefore adds binding identity, queue-wait and rollover-p99 retention and writes the non-authoritative RANGE
 attachment before assertions; it does not relax the ADR-0117 30,000-completion gate or authorize formal execution.
+
+On `704056b7...`, the standalone canary then passed all ten Native rows with zero warm-up/measured
+drop/failure/timeout and concurrency 57. RANGE-16 fixed-1000 also passed 30,000/30,000 in both independent and full
+diagnostics. The full task still ended 18/1/0/0 because its first 500-rps Native representative row ran after unrelated
+classes in the same worker and retained five final offers, beginning at ordinal 19,995 with 6,014-microsecond firing
+lag. Its 18-file/43,227-byte archive has manifest `3cfb1072...0141` and identity `8410344f...75a`.
+
+ADR 0124 keeps the full task serial and its JUnit inventory unchanged while setting one fresh worker per test class.
+The Native class continues to execute all ten rows against one shared runtime and population; only unrelated
+RANGE/STRICT/workflow class state is excluded from the formal-equivalent canary precondition. Formal execution and
+every evidence/qualification boundary remain unchanged.
