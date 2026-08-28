@@ -530,6 +530,12 @@ inventory. [ADR 0115](../decisions/0115-v2-m3-allocator-v3-diagnostic-inventory-
 unsealed diagnostic and corrects only the exact suite/test allowlist. It changes no diagnostic wire bytes, workload,
 formal planner, qualification, or selection semantics.
 
+The next clean-source diagnostic at `bc867579...` again completed 17/0/0/0, and the sealer accepted all six suite
+files before rejecting the newly listed testcase name: ADR 0115 had named an intended description rather than the
+actual JUnit method identity. [ADR 0116](../decisions/0116-v2-m3-allocator-v3-diagnostic-testcase-identity-amendment.md)
+preserves that second unsealed diagnostic and binds the exact emitted method name. It adds an explicit wrong-name
+negative contract without changing any evidence byte or allocator rule.
+
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.

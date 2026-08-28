@@ -179,6 +179,10 @@ completed six suites at 17/0/0/0, but sealing correctly rejected the stale five-
 JUnit, Gradle log, and exit status are immutable in an external read-only archive. Current-source sealing must bind
 the exact six-suite/17-test inventory and still reject missing, extra, aliased, failed, errored, or skipped testcases.
 
+ADR 0116 closes the remaining exact-name drift exposed at `bc867579...`: six suite files and 17 zero-failure tests
+ran, but the allowlist named a description that differed from the emitted JUnit method. The second failed diagnostic
+is independently archived. Current-source contracts bind the literal emitted identity and reject a substituted name.
+
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

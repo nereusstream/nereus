@@ -613,6 +613,12 @@ receipt. The archived diagnostic remains non-authoritative. The corrected allowl
 sequence suite while retaining create-new sealing, canonical parsing, source/executor binding, and fail-closed
 rejection of every missing, extra, aliased, failed, errored, or skipped testcase.
 
+[ADR 0116](../../../decisions/0116-v2-m3-allocator-v3-diagnostic-testcase-identity-amendment.md) records the remaining
+testcase-name correction. At `bc867579...`, the six-suite/17-test run completed, and sealing progressed past suite
+inventory before rejecting the descriptive name introduced by ADR 0115. The sealer now binds the actual emitted
+`replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()` identity, and a focused negative contract proves that
+the descriptive substitute remains invalid.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

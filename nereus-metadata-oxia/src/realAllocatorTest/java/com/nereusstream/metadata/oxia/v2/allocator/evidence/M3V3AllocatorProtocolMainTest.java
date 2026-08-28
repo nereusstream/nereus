@@ -90,6 +90,20 @@ class M3V3AllocatorProtocolMainTest {
                         "seal-diagnostic", junit, temporaryDirectory.resolve("forged.nadv"), source)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("summary");
+
+        Path mismatched = diagnosticJUnitDirectory("identity-mismatch");
+        Path strict = mismatched.resolve(
+                "TEST-" + M3RealAllocatorStrictIntervalDiagnosticTest.class.getName() + ".xml");
+        Files.writeString(
+                strict,
+                Files.readString(strict)
+                        .replace(
+                                "replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()",
+                                "strictFixedThenDerivedFormalSchedulesDrainWithoutUnexpectedWarmupFailure()"));
+        assertThatThrownBy(() -> M3V3AllocatorProtocolMain.main(arguments(
+                        "seal-diagnostic", mismatched, temporaryDirectory.resolve("wrong-identity.nadv"), source)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("inventory");
     }
 
     @Test
@@ -278,7 +292,7 @@ class M3V3AllocatorProtocolMainTest {
         writeSuite(
                 directory,
                 M3RealAllocatorStrictIntervalDiagnosticTest.class,
-                List.of("strictFixedThenDerivedFormalSchedulesDrainWithoutUnexpectedWarmupFailure()"));
+                List.of("replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()"));
         writeSuite(
                 directory,
                 M3V3AsyncActorLaneRunnerTest.class,

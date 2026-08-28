@@ -61,7 +61,7 @@ public final class M3V3AllocatorProtocolMain {
     private static final Set<String> DIAGNOSTIC_TESTS = Set.of(
             identity(
                     "M3RealAllocatorStrictIntervalDiagnosticTest",
-                    "strictFixedThenDerivedFormalSchedulesDrainWithoutUnexpectedWarmupFailure()"),
+                    "replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()"),
             identity(
                     "M3V3AsyncActorLaneRunnerTest",
                     "evidenceAdmissionCapIsDerivedFromFrozenRateLatencyAndActorCount()"),

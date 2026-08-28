@@ -854,6 +854,9 @@ new exact-source formal terminal.
 The first current-source replay at `372ca975...` completed the expanded diagnostic inventory at 17/0/0/0 but created
 no NADV3 because the sealer still expected five suite files. ADR 0115 preserves that diagnostic and closes the
 allowlist at six suites/17 tests without changing the still-open formal qualification question.
+The following `bc867579...` replay also passed 17/0/0/0 but exposed a literal testcase-name mismatch after the six
+suite files were accepted. ADR 0116 preserves that second diagnostic and binds the actual emitted JUnit identity;
+formal qualification remains unanswered.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

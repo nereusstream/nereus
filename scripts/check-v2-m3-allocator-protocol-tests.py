@@ -193,8 +193,12 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         protocol_main = V3_PROTOCOL_MAIN.read_text()
         self.assertIn('PACKAGE + "M3RealAllocatorStrictIntervalDiagnosticTest"', protocol_main)
         self.assertIn(
-            '"strictFixedThenDerivedFormalSchedulesDrainWithoutUnexpectedWarmupFailure()"',
+            '"replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()"',
             protocol_main,
+        )
+        self.assertIn(
+            "void replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()",
+            diagnostic,
         )
 
     def test_formal_archiver_is_create_new_byte_exact_and_collision_closed(self) -> None:
