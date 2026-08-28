@@ -96,7 +96,9 @@ class M3V3RealOxiaOperationDiagnosticTest {
         StringBuilder json = new StringBuilder(2048);
         json.append("{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_OPERATION_DIAGNOSTIC_V3\"")
                 .append(",\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false")
-                .append(",\"delaySchedulerThreadsPerActor\":1,\"rows\":[");
+                .append(",\"delaySchedulerThreadsPerActor\":")
+                .append(M3RealOxiaActors.CONTROLLED_DELAY_SCHEDULER_THREADS_PER_ACTOR)
+                .append(",\"rows\":[");
         for (int index = 0; index < rows.size(); index++) {
             if (index > 0) {
                 json.append(',');

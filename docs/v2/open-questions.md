@@ -938,6 +938,18 @@ interface-default empty acknowledgement and therefore validly reread. The remain
 exact-source 25ms receipt after value-preserving wrapper forwarding. It must show four common-path operations and both
 rows at zero drop/failure/timeout before canonical NADV4 or formal entry.
 
+ADRs 0132 through 0135 preserve the next exact-source diagnostic chain. Specialized evidence-store forwarding makes
+the acknowledged four-operation path observable; retry attribution then identifies foreign reservations rather than
+real CAS contention; independent installed grants stop waiting behind those foreign reservations; and successful
+renewal reuses exact acknowledged mutation snapshots. Exact `e50c455e...` leaves only three fixed-row drops and 58
+retries, while derived-800 remains zero-drop.
+
+ADR 0136 attributes the remaining boundary to the shared harness latency injector: real RTT is 7.773ms p99 and
+callback lag 102us p99, but the single actor-local controlled-delay lane fires 11.323ms p99 late. Formal and
+diagnostic now share four source-governed timer workers per actor, with every delayed item still inside the frozen
+Runner outstanding inventory. The open question is whether a fresh exact-source 25ms receipt makes both rows
+zero-drop and allows canonical NADV4; no threshold, qualification, plan, or selection semantic has changed.
+
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

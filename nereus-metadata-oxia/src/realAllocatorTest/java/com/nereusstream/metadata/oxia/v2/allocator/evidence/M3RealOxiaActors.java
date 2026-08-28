@@ -41,6 +41,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /** Four independently closeable real Oxia sessions with latency and raw-operation instrumentation. */
 final class M3RealOxiaActors implements AutoCloseable {
+    static final int CONTROLLED_DELAY_SCHEDULER_THREADS_PER_ACTOR = 4;
+
     private final String serviceAddress;
     private final List<Actor> actors = new ArrayList<>(M3AllocatorWorkloadPlan.BROKER_ACTORS);
     private final AtomicReference<SharedOperationDiagnostics> sharedOperationDiagnostics = new AtomicReference<>();
@@ -200,8 +202,15 @@ final class M3RealOxiaActors implements AutoCloseable {
 
         private InstrumentedClient(int actorId, Session initialSession) {
             this.actorId = actorId;
-            delayScheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
-                Thread thread = new Thread(runnable, "m3-allocator-oxia-delay-" + actorId);
+            AtomicInteger threadOrdinal = new AtomicInteger();
+            delayScheduler = Executors.newScheduledThreadPool(
+                    CONTROLLED_DELAY_SCHEDULER_THREADS_PER_ACTOR, runnable -> {
+                Thread thread = new Thread(
+                        runnable,
+                        "m3-allocator-oxia-delay-"
+                                + actorId
+                                + "-"
+                                + threadOrdinal.getAndIncrement());
                 thread.setDaemon(true);
                 return thread;
             });

@@ -733,6 +733,18 @@ preserves the exact `3bc11088...` wrapper-fallback diagnostic and the associated
 levels now preserve acknowledgement values through latency, response-loss, crash-barrier, and telemetry accounting;
 the V4 plan and 23-test/nine-suite inventory are unchanged.
 
+ADRs 0132 through 0135 preserve the subsequent diagnostic chain while forwarding specialized mutations, attributing
+retry reasons,
+isolating independent installed-RANGE reservations, and reusing acknowledged renewal proofs. Exact `e50c455e...`
+reduces fixed-1000 drop to three; derived-800 remains zero-drop with the four-operation common path.
+
+[ADR 0136](../../../decisions/0136-v2-m3-allocator-v4-controlled-delay-scheduler-capacity-amendment.md) binds the
+remaining measured harness boundary and the
+[controlled-delay scheduler capacity record](stage-b-v4-controlled-delay-scheduler-capacity.md). The shared
+formal/diagnostic latency injector uses four bounded timer workers per actor instead of one artificial completion
+lane. Delayed items remain inside 64-per-actor/256-global Runner outstanding accounting; production authority, V4
+plan/profile, workload, thresholds, and the 23-test/nine-suite inventory do not change.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

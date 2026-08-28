@@ -302,6 +302,10 @@ ADR 0135 records that exact `9fcbc7f2...` reduces fixed-1000 drop to 156 but sti
 after acknowledged reserve/install/clear results. The successful bounded renewal path may reuse those exact snapshots
 through install, clear, candidate create, and publish; every uncertain/conflicting result retains the public proofful
 fallback. Both zero-drop 25ms rows, canonical NADV4, and all source gates remain mandatory before formal execution.
+ADR 0136 records that exact `e50c455e...` reduces fixed-1000 drop to three, with real RTT and callback lag below the
+remaining single-thread controlled-delay scheduler lag. The shared formal/diagnostic latency injector now has four
+source-governed timer workers per actor while every delayed item remains inside the existing Runner outstanding
+inventory. Both zero-drop 25ms rows, canonical NADV4, and all source gates remain mandatory before formal execution.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

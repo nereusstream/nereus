@@ -228,6 +228,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0133-v2-m3-allocator-v4-fixed-storm-retry-attribution-amendment.md"
     "$repo_root/docs/decisions/0134-v2-m3-allocator-v4-independent-installed-range-reservation-amendment.md"
     "$repo_root/docs/decisions/0135-v2-m3-allocator-v4-range-renewal-acknowledged-proof-reuse-amendment.md"
+    "$repo_root/docs/decisions/0136-v2-m3-allocator-v4-controlled-delay-scheduler-capacity-amendment.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b2-native-executor-current-source-recertification.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-terminal-drain-formal-entry.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-range-latency-attribution.md"
@@ -240,6 +241,7 @@ required_domain_docs=(
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-fixed-storm-retry-attribution.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-independent-installed-range-reservation.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-range-renewal-acknowledged-proof-reuse.md"
+    "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-controlled-delay-scheduler-capacity.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"

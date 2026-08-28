@@ -396,6 +396,7 @@ Accepted decisions:
 - [ADR 0133: M3 V4 fixed-storm retry attribution amendment](../decisions/0133-v2-m3-allocator-v4-fixed-storm-retry-attribution-amendment.md)
 - [ADR 0134: M3 V4 independent installed-RANGE reservation amendment](../decisions/0134-v2-m3-allocator-v4-independent-installed-range-reservation-amendment.md)
 - [ADR 0135: M3 V4 RANGE-renewal acknowledged-proof reuse amendment](../decisions/0135-v2-m3-allocator-v4-range-renewal-acknowledged-proof-reuse-amendment.md)
+- [ADR 0136: M3 V4 controlled-delay scheduler capacity amendment](../decisions/0136-v2-m3-allocator-v4-controlled-delay-scheduler-capacity-amendment.md)
 
 ## Open design gates
 
@@ -688,6 +689,12 @@ exact `9fcbc7f2...` diagnostic: fixed drop falls to 156, but acknowledged grant 
 authorities and lengthen the global reservation. The bounded success path now reuses those exact mutation results;
 all uncertain/conflicting outcomes return to the original proof reads. Public API, STRICT, V4 plan, thresholds, and
 evidence semantics remain unchanged.
+
+[ADR 0136](../decisions/0136-v2-m3-allocator-v4-controlled-delay-scheduler-capacity-amendment.md) preserves the exact
+`e50c455e...` diagnostic: fixed drop falls to three and derived-800 remains zero-drop, while controlled-delay
+scheduler firing lag reaches 11.323ms p99 despite 7.773ms real RTT and 102us callback lag. The shared formal/diagnostic
+latency injector now owns four bounded timer workers per actor and reports that source-governed value. This changes no
+production allocator authority, V4 plan/profile, workload, threshold, or evidence semantics.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

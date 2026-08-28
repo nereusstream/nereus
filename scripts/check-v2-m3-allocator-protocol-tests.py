@@ -62,6 +62,10 @@ V4_TERMINAL_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
 V4_RANGE_LATENCY_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
     "M3V4RangeLatencyDiagnosticTest.java"
 )
+V3_OPERATION_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
+    "M3V3RealOxiaOperationDiagnosticTest.java"
+)
+ALLOCATOR_WIRING_TEST = V3_FORMAL_RUNTIME.with_name("M3AllocatorEvidenceWiringTest.java")
 V4_FORMAL_CAMPAIGN = V3_FORMAL_RUNTIME.with_name("M3V4BoundedAdaptiveFormalCampaignTest.java")
 PRODUCTION_ALLOCATOR = (
     ROOT
@@ -197,6 +201,21 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn("beginRetryDiagnosticCapture", V3_CANDIDATE_POPULATION.read_text())
         self.assertIn("endRetryDiagnosticCapture", V3_CANDIDATE_POPULATION.read_text())
         self.assertIn('\\"retryReasons\\"', V4_RANGE_LATENCY_DIAGNOSTIC.read_text())
+        self.assertIn("CONTROLLED_DELAY_SCHEDULER_THREADS_PER_ACTOR = 4", real_oxia_actors)
+        self.assertIn("Executors.newScheduledThreadPool(", real_oxia_actors)
+        self.assertNotIn("newSingleThreadScheduledExecutor", real_oxia_actors)
+        self.assertIn(
+            "controlledLatencySchedulerAdvancesFourDueCompletionsConcurrently",
+            ALLOCATOR_WIRING_TEST.read_text(),
+        )
+        self.assertIn(
+            "M3RealOxiaActors.CONTROLLED_DELAY_SCHEDULER_THREADS_PER_ACTOR",
+            V4_RANGE_LATENCY_DIAGNOSTIC.read_text(),
+        )
+        self.assertIn(
+            "M3RealOxiaActors.CONTROLLED_DELAY_SCHEDULER_THREADS_PER_ACTOR",
+            V3_OPERATION_DIAGNOSTIC.read_text(),
+        )
 
     def test_v4_plan_formal_entry_and_native_rows_are_independently_source_bound(self) -> None:
         first = subprocess.run(

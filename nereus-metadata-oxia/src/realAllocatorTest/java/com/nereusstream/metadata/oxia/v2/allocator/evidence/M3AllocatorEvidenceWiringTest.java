@@ -85,6 +85,42 @@ class M3AllocatorEvidenceWiringTest {
     }
 
     @Test
+    void controlledLatencySchedulerAdvancesFourDueCompletionsConcurrently() throws Exception {
+        assertThat(M3RealOxiaActors.CONTROLLED_DELAY_SCHEDULER_THREADS_PER_ACTOR).isEqualTo(4);
+        PendingReadConditionalClient delegate = new PendingReadConditionalClient();
+        CountDownLatch enteredCallbacks = new CountDownLatch(4);
+        CountDownLatch releaseCallbacks = new CountDownLatch(1);
+        List<CompletableFuture<Void>> completions = new java.util.ArrayList<>();
+
+        try (M3RealOxiaActors.InstrumentedClient client =
+                new M3RealOxiaActors.InstrumentedClient(0, delegate)) {
+            client.setControlledLatencyMillis(1);
+            for (int index = 0; index < 4; index++) {
+                completions.add(client.read("/nereus/v2/m3/delay-scheduler/" + index)
+                        .thenRun(() -> {
+                            enteredCallbacks.countDown();
+                            try {
+                                releaseCallbacks.await();
+                            } catch (InterruptedException interrupted) {
+                                Thread.currentThread().interrupt();
+                                throw new IllegalStateException(interrupted);
+                            }
+                        })
+                        .toCompletableFuture());
+            }
+            assertThat(delegate.reads).hasSize(4);
+            delegate.reads.forEach(read -> read.complete(Optional.empty()));
+
+            boolean allEntered = enteredCallbacks.await(5, TimeUnit.SECONDS);
+            releaseCallbacks.countDown();
+            CompletableFuture.allOf(completions.toArray(CompletableFuture[]::new)).join();
+            assertThat(allEntered).isTrue();
+        } finally {
+            releaseCallbacks.countDown();
+        }
+    }
+
+    @Test
     void isolatesRangePopulationExactCellAndRejectsInjectedConstructionLatency() throws Exception {
         ReentrantReadWriteLock cellLock = new ReentrantReadWriteLock(true);
         assertThatCode(() -> M3CandidateAllocatorPopulation.requireRangePopulationCellIsolation(
@@ -715,6 +751,28 @@ class M3AllocatorEvidenceWiringTest {
             CompletableFuture<Void> pending = new CompletableFuture<>();
             mutations.add(pending);
             return pending;
+        }
+    }
+
+    private static final class PendingReadConditionalClient implements OxiaConditionalClient {
+        private final List<CompletableFuture<Optional<AuthorityRecord>>> reads = new CopyOnWriteArrayList<>();
+
+        @Override
+        public CompletionStage<Optional<AuthorityRecord>> read(String key) {
+            CompletableFuture<Optional<AuthorityRecord>> pending = new CompletableFuture<>();
+            reads.add(pending);
+            return pending;
+        }
+
+        @Override
+        public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes storedBytes) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        @Override
+        public CompletionStage<Void> compareAndSet(
+                String key, CanonicalBytes storedBytes, long expectedVersionId) {
+            return CompletableFuture.completedFuture(null);
         }
     }
 

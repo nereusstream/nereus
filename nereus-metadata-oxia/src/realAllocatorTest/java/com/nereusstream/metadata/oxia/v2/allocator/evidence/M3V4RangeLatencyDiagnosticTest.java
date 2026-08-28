@@ -81,7 +81,8 @@ class M3V4RangeLatencyDiagnosticTest {
                             + ",\"sourceCommit\":" + M3V3DiagnosticOutput.jsonString(sourceCommit)
                             + ",\"candidate\":\"RANGE_1024\",\"activePopulation\":10000"
                             + ",\"latencyMillis\":" + latencyMillis
-                            + ",\"delaySchedulerThreadsPerActor\":1"
+                            + ",\"delaySchedulerThreadsPerActor\":"
+                            + M3RealOxiaActors.CONTROLLED_DELAY_SCHEDULER_THREADS_PER_ACTOR
                             + ",\"fixed1000\":" + fixed.json()
                             + ",\"derived800\":" + derived.json() + "}\n");
         } catch (Exception | Error failure) {
