@@ -12,7 +12,11 @@ import shutil
 import stat
 
 
-SCHEMA = "NEREUS_V2_M3_ALLOCATOR_FAILED_FORMAL_ARCHIVE_IDENTITY_V1"
+SCHEMA_BY_PROTOCOL = {
+    3: "NEREUS_V2_M3_ALLOCATOR_FAILED_FORMAL_ARCHIVE_IDENTITY_V1",
+    4: "NEREUS_V2_M3_ALLOCATOR_FAILED_FORMAL_ARCHIVE_IDENTITY_V1",
+    5: "NEREUS_V2_M3_ALLOCATOR_FAILED_FORMAL_ARCHIVE_IDENTITY_V2",
+}
 TERMINAL_REASONS_BY_STATUS = {
     "INFRASTRUCTURE_FAILED": {
         "ACTION_CAP_EXCEEDED",
@@ -72,6 +76,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", required=True, type=Path)
     parser.add_argument("--archive", required=True, type=Path)
+    parser.add_argument("--protocol-version", type=int, choices=sorted(SCHEMA_BY_PROTOCOL), default=3)
     parser.add_argument("--archived-on", required=True)
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--plan-sha256", required=True)
@@ -170,7 +175,8 @@ def main() -> int:
     manifest = archive / "SHA256SUMS"
     write_new(manifest, "".join(manifest_rows).encode("utf-8"))
     identity = {
-        "schema": SCHEMA,
+        "schema": SCHEMA_BY_PROTOCOL[args.protocol_version],
+        "protocolVersion": args.protocol_version,
         "archivedOn": args.archived_on,
         "archivePath": str(archive),
         "payloadPath": str(payload),

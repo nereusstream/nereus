@@ -13,7 +13,10 @@ import stat
 import xml.etree.ElementTree as ET
 
 
-SCHEMA = "NEREUS_V2_M3_ALLOCATOR_DIAGNOSTIC_ARCHIVE_IDENTITY_V1"
+SCHEMA_BY_PROTOCOL = {
+    4: "NEREUS_V2_M3_ALLOCATOR_DIAGNOSTIC_ARCHIVE_IDENTITY_V1",
+    5: "NEREUS_V2_M3_ALLOCATOR_DIAGNOSTIC_ARCHIVE_IDENTITY_V2",
+}
 
 
 def sha256(path: Path) -> str:
@@ -60,6 +63,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--diagnostic-output", required=True, type=Path)
     parser.add_argument("--junit-directory", required=True, type=Path)
     parser.add_argument("--archive", required=True, type=Path)
+    parser.add_argument("--protocol-version", type=int, choices=sorted(SCHEMA_BY_PROTOCOL), default=4)
+    parser.add_argument("--diagnostic-status", choices=("FAILED", "PASSED"), default="FAILED")
     parser.add_argument("--archived-on", required=True)
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--plan-sha256", required=True)
@@ -109,6 +114,8 @@ def main() -> int:
     }
     if totals != expected:
         raise ValueError(f"diagnostic JUnit summary differs: expected={expected} actual={totals}")
+    if args.diagnostic_status == "PASSED" and any(totals[field] != 0 for field in ("failures", "errors", "skipped")):
+        raise ValueError("passed diagnostic archive has a nonzero failure, error, or skipped inventory")
 
     archive.parent.mkdir(parents=True, exist_ok=True)
     archive.mkdir(mode=0o755)
@@ -147,7 +154,12 @@ def main() -> int:
 
     manifest = archive / "SHA256SUMS"
     write_new(manifest, "".join(sorted(manifest_rows)).encode("utf-8"))
-    range_receipts = sorted(diagnostic.glob("v4-range1024-*-formal-sequence.json"))
+    range_prefix = f"v{args.protocol_version}-range1024-"
+    all_range_receipts = sorted(diagnostic.glob("v[45]-range1024-*-formal-sequence.json"))
+    foreign_range_receipts = [path for path in all_range_receipts if not path.name.startswith(range_prefix)]
+    if foreign_range_receipts:
+        raise ValueError("diagnostic archive contains a foreign-protocol RANGE attribution")
+    range_receipts = [path for path in all_range_receipts if path.name.startswith(range_prefix)]
     range_receipt = range_receipts[0] if len(range_receipts) == 1 else None
     range_attributions = [
         {
@@ -157,7 +169,8 @@ def main() -> int:
         for receipt in range_receipts
     ]
     identity = {
-        "schema": SCHEMA,
+        "schema": SCHEMA_BY_PROTOCOL[args.protocol_version],
+        "protocolVersion": args.protocol_version,
         "archivedOn": args.archived_on,
         "archivePath": str(archive),
         "payloadPath": str(payload),
@@ -170,8 +183,8 @@ def main() -> int:
         "diagnosticOnly": True,
         "authority": False,
         "selectionEligible": False,
-        "diagnosticStatus": "FAILED",
-        "nadvPresent": any(path.suffix == ".nadv4" for path in diagnostic_files),
+        "diagnosticStatus": args.diagnostic_status,
+        "nadvPresent": any(path.suffix == f".nadv{args.protocol_version}" for path in diagnostic_files),
         "junit": {**totals, "suites": len(junit_xml)},
         "junitXmlManifestSha256": hashlib.sha256("".join(junit_manifest_rows).encode()).hexdigest(),
         "rangeAttributionRelativePath": range_receipt.name if range_receipt is not None else None,

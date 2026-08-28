@@ -78,6 +78,10 @@ threshold would not correct the protocol.
 7. A new formal campaign is permitted only after a complete V5 diagnostic passes from a new exact clean pushed source
    and proves the 25ms fixed-1000 and derived-800 rows lossless under the exact V5 admission tuple. Every failed
    diagnostic remains diagnostic-only and immutable.
+8. The external archive tooling is protocol-aware and create-new. V5 diagnostic archives bind an explicit PASSED or
+   FAILED status, exact JUnit inventory, all diagnostic bytes, and the NADV5 presence bit; V5 completed non-promotable
+   and failed formal archives carry distinct V5 identities. No archive changes or upgrades an evidence artifact's
+   authority.
 
 ## Consequences
 
@@ -85,3 +89,11 @@ The V4 negative diagnostic is preserved as a protocol-feasibility observation, n
 bounded capacity for the workload that was already frozen, without changing an offered request, latency injection,
 qualification threshold, or selection rule. Allocator mode remains `UNSELECTED` until a unique, validator-reproved V5
 formal evaluation seals a canonical selection.
+
+The accepted implementation fixes the V5 zero-decision plan digest at
+`3e0aea42527e85c58276a51f5953af0ffaba5029b8916e7bbd85f377f434d23a` and the Native execution-profile digest at
+`76d9bc38ce6fa9c47b2fed926c9485db828adaee3e1533b962ab6e9c1157e1ce`. NADV5 independently binds the exact
+24-test/ten-suite JUnit manifest and an exact 19-JSON raw manifest; NARS5 preserves both digests. This implementation
+record is not diagnostic or formal evidence and does not select an allocator mode. The protocol-aware archive
+contracts preserve V3/V4 defaults while closing collisions, foreign-protocol RANGE attribution, noncanonical dates,
+and a PASSED diagnostic with any failure, error, or skip.

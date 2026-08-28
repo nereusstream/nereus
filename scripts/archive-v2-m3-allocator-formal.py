@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import date
 import hashlib
 import json
 import os
@@ -15,6 +16,7 @@ import stat
 SCHEMA_BY_PROTOCOL = {
     3: "NEREUS_V2_M3_ALLOCATOR_FORMAL_ARCHIVE_IDENTITY_V2",
     4: "NEREUS_V2_M3_ALLOCATOR_FORMAL_ARCHIVE_IDENTITY_V3",
+    5: "NEREUS_V2_M3_ALLOCATOR_FORMAL_ARCHIVE_IDENTITY_V4",
 }
 NON_PROMOTABLE_EVALUATION_STATUSES = {
     "NATIVE_BASELINE_UNAVAILABLE",
@@ -97,8 +99,12 @@ def main() -> int:
         raise ValueError("archive source is absent, non-directory, or a symbolic link")
     if archive.exists() or archive.is_symlink():
         raise FileExistsError(f"archive target already exists: {archive}")
-    if args.archived_on != "2026-08-28":
-        raise ValueError("archive date differs from the authorized Stage B.2 date")
+    try:
+        archived_on = date.fromisoformat(args.archived_on)
+    except ValueError as error:
+        raise ValueError("archive date is not canonical ISO-8601") from error
+    if archived_on.isoformat() != args.archived_on:
+        raise ValueError("archive date is not canonical ISO-8601")
     require_hex(args.source_commit, "source commit", 40)
     for label, value in (
         ("plan digest", args.plan_sha256),
@@ -118,7 +124,9 @@ def main() -> int:
         raise ValueError("archive source file count or byte count differs")
 
     campaign_result = source / "campaign-result.json"
-    evaluation_relative_path = "evaluation.naev4" if args.protocol_version == 4 else "evaluation.naev"
+    evaluation_relative_path = (
+        "evaluation.naev" if args.protocol_version == 3 else f"evaluation.naev{args.protocol_version}"
+    )
     evaluation = source / evaluation_relative_path
     final_checkpoint = source / args.final_checkpoint_relative_path
     if sha256(campaign_result) != args.campaign_result_sha256:

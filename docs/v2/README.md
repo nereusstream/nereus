@@ -701,6 +701,9 @@ production allocator authority, V4 plan/profile, workload, threshold, or evidenc
 the standalone lossless 25ms result and the later full-suite V4 zero-drop failure, fixes raw diagnostic enforcement,
 and versions the already-frozen 2R storm admission contract as bounded `4/128/512/1`. The implementation record is
 [Stage B V5 storm admission and diagnostic raw integrity](detailed_design/m3/stage-b-v5-storm-admission-and-diagnostic-raw-integrity.md).
+V5 now has strict source-bound plan/profile/codec/launcher entrypoints and a canonical 19-file diagnostic raw
+manifest. A fresh 24-test/ten-suite current-source diagnostic and its NADV5 must pass before the launcher can create a
+formal output; no V5 formal evaluation or selection exists at this cut.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

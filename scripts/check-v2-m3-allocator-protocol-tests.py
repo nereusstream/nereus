@@ -26,6 +26,8 @@ DIAGNOSTIC_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-diagnostic.py"
 V3_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v3.py"
 V4_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v4.py"
 V4_LAUNCHER = ROOT / "scripts" / "run-v2-m3-real-allocator-evidence-v4.sh"
+V5_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v5.py"
+V5_LAUNCHER = ROOT / "scripts" / "run-v2-m3-real-allocator-evidence-v5.sh"
 V3_FORMAL_RUNTIME = (
     ROOT
     / "nereus-metadata-oxia"
@@ -55,18 +57,28 @@ V3_CANDIDATE_CUTOFF_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
 )
 V3_PROTOCOL_MAIN = V3_FORMAL_RUNTIME.with_name("M3V3AllocatorProtocolMain.java")
 V4_PROTOCOL_MAIN = V3_FORMAL_RUNTIME.with_name("M3V4AllocatorProtocolMain.java")
+V5_PROTOCOL_MAIN = V3_FORMAL_RUNTIME.with_name("M3V5AllocatorProtocolMain.java")
 V4_RUNNER_TEST = V3_FORMAL_RUNTIME.with_name("M3V4AsyncActorLaneRunnerTest.java")
+V5_RUNNER_TEST = V3_FORMAL_RUNTIME.with_name("M3V5AsyncActorLaneRunnerTest.java")
 V4_TERMINAL_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
     "M3V4TerminalAdmissionDrainDiagnosticTest.java"
 )
 V4_RANGE_LATENCY_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
     "M3V4RangeLatencyDiagnosticTest.java"
 )
+V5_TERMINAL_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
+    "M3V5TerminalAdmissionDrainDiagnosticTest.java"
+)
+V5_RANGE_LATENCY_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
+    "M3V5RangeLatencyDiagnosticTest.java"
+)
+V5_RAW_GATE = V3_FORMAL_RUNTIME.with_name("M3V5DiagnosticRawGate.java")
 V3_OPERATION_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
     "M3V3RealOxiaOperationDiagnosticTest.java"
 )
 ALLOCATOR_WIRING_TEST = V3_FORMAL_RUNTIME.with_name("M3AllocatorEvidenceWiringTest.java")
 V4_FORMAL_CAMPAIGN = V3_FORMAL_RUNTIME.with_name("M3V4BoundedAdaptiveFormalCampaignTest.java")
+V5_FORMAL_CAMPAIGN = V3_FORMAL_RUNTIME.with_name("M3V5BoundedAdaptiveFormalCampaignTest.java")
 PRODUCTION_ALLOCATOR = (
     ROOT
     / "nereus-metadata-spi"
@@ -271,7 +283,7 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn("commit.substring(0, 16),\n                true", formal)
         self.assertIn("NEREUS_V2_M3_ALLOCATOR_CAMPAIGN_EXECUTION_V4", formal)
         self.assertIn("NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_ROW_", canary)
-        self.assertIn('(terminalDrainV4 ? "V4" : "V3")', canary)
+        self.assertIn("return rowSchema(terminalDrainV4 ? 4 : 3)", canary)
         for token in (
             "NEREUS_M3_ALLOCATOR_V4_FORMAL_AUTHORIZATION_SHA",
             "NEREUS_M3_ALLOCATOR_V4_NATIVE_EXECUTION_PROFILE_SHA256",
@@ -369,6 +381,134 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn(r'\"diagnosticOnly\":true', range_latency)
         self.assertIn(r'\"authority\":false', range_latency)
         self.assertIn(r'\"selectionEligible\":false', range_latency)
+
+    def test_v5_storm_admission_plan_wire_and_diagnostic_are_independently_source_bound(self) -> None:
+        first = subprocess.run(
+            [sys.executable, str(V5_PLAN)],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        second = subprocess.run(
+            [sys.executable, str(V5_PLAN)],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        self.assertEqual(first, second)
+        plan = json.loads(first)
+        self.assertEqual("NEREUS_V2_M3_ALLOCATOR_CAMPAIGN_PLAN_V5", plan["schema"])
+        self.assertEqual(
+            "3e0aea42527e85c58276a51f5953af0ffaba5029b8916e7bbd85f377f434d23a",
+            plan["zeroDecisionPlanSha256"],
+        )
+        self.assertEqual(
+            "76d9bc38ce6fa9c47b2fed926c9485db828adaee3e1533b962ab6e9c1157e1ce",
+            plan["nativeExecution"]["nativeExecutionProfileSha256"],
+        )
+        self.assertEqual(
+            {
+                "actorCount": 4,
+                "maxAsyncOutstandingPerActor": 128,
+                "maxGlobalOutstanding": 512,
+                "maxRolloverOutstandingPerBinding": 1,
+                "preAdmissionQueueRateMultiplier": 2,
+                "derivedOutstandingPerActor": 125,
+            },
+            plan["admission"],
+        )
+        self.assertEqual(1_024, plan["stormAdmissionFeasibility"]["v4"]["optimisticRequestsPerSecond"])
+        self.assertEqual(
+            "STORM_ADMISSION_INFEASIBLE",
+            plan["stormAdmissionFeasibility"]["v4"]["status"],
+        )
+        self.assertEqual(2_048, plan["stormAdmissionFeasibility"]["v5"]["optimisticRequestsPerSecond"])
+        self.assertEqual("PLAN_FEASIBLE", plan["stormAdmissionFeasibility"]["v5"]["status"])
+        self.assertEqual(24_576, plan["stormAdmissionFeasibility"]["v5"]["optimisticServiceThroughRequests"])
+
+        module = MODULE_BUILD.read_text()
+        formal = V5_FORMAL_CAMPAIGN.read_text()
+        protocol = V5_PROTOCOL_MAIN.read_text()
+        raw_gate = V5_RAW_GATE.read_text()
+        runner_test = V5_RUNNER_TEST.read_text()
+        range_latency = V5_RANGE_LATENCY_DIAGNOSTIC.read_text()
+        for token in (
+            "realAllocatorV5BoundedAdaptiveFormalCampaign",
+            "realAllocatorV5DiagnosticTest",
+            "sealRealAllocatorV5Diagnostic",
+            "validateRealAllocatorV5Diagnostic",
+            "validateExistingRealAllocatorV5Diagnostic",
+            "validateRealAllocatorV5Checkpoint",
+            "sealRealAllocatorV5Evaluation",
+            "realAllocatorV5PromotionCheck",
+            "sealRealAllocatorV5Selection",
+            "realAllocatorV5PreCampaignCheck",
+        ):
+            self.assertIn(token, module)
+        diagnostic = module.split(
+            'val realAllocatorV5DiagnosticTest = tasks.register<Test>("realAllocatorV5DiagnosticTest")',
+            1,
+        )[1].split("val realAllocatorV5DiagnosticJUnitDirectory", 1)[0]
+        for suite in (
+            "M3V3AsyncActorLaneRunnerTest",
+            "M3V4AsyncActorLaneRunnerTest",
+            "M3V5AsyncActorLaneRunnerTest",
+            "M3V3NativeBaselineCanaryTest",
+            "M3V5TerminalAdmissionDrainDiagnosticTest",
+            "M3V5RangeLatencyDiagnosticTest",
+        ):
+            self.assertIn(suite, diagnostic)
+        self.assertIn('systemProperty("nereus.m3.allocator.protocol", "V5")', diagnostic)
+        self.assertIn("AllocatorCampaignCheckpointV5", formal)
+        self.assertIn("M3V5AdaptiveCampaignExecutor", formal)
+        self.assertIn("commit.substring(0, 16),\n                5", formal)
+        self.assertIn("NEREUS_V2_M3_ALLOCATOR_CAMPAIGN_EXECUTION_V5", formal)
+        self.assertIn("M3V5DiagnosticRawGate.validate", protocol)
+        self.assertIn("diagnostic.rawManifestDigest()", protocol)
+        self.assertIn("rawManifest", protocol)
+        self.assertIn("M3V4AsyncActorLaneRunnerTest", protocol)
+        self.assertIn("M3V5AsyncActorLaneRunnerTest", protocol)
+        self.assertIn("DIAGNOSTIC_RAW_MANIFEST_V5", raw_gate)
+        self.assertIn('"v5-range1024-25ms-formal-sequence.json"', raw_gate)
+        self.assertIn("requireLosslessRow(json, \"fixed1000\", 1_000, true)", raw_gate)
+        self.assertIn("requireLosslessRow(json, \"derived800\", 800, true)", raw_gate)
+        self.assertIn("native-baseline-row-09.json", raw_gate)
+        self.assertIn("actorLanesStopped", raw_gate)
+        self.assertIn("forContractTestV5", range_latency)
+        self.assertIn("MAX_GLOBAL_OUTSTANDING", runner_test)
+        self.assertIn("containsExactly(128, 128, 128, 128)", runner_test)
+
+        launcher = V5_LAUNCHER.read_text()
+        for token in (
+            "NEREUS_M3_ALLOCATOR_V5_FORMAL_AUTHORIZATION_SHA",
+            "NEREUS_M3_ALLOCATOR_V5_NATIVE_EXECUTION_PROFILE_SHA256",
+            "NEREUS_M3_ALLOCATOR_V5_DIAGNOSTIC_PATH",
+            "NEREUS_M3_ALLOCATOR_V5_DIAGNOSTIC_OUTPUT_DIRECTORY",
+            ":nereus-metadata-oxia:realAllocatorV5PreCampaignCheck",
+            ":nereus-metadata-oxia:validateExistingRealAllocatorV5Diagnostic",
+            ":nereus-metadata-oxia:realAllocatorV5BoundedAdaptiveFormalCampaign",
+            ".stormAdmissionFeasibility.v4.status",
+            ".stormAdmissionFeasibility.v5.status",
+            "--hard-deadline-seconds 48000",
+            "--no-configuration-cache",
+        ):
+            self.assertIn(token, launcher)
+        environment = dict(os.environ)
+        for name in tuple(environment):
+            if name.startswith("NEREUS_M3_ALLOCATOR_V5_"):
+                environment.pop(name)
+        output = ROOT / "build" / "never-created-v5-formal"
+        result = subprocess.run(
+            [str(V5_LAUNCHER), "--bounded-adaptive-formal", str(output)],
+            cwd=ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("separately authorized exact SHA", result.stderr)
+        self.assertFalse(output.exists())
 
     def test_v3_native_execution_plan_is_stable_source_bound_and_feasible(self) -> None:
         first = subprocess.run(
@@ -699,6 +839,49 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             self.assertEqual("evaluation.naev4", v4_identity["evaluationRelativePath"])
             self.assertFalse(v4_identity["nars4Present"])
 
+            v5_source = root / "v5-formal"
+            v5_checkpoints = v5_source / "checkpoints"
+            v5_checkpoints.mkdir(parents=True)
+            v5_checkpoint = v5_checkpoints / "last.nacp5"
+            v5_checkpoint.write_bytes(b"v5-checkpoint")
+            (v5_source / "campaign-result.json").write_bytes(campaign.read_bytes())
+            v5_evaluation = v5_source / "evaluation.naev5"
+            v5_evaluation.write_bytes(b"v5-evaluation")
+            v5_archive = root / "v5-none-archive"
+            v5_files = sorted(path for path in v5_source.rglob("*") if path.is_file())
+            v5_command = v4_command.copy()
+            replacements = {
+                str(v4_source): str(v5_source),
+                str(v4_archive): str(v5_archive),
+                "4": "5",
+                "e" * 40: "3" * 40,
+                "f" * 64: "4" * 64,
+                hashlib.sha256((v4_source / "campaign-result.json").read_bytes()).hexdigest(): hashlib.sha256(
+                    (v5_source / "campaign-result.json").read_bytes()
+                ).hexdigest(),
+                v4_checkpoint.relative_to(v4_source).as_posix(): v5_checkpoint.relative_to(v5_source).as_posix(),
+                hashlib.sha256(v4_checkpoint.read_bytes()).hexdigest(): hashlib.sha256(
+                    v5_checkpoint.read_bytes()
+                ).hexdigest(),
+                hashlib.sha256(v4_evaluation.read_bytes()).hexdigest(): hashlib.sha256(
+                    v5_evaluation.read_bytes()
+                ).hexdigest(),
+                str(len(v4_files)): str(len(v5_files)),
+                str(sum(path.stat().st_size for path in v4_files)): str(
+                    sum(path.stat().st_size for path in v5_files)
+                ),
+            }
+            v5_command = [replacements.get(value, value) for value in v5_command]
+            subprocess.run(v5_command, check=True, capture_output=True, text=True)
+            v5_identity = json.loads((v5_archive / "archive-identity.json").read_bytes())
+            self.assertEqual(
+                "NEREUS_V2_M3_ALLOCATOR_FORMAL_ARCHIVE_IDENTITY_V4",
+                v5_identity["schema"],
+            )
+            self.assertEqual(5, v5_identity["protocolVersion"])
+            self.assertEqual("evaluation.naev5", v5_identity["evaluationRelativePath"])
+            self.assertFalse(v5_identity["nars5Present"])
+
     def test_failed_formal_archiver_preserves_terminal_payload_and_junit(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -784,6 +967,18 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             self.assertNotEqual(0, repeated.returncode)
             self.assertIn("archive target already exists", repeated.stderr)
 
+            v5_archive = root / "v5-archive"
+            v5_command = command.copy()
+            v5_command[v5_command.index("--archive") + 1] = str(v5_archive)
+            v5_command[2:2] = ["--protocol-version", "5"]
+            subprocess.run(v5_command, check=True, capture_output=True, text=True)
+            v5_identity = json.loads((v5_archive / "archive-identity.json").read_bytes())
+            self.assertEqual(5, v5_identity["protocolVersion"])
+            self.assertEqual(
+                "NEREUS_V2_M3_ALLOCATOR_FAILED_FORMAL_ARCHIVE_IDENTITY_V2",
+                v5_identity["schema"],
+            )
+
     def test_diagnostic_archiver_preserves_output_and_exact_junit_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -859,14 +1054,15 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             diagnostic = root / "diagnostic"
             diagnostic.mkdir()
             receipts = [
-                diagnostic / "v4-range1024-10ms-formal-sequence.json",
-                diagnostic / "v4-range1024-25ms-formal-sequence.json",
+                diagnostic / "v5-range1024-10ms-formal-sequence.json",
+                diagnostic / "v5-range1024-25ms-formal-sequence.json",
             ]
             for receipt in receipts:
                 receipt.write_text(
                     '{"diagnosticOnly":true,"authority":false,"selectionEligible":false}\n',
                     encoding="utf-8",
                 )
+            (diagnostic / "receipt.nadv5").write_bytes(b"canonical-nadv5")
             junit = root / "junit"
             junit.mkdir()
             (junit / "TEST-example.xml").write_text(
@@ -885,6 +1081,10 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
                     str(junit),
                     "--archive",
                     str(archive),
+                    "--protocol-version",
+                    "5",
+                    "--diagnostic-status",
+                    "PASSED",
                     "--archived-on",
                     "2026-08-29",
                     "--source-commit",
@@ -912,6 +1112,9 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             )
 
             identity = json.loads((archive / "archive-identity.json").read_bytes())
+            self.assertEqual(5, identity["protocolVersion"])
+            self.assertEqual("PASSED", identity["diagnosticStatus"])
+            self.assertTrue(identity["nadvPresent"])
             self.assertIsNone(identity["rangeAttributionRelativePath"])
             self.assertIsNone(identity["rangeAttributionSha256"])
             self.assertEqual(

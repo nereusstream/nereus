@@ -1,7 +1,7 @@
 # Stage B V5 storm admission and diagnostic raw integrity
 
 - Design status: Accepted through ADR 0137
-- Evidence status: admission/profile/feasibility and shared Runner composition implemented; V5 wire and current-source diagnostic pending
+- Evidence status: V5 wire, launcher, feasibility, admission, and raw-integrity gates implemented; current-source diagnostic pending
 - Production allocator mode: `UNSELECTED`
 
 The V4 full-suite RANGE-1024 25ms row reached the source-governed 256-global outstanding cap and dropped 124 of
@@ -22,9 +22,33 @@ conservation and zero residue.
 V4 raw enforcement is also fail-closed: both RANGE receipt files are written before JUnit assertions, and protocol
 sealing/validation independently reconstruct their source, latency, fixed/derived offered inventory, zero drop,
 zero failure, zero timeout, and exact completion. V5 extends the canonical diagnostic receipt to bind both JUnit and
-raw-output manifests.
+raw-output manifests. `NADV5` has a new fixed wire and binds the JUnit manifest digest separately from the canonical
+raw manifest digest; `NARS5` carries both through selection. The raw manifest has an exact 19-JSON inventory, hashes
+every byte, and independently rechecks Native execution/workload identity, ten Native rows, source-bound STRICT,
+RANGE and terminal-drain receipts, fixed/derived conservation, zero drop/failure/timeout, and zero lifecycle residue.
+Unexpected/missing JSON, a symlink, digest substitution, or any raw hard-gate mismatch fails sealing, validation,
+promotion, and selection.
+
+The V5 zero-decision plan digest is
+`3e0aea42527e85c58276a51f5953af0ffaba5029b8916e7bbd85f377f434d23a`; its Native execution-profile digest is
+`76d9bc38ce6fa9c47b2fed926c9485db828adaee3e1533b962ab6e9c1157e1ce`. The plan retains 328 interval, 360 fault,
+32 scale, 720 total actions and the 48,000-second cap. `scripts/v2-m3-allocator-plan-v5.py` reconstructs those bytes,
+the rejected V4 storm tuple and accepted V5 tuple. `scripts/run-v2-m3-real-allocator-evidence-v5.sh` is the only V5
+formal launcher; Gradle exposes independent V5 diagnostic, checkpoint, evaluation, promotion, selection, preflight,
+and formal tasks. The complete diagnostic inventory is exactly 24 tests in ten suites, including the unchanged V3/V4
+compatibility proofs and V5 Native, storm-cap, terminal-drain, 10ms, and 25ms authority paths.
+
+The create-new external archive scripts recognize protocol V5 without changing existing V3/V4 payload bytes or
+defaults. Diagnostic archives preserve successful as well as failed exact JUnit/raw inventories, reject a foreign
+protocol RANGE attribution, and remain `diagnosticOnly=true`, `authority=false`, and `selectionEligible=false`.
+Completed non-promotable and failed formal archives use distinct V5 identities; archiving never creates promotion
+authority.
 
 The preserved full-suite diagnostic archive is
 `/Users/liusinan/Documents/Codex/2026-08-29/nereus-v2-m3-allocator/diagnostic-bb928a0b-v4-full-zero-drop-gate-miss-r1-archive2`
 with identity SHA-256 `404f9bddc87f0f47cf4d272fa64bdc94254d903038d8d54593cdeddc46f20cd7` and manifest SHA-256
 `2010a324159902472945dd018ab64d457770e9c190270e6dcae1ec05b1462a80`. It is never formal or selection input.
+
+No V5 diagnostic or formal campaign has run at this implementation cut. Production allocator mode remains
+`UNSELECTED`; the existing production source lock, child receipts, current-source M2 regression, scenarios, and M3
+Final are unchanged.

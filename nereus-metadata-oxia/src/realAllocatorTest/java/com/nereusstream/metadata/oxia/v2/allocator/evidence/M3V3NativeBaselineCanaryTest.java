@@ -11,6 +11,7 @@ package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 import static org.assertj.core.api.Assertions.assertThat;
 import com.nereusstream.domain.registry.allocator.AllocatorNativeExecutionProfileV3;
 import com.nereusstream.domain.registry.allocator.AllocatorNativeExecutionProfileV4;
+import com.nereusstream.domain.registry.allocator.AllocatorNativeExecutionProfileV5;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -21,19 +22,19 @@ import org.junit.jupiter.api.Test;
 class M3V3NativeBaselineCanaryTest {
     @Test
     void exactFormalScheduleClearsAllNativeBaselinesAndRepresentativeRows() throws Exception {
-        boolean terminalDrainV4 = System.getProperty("nereus.m3.allocator.protocol", "V3").equals("V4");
+        int protocolVersion = protocolVersion();
         ThreadPoolExecutor constructionWorkers = M3RealAllocatorEvidenceTest.exactWorkers();
         constructionWorkers.prestartAllCoreThreads();
         List<Row> rows = new ArrayList<>();
         long runnerOutstandingMaximum = 0;
         long operationOutstandingMaximum = 0;
         try (M3NativePulsarPopulation population = new M3NativePulsarPopulation(constructionWorkers)) {
-            M3V3NativeIntervalRuntime runtime = new M3V3NativeIntervalRuntime(population, terminalDrainV4);
+            M3V3NativeIntervalRuntime runtime = new M3V3NativeIntervalRuntime(population, protocolVersion);
             for (int activePopulation : M3AllocatorWorkloadPlan.ACTIVE_POPULATIONS) {
                 for (int latencyMillis : M3AllocatorWorkloadPlan.METADATA_LATENCY_P99_MILLIS) {
                     Row row = runRow(runtime, activePopulation, latencyMillis, 200);
                     rows.add(row);
-                    writeRow(rows.size() - 1, row, terminalDrainV4);
+                    writeRow(rows.size() - 1, row, protocolVersion);
                     assertBaseline(row);
                     runnerOutstandingMaximum = Math.max(runnerOutstandingMaximum, row.globalOutstandingMaximum());
                     operationOutstandingMaximum =
@@ -43,7 +44,7 @@ class M3V3NativeBaselineCanaryTest {
                     for (int latencyMillis : List.of(1, 25)) {
                         Row row = runRow(runtime, activePopulation, latencyMillis, 500);
                         rows.add(row);
-                        writeRow(rows.size() - 1, row, terminalDrainV4);
+                        writeRow(rows.size() - 1, row, protocolVersion);
                         assertRepresentative(row);
                         runnerOutstandingMaximum =
                                 Math.max(runnerOutstandingMaximum, row.globalOutstandingMaximum());
@@ -61,7 +62,7 @@ class M3V3NativeBaselineCanaryTest {
         assertThat(operationOutstandingMaximum).isGreaterThan(4);
         M3V3DiagnosticOutput.writeNew(
                 "native-baseline-canary-summary.json",
-                summaryJson(rows, runnerOutstandingMaximum, operationOutstandingMaximum, terminalDrainV4));
+                summaryJson(rows, runnerOutstandingMaximum, operationOutstandingMaximum, protocolVersion));
     }
 
     private static Row runRow(
@@ -147,21 +148,31 @@ class M3V3NativeBaselineCanaryTest {
         assertThat(row.actorLanesStopped()).isTrue();
     }
 
-    private static void writeRow(int ordinal, Row row, boolean terminalDrainV4) throws Exception {
+    private static void writeRow(int ordinal, Row row, int protocolVersion) throws Exception {
         M3V3DiagnosticOutput.writeNew(
-                "native-baseline-row-%02d.json".formatted(ordinal), row.json(terminalDrainV4));
+                "native-baseline-row-%02d.json".formatted(ordinal), row.json(protocolVersion));
     }
 
     static String rowSchema(boolean terminalDrainV4) {
-        return "NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_ROW_" + (terminalDrainV4 ? "V4" : "V3");
+        return rowSchema(terminalDrainV4 ? 4 : 3);
+    }
+
+    static String rowSchema(int protocolVersion) {
+        if (protocolVersion < 3 || protocolVersion > 5) {
+            throw new IllegalArgumentException("allocator native baseline protocol version differs");
+        }
+        return "NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_ROW_V" + protocolVersion;
     }
 
     private static String summaryJson(
-            List<Row> rows, long runnerMaximum, long operationMaximum, boolean terminalDrainV4) {
-        String version = terminalDrainV4 ? "V4" : "V3";
-        String executionProfile = terminalDrainV4
-                ? AllocatorNativeExecutionProfileV4.executionProfileDigest().toHex()
-                : AllocatorNativeExecutionProfileV3.executionProfileDigest().toHex();
+            List<Row> rows, long runnerMaximum, long operationMaximum, int protocolVersion) {
+        String version = "V" + protocolVersion;
+        String executionProfile = switch (protocolVersion) {
+            case 3 -> AllocatorNativeExecutionProfileV3.executionProfileDigest().toHex();
+            case 4 -> AllocatorNativeExecutionProfileV4.executionProfileDigest().toHex();
+            case 5 -> AllocatorNativeExecutionProfileV5.executionProfileDigest().toHex();
+            default -> throw new IllegalArgumentException("allocator native baseline protocol version differs");
+        };
         return "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_CANARY_" + version + "\""
                 + ",\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false"
                 + ",\"nativeExecutionModel\":\"" + AllocatorNativeExecutionProfileV3.MODEL + "\""
@@ -173,6 +184,15 @@ class M3V3NativeBaselineCanaryTest {
                 + ",\"runnerOutstandingMaximum\":" + runnerMaximum
                 + ",\"managedLedgerOperationOutstandingMaximum\":" + operationMaximum
                 + ",\"rowCount\":" + rows.size() + "}\n";
+    }
+
+    private static int protocolVersion() {
+        return switch (System.getProperty("nereus.m3.allocator.protocol", "V3")) {
+            case "V3" -> 3;
+            case "V4" -> 4;
+            case "V5" -> 5;
+            default -> throw new IllegalArgumentException("allocator native baseline protocol property differs");
+        };
     }
 
     private record Row(
@@ -213,8 +233,8 @@ class M3V3NativeBaselineCanaryTest {
             long ageP99Micros,
             long schedulerLagP99Micros,
             long callbackLagP99Micros) {
-        private String json(boolean terminalDrainV4) {
-            return "{\"schema\":\"" + rowSchema(terminalDrainV4) + "\""
+        private String json(int protocolVersion) {
+            return "{\"schema\":\"" + rowSchema(protocolVersion) + "\""
                     + ",\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false"
                     + ",\"activePopulation\":" + activePopulation + ",\"latencyMillis\":" + latencyMillis
                     + ",\"offeredRate\":" + offeredRate + ",\"offered\":" + offered
