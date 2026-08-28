@@ -658,6 +658,12 @@ final timer and producer-to-lane wake-up exposed by two measured drops at `100e5
 actor schedule uses a precise target wait, and an empty-queue/available-permit offer dispatches its existing async
 operation directly. No request is offered early and late/full/busy requests retain the same drop semantics.
 
+[ADR 0123](../../../decisions/0123-v2-m3-allocator-v3-candidate-cutoff-terminal-telemetry-amendment.md) retains the
+`c1ba429b...` 18/1/0/0 full-diagnostic attempt and the separate cutoff reproduction. Fixed-1000 fired its first
+dropped request with zero scheduler lag but left 15 requests behind per-binding pre-admission at cutoff. The RANGE
+diagnostics now write exact terminal/binding/queue/rollover telemetry before the unchanged ADR-0117 zero-drop gate;
+they do not add a grace period, reclassify a drop, or authorize formal execution.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

@@ -225,6 +225,12 @@ retained ordinals 7,998/7,999 as measured drops after about 5.4ms scheduler lag.
 and immediate non-blocking dispatch fast path remove that runner artifact without changing any target, cutoff, queue,
 permit, outcome, or baseline zero-drop requirement.
 
+ADR 0123 preserves the exact `c1ba429b...` Native-green/full-diagnostic-failed source. RANGE-16 fixed-1000 reproduced
+15 pre-admission drops with first-drop scheduler lag zero, so the next iteration must diagnose binding wait and
+workflow completion rather than change offer timing. RANGE sequence attachments are now written before assertions and
+include first dropped binding, queue wait, and rollover p99. The 30,000-completion gate and six-suite/18-test NADV3
+inventory remain unchanged.
+
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

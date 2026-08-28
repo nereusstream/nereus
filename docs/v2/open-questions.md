@@ -884,6 +884,9 @@ drop/failure/timeout=0 and complete drain.
 ADR 0122 further removes final timer/wake-up jitter as a runner artifact through a bounded precision window and
 immediate async dispatch when existing permits allow it. This does not change the still-open formal qualification
 question or permit post-cutoff admission.
+ADR 0123 retains the later `c1ba429b...` fixed-1000 reproduction where the first dropped request had zero scheduler
+lag and waited behind per-binding admission. It adds failure-time binding/queue/rollover telemetry while preserving
+the zero-drop gate. No diagnostic outcome selects a mode or authorizes another formal campaign.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

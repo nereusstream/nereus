@@ -111,6 +111,15 @@ class M3RealAllocatorStrictIntervalDiagnosticTest {
                     population,
                     Cell.fixedRate(Candidate.RANGE_16, 10_000, 1, 1_000),
                     1_000);
+            M3V3DiagnosticOutput.writeNew(
+                    "range16-formal-sequence.json",
+                    "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_RANGE16_FORMAL_SEQUENCE_DIAGNOSTIC_V1\""
+                            + ",\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false"
+                            + ",\"sourceCommit\":"
+                            + M3V3DiagnosticOutput.jsonString(sourceCommit)
+                            + ",\"fixed1000\":"
+                            + intervalJson(fixed.runnerResult())
+                            + "}\n");
             assertThat(fixed.runnerResult().warmupUnexpectedFailedAfterAdmission())
                     .withFailMessage(
                             "unexpected RANGE-16 fixed-1000 warmup failure: %s",
@@ -122,15 +131,6 @@ class M3RealAllocatorStrictIntervalDiagnosticTest {
             assertThat(fixed.runnerResult().timedOutAfterAdmission()).isZero();
             assertThat(fixed.runnerResult().actorLanesStoppedAtCleanupDeadline()).isTrue();
             assertThat(fixed.runnerResult().globalOutstandingMaximum()).isGreaterThan(4);
-            M3V3DiagnosticOutput.writeNew(
-                    "range16-formal-sequence.json",
-                    "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_RANGE16_FORMAL_SEQUENCE_DIAGNOSTIC_V1\""
-                            + ",\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false"
-                            + ",\"sourceCommit\":"
-                            + M3V3DiagnosticOutput.jsonString(sourceCommit)
-                            + ",\"fixed1000\":"
-                            + intervalJson(fixed.runnerResult())
-                            + "}\n");
         } catch (Exception | Error failure) {
             executionFailure = failure;
             throw failure;
@@ -159,6 +159,11 @@ class M3RealAllocatorStrictIntervalDiagnosticTest {
     }
 
     private static String intervalJson(M3V3AsyncActorLaneRunner.IntervalResult result) {
+        M3V3AsyncActorLaneRunner.RequestTelemetry firstDrop = result.measuredTelemetry().stream()
+                .filter(telemetry -> telemetry.outcome()
+                        == M3V3AsyncActorLaneRunner.TerminalOutcome.OVERLOAD_DROPPED_BEFORE_ADMISSION)
+                .findFirst()
+                .orElse(null);
         return "{\"warmupOffered\":" + result.warmupOffered()
                 + ",\"warmupCompleted\":" + result.warmupCompleted()
                 + ",\"warmupLoadRejectedAfterAdmission\":" + result.warmupLoadRejectedAfterAdmission()
@@ -166,10 +171,22 @@ class M3RealAllocatorStrictIntervalDiagnosticTest {
                 + result.warmupUnexpectedFailedAfterAdmission()
                 + ",\"warmupTimedOutAfterAdmission\":" + result.warmupTimedOutAfterAdmission()
                 + ",\"measuredOffered\":" + result.offered()
+                + ",\"measuredAdmitted\":" + result.admitted()
+                + ",\"measuredDroppedBeforeAdmission\":" + result.overloadDroppedBeforeAdmission()
                 + ",\"measuredCompleted\":" + result.completed()
                 + ",\"measuredFailedAfterAdmission\":" + result.failedAfterAdmission()
                 + ",\"measuredTimedOutAfterAdmission\":" + result.timedOutAfterAdmission()
                 + ",\"globalOutstandingMaximum\":" + result.globalOutstandingMaximum()
+                + ",\"bindingBusyMaximum\":" + result.bindingBusyMaximum()
+                + ",\"queueDepthMaximum\":" + result.queueDepthMaximum()
+                + ",\"queueWaitP99Micros\":" + result.queueWaitP99Micros()
+                + ",\"queueWaitMaximumMicros\":" + result.queueWaitMaximumMicros()
+                + ",\"schedulerFiringLagP99Micros\":" + result.schedulerFiringLagP99Micros()
+                + ",\"rolloverP99Micros\":" + result.rolloverP99Micros()
+                + ",\"firstDroppedOrdinal\":" + (firstDrop == null ? -1 : firstDrop.ordinal())
+                + ",\"firstDroppedBindingOrdinal\":" + (firstDrop == null ? -1 : firstDrop.bindingOrdinal())
+                + ",\"firstDroppedSchedulerLagMicros\":"
+                + (firstDrop == null ? 0 : firstDrop.schedulerFiringLagMicros())
                 + ",\"actorLanesStoppedAtCleanupDeadline\":"
                 + result.actorLanesStoppedAtCleanupDeadline() + '}';
     }

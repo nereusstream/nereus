@@ -106,11 +106,15 @@ class M3V3CandidateCutoffDiagnosticTest {
                 + ",\"dropped\":" + result.overloadDroppedBeforeAdmission()
                 + ",\"completed\":" + result.completed()
                 + ",\"globalOutstandingMaximum\":" + result.globalOutstandingMaximum()
+                + ",\"bindingBusyMaximum\":" + result.bindingBusyMaximum()
                 + ",\"queueDepthMaximum\":" + result.queueDepthMaximum()
+                + ",\"queueWaitP99Micros\":" + result.queueWaitP99Micros()
                 + ",\"queueWaitMaximumMicros\":" + result.queueWaitMaximumMicros()
                 + ",\"pendingPermitMaximum\":" + result.pendingPermitMaximum()
                 + ",\"schedulerFiringLagP99Micros\":" + result.schedulerFiringLagP99Micros()
+                + ",\"rolloverP99Micros\":" + result.rolloverP99Micros()
                 + ",\"firstDroppedOrdinal\":" + (firstDrop == null ? -1 : firstDrop.ordinal())
+                + ",\"firstDroppedBindingOrdinal\":" + (firstDrop == null ? -1 : firstDrop.bindingOrdinal())
                 + ",\"firstDroppedSchedulerLagMicros\":"
                 + (firstDrop == null ? 0 : firstDrop.schedulerFiringLagMicros())
                 + ",\"firstDroppedFailure\":"

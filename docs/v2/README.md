@@ -586,6 +586,11 @@ proved ADR 0120's 25ms/200 measured correction before stopping on that non-measu
 failure where the final two offers woke about 5.4ms late. The existing per-actor producers now use a bounded final
 50ms precision window and an immediate async-dispatch fast path only when the unchanged queue and permits allow it;
 late/full/busy requests still receive the same pre-admission drop.
+[ADR 0123](../decisions/0123-v2-m3-allocator-v3-candidate-cutoff-terminal-telemetry-amendment.md) preserves the later
+`c1ba429b...` full diagnostic at 18/1/0/0 after its Native rows passed but RANGE-16 fixed-1000 retained 15
+pre-admission requests. The independent cutoff run showed first-drop scheduler lag zero, so diagnostic attachments now
+retain binding identity, queue wait, and rollover p99 before the unchanged zero-drop assertion. This is observability,
+not a cutoff, qualification, workload, or formal-authorization change.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

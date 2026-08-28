@@ -143,3 +143,16 @@ about 5.4 milliseconds late and missed dispatch before cutoff. ADR 0122 preserve
 closes both remaining handoff costs. Each producer spins only for targets in the final 50ms and immediately performs
 async dispatch when the unchanged queue is empty and permit available; every busy/full/late request stays in the same
 bounded pre-admission/drop path.
+
+Exact source `c1ba429be96b7bc2969b5cd456086b25ab1f06aa` then passed the standalone ten-row Native canary with zero
+warm-up and measured drop/failure/timeout, complete drain, no hidden queue, and Runner/ManagedLedger-operation
+concurrency 60. Its full diagnostic passed the same Native inventory but ended 18/1/0/0 when RANGE-16 fixed-1000
+completed 29,985/30,000. The complete 23-file/47,607-byte failed attempt is archived under
+`diagnostic-c1ba429b-stage-b2-full-r1-strict-range16-cutoff-drop`, with manifest `d88f9e07...145c8` and identity
+`948cb7ce...75c9`.
+
+The separate cutoff diagnostic reproduced fixed-1000 at 29,985 completions plus 15 pre-admission drops. First drop
+ordinal 39,943 had scheduler lag zero, while queue wait reached 40,252 microseconds. This excludes another timer
+correction and locates the remaining boundary at per-binding wait versus workflow completion before cutoff. ADR 0123
+therefore adds binding identity, queue-wait and rollover-p99 retention and writes the non-authoritative RANGE
+attachment before assertions; it does not relax the ADR-0117 30,000-completion gate or authorize formal execution.

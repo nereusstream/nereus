@@ -45,6 +45,9 @@ V3_FORMAL_HARNESS = V3_FORMAL_RUNTIME.with_name("M3V3AllocatorFormalHarness.java
 V3_STRICT_SEQUENCE_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
     "M3RealAllocatorStrictIntervalDiagnosticTest.java"
 )
+V3_CANDIDATE_CUTOFF_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
+    "M3V3CandidateCutoffDiagnosticTest.java"
+)
 V3_PROTOCOL_MAIN = V3_FORMAL_RUNTIME.with_name("M3V3AllocatorProtocolMain.java")
 FORMAL_CAMPAIGN = (
     ROOT
@@ -243,6 +246,16 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         )
         self.assertIn("Cell.fixedRate(Candidate.RANGE_16, 10_000, 1, 1_000)", diagnostic)
         self.assertIn('"range16-formal-sequence.json"', diagnostic)
+        self.assertIn(r'\"measuredDroppedBeforeAdmission\"', diagnostic)
+        self.assertIn(r'\"firstDroppedBindingOrdinal\"', diagnostic)
+        self.assertIn("result.rolloverP99Micros()", diagnostic)
+        self.assertLess(
+            diagnostic.index('"range16-formal-sequence.json"'),
+            diagnostic.index("assertThat(fixed.runnerResult().completed()).isEqualTo(30_000)"),
+        )
+        cutoff_diagnostic = V3_CANDIDATE_CUTOFF_DIAGNOSTIC.read_text()
+        self.assertIn(r'\"firstDroppedBindingOrdinal\"', cutoff_diagnostic)
+        self.assertIn("result.rolloverP99Micros()", cutoff_diagnostic)
 
     def test_formal_archiver_is_create_new_byte_exact_and_collision_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
