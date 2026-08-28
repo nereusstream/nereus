@@ -108,9 +108,11 @@ class M3V4RangeLatencyDiagnosticTest {
             int latencyMillis)
             throws InterruptedException {
         actors.beginSharedDiagnosticCapture();
+        population.beginRetryDiagnosticCapture();
         AllocationObserver observer = new AllocationObserver();
         M3V3AllocatorFormalHarness.HarnessResult result;
         SharedOperationDiagnosticSnapshot sharedSnapshot;
+        M3CandidateAllocatorPopulation.RetryDiagnosticSnapshot retrySnapshot;
         try {
             M3V3AllocatorFormalHarness harness = M3V3AllocatorFormalHarness.forContractTest(
                     Duration.ofSeconds(10),
@@ -125,8 +127,10 @@ class M3V4RangeLatencyDiagnosticTest {
                     M3V3AllocatorFormalHarness.SupplementaryMeasurements::empty);
         } finally {
             sharedSnapshot = actors.endSharedDiagnosticCapture();
+            retrySnapshot = population.endRetryDiagnosticCapture();
         }
         assertConservationAndDrain(result);
+        assertThat(retrySnapshot.total()).isEqualTo(observer.reconcileRetries.get());
         List<OperationDiagnosticSnapshot> snapshots = sharedSnapshot.actorSnapshots();
         List<OperationSample> samples = snapshots.stream()
                 .flatMap(snapshot -> snapshot.samples().stream())
@@ -134,7 +138,7 @@ class M3V4RangeLatencyDiagnosticTest {
         assertThat(samples).isNotEmpty();
         assertThat(samples).allMatch(sample -> sample.injectedLatencyMillis() == latencyMillis);
         assertThat(sharedSnapshot.realOutstandingMaximum()).isGreaterThan(4);
-        return Row.from(offeredRate, result, observer, sharedSnapshot, samples);
+        return Row.from(offeredRate, result, observer, sharedSnapshot, retrySnapshot, samples);
     }
 
     private static void assertConservationAndDrain(M3V3AllocatorFormalHarness.HarnessResult result) {
@@ -253,9 +257,11 @@ class M3V4RangeLatencyDiagnosticTest {
             long reconcileRetries,
             long reconcileRetriesMaximum,
             String firstFailure,
+            Map<String, Long> retryReasons,
             Map<String, Long> operationKinds,
             Map<String, Long> failureKinds) {
         private Row {
+            retryReasons = Map.copyOf(retryReasons);
             operationKinds = Map.copyOf(operationKinds);
             failureKinds = Map.copyOf(failureKinds);
         }
@@ -265,6 +271,7 @@ class M3V4RangeLatencyDiagnosticTest {
                 M3V3AllocatorFormalHarness.HarnessResult result,
                 AllocationObserver observer,
                 SharedOperationDiagnosticSnapshot sharedSnapshot,
+                M3CandidateAllocatorPopulation.RetryDiagnosticSnapshot retrySnapshot,
                 List<OperationSample> samples) {
             var interval = result.runnerResult();
             List<OperationDiagnosticSnapshot> snapshots = sharedSnapshot.actorSnapshots();
@@ -273,6 +280,8 @@ class M3V4RangeLatencyDiagnosticTest {
             List<Long> realRtt = samples.stream().map(OperationSample::realRttMicros).toList();
             List<Long> schedulerLag = samples.stream().map(OperationSample::schedulerLagMicros).toList();
             List<Long> callbackLag = samples.stream().map(OperationSample::callbackLagMicros).toList();
+            Map<String, Long> retryReasons = new TreeMap<>();
+            retrySnapshot.reasons().forEach((reason, count) -> retryReasons.put(reason.name(), count));
             return new Row(
                     offeredRate,
                     interval.offered(),
@@ -302,6 +311,7 @@ class M3V4RangeLatencyDiagnosticTest {
                     observer.reconcileRetries.get(),
                     observer.reconcileRetriesMaximum.get(),
                     observer.firstFailure.get(),
+                    retryReasons,
                     operationKinds,
                     observer.failureKinds);
         }
@@ -334,6 +344,7 @@ class M3V4RangeLatencyDiagnosticTest {
                     + ",\"reconcileRetries\":" + reconcileRetries
                     + ",\"reconcileRetriesMaximum\":" + reconcileRetriesMaximum
                     + ",\"firstFailure\":" + M3V3DiagnosticOutput.jsonString(firstFailure)
+                    + ",\"retryReasons\":" + counts(retryReasons)
                     + ",\"operationKinds\":" + counts(operationKinds)
                     + ",\"failureKinds\":" + counts(failureKinds) + '}';
         }

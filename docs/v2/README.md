@@ -393,6 +393,7 @@ Accepted decisions:
 - [ADR 0130: M3 V4 applied-mutation acknowledgement amendment](../decisions/0130-v2-m3-allocator-v4-applied-mutation-acknowledgement-amendment.md)
 - [ADR 0131: M3 V4 applied-mutation instrumentation forwarding amendment](../decisions/0131-v2-m3-allocator-v4-applied-mutation-instrumentation-forwarding-amendment.md)
 - [ADR 0132: M3 V4 evidence-store specialized mutation forwarding amendment](../decisions/0132-v2-m3-allocator-v4-evidence-store-specialized-mutation-forwarding-amendment.md)
+- [ADR 0133: M3 V4 fixed-storm retry attribution amendment](../decisions/0133-v2-m3-allocator-v4-fixed-storm-retry-attribution-amendment.md)
 
 ## Open design gates
 
@@ -668,6 +669,11 @@ preserves the exact `e53b3af8...` diagnostic: acknowledgements reached the wrapp
 but the outer evidence-store decorator inherited SPI defaults and re-entered the ordinary mutation path. The decorator
 now forwards both installed-RANGE specialized methods through the same exact-key and fault telemetry helper; production
 semantics, V4 plan, and every threshold stay unchanged.
+
+[ADR 0133](../decisions/0133-v2-m3-allocator-v4-fixed-storm-retry-attribution-amendment.md) preserves the exact
+`792c77de...` diagnostic. Derived-800 now passes with four operations and zero drop, but fixed-1000 still drops 1,999
+offers and reports 25,780 retries. A diagnostic-only closed retry-reason inventory now binds those retries before the
+next proof-preserving correction; formal bytes and all V4 thresholds remain unchanged.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

@@ -43,11 +43,14 @@ import com.nereusstream.metadata.spi.model.VersionedVirtualLedgerSliceViewV1;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
@@ -57,6 +60,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -81,6 +85,7 @@ final class M3CandidateAllocatorPopulation {
     private final ReentrantLock[] headLocks = new ReentrantLock[100_000];
     private final ReentrantReadWriteLock cellProofLock = new ReentrantReadWriteLock(true);
     private final AtomicInteger activePopulation = new AtomicInteger();
+    private final AtomicReference<RetryDiagnosticCapture> retryDiagnosticCapture = new AtomicReference<>();
 
     M3CandidateAllocatorPopulation(
             AllocatorEvidenceCandidateV1 candidate,
@@ -117,7 +122,7 @@ final class M3CandidateAllocatorPopulation {
         boundedWorkflows = allocators.stream()
                 .map(allocator -> allocator.boundedWorkflow(
                         BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal(),
-                        M3CandidateAllocatorPopulation::boundedBackoff))
+                        this::boundedBackoffWithDiagnosticCapture))
                 .toList();
         cell.set(exactCreate(allocators.get(0).createCell(currentView)));
     }
@@ -268,6 +273,31 @@ final class M3CandidateAllocatorPopulation {
                         formalRetryBackoff(requestId, retryNumber, reason).toMillis(),
                         TimeUnit.MILLISECONDS,
                         Runnable::run));
+    }
+
+    void beginRetryDiagnosticCapture() {
+        if (!retryDiagnosticCapture.compareAndSet(null, new RetryDiagnosticCapture())) {
+            throw new IllegalStateException("allocator retry diagnostic capture is already active");
+        }
+    }
+
+    RetryDiagnosticSnapshot endRetryDiagnosticCapture() {
+        RetryDiagnosticCapture capture = retryDiagnosticCapture.getAndSet(null);
+        if (capture == null) {
+            throw new IllegalStateException("allocator retry diagnostic capture is not active");
+        }
+        return capture.snapshot();
+    }
+
+    private CompletionStage<Void> boundedBackoffWithDiagnosticCapture(
+            Sha256Digest requestId,
+            int retryNumber,
+            BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
+        RetryDiagnosticCapture capture = retryDiagnosticCapture.get();
+        if (capture != null) {
+            capture.record(reason);
+        }
+        return boundedBackoff(requestId, retryNumber, reason);
     }
 
     static Duration formalRetryBackoff(
@@ -901,6 +931,32 @@ final class M3CandidateAllocatorPopulation {
         NODE_CREATE,
         HEAD_PUBLISH,
         CELL_CLEAR
+    }
+
+    record RetryDiagnosticSnapshot(Map<BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason, Long> reasons) {
+        RetryDiagnosticSnapshot {
+            reasons = Map.copyOf(Objects.requireNonNull(reasons, "reasons"));
+        }
+
+        long total() {
+            return reasons.values().stream().mapToLong(Long::longValue).sum();
+        }
+    }
+
+    private static final class RetryDiagnosticCapture {
+        private final Map<BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason, LongAdder> reasons =
+                new ConcurrentHashMap<>();
+
+        private void record(BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason reason) {
+            reasons.computeIfAbsent(Objects.requireNonNull(reason, "reason"), ignored -> new LongAdder()).increment();
+        }
+
+        private RetryDiagnosticSnapshot snapshot() {
+            Map<BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason, Long> exact =
+                    new EnumMap<>(BoundedVirtualLedgerAllocatorWorkflowV2.RetryReason.class);
+            reasons.forEach((reason, count) -> exact.put(reason, count.longValue()));
+            return new RetryDiagnosticSnapshot(exact);
+        }
     }
 
     interface FormalAllocationObserver {

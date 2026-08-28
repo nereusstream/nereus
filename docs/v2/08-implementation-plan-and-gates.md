@@ -289,6 +289,10 @@ because the outer evidence-store decorator inherited the specialized SPI default
 the ordinary proofful methods. The decorator must forward both installed-RANGE specialized operations through its
 unchanged exact-key/fault telemetry helper. A deterministic zero-legacy/zero-read decorator contract, fresh exact
 25ms receipt, and complete canonical NADV4 remain required before formal execution.
+ADR 0133 records that exact `792c77de...` proves the four-operation derived-800 path with zero drop, while fixed-1000
+still drops 1,999 offers and reports 25,780 retries. The diagnostic now counts the exact closed retry-reason enum at
+the unchanged source-governed backoff boundary and requires its total to match completed Result accounting. Both rows
+must still reach zero drop before canonical NADV4 or formal execution.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

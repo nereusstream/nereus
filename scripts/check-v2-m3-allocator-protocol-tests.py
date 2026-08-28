@@ -180,6 +180,9 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             "delegate.compareAndSetHeadAfterStoreObservedRangeNode",
             evidence_allocator_store,
         )
+        self.assertIn("beginRetryDiagnosticCapture", V3_CANDIDATE_POPULATION.read_text())
+        self.assertIn("endRetryDiagnosticCapture", V3_CANDIDATE_POPULATION.read_text())
+        self.assertIn('\\"retryReasons\\"', V4_RANGE_LATENCY_DIAGNOSTIC.read_text())
 
     def test_v4_plan_formal_entry_and_native_rows_are_independently_source_bound(self) -> None:
         first = subprocess.run(
