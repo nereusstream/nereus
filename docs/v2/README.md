@@ -563,6 +563,9 @@ zero-decision plan digest, and the promotion CLI reconstructs each logical execu
 physical interval, scale, and ordered fault files. A separate exact-schedule RANGE cutoff diagnostic attributes the
 small pre-admission drop boundary without changing cutoff, workload, SLO, or selection semantics. This is not formal
 rerun authorization.
+The exact `436bca8b...` cutoff diagnostic completed 1/0/0/0: fixed-1000 was 30,000/30,000 with zero drop, while
+derived-800 retained 21 `PRE_ADMISSION_CUTOFF` outcomes among 24,000 offers. The first dropped offer fired with only
+62 microseconds lag, so the source makes no runner or workflow change from this diagnostic.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

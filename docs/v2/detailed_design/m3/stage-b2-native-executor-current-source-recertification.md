@@ -109,3 +109,10 @@ while the promotion verifier reconstructs each logical execution-record digest f
 scale, and ordered fault attachment. A separate exact-schedule RANGE cutoff diagnostic attributes small measured
 pre-admission drops without changing cutoff, workload, SLO, or selection semantics. These corrections remain within
 diagnostic and verification conformance; they do not authorize a new formal campaign.
+
+At exact source `436bca8bd890ffeef03987b76d6431ba73c9b499`, that cutoff diagnostic completed 1/0/0/0. RANGE-16
+fixed-1000 completed 30,000/30,000 with zero drop; the following derived-800 completed 23,979/24,000 and retained 21
+`PRE_ADMISSION_CUTOFF` outcomes. The first dropped ordinal 31,918 had only 62 microseconds of scheduler firing lag;
+the interval's p99 scheduler lag was 975 microseconds, while bounded queue depth/outstanding maxima were 135/229.
+Because offers fired on time and the remaining work was genuinely pre-admission at cutoff, Stage B.2 makes no runner
+or allocator workflow change from this result.

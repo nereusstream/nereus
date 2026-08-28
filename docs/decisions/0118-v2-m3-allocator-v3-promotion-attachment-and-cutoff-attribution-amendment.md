@@ -99,3 +99,18 @@ missing/extra/aliased attachments, logical aggregate reconstruction, legal non-p
 selected-status archive rejection. Publication additionally requires the ordinary Stage B.2 module, formatting,
 documentation, source, pre-campaign, diagnostic JUnit inventory, and canonical NADV3 gates on an exact clean pushed
 source.
+
+## Diagnostic outcome
+
+The first cutoff-attribution run at exact clean source `436bca8bd890ffeef03987b76d6431ba73c9b499` completed its
+single JUnit testcase with zero failure, error, or skip. The fixed-1000 interval admitted and completed all 30,000
+measured offers with zero drop. The following derived-800 interval offered 24,000, admitted and completed 23,979, and
+classified 21 as `PRE_ADMISSION_CUTOFF`; it had zero admitted failure and timeout and complete cleanup. The first drop
+was ordinal 31,918, among the final 82 offers. Its scheduler firing lag was 62 microseconds, while interval p99 firing
+lag was 975 microseconds, bounded queue depth reached 135, queue wait reached 228,974 microseconds, and global
+outstanding reached 229.
+
+Those measurements do not identify a late offer-scheduler defect: the final requests were fired on time but remained
+in the bounded pre-admission lifecycle at the physical cutoff. The result therefore remains a truthful diagnostic
+reproduction of the formal RANGE elimination boundary. No grace period, post-cutoff admission, drop reclassification,
+runner retry, or candidate-workflow change is accepted from this evidence.
