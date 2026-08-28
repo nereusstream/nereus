@@ -44,3 +44,7 @@ The exact-source formal-equivalent 25ms receipt must show four operations per un
 drop/failure/timeout for fixed-1000 and derived-800. The complete current-source V4 diagnostic remains 23 tests in the
 same nine suites and must seal/parse canonical NADV4 before another formal campaign. Historical evidence, V4 plan,
 workload, qualification, and selection bytes are unchanged.
+
+Exact `3bc11088...` did not exercise this production path through the formal instrumentation because the wrapper used
+the interface fallback. ADR 0131 corrects only that forwarding composition; this record remains authoritative for the
+production acknowledgement semantics.

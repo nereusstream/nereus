@@ -45,6 +45,7 @@ V3_NATIVE_RUNTIME = V3_FORMAL_RUNTIME.with_name("M3V3NativeIntervalRuntime.java"
 V3_CANDIDATE_POPULATION = V3_FORMAL_RUNTIME.with_name("M3CandidateAllocatorPopulation.java")
 V3_ASYNC_RUNNER = V3_FORMAL_RUNTIME.with_name("M3V3AsyncActorLaneRunner.java")
 V3_FORMAL_HARNESS = V3_FORMAL_RUNTIME.with_name("M3V3AllocatorFormalHarness.java")
+REAL_OXIA_ACTORS = V3_FORMAL_RUNTIME.with_name("M3RealOxiaActors.java")
 V3_STRICT_SEQUENCE_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
     "M3RealAllocatorStrictIntervalDiagnosticTest.java"
 )
@@ -128,6 +129,7 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         workflow = BOUNDED_WORKFLOW.read_text()
         workflow_test = BOUNDED_WORKFLOW_TEST.read_text()
         mutation_engine = CONDITIONAL_MUTATION_ENGINE.read_text()
+        real_oxia_actors = REAL_OXIA_ACTORS.read_text()
         conditional_client = OXIA_CONDITIONAL_CLIENT.read_text()
         oxia_store = OXIA_ALLOCATOR_STORE.read_text()
         allocator_store = ALLOCATOR_STORE.read_text()
@@ -162,6 +164,10 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn("mutationAttempt(() -> client.compareAndSet", mutation_engine)
         self.assertGreaterEqual(mutation_engine.count("thenCompose(attempt -> reread(key)"), 2)
         self.assertGreaterEqual(mutation_engine.count("return reread(key).thenApply"), 2)
+        self.assertGreaterEqual(real_oxia_actors.count("createIfAbsentAcknowledged"), 4)
+        self.assertGreaterEqual(real_oxia_actors.count("compareAndSetAcknowledged"), 4)
+        self.assertIn("private <T> CompletionStage<T> mutation", real_oxia_actors)
+        self.assertIn("private <T> CompletionStage<T> hold", real_oxia_actors)
 
     def test_v4_plan_formal_entry_and_native_rows_are_independently_source_bound(self) -> None:
         first = subprocess.run(

@@ -933,6 +933,11 @@ is whether retaining the pinned Oxia successful conditional-put key/version remo
 proves the unchanged 25ms rows at zero drop/failure/timeout in a canonical 23-test/nine-suite NADV4. Selection remains
 open and no historical evidence is reinterpreted.
 
+ADR 0131 attributes the first acknowledgement attempt to the formal wrapper: exact `3bc11088...` used the
+interface-default empty acknowledgement and therefore validly reread. The remaining question is now bounded to a new
+exact-source 25ms receipt after value-preserving wrapper forwarding. It must show four common-path operations and both
+rows at zero drop/failure/timeout before canonical NADV4 or formal entry.
+
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

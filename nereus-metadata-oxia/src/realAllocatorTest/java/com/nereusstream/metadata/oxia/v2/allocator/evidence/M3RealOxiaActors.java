@@ -19,6 +19,7 @@ import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.Ev
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.OxiaOperationKind;
 import com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
+import com.nereusstream.metadata.oxia.v2.mutation.MutationAcknowledgement;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import io.oxia.client.api.AsyncOxiaClient;
 import io.oxia.client.api.OxiaClientBuilder;
@@ -303,6 +304,17 @@ final class M3RealOxiaActors implements AutoCloseable {
         }
 
         @Override
+        public CompletionStage<Optional<MutationAcknowledgement>> createIfAbsentAcknowledged(
+                String key, CanonicalBytes storedBytes) {
+            return mutation(
+                    null,
+                    "CREATE_IF_ABSENT",
+                    key,
+                    storedBytes,
+                    delegate -> delegate.createIfAbsentAcknowledged(key, storedBytes));
+        }
+
+        @Override
         public CompletionStage<Void> compareAndSet(
                 String key, CanonicalBytes storedBytes, long expectedVersionId) {
             return mutation(
@@ -313,12 +325,23 @@ final class M3RealOxiaActors implements AutoCloseable {
                     delegate -> delegate.compareAndSet(key, storedBytes, expectedVersionId));
         }
 
-        private CompletionStage<Void> mutation(
+        @Override
+        public CompletionStage<Optional<MutationAcknowledgement>> compareAndSetAcknowledged(
+                String key, CanonicalBytes storedBytes, long expectedVersionId) {
+            return mutation(
+                    null,
+                    "COMPARE_AND_SET",
+                    key,
+                    storedBytes,
+                    delegate -> delegate.compareAndSetAcknowledged(key, storedBytes, expectedVersionId));
+        }
+
+        private <T> CompletionStage<T> mutation(
                 OperationBinding binding,
                 String diagnosticKind,
                 String key,
                 CanonicalBytes storedBytes,
-                MutationDispatch dispatch) {
+                MutationDispatch<T> dispatch) {
             requireBindingKey(binding, key);
             OperationCapture capture = startDiagnosticOperation(diagnosticKind);
             M3AllocatorRequestTelemetry.OxiaOperation operation = binding == null
@@ -330,13 +353,13 @@ final class M3RealOxiaActors implements AutoCloseable {
             }
             boolean loseResponse = loseNextMutationResponse.compareAndSet(true, false);
             CrashBarrier barrier = crashBarrier.getAndSet(null);
-            CompletionStage<Void> dispatched;
+            CompletionStage<T> dispatched;
             try {
                 dispatched = dispatch.run(requireSession().delegate);
             } catch (RuntimeException failure) {
                 dispatched = CompletableFuture.failedFuture(failure);
             }
-            CompletionStage<Void> held = barrier == null ? dispatched : barrier.hold(dispatched);
+            CompletionStage<T> held = barrier == null ? dispatched : barrier.hold(dispatched);
             return delayed(held, loseResponse, capture).whenComplete((ignored, failure) -> {
                 if (binding != null) {
                     binding.trace.endOxia(
@@ -493,6 +516,17 @@ final class M3RealOxiaActors implements AutoCloseable {
             }
 
             @Override
+            public CompletionStage<Optional<MutationAcknowledgement>> createIfAbsentAcknowledged(
+                    String key, CanonicalBytes storedBytes) {
+                return client.mutation(
+                        binding,
+                        "CREATE_IF_ABSENT",
+                        key,
+                        storedBytes,
+                        delegate -> delegate.createIfAbsentAcknowledged(key, storedBytes));
+            }
+
+            @Override
             public CompletionStage<Void> compareAndSet(
                     String key, CanonicalBytes storedBytes, long expectedVersionId) {
                 return client.mutation(
@@ -501,6 +535,17 @@ final class M3RealOxiaActors implements AutoCloseable {
                         key,
                         storedBytes,
                         delegate -> delegate.compareAndSet(key, storedBytes, expectedVersionId));
+            }
+
+            @Override
+            public CompletionStage<Optional<MutationAcknowledgement>> compareAndSetAcknowledged(
+                    String key, CanonicalBytes storedBytes, long expectedVersionId) {
+                return client.mutation(
+                        binding,
+                        "COMPARE_AND_SET",
+                        key,
+                        storedBytes,
+                        delegate -> delegate.compareAndSetAcknowledged(key, storedBytes, expectedVersionId));
             }
         }
 
@@ -621,8 +666,8 @@ final class M3RealOxiaActors implements AutoCloseable {
         }
 
         @FunctionalInterface
-        private interface MutationDispatch {
-            CompletionStage<Void> run(OxiaConditionalClient delegate);
+        private interface MutationDispatch<T> {
+            CompletionStage<T> run(OxiaConditionalClient delegate);
         }
     }
 
@@ -691,9 +736,9 @@ final class M3RealOxiaActors implements AutoCloseable {
             release.complete(null);
         }
 
-        private CompletionStage<Void> hold(CompletionStage<Void> source) {
-            CompletableFuture<Void> output = new CompletableFuture<>();
-            source.whenComplete((ignored, failure) -> {
+        private <T> CompletionStage<T> hold(CompletionStage<T> source) {
+            CompletableFuture<T> output = new CompletableFuture<>();
+            source.whenComplete((value, failure) -> {
                 if (failure != null) {
                     output.completeExceptionally(failure);
                     applied.countDown();
@@ -702,7 +747,7 @@ final class M3RealOxiaActors implements AutoCloseable {
                 applied.countDown();
                 release.whenComplete((released, releaseFailure) -> {
                     if (releaseFailure == null) {
-                        output.complete(null);
+                        output.complete(value);
                     } else {
                         output.completeExceptionally(releaseFailure);
                     }

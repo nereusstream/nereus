@@ -280,6 +280,10 @@ ADR 0130 records the exact `ad9dce4f...` result: the six-operation path has no r
 key/version acknowledgement as its applied snapshot; every missing/failed/conflicting response still rereads. A new
 exact pushed source must prove four common-path operations, both 25ms rows at zero drop/failure/timeout, complete
 23-test/nine-suite canonical NADV4, and all source gates before formal execution.
+ADR 0131 records that exact `3bc11088...` still measured six operations because the formal/diagnostic instrumented
+client used the interface-default empty acknowledgement. Both wrapper levels must forward acknowledgement values
+through the same latency/loss/crash/telemetry chain. A deterministic no-legacy-fallback contract plus a fresh exact
+25ms receipt and complete canonical NADV4 are required before formal execution.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

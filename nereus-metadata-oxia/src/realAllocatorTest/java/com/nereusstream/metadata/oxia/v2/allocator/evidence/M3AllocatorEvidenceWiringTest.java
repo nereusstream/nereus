@@ -35,6 +35,7 @@ import com.nereusstream.domain.registry.allocator.ChainPointerV1;
 import com.nereusstream.domain.registry.allocator.ManagedLedgerIncarnationIdV1;
 import com.nereusstream.domain.registry.allocator.VirtualLedgerCellAllocatorStateV1;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
+import com.nereusstream.metadata.oxia.v2.mutation.MutationAcknowledgement;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import com.nereusstream.metadata.spi.allocator.VersionedAllocatorCellStateV1;
 import com.nereusstream.metadata.spi.model.MetadataVersion;
@@ -321,6 +322,58 @@ class M3AllocatorEvidenceWiringTest {
     }
 
     @Test
+    void instrumentedClientPreservesAcknowledgedMutationResultsWithoutLegacyFallback() throws Exception {
+        List<AllocatorRawEvidenceEventV1> events = Collections.synchronizedList(new java.util.ArrayList<>());
+        M3AllocatorRequestTelemetry telemetry = new M3AllocatorRequestTelemetry(events::add, System.nanoTime());
+        AllocatorEvidenceContextV1 context = AllocatorEvidenceContextV1.candidateContext(
+                AllocatorEvidenceCandidateV1.range(1024), 10_000, 25, 1_000);
+        M3AllocatorRequestTelemetry.RequestTrace trace = telemetry.trace(
+                context,
+                new M3AllocatorWorkloadPlan.PlannedRequest(
+                        31,
+                        1,
+                        303,
+                        M3AllocatorWorkloadPlan.Trigger.ENTRY,
+                        M3AllocatorWorkloadPlan.Phase.MEASURED_STEADY,
+                        0),
+                null,
+                1);
+        AcknowledgedConditionalClient delegate = new AcknowledgedConditionalClient();
+        String key = "/nereus/v2/m3/allocator/acknowledged";
+        CanonicalBytes bytes = CanonicalBytes.copyOf(new byte[] {8, 9, 10});
+
+        try (M3RealOxiaActors.InstrumentedClient client =
+                new M3RealOxiaActors.InstrumentedClient(2, delegate)) {
+            client.beginDiagnosticCapture();
+            OxiaConditionalClient bound =
+                    client.bound(client.binding(key, trace, OxiaOperationKind.HEAD_PUBLISH_CAS));
+
+            MutationAcknowledgement created = client.createIfAbsentAcknowledged(key, bytes)
+                    .toCompletableFuture()
+                    .join()
+                    .orElseThrow();
+            MutationAcknowledgement applied = bound.compareAndSetAcknowledged(key, bytes, created.versionId())
+                    .toCompletableFuture()
+                    .join()
+                    .orElseThrow();
+            M3RealOxiaActors.InstrumentedClient.OperationDiagnosticSnapshot snapshot =
+                    client.endDiagnosticCapture();
+
+            assertThat(created).isEqualTo(new MutationAcknowledgement(key, 7));
+            assertThat(applied).isEqualTo(new MutationAcknowledgement(key, 8));
+            assertThat(delegate.acknowledgedCreates).isOne();
+            assertThat(delegate.acknowledgedCas).isOne();
+            assertThat(delegate.legacyMutations).isZero();
+            assertThat(snapshot.samples())
+                    .extracting(M3RealOxiaActors.InstrumentedClient.OperationSample::kind)
+                    .containsExactly("CREATE_IF_ABSENT", "COMPARE_AND_SET");
+            assertThat(events)
+                    .extracting(AllocatorRawEvidenceEventV1::kind)
+                    .containsExactly(EventKind.OXIA_OPERATION_START, EventKind.OXIA_OPERATION_END);
+        }
+    }
+
+    @Test
     void drainsEverySubmittedCompletionBeforeRethrowingTheFirstFailure() throws Exception {
         ExecutorService workers = Executors.newFixedThreadPool(2);
         CompletionService<Void> completions = new ExecutorCompletionService<>(workers);
@@ -596,6 +649,44 @@ class M3AllocatorEvidenceWiringTest {
             CompletableFuture<Void> pending = new CompletableFuture<>();
             mutations.add(pending);
             return pending;
+        }
+    }
+
+    private static final class AcknowledgedConditionalClient implements OxiaConditionalClient {
+        private int acknowledgedCreates;
+        private int acknowledgedCas;
+        private int legacyMutations;
+
+        @Override
+        public CompletionStage<Optional<AuthorityRecord>> read(String key) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+
+        @Override
+        public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes storedBytes) {
+            legacyMutations++;
+            return CompletableFuture.failedFuture(new AssertionError("legacy create path was invoked"));
+        }
+
+        @Override
+        public CompletionStage<Optional<MutationAcknowledgement>> createIfAbsentAcknowledged(
+                String key, CanonicalBytes storedBytes) {
+            acknowledgedCreates++;
+            return CompletableFuture.completedFuture(Optional.of(new MutationAcknowledgement(key, 7)));
+        }
+
+        @Override
+        public CompletionStage<Void> compareAndSet(
+                String key, CanonicalBytes storedBytes, long expectedVersionId) {
+            legacyMutations++;
+            return CompletableFuture.failedFuture(new AssertionError("legacy CAS path was invoked"));
+        }
+
+        @Override
+        public CompletionStage<Optional<MutationAcknowledgement>> compareAndSetAcknowledged(
+                String key, CanonicalBytes storedBytes, long expectedVersionId) {
+            acknowledgedCas++;
+            return CompletableFuture.completedFuture(Optional.of(new MutationAcknowledgement(key, 8)));
         }
     }
 }

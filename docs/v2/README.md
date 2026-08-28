@@ -391,6 +391,7 @@ Accepted decisions:
 - [ADR 0128: M3 V4 25ms operation-attribution amendment](../decisions/0128-v2-m3-allocator-v4-25ms-operation-attribution-amendment.md)
 - [ADR 0129: M3 V4 installed-RANGE proof-reuse amendment](../decisions/0129-v2-m3-allocator-v4-installed-range-proof-reuse-amendment.md)
 - [ADR 0130: M3 V4 applied-mutation acknowledgement amendment](../decisions/0130-v2-m3-allocator-v4-applied-mutation-acknowledgement-amendment.md)
+- [ADR 0131: M3 V4 applied-mutation instrumentation forwarding amendment](../decisions/0131-v2-m3-allocator-v4-applied-mutation-instrumentation-forwarding-amendment.md)
 
 ## Open design gates
 
@@ -653,6 +654,12 @@ exact `ad9dce4f...` diagnostic and its seven-file archive. Six operations/five s
 offers at 25ms despite zero retry/failure/timeout. The pinned Oxia success result already binds the committed key and
 version, so only the store-observed installed-RANGE path may use it as the exact mutation snapshot. Missing/failed or
 conflicting responses retain same-key reread; public/STRICT/renewal/fault paths and every V4 evidence threshold remain
+unchanged.
+
+[ADR 0131](../decisions/0131-v2-m3-allocator-v4-applied-mutation-instrumentation-forwarding-amendment.md) preserves
+the exact `3bc11088...` diagnostic and identifies why it still measured six operations: the shared instrumented client
+fell back to interface-default legacy mutations and discarded the acknowledgement. Formal and diagnostic wrappers now
+forward the exact result through latency/loss/crash instrumentation. Production semantics and every V4 threshold stay
 unchanged.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
