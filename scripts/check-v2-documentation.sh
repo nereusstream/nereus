@@ -219,9 +219,11 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0124-v2-m3-allocator-v3-diagnostic-suite-worker-isolation-amendment.md"
     "$repo_root/docs/decisions/0125-v2-m3-allocator-v4-terminal-admission-drain-amendment.md"
     "$repo_root/docs/decisions/0126-v2-m3-allocator-v4-range-latency-attribution-amendment.md"
+    "$repo_root/docs/decisions/0127-v2-m3-allocator-v4-range-authority-proof-concurrency-amendment.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b2-native-executor-current-source-recertification.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-terminal-drain-formal-entry.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-range-latency-attribution.md"
+    "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-range-authority-proof-concurrency.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"

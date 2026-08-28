@@ -22,6 +22,7 @@ MODULE_BUILD = ROOT / "nereus-metadata-oxia" / "build.gradle.kts"
 HARD_DEADLINE = ROOT / "scripts" / "run-v2-m3-with-hard-deadline.py"
 FORMAL_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-formal.py"
 FAILED_FORMAL_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-failed-formal.py"
+DIAGNOSTIC_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-diagnostic.py"
 V3_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v3.py"
 V4_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v4.py"
 V4_LAUNCHER = ROOT / "scripts" / "run-v2-m3-real-allocator-evidence-v4.sh"
@@ -635,6 +636,69 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             for source_file in files:
                 relative = source_file.relative_to(source)
                 self.assertEqual(source_file.read_bytes(), (archive / "payload" / relative).read_bytes())
+            repeated = subprocess.run(command, check=False, capture_output=True, text=True)
+            self.assertNotEqual(0, repeated.returncode)
+            self.assertIn("archive target already exists", repeated.stderr)
+
+    def test_diagnostic_archiver_preserves_output_and_exact_junit_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            diagnostic = root / "diagnostic"
+            diagnostic.mkdir()
+            receipt = diagnostic / "v4-range1024-10ms-formal-sequence.json"
+            receipt.write_text(
+                '{"diagnosticOnly":true,"authority":false,"selectionEligible":false}\n',
+                encoding="utf-8",
+            )
+            junit = root / "junit"
+            junit.mkdir()
+            xml = junit / "TEST-example.xml"
+            xml.write_text(
+                '<testsuite tests="2" failures="1" errors="0" skipped="0">'
+                '<testcase name="passes"/><testcase name="fails"><failure/></testcase></testsuite>\n',
+                encoding="utf-8",
+            )
+            (junit / "results.bin").write_bytes(b"exact-junit-binary")
+            archive = root / "archive"
+            command = [
+                sys.executable,
+                str(DIAGNOSTIC_ARCHIVER),
+                "--diagnostic-output",
+                str(diagnostic),
+                "--junit-directory",
+                str(junit),
+                "--archive",
+                str(archive),
+                "--archived-on",
+                "2026-08-28",
+                "--source-commit",
+                "a" * 40,
+                "--plan-sha256",
+                "b" * 64,
+                "--executor-sha256",
+                "c" * 64,
+                "--run-id",
+                "diagnostic-r1",
+                "--expected-tests",
+                "2",
+                "--expected-failures",
+                "1",
+                "--expected-errors",
+                "0",
+                "--expected-skipped",
+                "0",
+                "--expected-suites",
+                "1",
+            ]
+
+            subprocess.run(command, check=True, capture_output=True, text=True)
+            identity = json.loads((archive / "archive-identity.json").read_bytes())
+            self.assertEqual("FAILED", identity["diagnosticStatus"])
+            self.assertEqual({"tests": 2, "failures": 1, "errors": 0, "skipped": 0, "suites": 1}, identity["junit"])
+            self.assertFalse(identity["nadvPresent"])
+            self.assertFalse(identity["promotableInput"])
+            self.assertEqual(receipt.read_bytes(), (archive / "payload" / "diagnostic-output" / receipt.name).read_bytes())
+            self.assertEqual(xml.read_bytes(), (archive / "payload" / "junit" / xml.name).read_bytes())
             repeated = subprocess.run(command, check=False, capture_output=True, text=True)
             self.assertNotEqual(0, repeated.returncode)
             self.assertIn("archive target already exists", repeated.stderr)

@@ -614,20 +614,22 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
     }
 
     private CompletionStage<Authorities> readAuthorities(Request request) {
-        return store.readCell(
-                        request.currentView().value().ledgerIdCompatibilityNamespaceId(),
-                        request.currentView().value().assignment().sliceAssignmentId())
-                .thenCompose(cell -> store.readHead(
-                                request.expectedHead().ledgerIdCompatibilityNamespaceId(),
-                                request.expectedHead().sliceAssignmentId(),
-                                request.expectedHead().value().managedLedgerIncarnation())
-                        .thenApply(head -> new Authorities(
-                                cell.orElseThrow(() -> failure(
-                                        AllocatorProtocolException.Code.CELL_STATE_DRIFT,
-                                        "allocator Cell authority is absent")),
-                                head.orElseThrow(() -> failure(
-                                        AllocatorProtocolException.Code.HEAD_STATE_DRIFT,
-                                        "allocator Head authority is absent")))));
+        CompletionStage<Optional<VersionedAllocatorCellStateV1>> cell = store.readCell(
+                request.currentView().value().ledgerIdCompatibilityNamespaceId(),
+                request.currentView().value().assignment().sliceAssignmentId());
+        CompletionStage<Optional<VersionedManagedLedgerAllocatorHeadV1>> head = store.readHead(
+                request.expectedHead().ledgerIdCompatibilityNamespaceId(),
+                request.expectedHead().sliceAssignmentId(),
+                request.expectedHead().value().managedLedgerIncarnation());
+        return cell.thenCombine(
+                head,
+                (exactCell, exactHead) -> new Authorities(
+                        exactCell.orElseThrow(() -> failure(
+                                AllocatorProtocolException.Code.CELL_STATE_DRIFT,
+                                "allocator Cell authority is absent")),
+                        exactHead.orElseThrow(() -> failure(
+                                AllocatorProtocolException.Code.HEAD_STATE_DRIFT,
+                                "allocator Head authority is absent"))));
     }
 
     private CompletionStage<Result> retry(State state, RetryReason reason, Supplier<CompletionStage<Result>> retry) {

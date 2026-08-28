@@ -700,6 +700,15 @@ all eight rows; RANGE-64/256/1024 instead shared a first eliminating 10k/10ms ro
 operation/scheduler diagnostic. Current-source NADV4 is therefore 22 tests/nine suites; workload, qualification,
 selection, plan/profile, V4 wire, and all historical evidence bytes remain unchanged.
 
+[ADR 0127](../../../decisions/0127-v2-m3-allocator-v4-range-authority-proof-concurrency-amendment.md) records the
+failed `c4f442ea` diagnostic and its byte-verified 28-file archive. Its valid RANGE attribution row proves 256 real
+Oxia operations were concurrently active, but the installed RANGE path serialized three independent authority-proof
+pairs. The accepted correction retains all ten operations and same-key rereads while joining each independent pair,
+reducing the uncontended chain from ten to seven stages. The associated
+[implementation record](stage-b-v4-range-authority-proof-concurrency.md) also removes the runner-only test's 20ms host
+scheduling dependency. No scheduler pool, protocol threshold, plan digest, selection rule, or historical evidence is
+changed.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

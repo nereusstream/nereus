@@ -1,7 +1,8 @@
 # Stage B V4 RANGE latency attribution
 
 - Design status: Accepted through ADR 0126
-- Runtime status: diagnostic wiring only; current-source run pending publication
+- Runtime status: `c4f442ea` diagnostic completed with preserved non-authoritative JUnit failure; ADR 0127 supersedes
+  the implementation path
 - Selection authority: none
 
 ## Immutable input
@@ -32,3 +33,8 @@ The new suite is diagnostic-only, carries `authority=false` and `selectionEligib
 current-source NADV4 inventory to 22 tests/nine suites. It cannot select a candidate. A later implementation change
 must cite its measured bottleneck, retain every ADR-0125 frozen contract, publish a new exact clean SHA, and rerun the
 entire diagnostic before any new formal campaign.
+
+The published `c4f442ea` run reproduced derived-800 with 1,312 drops and identified ten operations per completed
+workflow. Its full task ended 23/2/0/0 only because the separate runner-only 20ms synthetic admission window dropped
+four t0 offers; no NADV4 was sealed. ADR 0127 records the byte-verified failed-diagnostic archive and accepts concurrent
+dispatch of the three independent exact-authority proof pairs.

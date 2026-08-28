@@ -184,6 +184,8 @@ class M3V4RangeLatencyDiagnosticTest {
     private static final class AllocationObserver implements M3CandidateAllocatorPopulation.FormalAllocationObserver {
         private final AtomicLong completed = new AtomicLong();
         private final AtomicLong failed = new AtomicLong();
+        private final AtomicLong reconcileRetries = new AtomicLong();
+        private final AtomicLong reconcileRetriesMaximum = new AtomicLong();
         private final List<Long> elapsedMicros = java.util.Collections.synchronizedList(new ArrayList<>());
         private final Map<String, Long> failureKinds = java.util.Collections.synchronizedMap(new TreeMap<>());
         private final AtomicReference<String> firstFailure = new AtomicReference<>("");
@@ -193,6 +195,8 @@ class M3V4RangeLatencyDiagnosticTest {
                 int actorId, M3AllocatorWorkloadPlan.PlannedRequest request, Result result, long elapsed) {
             completed.incrementAndGet();
             elapsedMicros.add(elapsed);
+            reconcileRetries.addAndGet(result.reconcileRetries());
+            reconcileRetriesMaximum.accumulateAndGet(result.reconcileRetries(), Math::max);
         }
 
         @Override
@@ -234,6 +238,8 @@ class M3V4RangeLatencyDiagnosticTest {
             long workflowP99Micros,
             long observerCompleted,
             long observerFailed,
+            long reconcileRetries,
+            long reconcileRetriesMaximum,
             String firstFailure,
             Map<String, Long> operationKinds,
             Map<String, Long> failureKinds) {
@@ -281,6 +287,8 @@ class M3V4RangeLatencyDiagnosticTest {
                     percentile(observer.elapsedMicros, 0.99),
                     observer.completed.get(),
                     observer.failed.get(),
+                    observer.reconcileRetries.get(),
+                    observer.reconcileRetriesMaximum.get(),
                     observer.firstFailure.get(),
                     operationKinds,
                     observer.failureKinds);
@@ -311,6 +319,8 @@ class M3V4RangeLatencyDiagnosticTest {
                     + ",\"workflowP99Micros\":" + workflowP99Micros
                     + ",\"observerCompleted\":" + observerCompleted
                     + ",\"observerFailed\":" + observerFailed
+                    + ",\"reconcileRetries\":" + reconcileRetries
+                    + ",\"reconcileRetriesMaximum\":" + reconcileRetriesMaximum
                     + ",\"firstFailure\":" + M3V3DiagnosticOutput.jsonString(firstFailure)
                     + ",\"operationKinds\":" + counts(operationKinds)
                     + ",\"failureKinds\":" + counts(failureKinds) + '}';

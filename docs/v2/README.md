@@ -621,6 +621,13 @@ admission while draining all admitted work. Its 135-file, 20,556,200-byte payloa
 22 tests/nine suites. This adds telemetry only and does not modify any V4 threshold, plan, evidence, or selection
 semantic.
 
+[ADR 0127](../decisions/0127-v2-m3-allocator-v4-range-authority-proof-concurrency-amendment.md) binds the resulting
+`c4f442ea` diagnostic failure and attribution. The task produced no NADV4 because a separate runner-only test used a
+non-deterministic 20ms admission window, but its RANGE-1024 row validly measured 1,312 derived-800 drops, 256 real
+operations outstanding, ten metadata operations per request, and 171.980ms workflow p99. The production correction
+keeps every exact read and mutation while dispatching three independent authority-proof pairs concurrently. It does
+not alter the V4 plan, workload, qualification, or selection contract.
+
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.

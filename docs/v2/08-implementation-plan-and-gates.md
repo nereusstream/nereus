@@ -262,6 +262,10 @@ with the formal workload and V4 drain while measuring real RTT, controlled-delay
 outstanding, workflow latency, and runner queue/outstanding. It must remain diagnostic-only. Any implementation
 correction derived from those measurements requires a new pushed exact source, fresh NADV4, and new formal directory;
 the frozen V4 plan, rates, SLOs, zero-drop rule, and selection semantics cannot change.
+ADR 0127 accepts the measured correction: initial Cell/Head, pre-create Cell/Head, and pre-publish Cell/node proofs
+remain exact store operations but dispatch in three independent pairs. Create/CAS same-key rereads and all bounded
+reconcile/deadline guards remain unchanged. The current-source diagnostic gate remains 22 tests/nine suites and must
+prove both RANGE-1024 10ms rows have zero drop/failure/timeout before a new formal entry.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

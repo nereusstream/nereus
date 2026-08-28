@@ -255,6 +255,69 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
     }
 
     @Test
+    void rangeWorkflowDispatchesIndependentAuthorityAndCandidateProofReadsTogether() {
+        store = new ReconcileStore();
+        ProductionVirtualLedgerAllocator range =
+                ProductionVirtualLedgerAllocator.forEvidenceCandidate(AllocatorEvidenceCandidateV1.range(64), store);
+        cell = createCell(AllocatorModeV1.RANGE_LEASED);
+        head = createHead(cell, incarnation("range-parallel-authorities"));
+        cell = exact(range.reserve(cell, head, activeView(), digest("range-parallel-authorities-grant")));
+        head = exact(range.installRangeReservedGrant(cell, head, activeView()));
+        cell = exact(range.clearReservation(cell, head));
+        store.delayReadCellCall = store.readCellCalls + 1;
+        store.delayReadHeadCall = store.readHeadCalls + 1;
+
+        CompletableFuture<Result> allocation = range.boundedWorkflow(
+                        8, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler.immediate())
+                .allocate(request(head, "range-parallel-authorities"))
+                .toCompletableFuture();
+
+        assertThat(store.delayedReadCell).isNotNull();
+        assertThat(store.delayedReadHead).isNotNull();
+        VersionedAllocatorCellStateV1 exactCell = store.cell;
+        VersionedManagedLedgerAllocatorHeadV1 exactHead = store.head;
+        store.delayReadCellCall = store.readCellCalls + 1;
+        store.delayReadHeadCall = store.readHeadCalls + 1;
+        store.delayedReadCell.complete(Optional.of(exactCell));
+        store.delayedReadHead.complete(Optional.of(exactHead));
+
+        assertThat(store.readCellCalls).isEqualTo(store.delayReadCellCall);
+        assertThat(store.readHeadCalls).isEqualTo(store.delayReadHeadCall);
+        CompletableFuture<Optional<VersionedAllocatorCellStateV1>> candidateCellProof = store.delayedReadCell;
+        CompletableFuture<Optional<VersionedManagedLedgerAllocatorHeadV1>> candidateHeadProof = store.delayedReadHead;
+        candidateCellProof.complete(Optional.of(exactCell));
+        candidateHeadProof.complete(Optional.of(exactHead));
+
+        assertThat(allocation.join().exactNode().value().ledgerId())
+                .isEqualTo(exactHead.value().nextLedgerId());
+    }
+
+    @Test
+    void rangeWorkflowDispatchesCellAndNodePublishProofReadsTogether() {
+        store = new ReconcileStore();
+        ProductionVirtualLedgerAllocator range =
+                ProductionVirtualLedgerAllocator.forEvidenceCandidate(AllocatorEvidenceCandidateV1.range(64), store);
+        cell = createCell(AllocatorModeV1.RANGE_LEASED);
+        head = createHead(cell, incarnation("range-parallel-publish"));
+        cell = exact(range.reserve(cell, head, activeView(), digest("range-parallel-publish-grant")));
+        head = exact(range.installRangeReservedGrant(cell, head, activeView()));
+        cell = exact(range.clearReservation(cell, head));
+        store.delayReadCellCall = store.readCellCalls + 3;
+
+        CompletableFuture<Result> allocation = range.boundedWorkflow(
+                        8, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler.immediate())
+                .allocate(request(head, "range-parallel-publish"))
+                .toCompletableFuture();
+
+        assertThat(store.delayedReadCell).isNotNull();
+        assertThat(store.readNodeCalls).isEqualTo(1);
+        store.delayedReadCell.complete(Optional.of(store.cell));
+
+        assertThat(allocation.join().exactHead().value().nextLedgerId())
+                .isEqualTo(head.value().nextLedgerId() + 1);
+    }
+
+    @Test
     void staleOwnerAndSliceContextDriftFailClosedBeforeAllocation() {
         VersionedManagedLedgerAllocatorHeadV1 original = head;
         store.head = versionedHead(AllocatorProtocolV1.takeover(head.value(), 11));
@@ -463,6 +526,7 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         private int delayReadHeadCall;
         private int readCellCalls;
         private int readHeadCalls;
+        private int readNodeCalls;
         private int createNodeCalls;
         private CompletableFuture<Optional<VersionedAllocatorCellStateV1>> delayedReadCell;
         private CompletableFuture<Optional<VersionedManagedLedgerAllocatorHeadV1>> delayedReadHead;
@@ -589,6 +653,7 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
                 Sha256Digest sliceAssignmentId,
                 ManagedLedgerIncarnationIdV1 managedLedgerIncarnation,
                 long ledgerId) {
+            readNodeCalls++;
             return CompletableFuture.completedFuture(Optional.ofNullable(nodes.get(ledgerId)));
         }
 

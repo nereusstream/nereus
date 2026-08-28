@@ -908,6 +908,13 @@ NADV4 is now 22 tests/nine suites and adds the exact formal-sequence 10ms operat
 question is which measured runner, delay scheduler, Oxia RTT, workflow round-trip, or contention component explains
 that capacity boundary; it is not whether to weaken the V4 zero-drop or qualification contract.
 
+ADR 0127 resolves the first attribution iteration. The archived `c4f442ea` diagnostic reached 256 real Oxia
+operations, so the admission/global cap was active; it also showed eight reads plus create/CAS and 171.980ms workflow
+p99. The accepted implementation joins three independent exact-authority proof pairs without removing any read,
+same-key reread, or CAS predecessor. The remaining open question is empirical: whether the new seven-stage chain makes
+the unchanged fixed-1000 and derived-800 10ms rows zero-drop in a canonical 22-test/nine-suite NADV4. Formal remains
+closed until that exact-source diagnostic passes.
+
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

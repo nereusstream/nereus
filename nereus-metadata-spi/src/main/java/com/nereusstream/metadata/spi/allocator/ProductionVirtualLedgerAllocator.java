@@ -188,8 +188,10 @@ public final class ProductionVirtualLedgerAllocator {
                         ? AllocatorProtocolV1.strictCandidateFromReservation(
                                 exactCell.value(), exactHead.value(), ledgerDescriptorDigest)
                         : AllocatorProtocolV1.candidate(exactHead.value(), ledgerDescriptorDigest);
-        return requireStoredCell(exactCell)
-                .thenCompose(ignored -> requireStoredHead(exactCell.value(), exactHead))
+        CompletionStage<Void> exactCellProof = requireStoredCell(exactCell);
+        CompletionStage<Void> exactHeadProof = requireStoredHead(exactCell.value(), exactHead);
+        return exactCellProof
+                .thenCombine(exactHeadProof, (cellProof, headProof) -> null)
                 .thenCompose(ignored -> store.createNode(
                         exactCell.value().ledgerIdCompatibilityNamespaceId(),
                         exactCell.value().sliceAssignmentId(),
@@ -208,8 +210,10 @@ public final class ProductionVirtualLedgerAllocator {
                         == com.nereusstream.domain.registry.allocator.AllocatorModeV1.STRICT_SERIALIZED
                 ? AllocatorProtocolV1.publishStrictReserved(exactCell.value(), exactHead.value(), exactNode.value())
                 : AllocatorProtocolV1.publish(exactHead.value(), exactNode.value());
-        return requireStoredCell(exactCell)
-                .thenCompose(ignored -> requireStoredNode(exactCell.value(), exactNode))
+        CompletionStage<Void> exactCellProof = requireStoredCell(exactCell);
+        CompletionStage<Void> exactNodeProof = requireStoredNode(exactCell.value(), exactNode);
+        return exactCellProof
+                .thenCombine(exactNodeProof, (cellProof, nodeProof) -> null)
                 .thenCompose(ignored -> successor.equals(exactHead.value())
                         ? unchanged(exactHead)
                         : store.compareAndSetHead(

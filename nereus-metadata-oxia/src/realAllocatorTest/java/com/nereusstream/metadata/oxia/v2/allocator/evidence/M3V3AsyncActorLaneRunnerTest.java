@@ -91,7 +91,7 @@ class M3V3AsyncActorLaneRunnerTest {
         for (int rate : rates) {
             for (int latency : latencies) {
                 M3V3AsyncActorLaneRunner<String> runner =
-                        runner(Duration.ofMillis(20), Duration.ofMillis(latency + 100L));
+                        runner(Duration.ofMillis(250), Duration.ofMillis(latency + 250L));
                 var result = runner.run(rate, uniqueSchedule(4), (actor, request, context) -> {
                     CompletableFuture<Void> completion = new CompletableFuture<>();
                     CompletableFuture.delayedExecutor(latency, TimeUnit.MILLISECONDS).execute(() -> {
