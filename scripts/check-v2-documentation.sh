@@ -217,6 +217,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0122-v2-m3-allocator-v3-final-offer-dispatch-precision-amendment.md"
     "$repo_root/docs/decisions/0123-v2-m3-allocator-v3-candidate-cutoff-terminal-telemetry-amendment.md"
     "$repo_root/docs/decisions/0124-v2-m3-allocator-v3-diagnostic-suite-worker-isolation-amendment.md"
+    "$repo_root/docs/decisions/0125-v2-m3-allocator-v4-terminal-admission-drain-amendment.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b2-native-executor-current-source-recertification.md"
 )
 for path in "${required_domain_docs[@]}"; do

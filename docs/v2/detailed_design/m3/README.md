@@ -670,6 +670,14 @@ ten-row Native canary passed, while the same class later in a shared full-task J
 offers after unrelated suites. The Native class itself still runs all ten rows in one worker/shared runtime; the exact
 18-test XML inventory, zero failure/error/skip NADV3 gate, and formal runtime remain unchanged.
 
+[ADR 0125](../../../decisions/0125-v2-m3-allocator-v4-terminal-admission-drain-amendment.md) keeps the exact
+`0cc962e9...` V3 campaign and archive immutable while versioning the remaining terminal-boundary correction. The
+derived-800 first dropped binding was offered on time 25ms before cutoff but repeated a binding still inside its
+23.875ms predecessor gap; V3's per-binding single-flight therefore right-censored accepted offered load. V4 separates
+40-second offer close from a final two-second admission deadline, equal to the existing maximum-starvation SLO, and
+then retains the exact zero-drop and five-second cleanup partitions. New NACP4/NAEV4/NARS4/NADV4, plan/profile digest,
+preflight, diagnostic, and formal gates are required before any selection or downstream Final input exists.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

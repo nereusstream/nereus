@@ -237,6 +237,14 @@ same Gradle worker; the standalone canary at that source passed all ten rows. Th
 `maxParallelForks=1` while using `forkEvery=1`, retaining one serial 18-test XML inventory and one shared-runtime
 ten-row Native class without making cross-suite JVM state a formal-equivalence prerequisite.
 
+ADR 0125 records the next protocol correction after exact `0cc962e9...` completed a fully verified V3
+`NONE_QUALIFIED`. V3's immutable schedule contains on-time same-binding tail collisions closer to the physical cutoff
+than the observed candidate rollover p99, so one instant cannot both close offered load and classify all waiting work
+as overload. V4 retains every request, rate, zero-drop/SLO rule, `4/64/256/1`, per-binding single-flight, and bounded
+queue. It adds only a two-second final admission drain equal to the existing starvation maximum, then applies the same
+pre-admission drop and five-second admitted cleanup partitions. Implementation must publish independent V4 wire,
+profile, feasibility, diagnostics, formal entry, promotion, and selection gates while V1/V2/V3 remain byte-stable.
+
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

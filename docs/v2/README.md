@@ -596,6 +596,13 @@ not a cutoff, qualification, workload, or formal-authorization change.
 representative row fired late after unrelated RANGE/STRICT/workflow classes had run in the same worker. The full task
 remains serial and one canonical inventory but now forks once per test class; the Native class still runs all ten rows
 in one shared runtime and formal execution is unchanged.
+[ADR 0125](../decisions/0125-v2-m3-allocator-v4-terminal-admission-drain-amendment.md) preserves the later exact
+`0cc962e9...` V3 `NONE_QUALIFIED` result and corrects a protocol-level terminal-censoring defect only in V4. The exact
+derived-800 schedule repeats binding 9730 after 23.875ms and offers the successor only 25ms before cutoff; scheduler
+lag was zero and rollover p99 was 132.270ms. V4 keeps every request, zero-drop rule, SLO, queue/outstanding cap, and
+per-binding single-flight, but closes offers at 40s and gives already-offered work the existing two-second starvation
+bound to reach admission before the unchanged drop partition is finalized. Distinct NACP4/NAEV4/NARS4/NADV4 and a
+new source-bound plan prevent any reinterpretation of V3 evidence.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

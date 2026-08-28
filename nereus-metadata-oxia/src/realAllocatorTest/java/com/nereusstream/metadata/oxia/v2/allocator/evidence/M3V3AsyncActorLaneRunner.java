@@ -9,6 +9,7 @@
 package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceAdmissionPolicyV3;
+import com.nereusstream.domain.registry.allocator.AllocatorEvidenceAdmissionPolicyV4;
 import com.nereusstream.domain.registry.allocator.AllocatorProtocolException;
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -47,16 +48,31 @@ final class M3V3AsyncActorLaneRunner<T> {
 
     private final Duration warmup;
     private final Duration measurement;
+    private final Duration terminalAdmissionDrain;
     private final Duration cleanupGrace;
 
     M3V3AsyncActorLaneRunner(Duration warmup, Duration measurement, Duration cleanupGrace) {
+        this(warmup, measurement, Duration.ZERO, cleanupGrace);
+    }
+
+    M3V3AsyncActorLaneRunner(
+            Duration warmup, Duration measurement, Duration terminalAdmissionDrain, Duration cleanupGrace) {
         this.warmup = requirePositiveOrZero(warmup, "warmup");
         this.measurement = requirePositive(measurement, "measurement");
+        this.terminalAdmissionDrain = requirePositiveOrZero(terminalAdmissionDrain, "terminal admission drain");
         this.cleanupGrace = requirePositive(cleanupGrace, "cleanup grace");
     }
 
     static <T> M3V3AsyncActorLaneRunner<T> formal() {
         return new M3V3AsyncActorLaneRunner<>(FORMAL_WARMUP, FORMAL_MEASUREMENT, FORMAL_CLEANUP_GRACE);
+    }
+
+    static <T> M3V3AsyncActorLaneRunner<T> formalV4() {
+        return new M3V3AsyncActorLaneRunner<>(
+                FORMAL_WARMUP,
+                FORMAL_MEASUREMENT,
+                Duration.ofSeconds(AllocatorEvidenceAdmissionPolicyV4.TERMINAL_ADMISSION_DRAIN_SECONDS),
+                FORMAL_CLEANUP_GRACE);
     }
 
     IntervalResult run(
@@ -72,9 +88,15 @@ final class M3V3AsyncActorLaneRunner<T> {
         long warmupNanos = warmup.toNanos();
         long intervalNanos = Math.addExact(warmupNanos, measurement.toNanos());
         long startNanos = System.nanoTime();
-        long cutoffNanos = Math.addExact(startNanos, intervalNanos);
-        long cleanupDeadlineNanos = Math.addExact(cutoffNanos, cleanupGrace.toNanos());
-        RunState<T> state = new RunState<>(queueCapacity, cutoffNanos, cleanupDeadlineNanos, admissionMode);
+        long offerCutoffNanos = Math.addExact(startNanos, intervalNanos);
+        long admissionCutoffNanos = Math.addExact(offerCutoffNanos, terminalAdmissionDrain.toNanos());
+        long cleanupDeadlineNanos = Math.addExact(admissionCutoffNanos, cleanupGrace.toNanos());
+        RunState<T> state = new RunState<>(
+                queueCapacity,
+                offerCutoffNanos,
+                admissionCutoffNanos,
+                cleanupDeadlineNanos,
+                admissionMode);
         CountDownLatch laneStops = new CountDownLatch(ACTOR_COUNT);
         List<Thread> lanes = startLanes(state, operation, laneStops);
         CountDownLatch measurementReady = new CountDownLatch(ACTOR_COUNT);
@@ -90,7 +112,7 @@ final class M3V3AsyncActorLaneRunner<T> {
             offerers = startOfferers(
                     exactSchedule,
                     startNanos,
-                    cutoffNanos,
+                    offerCutoffNanos,
                     state,
                     operation,
                     measurementReady,
@@ -105,7 +127,7 @@ final class M3V3AsyncActorLaneRunner<T> {
             }
             offererStops.await();
             rethrowOffererFailure(offererFailure.get());
-            waitUntil(cutoffNanos);
+            waitUntil(admissionCutoffNanos);
             state.cutoff();
             state.awaitQuiescence(cleanupDeadlineNanos);
             state.timeoutActiveAtCleanupDeadline();
@@ -527,7 +549,8 @@ final class M3V3AsyncActorLaneRunner<T> {
 
     private static final class RunState<T> {
         private final int queueCapacity;
-        private final long cutoffNanos;
+        private final long offerCutoffNanos;
+        private final long admissionCutoffNanos;
         private final long cleanupDeadlineNanos;
         private final AdmissionMode admissionMode;
         private final List<Integer> laneCapacities;
@@ -540,9 +563,14 @@ final class M3V3AsyncActorLaneRunner<T> {
         private boolean accepting = true;
 
         private RunState(
-                int queueCapacity, long cutoffNanos, long cleanupDeadlineNanos, AdmissionMode admissionMode) {
+                int queueCapacity,
+                long offerCutoffNanos,
+                long admissionCutoffNanos,
+                long cleanupDeadlineNanos,
+                AdmissionMode admissionMode) {
             this.queueCapacity = queueCapacity;
-            this.cutoffNanos = cutoffNanos;
+            this.offerCutoffNanos = offerCutoffNanos;
+            this.admissionCutoffNanos = admissionCutoffNanos;
             this.cleanupDeadlineNanos = cleanupDeadlineNanos;
             this.admissionMode = admissionMode;
             List<Integer> capacities = new ArrayList<>(ACTOR_COUNT);
@@ -576,7 +604,7 @@ final class M3V3AsyncActorLaneRunner<T> {
             long schedulerLag = Math.max(0, now - targetNanos);
             metrics.offered(offer.measured(), schedulerLag);
             ArrayDeque<QueuedRequest<T>> queue = queues.get(offer.actorId());
-            if (!accepting || now >= cutoffNanos || queue.size() >= laneCapacities.get(offer.actorId())) {
+            if (!accepting || now >= offerCutoffNanos || queue.size() >= laneCapacities.get(offer.actorId())) {
                 metrics.dropped(offer, schedulerLag);
                 return null;
             }
@@ -593,14 +621,14 @@ final class M3V3AsyncActorLaneRunner<T> {
             ArrayDeque<QueuedRequest<T>> queue = queues.get(actorId);
             try {
                 while (true) {
-                    while (queue.isEmpty() && accepting && System.nanoTime() < cutoffNanos) {
-                        waitBounded(cutoffNanos);
+                    while (queue.isEmpty() && accepting && System.nanoTime() < admissionCutoffNanos) {
+                        waitBounded(admissionCutoffNanos);
                     }
                     if (queue.isEmpty()) {
                         return null;
                     }
                     QueuedRequest<T> queued = queue.peekFirst();
-                    if (!accepting || System.nanoTime() >= cutoffNanos) {
+                    if (!accepting || System.nanoTime() >= admissionCutoffNanos) {
                         queue.removeFirst();
                         metrics.dequeued();
                         metrics.dropped(queued.offer(), queued.schedulerFiringLagNanos());
@@ -608,7 +636,7 @@ final class M3V3AsyncActorLaneRunner<T> {
                     }
                     if (!canAdmit(queued.offer())) {
                         setWaiting(actorId, true);
-                        waitBounded(cutoffNanos);
+                        waitBounded(admissionCutoffNanos);
                         continue;
                     }
                     setWaiting(actorId, false);
