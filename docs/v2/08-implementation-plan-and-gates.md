@@ -298,6 +298,10 @@ only 26 real Cell CAS conflicts. The workflow must consume a target Head's exact
 before interpreting another Head's Cell reservation, while Heads needing a new grant retain the bounded reservation
 path. Deterministic dual-path contracts, both zero-drop 25ms rows, canonical NADV4, and all source gates remain required
 before formal execution.
+ADR 0135 records that exact `9fcbc7f2...` reduces fixed-1000 drop to 156 but still performs redundant proof reads
+after acknowledged reserve/install/clear results. The successful bounded renewal path may reuse those exact snapshots
+through install, clear, candidate create, and publish; every uncertain/conflicting result retains the public proofful
+fallback. Both zero-drop 25ms rows, canonical NADV4, and all source gates remain mandatory before formal execution.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

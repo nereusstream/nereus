@@ -159,6 +159,27 @@ public final class ProductionVirtualLedgerAllocator {
                                 successor));
     }
 
+    CompletionStage<ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1>>
+            installRangeReservedGrantAfterStoreObservedAuthorities(
+                    VersionedAllocatorCellStateV1 exactCell,
+                    VersionedManagedLedgerAllocatorHeadV1 exactHead,
+                    VersionedVirtualLedgerSliceViewV1 currentView) {
+        requireCurrentActiveCell(exactCell.value(), currentView);
+        requireHeadBoundToCell(exactCell.value(), exactHead);
+        if (exactCell.value().mode() != AllocatorModeV1.RANGE_LEASED) {
+            throw new IllegalArgumentException("store-observed grant install requires RANGE mode");
+        }
+        ManagedLedgerAllocatorHeadV1 successor =
+                AllocatorProtocolV1.installReservedRange(exactCell.value(), exactHead.value());
+        return successor.equals(exactHead.value())
+                ? unchanged(exactHead)
+                : store.compareAndSetHead(
+                        exactCell.value().ledgerIdCompatibilityNamespaceId(),
+                        exactCell.value().sliceAssignmentId(),
+                        exactHead,
+                        successor);
+    }
+
     public CompletionStage<ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1>> takeover(
             VersionedAllocatorCellStateV1 exactCell,
             VersionedManagedLedgerAllocatorHeadV1 exactHead,
@@ -313,6 +334,21 @@ public final class ProductionVirtualLedgerAllocator {
                 .thenCompose(successor -> successor.equals(exactCell.value())
                         ? unchanged(exactCell)
                         : store.compareAndSetCell(exactCell, successor));
+    }
+
+    CompletionStage<ConditionalCasResult<VersionedAllocatorCellStateV1>>
+            clearRangeReservationAfterStoreObservedInstalledHead(
+                    VersionedAllocatorCellStateV1 exactCell, VersionedManagedLedgerAllocatorHeadV1 exactHead) {
+        requireActivation(exactCell.value());
+        requireHeadBoundToCell(exactCell.value(), exactHead);
+        if (exactCell.value().mode() != AllocatorModeV1.RANGE_LEASED) {
+            throw new IllegalArgumentException("store-observed reservation clear requires RANGE mode");
+        }
+        VirtualLedgerCellAllocatorStateV1 successor =
+                AllocatorProtocolV1.clearInstalledReservation(exactCell.value(), exactHead.value());
+        return successor.equals(exactCell.value())
+                ? unchanged(exactCell)
+                : store.compareAndSetCell(exactCell, successor);
     }
 
     private CompletionStage<VirtualLedgerCellAllocatorStateV1> clearSuccessor(

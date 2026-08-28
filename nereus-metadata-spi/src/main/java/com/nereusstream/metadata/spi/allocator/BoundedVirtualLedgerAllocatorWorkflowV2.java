@@ -169,7 +169,8 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
                 state,
                 reserved,
                 head,
-                invoke(() -> allocator.installRangeReservedGrant(reserved, head, request.currentView())));
+                invoke(() -> allocator.installRangeReservedGrantAfterStoreObservedAuthorities(
+                        reserved, head, request.currentView())));
     }
 
     private CompletionStage<Result> installRangeGrant(
@@ -247,12 +248,12 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
             State state,
             VersionedAllocatorCellStateV1 reserved,
             VersionedManagedLedgerAllocatorHeadV1 terminalHead) {
-        return clearReservation(
-                request,
-                state,
-                reserved,
-                terminalHead,
-                invoke(() -> allocator.clearReservation(reserved, terminalHead)));
+        CompletionStage<ConditionalCasResult<VersionedAllocatorCellStateV1>> stage =
+                reserved.value().mode() == AllocatorModeV1.RANGE_LEASED
+                        ? invoke(() ->
+                                allocator.clearRangeReservationAfterStoreObservedInstalledHead(reserved, terminalHead))
+                        : invoke(() -> allocator.clearReservation(reserved, terminalHead));
+        return clearReservation(request, state, reserved, terminalHead, stage);
     }
 
     private CompletionStage<Result> clearReservation(
@@ -336,7 +337,7 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
             }
             return CompletableFuture.completedFuture(new Result(cell, head, state.exactNode, state.reconcileRetries));
         }
-        return createCandidate(request, state, cell, head);
+        return createCandidate(request, state, cell, head, true);
     }
 
     private CompletionStage<Result> createCandidate(

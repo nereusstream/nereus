@@ -96,6 +96,10 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
                 ProductionVirtualLedgerAllocator.forEvidenceCandidate(AllocatorEvidenceCandidateV1.range(16), store);
         cell = createCell(AllocatorModeV1.RANGE_LEASED);
         head = createHead(cell, incarnation("range"));
+        int cellReadsBefore = store.readCellCalls;
+        int headReadsBefore = store.readHeadCalls;
+        int nodeReadsBefore = store.readNodeCalls;
+        int cellCasBefore = store.compareAndSetCellCalls;
 
         Result result = range.boundedWorkflow(8, BoundedVirtualLedgerAllocatorWorkflowV2.RetryScheduler.immediate())
                 .allocate(request(head, "range"))
@@ -108,6 +112,12 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         assertThat(result.exactHead().value().grantId()).isPositive();
         assertThat(result.exactHead().value().nextLedgerId())
                 .isEqualTo(result.exactNode().value().ledgerId() + 1);
+        assertThat(store.readCellCalls).isEqualTo(cellReadsBefore + 1);
+        assertThat(store.readHeadCalls).isEqualTo(headReadsBefore + 1);
+        assertThat(store.readNodeCalls).isEqualTo(nodeReadsBefore);
+        assertThat(store.compareAndSetCellCalls).isEqualTo(cellCasBefore + 2);
+        assertThat(store.rangeAcknowledgedNodeCreateCalls).isOne();
+        assertThat(store.rangeAcknowledgedHeadCasCalls).isOne();
         assertThat(List.of(BoundedVirtualLedgerAllocatorWorkflowV2.class.getDeclaredFields()))
                 .extracting(Field::getType)
                 .noneMatch(Lock.class::isAssignableFrom);

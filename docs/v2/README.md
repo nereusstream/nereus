@@ -395,6 +395,7 @@ Accepted decisions:
 - [ADR 0132: M3 V4 evidence-store specialized mutation forwarding amendment](../decisions/0132-v2-m3-allocator-v4-evidence-store-specialized-mutation-forwarding-amendment.md)
 - [ADR 0133: M3 V4 fixed-storm retry attribution amendment](../decisions/0133-v2-m3-allocator-v4-fixed-storm-retry-attribution-amendment.md)
 - [ADR 0134: M3 V4 independent installed-RANGE reservation amendment](../decisions/0134-v2-m3-allocator-v4-independent-installed-range-reservation-amendment.md)
+- [ADR 0135: M3 V4 RANGE-renewal acknowledged-proof reuse amendment](../decisions/0135-v2-m3-allocator-v4-range-renewal-acknowledged-proof-reuse-amendment.md)
 
 ## Open design gates
 
@@ -681,6 +682,12 @@ exact `026dfddf...` diagnostic and attributes 25,814 of 25,890 fixed-row retries
 bounded workflow now permits an exact Head to consume its own installed RANGE grant before interpreting another
 Head's grant-renewal reservation; Heads without a usable grant retain the same bounded reservation path. V4 protocol,
 plan, workload, thresholds, and evidence bytes remain unchanged.
+
+[ADR 0135](../decisions/0135-v2-m3-allocator-v4-range-renewal-acknowledged-proof-reuse-amendment.md) preserves the
+exact `9fcbc7f2...` diagnostic: fixed drop falls to 156, but acknowledged grant install/clear still reread exact
+authorities and lengthen the global reservation. The bounded success path now reuses those exact mutation results;
+all uncertain/conflicting outcomes return to the original proof reads. Public API, STRICT, V4 plan, thresholds, and
+evidence semantics remain unchanged.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

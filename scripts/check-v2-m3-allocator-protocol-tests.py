@@ -138,6 +138,8 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
 
         self.assertIn("createCandidateAfterStoreObservedRangeAuthorities", allocator)
         self.assertIn("publishCandidateAfterStoreObservedRangeNode", allocator)
+        self.assertIn("installRangeReservedGrantAfterStoreObservedAuthorities", allocator)
+        self.assertIn("clearRangeReservationAfterStoreObservedInstalledHead", allocator)
         self.assertIn("store-observed candidate fast path requires RANGE mode", allocator)
         self.assertIn("store-observed publish fast path requires RANGE mode", allocator)
         self.assertIn("canUseIndependentInstalledRangeGrant(authorities, reservation)", workflow)
@@ -149,6 +151,11 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             "createCandidate(request, state, authorities.cell(), authorities.head(), true)",
             workflow,
         )
+        self.assertIn("installRangeReservedGrantAfterStoreObservedAuthorities", workflow)
+        self.assertIn("clearRangeReservationAfterStoreObservedInstalledHead", workflow)
+        self.assertIn("return createCandidate(request, state, cell, head, true)", workflow)
+        self.assertIn("allocator.installRangeReservedGrant(", workflow)
+        self.assertIn("allocator.clearReservation(", workflow)
         self.assertIn("case DEFINITIVE_CONFLICT", workflow)
         self.assertIn("reconcilePublishedHead", workflow)
         self.assertIn(
