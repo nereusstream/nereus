@@ -372,6 +372,12 @@ Accepted decisions:
 - [ADR 0109: M3 Native baseline executor composition and formal-diagnostic equivalence amendment](../decisions/0109-v2-m3-native-baseline-executor-composition-formal-diagnostic-equivalence-amendment.md)
 - [ADR 0110: M3 candidate warm-up load-rejection classification amendment](../decisions/0110-v2-m3-allocator-candidate-warmup-load-rejection-classification-amendment.md)
 - [ADR 0111: M3 derived-floor physical budget projection amendment](../decisions/0111-v2-m3-allocator-derived-floor-physical-budget-projection-amendment.md)
+- [ADR 0112: M3 V3 derived-rate workload entry amendment](../decisions/0112-v2-m3-allocator-v3-derived-rate-workload-entry-amendment.md)
+- [ADR 0113: M3 V3 completed-workflow Cell reconciliation amendment](../decisions/0113-v2-m3-allocator-v3-completed-workflow-cell-reconciliation-amendment.md)
+- [ADR 0114: M3 V3 warm-up unexpected-failure attribution amendment](../decisions/0114-v2-m3-allocator-v3-warmup-unexpected-failure-attribution-amendment.md)
+- [ADR 0115: M3 V3 diagnostic inventory sealing amendment](../decisions/0115-v2-m3-allocator-v3-diagnostic-inventory-sealing-amendment.md)
+- [ADR 0116: M3 V3 diagnostic testcase identity amendment](../decisions/0116-v2-m3-allocator-v3-diagnostic-testcase-identity-amendment.md)
+- [ADR 0117: M3 V3 RANGE completion reservation-handoff amendment](../decisions/0117-v2-m3-allocator-v3-range-completion-reservation-handoff-amendment.md)
 
 ## Open design gates
 
@@ -535,6 +541,15 @@ files before rejecting the newly listed testcase name: ADR 0115 had named an int
 actual JUnit method identity. [ADR 0116](../decisions/0116-v2-m3-allocator-v3-diagnostic-testcase-identity-amendment.md)
 preserves that second unsealed diagnostic and binds the exact emitted method name. It adds an explicit wrong-name
 negative contract without changing any evidence byte or allocator rule.
+
+The following exact-source formal attempt at `b9659232...` completed all 30,000 measured RANGE-16 fixed-1000
+requests but stopped fail-closed because 26 warm-up callbacks returned an exact snapshot containing another
+in-flight request's RANGE reservation. [ADR 0117](../decisions/0117-v2-m3-allocator-v3-range-completion-reservation-handoff-amendment.md)
+preserves the 25-file failed attempt and external archive. The harness now ignores a validated transient reserved
+completion snapshot for its reservation-free population proof and still requires a later cleared completion to
+advance cursor/grant state. The current-source NADV3 inventory becomes six suites/18 tests by adding the exact
+RANGE-16 10k/1ms fixed-1000 formal schedule; production CAS/reread authority and every frozen campaign rule remain
+unchanged.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

@@ -619,6 +619,14 @@ inventory before rejecting the descriptive name introduced by ADR 0115. The seal
 `replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()` identity, and a focused negative contract proves that
 the descriptive substitute remains invalid.
 
+[ADR 0117](../../../decisions/0117-v2-m3-allocator-v3-range-completion-reservation-handoff-amendment.md) records the
+next RANGE completion-handoff correction. Exact source `b9659232...` completed the measured RANGE-16 fixed-1000
+inventory but stopped because concurrent successful warm-up callbacks could return another request's exact transient
+Cell reservation. The population proof now validates and ignores such reserved snapshots while remaining
+reservation-free; only a cleared completion may advance its monotonic cursor/grant state. A formal-equivalent
+RANGE-16 10k/1ms sequence extends current-source NADV3 to six suites/18 tests. No production operation, shared Cell
+lock, workload, plan, SLO, disposition, or selection rule changes.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

@@ -857,6 +857,11 @@ allowlist at six suites/17 tests without changing the still-open formal qualific
 The following `bc867579...` replay also passed 17/0/0/0 but exposed a literal testcase-name mismatch after the six
 suite files were accepted. ADR 0116 preserves that second diagnostic and binds the actual emitted JUnit identity;
 formal qualification remains unanswered.
+The next exact-source formal attempt at `b9659232...` completed the RANGE-16 measured row but stopped on 26 warm-up
+callback failures caused by another request's exact transient RANGE reservation snapshot. ADR 0117 preserves the
+failed attempt, keeps the harness-local proof reservation-free, and adds an exact RANGE-16 formal-sequence diagnostic
+to the six-suite/18-test NADV3 inventory. It changes no production allocator transition or qualification rule, so
+formal qualification remains unanswered pending a fresh exact-source terminal campaign.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

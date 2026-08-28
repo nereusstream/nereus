@@ -183,6 +183,14 @@ ADR 0116 closes the remaining exact-name drift exposed at `bc867579...`: six sui
 ran, but the allowlist named a description that differed from the emitted JUnit method. The second failed diagnostic
 is independently archived. Current-source contracts bind the literal emitted identity and reject a substituted name.
 
+ADR 0117 governs the RANGE completion handoff exposed at exact source `b9659232...`. Its first RANGE-16 interval
+completed all measured requests but 26 warm-up callbacks returned another in-flight request's exact reserved Cell
+snapshot and were incorrectly rejected as if their own workflow had failed to clear. The 25-file attempt is immutable
+and externally archived. The population proof must remain reservation-free, ignore only a same-identity transient
+reserved completion, advance only on cleared monotonic snapshots, and retain every production CAS/reread and
+fail-closed interval rule. Publication requires the exact RANGE-16 formal schedule inside the six-suite/18-test
+NADV3 inventory, full source gates, fresh preflight, and a new exact-source formal directory.
+
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

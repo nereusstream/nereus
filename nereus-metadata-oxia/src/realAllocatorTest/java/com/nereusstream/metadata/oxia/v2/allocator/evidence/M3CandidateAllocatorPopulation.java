@@ -301,8 +301,15 @@ final class M3CandidateAllocatorPopulation {
                 || current.value().sliceEndInclusive() != observed.value().sliceEndInclusive()) {
             throw new IllegalStateException("allocator V3 workflow Cell snapshot changed exact slice identity");
         }
+        if (current.value().reservation().isPresent()) {
+            throw new IllegalStateException("allocator V3 population Cell proof retained a reservation");
+        }
         if (observed.value().reservation().isPresent()) {
-            throw new IllegalStateException("allocator V3 completed workflow retained a Cell reservation");
+            // RANGE completions may carry an exact snapshot of another in-flight request's
+            // reservation. The request that owns that reservation cannot finish until it
+            // clears it, so only reservation-free completions are eligible to advance the
+            // population's post-interval Cell proof.
+            return current;
         }
         long currentCursor = current.value().nextSliceLedgerId();
         long observedCursor = observed.value().nextSliceLedgerId();

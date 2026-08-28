@@ -63,6 +63,9 @@ public final class M3V3AllocatorProtocolMain {
                     "M3RealAllocatorStrictIntervalDiagnosticTest",
                     "replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()"),
             identity(
+                    "M3RealAllocatorStrictIntervalDiagnosticTest",
+                    "replaysTheExactRange16ScaleThenFixedIntervalWithoutRetainingReservations()"),
+            identity(
                     "M3V3AsyncActorLaneRunnerTest",
                     "evidenceAdmissionCapIsDerivedFromFrozenRateLatencyAndActorCount()"),
             identity(

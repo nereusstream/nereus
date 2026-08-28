@@ -292,7 +292,9 @@ class M3V3AllocatorProtocolMainTest {
         writeSuite(
                 directory,
                 M3RealAllocatorStrictIntervalDiagnosticTest.class,
-                List.of("replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()"));
+                List.of(
+                        "replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()",
+                        "replaysTheExactRange16ScaleThenFixedIntervalWithoutRetainingReservations()"));
         writeSuite(
                 directory,
                 M3V3AsyncActorLaneRunnerTest.class,

@@ -163,7 +163,9 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             v3_completion,
         )
         self.assertIn("heads.compareAndSet(ledgerIndex, predecessor, exact.exactHead())", v3_completion)
-        self.assertIn("completed workflow retained a Cell reservation", population)
+        self.assertIn("population Cell proof retained a reservation", population)
+        self.assertIn("if (observed.value().reservation().isPresent())", population)
+        self.assertIn("return current;", population)
         self.assertIn("workflow Cell cursor/grant ordering diverged", population)
 
     def test_v3_unexpected_warmup_failure_is_attributed_and_formal_sequence_is_replayed(self) -> None:
@@ -197,9 +199,19 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             protocol_main,
         )
         self.assertIn(
+            '"replaysTheExactRange16ScaleThenFixedIntervalWithoutRetainingReservations()"',
+            protocol_main,
+        )
+        self.assertIn(
             "void replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()",
             diagnostic,
         )
+        self.assertIn(
+            "void replaysTheExactRange16ScaleThenFixedIntervalWithoutRetainingReservations()",
+            diagnostic,
+        )
+        self.assertIn("Cell.fixedRate(Candidate.RANGE_16, 10_000, 1, 1_000)", diagnostic)
+        self.assertIn('"range16-formal-sequence.json"', diagnostic)
 
     def test_formal_archiver_is_create_new_byte_exact_and_collision_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

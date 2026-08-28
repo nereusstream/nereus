@@ -87,6 +87,66 @@ class M3RealAllocatorStrictIntervalDiagnosticTest {
         }
     }
 
+    @Test
+    void replaysTheExactRange16ScaleThenFixedIntervalWithoutRetainingReservations() throws Exception {
+        String serviceAddress =
+                M3V3DiagnosticOutput.requiredProperty("nereus.m3.allocator.v3.oxiaServiceAddress");
+        String sourceCommit = M3V3DiagnosticOutput.requiredProperty("nereus.m3.allocator.v3.nereusCommit");
+        if (!sourceCommit.matches("[0-9a-f]{40}")) {
+            throw new IllegalArgumentException("diagnostic Nereus source commit must be exact");
+        }
+        ThreadPoolExecutor workers = M3RealAllocatorEvidenceTest.exactWorkers();
+        workers.prestartAllCoreThreads();
+        Throwable executionFailure = null;
+        try (M3RealOxiaActors actors = new M3RealOxiaActors(serviceAddress)) {
+            M3CandidateAllocatorPopulation population = new M3CandidateAllocatorPopulation(
+                    AllocatorEvidenceCandidateV1.range(16),
+                    1,
+                    "range16-interval-" + sourceCommit.substring(0, 16),
+                    actors,
+                    workers);
+            population.ensurePopulation(10_000);
+            actors.setControlledLatencyMillis(1);
+            M3V3AllocatorFormalHarness.HarnessResult fixed = runInterval(
+                    population,
+                    Cell.fixedRate(Candidate.RANGE_16, 10_000, 1, 1_000),
+                    1_000);
+            assertThat(fixed.runnerResult().warmupUnexpectedFailedAfterAdmission())
+                    .withFailMessage(
+                            "unexpected RANGE-16 fixed-1000 warmup failure: %s",
+                            fixed.runnerResult().warmupFirstUnexpectedFailure())
+                    .isZero();
+            assertThat(fixed.runnerResult().warmupTimedOutAfterAdmission()).isZero();
+            assertThat(fixed.runnerResult().completed()).isEqualTo(30_000);
+            assertThat(fixed.runnerResult().failedAfterAdmission()).isZero();
+            assertThat(fixed.runnerResult().timedOutAfterAdmission()).isZero();
+            assertThat(fixed.runnerResult().actorLanesStoppedAtCleanupDeadline()).isTrue();
+            assertThat(fixed.runnerResult().globalOutstandingMaximum()).isGreaterThan(4);
+            M3V3DiagnosticOutput.writeNew(
+                    "range16-formal-sequence.json",
+                    "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_RANGE16_FORMAL_SEQUENCE_DIAGNOSTIC_V1\""
+                            + ",\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false"
+                            + ",\"sourceCommit\":"
+                            + M3V3DiagnosticOutput.jsonString(sourceCommit)
+                            + ",\"fixed1000\":"
+                            + intervalJson(fixed.runnerResult())
+                            + "}\n");
+        } catch (Exception | Error failure) {
+            executionFailure = failure;
+            throw failure;
+        } finally {
+            workers.shutdownNow();
+            if (!workers.awaitTermination(3, TimeUnit.MINUTES)) {
+                IllegalStateException termination =
+                        new IllegalStateException("RANGE-16 interval diagnostic executor did not terminate");
+                if (executionFailure == null) {
+                    throw termination;
+                }
+                executionFailure.addSuppressed(termination);
+            }
+        }
+    }
+
     private static String diagnosticJson(
             String sourceCommit,
             M3V3AsyncActorLaneRunner.IntervalResult fixed,

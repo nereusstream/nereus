@@ -24,11 +24,15 @@ import com.nereusstream.domain.registry.allocator.AllocatorEvidenceAttachmentKin
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceCandidateV1;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceContextV1;
 import com.nereusstream.domain.registry.allocator.AllocatorFaultCutV1;
+import com.nereusstream.domain.registry.allocator.AllocatorHeadStateV1;
 import com.nereusstream.domain.registry.allocator.AllocatorModeV1;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.EventKind;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.EventOutcome;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.OxiaOperationKind;
+import com.nereusstream.domain.registry.allocator.CellAllocatorReservationV1;
+import com.nereusstream.domain.registry.allocator.ChainPointerV1;
+import com.nereusstream.domain.registry.allocator.ManagedLedgerIncarnationIdV1;
 import com.nereusstream.domain.registry.allocator.VirtualLedgerCellAllocatorStateV1;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
@@ -128,6 +132,18 @@ class M3AllocatorEvidenceWiringTest {
         assertThat(M3CandidateAllocatorPopulation.newestCompletedWorkflowCell(
                         second, sameValueDifferentOpaqueVersion))
                 .isSameAs(second);
+
+        VersionedAllocatorCellStateV1 reservedSecond = reservedCell(32, 3, 2);
+        assertThat(M3CandidateAllocatorPopulation.newestCompletedWorkflowCell(first, reservedSecond))
+                .as("another in-flight RANGE reservation is not a terminal population proof")
+                .isSameAs(first);
+        assertThat(M3CandidateAllocatorPopulation.newestCompletedWorkflowCell(second, reservedSecond))
+                .as("a late reserved snapshot cannot replace the matching cleared completion")
+                .isSameAs(second);
+        assertThatThrownBy(() -> M3CandidateAllocatorPopulation.newestCompletedWorkflowCell(
+                        reservedSecond, second))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("population Cell proof retained a reservation");
 
         VersionedAllocatorCellStateV1 mismatchedGrant = exactCell(48, 3, 4);
         assertThatThrownBy(() -> M3CandidateAllocatorPopulation.newestCompletedWorkflowCell(
@@ -516,6 +532,32 @@ class M3AllocatorEvidenceWiringTest {
                         nextGrantId,
                         Optional.empty()),
                 new MetadataVersion(CanonicalBytes.copyOf(new byte[] {(byte) version})));
+    }
+
+    private static VersionedAllocatorCellStateV1 reservedCell(long consumed, long nextGrantId, int version) {
+        VersionedAllocatorCellStateV1 exact = exactCell(consumed, nextGrantId, version);
+        long rangeEnd = exact.value().nextSliceLedgerId();
+        long rangeStart = rangeEnd - 16;
+        CellAllocatorReservationV1 reservation = new CellAllocatorReservationV1(
+                new ManagedLedgerIncarnationIdV1(
+                        Sha256Digest.hash(CanonicalBytes.copyOf("incarnation".getBytes(StandardCharsets.UTF_8)))),
+                nextGrantId - 1,
+                rangeStart,
+                rangeEnd,
+                Sha256Digest.hash(CanonicalBytes.copyOf("request".getBytes(StandardCharsets.UTF_8))),
+                new AllocatorHeadStateV1(ChainPointerV1.absent(), 0, 0, 0, rangeStart));
+        return new VersionedAllocatorCellStateV1(
+                new VirtualLedgerCellAllocatorStateV1(
+                        exact.value().mode(),
+                        exact.value().allocatorProtocolVersion(),
+                        exact.value().ledgerIdCompatibilityNamespaceId(),
+                        exact.value().sliceAssignmentId(),
+                        exact.value().sliceStartInclusive(),
+                        exact.value().sliceEndInclusive(),
+                        exact.value().nextSliceLedgerId(),
+                        exact.value().nextGrantId(),
+                        Optional.of(reservation)),
+                exact.metadataVersion());
     }
 
     private static String junitXml(String skipped) {

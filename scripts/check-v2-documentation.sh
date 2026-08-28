@@ -209,6 +209,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0114-v2-m3-allocator-v3-warmup-unexpected-failure-attribution-amendment.md"
     "$repo_root/docs/decisions/0115-v2-m3-allocator-v3-diagnostic-inventory-sealing-amendment.md"
     "$repo_root/docs/decisions/0116-v2-m3-allocator-v3-diagnostic-testcase-identity-amendment.md"
+    "$repo_root/docs/decisions/0117-v2-m3-allocator-v3-range-completion-reservation-handoff-amendment.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"
