@@ -35,6 +35,7 @@ final class M3AllocatorWorkloadPlan {
     static final List<Integer> ACTIVE_POPULATIONS = List.of(10_000, 100_000);
     static final List<Integer> METADATA_LATENCY_P99_MILLIS = List.of(1, 5, 10, 25);
     static final List<Integer> OFFERED_RATES = List.of(200, 250, 333, 500, 750, 1000);
+    static final List<Integer> V3_OFFERED_RATES = List.of(200, 250, 267, 333, 400, 500, 600, 750, 800, 1000);
     static final List<Long> RANGE_SIZES = List.copyOf(AllocatorEvidenceCandidateV1.RANGE_SIZES);
     static final List<Integer> ARRIVAL_JITTER_MICROS = List.of(0, 125, -125, 250, -250, 500, -500, 0);
 
@@ -43,7 +44,13 @@ final class M3AllocatorWorkloadPlan {
     static Iterable<PlannedRequest> requests(int activePopulation, int offeredRate) {
         requireDimension(ACTIVE_POPULATIONS, activePopulation, "active population");
         requireDimension(OFFERED_RATES, offeredRate, "offered rate");
-        return () -> new RequestIterator(activePopulation, offeredRate);
+        return () -> new RequestIterator(activePopulation, offeredRate, false);
+    }
+
+    static Iterable<PlannedRequest> v3Requests(int activePopulation, int offeredRate) {
+        requireDimension(ACTIVE_POPULATIONS, activePopulation, "active population");
+        requireDimension(V3_OFFERED_RATES, offeredRate, "V3 offered rate");
+        return () -> new RequestIterator(activePopulation, offeredRate, true);
     }
 
     static int requestCount(int offeredRate) {
@@ -53,6 +60,16 @@ final class M3AllocatorWorkloadPlan {
 
     static int measuredRequestCount(int offeredRate) {
         requireDimension(OFFERED_RATES, offeredRate, "offered rate");
+        return Math.multiplyExact(MEASURED_SECONDS, offeredRate);
+    }
+
+    static int v3RequestCount(int offeredRate) {
+        requireDimension(V3_OFFERED_RATES, offeredRate, "V3 offered rate");
+        return Math.multiplyExact(WARM_UP_SECONDS + MEASURED_SECONDS, offeredRate);
+    }
+
+    static int v3MeasuredRequestCount(int offeredRate) {
+        requireDimension(V3_OFFERED_RATES, offeredRate, "V3 offered rate");
         return Math.multiplyExact(MEASURED_SECONDS, offeredRate);
     }
 
@@ -119,12 +136,14 @@ final class M3AllocatorWorkloadPlan {
         private final AllocatorEvidenceScheduleV1.ArrivalCursor arrivals;
         private long ordinal;
 
-        RequestIterator(int activePopulation, int offeredRate) {
+        RequestIterator(int activePopulation, int offeredRate, boolean v3) {
             this.activePopulation = activePopulation;
             this.offeredRate = offeredRate;
-            this.requestCount = requestCount(offeredRate);
+            this.requestCount = v3 ? v3RequestCount(offeredRate) : requestCount(offeredRate);
             ledgers = AllocatorEvidenceScheduleV1.ledgerCursor(activePopulation);
-            arrivals = AllocatorEvidenceScheduleV1.arrivalCursor(offeredRate);
+            arrivals = v3
+                    ? AllocatorEvidenceScheduleV1.arrivalCursorV3(offeredRate)
+                    : AllocatorEvidenceScheduleV1.arrivalCursor(offeredRate);
         }
 
         @Override

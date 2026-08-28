@@ -96,7 +96,7 @@ final class M3V3NativeIntervalRuntime {
             int activePopulation, int offeredRate) {
         List<M3V3AsyncActorLaneRunner.ScheduledOffer<NativeOffer>> schedule = new ArrayList<>();
         for (M3AllocatorWorkloadPlan.PlannedRequest request :
-                M3AllocatorWorkloadPlan.requests(activePopulation, offeredRate)) {
+                M3AllocatorWorkloadPlan.v3Requests(activePopulation, offeredRate)) {
             schedule.add(new M3V3AsyncActorLaneRunner.ScheduledOffer<>(
                     request.requestOrdinal(),
                     request.actorId(),

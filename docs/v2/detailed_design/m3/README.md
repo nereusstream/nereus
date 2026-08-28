@@ -580,6 +580,15 @@ the planner-resolved derived rate remains carried by `ExecuteCell`. The logical 
 40-second interval charge, 5-second cleanup charge, and all validator/selection semantics are unchanged. Its immutable
 21-file failed campaign and external archive are not evaluation or future campaign input.
 
+[ADR 0112](../../../decisions/0112-v2-m3-allocator-v3-derived-rate-workload-entry-amendment.md) records the next
+physical-entry correction. Exact source `1771b000...` again completed all Native baselines and the first failed fixed
+STRICT row, but the formal candidate runtime still entered the workload generator through its deliberately
+fixed-rate-only ADR-0094 V1/V2 method. The planner-required derived-800 action was therefore rejected before dispatch.
+The failed 21-file attempt and JUnit are retained byte-exact in an external read-only archive. Explicit V3 workload
+and arrival-cursor entries now accept only fixed rates plus exact reconstructible 800/600/400/267 values, while the
+legacy entry continues rejecting them. Ordinal phase authority, jitter, trigger mix, workload bytes, plan digest,
+budgets, SLOs, dispositions, and selection rules remain unchanged.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

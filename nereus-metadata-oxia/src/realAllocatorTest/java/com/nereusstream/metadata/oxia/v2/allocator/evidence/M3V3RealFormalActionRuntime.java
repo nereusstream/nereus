@@ -113,18 +113,7 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
         M3V3AllocatorFormalHarness harness = M3V3AllocatorFormalHarness.formalActors(
                 population.formalActorEndpointsV3(cell, measurements));
         List<M3V3AsyncActorLaneRunner.ScheduledOffer<M3V3AllocatorFormalHarness.CandidateRequest>> schedule =
-                new ArrayList<>();
-        for (M3AllocatorWorkloadPlan.PlannedRequest request : M3AllocatorWorkloadPlan.requests(
-                cell.activeManagedLedgers(), offeredRate)) {
-            schedule.add(new M3V3AsyncActorLaneRunner.ScheduledOffer<>(
-                    request.requestOrdinal(),
-                    request.actorId(),
-                    request.ledgerIndex(),
-                    TimeUnit.MICROSECONDS.toNanos(request.arrivalOffsetMicros()),
-                    request.phase() != M3AllocatorWorkloadPlan.Phase.WARM_UP,
-                    new M3V3AllocatorFormalHarness.CandidateRequest(
-                            request.requestOrdinal(), request.ledgerIndex(), request)));
-        }
+                candidateSchedule(cell.activeManagedLedgers(), offeredRate);
         M3V3AllocatorFormalHarness.HarnessResult result;
         try {
             result = harness.runCandidate(cell, offeredRate, schedule, measurements::supplementary);
@@ -138,6 +127,24 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
                 attachment.digest(),
                 result.infrastructureValid(),
                 M3V3AllocatorFormalHarness.infrastructureDetail(result.runnerResult()));
+    }
+
+    static List<M3V3AsyncActorLaneRunner.ScheduledOffer<M3V3AllocatorFormalHarness.CandidateRequest>>
+            candidateSchedule(int activePopulation, int offeredRate) {
+        List<M3V3AsyncActorLaneRunner.ScheduledOffer<M3V3AllocatorFormalHarness.CandidateRequest>> schedule =
+                new ArrayList<>();
+        for (M3AllocatorWorkloadPlan.PlannedRequest request :
+                M3AllocatorWorkloadPlan.v3Requests(activePopulation, offeredRate)) {
+            schedule.add(new M3V3AsyncActorLaneRunner.ScheduledOffer<>(
+                    request.requestOrdinal(),
+                    request.actorId(),
+                    request.ledgerIndex(),
+                    TimeUnit.MICROSECONDS.toNanos(request.arrivalOffsetMicros()),
+                    request.phase() != M3AllocatorWorkloadPlan.Phase.WARM_UP,
+                    new M3V3AllocatorFormalHarness.CandidateRequest(
+                            request.requestOrdinal(), request.ledgerIndex(), request)));
+        }
+        return List.copyOf(schedule);
     }
 
     @Override

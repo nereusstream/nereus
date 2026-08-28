@@ -836,6 +836,10 @@ The subsequent `c0e28f8e...` attempt reached the derived-800 transition but expo
 before dispatch: first-population detection treated the DERIVED slot as FIXED. ADR 0111 freezes that failed attempt and
 requires explicit FIXED ordinal-zero setup detection while retaining the exact planner-resolved derived rate. This
 correction does not answer candidate qualification or change the frozen plan, budget, SLO, or selection question.
+The next `1771b000...` attempt passed that projection boundary but stopped before the derived-800 dispatch because the
+V3 candidate runtime still called the ADR-0094 fixed-rate-only workload entry. ADR 0112 preserves that attempt and
+adds separate closed V3 schedule entries for fixed plus exact reconstructible derived rates; V1/V2 stay fixed-only.
+This is still a physical conformance correction, not a candidate PASS, threshold change, or selection decision.
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

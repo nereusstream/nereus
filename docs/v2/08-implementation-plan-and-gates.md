@@ -146,6 +146,13 @@ Physical budget projection must now identify first setup only by FIXED ordinal z
 offered rate; a derived action retains its resolved planner rate and unchanged interval/cleanup charge. Publication
 requires the derived-800 regression, stable `5f94079e...b283` plan digest, full current-source gates, fresh NADV3, and
 fresh preflight before any new formal directory.
+
+ADR 0112 governs the following V3 workload-entry correction. Exact source `1771b000...` completed the Native rows and
+the first failed fixed STRICT row, then stopped before dispatching the planner-required derived-800 action because the
+formal candidate path still called the ADR-0094 V1/V2 fixed-rate-only schedule entry. Its 21-file failed attempt is
+immutable and externally archived. V1/V2 entries continue rejecting derived rates; the V3 Native and candidate paths
+must both construct the exact closed fixed-plus-derived schedule through an explicit V3 entry. Publication requires
+derived 800/600/400/267 schedule regressions through both paths and an unchanged `5f94079e...b283` plan digest.
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

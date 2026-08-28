@@ -113,6 +113,8 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         shared = V3_NATIVE_RUNTIME.read_text()
         module = MODULE_BUILD.read_text()
         self.assertIn("nativeIntervalRuntime().run(", formal)
+        self.assertIn("M3AllocatorWorkloadPlan.v3Requests", formal)
+        self.assertIn("M3AllocatorWorkloadPlan.v3Requests", shared)
         for forbidden in (
             "nativeDispatchWorkers",
             "boundedNativeDispatchWorkers",

@@ -501,6 +501,13 @@ The following exact-source attempt at `c0e28f8e...` reached that deterministic d
 setup charges. The derived logical identity, resolved rate, frozen plan digest, action budgets, and qualification rules
 remain unchanged.
 
+The next exact-source attempt at `1771b000...` passed the same Native baseline inventory and consumed the failed fixed
+STRICT row, then exposed one final version-entry mismatch before dispatching derived 800: the V3 candidate runtime
+still called the ADR-0094 V1/V2 fixed-rate-only workload entry. [ADR 0112](../decisions/0112-v2-m3-allocator-v3-derived-rate-workload-entry-amendment.md)
+preserves the 21-file failed attempt and its external archive. V1/V2 remain closed to their six fixed rates; explicit
+V3 workload and arrival entries admit only the fixed rates plus exact reconstructible 800/600/400/267 values. The
+schedule/profile/plan digests, jitter bytes, thresholds, budgets, and selection rules remain unchanged.
+
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.

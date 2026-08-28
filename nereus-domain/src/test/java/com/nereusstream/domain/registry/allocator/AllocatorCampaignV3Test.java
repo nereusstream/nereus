@@ -59,6 +59,20 @@ class AllocatorCampaignV3Test {
     }
 
     @Test
+    void v3ArrivalEntryAcceptsOnlyFixedOrExactlyDerivedRates() {
+        assertThatThrownBy(() -> AllocatorEvidenceScheduleV1.arrivalCursor(800))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not frozen");
+        for (int rate : List.of(800, 600, 400, 267)) {
+            assertThat(AllocatorEvidenceScheduleV1.arrivalCursorV3(rate).nextOfferedTimestampMicros())
+                    .isZero();
+        }
+        assertThatThrownBy(() -> AllocatorEvidenceScheduleV1.arrivalCursorV3(801))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not frozen or exact-derived");
+    }
+
+    @Test
     void noneQualifiedIsValidAndDerivesMinimumValidCount() {
         Completed completed = drive(cell ->
                 cell.candidate().nativePath() ? passing(cell, cell.rateSlot().fixedRate()) : relativeFailure(cell));

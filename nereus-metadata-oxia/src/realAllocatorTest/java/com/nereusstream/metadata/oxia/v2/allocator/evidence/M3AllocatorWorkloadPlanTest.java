@@ -15,6 +15,7 @@
 package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceContextV1;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -48,6 +49,8 @@ class M3AllocatorWorkloadPlanTest {
         assertThat(M3AllocatorWorkloadPlan.ACTIVE_POPULATIONS).containsExactly(10_000, 100_000);
         assertThat(M3AllocatorWorkloadPlan.METADATA_LATENCY_P99_MILLIS).containsExactly(1, 5, 10, 25);
         assertThat(M3AllocatorWorkloadPlan.OFFERED_RATES).containsExactly(200, 250, 333, 500, 750, 1000);
+        assertThat(M3AllocatorWorkloadPlan.V3_OFFERED_RATES)
+                .containsExactly(200, 250, 267, 333, 400, 500, 600, 750, 800, 1000);
         assertThat(M3AllocatorWorkloadPlan.BROKER_ACTORS).isEqualTo(4);
         assertThat(M3AllocatorWorkloadPlan.WORKER_THREADS).isEqualTo(96);
         assertThat(M3AllocatorWorkloadPlan.BYTE_PAYLOAD_BYTES).isEqualTo(65_536);
@@ -56,6 +59,29 @@ class M3AllocatorWorkloadPlanTest {
                 .isEqualTo(30_000_000L);
         assertThat(AllocatorEvidenceContextV1.massTakeoverRecoveryBoundMicros(100_000))
                 .isEqualTo(60_000_000L);
+    }
+
+    @Test
+    void v3DerivedRatesUseTheFrozenScheduleWithoutRelaxingTheV1Entry() {
+        assertThatThrownBy(() -> M3AllocatorWorkloadPlan.requests(10_000, 800))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ADR 0094");
+        assertThatThrownBy(() -> M3AllocatorWorkloadPlan.v3Requests(10_000, 801))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("V3 offered rate");
+
+        for (int rate : List.of(800, 600, 400, 267)) {
+            List<M3AllocatorWorkloadPlan.PlannedRequest> requests = collectV3(10_000, rate);
+            assertThat(requests).hasSize(Math.multiplyExact(40, rate));
+            assertThat(requests.subList(0, Math.multiplyExact(10, rate)))
+                    .allMatch(request -> request.phase() == M3AllocatorWorkloadPlan.Phase.WARM_UP);
+            assertThat(requests.subList(Math.multiplyExact(10, rate), Math.multiplyExact(20, rate)))
+                    .allMatch(request -> request.phase() == M3AllocatorWorkloadPlan.Phase.MEASURED_STEADY);
+            assertThat(requests.subList(Math.multiplyExact(20, rate), requests.size()))
+                    .allMatch(request -> request.phase() == M3AllocatorWorkloadPlan.Phase.MEASURED_STORM);
+            assertThat(requests.get(requests.size() - 1).arrivalOffsetMicros()).isLessThan(40_000_000L);
+            assertThat(M3AllocatorWorkloadPlan.v3MeasuredRequestCount(rate)).isEqualTo(30 * rate);
+        }
     }
 
     @Test
@@ -105,6 +131,12 @@ class M3AllocatorWorkloadPlanTest {
     private static List<M3AllocatorWorkloadPlan.PlannedRequest> collect(int population, int rate) {
         List<M3AllocatorWorkloadPlan.PlannedRequest> requests = new ArrayList<>();
         M3AllocatorWorkloadPlan.requests(population, rate).forEach(requests::add);
+        return List.copyOf(requests);
+    }
+
+    private static List<M3AllocatorWorkloadPlan.PlannedRequest> collectV3(int population, int rate) {
+        List<M3AllocatorWorkloadPlan.PlannedRequest> requests = new ArrayList<>();
+        M3AllocatorWorkloadPlan.v3Requests(population, rate).forEach(requests::add);
         return List.copyOf(requests);
     }
 }

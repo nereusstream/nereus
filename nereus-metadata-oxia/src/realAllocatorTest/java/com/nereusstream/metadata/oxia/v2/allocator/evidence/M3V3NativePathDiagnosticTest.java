@@ -25,6 +25,12 @@ class M3V3NativePathDiagnosticTest {
         assertThat(M3V3NativeIntervalRuntime.executionModel())
                 .isEqualTo(AllocatorNativeExecutionProfileV3.MODEL);
         assertThat(M3V3NativeIntervalRuntime.hiddenDispatchQueue()).isZero();
+        for (int derivedRate : List.of(800, 600, 400, 267)) {
+            assertThat(M3V3NativeIntervalRuntime.schedule(10_000, derivedRate))
+                    .hasSize(Math.multiplyExact(40, derivedRate));
+            assertThat(M3V3RealFormalActionRuntime.candidateSchedule(10_000, derivedRate))
+                    .hasSize(Math.multiplyExact(40, derivedRate));
+        }
         assertThat(AllocatorNativeExecutionProfileV3.NATIVE_BRIDGE_WORKERS).isZero();
         assertThat(AllocatorNativeExecutionProfileV3.NATIVE_BRIDGE_QUEUE_CAPACITY).isZero();
 

@@ -75,6 +75,24 @@ public final class AllocatorEvidenceScheduleV1 {
         return new ArrivalCursor(offeredRate);
     }
 
+    /**
+     * Returns the unchanged V1 arrival schedule for a V3 fixed or exact-derived rate.
+     *
+     * <p>The V1 entry above remains closed to the six ADR-0094 rates. V3 adds a logical
+     * exact-derived slot, so its runtime entry admits only values that can be rebuilt from one of
+     * those six native baselines using the accepted V3 derivation.</p>
+     */
+    public static ArrivalCursor arrivalCursorV3(int offeredRate) {
+        boolean fixed = AllocatorEvidenceContextV1.OFFERED_RATES.contains(offeredRate);
+        boolean derived = AllocatorEvidenceContextV1.OFFERED_RATES.stream()
+                .mapToInt(AllocatorCampaignV3::derivedRate)
+                .anyMatch(rate -> rate == offeredRate);
+        if (!fixed && !derived) {
+            throw new IllegalArgumentException("allocator V3 evidence offered rate is not frozen or exact-derived");
+        }
+        return new ArrivalCursor(offeredRate);
+    }
+
     public static final class ArrivalCursor {
         private final int offeredRate;
         private long ordinal;
