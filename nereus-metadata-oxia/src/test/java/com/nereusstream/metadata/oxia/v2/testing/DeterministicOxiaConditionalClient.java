@@ -16,6 +16,7 @@ package com.nereusstream.metadata.oxia.v2.testing;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
+import com.nereusstream.metadata.oxia.v2.mutation.MutationAcknowledgement;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import io.oxia.client.api.exceptions.KeyAlreadyExistsException;
 import io.oxia.client.api.exceptions.UnexpectedVersionIdException;
@@ -106,6 +107,16 @@ public final class DeterministicOxiaConditionalClient implements OxiaConditional
     }
 
     @Override
+    public CompletionStage<Optional<MutationAcknowledgement>> createIfAbsentAcknowledged(
+            String key, CanonicalBytes storedBytes) {
+        createCount++;
+        if (records.containsKey(key)) {
+            return CompletableFuture.failedFuture(new KeyAlreadyExistsException(key));
+        }
+        return applyAcknowledged(key, storedBytes, 0);
+    }
+
+    @Override
     public CompletionStage<Void> compareAndSet(String key, CanonicalBytes storedBytes, long expectedVersionId) {
         casCount++;
         AuthorityRecord current = records.get(key);
@@ -113,6 +124,17 @@ public final class DeterministicOxiaConditionalClient implements OxiaConditional
             return CompletableFuture.failedFuture(new UnexpectedVersionIdException(key, expectedVersionId));
         }
         return apply(key, storedBytes, Math.addExact(current.versionId(), 1));
+    }
+
+    @Override
+    public CompletionStage<Optional<MutationAcknowledgement>> compareAndSetAcknowledged(
+            String key, CanonicalBytes storedBytes, long expectedVersionId) {
+        casCount++;
+        AuthorityRecord current = records.get(key);
+        if (current == null || current.versionId() != expectedVersionId) {
+            return CompletableFuture.failedFuture(new UnexpectedVersionIdException(key, expectedVersionId));
+        }
+        return applyAcknowledged(key, storedBytes, Math.addExact(current.versionId(), 1));
     }
 
     private CompletionStage<Void> apply(String key, CanonicalBytes requestedBytes, long version) {
@@ -130,7 +152,23 @@ public final class DeterministicOxiaConditionalClient implements OxiaConditional
         return CompletableFuture.completedFuture(null);
     }
 
-    private static CompletionStage<Void> responseLoss() {
+    private CompletionStage<Optional<MutationAcknowledgement>> applyAcknowledged(
+            String key, CanonicalBytes requestedBytes, long version) {
+        MutationMode mode = nextMutationMode;
+        nextMutationMode = MutationMode.NORMAL;
+        if (mode == MutationMode.RESPONSE_LOSS_WITHOUT_APPLY) {
+            return responseLoss();
+        }
+        CanonicalBytes storedBytes =
+                mode == MutationMode.SUCCESS_WITH_DIFFERENT_BYTES ? differentSuccessBytes : requestedBytes;
+        records.put(key, new AuthorityRecord(key, storedBytes, version));
+        if (mode == MutationMode.APPLY_THEN_RESPONSE_LOSS) {
+            return responseLoss();
+        }
+        return CompletableFuture.completedFuture(Optional.of(new MutationAcknowledgement(key, version)));
+    }
+
+    private static <T> CompletionStage<T> responseLoss() {
         return CompletableFuture.failedFuture(new IllegalStateException("scripted response loss"));
     }
 }

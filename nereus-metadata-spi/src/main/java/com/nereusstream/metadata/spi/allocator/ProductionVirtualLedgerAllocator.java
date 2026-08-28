@@ -210,7 +210,7 @@ public final class ProductionVirtualLedgerAllocator {
                                 exactCell.value(), exactHead.value(), ledgerDescriptorDigest)
                         : AllocatorProtocolV1.candidate(exactHead.value(), ledgerDescriptorDigest);
         if (!requireAuthorityReread) {
-            return store.createNode(
+            return store.createNodeAfterStoreObservedRangeAuthorities(
                     exactCell.value().ledgerIdCompatibilityNamespaceId(),
                     exactCell.value().sliceAssignmentId(),
                     candidate);
@@ -261,7 +261,7 @@ public final class ProductionVirtualLedgerAllocator {
         if (!requireAuthorityReread) {
             return successor.equals(exactHead.value())
                     ? unchanged(exactHead)
-                    : store.compareAndSetHead(
+                    : store.compareAndSetHeadAfterStoreObservedRangeNode(
                             exactCell.value().ledgerIdCompatibilityNamespaceId(),
                             exactCell.value().sliceAssignmentId(),
                             exactHead,

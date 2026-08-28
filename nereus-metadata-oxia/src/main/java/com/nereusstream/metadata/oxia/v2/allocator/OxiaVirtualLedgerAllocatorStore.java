@@ -150,6 +150,34 @@ public final class OxiaVirtualLedgerAllocatorStore implements PulsarVirtualLedge
     }
 
     @Override
+    public CompletionStage<ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1>>
+            compareAndSetHeadAfterStoreObservedRangeNode(
+                    Sha256Digest namespaceId,
+                    Sha256Digest sliceAssignmentId,
+                    VersionedManagedLedgerAllocatorHeadV1 exactPredecessor,
+                    ManagedLedgerAllocatorHeadV1 candidate) {
+        return AdapterFutures.localValidation(() -> {
+            admission.requireOpen();
+            Objects.requireNonNull(exactPredecessor, "exactPredecessor");
+            Objects.requireNonNull(candidate, "candidate");
+            if (!exactPredecessor.value().managedLedgerIncarnation().equals(candidate.managedLedgerIncarnation())) {
+                throw new IllegalArgumentException("allocator Head predecessor and candidate incarnations differ");
+            }
+            String key = keys.headKey(namespaceId, sliceAssignmentId, candidate.managedLedgerIncarnation());
+            if (!exactPredecessor.ledgerIdCompatibilityNamespaceId().equals(namespaceId)
+                    || !exactPredecessor.sliceAssignmentId().equals(sliceAssignmentId)
+                    || !exactPredecessor.authorityKey().equals(key)) {
+                throw new IllegalArgumentException("allocator Head predecessor provenance differs from exact key");
+            }
+            return mutationEngine.compareAndSetUsingAcknowledgedSuccess(
+                    key,
+                    AllocatorWireV1.encodeHead(candidate),
+                    MetadataVersionMapper.toOxia(exactPredecessor.metadataVersion()),
+                    headResolver(key, namespaceId, sliceAssignmentId, candidate, exactPredecessor));
+        });
+    }
+
+    @Override
     public CompletionStage<Optional<VersionedVirtualLedgerCandidateNodeV1>> readNode(
             Sha256Digest namespaceId,
             Sha256Digest sliceAssignmentId,
@@ -174,6 +202,21 @@ public final class OxiaVirtualLedgerAllocatorStore implements PulsarVirtualLedge
                     namespaceId, sliceAssignmentId, candidate.managedLedgerIncarnation(), candidate.ledgerId());
             CanonicalBytes bytes = AllocatorWireV1.encodeNode(candidate);
             return mutationEngine.create(key, bytes, nodeResolver(key, namespaceId, sliceAssignmentId, candidate));
+        });
+    }
+
+    @Override
+    public CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>>
+            createNodeAfterStoreObservedRangeAuthorities(
+                    Sha256Digest namespaceId, Sha256Digest sliceAssignmentId, VirtualLedgerCandidateNodeV1 candidate) {
+        return AdapterFutures.localValidation(() -> {
+            admission.requireOpen();
+            Objects.requireNonNull(candidate, "candidate");
+            String key = keys.nodeKey(
+                    namespaceId, sliceAssignmentId, candidate.managedLedgerIncarnation(), candidate.ledgerId());
+            CanonicalBytes bytes = AllocatorWireV1.encodeNode(candidate);
+            return mutationEngine.createUsingAcknowledgedSuccess(
+                    key, bytes, nodeResolver(key, namespaceId, sliceAssignmentId, candidate));
         });
     }
 

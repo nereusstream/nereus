@@ -222,12 +222,14 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0127-v2-m3-allocator-v4-range-authority-proof-concurrency-amendment.md"
     "$repo_root/docs/decisions/0128-v2-m3-allocator-v4-25ms-operation-attribution-amendment.md"
     "$repo_root/docs/decisions/0129-v2-m3-allocator-v4-installed-range-proof-reuse-amendment.md"
+    "$repo_root/docs/decisions/0130-v2-m3-allocator-v4-applied-mutation-acknowledgement-amendment.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b2-native-executor-current-source-recertification.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-terminal-drain-formal-entry.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-range-latency-attribution.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-range-authority-proof-concurrency.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-25ms-operation-attribution.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-installed-range-proof-reuse.md"
+    "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-applied-mutation-acknowledgement.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"

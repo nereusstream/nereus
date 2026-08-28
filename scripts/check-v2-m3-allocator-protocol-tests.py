@@ -102,6 +102,9 @@ CONDITIONAL_MUTATION_ENGINE = (
     / "mutation"
     / "ConditionalMutationEngine.java"
 )
+OXIA_CONDITIONAL_CLIENT = CONDITIONAL_MUTATION_ENGINE.with_name("AsyncOxiaConditionalClient.java")
+OXIA_ALLOCATOR_STORE = CONDITIONAL_MUTATION_ENGINE.parents[1] / "allocator" / "OxiaVirtualLedgerAllocatorStore.java"
+ALLOCATOR_STORE = PRODUCTION_ALLOCATOR.with_name("PulsarVirtualLedgerAllocatorStore.java")
 FORMAL_CAMPAIGN = (
     ROOT
     / "nereus-metadata-oxia"
@@ -120,11 +123,14 @@ FORMAL_CAMPAIGN = (
 
 
 class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
-    def test_v4_installed_range_fast_path_reuses_only_store_observed_authority(self) -> None:
+    def test_v4_installed_range_fast_path_reuses_only_exact_store_and_mutation_authority(self) -> None:
         allocator = PRODUCTION_ALLOCATOR.read_text()
         workflow = BOUNDED_WORKFLOW.read_text()
         workflow_test = BOUNDED_WORKFLOW_TEST.read_text()
         mutation_engine = CONDITIONAL_MUTATION_ENGINE.read_text()
+        conditional_client = OXIA_CONDITIONAL_CLIENT.read_text()
+        oxia_store = OXIA_ALLOCATOR_STORE.read_text()
+        allocator_store = ALLOCATOR_STORE.read_text()
 
         self.assertIn("createCandidateAfterStoreObservedRangeAuthorities", allocator)
         self.assertIn("publishCandidateAfterStoreObservedRangeNode", allocator)
@@ -142,9 +148,20 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             workflow_test,
         )
         self.assertIn("directAllocatorApiRetainsIndependentCellHeadAndNodeProofReads", workflow_test)
+        self.assertIn("createNodeAfterStoreObservedRangeAuthorities", allocator_store)
+        self.assertIn("compareAndSetHeadAfterStoreObservedRangeNode", allocator_store)
+        self.assertIn("createUsingAcknowledgedSuccess", oxia_store)
+        self.assertIn("compareAndSetUsingAcknowledgedSuccess", oxia_store)
+        self.assertIn("createIfAbsentAcknowledged", conditional_client)
+        self.assertIn("compareAndSetAcknowledged", conditional_client)
+        self.assertIn("Oxia conditional mutation returned a different authority key", conditional_client)
+        self.assertIn("createUsingAcknowledgedSuccess", mutation_engine)
+        self.assertIn("compareAndSetUsingAcknowledgedSuccess", mutation_engine)
+        self.assertIn("exactAcknowledgement", mutation_engine)
         self.assertIn("mutationAttempt(() -> client.createIfAbsent", mutation_engine)
         self.assertIn("mutationAttempt(() -> client.compareAndSet", mutation_engine)
         self.assertGreaterEqual(mutation_engine.count("thenCompose(attempt -> reread(key)"), 2)
+        self.assertGreaterEqual(mutation_engine.count("return reread(key).thenApply"), 2)
 
     def test_v4_plan_formal_entry_and_native_rows_are_independently_source_bound(self) -> None:
         first = subprocess.run(
@@ -718,7 +735,7 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             root = Path(temporary)
             diagnostic = root / "diagnostic"
             diagnostic.mkdir()
-            receipt = diagnostic / "v4-range1024-10ms-formal-sequence.json"
+            receipt = diagnostic / "v4-range1024-25ms-formal-sequence.json"
             receipt.write_text(
                 '{"diagnosticOnly":true,"authority":false,"selectionEligible":false}\n',
                 encoding="utf-8",
@@ -770,6 +787,8 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             self.assertEqual({"tests": 2, "failures": 1, "errors": 0, "skipped": 0, "suites": 1}, identity["junit"])
             self.assertFalse(identity["nadvPresent"])
             self.assertFalse(identity["promotableInput"])
+            self.assertEqual(receipt.name, identity["rangeAttributionRelativePath"])
+            self.assertEqual(hashlib.sha256(receipt.read_bytes()).hexdigest(), identity["rangeAttributionSha256"])
             self.assertEqual(receipt.read_bytes(), (archive / "payload" / "diagnostic-output" / receipt.name).read_bytes())
             self.assertEqual(xml.read_bytes(), (archive / "payload" / "junit" / xml.name).read_bytes())
             repeated = subprocess.run(command, check=False, capture_output=True, text=True)

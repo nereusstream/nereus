@@ -51,6 +51,31 @@ class ConditionalMutationEngineTest {
     }
 
     @Test
+    void acknowledgedCreateSuccessUsesCommittedVersionWithoutReread() {
+        var result = engine.createUsingAcknowledgedSuccess(KEY, CANDIDATE, resolver())
+                .toCompletableFuture()
+                .join();
+
+        assertThat(result.outcome()).isEqualTo(CreateMutationOutcome.CREATED);
+        assertThat(result.exactSnapshot()).contains(CANDIDATE);
+        assertThat(client.createCount()).isOne();
+        assertThat(client.readCount()).isZero();
+    }
+
+    @Test
+    void acknowledgedCreateResponseLossStillConvergesThroughReread() {
+        client.nextMutation(MutationMode.APPLY_THEN_RESPONSE_LOSS);
+
+        var result = engine.createUsingAcknowledgedSuccess(KEY, CANDIDATE, resolver())
+                .toCompletableFuture()
+                .join();
+
+        assertThat(result.outcome()).isEqualTo(CreateMutationOutcome.EXISTING_EXACT);
+        assertThat(client.createCount()).isOne();
+        assertThat(client.readCount()).isOne();
+    }
+
+    @Test
     void existingExactConditionFailureIsClosed() {
         client.seed(KEY, CANDIDATE, 4);
 
@@ -135,6 +160,34 @@ class ConditionalMutationEngineTest {
                 .join();
 
         assertThat(result.outcome()).isEqualTo(ConditionalCasOutcome.APPLIED_EXACT);
+        assertThat(client.casCount()).isOne();
+        assertThat(client.readCount()).isOne();
+    }
+
+    @Test
+    void acknowledgedCasSuccessUsesCommittedVersionWithoutReread() {
+        client.seed(KEY, PREDECESSOR, 7);
+
+        var result = engine.compareAndSetUsingAcknowledgedSuccess(KEY, CANDIDATE, 7, resolver())
+                .toCompletableFuture()
+                .join();
+
+        assertThat(result.outcome()).isEqualTo(ConditionalCasOutcome.APPLIED_EXACT);
+        assertThat(result.exactSnapshot()).contains(CANDIDATE);
+        assertThat(client.casCount()).isOne();
+        assertThat(client.readCount()).isZero();
+    }
+
+    @Test
+    void acknowledgedCasConflictStillConvergesThroughReread() {
+        client.seed(KEY, PREDECESSOR, 7);
+
+        var result = engine.compareAndSetUsingAcknowledgedSuccess(KEY, CANDIDATE, 6, resolver())
+                .toCompletableFuture()
+                .join();
+
+        assertThat(result.outcome()).isEqualTo(ConditionalCasOutcome.PREDECESSOR_UNCHANGED);
+        assertThat(result.exactSnapshot()).contains(PREDECESSOR);
         assertThat(client.casCount()).isOne();
         assertThat(client.readCount()).isOne();
     }

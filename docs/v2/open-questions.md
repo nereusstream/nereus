@@ -927,6 +927,12 @@ chain. The accepted correction removes only duplicate workflow-owned proof pairs
 whether a fresh exact-source 23-test/nine-suite diagnostic proves both 25ms rows at zero drop/failure/timeout. Neither
 the diagnostic nor implementation changes selection state.
 
+ADR 0130 closes that empirical question negatively: exact `ad9dce4f...` reaches six operations and zero reconcile
+retry on derived-800 but still drops 2,882 offers. Its immutable archive is diagnostic-only. The next bounded question
+is whether retaining the pinned Oxia successful conditional-put key/version removes both redundant success gets and
+proves the unchanged 25ms rows at zero drop/failure/timeout in a canonical 23-test/nine-suite NADV4. Selection remains
+open and no historical evidence is reinterpreted.
+
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

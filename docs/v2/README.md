@@ -383,6 +383,14 @@ Accepted decisions:
 - [ADR 0120: M3 V3 per-actor offer-producer amendment](../decisions/0120-v2-m3-allocator-v3-per-actor-offer-producer-amendment.md)
 - [ADR 0121: M3 V3 Native warm-up pre-admission observation amendment](../decisions/0121-v2-m3-allocator-v3-native-warmup-preadmission-observation-amendment.md)
 - [ADR 0122: M3 V3 final-offer dispatch-precision amendment](../decisions/0122-v2-m3-allocator-v3-final-offer-dispatch-precision-amendment.md)
+- [ADR 0123: M3 V3 candidate cutoff terminal-telemetry amendment](../decisions/0123-v2-m3-allocator-v3-candidate-cutoff-terminal-telemetry-amendment.md)
+- [ADR 0124: M3 V3 diagnostic suite worker-isolation amendment](../decisions/0124-v2-m3-allocator-v3-diagnostic-suite-worker-isolation-amendment.md)
+- [ADR 0125: M3 V4 terminal-admission drain amendment](../decisions/0125-v2-m3-allocator-v4-terminal-admission-drain-amendment.md)
+- [ADR 0126: M3 V4 RANGE latency-attribution amendment](../decisions/0126-v2-m3-allocator-v4-range-latency-attribution-amendment.md)
+- [ADR 0127: M3 V4 RANGE authority-proof concurrency amendment](../decisions/0127-v2-m3-allocator-v4-range-authority-proof-concurrency-amendment.md)
+- [ADR 0128: M3 V4 25ms operation-attribution amendment](../decisions/0128-v2-m3-allocator-v4-25ms-operation-attribution-amendment.md)
+- [ADR 0129: M3 V4 installed-RANGE proof-reuse amendment](../decisions/0129-v2-m3-allocator-v4-installed-range-proof-reuse-amendment.md)
+- [ADR 0130: M3 V4 applied-mutation acknowledgement amendment](../decisions/0130-v2-m3-allocator-v4-applied-mutation-acknowledgement-amendment.md)
 
 ## Open design gates
 
@@ -639,6 +647,13 @@ No V4 protocol, threshold, plan, selection rule, or historical evidence changes.
 RANGE proof chain drives 289–565ms workflow p99. Only the workflow-owned store-observed steady-state path reuses its
 exact Cell/Head and create-reread node, reducing ten operations/seven stages to six/five. Mutation same-key rereads,
 public allocator proof reads, conflict/fault/renewal paths, V4 plan, thresholds, and historical evidence are preserved.
+
+[ADR 0130](../decisions/0130-v2-m3-allocator-v4-applied-mutation-acknowledgement-amendment.md) preserves the resulting
+exact `ad9dce4f...` diagnostic and its seven-file archive. Six operations/five stages still drop 2,882 derived-800
+offers at 25ms despite zero retry/failure/timeout. The pinned Oxia success result already binds the committed key and
+version, so only the store-observed installed-RANGE path may use it as the exact mutation snapshot. Missing/failed or
+conflicting responses retain same-key reread; public/STRICT/renewal/fault paths and every V4 evidence threshold remain
+unchanged.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

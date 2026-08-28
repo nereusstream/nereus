@@ -721,6 +721,12 @@ Only the just-store-observed installed-grant path reuses exact Cell/Head and the
 renewal/conflict/fault paths, and mutation rereads remain proofful. The V4 diagnostic inventory stays 23 tests/nine
 suites and no protocol/evidence/selection identity changes.
 
+[ADR 0130](../../../decisions/0130-v2-m3-allocator-v4-applied-mutation-acknowledgement-amendment.md) preserves the
+exact `ad9dce4f...` 25ms diagnostic and its byte-verified archive. Its six-operation path still drops derived-800
+offers. The [applied-mutation acknowledgement record](stage-b-v4-applied-mutation-acknowledgement.md) keeps the exact
+successful Oxia key/version instead of discarding it and issuing a redundant success get, only for the just-observed
+installed-RANGE branch. All response-unknown/conflict paths reread, and the V4 diagnostic remains 23 tests/nine suites.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

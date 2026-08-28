@@ -24,5 +24,15 @@ public interface OxiaConditionalClient {
 
     CompletionStage<Void> createIfAbsent(String key, CanonicalBytes storedBytes);
 
+    default CompletionStage<Optional<MutationAcknowledgement>> createIfAbsentAcknowledged(
+            String key, CanonicalBytes storedBytes) {
+        return createIfAbsent(key, storedBytes).thenApply(ignored -> Optional.empty());
+    }
+
     CompletionStage<Void> compareAndSet(String key, CanonicalBytes storedBytes, long expectedVersionId);
+
+    default CompletionStage<Optional<MutationAcknowledgement>> compareAndSetAcknowledged(
+            String key, CanonicalBytes storedBytes, long expectedVersionId) {
+        return compareAndSet(key, storedBytes, expectedVersionId).thenApply(ignored -> Optional.empty());
+    }
 }

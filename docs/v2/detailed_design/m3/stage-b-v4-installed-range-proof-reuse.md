@@ -1,7 +1,7 @@
 # Stage B V4 installed-RANGE proof reuse
 
 - Design status: Accepted through ADR 0129
-- Runtime status: implementation pending exact-source diagnostic recertification
+- Runtime status: exact `ad9dce4f...` diagnostic proved six operations but insufficient 25ms capacity
 - Selection authority: none
 
 ## Measured boundary
@@ -37,3 +37,7 @@ contracts prove their Cell/Head/node proof reads are unchanged.
 The full exact-source V4 diagnostic remains 23 tests/nine suites. The 25ms receipt must show the reduced operation
 inventory and zero drop/failure/timeout for both RANGE-1024 rows before another formal campaign. Historical V4 results
 and the plan/qualification/selection contract are unchanged.
+
+The exact `ad9dce4f...` execution confirmed six operations per uncontended derived workflow but retained 2,882 drops.
+ADR 0130 therefore supersedes only the clean-success mutation-reread portion through the server's exact applied
+key/version acknowledgement. This record remains authoritative for the earlier duplicate-proof removal.

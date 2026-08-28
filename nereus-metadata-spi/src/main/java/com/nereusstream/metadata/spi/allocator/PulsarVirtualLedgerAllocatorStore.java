@@ -49,6 +49,15 @@ public interface PulsarVirtualLedgerAllocatorStore {
             VersionedManagedLedgerAllocatorHeadV1 exactPredecessor,
             ManagedLedgerAllocatorHeadV1 candidate);
 
+    default CompletionStage<ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1>>
+            compareAndSetHeadAfterStoreObservedRangeNode(
+                    Sha256Digest namespaceId,
+                    Sha256Digest sliceAssignmentId,
+                    VersionedManagedLedgerAllocatorHeadV1 exactPredecessor,
+                    ManagedLedgerAllocatorHeadV1 candidate) {
+        return compareAndSetHead(namespaceId, sliceAssignmentId, exactPredecessor, candidate);
+    }
+
     CompletionStage<Optional<VersionedVirtualLedgerCandidateNodeV1>> readNode(
             Sha256Digest namespaceId,
             Sha256Digest sliceAssignmentId,
@@ -57,4 +66,10 @@ public interface PulsarVirtualLedgerAllocatorStore {
 
     CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>> createNode(
             Sha256Digest namespaceId, Sha256Digest sliceAssignmentId, VirtualLedgerCandidateNodeV1 candidate);
+
+    default CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>>
+            createNodeAfterStoreObservedRangeAuthorities(
+                    Sha256Digest namespaceId, Sha256Digest sliceAssignmentId, VirtualLedgerCandidateNodeV1 candidate) {
+        return createNode(namespaceId, sliceAssignmentId, candidate);
+    }
 }

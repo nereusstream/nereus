@@ -39,11 +39,40 @@ public final class ConditionalMutationEngine {
                 .thenCompose(attempt -> reread(key).thenApply(read -> resolveCreate(attempt, read, resolver)));
     }
 
+    public <T> CompletionStage<CreateMutationResult<T>> createUsingAcknowledgedSuccess(
+            String key, CanonicalBytes candidateBytes, ExactRecordResolver<T> resolver) {
+        Objects.requireNonNull(resolver, "resolver");
+        return acknowledgedMutationAttempt(() -> client.createIfAbsentAcknowledged(key, candidateBytes))
+                .thenCompose(attempt -> {
+                    Optional<MutationAcknowledgement> acknowledgement = exactAcknowledgement(key, attempt);
+                    if (acknowledgement.isPresent()) {
+                        return CompletableFuture.completedFuture(resolveAcknowledgedCreate(
+                                key, candidateBytes, acknowledgement.orElseThrow(), resolver));
+                    }
+                    return reread(key).thenApply(read -> resolveCreate(attempt, read, resolver));
+                });
+    }
+
     public <T> CompletionStage<ConditionalCasResult<T>> compareAndSet(
             String key, CanonicalBytes candidateBytes, long expectedVersionId, ExactRecordResolver<T> resolver) {
         Objects.requireNonNull(resolver, "resolver");
         return mutationAttempt(() -> client.compareAndSet(key, candidateBytes, expectedVersionId))
                 .thenCompose(attempt -> reread(key).thenApply(read -> resolveCas(attempt, read, resolver)));
+    }
+
+    public <T> CompletionStage<ConditionalCasResult<T>> compareAndSetUsingAcknowledgedSuccess(
+            String key, CanonicalBytes candidateBytes, long expectedVersionId, ExactRecordResolver<T> resolver) {
+        Objects.requireNonNull(resolver, "resolver");
+        return acknowledgedMutationAttempt(
+                        () -> client.compareAndSetAcknowledged(key, candidateBytes, expectedVersionId))
+                .thenCompose(attempt -> {
+                    Optional<MutationAcknowledgement> acknowledgement = exactAcknowledgement(key, attempt);
+                    if (acknowledgement.isPresent()) {
+                        return CompletableFuture.completedFuture(
+                                resolveAcknowledgedCas(key, candidateBytes, acknowledgement.orElseThrow(), resolver));
+                    }
+                    return reread(key).thenApply(read -> resolveCas(attempt, read, resolver));
+                });
     }
 
     private CompletionStage<MutationAttempt> mutationAttempt(MutationDispatch dispatch) {
@@ -59,6 +88,57 @@ public final class ConditionalMutationEngine {
             }
             return MutationAttempt.failed(failureClassifier.classify(failure));
         });
+    }
+
+    private CompletionStage<MutationAttempt> acknowledgedMutationAttempt(AcknowledgedMutationDispatch dispatch) {
+        CompletionStage<Optional<MutationAcknowledgement>> dispatched;
+        try {
+            dispatched = Objects.requireNonNull(dispatch.run(), "acknowledged conditional mutation stage");
+        } catch (RuntimeException failure) {
+            dispatched = CompletableFuture.failedFuture(failure);
+        }
+        return dispatched.handle((acknowledgement, failure) -> {
+            if (failure == null) {
+                return MutationAttempt.success(
+                        Objects.requireNonNull(acknowledgement, "conditional mutation acknowledgement"));
+            }
+            return MutationAttempt.failed(failureClassifier.classify(failure));
+        });
+    }
+
+    private static Optional<MutationAcknowledgement> exactAcknowledgement(String key, MutationAttempt attempt) {
+        if (!attempt.succeeded()) {
+            return Optional.empty();
+        }
+        return attempt.acknowledgement().filter(value -> value.key().equals(key));
+    }
+
+    private static <T> CreateMutationResult<T> resolveAcknowledgedCreate(
+            String key,
+            CanonicalBytes candidateBytes,
+            MutationAcknowledgement acknowledgement,
+            ExactRecordResolver<T> resolver) {
+        Decoded<T> decoded = decode(
+                ReadAttempt.completed(
+                        Optional.of(new AuthorityRecord(key, candidateBytes, acknowledgement.versionId()))),
+                resolver);
+        return decoded.valid() && resolver.isCandidateExact(decoded.snapshot())
+                ? CreateMutationResult.created(decoded.snapshot())
+                : CreateMutationResult.indeterminate();
+    }
+
+    private static <T> ConditionalCasResult<T> resolveAcknowledgedCas(
+            String key,
+            CanonicalBytes candidateBytes,
+            MutationAcknowledgement acknowledgement,
+            ExactRecordResolver<T> resolver) {
+        Decoded<T> decoded = decode(
+                ReadAttempt.completed(
+                        Optional.of(new AuthorityRecord(key, candidateBytes, acknowledgement.versionId()))),
+                resolver);
+        return decoded.valid() && resolver.isCandidateExact(decoded.snapshot())
+                ? ConditionalCasResult.appliedExact(decoded.snapshot())
+                : ConditionalCasResult.indeterminate();
     }
 
     private CompletionStage<ReadAttempt> reread(String key) {
@@ -131,13 +211,29 @@ public final class ConditionalMutationEngine {
         CompletionStage<Void> run();
     }
 
-    private record MutationAttempt(boolean succeeded, MutationFailureClassifier.Kind failureKind) {
+    @FunctionalInterface
+    private interface AcknowledgedMutationDispatch {
+        CompletionStage<Optional<MutationAcknowledgement>> run();
+    }
+
+    private record MutationAttempt(
+            boolean succeeded,
+            MutationFailureClassifier.Kind failureKind,
+            Optional<MutationAcknowledgement> acknowledgement) {
+        private MutationAttempt {
+            Objects.requireNonNull(acknowledgement, "acknowledgement");
+        }
+
         private static MutationAttempt success() {
-            return new MutationAttempt(true, null);
+            return success(Optional.empty());
+        }
+
+        private static MutationAttempt success(Optional<MutationAcknowledgement> acknowledgement) {
+            return new MutationAttempt(true, null, acknowledgement);
         }
 
         private static MutationAttempt failed(MutationFailureClassifier.Kind kind) {
-            return new MutationAttempt(false, Objects.requireNonNull(kind, "kind"));
+            return new MutationAttempt(false, Objects.requireNonNull(kind, "kind"), Optional.empty());
         }
     }
 

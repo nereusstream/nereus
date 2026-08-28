@@ -46,6 +46,15 @@ public final class AsyncOxiaConditionalClient implements OxiaConditionalClient {
     }
 
     @Override
+    public CompletionStage<Optional<MutationAcknowledgement>> createIfAbsentAcknowledged(
+            String key, CanonicalBytes storedBytes) {
+        requireKey(key);
+        Objects.requireNonNull(storedBytes, "storedBytes");
+        return client.put(key, storedBytes.toByteArray(), Set.of(PutOption.IfRecordDoesNotExist))
+                .thenApply(result -> Optional.of(toAcknowledgement(key, result)));
+    }
+
+    @Override
     public CompletionStage<Void> compareAndSet(String key, CanonicalBytes storedBytes, long expectedVersionId) {
         requireKey(key);
         Objects.requireNonNull(storedBytes, "storedBytes");
@@ -54,6 +63,27 @@ public final class AsyncOxiaConditionalClient implements OxiaConditionalClient {
         }
         return client.put(key, storedBytes.toByteArray(), Set.of(PutOption.IfVersionIdEquals(expectedVersionId)))
                 .thenApply(ignored -> null);
+    }
+
+    @Override
+    public CompletionStage<Optional<MutationAcknowledgement>> compareAndSetAcknowledged(
+            String key, CanonicalBytes storedBytes, long expectedVersionId) {
+        requireKey(key);
+        Objects.requireNonNull(storedBytes, "storedBytes");
+        if (expectedVersionId < 0) {
+            throw new IllegalArgumentException("expectedVersionId must not be negative");
+        }
+        return client.put(key, storedBytes.toByteArray(), Set.of(PutOption.IfVersionIdEquals(expectedVersionId)))
+                .thenApply(result -> Optional.of(toAcknowledgement(key, result)));
+    }
+
+    private static MutationAcknowledgement toAcknowledgement(String expectedKey, io.oxia.client.api.PutResult result) {
+        Objects.requireNonNull(result, "Oxia conditional mutation result");
+        if (!expectedKey.equals(result.key())) {
+            throw new IllegalStateException("Oxia conditional mutation returned a different authority key");
+        }
+        Objects.requireNonNull(result.version(), "Oxia conditional mutation version");
+        return new MutationAcknowledgement(result.key(), result.version().versionId());
     }
 
     private static Optional<AuthorityRecord> toAuthorityRecord(String expectedKey, GetResult result) {

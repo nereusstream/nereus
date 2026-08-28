@@ -287,6 +287,8 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         assertThat(store.readCellCalls).isEqualTo(cellReadsBefore + 1);
         assertThat(store.readHeadCalls).isEqualTo(headReadsBefore + 1);
         assertThat(store.readNodeCalls).isEqualTo(nodeReadsBefore);
+        assertThat(store.rangeAcknowledgedNodeCreateCalls).isOne();
+        assertThat(store.rangeAcknowledgedHeadCasCalls).isOne();
     }
 
     @Test
@@ -528,6 +530,8 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         private int readHeadCalls;
         private int readNodeCalls;
         private int createNodeCalls;
+        private int rangeAcknowledgedNodeCreateCalls;
+        private int rangeAcknowledgedHeadCasCalls;
         private CompletableFuture<Optional<VersionedAllocatorCellStateV1>> delayedReadCell;
         private CompletableFuture<Optional<VersionedManagedLedgerAllocatorHeadV1>> delayedReadHead;
 
@@ -648,6 +652,17 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
         }
 
         @Override
+        public synchronized CompletionStage<ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1>>
+                compareAndSetHeadAfterStoreObservedRangeNode(
+                        Sha256Digest namespaceId,
+                        Sha256Digest sliceAssignmentId,
+                        VersionedManagedLedgerAllocatorHeadV1 predecessor,
+                        ManagedLedgerAllocatorHeadV1 candidate) {
+            rangeAcknowledgedHeadCasCalls++;
+            return compareAndSetHead(namespaceId, sliceAssignmentId, predecessor, candidate);
+        }
+
+        @Override
         public synchronized CompletionStage<Optional<VersionedVirtualLedgerCandidateNodeV1>> readNode(
                 Sha256Digest namespaceId,
                 Sha256Digest sliceAssignmentId,
@@ -702,6 +717,16 @@ class BoundedVirtualLedgerAllocatorWorkflowV2Test {
                 return CompletableFuture.completedFuture(CreateMutationResult.indeterminate());
             }
             return CompletableFuture.completedFuture(CreateMutationResult.created(exact));
+        }
+
+        @Override
+        public synchronized CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>>
+                createNodeAfterStoreObservedRangeAuthorities(
+                        Sha256Digest namespaceId,
+                        Sha256Digest sliceAssignmentId,
+                        VirtualLedgerCandidateNodeV1 candidate) {
+            rangeAcknowledgedNodeCreateCalls++;
+            return createNode(namespaceId, sliceAssignmentId, candidate);
         }
 
         private record PendingCellCas(

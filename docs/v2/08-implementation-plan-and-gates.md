@@ -275,6 +275,11 @@ ADR 0129 records the exact `d434f910...` measurement and accepts proof reuse onl
 RANGE steady-state branch. Initial authorities and both mutation same-key rereads remain, while two duplicate proof
 pairs are removed; the public API and every renewal/conflict/fault path stay proofful. A fresh pushed exact source must
 pass the complete 23-test/nine-suite NADV4 and prove the 25ms rows before formal execution.
+ADR 0130 records the exact `ad9dce4f...` result: the six-operation path has no retry/failure/timeout but still drops
+2,882 derived-800 offers. Only the same store-observed installed-RANGE branch may retain Oxia's exact successful
+key/version acknowledgement as its applied snapshot; every missing/failed/conflicting response still rereads. A new
+exact pushed source must prove four common-path operations, both 25ms rows at zero drop/failure/timeout, complete
+23-test/nine-suite canonical NADV4, and all source gates before formal execution.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

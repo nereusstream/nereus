@@ -30,6 +30,7 @@ import com.nereusstream.domain.registry.allocator.ManagedLedgerIncarnationIdV1;
 import com.nereusstream.domain.registry.allocator.VirtualLedgerCandidateNodeV1;
 import com.nereusstream.domain.registry.allocator.VirtualLedgerCellAllocatorStateV1;
 import com.nereusstream.metadata.oxia.v2.mutation.ConditionalMutationEngine;
+import com.nereusstream.metadata.oxia.v2.mutation.MetadataVersionMapper;
 import com.nereusstream.metadata.oxia.v2.mutation.MutationFailureClassifier;
 import com.nereusstream.metadata.oxia.v2.testing.DeterministicOxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.testing.DeterministicOxiaConditionalClient.MutationMode;
@@ -130,6 +131,63 @@ class OxiaVirtualLedgerAllocatorStoreTest {
                 .get()
                 .extracting(snapshot -> snapshot.value())
                 .isEqualTo(node);
+    }
+
+    @Test
+    void installedRangeAcknowledgementsReturnExactNodeAndHeadWithoutSuccessRereads() {
+        VirtualLedgerCellAllocatorStateV1 reserved =
+                AllocatorProtocolV1.reserve(initialCell, initialHead, digest("request"), 8);
+        ManagedLedgerAllocatorHeadV1 installed = AllocatorProtocolV1.installReservedRange(reserved, initialHead);
+        VirtualLedgerCandidateNodeV1 node = AllocatorProtocolV1.candidate(installed, digest("descriptor"));
+        int readsBeforeNode = client.readCount();
+
+        var exactNode = store.createNodeAfterStoreObservedRangeAuthorities(
+                        namespace(), assignment().sliceAssignmentId(), node)
+                .toCompletableFuture()
+                .join()
+                .exactSnapshot()
+                .orElseThrow();
+
+        assertThat(exactNode.value()).isEqualTo(node);
+        assertThat(MetadataVersionMapper.toOxia(exactNode.metadataVersion())).isZero();
+        assertThat(client.readCount()).isEqualTo(readsBeforeNode);
+
+        var predecessor = store.createHead(namespace(), assignment().sliceAssignmentId(), installed)
+                .toCompletableFuture()
+                .join()
+                .exactSnapshot()
+                .orElseThrow();
+        ManagedLedgerAllocatorHeadV1 successor = AllocatorProtocolV1.publish(installed, node);
+        int readsBeforeHead = client.readCount();
+
+        var exactHead = store.compareAndSetHeadAfterStoreObservedRangeNode(
+                        namespace(), assignment().sliceAssignmentId(), predecessor, successor)
+                .toCompletableFuture()
+                .join()
+                .exactSnapshot()
+                .orElseThrow();
+
+        assertThat(exactHead.value()).isEqualTo(successor);
+        assertThat(MetadataVersionMapper.toOxia(exactHead.metadataVersion())).isOne();
+        assertThat(client.readCount()).isEqualTo(readsBeforeHead);
+    }
+
+    @Test
+    void installedRangeAcknowledgementFailureStillUsesSameKeyReread() {
+        VirtualLedgerCellAllocatorStateV1 reserved =
+                AllocatorProtocolV1.reserve(initialCell, initialHead, digest("request-loss"), 8);
+        ManagedLedgerAllocatorHeadV1 installed = AllocatorProtocolV1.installReservedRange(reserved, initialHead);
+        VirtualLedgerCandidateNodeV1 node = AllocatorProtocolV1.candidate(installed, digest("descriptor-loss"));
+        client.nextMutation(MutationMode.APPLY_THEN_RESPONSE_LOSS);
+        int readsBefore = client.readCount();
+
+        var result = store.createNodeAfterStoreObservedRangeAuthorities(
+                        namespace(), assignment().sliceAssignmentId(), node)
+                .toCompletableFuture()
+                .join();
+
+        assertThat(result.outcome()).isEqualTo(CreateMutationOutcome.EXISTING_EXACT);
+        assertThat(client.readCount()).isEqualTo(readsBefore + 1);
     }
 
     @Test

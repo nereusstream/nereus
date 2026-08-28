@@ -1109,6 +1109,17 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
         }
 
         @Override
+        public CompletionStage<ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1>>
+                compareAndSetHeadAfterStoreObservedRangeNode(
+                        Sha256Digest namespaceId,
+                        Sha256Digest sliceAssignmentId,
+                        VersionedManagedLedgerAllocatorHeadV1 exactPredecessor,
+                        ManagedLedgerAllocatorHeadV1 candidate) {
+            return authorized(() -> delegate.compareAndSetHeadAfterStoreObservedRangeNode(
+                    namespaceId, sliceAssignmentId, exactPredecessor, candidate));
+        }
+
+        @Override
         public CompletionStage<Optional<VersionedVirtualLedgerCandidateNodeV1>> readNode(
                 Sha256Digest namespaceId,
                 Sha256Digest sliceAssignmentId,
@@ -1122,6 +1133,16 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
         public CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>> createNode(
                 Sha256Digest namespaceId, Sha256Digest sliceAssignmentId, VirtualLedgerCandidateNodeV1 candidate) {
             return authorized(() -> delegate.createNode(namespaceId, sliceAssignmentId, candidate));
+        }
+
+        @Override
+        public CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>>
+                createNodeAfterStoreObservedRangeAuthorities(
+                        Sha256Digest namespaceId,
+                        Sha256Digest sliceAssignmentId,
+                        VirtualLedgerCandidateNodeV1 candidate) {
+            return authorized(() ->
+                    delegate.createNodeAfterStoreObservedRangeAuthorities(namespaceId, sliceAssignmentId, candidate));
         }
 
         private <T> CompletionStage<T> authorized(Supplier<CompletionStage<T>> operation) {
