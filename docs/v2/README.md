@@ -371,6 +371,7 @@ Accepted decisions:
 - [ADR 0108: M3 allocator protocol feasibility, asynchronous admission, and baseline amendment](../decisions/0108-v2-m3-allocator-protocol-feasibility-async-admission-baseline-amendment.md)
 - [ADR 0109: M3 Native baseline executor composition and formal-diagnostic equivalence amendment](../decisions/0109-v2-m3-native-baseline-executor-composition-formal-diagnostic-equivalence-amendment.md)
 - [ADR 0110: M3 candidate warm-up load-rejection classification amendment](../decisions/0110-v2-m3-allocator-candidate-warmup-load-rejection-classification-amendment.md)
+- [ADR 0111: M3 derived-floor physical budget projection amendment](../decisions/0111-v2-m3-allocator-derived-floor-physical-budget-projection-amendment.md)
 
 ## Open design gates
 
@@ -492,6 +493,13 @@ was treated as a launcher/runtime failure. [ADR 0110](../decisions/0110-v2-m3-al
 preserves that 20-file attempt and its external archive, partitions warm-up failures into explicit load rejection and
 unexpected failure, and lets only the former reach the unchanged measured validator and adaptive rate descent. Every
 warm-up counter is emitted in the action attachment; measured zero-drop/failure/timeout qualification is unchanged.
+
+The following exact-source attempt at `c0e28f8e...` reached that deterministic descent: eight Native rows established
+1000 requests per second and the failed fixed STRICT row resolved its next action to the distinct derived-800 slot.
+[ADR 0111](../decisions/0111-v2-m3-allocator-derived-floor-physical-budget-projection-amendment.md) preserves the
+21-file failed attempt and corrects the physical budget projection so only FIXED ordinal zero can receive first-action
+setup charges. The derived logical identity, resolved rate, frozen plan digest, action budgets, and qualification rules
+remain unchanged.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

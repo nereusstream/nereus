@@ -203,6 +203,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0088-v2-m3-nwg1-implementation-input-closure.md"
     "$repo_root/docs/decisions/0109-v2-m3-native-baseline-executor-composition-formal-diagnostic-equivalence-amendment.md"
     "$repo_root/docs/decisions/0110-v2-m3-allocator-candidate-warmup-load-rejection-classification-amendment.md"
+    "$repo_root/docs/decisions/0111-v2-m3-allocator-derived-floor-physical-budget-projection-amendment.md"
 )
 for path in "${required_domain_docs[@]}"; do
     [[ -f "$path" ]] || fail "missing ${path#"$repo_root/"}"

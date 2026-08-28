@@ -572,6 +572,14 @@ continue to measured validation. Warm-up timeout, unexpected failure, incomplete
 remain fail-closed. The failed 20-file attempt and JUnit are byte-exact in a read-only external archive and cannot be
 resumed or promoted.
 
+[ADR 0111](../../../decisions/0111-v2-m3-allocator-derived-floor-physical-budget-projection-amendment.md) records the
+next physical-plan correction. Exact source `c0e28f8e...` passed all eight Native rows and correctly consumed the first
+failed STRICT row, but budget setup detection called `fixedRate()` on the resulting distinct derived-800 slot before
+dispatch. The adapter now recognizes a first action only from FIXED ordinal zero and the highest fixed offered rate;
+the planner-resolved derived rate remains carried by `ExecuteCell`. The logical context identity, plan digest,
+40-second interval charge, 5-second cleanup charge, and all validator/selection semantics are unchanged. Its immutable
+21-file failed campaign and external archive are not evaluation or future campaign input.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

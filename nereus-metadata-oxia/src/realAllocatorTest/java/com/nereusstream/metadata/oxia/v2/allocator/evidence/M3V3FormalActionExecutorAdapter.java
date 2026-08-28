@@ -16,6 +16,7 @@ package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.Candidate;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.Cell;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.ExecuteCell;
@@ -248,7 +249,7 @@ final class M3V3FormalActionExecutorAdapter implements ActionExecutor {
         return action.kind() == ActionKind.NATIVE_INTERVAL
                 && action.cell().activeManagedLedgers() == 10_000
                 && action.cell().metadataLatencyP99Millis() == 1
-                && action.cell().rateSlot().fixedRate() == 1000;
+                && highestFixedRate(action);
     }
 
     private static boolean firstPopulationAction(PlannedActionV3 action) {
@@ -258,7 +259,13 @@ final class M3V3FormalActionExecutorAdapter implements ActionExecutor {
         return action.kind().interval()
                 && !action.cell().candidate().range()
                 && action.cell().metadataLatencyP99Millis() == 1
-                && action.cell().rateSlot().fixedRate() == 1000;
+                && highestFixedRate(action);
+    }
+
+    private static boolean highestFixedRate(PlannedActionV3 action) {
+        return !action.cell().rateSlot().derivedFloor()
+                && action.cell().rateSlot().ordinal() == 0
+                && action.offeredRate() == AllocatorCampaignV3.DESCENDING_FIXED_RATES.get(0);
     }
 
     interface RealActionRuntime {

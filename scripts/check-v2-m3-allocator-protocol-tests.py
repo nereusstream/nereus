@@ -225,8 +225,8 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
                 json.dumps(
                     {
                         "status": "INFRASTRUCTURE_FAILED",
-                        "terminalReason": "INFRASTRUCTURE_FAILED",
-                        "terminalDetail": "typed warmup rejection",
+                        "terminalReason": "BUDGET_ACCOUNTING_FAILED",
+                        "terminalDetail": "derived slot has no baseline-independent rate",
                         "checkpointSequence": 1,
                         "evaluationCreated": False,
                         "selectionCreated": False,
@@ -271,11 +271,21 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
                 str(sum(path.stat().st_size for path in files)),
                 "--terminal-status",
                 "INFRASTRUCTURE_FAILED",
+                "--terminal-reason",
+                "BUDGET_ACCOUNTING_FAILED",
             ]
+
+            invalid = command.copy()
+            invalid[invalid.index("--terminal-reason") + 1] = "BUDGET_EXHAUSTED"
+            rejected = subprocess.run(invalid, check=False, capture_output=True, text=True)
+            self.assertNotEqual(0, rejected.returncode)
+            self.assertIn("terminal reason does not belong", rejected.stderr)
+            self.assertFalse(archive.exists())
 
             subprocess.run(command, check=True, capture_output=True, text=True)
             identity = json.loads((archive / "archive-identity.json").read_bytes())
             self.assertEqual("INFRASTRUCTURE_FAILED", identity["campaignStatus"])
+            self.assertEqual("BUDGET_ACCOUNTING_FAILED", identity["terminalReason"])
             self.assertFalse(identity["evaluationCreated"])
             self.assertFalse(identity["selectionCreated"])
             self.assertFalse(identity["promotableInput"])

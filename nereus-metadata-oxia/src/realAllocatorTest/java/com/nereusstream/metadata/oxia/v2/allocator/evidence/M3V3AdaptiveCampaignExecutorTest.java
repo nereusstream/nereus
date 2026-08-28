@@ -99,6 +99,21 @@ class M3V3AdaptiveCampaignExecutorTest {
     }
 
     @Test
+    void derivedFloorActionUsesResolvedRateWithoutFixedSlotBudgetProjection() {
+        Cell derived = Cell.derived(Candidate.STRICT, 10_000, 1);
+        PlannedActionV3 action = M3V3FormalCampaignPlan.actionsFor(
+                        new ExecuteCell(derived, 800), List.of())
+                .getFirst();
+        M3V3FormalActionExecutorAdapter adapter = new M3V3FormalActionExecutorAdapter(new FakeRuntime());
+
+        assertThat(action.cell()).isEqualTo(derived);
+        assertThat(action.offeredRate()).isEqualTo(800);
+        assertThat(adapter.budgetFor(action)).isEqualTo(new BudgetCharge(0, 0, 0, 0, 40, 5, 0));
+        assertThat(M3V3FormalCampaignPlan.zeroDecisionPlanDigest().toHex())
+                .isEqualTo("5f94079eb0d41739e4da32c0d4170a837ca2a63b33a6a8ad71b25a87ca49b283");
+    }
+
+    @Test
     void strictCampaignPersistsEveryValidatorDerivedCheckpointWithoutSealingEvaluation() throws Exception {
         CollectingSink sink = new CollectingSink();
         FakeActions actions = new FakeActions();

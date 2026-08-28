@@ -138,6 +138,14 @@ fully counted and attached but may not prevent the complete measured failed row 
 descent. Unexpected warm-up failure, timeout, incomplete drain, and every measured drop/failure/timeout remain
 fail-closed. A rerun requires a new exact clean pushed source, fresh executor/NADV3/preflight identities, and a new
 `<source>-r1` directory; the failed attempt is never resumed or copied.
+
+ADR 0111 governs the next formal projection correction. Exact source `c0e28f8e...` proved the ADR-0110 classifier and
+then stopped before dispatching the legal derived-800 action because first-population budget detection queried that
+DERIVED slot as a baseline-independent fixed rate. The 21-file failed attempt is immutable and externally archived.
+Physical budget projection must now identify first setup only by FIXED ordinal zero plus the exact highest fixed
+offered rate; a derived action retains its resolved planner rate and unchanged interval/cleanup charge. Publication
+requires the derived-800 regression, stable `5f94079e...b283` plan digest, full current-source gates, fresh NADV3, and
+fresh preflight before any new formal directory.
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

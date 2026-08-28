@@ -13,6 +13,20 @@ import stat
 
 
 SCHEMA = "NEREUS_V2_M3_ALLOCATOR_FAILED_FORMAL_ARCHIVE_IDENTITY_V1"
+TERMINAL_REASONS_BY_STATUS = {
+    "INFRASTRUCTURE_FAILED": {
+        "ACTION_CAP_EXCEEDED",
+        "BUDGET_ACCOUNTING_FAILED",
+        "INFRASTRUCTURE_FAILED",
+        "INVALID_ACTION_RESULT",
+        "WALL_CLOCK_CAP_EXCEEDED",
+    },
+    "INTERRUPTED": {
+        "ACTION_INTERRUPTED",
+        "BUDGET_EXHAUSTED",
+        "STOP_REQUESTED",
+    },
+}
 
 
 def sha256(path: Path) -> str:
@@ -69,6 +83,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-file-count", required=True, type=int)
     parser.add_argument("--expected-total-bytes", required=True, type=int)
     parser.add_argument("--terminal-status", required=True)
+    parser.add_argument("--terminal-reason", required=True)
     return parser.parse_args()
 
 
@@ -91,8 +106,10 @@ def main() -> int:
         ("formal JUnit digest", args.formal_junit_sha256),
     ):
         require_hex(value, label)
-    if args.terminal_status not in {"INFRASTRUCTURE_FAILED", "INTERRUPTED"}:
+    if args.terminal_status not in TERMINAL_REASONS_BY_STATUS:
         raise ValueError("failed archive terminal status is not fail-closed")
+    if args.terminal_reason not in TERMINAL_REASONS_BY_STATUS[args.terminal_status]:
+        raise ValueError("failed archive terminal reason does not belong to the fail-closed status")
 
     source_files = regular_files(source)
     source_total_bytes = sum(path.stat().st_size for path in source_files)
@@ -107,7 +124,8 @@ def main() -> int:
     if sha256(junit) != args.formal_junit_sha256:
         raise ValueError("archive formal JUnit digest differs")
     result_value = json.loads(campaign_result.read_text(encoding="utf-8"))
-    if result_value.get("status") != args.terminal_status or result_value.get("terminalReason") != args.terminal_status:
+    if (result_value.get("status") != args.terminal_status
+            or result_value.get("terminalReason") != args.terminal_reason):
         raise ValueError("archive campaign-result terminal status differs")
     if result_value.get("evaluationCreated") is not False or result_value.get("selectionCreated") is not False:
         raise ValueError("failed archive unexpectedly contains evaluation or selection")
