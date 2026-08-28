@@ -157,9 +157,10 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         representative_assertions = canary.split("private static void assertRepresentative", 1)[1].split(
             "private static void assertCommon", 1
         )[0]
-        self.assertIn("row.warmupDropped()", baseline_assertions)
+        self.assertNotIn("row.warmupDropped()", baseline_assertions)
         self.assertNotIn("row.warmupDropped()", representative_assertions)
         for measured_assertion in ("row.dropped()", "row.failed()", "row.timedOut()"):
+            self.assertIn(measured_assertion, baseline_assertions)
             self.assertIn(measured_assertion, representative_assertions)
         self.assertIn('maxHeapSize = "6144m"', diagnostic)
         self.assertIn("timeout.set(Duration.ofMinutes(60))", diagnostic)

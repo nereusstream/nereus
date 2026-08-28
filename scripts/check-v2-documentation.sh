@@ -213,6 +213,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0118-v2-m3-allocator-v3-promotion-attachment-and-cutoff-attribution-amendment.md"
     "$repo_root/docs/decisions/0119-v2-m3-allocator-v3-native-representative-warmup-observation-amendment.md"
     "$repo_root/docs/decisions/0120-v2-m3-allocator-v3-per-actor-offer-producer-amendment.md"
+    "$repo_root/docs/decisions/0121-v2-m3-allocator-v3-native-warmup-preadmission-observation-amendment.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b2-native-executor-current-source-recertification.md"
 )
 for path in "${required_domain_docs[@]}"; do

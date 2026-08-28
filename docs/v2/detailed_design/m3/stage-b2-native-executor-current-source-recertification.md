@@ -131,3 +131,9 @@ physical cutoff, then remained pre-admission while all other 5,999 measured requ
 the 7-file/7,013-byte failed archive and removes the global serialized offer coordinator. Four per-actor producers
 retain exact per-actor order and one shared phase barrier; queue/outstanding caps, cutoff, cleanup, and outcome
 semantics do not change.
+
+The `7dcab4be...` replay proved that correction: 10k/25ms/200 completed measured 6,000/6,000 with zero drop. It later
+stopped after the 100k/10ms/200 row reported one separate `warmupDropped` beside measured 6,000/6,000, zero
+failure/timeout, and complete drain. ADR 0121 preserves the 12-file/12,575-byte attempt and aligns the JUnit gate with
+the already versioned row schema: warm-up pre-admission pressure remains telemetry; every baseline measured
+drop/failure/timeout remains a hard failure.

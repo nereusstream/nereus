@@ -381,6 +381,7 @@ Accepted decisions:
 - [ADR 0118: M3 V3 promotion-attachment and cutoff-attribution amendment](../decisions/0118-v2-m3-allocator-v3-promotion-attachment-and-cutoff-attribution-amendment.md)
 - [ADR 0119: M3 V3 Native representative warm-up observation amendment](../decisions/0119-v2-m3-allocator-v3-native-representative-warmup-observation-amendment.md)
 - [ADR 0120: M3 V3 per-actor offer-producer amendment](../decisions/0120-v2-m3-allocator-v3-per-actor-offer-producer-amendment.md)
+- [ADR 0121: M3 V3 Native warm-up pre-admission observation amendment](../decisions/0121-v2-m3-allocator-v3-native-warmup-preadmission-observation-amendment.md)
 
 ## Open design gates
 
@@ -576,6 +577,10 @@ visible telemetry rather than becoming an unaccepted ninth qualification thresho
 failure where the final 10k/25ms/200 request was offered on time but missed dispatch before cutoff. Four persistent
 per-actor offer producers replace the remaining global serialized offer coordinator while retaining the same frozen
 arrival bytes, barriered phase transition, bounded admission, physical cutoff, and drop classification.
+[ADR 0121](../decisions/0121-v2-m3-allocator-v3-native-warmup-preadmission-observation-amendment.md) closes the
+remaining schema/gate mismatch: all Native rows retain `warmupDropped` as separate raw telemetry, while the eight
+baseline rows continue to require measured drop/failure/timeout=0 and complete drain. The exact `7dcab4be...` run
+proved ADR 0120's 25ms/200 measured correction before stopping on that non-measured assertion.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

@@ -648,6 +648,11 @@ single offer-coordinator bottleneck after the last 10k/25ms/200 request missed d
 per-actor producers preserve actor order and exact arrival offsets, synchronize the one-way measurement transition,
 and feed the unchanged bounded queues. No grace, early dispatch, hidden queue, or outcome reclassification is added.
 
+[ADR 0121](../../../decisions/0121-v2-m3-allocator-v3-native-warmup-preadmission-observation-amendment.md) aligns the
+Native JUnit gate with its versioned row schema after `7dcab4be...` passed the corrected 25ms/200 measured inventory
+but stopped on one separate warm-up pre-admission observation. Baseline measured zero-drop/failure/timeout and full
+drain remain mandatory; `warmupDropped` stays explicit non-measured telemetry.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

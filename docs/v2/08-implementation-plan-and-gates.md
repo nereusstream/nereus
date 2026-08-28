@@ -215,6 +215,11 @@ join a single warm-up/measurement barrier before using the existing admission qu
 pre-admission drop partition are unchanged; publication still requires all eight baseline rows to reach zero measured
 drop/failure/timeout on the new exact source.
 
+ADR 0121 removes no measured Native gate. It preserves the exact `7dcab4be...` attempt where the corrected 25ms/200
+row passed 6,000/6,000, but a later 100k/10ms/200 row failed only the separate `warmupDropped` assertion despite
+measured 6,000/6,000 and full drain. Warm-up pre-admission remains raw telemetry for all rows; measured
+drop/failure/timeout=0 remains mandatory for all eight baselines.
+
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

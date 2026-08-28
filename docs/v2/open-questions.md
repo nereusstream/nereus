@@ -878,6 +878,9 @@ ADR 0120 additionally removes the global serialized offer coordinator after a fi
 fired before cutoff but missed actor-lane dispatch. The correction is runner conformance only: per-actor producers use
 the same arrival schedule, bounded queues, phase boundary, and physical cutoff, so formal candidate qualification
 remains an open later-stage question.
+ADR 0121 does not answer that question or relax a baseline: it only keeps `warmupDropped` separate from the measured
+zero-drop field already used by qualification. All eight Native baselines still require measured
+drop/failure/timeout=0 and complete drain.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
