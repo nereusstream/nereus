@@ -250,11 +250,18 @@ The source-bound V4 core now fixes zero-decision plan digest
 campaign identity, plan/profile identity, and 42-second interval accounting around the already proved V3 logical
 planner payload; NAEV4/NADV4/NARS4 consume only that outer authority. Cross-version parsers reject every direct wire
 substitution, and the wrapper rejects any nested logical checkpoint not bound to the exact V4 plan digest.
-Before V4 formal entry, `realAllocatorV4DiagnosticTest` must finish the exact 21-test/eight-suite inventory with zero
+Before the ADR-0125 V4 formal entry, `realAllocatorV4DiagnosticTest` had to finish the exact 21-test/eight-suite inventory with zero
 failure/error/skip, including both V4 cutoff/drain runner contracts and the exact real-Oxia RANGE-16
 fixed-1000/derived-800 terminal-drain rows. `sealRealAllocatorV4Diagnostic` and
 `validateRealAllocatorV4Diagnostic` must then round-trip canonical NADV4 from that task's own XML directory; NADV3
 remains fixed at its prior 18-test/six-suite inventory and cannot satisfy the V4 gate.
+
+ADR 0126 preserves the completed `c44a56c2...-r1` V4 `NONE_QUALIFIED` result and raises only the current-source
+diagnostic inventory to 22 tests/nine suites. The added suite replays RANGE-1024 10k/10ms fixed-1000 then derived-800
+with the formal workload and V4 drain while measuring real RTT, controlled-delay scheduler/callback lag, operation
+outstanding, workflow latency, and runner queue/outstanding. It must remain diagnostic-only. Any implementation
+correction derived from those measurements requires a new pushed exact source, fresh NADV4, and new formal directory;
+the frozen V4 plan, rates, SLOs, zero-drop rule, and selection semantics cannot change.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

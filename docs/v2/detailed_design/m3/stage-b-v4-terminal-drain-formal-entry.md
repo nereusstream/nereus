@@ -34,7 +34,7 @@ persists only V4 campaign-result, physical attachment, and NACP4 identities. It 
 `scripts/run-v2-m3-real-allocator-evidence-v4.sh` is the only formal launcher. It requires all explicit V4
 authorization variables, verifies `HEAD == origin/main`, clean `main`, all three clean locked external worktrees,
 source/dependency locks, locked Oxia-client JAR, image digest/revision, exact executor JAR, plan/profile, and canonical
-current-source NADV4 plus the exact eight-suite JUnit directory. Only after the offline gates pass does it create the
+current-source NADV4 plus its exact source-governed JUnit directory (nine suites after ADR 0126). Only after the offline gates pass does it create the
 task-owned Oxia container and new formal output. Both process supervisor and Gradle task retain the 48,000-second hard
 deadline, and the container is removed on every launcher exit without deleting evidence.
 
@@ -54,6 +54,10 @@ protocol, but the individual raw rows previously used a literal V3 schema. V4 ex
 `NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_ROW_V4`, while the unchanged V3 path continues to emit the V3 identity. The
 earlier `a071fb4b...` diagnostic-only run passed 21/0/0/0 numerically and sealed NADV4, but its V3-labeled Native rows
 cannot be reused as current V4 raw authority. It is retained as diagnostic history only.
+
+ADR 0126 later preserves the completed `c44a56c2...-r1` V4 `NONE_QUALIFIED` result and supersedes only the
+current-source diagnostic count with the 22-test/nine-suite RANGE-1024 10ms attribution inventory. The V4 wire,
+terminal drain, plan/profile, workload, qualification, and selection contracts in this record remain unchanged.
 
 ## Stop and execution boundary
 

@@ -977,7 +977,7 @@ val realAllocatorV4BoundedAdaptiveFormalCampaign = tasks.register<Test>(
             "allocator V4 formal diagnostic JUnit directory is absent or a link"
         }
         Files.list(diagnosticJUnit).use { files ->
-            check(files.filter { it.fileName.toString().matches(Regex("TEST-[A-Za-z0-9_.]+\\.xml")) }.count() == 8L) {
+            check(files.filter { it.fileName.toString().matches(Regex("TEST-[A-Za-z0-9_.]+\\.xml")) }.count() == 9L) {
                 "allocator V4 formal diagnostic JUnit file inventory differs"
             }
         }
@@ -1143,6 +1143,9 @@ val realAllocatorV4DiagnosticTest = tasks.register<Test>("realAllocatorV4Diagnos
         )
         includeTestsMatching(
             "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V4TerminalAdmissionDrainDiagnosticTest",
+        )
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V4RangeLatencyDiagnosticTest",
         )
         includeTestsMatching(
             "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3RealAllocatorStrictIntervalDiagnosticTest",

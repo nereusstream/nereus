@@ -683,7 +683,7 @@ The V4 protocol core binds plan digest
 lineage, campaign ID, plan/profile and 42-second interval budget while retaining the V3 logical campaign algebra as a
 strictly nested implementation payload. NAEV4, NADV4, and NARS4 reference only NACP4 identities; NACP3/NAEV3/NADV3/
 NARS3 remain mutually rejected and cannot be wrapped when their workload digest is not the V4 plan.
-The V4 diagnostic entry is a create-new, diagnostic-only 21-test/eight-suite inventory. It preserves all 18 V3
+The ADR-0125 V4 diagnostic baseline was a create-new, diagnostic-only 21-test/eight-suite inventory. It preserves all 18 V3
 testcase identities, adds a separate two-test V4 runner suite plus the exact real-Oxia RANGE-16 fixed-1000/derived-800
 terminal-drain suite, and seals/parse-validates only NADV4. The V3 task and NADV3 manifest remain six suites and 18
 tests, so adding V4 coverage cannot silently change historical diagnostic authority.
@@ -691,6 +691,14 @@ The [V4 terminal-drain formal-entry implementation record](stage-b-v4-terminal-d
 create-new execution path, exact authorization tuple, offline post-run commands, and the V3/V4 Native row-schema
 boundary. It is source wiring only until the final exact clean source reruns the 21-test diagnostic, seals NADV4, and
 executes a separately source-bound formal campaign.
+
+[ADR 0126](../../../decisions/0126-v2-m3-allocator-v4-range-latency-attribution-amendment.md) preserves the resulting
+exact `c44a56c2...-r1` V4 `NONE_QUALIFIED` campaign and its 135-file external archive. Native sustained 1,000 RPS in
+all eight rows; RANGE-64/256/1024 instead shared a first eliminating 10k/10ms row, and RANGE-1024 derived-800 retained
+1,335 pre-admission drops despite zero admitted failure/timeout and complete lifecycle drain. The
+[RANGE latency attribution record](stage-b-v4-range-latency-attribution.md) adds an exact formal-sequence 10ms
+operation/scheduler diagnostic. Current-source NADV4 is therefore 22 tests/nine suites; workload, qualification,
+selection, plan/profile, V4 wire, and all historical evidence bytes remain unchanged.
 
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0

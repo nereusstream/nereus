@@ -56,6 +56,9 @@ V4_RUNNER_TEST = V3_FORMAL_RUNTIME.with_name("M3V4AsyncActorLaneRunnerTest.java"
 V4_TERMINAL_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
     "M3V4TerminalAdmissionDrainDiagnosticTest.java"
 )
+V4_RANGE_LATENCY_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
+    "M3V4RangeLatencyDiagnosticTest.java"
+)
 V4_FORMAL_CAMPAIGN = V3_FORMAL_RUNTIME.with_name("M3V4BoundedAdaptiveFormalCampaignTest.java")
 FORMAL_CAMPAIGN = (
     ROOT
@@ -169,6 +172,7 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         protocol = V4_PROTOCOL_MAIN.read_text()
         runner_test = V4_RUNNER_TEST.read_text()
         terminal = V4_TERMINAL_DIAGNOSTIC.read_text()
+        range_latency = V4_RANGE_LATENCY_DIAGNOSTIC.read_text()
 
         diagnostic = module.split(
             'val realAllocatorV4DiagnosticTest = tasks.register<Test>("realAllocatorV4DiagnosticTest")',
@@ -182,6 +186,7 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             "M3V3NativePathDiagnosticTest",
             "M3V3NativeBaselineCanaryTest",
             "M3V4TerminalAdmissionDrainDiagnosticTest",
+            "M3V4RangeLatencyDiagnosticTest",
             "M3RealAllocatorStrictIntervalDiagnosticTest",
         ):
             self.assertIn(suite, diagnostic)
@@ -194,6 +199,7 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn('readDiagnosticSuite(directory, DIAGNOSTIC_SUITES, "V4")', protocol)
         self.assertIn("M3V4AsyncActorLaneRunnerTest", protocol)
         self.assertIn("M3V4TerminalAdmissionDrainDiagnosticTest", protocol)
+        self.assertIn("M3V4RangeLatencyDiagnosticTest", protocol)
         self.assertIn("AllocatorCampaignPromotionGateV4", protocol)
         self.assertIn("AllocatorCampaignSelectionV4", protocol)
         self.assertIn("formalV4()", runner)
@@ -209,6 +215,15 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn(r'\"diagnosticOnly\":true', terminal)
         self.assertIn(r'\"authority\":false', terminal)
         self.assertIn(r'\"selectionEligible\":false', terminal)
+        self.assertIn("Cell.fixedRate(Candidate.RANGE_1024, POPULATION, LATENCY_MILLIS, 1_000)", range_latency)
+        self.assertIn("Cell.derived(Candidate.RANGE_1024, POPULATION, LATENCY_MILLIS)", range_latency)
+        self.assertIn("M3V3RealFormalActionRuntime.candidateSchedule", range_latency)
+        self.assertIn("beginSharedDiagnosticCapture", range_latency)
+        self.assertIn("realOutstandingMaximum", range_latency)
+        self.assertIn("delaySchedulerLagP99Micros", range_latency)
+        self.assertIn(r'\"diagnosticOnly\":true', range_latency)
+        self.assertIn(r'\"authority\":false', range_latency)
+        self.assertIn(r'\"selectionEligible\":false', range_latency)
 
     def test_v3_native_execution_plan_is_stable_source_bound_and_feasible(self) -> None:
         first = subprocess.run(
@@ -486,8 +501,58 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             selected_command[selected_command.index("--evaluation-status") + 1] = "RANGE_SELECTED"
             selected = subprocess.run(selected_command, check=False, capture_output=True, text=True)
             self.assertNotEqual(0, selected.returncode)
-            self.assertIn("not a legal non-promotable V3 terminal", selected.stderr)
+            self.assertIn("not a legal non-promotable allocator terminal", selected.stderr)
             self.assertFalse(selected_archive.exists())
+
+            v4_source = root / "v4-formal"
+            v4_checkpoints = v4_source / "checkpoints"
+            v4_checkpoints.mkdir(parents=True)
+            v4_checkpoint = v4_checkpoints / "last.nacp4"
+            v4_checkpoint.write_bytes(b"v4-checkpoint")
+            (v4_source / "campaign-result.json").write_bytes(campaign.read_bytes())
+            v4_evaluation = v4_source / "evaluation.naev4"
+            v4_evaluation.write_bytes(b"v4-evaluation")
+            v4_archive = root / "v4-none-archive"
+            v4_files = sorted(path for path in v4_source.rglob("*") if path.is_file())
+            v4_command = [
+                sys.executable,
+                str(FORMAL_ARCHIVER),
+                "--source",
+                str(v4_source),
+                "--archive",
+                str(v4_archive),
+                "--protocol-version",
+                "4",
+                "--archived-on",
+                "2026-08-28",
+                "--source-commit",
+                "e" * 40,
+                "--plan-sha256",
+                "f" * 64,
+                "--campaign-result-sha256",
+                hashlib.sha256((v4_source / "campaign-result.json").read_bytes()).hexdigest(),
+                "--final-checkpoint-relative-path",
+                v4_checkpoint.relative_to(v4_source).as_posix(),
+                "--final-checkpoint-sha256",
+                hashlib.sha256(v4_checkpoint.read_bytes()).hexdigest(),
+                "--evaluation-sha256",
+                hashlib.sha256(v4_evaluation.read_bytes()).hexdigest(),
+                "--attachment-root-sha256",
+                "1" * 64,
+                "--formal-junit-sha256",
+                "2" * 64,
+                "--expected-file-count",
+                str(len(v4_files)),
+                "--expected-total-bytes",
+                str(sum(path.stat().st_size for path in v4_files)),
+                "--evaluation-status",
+                "NONE_QUALIFIED",
+            ]
+            subprocess.run(v4_command, check=True, capture_output=True, text=True)
+            v4_identity = json.loads((v4_archive / "archive-identity.json").read_bytes())
+            self.assertEqual(4, v4_identity["protocolVersion"])
+            self.assertEqual("evaluation.naev4", v4_identity["evaluationRelativePath"])
+            self.assertFalse(v4_identity["nars4Present"])
 
     def test_failed_formal_archiver_preserves_terminal_payload_and_junit(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -47,7 +47,7 @@ if [[ "${1:-}" == "--bounded-adaptive-formal" ]]; then
   formal_oxia_image_digest="${NEREUS_M3_ALLOCATOR_V4_OXIA_IMAGE_DIGEST:?set the reviewed Oxia image digest}"
   formal_diagnostic="${NEREUS_M3_ALLOCATOR_V4_DIAGNOSTIC_PATH:?set the exact-source NADV4 path}"
   formal_diagnostic_sha="${NEREUS_M3_ALLOCATOR_V4_DIAGNOSTIC_SHA256:?set the reviewed NADV4 SHA}"
-  formal_diagnostic_junit="${NEREUS_M3_ALLOCATOR_V4_DIAGNOSTIC_JUNIT_DIRECTORY:?set the exact eight-suite V4 diagnostic JUnit directory}"
+  formal_diagnostic_junit="${NEREUS_M3_ALLOCATOR_V4_DIAGNOSTIC_JUNIT_DIRECTORY:?set the exact nine-suite V4 diagnostic JUnit directory}"
   formal_output="$2"
 
   test "$(git -C "$repo_root" rev-parse HEAD)" = "$formal_authorization"

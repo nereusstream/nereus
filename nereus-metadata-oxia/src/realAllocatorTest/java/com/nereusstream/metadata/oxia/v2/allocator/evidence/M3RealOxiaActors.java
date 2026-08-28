@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicReference;
 final class M3RealOxiaActors implements AutoCloseable {
     private final String serviceAddress;
     private final List<Actor> actors = new ArrayList<>(M3AllocatorWorkloadPlan.BROKER_ACTORS);
+    private final AtomicReference<SharedOperationDiagnostics> sharedOperationDiagnostics = new AtomicReference<>();
 
     M3RealOxiaActors(String serviceAddress) throws Exception {
         this.serviceAddress = requireServiceAddress(serviceAddress);
@@ -75,6 +76,30 @@ final class M3RealOxiaActors implements AutoCloseable {
             throw new IllegalArgumentException("controlled Oxia latency differs from ADR 0094");
         }
         actors.forEach(actor -> actor.client.setControlledLatencyMillis(latencyMillis));
+    }
+
+    void beginSharedDiagnosticCapture() {
+        SharedOperationDiagnostics shared = new SharedOperationDiagnostics();
+        if (!sharedOperationDiagnostics.compareAndSet(null, shared)) {
+            throw new IllegalStateException("allocator shared Oxia operation diagnostic capture is already active");
+        }
+        try {
+            actors.forEach(actor -> actor.client.beginDiagnosticCapture(shared));
+        } catch (RuntimeException failure) {
+            sharedOperationDiagnostics.compareAndSet(shared, null);
+            throw failure;
+        }
+    }
+
+    SharedOperationDiagnosticSnapshot endSharedDiagnosticCapture() {
+        SharedOperationDiagnostics shared = sharedOperationDiagnostics.getAndSet(null);
+        if (shared == null) {
+            throw new IllegalStateException("allocator shared Oxia operation diagnostic capture is not active");
+        }
+        List<InstrumentedClient.OperationDiagnosticSnapshot> actorSnapshots = actors.stream()
+                .map(actor -> actor.client.endDiagnosticCapture())
+                .toList();
+        return shared.snapshot(actorSnapshots);
     }
 
     void requirePopulationConstructionLatencyDisabled() {
@@ -203,7 +228,11 @@ final class M3RealOxiaActors implements AutoCloseable {
         }
 
         void beginDiagnosticCapture() {
-            if (!operationDiagnostics.compareAndSet(null, new OperationDiagnostics())) {
+            beginDiagnosticCapture(null);
+        }
+
+        private void beginDiagnosticCapture(SharedOperationDiagnostics shared) {
+            if (!operationDiagnostics.compareAndSet(null, new OperationDiagnostics(shared))) {
                 throw new IllegalStateException("allocator Oxia operation diagnostic capture is already active");
             }
         }
@@ -333,6 +362,9 @@ final class M3RealOxiaActors implements AutoCloseable {
             CompletableFuture<T> output = new CompletableFuture<>();
             source.whenComplete((value, failure) -> {
                 long sourceCompletedNanos = System.nanoTime();
+                if (capture != null) {
+                    capture.sourceCompleted();
+                }
                 int delayMillis = controlledLatencyMillis.get();
                 long targetNanos = Math.addExact(
                         sourceCompletedNanos, TimeUnit.MILLISECONDS.toNanos(delayMillis));
@@ -499,24 +531,47 @@ final class M3RealOxiaActors implements AutoCloseable {
             }
         }
 
-        record OperationDiagnosticSnapshot(List<OperationSample> samples, int outstandingMaximum) {
+        record OperationDiagnosticSnapshot(
+                List<OperationSample> samples, int outstandingMaximum, int realOutstandingMaximum) {
             OperationDiagnosticSnapshot {
                 samples = List.copyOf(samples);
-                if (samples.isEmpty() || outstandingMaximum <= 0) {
+                if (samples.isEmpty() || outstandingMaximum <= 0 || realOutstandingMaximum <= 0) {
                     throw new IllegalArgumentException("allocator Oxia operation diagnostic snapshot is empty");
                 }
             }
         }
 
         private static final class OperationDiagnostics {
+            private final SharedOperationDiagnostics shared;
             private final List<OperationSample> samples = new ArrayList<>();
             private int outstanding;
             private int outstandingMaximum;
+            private int realOutstanding;
+            private int realOutstandingMaximum;
+
+            private OperationDiagnostics(SharedOperationDiagnostics shared) {
+                this.shared = shared;
+            }
 
             private synchronized OperationCapture start(String kind, long dispatchedNanos) {
                 outstanding++;
                 outstandingMaximum = Math.max(outstandingMaximum, outstanding);
+                realOutstanding++;
+                realOutstandingMaximum = Math.max(realOutstandingMaximum, realOutstanding);
+                if (shared != null) {
+                    shared.start();
+                }
                 return new OperationCapture(this, kind, dispatchedNanos);
+            }
+
+            private synchronized void sourceCompleted() {
+                realOutstanding--;
+                if (realOutstanding < 0) {
+                    throw new IllegalStateException("allocator Oxia diagnostic real outstanding became negative");
+                }
+                if (shared != null) {
+                    shared.sourceCompleted();
+                }
             }
 
             private synchronized void finish(OperationSample sample) {
@@ -525,13 +580,16 @@ final class M3RealOxiaActors implements AutoCloseable {
                 if (outstanding < 0) {
                     throw new IllegalStateException("allocator Oxia diagnostic outstanding became negative");
                 }
+                if (shared != null) {
+                    shared.finish();
+                }
             }
 
             private synchronized OperationDiagnosticSnapshot snapshot() {
-                if (outstanding != 0) {
+                if (outstanding != 0 || realOutstanding != 0) {
                     throw new IllegalStateException("allocator Oxia diagnostic has in-flight operations");
                 }
-                return new OperationDiagnosticSnapshot(samples, outstandingMaximum);
+                return new OperationDiagnosticSnapshot(samples, outstandingMaximum, realOutstandingMaximum);
             }
         }
 
@@ -539,6 +597,10 @@ final class M3RealOxiaActors implements AutoCloseable {
             private OperationCapture {
                 Objects.requireNonNull(owner, "owner");
                 Objects.requireNonNull(kind, "kind");
+            }
+
+            private void sourceCompleted() {
+                owner.sourceCompleted();
             }
 
             private void finish(
@@ -561,6 +623,57 @@ final class M3RealOxiaActors implements AutoCloseable {
         @FunctionalInterface
         private interface MutationDispatch {
             CompletionStage<Void> run(OxiaConditionalClient delegate);
+        }
+    }
+
+    record SharedOperationDiagnosticSnapshot(
+            List<InstrumentedClient.OperationDiagnosticSnapshot> actorSnapshots,
+            int outstandingMaximum,
+            int realOutstandingMaximum) {
+        SharedOperationDiagnosticSnapshot {
+            actorSnapshots = List.copyOf(actorSnapshots);
+            if (actorSnapshots.size() != M3AllocatorWorkloadPlan.BROKER_ACTORS
+                    || outstandingMaximum <= 0
+                    || realOutstandingMaximum <= 0) {
+                throw new IllegalArgumentException("allocator shared Oxia operation diagnostic snapshot is empty");
+            }
+        }
+    }
+
+    private static final class SharedOperationDiagnostics {
+        private int outstanding;
+        private int outstandingMaximum;
+        private int realOutstanding;
+        private int realOutstandingMaximum;
+
+        private synchronized void start() {
+            outstanding++;
+            outstandingMaximum = Math.max(outstandingMaximum, outstanding);
+            realOutstanding++;
+            realOutstandingMaximum = Math.max(realOutstandingMaximum, realOutstanding);
+        }
+
+        private synchronized void sourceCompleted() {
+            realOutstanding--;
+            if (realOutstanding < 0) {
+                throw new IllegalStateException("allocator shared Oxia diagnostic real outstanding became negative");
+            }
+        }
+
+        private synchronized void finish() {
+            outstanding--;
+            if (outstanding < 0) {
+                throw new IllegalStateException("allocator shared Oxia diagnostic outstanding became negative");
+            }
+        }
+
+        private synchronized SharedOperationDiagnosticSnapshot snapshot(
+                List<InstrumentedClient.OperationDiagnosticSnapshot> actorSnapshots) {
+            if (outstanding != 0 || realOutstanding != 0) {
+                throw new IllegalStateException("allocator shared Oxia diagnostic has in-flight operations");
+            }
+            return new SharedOperationDiagnosticSnapshot(
+                    actorSnapshots, outstandingMaximum, realOutstandingMaximum);
         }
     }
 

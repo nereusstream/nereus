@@ -38,7 +38,8 @@ public final class M3V4AllocatorProtocolMain {
             M3V3AllocatorProtocolMain.DIAGNOSTIC_SUITES,
             Set.of(
                     PACKAGE + "M3V4AsyncActorLaneRunnerTest",
-                    PACKAGE + "M3V4TerminalAdmissionDrainDiagnosticTest"));
+                    PACKAGE + "M3V4TerminalAdmissionDrainDiagnosticTest",
+                    PACKAGE + "M3V4RangeLatencyDiagnosticTest"));
     static final Set<String> DIAGNOSTIC_TESTS = union(
             M3V3AllocatorProtocolMain.DIAGNOSTIC_TESTS,
             Set.of(
@@ -48,7 +49,10 @@ public final class M3V4AllocatorProtocolMain {
                             "dropsAnOnTimeRequestStillBlockedAtTheFinalAdmissionDeadline()"),
                     identity(
                             "M3V4TerminalAdmissionDrainDiagnosticTest",
-                            "exactRange16FixedAndDerivedRowsDrainEveryOnTimeOfferWithoutLoss()")));
+                            "exactRange16FixedAndDerivedRowsDrainEveryOnTimeOfferWithoutLoss()"),
+                    identity(
+                            "M3V4RangeLatencyDiagnosticTest",
+                            "exactRange1024TenMillisSequenceAttributesOperationAndSchedulerCapacity()")));
 
     private M3V4AllocatorProtocolMain() {}
 

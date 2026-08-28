@@ -603,15 +603,23 @@ lag was zero and rollover p99 was 132.270ms. V4 keeps every request, zero-drop r
 per-binding single-flight, but closes offers at 40s and gives already-offered work the existing two-second starvation
 bound to reach admission before the unchanged drop partition is finalized. Distinct NACP4/NAEV4/NARS4/NADV4 and a
 new source-bound plan prevent any reinterpretation of V3 evidence.
-The V4 diagnostic source gate is independently versioned: 21 tests across eight exact JUnit suites, comprising the
+The ADR-0125 V4 diagnostic source gate was independently versioned as 21 tests across eight exact JUnit suites, comprising the
 unchanged V3 18-test inventory plus two V4 runner drain contracts and one real-Oxia RANGE-16 fixed/derived drain test.
 Only the V4 seal/validate tasks may turn that inventory into NADV4; it remains diagnostic-only and cannot select a
 mode.
 The accepted V4 source now has a separate pure plan, process-supervised launcher, default-off Gradle formal task, and
 offline NACP4/NAEV4/promotion/NARS4 commands. Both launcher and task bind clean pushed source, V4 plan/profile,
-locks/worktrees/JAR/image/executor, canonical NADV4 with its eight-suite JUnit inventory, and a create-new output
+locks/worktrees/JAR/image/executor, canonical NADV4 with its current exact JUnit inventory, and a create-new output
 directory. The shared Native canary emits V4 row schemas only when the V4 drain runtime is selected; V3 keeps its
 prior row bytes. This wiring is not a formal result or allocator selection.
+
+[ADR 0126](../decisions/0126-v2-m3-allocator-v4-range-latency-attribution-amendment.md) freezes the exact
+`c44a56c2...-r1` V4 result as `NONE_QUALIFIED`. Its NACP4/NAEV4/promotion chain and 99 physical attachments validate,
+but every RANGE is eliminated by 10k/10ms or earlier; RANGE-1024 derived-800 drops 1,335 on-time requests before
+admission while draining all admitted work. Its 135-file, 20,556,200-byte payload is preserved under manifest
+`ab829692...39db3`. Current-source NADV4 adds one formal-equivalent RANGE-1024 10ms attribution suite and is exactly
+22 tests/nine suites. This adds telemetry only and does not modify any V4 threshold, plan, evidence, or selection
+semantic.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

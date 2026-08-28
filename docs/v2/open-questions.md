@@ -894,12 +894,19 @@ explicitly authorized formal campaign.
 ADR 0125 preserves the exact `0cc962e9...` V3 `NONE_QUALIFIED` terminal and moves only the infeasible terminal
 offer/admission boundary into source-bound V4. V4 keeps the frozen workload and zero-drop/SLO selection contract,
 closes offers at 40 seconds, admits only already-offered bounded work for two further seconds, and then applies the
-unchanged five-second cleanup. The independent NACP4/NAEV4/NADV4/NARS4 codecs, plan/profile, 21-test/eight-suite
+unchanged five-second cleanup. The independent NACP4/NAEV4/NADV4/NARS4 codecs, plan/profile, original 21-test/eight-suite
 diagnostic gate, pure plan-only projection, default-off supervised formal launcher, checkpoint/evaluation/promotion/
 selection commands, and exact-source Gradle entry are implemented. An earlier diagnostic-only run that numerically
 passed but labeled its V4 Native raw rows with the V3 schema remains non-authoritative history; current-source NADV4
 must be regenerated after that identity correction. The open question is now solely the outcome of one valid V4
 formal campaign on that final clean pushed source, not permission to reinterpret or resample any V3 result.
+
+ADR 0126 closes that first V4 execution question with an exact `c44a56c2...-r1` `NONE_QUALIFIED` result, preserves
+its archive, and opens only a measured implementation-attribution step. RANGE-64/256/1024 all eliminate at 10k/10ms;
+RANGE-1024 derived-800 has 1,335 pre-admission drops with zero admitted failure/timeout and full drain. Current-source
+NADV4 is now 22 tests/nine suites and adds the exact formal-sequence 10ms operation/scheduler diagnostic. The open
+question is which measured runner, delay scheduler, Oxia RTT, workflow round-trip, or contention component explains
+that capacity boundary; it is not whether to weaken the V4 zero-drop or qualification contract.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

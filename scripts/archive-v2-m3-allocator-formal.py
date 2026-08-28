@@ -12,7 +12,10 @@ import shutil
 import stat
 
 
-SCHEMA = "NEREUS_V2_M3_ALLOCATOR_FORMAL_ARCHIVE_IDENTITY_V2"
+SCHEMA_BY_PROTOCOL = {
+    3: "NEREUS_V2_M3_ALLOCATOR_FORMAL_ARCHIVE_IDENTITY_V2",
+    4: "NEREUS_V2_M3_ALLOCATOR_FORMAL_ARCHIVE_IDENTITY_V3",
+}
 NON_PROMOTABLE_EVALUATION_STATUSES = {
     "NATIVE_BASELINE_UNAVAILABLE",
     "NONE_QUALIFIED",
@@ -70,6 +73,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", required=True, type=Path)
     parser.add_argument("--archive", required=True, type=Path)
+    parser.add_argument("--protocol-version", type=int, choices=sorted(SCHEMA_BY_PROTOCOL), default=3)
     parser.add_argument("--archived-on", required=True)
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--plan-sha256", required=True)
@@ -106,7 +110,7 @@ def main() -> int:
     ):
         require_hex(value, label)
     if args.evaluation_status not in NON_PROMOTABLE_EVALUATION_STATUSES:
-        raise ValueError("archive evaluation status is not a legal non-promotable V3 terminal")
+        raise ValueError("archive evaluation status is not a legal non-promotable allocator terminal")
 
     source_files = regular_files(source)
     source_total_bytes = sum(path.stat().st_size for path in source_files)
@@ -114,7 +118,8 @@ def main() -> int:
         raise ValueError("archive source file count or byte count differs")
 
     campaign_result = source / "campaign-result.json"
-    evaluation = source / "evaluation.naev"
+    evaluation_relative_path = "evaluation.naev4" if args.protocol_version == 4 else "evaluation.naev"
+    evaluation = source / evaluation_relative_path
     final_checkpoint = source / args.final_checkpoint_relative_path
     if sha256(campaign_result) != args.campaign_result_sha256:
         raise ValueError("archive campaign-result digest differs")
@@ -160,7 +165,8 @@ def main() -> int:
     write_new(manifest, "".join(manifest_rows).encode("utf-8"))
     manifest_digest = sha256(manifest)
     identity = {
-        "schema": SCHEMA,
+        "schema": SCHEMA_BY_PROTOCOL[args.protocol_version],
+        "protocolVersion": args.protocol_version,
         "archivedOn": args.archived_on,
         "archivePath": str(archive),
         "payloadPath": str(payload),
@@ -171,14 +177,14 @@ def main() -> int:
         "evaluationStatus": args.evaluation_status,
         "selectionEligible": False,
         "allocatorMode": "UNSELECTED",
-        "nars3Present": False,
+        f"nars{args.protocol_version}Present": False,
         "payloadFileCount": len(copied_files),
         "payloadTotalBytes": copied_total_bytes,
         "manifestRelativePath": "SHA256SUMS",
         "manifestSha256": manifest_digest,
         "campaignResultRelativePath": "campaign-result.json",
         "campaignResultSha256": args.campaign_result_sha256,
-        "evaluationRelativePath": "evaluation.naev",
+        "evaluationRelativePath": evaluation_relative_path,
         "evaluationSha256": args.evaluation_sha256,
         "finalCheckpointRelativePath": args.final_checkpoint_relative_path,
         "finalCheckpointSha256": args.final_checkpoint_sha256,
