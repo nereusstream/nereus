@@ -38,6 +38,7 @@ import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.Observatio
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.Plan;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.Row;
 import com.nereusstream.domain.registry.allocator.AllocatorFaultCutV1;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -84,6 +85,20 @@ class M3V3AllocatorProtocolMainTest {
         assertThat(diagnostic.source()).isEqualTo(source);
         assertThat(diagnostic.scenarios()).containsExactlyInAnyOrderElementsOf(EnumSet.allOf(DiagnosticScenario.class));
 
+        SourceBinding scheduleOnlySource = new SourceBinding(
+                source.nereusCommit(),
+                source.oxiaImageDigest(),
+                source.dependencyLockDigest(),
+                source.executorDigest(),
+                digest("schedule-only"));
+        assertThatThrownBy(() -> M3V3AllocatorProtocolMain.main(arguments(
+                        "seal-diagnostic",
+                        junit,
+                        temporaryDirectory.resolve("schedule-only.nadv"),
+                        scheduleOnlySource)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("formal plan");
+
         Path first = junit.resolve("TEST-" + M3V3AsyncActorLaneRunnerTest.class.getName() + ".xml");
         Files.writeString(first, Files.readString(first).replaceFirst("/>", "><failure/></testcase>"));
         assertThatThrownBy(() -> M3V3AllocatorProtocolMain.main(arguments(
@@ -123,8 +138,8 @@ class M3V3AllocatorProtocolMainTest {
                 formalJunit,
                 "<testsuite name=\"formal\" tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"0\">"
                         + "<testcase classname=\"formal\" name=\"formal\"/></testsuite>");
-        for (int index = 0; index < fixture.attachmentBytes().size(); index++) {
-            Files.write(attachments.resolve("attachment-" + index + ".bin"), fixture.attachmentBytes().get(index));
+        for (PhysicalAttachment attachment : fixture.attachments()) {
+            Files.write(attachments.resolve(attachment.name()), attachment.bytes());
         }
 
         List<String> args = new ArrayList<>();
@@ -150,6 +165,15 @@ class M3V3AllocatorProtocolMainTest {
         assertThatThrownBy(() -> M3V3AllocatorProtocolMain.main(args.toArray(String[]::new)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("non-promotable");
+
+        PhysicalAttachment firstAttachment = fixture.attachments().get(0);
+        Files.writeString(attachments.resolve(firstAttachment.name()), "tampered");
+        args.set(0, "promotion-check");
+        args.set(7, temporaryDirectory.resolve("tampered-attachment-decision.json").toString());
+        assertThatThrownBy(() -> M3V3AllocatorProtocolMain.main(args.toArray(String[]::new)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("filename digest");
+        Files.write(attachments.resolve(firstAttachment.name()), firstAttachment.bytes());
 
         Path tamperedDiagnostic = Files.createDirectory(temporaryDirectory.resolve("tampered-diagnostic"));
         Files.writeString(tamperedDiagnostic.resolve("TEST-formal.xml"), Files.readString(formalJunit));
@@ -184,7 +208,7 @@ class M3V3AllocatorProtocolMainTest {
     private static Fixture fixture() {
         List<Observation> observations = new ArrayList<>();
         List<ExecutionRecord> records = new ArrayList<>();
-        List<byte[]> attachments = new ArrayList<>();
+        List<PhysicalAttachment> attachments = new ArrayList<>();
         Plan terminal = null;
         for (int guard = 0; guard < 400; guard++) {
             Plan plan = AllocatorCampaignPlannerV3.plan(observations);
@@ -192,15 +216,23 @@ class M3V3AllocatorProtocolMainTest {
                 terminal = plan;
                 break;
             }
-            Observation observation = plan.nextAction().orElseThrow() instanceof ExecuteCell executeCell
+            var required = plan.nextAction().orElseThrow();
+            Observation observation = required instanceof ExecuteCell executeCell
                     ? executeCell.cell().candidate().nativePath()
                             ? passing(executeCell.cell(), executeCell.offeredRate())
                             : relativeFailure(executeCell.cell(), executeCell.offeredRate())
-                    : passingFault(((ExecuteFaultRow) plan.nextAction().orElseThrow()).row());
-            byte[] attachment = ("attachment-content-" + records.size()).getBytes(StandardCharsets.UTF_8);
+                    : passingFault(((ExecuteFaultRow) required).row());
+            List<Sha256Digest> physicalDigests = new ArrayList<>();
+            for (M3V3FormalCampaignPlan.PlannedActionV3 action :
+                    M3V3FormalCampaignPlan.actionsFor(required, observations)) {
+                byte[] bytes = ("physical-attachment-content-" + attachments.size())
+                        .getBytes(StandardCharsets.UTF_8);
+                Sha256Digest physicalDigest = Sha256Digest.hash(CanonicalBytes.copyOf(bytes));
+                physicalDigests.add(physicalDigest);
+                attachments.add(new PhysicalAttachment(physicalName(action, physicalDigest), bytes));
+            }
             observations.add(observation);
-            records.add(new ExecutionRecord(observation, Sha256Digest.hash(CanonicalBytes.copyOf(attachment))));
-            attachments.add(attachment);
+            records.add(new ExecutionRecord(observation, aggregateDigest(physicalDigests)));
         }
         if (terminal == null) {
             throw new AssertionError("allocator V3 CLI fixture did not terminate");
@@ -216,6 +248,26 @@ class M3V3AllocatorProtocolMainTest {
                 source,
                 AllocatorCampaignCheckpointV3.encode(checkpoint),
                 List.copyOf(attachments));
+    }
+
+    private static String physicalName(
+            M3V3FormalCampaignPlan.PlannedActionV3 action, Sha256Digest digest) {
+        return switch (action.kind()) {
+            case NATIVE_INTERVAL, CANDIDATE_INTERVAL ->
+                "interval-" + action.cell().contextId() + '-' + digest.toHex() + ".json";
+            case SCALE_ACTION -> "scale-" + action.row().candidate() + '-'
+                    + action.row().activeManagedLedgers() + '-' + action.row().metadataLatencyP99Millis() + '-'
+                    + digest.toHex() + ".json";
+            case FAULT_ACTION -> "fault-" + action.row().candidate() + '-'
+                    + action.row().activeManagedLedgers() + '-' + action.row().metadataLatencyP99Millis() + '-'
+                    + action.faultCut() + '-' + digest.toHex() + ".nare1";
+        };
+    }
+
+    private static Sha256Digest aggregateDigest(List<Sha256Digest> physicalDigests) {
+        ByteBuffer bytes = ByteBuffer.allocate(Math.multiplyExact(physicalDigests.size(), Sha256Digest.LENGTH));
+        physicalDigests.forEach(digest -> bytes.put(digest.bytes().toByteArray()));
+        return Sha256Digest.hash(CanonicalBytes.copyOf(bytes.array()));
     }
 
     private static IntervalEvidence passing(Cell cell, int offeredRate) {
@@ -280,7 +332,11 @@ class M3V3AllocatorProtocolMainTest {
 
     private static SourceBinding source() {
         return new SourceBinding(
-                "c".repeat(40), digest("oxia"), digest("dependency"), digest("executor"), digest("workload"));
+                "c".repeat(40),
+                digest("oxia"),
+                digest("dependency"),
+                digest("executor"),
+                M3V3FormalCampaignPlan.zeroDecisionPlanDigest());
     }
 
     private static Sha256Digest digest(String value) {
@@ -346,5 +402,17 @@ class M3V3AllocatorProtocolMainTest {
         Files.writeString(directory.resolve("TEST-" + suite.getName() + ".xml"), xml);
     }
 
-    private record Fixture(SourceBinding source, CanonicalBytes checkpointBytes, List<byte[]> attachmentBytes) {}
+    private record PhysicalAttachment(String name, byte[] bytes) {
+        private PhysicalAttachment {
+            bytes = bytes.clone();
+        }
+
+        @Override
+        public byte[] bytes() {
+            return bytes.clone();
+        }
+    }
+
+    private record Fixture(
+            SourceBinding source, CanonicalBytes checkpointBytes, List<PhysicalAttachment> attachments) {}
 }

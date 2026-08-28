@@ -292,6 +292,25 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             self.assertEqual(manifest_before, (archive / "SHA256SUMS").read_bytes())
             self.assertIn('"sourceAndPayloadByteIdentical": true', first.stdout)
 
+            none_archive = root / "none-archive"
+            none_command = command.copy()
+            none_command[none_command.index("--archive") + 1] = str(none_archive)
+            none_command[none_command.index("--evaluation-status") + 1] = "NONE_QUALIFIED"
+            subprocess.run(none_command, check=True, capture_output=True, text=True)
+            none_identity = json.loads((none_archive / "archive-identity.json").read_bytes())
+            self.assertEqual("NONE_QUALIFIED", none_identity["evaluationStatus"])
+            self.assertFalse(none_identity["selectionEligible"])
+            self.assertFalse(none_identity["promotableInput"])
+
+            selected_archive = root / "selected-archive"
+            selected_command = command.copy()
+            selected_command[selected_command.index("--archive") + 1] = str(selected_archive)
+            selected_command[selected_command.index("--evaluation-status") + 1] = "RANGE_SELECTED"
+            selected = subprocess.run(selected_command, check=False, capture_output=True, text=True)
+            self.assertNotEqual(0, selected.returncode)
+            self.assertIn("not a legal non-promotable V3 terminal", selected.stderr)
+            self.assertFalse(selected_archive.exists())
+
     def test_failed_formal_archiver_preserves_terminal_payload_and_junit(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

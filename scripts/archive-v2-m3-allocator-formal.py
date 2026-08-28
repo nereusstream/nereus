@@ -13,6 +13,11 @@ import stat
 
 
 SCHEMA = "NEREUS_V2_M3_ALLOCATOR_FORMAL_ARCHIVE_IDENTITY_V2"
+NON_PROMOTABLE_EVALUATION_STATUSES = {
+    "NATIVE_BASELINE_UNAVAILABLE",
+    "NONE_QUALIFIED",
+    "BOTH_QUALIFIED",
+}
 
 
 def sha256(path: Path) -> str:
@@ -100,8 +105,8 @@ def main() -> int:
         ("formal JUnit digest", args.formal_junit_sha256),
     ):
         require_hex(value, label)
-    if args.evaluation_status != "NATIVE_BASELINE_UNAVAILABLE":
-        raise ValueError("archive evaluation status differs from the authorized formal terminal")
+    if args.evaluation_status not in NON_PROMOTABLE_EVALUATION_STATUSES:
+        raise ValueError("archive evaluation status is not a legal non-promotable V3 terminal")
 
     source_files = regular_files(source)
     source_total_bytes = sum(path.stat().st_size for path in source_files)
