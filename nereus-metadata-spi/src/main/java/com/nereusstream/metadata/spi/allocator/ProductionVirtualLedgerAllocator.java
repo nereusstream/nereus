@@ -181,6 +181,27 @@ public final class ProductionVirtualLedgerAllocator {
             VersionedManagedLedgerAllocatorHeadV1 exactHead,
             VersionedVirtualLedgerSliceViewV1 currentView,
             Sha256Digest ledgerDescriptorDigest) {
+        return createCandidate(exactCell, exactHead, currentView, ledgerDescriptorDigest, true);
+    }
+
+    CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>>
+            createCandidateAfterStoreObservedRangeAuthorities(
+                    VersionedAllocatorCellStateV1 exactCell,
+                    VersionedManagedLedgerAllocatorHeadV1 exactHead,
+                    VersionedVirtualLedgerSliceViewV1 currentView,
+                    Sha256Digest ledgerDescriptorDigest) {
+        if (exactCell.value().mode() != AllocatorModeV1.RANGE_LEASED) {
+            throw new IllegalArgumentException("store-observed candidate fast path requires RANGE mode");
+        }
+        return createCandidate(exactCell, exactHead, currentView, ledgerDescriptorDigest, false);
+    }
+
+    private CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>> createCandidate(
+            VersionedAllocatorCellStateV1 exactCell,
+            VersionedManagedLedgerAllocatorHeadV1 exactHead,
+            VersionedVirtualLedgerSliceViewV1 currentView,
+            Sha256Digest ledgerDescriptorDigest,
+            boolean requireAuthorityReread) {
         requireCurrentActiveCell(exactCell.value(), currentView);
         requireHeadBoundToCell(exactCell.value(), exactHead);
         VirtualLedgerCandidateNodeV1 candidate =
@@ -188,6 +209,12 @@ public final class ProductionVirtualLedgerAllocator {
                         ? AllocatorProtocolV1.strictCandidateFromReservation(
                                 exactCell.value(), exactHead.value(), ledgerDescriptorDigest)
                         : AllocatorProtocolV1.candidate(exactHead.value(), ledgerDescriptorDigest);
+        if (!requireAuthorityReread) {
+            return store.createNode(
+                    exactCell.value().ledgerIdCompatibilityNamespaceId(),
+                    exactCell.value().sliceAssignmentId(),
+                    candidate);
+        }
         CompletionStage<Void> exactCellProof = requireStoredCell(exactCell);
         CompletionStage<Void> exactHeadProof = requireStoredHead(exactCell.value(), exactHead);
         return exactCellProof
@@ -203,6 +230,27 @@ public final class ProductionVirtualLedgerAllocator {
             VersionedManagedLedgerAllocatorHeadV1 exactHead,
             VersionedVirtualLedgerCandidateNodeV1 exactNode,
             VersionedVirtualLedgerSliceViewV1 currentView) {
+        return publishCandidate(exactCell, exactHead, exactNode, currentView, true);
+    }
+
+    CompletionStage<ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1>>
+            publishCandidateAfterStoreObservedRangeNode(
+                    VersionedAllocatorCellStateV1 exactCell,
+                    VersionedManagedLedgerAllocatorHeadV1 exactHead,
+                    VersionedVirtualLedgerCandidateNodeV1 exactNode,
+                    VersionedVirtualLedgerSliceViewV1 currentView) {
+        if (exactCell.value().mode() != AllocatorModeV1.RANGE_LEASED) {
+            throw new IllegalArgumentException("store-observed publish fast path requires RANGE mode");
+        }
+        return publishCandidate(exactCell, exactHead, exactNode, currentView, false);
+    }
+
+    private CompletionStage<ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1>> publishCandidate(
+            VersionedAllocatorCellStateV1 exactCell,
+            VersionedManagedLedgerAllocatorHeadV1 exactHead,
+            VersionedVirtualLedgerCandidateNodeV1 exactNode,
+            VersionedVirtualLedgerSliceViewV1 currentView,
+            boolean requireAuthorityReread) {
         requireCurrentActiveCell(exactCell.value(), currentView);
         requireHeadBoundToCell(exactCell.value(), exactHead);
         requireNodeBoundToCell(exactCell.value(), exactNode);
@@ -210,6 +258,15 @@ public final class ProductionVirtualLedgerAllocator {
                         == com.nereusstream.domain.registry.allocator.AllocatorModeV1.STRICT_SERIALIZED
                 ? AllocatorProtocolV1.publishStrictReserved(exactCell.value(), exactHead.value(), exactNode.value())
                 : AllocatorProtocolV1.publish(exactHead.value(), exactNode.value());
+        if (!requireAuthorityReread) {
+            return successor.equals(exactHead.value())
+                    ? unchanged(exactHead)
+                    : store.compareAndSetHead(
+                            exactCell.value().ledgerIdCompatibilityNamespaceId(),
+                            exactCell.value().sliceAssignmentId(),
+                            exactHead,
+                            successor);
+        }
         CompletionStage<Void> exactCellProof = requireStoredCell(exactCell);
         CompletionStage<Void> exactNodeProof = requireStoredNode(exactCell.value(), exactNode);
         return exactCellProof

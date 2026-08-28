@@ -921,6 +921,12 @@ formal attachments. The open question is now whether exact 25ms telemetry assign
 single-thread per-actor controlled-delay scheduler, callback execution, or another stage. Current-source NADV4 is 23
 tests/nine suites; scheduler parallelism and further workflow changes remain closed until that measurement exists.
 
+ADR 0129 resolves that attribution question: the exact `d434f910...` receipt shows real RTT below 7.4ms p99 and
+single-thread scheduler lag below 11.6ms p99, but a 289–565ms workflow and ten-operation/seven-stage installed RANGE
+chain. The accepted correction removes only duplicate workflow-owned proof pairs. The remaining question is empirical:
+whether a fresh exact-source 23-test/nine-suite diagnostic proves both 25ms rows at zero drop/failure/timeout. Neither
+the diagnostic nor implementation changes selection state.
+
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

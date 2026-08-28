@@ -271,6 +271,10 @@ but still sealed `NONE_QUALIFIED`. Before any scheduler change, the current-sour
 in the same nine suites and must split the exact 25ms fixed/derived sequence into real RTT, injected-delay scheduler
 lag, callback lag, operation outstanding, workflow latency, and runner queue telemetry. No new formal entry is allowed
 until the measured cause is corrected on a new pushed exact source and the complete current-source diagnostic passes.
+ADR 0129 records the exact `d434f910...` measurement and accepts proof reuse only for the store-observed installed
+RANGE steady-state branch. Initial authorities and both mutation same-key rereads remain, while two duplicate proof
+pairs are removed; the public API and every renewal/conflict/fault path stay proofful. A fresh pushed exact source must
+pass the complete 23-test/nine-suite NADV4 and prove the 25ms rows before formal execution.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

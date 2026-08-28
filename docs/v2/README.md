@@ -634,6 +634,12 @@ offers and reports operation/workflow p99 near 267ms. The current-source diagnos
 sequence, making NADV4 23 tests in the same nine suites, before any delay-scheduler or workflow correction is allowed.
 No V4 protocol, threshold, plan, selection rule, or historical evidence changes.
 
+[ADR 0129](../decisions/0129-v2-m3-allocator-v4-installed-range-proof-reuse-amendment.md) binds the exact
+`d434f910...` 25ms attribution: real RTT and one-thread scheduler lag are secondary, while the seven-stage installed
+RANGE proof chain drives 289–565ms workflow p99. Only the workflow-owned store-observed steady-state path reuses its
+exact Cell/Head and create-reread node, reducing ten operations/seven stages to six/five. Mutation same-key rereads,
+public allocator proof reads, conflict/fault/renewal paths, V4 plan, thresholds, and historical evidence are preserved.
+
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.

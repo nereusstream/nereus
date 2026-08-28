@@ -97,7 +97,7 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
             }
             if (authorities.cell().value().mode() == AllocatorModeV1.RANGE_LEASED
                     && hasUsableGrant(authorities.head().value())) {
-                return createCandidate(request, state, authorities.cell(), authorities.head());
+                return createCandidate(request, state, authorities.cell(), authorities.head(), true);
             }
             return handleReserve(
                     request,
@@ -342,6 +342,15 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
             State state,
             VersionedAllocatorCellStateV1 cell,
             VersionedManagedLedgerAllocatorHeadV1 head) {
+        return createCandidate(request, state, cell, head, false);
+    }
+
+    private CompletionStage<Result> createCandidate(
+            Request request,
+            State state,
+            VersionedAllocatorCellStateV1 cell,
+            VersionedManagedLedgerAllocatorHeadV1 head,
+            boolean storeObservedRangeAuthorities) {
         VirtualLedgerCandidateNodeV1 expected = expectedCandidate(request, cell, head);
         if (state.candidateValue != null && !state.candidateValue.equals(expected)) {
             return failed(failure(
@@ -354,7 +363,11 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
                 state,
                 cell,
                 head,
-                invoke(() -> allocator.createCandidate(cell, head, request.currentView(), request.descriptorDigest())));
+                storeObservedRangeAuthorities,
+                invoke(() -> storeObservedRangeAuthorities
+                        ? allocator.createCandidateAfterStoreObservedRangeAuthorities(
+                                cell, head, request.currentView(), request.descriptorDigest())
+                        : allocator.createCandidate(cell, head, request.currentView(), request.descriptorDigest())));
     }
 
     private CompletionStage<Result> createCandidate(
@@ -362,6 +375,7 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
             State state,
             VersionedAllocatorCellStateV1 cell,
             VersionedManagedLedgerAllocatorHeadV1 head,
+            boolean storeObservedRangeAuthorities,
             CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>> stage) {
         return stage.<CompletionStage<Result>>handle((result, failure) -> {
                     if (failure != null) {
@@ -389,6 +403,7 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
                                     state,
                                     cell,
                                     head,
+                                    storeObservedRangeAuthorities,
                                     requireExactNode(result.exactSnapshot(), state.candidateValue));
                         }
                         case INDETERMINATE -> {
@@ -401,8 +416,18 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
                                             state,
                                             cell,
                                             head,
-                                            invoke(() -> allocator.createCandidate(
-                                                    cell, head, request.currentView(), request.descriptorDigest()))));
+                                            storeObservedRangeAuthorities,
+                                            invoke(() -> storeObservedRangeAuthorities
+                                                    ? allocator.createCandidateAfterStoreObservedRangeAuthorities(
+                                                            cell,
+                                                            head,
+                                                            request.currentView(),
+                                                            request.descriptorDigest())
+                                                    : allocator.createCandidate(
+                                                            cell,
+                                                            head,
+                                                            request.currentView(),
+                                                            request.descriptorDigest()))));
                         }
                         case DEFINITIVE_CONFLICT -> {
                             state.candidateMutationDefinitivelyDidNotPersist();
@@ -500,6 +525,16 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
             VersionedAllocatorCellStateV1 cell,
             VersionedManagedLedgerAllocatorHeadV1 predecessor,
             VersionedVirtualLedgerCandidateNodeV1 node) {
+        return publishCandidate(request, state, cell, predecessor, false, node);
+    }
+
+    private CompletionStage<Result> publishCandidate(
+            Request request,
+            State state,
+            VersionedAllocatorCellStateV1 cell,
+            VersionedManagedLedgerAllocatorHeadV1 predecessor,
+            boolean storeObservedRangeAuthorities,
+            VersionedVirtualLedgerCandidateNodeV1 node) {
         state.exactNode = node;
         ManagedLedgerAllocatorHeadV1 expectedHead = cell.value().mode() == AllocatorModeV1.STRICT_SERIALIZED
                 ? AllocatorProtocolV1.publishStrictReserved(cell.value(), predecessor.value(), node.value())
@@ -511,7 +546,11 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
                 predecessor,
                 node,
                 expectedHead,
-                invoke(() -> allocator.publishCandidate(cell, predecessor, node, request.currentView())));
+                storeObservedRangeAuthorities,
+                invoke(() -> storeObservedRangeAuthorities
+                        ? allocator.publishCandidateAfterStoreObservedRangeNode(
+                                cell, predecessor, node, request.currentView())
+                        : allocator.publishCandidate(cell, predecessor, node, request.currentView())));
     }
 
     private CompletionStage<Result> publishCandidate(
@@ -521,6 +560,7 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
             VersionedManagedLedgerAllocatorHeadV1 predecessor,
             VersionedVirtualLedgerCandidateNodeV1 node,
             ManagedLedgerAllocatorHeadV1 expectedHead,
+            boolean storeObservedRangeAuthorities,
             CompletionStage<ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1>> stage) {
         return stage.<CompletionStage<Result>>handle((result, failure) -> {
                     if (failure != null) {
@@ -549,8 +589,12 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
                                             predecessor,
                                             node,
                                             expectedHead,
-                                            invoke(() -> allocator.publishCandidate(
-                                                    cell, predecessor, node, request.currentView()))));
+                                            storeObservedRangeAuthorities,
+                                            invoke(() -> storeObservedRangeAuthorities
+                                                    ? allocator.publishCandidateAfterStoreObservedRangeNode(
+                                                            cell, predecessor, node, request.currentView())
+                                                    : allocator.publishCandidate(
+                                                            cell, predecessor, node, request.currentView()))));
                         case DEFINITIVE_CONFLICT ->
                             retry(
                                     state,
@@ -582,6 +626,7 @@ public final class BoundedVirtualLedgerAllocatorWorkflowV2 {
                             predecessor,
                             node,
                             expectedHead,
+                            false,
                             invoke(() ->
                                     allocator.publishCandidate(current, predecessor, node, request.currentView())));
                 });

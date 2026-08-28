@@ -61,6 +61,47 @@ V4_RANGE_LATENCY_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
     "M3V4RangeLatencyDiagnosticTest.java"
 )
 V4_FORMAL_CAMPAIGN = V3_FORMAL_RUNTIME.with_name("M3V4BoundedAdaptiveFormalCampaignTest.java")
+PRODUCTION_ALLOCATOR = (
+    ROOT
+    / "nereus-metadata-spi"
+    / "src"
+    / "main"
+    / "java"
+    / "com"
+    / "nereusstream"
+    / "metadata"
+    / "spi"
+    / "allocator"
+    / "ProductionVirtualLedgerAllocator.java"
+)
+BOUNDED_WORKFLOW = PRODUCTION_ALLOCATOR.with_name("BoundedVirtualLedgerAllocatorWorkflowV2.java")
+BOUNDED_WORKFLOW_TEST = (
+    ROOT
+    / "nereus-metadata-spi"
+    / "src"
+    / "test"
+    / "java"
+    / "com"
+    / "nereusstream"
+    / "metadata"
+    / "spi"
+    / "allocator"
+    / "BoundedVirtualLedgerAllocatorWorkflowV2Test.java"
+)
+CONDITIONAL_MUTATION_ENGINE = (
+    ROOT
+    / "nereus-metadata-oxia"
+    / "src"
+    / "main"
+    / "java"
+    / "com"
+    / "nereusstream"
+    / "metadata"
+    / "oxia"
+    / "v2"
+    / "mutation"
+    / "ConditionalMutationEngine.java"
+)
 FORMAL_CAMPAIGN = (
     ROOT
     / "nereus-metadata-oxia"
@@ -79,6 +120,32 @@ FORMAL_CAMPAIGN = (
 
 
 class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
+    def test_v4_installed_range_fast_path_reuses_only_store_observed_authority(self) -> None:
+        allocator = PRODUCTION_ALLOCATOR.read_text()
+        workflow = BOUNDED_WORKFLOW.read_text()
+        workflow_test = BOUNDED_WORKFLOW_TEST.read_text()
+        mutation_engine = CONDITIONAL_MUTATION_ENGINE.read_text()
+
+        self.assertIn("createCandidateAfterStoreObservedRangeAuthorities", allocator)
+        self.assertIn("publishCandidateAfterStoreObservedRangeNode", allocator)
+        self.assertIn("store-observed candidate fast path requires RANGE mode", allocator)
+        self.assertIn("store-observed publish fast path requires RANGE mode", allocator)
+        self.assertIn("hasUsableGrant(authorities.head().value())", workflow)
+        self.assertIn(
+            "createCandidate(request, state, authorities.cell(), authorities.head(), true)",
+            workflow,
+        )
+        self.assertIn("case DEFINITIVE_CONFLICT", workflow)
+        self.assertIn("reconcilePublishedHead", workflow)
+        self.assertIn(
+            "installedRangeWorkflowDispatchesInitialAuthoritiesTogetherAndReusesExactMutationResults",
+            workflow_test,
+        )
+        self.assertIn("directAllocatorApiRetainsIndependentCellHeadAndNodeProofReads", workflow_test)
+        self.assertIn("mutationAttempt(() -> client.createIfAbsent", mutation_engine)
+        self.assertIn("mutationAttempt(() -> client.compareAndSet", mutation_engine)
+        self.assertGreaterEqual(mutation_engine.count("thenCompose(attempt -> reread(key)"), 2)
+
     def test_v4_plan_formal_entry_and_native_rows_are_independently_source_bound(self) -> None:
         first = subprocess.run(
             [sys.executable, str(V4_PLAN)],

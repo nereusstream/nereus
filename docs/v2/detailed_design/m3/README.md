@@ -715,6 +715,12 @@ changed.
 fixed/derived sequence and raises current-source NADV4 to 23 tests in the same nine suites. It changes no scheduler,
 allocator, plan, threshold, selection rule, or evidence wire until real RTT and scheduler/callback lag are measured.
 
+[ADR 0129](../../../decisions/0129-v2-m3-allocator-v4-installed-range-proof-reuse-amendment.md) binds the resulting
+`d434f910...` measurement and the [installed-RANGE proof-reuse record](stage-b-v4-installed-range-proof-reuse.md).
+Only the just-store-observed installed-grant path reuses exact Cell/Head and the exact create-reread node; public calls,
+renewal/conflict/fault paths, and mutation rereads remain proofful. The V4 diagnostic inventory stays 23 tests/nine
+suites and no protocol/evidence/selection identity changes.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1
