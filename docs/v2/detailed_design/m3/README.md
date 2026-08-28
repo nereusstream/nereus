@@ -589,6 +589,14 @@ and arrival-cursor entries now accept only fixed rates plus exact reconstructibl
 legacy entry continues rejecting them. Ordinal phase authority, jitter, trigger mix, workload bytes, plan digest,
 budgets, SLOs, dispositions, and selection rules remain unchanged.
 
+[ADR 0113](../../../decisions/0113-v2-m3-allocator-v3-completed-workflow-cell-reconciliation-amendment.md) records the
+next formal-state handoff correction. Exact source `ba7e313f...` executed the derived-800 workload and a complete
+RANGE-16 interval, then the first following fault action combined its exact post-interval Head with the population's
+stale pre-interval Cell snapshot. The failed 26-file attempt and JUnit are byte-identical in an external read-only
+archive. The V3 async completion now merges the returned exact Cell under a monotonic cursor/grant rule before it
+replaces the exact Head. This local proof handoff is not allocator correctness authority and adds no shared Cell lock;
+normal requests still prove correctness only through the production workflow's Oxia CAS/reread/bounded-retry chain.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

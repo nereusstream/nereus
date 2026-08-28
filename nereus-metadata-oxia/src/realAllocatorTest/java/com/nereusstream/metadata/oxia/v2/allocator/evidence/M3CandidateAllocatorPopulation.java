@@ -209,7 +209,11 @@ final class M3CandidateAllocatorPopulation {
             long elapsedMicros = TimeUnit.NANOSECONDS.toMicros(System.nanoTime() - started);
             if (failure == null) {
                 Result exact = Objects.requireNonNull(result, "bounded allocator result");
-                heads.compareAndSet(ledgerIndex, predecessor, exact.exactHead());
+                cell.updateAndGet(current -> newestCompletedWorkflowCell(current, exact.exactCell()));
+                if (!heads.compareAndSet(ledgerIndex, predecessor, exact.exactHead())) {
+                    throw new IllegalStateException(
+                            "allocator V3 binding completion lost its exact Head predecessor");
+                }
                 observer.completed(actorId, planned, exact, elapsedMicros);
             } else {
                 observer.failed(actorId, planned, failure, elapsedMicros);
@@ -280,6 +284,43 @@ final class M3CandidateAllocatorPopulation {
         int mixed = requestByte ^ Integer.rotateLeft(retryNumber * 0x9e3779b9, reason.ordinal() & 15);
         int phase = Math.floorMod(mixed, M3V2BoundedActorLaneRunner.ACTOR_COUNT);
         return FORMAL_RETRY_BACKOFF_BASE.plusMillis(phase);
+    }
+
+    static VersionedAllocatorCellStateV1 newestCompletedWorkflowCell(
+            VersionedAllocatorCellStateV1 current, VersionedAllocatorCellStateV1 observed) {
+        Objects.requireNonNull(current, "current");
+        Objects.requireNonNull(observed, "observed");
+        if (current.value().mode() != observed.value().mode()
+                || current.value().allocatorProtocolVersion() != observed.value().allocatorProtocolVersion()
+                || !current
+                        .value()
+                        .ledgerIdCompatibilityNamespaceId()
+                        .equals(observed.value().ledgerIdCompatibilityNamespaceId())
+                || !current.value().sliceAssignmentId().equals(observed.value().sliceAssignmentId())
+                || current.value().sliceStartInclusive() != observed.value().sliceStartInclusive()
+                || current.value().sliceEndInclusive() != observed.value().sliceEndInclusive()) {
+            throw new IllegalStateException("allocator V3 workflow Cell snapshot changed exact slice identity");
+        }
+        if (observed.value().reservation().isPresent()) {
+            throw new IllegalStateException("allocator V3 completed workflow retained a Cell reservation");
+        }
+        long currentCursor = current.value().nextSliceLedgerId();
+        long observedCursor = observed.value().nextSliceLedgerId();
+        long currentGrant = current.value().nextGrantId();
+        long observedGrant = observed.value().nextGrantId();
+        if (observedCursor < currentCursor || observedGrant < currentGrant) {
+            if (observedCursor <= currentCursor && observedGrant <= currentGrant) {
+                return current;
+            }
+            throw new IllegalStateException("allocator V3 workflow Cell cursor/grant ordering diverged");
+        }
+        if (observedCursor == currentCursor || observedGrant == currentGrant) {
+            if (!observed.value().equals(current.value())) {
+                throw new IllegalStateException("allocator V3 workflow Cell cursor/grant ordering diverged");
+            }
+            return current;
+        }
+        return observed;
     }
 
     long ensurePopulation(int requestedPopulation) throws Exception {

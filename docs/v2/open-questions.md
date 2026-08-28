@@ -840,6 +840,11 @@ The next `1771b000...` attempt passed that projection boundary but stopped befor
 V3 candidate runtime still called the ADR-0094 fixed-rate-only workload entry. ADR 0112 preserves that attempt and
 adds separate closed V3 schedule entries for fixed plus exact reconstructible derived rates; V1/V2 stay fixed-only.
 This is still a physical conformance correction, not a candidate PASS, threshold change, or selection decision.
+The following `ba7e313f...` attempt proved that entry and completed a RANGE-16 interval, then stopped when its first
+fault action observed a post-interval Head beside the harness's stale pre-interval Cell snapshot. ADR 0113 preserves
+that failed attempt and requires a monotonic exact-Cell completion handoff before later fault/scale helpers. It does
+not replace Oxia correctness with a Java lock, reinterpret the failed row, or change any candidate threshold,
+workload, budget, disposition, or selection rule.
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

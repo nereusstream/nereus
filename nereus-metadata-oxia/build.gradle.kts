@@ -1265,7 +1265,8 @@ tasks.register<Test>("realAllocatorRange100kConstructionDiagnosticTest") {
 
 tasks.register<Test>("realAllocatorRangeFaultBatchDiagnosticTest") {
     group = "verification"
-    description = "Run the diagnostic-only 10k RANGE-16 nine-cut batch against real Oxia without emitting evidence."
+    description =
+        "Run the diagnostic-only V3 async Cell handoff plus 10k RANGE-16 nine-cut batch against real Oxia."
     dependsOn(realAllocatorEvidenceArtifactJar)
     testClassesDirs = realAllocatorTest.output.classesDirs
     classpath = realAllocatorEvidenceRuntimeClasspath

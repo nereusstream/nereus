@@ -508,6 +508,14 @@ preserves the 21-file failed attempt and its external archive. V1/V2 remain clos
 V3 workload and arrival entries admit only the fixed rates plus exact reconstructible 800/600/400/267 values. The
 schedule/profile/plan digests, jitter bytes, thresholds, budgets, and selection rules remain unchanged.
 
+The subsequent exact-source attempt at `ba7e313f...` executed derived 800 and then completed the RANGE-16 scale and
+fixed-rate interval before the first following fault action paired a post-interval exact Head with the formal
+population's stale pre-interval Cell snapshot. [ADR 0113](../decisions/0113-v2-m3-allocator-v3-completed-workflow-cell-reconciliation-amendment.md)
+preserves the 26-file failed attempt and external archive. The V3 completion callback now monotonically reconciles
+the workflow's returned exact Cell before handing its exact Head to later fault/scale helpers. Oxia CAS/reread remains
+the production correctness authority; no cross-actor correctness lock, workload, SLO, budget, or selection change is
+introduced.
+
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.

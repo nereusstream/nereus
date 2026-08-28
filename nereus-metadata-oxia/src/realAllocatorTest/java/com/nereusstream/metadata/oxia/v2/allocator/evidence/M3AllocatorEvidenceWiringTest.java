@@ -18,16 +18,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.domain.registry.VirtualLedgerSliceAssignmentV1;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceAttachmentKindV1;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceCandidateV1;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceContextV1;
 import com.nereusstream.domain.registry.allocator.AllocatorFaultCutV1;
+import com.nereusstream.domain.registry.allocator.AllocatorModeV1;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.EventKind;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.EventOutcome;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.OxiaOperationKind;
+import com.nereusstream.domain.registry.allocator.VirtualLedgerCellAllocatorStateV1;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
+import com.nereusstream.metadata.spi.allocator.VersionedAllocatorCellStateV1;
+import com.nereusstream.metadata.spi.model.MetadataVersion;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -109,6 +115,25 @@ class M3AllocatorEvidenceWiringTest {
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("inherited measured metadata latency");
         }
+    }
+
+    @Test
+    void reconcilesCompletedV3WorkflowCellsMonotonicallyForFollowingFaultActions() {
+        VersionedAllocatorCellStateV1 first = exactCell(16, 2, 1);
+        VersionedAllocatorCellStateV1 second = exactCell(32, 3, 2);
+        VersionedAllocatorCellStateV1 sameValueDifferentOpaqueVersion = exactCell(32, 3, 3);
+
+        assertThat(M3CandidateAllocatorPopulation.newestCompletedWorkflowCell(first, second)).isSameAs(second);
+        assertThat(M3CandidateAllocatorPopulation.newestCompletedWorkflowCell(second, first)).isSameAs(second);
+        assertThat(M3CandidateAllocatorPopulation.newestCompletedWorkflowCell(
+                        second, sameValueDifferentOpaqueVersion))
+                .isSameAs(second);
+
+        VersionedAllocatorCellStateV1 mismatchedGrant = exactCell(48, 3, 4);
+        assertThatThrownBy(() -> M3CandidateAllocatorPopulation.newestCompletedWorkflowCell(
+                        second, mismatchedGrant))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cursor/grant ordering diverged");
     }
 
     @Test
@@ -475,6 +500,22 @@ class M3AllocatorEvidenceWiringTest {
         String digest = HexFormat.of()
                 .formatHex(MessageDigest.getInstance("SHA-256").digest(zeroed.getBytes(StandardCharsets.UTF_8)));
         return zeroed.replaceFirst("0{64}", digest);
+    }
+
+    private static VersionedAllocatorCellStateV1 exactCell(long consumed, long nextGrantId, int version) {
+        long start = VirtualLedgerSliceAssignmentV1.RESERVED_START_INCLUSIVE;
+        return new VersionedAllocatorCellStateV1(
+                new VirtualLedgerCellAllocatorStateV1(
+                        AllocatorModeV1.RANGE_LEASED,
+                        VirtualLedgerCellAllocatorStateV1.PROTOCOL_VERSION,
+                        Sha256Digest.hash(CanonicalBytes.copyOf("namespace".getBytes(StandardCharsets.UTF_8))),
+                        Sha256Digest.hash(CanonicalBytes.copyOf("assignment".getBytes(StandardCharsets.UTF_8))),
+                        start,
+                        Math.addExact(start, VirtualLedgerSliceAssignmentV1.SLICE_SIZE - 1),
+                        Math.addExact(start, consumed),
+                        nextGrantId,
+                        Optional.empty()),
+                new MetadataVersion(CanonicalBytes.copyOf(new byte[] {(byte) version})));
     }
 
     private static String junitXml(String skipped) {

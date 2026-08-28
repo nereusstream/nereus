@@ -39,6 +39,7 @@ V3_FORMAL_RUNTIME = (
     / "M3V3RealFormalActionRuntime.java"
 )
 V3_NATIVE_RUNTIME = V3_FORMAL_RUNTIME.with_name("M3V3NativeIntervalRuntime.java")
+V3_CANDIDATE_POPULATION = V3_FORMAL_RUNTIME.with_name("M3CandidateAllocatorPopulation.java")
 FORMAL_CAMPAIGN = (
     ROOT
     / "nereus-metadata-oxia"
@@ -145,6 +146,19 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             "candidateWarmupLoadRejectionAllowsAdaptiveDescentButUnexpectedFailureDoesNot()",
             protocol_main,
         )
+
+    def test_v3_async_completion_reconciles_exact_cell_before_following_fault_action(self) -> None:
+        population = V3_CANDIDATE_POPULATION.read_text()
+        v3_completion = population.split("private CompletionStage<?> boundedAllocateV3(", 1)[1].split(
+            "private CompletionStage<?> boundedAllocate(", 1
+        )[0]
+        self.assertIn(
+            "cell.updateAndGet(current -> newestCompletedWorkflowCell(current, exact.exactCell()))",
+            v3_completion,
+        )
+        self.assertIn("heads.compareAndSet(ledgerIndex, predecessor, exact.exactHead())", v3_completion)
+        self.assertIn("completed workflow retained a Cell reservation", population)
+        self.assertIn("workflow Cell cursor/grant ordering diverged", population)
 
     def test_formal_archiver_is_create_new_byte_exact_and_collision_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
