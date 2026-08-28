@@ -10,6 +10,7 @@ package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceAdmissionPolicyV3;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceAdmissionPolicyV4;
+import com.nereusstream.domain.registry.allocator.AllocatorEvidenceAdmissionPolicyV5;
 import com.nereusstream.domain.registry.allocator.AllocatorProtocolException;
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -50,17 +51,48 @@ final class M3V3AsyncActorLaneRunner<T> {
     private final Duration measurement;
     private final Duration terminalAdmissionDrain;
     private final Duration cleanupGrace;
+    private final int maxOutstandingPerActor;
+    private final int maxGlobalOutstanding;
 
     M3V3AsyncActorLaneRunner(Duration warmup, Duration measurement, Duration cleanupGrace) {
-        this(warmup, measurement, Duration.ZERO, cleanupGrace);
+        this(
+                warmup,
+                measurement,
+                Duration.ZERO,
+                cleanupGrace,
+                MAX_OUTSTANDING_PER_ACTOR,
+                MAX_GLOBAL_OUTSTANDING);
     }
 
     M3V3AsyncActorLaneRunner(
             Duration warmup, Duration measurement, Duration terminalAdmissionDrain, Duration cleanupGrace) {
+        this(
+                warmup,
+                measurement,
+                terminalAdmissionDrain,
+                cleanupGrace,
+                MAX_OUTSTANDING_PER_ACTOR,
+                MAX_GLOBAL_OUTSTANDING);
+    }
+
+    M3V3AsyncActorLaneRunner(
+            Duration warmup,
+            Duration measurement,
+            Duration terminalAdmissionDrain,
+            Duration cleanupGrace,
+            int maxOutstandingPerActor,
+            int maxGlobalOutstanding) {
         this.warmup = requirePositiveOrZero(warmup, "warmup");
         this.measurement = requirePositive(measurement, "measurement");
         this.terminalAdmissionDrain = requirePositiveOrZero(terminalAdmissionDrain, "terminal admission drain");
         this.cleanupGrace = requirePositive(cleanupGrace, "cleanup grace");
+        if (maxOutstandingPerActor <= 0
+                || maxGlobalOutstanding <= 0
+                || maxGlobalOutstanding > Math.multiplyExact(ACTOR_COUNT, maxOutstandingPerActor)) {
+            throw new IllegalArgumentException("allocator asynchronous admission caps are invalid");
+        }
+        this.maxOutstandingPerActor = maxOutstandingPerActor;
+        this.maxGlobalOutstanding = maxGlobalOutstanding;
     }
 
     static <T> M3V3AsyncActorLaneRunner<T> formal() {
@@ -72,7 +104,19 @@ final class M3V3AsyncActorLaneRunner<T> {
                 FORMAL_WARMUP,
                 FORMAL_MEASUREMENT,
                 Duration.ofSeconds(AllocatorEvidenceAdmissionPolicyV4.TERMINAL_ADMISSION_DRAIN_SECONDS),
-                FORMAL_CLEANUP_GRACE);
+                FORMAL_CLEANUP_GRACE,
+                AllocatorEvidenceAdmissionPolicyV4.MAX_ASYNC_OUTSTANDING_PER_ACTOR,
+                AllocatorEvidenceAdmissionPolicyV4.MAX_GLOBAL_OUTSTANDING);
+    }
+
+    static <T> M3V3AsyncActorLaneRunner<T> formalV5() {
+        return new M3V3AsyncActorLaneRunner<>(
+                FORMAL_WARMUP,
+                FORMAL_MEASUREMENT,
+                Duration.ofSeconds(AllocatorEvidenceAdmissionPolicyV5.TERMINAL_ADMISSION_DRAIN_SECONDS),
+                FORMAL_CLEANUP_GRACE,
+                AllocatorEvidenceAdmissionPolicyV5.MAX_ASYNC_OUTSTANDING_PER_ACTOR,
+                AllocatorEvidenceAdmissionPolicyV5.MAX_GLOBAL_OUTSTANDING);
     }
 
     IntervalResult run(
@@ -96,7 +140,9 @@ final class M3V3AsyncActorLaneRunner<T> {
                 offerCutoffNanos,
                 admissionCutoffNanos,
                 cleanupDeadlineNanos,
-                admissionMode);
+                admissionMode,
+                maxOutstandingPerActor,
+                maxGlobalOutstanding);
         CountDownLatch laneStops = new CountDownLatch(ACTOR_COUNT);
         List<Thread> lanes = startLanes(state, operation, laneStops);
         CountDownLatch measurementReady = new CountDownLatch(ACTOR_COUNT);
@@ -553,13 +599,15 @@ final class M3V3AsyncActorLaneRunner<T> {
         private final long admissionCutoffNanos;
         private final long cleanupDeadlineNanos;
         private final AdmissionMode admissionMode;
+        private final int maxOutstandingPerActor;
+        private final int maxGlobalOutstanding;
         private final List<Integer> laneCapacities;
         private final List<ArrayDeque<QueuedRequest<T>>> queues = new ArrayList<>(ACTOR_COUNT);
         private final Map<Long, AdmittedRequest<T>> active = new LinkedHashMap<>();
         private final Map<Long, Integer> bindingOutstanding = new HashMap<>();
         private final int[] actorOutstanding = new int[ACTOR_COUNT];
         private final boolean[] actorWaiting = new boolean[ACTOR_COUNT];
-        private final Metrics metrics = new Metrics();
+        private final Metrics metrics;
         private boolean accepting = true;
 
         private RunState(
@@ -567,12 +615,17 @@ final class M3V3AsyncActorLaneRunner<T> {
                 long offerCutoffNanos,
                 long admissionCutoffNanos,
                 long cleanupDeadlineNanos,
-                AdmissionMode admissionMode) {
+                AdmissionMode admissionMode,
+                int maxOutstandingPerActor,
+                int maxGlobalOutstanding) {
             this.queueCapacity = queueCapacity;
             this.offerCutoffNanos = offerCutoffNanos;
             this.admissionCutoffNanos = admissionCutoffNanos;
             this.cleanupDeadlineNanos = cleanupDeadlineNanos;
             this.admissionMode = admissionMode;
+            this.maxOutstandingPerActor = maxOutstandingPerActor;
+            this.maxGlobalOutstanding = maxGlobalOutstanding;
+            this.metrics = new Metrics(maxOutstandingPerActor, maxGlobalOutstanding);
             List<Integer> capacities = new ArrayList<>(ACTOR_COUNT);
             int base = queueCapacity / ACTOR_COUNT;
             int remainder = queueCapacity % ACTOR_COUNT;
@@ -665,8 +718,8 @@ final class M3V3AsyncActorLaneRunner<T> {
         private boolean canAdmit(ScheduledOffer<T> offer) {
             boolean bindingAvailable = admissionMode == AdmissionMode.CONFLICT_PROOF
                     || !bindingOutstanding.containsKey(offer.bindingOrdinal());
-            return actorOutstanding[offer.actorId()] < MAX_OUTSTANDING_PER_ACTOR
-                    && active.size() < MAX_GLOBAL_OUTSTANDING
+            return actorOutstanding[offer.actorId()] < maxOutstandingPerActor
+                    && active.size() < maxGlobalOutstanding
                     && bindingAvailable;
         }
 
@@ -783,6 +836,8 @@ final class M3V3AsyncActorLaneRunner<T> {
     }
 
     private static final class Metrics {
+        private final int maxOutstandingPerActor;
+        private final int maxGlobalOutstanding;
         private boolean measuring;
         private long offered;
         private long admitted;
@@ -798,6 +853,11 @@ final class M3V3AsyncActorLaneRunner<T> {
         private long pendingPermit;
         private long pendingPermitMaximum;
         private final List<Long> globalOutstandingSamples = new ArrayList<>();
+
+        private Metrics(int maxOutstandingPerActor, int maxGlobalOutstanding) {
+            this.maxOutstandingPerActor = maxOutstandingPerActor;
+            this.maxGlobalOutstanding = maxGlobalOutstanding;
+        }
         private final List<Long> queueWaitMicros = new ArrayList<>();
         private final List<Long> schedulerLagMicros = new ArrayList<>();
         private final List<Long> callbackLagMicros = new ArrayList<>();
@@ -854,8 +914,8 @@ final class M3V3AsyncActorLaneRunner<T> {
                 queueWaitMicros.add(
                         TimeUnit.NANOSECONDS.toMicros(request.admittedNanos() - request.queued().enqueuedNanos()));
             }
-            if (actorOutstanding[request.offer().actorId()] > MAX_OUTSTANDING_PER_ACTOR
-                    || globalOutstanding > MAX_GLOBAL_OUTSTANDING) {
+            if (actorOutstanding[request.offer().actorId()] > maxOutstandingPerActor
+                    || globalOutstanding > maxGlobalOutstanding) {
                 throw new IllegalStateException("allocator V3 asynchronous outstanding bound was exceeded");
             }
             if (measuring) {

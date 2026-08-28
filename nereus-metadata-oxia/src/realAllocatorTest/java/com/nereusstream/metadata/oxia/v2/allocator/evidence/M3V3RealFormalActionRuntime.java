@@ -53,7 +53,7 @@ import java.util.concurrent.atomic.AtomicLong;
 final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoCloseable {
     private final Path actionDirectory;
     private final String executionDiscriminator;
-    private final boolean terminalDrainV4;
+    private final int protocolVersion;
     private final String attachmentProtocol;
     private final ThreadPoolExecutor constructionAndFaultWorkers;
     private final M3RealOxiaActors actors;
@@ -64,7 +64,7 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
 
     M3V3RealFormalActionRuntime(Path outputDirectory, String oxiaServiceAddress, String executionDiscriminator)
             throws Exception {
-        this(outputDirectory, oxiaServiceAddress, executionDiscriminator, false);
+        this(outputDirectory, oxiaServiceAddress, executionDiscriminator, 3);
     }
 
     M3V3RealFormalActionRuntime(
@@ -73,13 +73,25 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
             String executionDiscriminator,
             boolean terminalDrainV4)
             throws Exception {
+        this(outputDirectory, oxiaServiceAddress, executionDiscriminator, terminalDrainV4 ? 4 : 3);
+    }
+
+    M3V3RealFormalActionRuntime(
+            Path outputDirectory,
+            String oxiaServiceAddress,
+            String executionDiscriminator,
+            int protocolVersion)
+            throws Exception {
         Path exactOutput = Objects.requireNonNull(outputDirectory, "outputDirectory").toAbsolutePath().normalize();
         if (!Files.isDirectory(exactOutput) || Files.isSymbolicLink(exactOutput)) {
             throw new IllegalArgumentException("allocator V3 formal output directory is absent or a link");
         }
         this.executionDiscriminator = requireSafeIdentity(executionDiscriminator);
-        this.terminalDrainV4 = terminalDrainV4;
-        attachmentProtocol = terminalDrainV4 ? "V4" : "V3";
+        if (protocolVersion < 3 || protocolVersion > 5) {
+            throw new IllegalArgumentException("allocator formal action runtime protocol version differs");
+        }
+        this.protocolVersion = protocolVersion;
+        attachmentProtocol = "V" + protocolVersion;
         actionDirectory = Files.createDirectory(exactOutput.resolve("actions"));
         constructionAndFaultWorkers = M3RealAllocatorEvidenceTest.exactWorkers();
         constructionAndFaultWorkers.prestartAllCoreThreads();
@@ -125,9 +137,12 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
                         cell.candidate(), ignored -> ConcurrentHashMap.newKeySet()));
         List<M3V3AllocatorFormalHarness.ActorEndpoint> endpoints =
                 population.formalActorEndpointsV3(cell, measurements);
-        M3V3AllocatorFormalHarness harness = terminalDrainV4
-                ? M3V3AllocatorFormalHarness.formalActorsV4(endpoints)
-                : M3V3AllocatorFormalHarness.formalActors(endpoints);
+        M3V3AllocatorFormalHarness harness = switch (protocolVersion) {
+            case 3 -> M3V3AllocatorFormalHarness.formalActors(endpoints);
+            case 4 -> M3V3AllocatorFormalHarness.formalActorsV4(endpoints);
+            case 5 -> M3V3AllocatorFormalHarness.formalActorsV5(endpoints);
+            default -> throw new IllegalStateException("allocator formal action runtime protocol version differs");
+        };
         List<M3V3AsyncActorLaneRunner.ScheduledOffer<M3V3AllocatorFormalHarness.CandidateRequest>> schedule =
                 candidateSchedule(cell.activeManagedLedgers(), offeredRate);
         M3V3AllocatorFormalHarness.HarnessResult result;
@@ -233,7 +248,7 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
 
     private M3V3NativeIntervalRuntime nativeIntervalRuntime() throws Exception {
         if (nativeIntervalRuntime == null) {
-            nativeIntervalRuntime = new M3V3NativeIntervalRuntime(nativePopulation(), terminalDrainV4);
+            nativeIntervalRuntime = new M3V3NativeIntervalRuntime(nativePopulation(), protocolVersion);
         }
         return nativeIntervalRuntime;
     }

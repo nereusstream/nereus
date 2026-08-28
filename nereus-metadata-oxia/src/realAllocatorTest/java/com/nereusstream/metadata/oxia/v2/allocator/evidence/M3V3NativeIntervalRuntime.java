@@ -26,15 +26,22 @@ import java.util.concurrent.atomic.AtomicLong;
 /** Shared ADR-0109 Native interval runtime used by both formal execution and diagnostic canaries. */
 final class M3V3NativeIntervalRuntime {
     private final M3NativePulsarPopulation population;
-    private final boolean terminalDrainV4;
+    private final int protocolVersion;
 
     M3V3NativeIntervalRuntime(M3NativePulsarPopulation population) {
-        this(population, false);
+        this(population, 3);
     }
 
     M3V3NativeIntervalRuntime(M3NativePulsarPopulation population, boolean terminalDrainV4) {
+        this(population, terminalDrainV4 ? 4 : 3);
+    }
+
+    M3V3NativeIntervalRuntime(M3NativePulsarPopulation population, int protocolVersion) {
         this.population = Objects.requireNonNull(population, "population");
-        this.terminalDrainV4 = terminalDrainV4;
+        if (protocolVersion < 3 || protocolVersion > 5) {
+            throw new IllegalArgumentException("allocator Native interval protocol version differs");
+        }
+        this.protocolVersion = protocolVersion;
     }
 
     Result run(
@@ -51,9 +58,12 @@ final class M3V3NativeIntervalRuntime {
         AllocatorEvidenceContextV1 context =
                 AllocatorEvidenceContextV1.nativeContext(activePopulation, metadataLatencyMillis, offeredRate);
         List<M3V3AsyncActorLaneRunner.ScheduledOffer<NativeOffer>> schedule = schedule(activePopulation, offeredRate);
-        M3V3AsyncActorLaneRunner<NativeOffer> runner = terminalDrainV4
-                ? M3V3AsyncActorLaneRunner.formalV4()
-                : M3V3AsyncActorLaneRunner.formal();
+        M3V3AsyncActorLaneRunner<NativeOffer> runner = switch (protocolVersion) {
+            case 3 -> M3V3AsyncActorLaneRunner.formal();
+            case 4 -> M3V3AsyncActorLaneRunner.formalV4();
+            case 5 -> M3V3AsyncActorLaneRunner.formalV5();
+            default -> throw new IllegalStateException("allocator Native interval protocol version differs");
+        };
         M3V3AsyncActorLaneRunner.IntervalResult interval;
         try {
             interval = runner.run(offeredRate, schedule, (actorId, offer, operationContext) -> {

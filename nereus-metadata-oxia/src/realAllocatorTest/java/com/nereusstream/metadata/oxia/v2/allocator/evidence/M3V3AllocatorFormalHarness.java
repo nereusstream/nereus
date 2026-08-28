@@ -17,6 +17,7 @@ package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.Cell;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignV3.IntervalEvidence;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignValidatorV3;
+import com.nereusstream.domain.registry.allocator.AllocatorEvidenceAdmissionPolicyV5;
 import com.nereusstream.metadata.spi.allocator.BoundedVirtualLedgerAllocatorWorkflowV2;
 import com.nereusstream.metadata.spi.allocator.BoundedVirtualLedgerAllocatorWorkflowV2.Request;
 import java.time.Duration;
@@ -66,14 +67,18 @@ final class M3V3AllocatorFormalHarness {
     }
 
     static M3V3AllocatorFormalHarness formalActors(List<ActorEndpoint> actors) {
-        return formalActors(actors, false);
+        return formalActors(actors, 3);
     }
 
     static M3V3AllocatorFormalHarness formalActorsV4(List<ActorEndpoint> actors) {
-        return formalActors(actors, true);
+        return formalActors(actors, 4);
     }
 
-    private static M3V3AllocatorFormalHarness formalActors(List<ActorEndpoint> actors, boolean terminalDrainV4) {
+    static M3V3AllocatorFormalHarness formalActorsV5(List<ActorEndpoint> actors) {
+        return formalActors(actors, 5);
+    }
+
+    private static M3V3AllocatorFormalHarness formalActors(List<ActorEndpoint> actors, int protocolVersion) {
         for (ActorEndpoint actor : List.copyOf(Objects.requireNonNull(actors, "actors"))) {
             if (!(actor.coordinatorIdentity() instanceof BoundedVirtualLedgerAllocatorWorkflowV2 workflow)
                     || !workflow.bounds().equals(BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal())) {
@@ -81,9 +86,12 @@ final class M3V3AllocatorFormalHarness {
                         "allocator V3 formal actor is not an exact bounded production workflow");
             }
         }
-        M3V3AsyncActorLaneRunner<CandidateRequest> runner = terminalDrainV4
-                ? M3V3AsyncActorLaneRunner.formalV4()
-                : M3V3AsyncActorLaneRunner.formal();
+        M3V3AsyncActorLaneRunner<CandidateRequest> runner = switch (protocolVersion) {
+            case 3 -> M3V3AsyncActorLaneRunner.formal();
+            case 4 -> M3V3AsyncActorLaneRunner.formalV4();
+            case 5 -> M3V3AsyncActorLaneRunner.formalV5();
+            default -> throw new IllegalArgumentException("allocator formal harness protocol version differs");
+        };
         return new M3V3AllocatorFormalHarness(runner, actors);
     }
 
@@ -100,6 +108,23 @@ final class M3V3AllocatorFormalHarness {
             List<ActorEndpoint> actors) {
         return new M3V3AllocatorFormalHarness(
                 new M3V3AsyncActorLaneRunner<>(warmup, measurement, terminalAdmissionDrain, cleanupGrace), actors);
+    }
+
+    static M3V3AllocatorFormalHarness forContractTestV5(
+            Duration warmup,
+            Duration measurement,
+            Duration terminalAdmissionDrain,
+            Duration cleanupGrace,
+            List<ActorEndpoint> actors) {
+        return new M3V3AllocatorFormalHarness(
+                new M3V3AsyncActorLaneRunner<>(
+                        warmup,
+                        measurement,
+                        terminalAdmissionDrain,
+                        cleanupGrace,
+                        AllocatorEvidenceAdmissionPolicyV5.MAX_ASYNC_OUTSTANDING_PER_ACTOR,
+                        AllocatorEvidenceAdmissionPolicyV5.MAX_GLOBAL_OUTSTANDING),
+                actors);
     }
 
     HarnessResult runCandidate(
