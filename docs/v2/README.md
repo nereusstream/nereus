@@ -492,6 +492,9 @@ rerun, source-lock, child, current-source M2, scenario, or Final update.
 The amended source-bound schedule/profile identities are `b0e923a0...e798` and `4b11530b...d751`, yielding plan
 digest `5f94079e...b283` without changing the V3 logical action inventory or any qualification rule. Its NADV3 gate
 seals and parse-canonically revalidates all six diagnostic suites and, after ADR 0117, 18 exact testcase identities.
+The [Stage B.2 current-source recertification record](detailed_design/m3/stage-b2-native-executor-current-source-recertification.md)
+binds the same accepted profile to a new exact clean pushed source through diagnostic-only canary and NADV3 replay.
+It expressly creates no formal authorization, selection, production source-lock, child, M2, scenario, or Final input.
 
 The next authorized attempt at exact source `e60327ae...` established all eight Native baselines at 1000 requests per
 second, then failed infrastructure classification after its first STRICT row because bounded typed warm-up rejection

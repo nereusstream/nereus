@@ -562,6 +562,8 @@ The schedule/profile hashes are `b0e923a0...e798` and `4b11530b...d751`; the res
 `5f94079e...b283`. Formal and diagnostic construct `M3V3NativeIntervalRuntime` directly, and the current NADV3
 validator requires the exact six-XML/18-test suite manifest after ADR 0117 rather than accepting one selected test
 result.
+The [Stage B.2 current-source recertification record](stage-b2-native-executor-current-source-recertification.md)
+defines the create-new diagnostic replay and no-formal stop boundary for the exact pushed source that contains it.
 
 [ADR 0110](../../../decisions/0110-v2-m3-allocator-candidate-warmup-load-rejection-classification-amendment.md)
 records the subsequent candidate-boundary correction. Exact source `e60327ae...` completed all eight Native baselines

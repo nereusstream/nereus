@@ -134,6 +134,10 @@ also required canonical revalidation of the complete five-suite, 16-test NADV3 J
 For ADR 0114 through ADR 0116 sources, ADR 0115 extends that closed inventory to exactly six suites and 17 tests by
 including the formal-equivalent STRICT fixed-1000/derived-800 diagnostic. ADR 0117 adds the exact RANGE-16 sequence,
 so current-source NADV3 is six suites/18 tests; historical receipts remain unchanged and parse-compatible.
+The [Stage B.2 current-source recertification record](detailed_design/m3/stage-b2-native-executor-current-source-recertification.md)
+requires a fresh diagnostic-only replay on the exact pushed source containing that record. It preserves the original
+four-commit correction ancestry and the immutable `4bf51a38...-r1` archive, and stops with no formal directory for the
+new source. It is not Stage B r2 authorization.
 
 ADR 0110 governs the next V3 formal harness correction. The `e60327ae...-r1` attempt remains immutable
 `INFRASTRUCTURE_FAILED` evidence with no evaluation or selection. Candidate warm-up typed load rejection must remain

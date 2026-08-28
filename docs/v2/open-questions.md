@@ -827,6 +827,9 @@ remaining open question is still formal candidate qualification on the later exp
 B.2 diagnostic conformance cannot select a mode or promote a scenario.
 The Stage B.2 profile is closed at schedule digest `b0e923a0...e798`, execution digest `4b11530b...d751`, and plan
 digest `5f94079e...b283`; only a later exact-SHA formal authorization may answer that remaining qualification question.
+The [Stage B.2 current-source recertification record](detailed_design/m3/stage-b2-native-executor-current-source-recertification.md)
+requires a fresh diagnostic-only canary/NADV3 proof on its pushed source and still leaves this qualification question
+open.
 That authorization first ran at `e60327ae...`: all Native baselines were valid at 1000 requests per second, while the
 first STRICT row produced a complete measured failure inventory plus expected typed warm-up contention. ADR 0110
 freezes the failed attempt and corrects only the infrastructure classifier so the validator can consume the failed
