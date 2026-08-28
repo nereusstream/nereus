@@ -78,10 +78,27 @@ JUnit, file count, byte count, regular-file inventory, and collision-free archiv
 byte; emits `SHA256SUMS` and a create-new identity; and makes the archive read-only. Such an archive is permanently
 non-promotable and never a future campaign input.
 
+### Current-source diagnostic inventory
+
+The first clean-source verification at `e5b1741b80cce8aa56215e32b1ae1c15d593e7a2` completed all five diagnostic
+suites with 16 tests and zero failure, error, or skip, but the NADV3 sealer correctly rejected the result because its
+closed testcase allowlist still described the pre-amendment 15-test suite. No NADV3 was created. The diagnostic raw
+files and complete JUnit directory are archived read-only at
+`/Users/liusinan/Documents/Codex/2026-08-28/nereus-v2-m3-allocator/diagnostic-e5b1741b-adr0110-r1-nadv3-inventory-mismatch`.
+Its payload manifest SHA-256 is `11c5bed8fd25dbcd6ecb1aeac349cab87ba85c98a207c22cbee0b53fa96ffd9f`,
+archive identity SHA-256 is `670e588db7d24538e82af3bb33c68a97f55e1e5d723f25f9b68faf1a9015dba6`, and
+the unsealed 16-test JUnit manifest SHA-256 is
+`3985c19a2a04c7f10046a84ab3e6c6b104085de8edade9b68591b2b6af0cfa00`.
+
+The canonical diagnostic inventory therefore includes the new warm-up classification contract as its sixteenth
+testcase. This is an allowlist closure correction only: it does not accept a failing, errored, or skipped test and
+does not change NADV3 wire semantics, source binding, diagnostic authority, or promotion eligibility.
+
 ## Consequences
 
 - The `e60327ae...-r1` attempt remains a valid immutable infrastructure-failure record, not a candidate evaluation.
 - Expected warm-up load rejection is visible and conserved but no longer prevents deterministic rate descent.
+- Current-source NADV3 must bind the exact five-suite, 16-test inventory including the classification contract.
 - Unexpected warm-up failure, timeout, incomplete cleanup, source/runtime drift, and every measured failure remain
   fail-closed.
 - No SLO, threshold, workload, candidate, rate, disposition, selection preference, or evidence-accounting rule is

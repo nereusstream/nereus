@@ -484,7 +484,7 @@ async ManagedLedger runtime with no admission-after hidden queue. Stage B.2 is d
 rerun, source-lock, child, current-source M2, scenario, or Final update.
 The amended source-bound schedule/profile identities are `b0e923a0...e798` and `4b11530b...d751`, yielding plan
 digest `5f94079e...b283` without changing the V3 logical action inventory or any qualification rule. Its NADV3 gate
-seals and parse-canonically revalidates all five diagnostic suites and 15 exact testcase identities.
+seals and parse-canonically revalidates all five diagnostic suites and 16 exact testcase identities.
 
 The next authorized attempt at exact source `e60327ae...` established all eight Native baselines at 1000 requests per
 second, then failed infrastructure classification after its first STRICT row because bounded typed warm-up rejection

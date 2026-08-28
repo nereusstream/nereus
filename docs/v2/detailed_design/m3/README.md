@@ -560,7 +560,7 @@ ManagedLedger async chain, rejects the old hidden-queue profile, runs an exact-s
 the complete diagnostic JUnit inventory. It does not authorize a formal rerun or any downstream promotion.
 The schedule/profile hashes are `b0e923a0...e798` and `4b11530b...d751`; the resulting amended zero-decision plan is
 `5f94079e...b283`. Formal and diagnostic construct `M3V3NativeIntervalRuntime` directly, and the NADV3 validator
-requires the exact five-XML/15-test suite manifest rather than accepting one selected test result.
+requires the exact five-XML/16-test suite manifest rather than accepting one selected test result.
 
 [ADR 0110](../../../decisions/0110-v2-m3-allocator-candidate-warmup-load-rejection-classification-amendment.md)
 records the subsequent candidate-boundary correction. Exact source `e60327ae...` completed all eight Native baselines

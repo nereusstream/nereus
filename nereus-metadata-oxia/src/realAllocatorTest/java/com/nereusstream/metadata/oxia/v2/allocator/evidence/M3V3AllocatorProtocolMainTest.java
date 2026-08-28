@@ -288,7 +288,8 @@ class M3V3AllocatorProtocolMainTest {
                         "cleanupTimeoutClosesTheWorkflowGuardAndLateCompletionCannotDispatchNextOperation()",
                         "normalIntervalsSingleFlightBindingsWhileConflictProofRetainsSameKeyConcurrency()",
                         "everyFrozenRateRetainsOneOrdinalAuthoritativeMeasurementTransition()",
-                        "scheduleRejectsWarmupAfterMeasurementAndRunnerContainsNoCorrectnessLockOrWorkerPool()"));
+                        "scheduleRejectsWarmupAfterMeasurementAndRunnerContainsNoCorrectnessLockOrWorkerPool()",
+                        "candidateWarmupLoadRejectionAllowsAdaptiveDescentButUnexpectedFailureDoesNot()"));
         writeSuite(
                 directory,
                 M3V3RealOxiaOperationDiagnosticTest.class,

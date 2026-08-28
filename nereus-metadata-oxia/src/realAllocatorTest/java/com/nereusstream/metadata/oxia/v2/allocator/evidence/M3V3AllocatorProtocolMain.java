@@ -89,6 +89,9 @@ public final class M3V3AllocatorProtocolMain {
                     "M3V3AsyncActorLaneRunnerTest",
                     "scheduleRejectsWarmupAfterMeasurementAndRunnerContainsNoCorrectnessLockOrWorkerPool()"),
             identity(
+                    "M3V3AsyncActorLaneRunnerTest",
+                    "candidateWarmupLoadRejectionAllowsAdaptiveDescentButUnexpectedFailureDoesNot()"),
+            identity(
                     "M3V3RealOxiaOperationDiagnosticTest",
                     "realOxiaOperationsRemainNonzeroAcrossEveryFrozenLatency()"),
             identity(

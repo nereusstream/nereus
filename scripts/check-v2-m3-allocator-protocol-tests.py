@@ -135,9 +135,14 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn("timeout.set(Duration.ofMinutes(60))", diagnostic)
         self.assertIn("validateRealAllocatorV3Diagnostic", module)
         harness = V3_FORMAL_RUNTIME.with_name("M3V3AllocatorFormalHarness.java").read_text()
+        protocol_main = V3_FORMAL_RUNTIME.with_name("M3V3AllocatorProtocolMain.java").read_text()
         self.assertIn("candidateInfrastructureValid(interval)", harness)
         self.assertIn("warmupLoadRejectedAfterAdmission", formal)
         self.assertIn("warmupUnexpectedFailedAfterAdmission", formal)
+        self.assertIn(
+            "candidateWarmupLoadRejectionAllowsAdaptiveDescentButUnexpectedFailureDoesNot()",
+            protocol_main,
+        )
 
     def test_formal_archiver_is_create_new_byte_exact_and_collision_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
