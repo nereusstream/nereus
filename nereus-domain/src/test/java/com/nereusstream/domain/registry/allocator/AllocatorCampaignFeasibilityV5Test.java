@@ -30,13 +30,13 @@ class AllocatorCampaignFeasibilityV5Test {
         var result = AllocatorCampaignFeasibilityV5.requireFormalFeasible();
 
         assertThat(result.status()).isEqualTo(Status.PLAN_FEASIBLE);
-        assertThat(result.admission())
-                .isEqualTo(new AllocatorCampaignFeasibilityV3.AdmissionTuple(4, 128, 512, 1));
+        assertThat(result.admission()).isEqualTo(new AllocatorCampaignFeasibilityV3.AdmissionTuple(4, 128, 512, 1));
         assertThat(result.optimisticRequestsPerSecond()).isEqualTo(2_048);
         assertThat(result.instantaneousStormFeasible()).isTrue();
         assertThat(result.terminalDrainFeasible()).isTrue();
         assertThat(result.serviceThroughDrain()).isEqualTo(24_576);
-        assertThat(AllocatorEvidenceAdmissionPolicyV5.EXACT_STORM_OUTSTANDING_PER_ACTOR).isEqualTo(125);
+        assertThat(AllocatorEvidenceAdmissionPolicyV5.EXACT_STORM_OUTSTANDING_PER_ACTOR)
+                .isEqualTo(125);
         assertThat(AllocatorNativeExecutionProfileV5.scheduleDigest())
                 .isEqualTo(AllocatorNativeExecutionProfileV4.scheduleDigest());
         assertThat(AllocatorNativeExecutionProfileV5.executionProfileDigest())

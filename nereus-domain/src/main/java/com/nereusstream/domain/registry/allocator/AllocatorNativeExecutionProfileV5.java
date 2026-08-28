@@ -29,8 +29,8 @@ public final class AllocatorNativeExecutionProfileV5 {
     }
 
     public static Sha256Digest executionProfileDigest() {
-        return Sha256Digest.hash(CanonicalBytes.copyOf(
-                executionProfileCanonicalText().getBytes(StandardCharsets.UTF_8)));
+        return Sha256Digest.hash(
+                CanonicalBytes.copyOf(executionProfileCanonicalText().getBytes(StandardCharsets.UTF_8)));
     }
 
     public static String executionProfileCanonicalText() {

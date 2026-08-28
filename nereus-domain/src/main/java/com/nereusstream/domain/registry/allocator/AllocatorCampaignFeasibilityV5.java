@@ -30,15 +30,12 @@ public final class AllocatorCampaignFeasibilityV5 {
     public static Result evaluate(AdmissionTuple admission) {
         Objects.requireNonNull(admission, "admission");
         AllocatorCampaignFeasibilityV3.Result steady = AllocatorCampaignFeasibilityV3.evaluate(admission);
-        long capacity = AllocatorCampaignFeasibilityV3.optimisticRequestsPerSecond(
-                admission, COMPLETION_BOUND_MILLIS);
+        long capacity = AllocatorCampaignFeasibilityV3.optimisticRequestsPerSecond(admission, COMPLETION_BOUND_MILLIS);
         long offeredDuringStorm = Math.multiplyExact((long) STORM_RATE, STORM_SECONDS);
         long serviceThroughDrain = Math.multiplyExact(capacity, Math.addExact(STORM_SECONDS, DRAIN_SECONDS));
         boolean instantaneous = capacity >= STORM_RATE;
         boolean drain = serviceThroughDrain >= offeredDuringStorm;
-        Status status = steady.status() == AllocatorCampaignFeasibilityV3.Status.PLAN_FEASIBLE
-                        && instantaneous
-                        && drain
+        Status status = steady.status() == AllocatorCampaignFeasibilityV3.Status.PLAN_FEASIBLE && instantaneous && drain
                 ? Status.PLAN_FEASIBLE
                 : Status.STORM_ADMISSION_INFEASIBLE;
         return new Result(

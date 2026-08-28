@@ -23,15 +23,13 @@ public final class AllocatorEvidenceAdmissionPolicyV5 {
             AllocatorEvidenceAdmissionPolicyV4.TERMINAL_ADMISSION_DRAIN_SECONDS;
     public static final int CLEANUP_GRACE_SECONDS = AllocatorEvidenceAdmissionPolicyV4.CLEANUP_GRACE_SECONDS;
     public static final int MAX_STORM_RATE_MULTIPLIER = 2;
-    public static final int MAX_STORM_RATE = Math.multiplyExact(
-            AllocatorEvidenceAdmissionPolicyV3.MAX_FROZEN_RATE, MAX_STORM_RATE_MULTIPLIER);
+    public static final int MAX_STORM_RATE =
+            Math.multiplyExact(AllocatorEvidenceAdmissionPolicyV3.MAX_FROZEN_RATE, MAX_STORM_RATE_MULTIPLIER);
     public static final int EXACT_STORM_OUTSTANDING_PER_ACTOR = 125;
 
     static {
         int exact = AllocatorEvidenceAdmissionPolicyV3.exactOutstandingPerActor(
-                MAX_STORM_RATE,
-                AllocatorEvidenceAdmissionPolicyV3.ROLLOVER_P99_MILLIS,
-                ACTOR_COUNT);
+                MAX_STORM_RATE, AllocatorEvidenceAdmissionPolicyV3.ROLLOVER_P99_MILLIS, ACTOR_COUNT);
         if (exact != EXACT_STORM_OUTSTANDING_PER_ACTOR
                 || MAX_ASYNC_OUTSTANDING_PER_ACTOR < exact
                 || Math.multiplyExact(ACTOR_COUNT, MAX_ASYNC_OUTSTANDING_PER_ACTOR) != MAX_GLOBAL_OUTSTANDING) {
