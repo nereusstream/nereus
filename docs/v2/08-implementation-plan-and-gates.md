@@ -130,10 +130,10 @@ rows to pass one exact-schedule diagnostic canary with actual operation concurre
 NADV3 to bind the complete diagnostic JUnit XML inventory. Stage B.2 stops before any new formal campaign.
 The shared schedule/profile digests are `b0e923a0...e798` and `4b11530b...d751`; their source-bound V3 plan digest is
 `5f94079e...b283`, with the existing 328/360/32/720 action limits and 48,000-second hard cap unchanged. Publication
-also requires canonical revalidation of the complete five-suite, 16-test NADV3 JUnit inventory.
-For ADR 0114 and later current sources, ADR 0115 extends that closed inventory to exactly six suites and 17 tests by
-including the formal-equivalent STRICT fixed-1000/derived-800 diagnostic; historical five-suite receipts remain
-unchanged and parse-compatible.
+also required canonical revalidation of the complete five-suite, 16-test NADV3 JUnit inventory at that source.
+For ADR 0114 through ADR 0116 sources, ADR 0115 extends that closed inventory to exactly six suites and 17 tests by
+including the formal-equivalent STRICT fixed-1000/derived-800 diagnostic. ADR 0117 adds the exact RANGE-16 sequence,
+so current-source NADV3 is six suites/18 tests; historical receipts remain unchanged and parse-compatible.
 
 ADR 0110 governs the next V3 formal harness correction. The `e60327ae...-r1` attempt remains immutable
 `INFRASTRUCTURE_FAILED` evidence with no evaluation or selection. Candidate warm-up typed load rejection must remain
