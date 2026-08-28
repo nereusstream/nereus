@@ -835,6 +835,9 @@ val realAllocatorV3DiagnosticTest = tasks.register<Test>("realAllocatorV3Diagnos
         includeTestsMatching(
             "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3NativeBaselineCanaryTest",
         )
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3RealAllocatorStrictIntervalDiagnosticTest",
+        )
     }
     outputs.upToDateWhen { false }
     doFirst {
@@ -1286,6 +1289,39 @@ tasks.register<Test>("realAllocatorRangeFaultBatchDiagnosticTest") {
         "nereus.m3.allocator.nereusSourceCommit",
         providers.gradleProperty("v2M3AllocatorNereusSourceCommit").getOrElse("UNSET"),
     )
+}
+
+tasks.register<Test>("realAllocatorStrictIntervalDiagnosticTest") {
+    group = "verification"
+    description = "Replay consecutive diagnostic-only formal 10k/1ms STRICT intervals against real Oxia."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    testClassesDirs = realAllocatorTest.output.classesDirs
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3RealAllocatorStrictIntervalDiagnosticTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for the V3 STRICT interval diagnostic")
+        val output = file(required("v2M3AllocatorV3StrictDiagnosticOutput")).toPath().toAbsolutePath().normalize()
+        require(!Files.exists(output, LinkOption.NOFOLLOW_LINKS)) {
+            "V3 STRICT interval diagnostic output already exists: $output"
+        }
+        val parent = output.parent
+        require(parent != null && Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(parent)) {
+            "V3 STRICT interval diagnostic output parent is absent or nonregular: $parent"
+        }
+        Files.createDirectory(output)
+        systemProperty("nereus.m3.allocator.v3.oxiaServiceAddress", required("v2M3AllocatorOxiaServiceAddress"))
+        systemProperty("nereus.m3.allocator.v3.nereusCommit", required("v2M3AllocatorV3NereusCommit"))
+        systemProperty("nereus.m3.allocator.v3.diagnosticOutput", output.toString())
+    }
 }
 
 tasks.register<Test>("m3ObjectWalMetadataTest") {

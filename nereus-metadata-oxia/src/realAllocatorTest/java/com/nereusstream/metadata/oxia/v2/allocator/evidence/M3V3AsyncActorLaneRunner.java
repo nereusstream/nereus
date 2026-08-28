@@ -356,6 +356,7 @@ final class M3V3AsyncActorLaneRunner<T> {
             long warmupUnexpectedFailedAfterAdmission,
             long warmupTimedOutAfterAdmission,
             String warmupFirstFailure,
+            String warmupFirstUnexpectedFailure,
             boolean actorLanesStoppedAtCleanupDeadline,
             List<TerminalRecord> measuredTerminals,
             List<RequestTelemetry> measuredTelemetry) {
@@ -365,6 +366,7 @@ final class M3V3AsyncActorLaneRunner<T> {
             measuredTerminals = List.copyOf(measuredTerminals);
             measuredTelemetry = List.copyOf(measuredTelemetry);
             Objects.requireNonNull(warmupFirstFailure, "warmupFirstFailure");
+            Objects.requireNonNull(warmupFirstUnexpectedFailure, "warmupFirstUnexpectedFailure");
             long measuredTerminal = Math.addExact(
                     completed, Math.addExact(failedAfterAdmission, timedOutAfterAdmission));
             long warmupTerminal = Math.addExact(
@@ -381,7 +383,9 @@ final class M3V3AsyncActorLaneRunner<T> {
                     || warmupFailedAfterAdmission
                             != Math.addExact(
                                     warmupLoadRejectedAfterAdmission, warmupUnexpectedFailedAfterAdmission)
-                    || (warmupFailedAfterAdmission == 0) != warmupFirstFailure.isEmpty()) {
+                    || (warmupFailedAfterAdmission == 0) != warmupFirstFailure.isEmpty()
+                    || (warmupUnexpectedFailedAfterAdmission == 0)
+                            != warmupFirstUnexpectedFailure.isEmpty()) {
                 throw new IllegalArgumentException("allocator V3 asynchronous inventory differs");
             }
         }
@@ -638,6 +642,7 @@ final class M3V3AsyncActorLaneRunner<T> {
         private long warmupUnexpectedFailed;
         private long warmupTimedOut;
         private String warmupFirstFailure = "";
+        private String warmupFirstUnexpectedFailure = "";
 
         private void beginMeasurement(int globalOutstanding, int[] actorOutstanding, int bindingBusy) {
             if (measuring) {
@@ -770,6 +775,9 @@ final class M3V3AsyncActorLaneRunner<T> {
                             warmupLoadRejected++;
                         } else {
                             warmupUnexpectedFailed++;
+                            if (warmupFirstUnexpectedFailure.isEmpty()) {
+                                warmupFirstUnexpectedFailure = failureSummary(terminalFailure);
+                            }
                         }
                         if (warmupFirstFailure.isEmpty()) {
                             warmupFirstFailure = failureSummary(terminalFailure);
@@ -845,6 +853,7 @@ final class M3V3AsyncActorLaneRunner<T> {
                     warmupUnexpectedFailed,
                     warmupTimedOut,
                     warmupFirstFailure,
+                    warmupFirstUnexpectedFailure,
                     lanesStopped,
                     terminals,
                     telemetry);

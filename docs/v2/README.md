@@ -516,6 +516,14 @@ the workflow's returned exact Cell before handing its exact Head to later fault/
 the production correctness authority; no cross-actor correctness lock, workload, SLO, budget, or selection change is
 introduced.
 
+The next exact-source attempt at `ee335a8c...` completed all Native baselines and a validator-consumable failed
+STRICT fixed-1000 row, then stopped on derived 800 because one of 937 admitted warm-up failures was unexpected while
+the other 936 were exact typed load rejections. [ADR 0114](../decisions/0114-v2-m3-allocator-v3-warmup-unexpected-failure-attribution-amendment.md)
+preserves the 22-file failed attempt and external archive. The async runner now retains the first unexpected failure
+separately from the first failure overall, and the current-source diagnostic inventory replays the exact consecutive
+fixed-1000 and derived-800 formal schedules on one real-Oxia population. This changes no attachment bytes,
+classification, workload, retry bound, threshold, SLO, budget, disposition, or selection rule.
+
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.

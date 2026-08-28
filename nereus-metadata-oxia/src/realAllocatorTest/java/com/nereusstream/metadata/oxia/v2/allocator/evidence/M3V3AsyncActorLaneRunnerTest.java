@@ -315,6 +315,7 @@ class M3V3AsyncActorLaneRunnerTest {
         assertThat(loadRejected.warmupFailedAfterAdmission()).isEqualTo(1);
         assertThat(loadRejected.warmupLoadRejectedAfterAdmission()).isEqualTo(1);
         assertThat(loadRejected.warmupUnexpectedFailedAfterAdmission()).isZero();
+        assertThat(loadRejected.warmupFirstUnexpectedFailure()).isEmpty();
         assertThat(M3V3AllocatorFormalHarness.infrastructureValid(loadRejected)).isFalse();
         assertThat(M3V3AllocatorFormalHarness.candidateInfrastructureValid(loadRejected)).isTrue();
         assertThat(M3V3AllocatorFormalHarness.infrastructureDetail(loadRejected))
@@ -328,6 +329,8 @@ class M3V3AsyncActorLaneRunnerTest {
 
         assertThat(unexpected.warmupLoadRejectedAfterAdmission()).isZero();
         assertThat(unexpected.warmupUnexpectedFailedAfterAdmission()).isEqualTo(1);
+        assertThat(unexpected.warmupFirstUnexpectedFailure())
+                .isEqualTo("IllegalStateException:unexpected wiring failure");
         assertThat(M3V3AllocatorFormalHarness.candidateInfrastructureValid(unexpected)).isFalse();
     }
 

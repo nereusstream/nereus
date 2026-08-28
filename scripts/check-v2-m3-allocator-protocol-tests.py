@@ -40,6 +40,11 @@ V3_FORMAL_RUNTIME = (
 )
 V3_NATIVE_RUNTIME = V3_FORMAL_RUNTIME.with_name("M3V3NativeIntervalRuntime.java")
 V3_CANDIDATE_POPULATION = V3_FORMAL_RUNTIME.with_name("M3CandidateAllocatorPopulation.java")
+V3_ASYNC_RUNNER = V3_FORMAL_RUNTIME.with_name("M3V3AsyncActorLaneRunner.java")
+V3_FORMAL_HARNESS = V3_FORMAL_RUNTIME.with_name("M3V3AllocatorFormalHarness.java")
+V3_STRICT_SEQUENCE_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
+    "M3RealAllocatorStrictIntervalDiagnosticTest.java"
+)
 FORMAL_CAMPAIGN = (
     ROOT
     / "nereus-metadata-oxia"
@@ -159,6 +164,31 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn("heads.compareAndSet(ledgerIndex, predecessor, exact.exactHead())", v3_completion)
         self.assertIn("completed workflow retained a Cell reservation", population)
         self.assertIn("workflow Cell cursor/grant ordering diverged", population)
+
+    def test_v3_unexpected_warmup_failure_is_attributed_and_formal_sequence_is_replayed(self) -> None:
+        runner = V3_ASYNC_RUNNER.read_text()
+        harness = V3_FORMAL_HARNESS.read_text()
+        diagnostic = V3_STRICT_SEQUENCE_DIAGNOSTIC.read_text()
+        module = MODULE_BUILD.read_text()
+        self.assertIn("warmupFirstUnexpectedFailure", runner)
+        self.assertIn("warmupFirstUnexpectedFailure", harness)
+        self.assertIn("warmupFirstUnexpectedFailure.isEmpty()", runner)
+        self.assertNotIn("warmupFirstUnexpectedFailure", V3_FORMAL_RUNTIME.read_text())
+        self.assertIn("Cell.fixedRate(Candidate.STRICT, 10_000, 1, 1_000)", diagnostic)
+        self.assertIn("Cell.derived(Candidate.STRICT, 10_000, 1)", diagnostic)
+        self.assertIn("Duration.ofSeconds(10)", diagnostic)
+        self.assertIn("Duration.ofSeconds(30)", diagnostic)
+        self.assertIn("M3V3RealFormalActionRuntime.candidateSchedule", diagnostic)
+        self.assertIn("globalOutstandingMaximum()).isGreaterThan(4)", diagnostic)
+        self.assertIn(r'\"diagnosticOnly\":true', diagnostic)
+        self.assertIn(r'\"authority\":false', diagnostic)
+        self.assertIn(r'\"selectionEligible\":false', diagnostic)
+        self.assertIn("M3RealAllocatorStrictIntervalDiagnosticTest", module)
+        full_diagnostic = module.split(
+            'val realAllocatorV3DiagnosticTest = tasks.register<Test>("realAllocatorV3DiagnosticTest")',
+            1,
+        )[1].split("val realAllocatorV3NativeCanaryTest", 1)[0]
+        self.assertIn("M3RealAllocatorStrictIntervalDiagnosticTest", full_diagnostic)
 
     def test_formal_archiver_is_create_new_byte_exact_and_collision_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

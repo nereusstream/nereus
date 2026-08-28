@@ -161,6 +161,16 @@ immutable and externally archived. V3 completion must monotonically merge the ex
 the exact Head, reject reservation/order/identity drift, and leave production CAS/reread correctness and V2 behavior
 unchanged. Publication requires the completion-order regression, full current-source gates, fresh NADV3, and fresh
 preflight before a new exact-source formal directory.
+
+ADR 0114 governs the following fail-closed diagnostic correction. Exact source `ee335a8c...` completed every Native
+baseline and the first validator-consumable failed STRICT action, but the derived-800 warm-up contained one unexpected
+failure beside 936 exact typed load rejections. The old detail retained only the first failure overall and therefore
+could not name the unexpected path. The 22-file attempt is immutable and externally archived. The runner must retain
+the first unexpected summary separately, and the complete current-source diagnostic inventory must execute exact
+fixed-1000 then derived-800 formal schedules on one real-Oxia population with zero unexpected warm-up failure, zero
+warm-up timeout, full drain, and real concurrency above four. Classification, interval bytes, frozen plan, workload,
+budgets, SLOs, dispositions, and selection rules remain unchanged.
+
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

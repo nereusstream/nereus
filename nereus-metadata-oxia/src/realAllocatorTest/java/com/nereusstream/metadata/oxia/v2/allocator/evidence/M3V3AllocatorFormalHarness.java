@@ -154,7 +154,11 @@ final class M3V3AllocatorFormalHarness {
                 + ",warmupUnexpectedFailedAfterAdmission=" + interval.warmupUnexpectedFailedAfterAdmission()
                 + ",warmupTimedOutAfterAdmission=" + interval.warmupTimedOutAfterAdmission()
                 + ",warmupFirstFailure="
-                + (interval.warmupFirstFailure().isEmpty() ? "NONE" : interval.warmupFirstFailure());
+                + (interval.warmupFirstFailure().isEmpty() ? "NONE" : interval.warmupFirstFailure())
+                + ",warmupFirstUnexpectedFailure="
+                + (interval.warmupFirstUnexpectedFailure().isEmpty()
+                        ? "NONE"
+                        : interval.warmupFirstUnexpectedFailure());
     }
 
     private static List<ActorEndpoint> requireIndependentActors(List<ActorEndpoint> actors) {

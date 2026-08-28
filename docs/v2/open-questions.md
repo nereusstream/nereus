@@ -845,6 +845,13 @@ fault action observed a post-interval Head beside the harness's stale pre-interv
 that failed attempt and requires a monotonic exact-Cell completion handoff before later fault/scale helpers. It does
 not replace Oxia correctness with a Java lock, reinterpret the failed row, or change any candidate threshold,
 workload, budget, disposition, or selection rule.
+The next `ee335a8c...` attempt passed all Native baselines and the first failed STRICT action, then stopped because the
+derived-800 warm-up contained one unexpected failure among 937 admitted failures. ADR 0114 preserves the 22-file
+attempt and adds separate first-unexpected attribution plus an exact consecutive fixed-1000/derived-800 real-Oxia
+diagnostic. It neither reclassifies an exception nor changes interval bytes, candidate qualification, workload,
+budget, SLO, disposition, or selection semantics. The allocator selection question therefore remains open pending a
+new exact-source formal terminal.
+
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

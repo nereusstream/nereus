@@ -597,6 +597,15 @@ archive. The V3 async completion now merges the returned exact Cell under a mono
 replaces the exact Head. This local proof handoff is not allocator correctness authority and adds no shared Cell lock;
 normal requests still prove correctness only through the production workflow's Oxia CAS/reread/bounded-retry chain.
 
+[ADR 0114](../../../decisions/0114-v2-m3-allocator-v3-warmup-unexpected-failure-attribution-amendment.md) records the
+next fail-closed diagnostic correction. Exact source `ee335a8c...` reached the derived-800 STRICT action, where one
+warm-up failure was unexpected beside 936 exact typed contention rejections. The failed attempt retained only the
+first failure overall and could not identify that distinct exception. The runner now keeps a bounded first-unexpected
+summary for infrastructure detail, while leaving interval attachment bytes and the exact classifier unchanged. A
+current-source real-Oxia diagnostic runs the formal 10+30-second fixed-1000 and derived-800 schedules consecutively on
+one population and requires zero unexpected warm-up failure, zero warm-up timeout, complete drain, and concurrency
+above four. It is diagnostic-only and cannot qualify or select a mode.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1
