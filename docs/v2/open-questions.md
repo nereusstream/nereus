@@ -874,6 +874,10 @@ frozen qualification contract or authorize another formal run.
 ADR 0119 additionally prevents the two 500-rps Native extension rows from becoming undeclared qualification rows:
 their warm-up pre-admission drops remain visible observations, while all measured and lifecycle checks stay closed.
 The eight 200-rps baseline rows retain every zero-drop requirement.
+ADR 0120 additionally removes the global serialized offer coordinator after a final 25ms/200 baseline request was
+fired before cutoff but missed actor-lane dispatch. The correction is runner conformance only: per-actor producers use
+the same arrival schedule, bounded queues, phase boundary, and physical cutoff, so formal candidate qualification
+remains an open later-stage question.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

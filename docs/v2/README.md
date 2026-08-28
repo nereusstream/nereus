@@ -380,6 +380,7 @@ Accepted decisions:
 - [ADR 0117: M3 V3 RANGE completion reservation-handoff amendment](../decisions/0117-v2-m3-allocator-v3-range-completion-reservation-handoff-amendment.md)
 - [ADR 0118: M3 V3 promotion-attachment and cutoff-attribution amendment](../decisions/0118-v2-m3-allocator-v3-promotion-attachment-and-cutoff-attribution-amendment.md)
 - [ADR 0119: M3 V3 Native representative warm-up observation amendment](../decisions/0119-v2-m3-allocator-v3-native-representative-warmup-observation-amendment.md)
+- [ADR 0120: M3 V3 per-actor offer-producer amendment](../decisions/0120-v2-m3-allocator-v3-per-actor-offer-producer-amendment.md)
 
 ## Open design gates
 
@@ -571,6 +572,10 @@ derived-800 retained 21 `PRE_ADMISSION_CUTOFF` outcomes among 24,000 offers. The
 later failed full-diagnostic attempt where a 500-rps observational row completed all 15,000 measured offers but had
 one warm-up pre-admission drop. The eight 200-rps baseline gates remain unchanged; representative warm-up drops stay
 visible telemetry rather than becoming an unaccepted ninth qualification threshold.
+[ADR 0120](../decisions/0120-v2-m3-allocator-v3-per-actor-offer-producer-amendment.md) preserves a later hard-gate
+failure where the final 10k/25ms/200 request was offered on time but missed dispatch before cutoff. Four persistent
+per-actor offer producers replace the remaining global serialized offer coordinator while retaining the same frozen
+arrival bytes, barriered phase transition, bounded admission, physical cutoff, and drop classification.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

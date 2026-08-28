@@ -643,6 +643,11 @@ ADR 0109's exact Native canary split after a full diagnostic failed on one warm-
 15,000/15,000 representative 500-rps row. Baseline 200-rps rows still require zero warm-up and measured drop;
 representative warm-up drop remains retained telemetry while measured and lifecycle assertions remain fail-closed.
 
+[ADR 0120](../../../decisions/0120-v2-m3-allocator-v3-per-actor-offer-producer-amendment.md) corrects the remaining
+single offer-coordinator bottleneck after the last 10k/25ms/200 request missed dispatch before cutoff. Four persistent
+per-actor producers preserve actor order and exact arrival offsets, synchronize the one-way measurement transition,
+and feed the unchanged bounded queues. No grace, early dispatch, hidden queue, or outcome reclassification is added.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
 /**
@@ -70,31 +71,37 @@ final class M3V3AsyncActorLaneRunner<T> {
         long warmupNanos = warmup.toNanos();
         long intervalNanos = Math.addExact(warmupNanos, measurement.toNanos());
         long startNanos = System.nanoTime();
-        long measurementStartNanos = Math.addExact(startNanos, warmupNanos);
         long cutoffNanos = Math.addExact(startNanos, intervalNanos);
         long cleanupDeadlineNanos = Math.addExact(cutoffNanos, cleanupGrace.toNanos());
         RunState<T> state = new RunState<>(queueCapacity, cutoffNanos, cleanupDeadlineNanos, admissionMode);
         CountDownLatch laneStops = new CountDownLatch(ACTOR_COUNT);
         List<Thread> lanes = startLanes(state, operation, laneStops);
+        CountDownLatch measurementReady = new CountDownLatch(ACTOR_COUNT);
+        CountDownLatch measurementRelease = new CountDownLatch(warmupNanos == 0 ? 0 : 1);
+        CountDownLatch offererStops = new CountDownLatch(ACTOR_COUNT);
+        AtomicReference<Throwable> offererFailure = new AtomicReference<>();
+        List<Thread> offerers = List.of();
 
         try {
-            boolean measurementStarted = warmupNanos == 0;
-            if (measurementStarted) {
+            if (warmupNanos == 0) {
                 state.beginMeasurement();
             }
-            for (ScheduledOffer<T> offer : exactSchedule) {
-                long targetNanos = Math.addExact(startNanos, offer.arrivalOffsetNanos());
-                waitUntil(targetNanos);
-                if (!measurementStarted && offer.measured()) {
-                    state.beginMeasurement();
-                    measurementStarted = true;
-                }
-                state.offer(offer, targetNanos);
-            }
-            if (!measurementStarted) {
-                waitUntil(measurementStartNanos);
+            offerers = startOfferers(
+                    exactSchedule,
+                    startNanos,
+                    state,
+                    measurementReady,
+                    measurementRelease,
+                    offererStops,
+                    offererFailure);
+            if (warmupNanos != 0) {
+                measurementReady.await();
+                rethrowOffererFailure(offererFailure.get());
                 state.beginMeasurement();
+                measurementRelease.countDown();
             }
+            offererStops.await();
+            rethrowOffererFailure(offererFailure.get());
             waitUntil(cutoffNanos);
             state.cutoff();
             state.awaitQuiescence(cleanupDeadlineNanos);
@@ -104,8 +111,17 @@ final class M3V3AsyncActorLaneRunner<T> {
             lanes.forEach(Thread::interrupt);
             return state.result(laneStops.getCount() == 0);
         } catch (InterruptedException failure) {
+            measurementRelease.countDown();
             state.cutoff();
             state.timeoutActiveAtCleanupDeadline();
+            offerers.forEach(Thread::interrupt);
+            lanes.forEach(Thread::interrupt);
+            throw failure;
+        } catch (RuntimeException | Error failure) {
+            measurementRelease.countDown();
+            state.cutoff();
+            state.timeoutActiveAtCleanupDeadline();
+            offerers.forEach(Thread::interrupt);
             lanes.forEach(Thread::interrupt);
             throw failure;
         }
@@ -134,6 +150,93 @@ final class M3V3AsyncActorLaneRunner<T> {
             thread.start();
         }
         return List.copyOf(threads);
+    }
+
+    private List<Thread> startOfferers(
+            List<ScheduledOffer<T>> schedule,
+            long startNanos,
+            RunState<T> state,
+            CountDownLatch measurementReady,
+            CountDownLatch measurementRelease,
+            CountDownLatch offererStops,
+            AtomicReference<Throwable> offererFailure) {
+        List<List<ScheduledOffer<T>>> byActor = new ArrayList<>(ACTOR_COUNT);
+        for (int actorId = 0; actorId < ACTOR_COUNT; actorId++) {
+            byActor.add(new ArrayList<>());
+        }
+        schedule.forEach(offer -> byActor.get(offer.actorId()).add(offer));
+        List<Thread> threads = new ArrayList<>(ACTOR_COUNT);
+        for (int actorId = 0; actorId < ACTOR_COUNT; actorId++) {
+            int exactActorId = actorId;
+            Thread thread = new Thread(
+                    () -> runOfferer(
+                            byActor.get(exactActorId),
+                            startNanos,
+                            state,
+                            measurementReady,
+                            measurementRelease,
+                            offererStops,
+                            offererFailure),
+                    "m3-v3-allocator-offer-actor-" + actorId);
+            thread.setDaemon(true);
+            threads.add(thread);
+            thread.start();
+        }
+        return List.copyOf(threads);
+    }
+
+    private void runOfferer(
+            List<ScheduledOffer<T>> offers,
+            long startNanos,
+            RunState<T> state,
+            CountDownLatch measurementReady,
+            CountDownLatch measurementRelease,
+            CountDownLatch offererStops,
+            AtomicReference<Throwable> offererFailure) {
+        boolean measurementBarrierReached = false;
+        try {
+            for (ScheduledOffer<T> offer : offers) {
+                if (offer.measured() && !measurementBarrierReached) {
+                    measurementReady.countDown();
+                    measurementBarrierReached = true;
+                    measurementRelease.await();
+                }
+                long targetNanos = Math.addExact(startNanos, offer.arrivalOffsetNanos());
+                waitUntil(targetNanos);
+                state.offer(offer, targetNanos);
+            }
+            if (!measurementBarrierReached) {
+                measurementReady.countDown();
+                measurementBarrierReached = true;
+                measurementRelease.await();
+            }
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            offererFailure.compareAndSet(null, failure);
+        } catch (RuntimeException | Error failure) {
+            offererFailure.compareAndSet(null, failure);
+        } finally {
+            if (!measurementBarrierReached) {
+                measurementReady.countDown();
+            }
+            offererStops.countDown();
+        }
+    }
+
+    private static void rethrowOffererFailure(Throwable failure) throws InterruptedException {
+        if (failure == null) {
+            return;
+        }
+        if (failure instanceof InterruptedException interrupted) {
+            throw interrupted;
+        }
+        if (failure instanceof RuntimeException runtime) {
+            throw runtime;
+        }
+        if (failure instanceof Error error) {
+            throw error;
+        }
+        throw new IllegalStateException("allocator V3 offer producer failed", failure);
     }
 
     private void runLane(RunState<T> state, int actorId, ActorOperation<T> operation) {

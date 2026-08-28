@@ -209,6 +209,12 @@ warm-up pre-admission drop failed JUnit. The eight 200-rps baseline rows retain 
 representative warm-up drops remain explicit telemetry, consistent with their observational-only role. No formal
 qualification or selection rule changes.
 
+ADR 0120 closes the residual global offer-coordinator dependency exposed by final ordinal 7,999 in the exact
+`94fa710a...` 10k/25ms/200 Native baseline. Four bounded-lifetime per-actor producers replay the unchanged schedule and
+join a single warm-up/measurement barrier before using the existing admission queues. The physical cutoff and
+pre-admission drop partition are unchanged; publication still requires all eight baseline rows to reach zero measured
+drop/failure/timeout on the new exact source.
+
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

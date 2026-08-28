@@ -124,3 +124,10 @@ preserves its 18-file/42,212-byte external archive and restores the accepted dis
 warm-up and measured assertions remain hard gates, while a representative warm-up drop remains raw telemetry rather
 than an additional qualification row. Representative measured zero-drop/failure/timeout and lifecycle rules remain
 unchanged.
+
+The following exact-source Native canary at `94fa710a8520423c0e8b071d02c5b772e8bd5c16` stopped on the hard
+10k/25ms/200 baseline: final ordinal 7,999 was fired 1.164 milliseconds late but still 1.336 milliseconds before the
+physical cutoff, then remained pre-admission while all other 5,999 measured requests completed. ADR 0120 preserves
+the 7-file/7,013-byte failed archive and removes the global serialized offer coordinator. Four per-actor producers
+retain exact per-actor order and one shared phase barrier; queue/outstanding caps, cutoff, cleanup, and outcome
+semantics do not change.
