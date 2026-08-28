@@ -83,6 +83,19 @@ class M3V5AllocatorProtocolMainTest {
                 .hasMessageContaining("Native diagnostic row hard gate failed");
         Files.writeString(firstNative, validFirstNative);
 
+        Path strict = raw.resolve("strict-formal-sequence.json");
+        String validStrict = Files.readString(strict);
+        Files.writeString(
+                strict,
+                validStrict.replaceFirst(
+                        "\"measuredDroppedBeforeAdmission\":0",
+                        "\"measuredDroppedBeforeAdmission\":1"));
+        assertThatThrownBy(() -> M3V5AllocatorProtocolMain.main(
+                        arguments("validate-diagnostic", output, junit, source, raw)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("legacy hard gate failed");
+        Files.writeString(strict, validStrict);
+
         Path v5Runner = junit.resolve("TEST-" + M3V5AsyncActorLaneRunnerTest.class.getName() + ".xml");
         Files.writeString(v5Runner, Files.readString(v5Runner).replaceFirst("/>", "><failure/></testcase>"));
         assertThatThrownBy(() -> M3V5AllocatorProtocolMain.main(arguments(
@@ -139,7 +152,8 @@ class M3V5AllocatorProtocolMainTest {
                 directory.resolve("range16-formal-sequence.json"),
                 diagnostic(
                         "NEREUS_V2_M3_ALLOCATOR_RANGE16_FORMAL_SEQUENCE_DIAGNOSTIC_V1",
-                        ",\"sourceCommit\":\"" + source.nereusCommit() + "\""));
+                        ",\"sourceCommit\":\"" + source.nereusCommit() + "\""
+                                + ",\"fixed1000\":" + legacyLosslessRow(1_000)));
         Files.writeString(
                 directory.resolve("real-oxia-operation-diagnostic.json"),
                 diagnostic("NEREUS_V2_M3_ALLOCATOR_OPERATION_DIAGNOSTIC_V3", ""));
@@ -150,7 +164,9 @@ class M3V5AllocatorProtocolMainTest {
                 directory.resolve("strict-formal-sequence.json"),
                 diagnostic(
                         "NEREUS_V2_M3_ALLOCATOR_STRICT_FORMAL_SEQUENCE_DIAGNOSTIC_V1",
-                        ",\"sourceCommit\":\"" + source.nereusCommit() + "\""));
+                        ",\"sourceCommit\":\"" + source.nereusCommit() + "\""
+                                + ",\"fixed1000\":" + legacyLosslessRow(1_000)
+                                + ",\"derived800\":" + legacyLosslessRow(800)));
         for (int latencyMillis : new int[] {10, 25}) {
             Files.writeString(
                     directory.resolve("v5-range1024-" + latencyMillis + "ms-formal-sequence.json"),
@@ -191,6 +207,18 @@ class M3V5AllocatorProtocolMainTest {
     private static String lifecycle() {
         return ",\"queueDepthAtEnd\":0,\"globalOutstandingAtEnd\":0,\"bindingBusyAtEnd\":0"
                 + ",\"pendingPermitAtEnd\":0,\"actorLanesStopped\":true";
+    }
+
+    private static String legacyLosslessRow(int rate) {
+        long warmup = Math.multiplyExact((long) rate, 10L);
+        long measured = Math.multiplyExact((long) rate, 30L);
+        return "{\"warmupOffered\":" + warmup + ",\"warmupCompleted\":" + warmup
+                + ",\"warmupLoadRejectedAfterAdmission\":0"
+                + ",\"warmupUnexpectedFailedAfterAdmission\":0,\"warmupTimedOutAfterAdmission\":0"
+                + ",\"measuredOffered\":" + measured + ",\"measuredAdmitted\":" + measured
+                + ",\"measuredDroppedBeforeAdmission\":0,\"measuredCompleted\":" + measured
+                + ",\"measuredFailedAfterAdmission\":0,\"measuredTimedOutAfterAdmission\":0"
+                + ",\"globalOutstandingMaximum\":16,\"actorLanesStoppedAtCleanupDeadline\":true}";
     }
 
     private Path diagnosticJUnitDirectory() throws Exception {

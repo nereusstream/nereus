@@ -64,7 +64,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--junit-directory", required=True, type=Path)
     parser.add_argument("--archive", required=True, type=Path)
     parser.add_argument("--protocol-version", type=int, choices=sorted(SCHEMA_BY_PROTOCOL), default=4)
-    parser.add_argument("--diagnostic-status", choices=("FAILED", "PASSED"), default="FAILED")
+    parser.add_argument(
+        "--diagnostic-status",
+        choices=("FAILED", "INTERRUPTED", "PASSED"),
+        default="FAILED",
+    )
     parser.add_argument("--archived-on", required=True)
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--plan-sha256", required=True)

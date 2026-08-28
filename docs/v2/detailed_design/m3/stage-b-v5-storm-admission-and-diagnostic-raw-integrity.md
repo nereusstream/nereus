@@ -27,7 +27,9 @@ raw manifest digest; `NARS5` carries both through selection. The raw manifest ha
 every byte, and independently rechecks Native execution/workload identity, ten Native rows, source-bound STRICT,
 RANGE and terminal-drain receipts, fixed/derived conservation, zero drop/failure/timeout, and zero lifecycle residue.
 Unexpected/missing JSON, a symlink, digest substitution, or any raw hard-gate mismatch fails sealing, validation,
-promotion, and selection.
+promotion, and selection. Native row ordinals reconstruct the exact population/latency/rate matrix; legacy STRICT and
+RANGE-16 compatibility receipts independently prove warm-up conservation, zero unexpected warm-up terminal, exact
+measured conservation, zero measured loss, real concurrency above four, and stopped actor lanes.
 
 The V5 zero-decision plan digest is
 `3e0aea42527e85c58276a51f5953af0ffaba5029b8916e7bbd85f377f434d23a`; its Native execution-profile digest is
@@ -42,7 +44,8 @@ The create-new external archive scripts recognize protocol V5 without changing e
 defaults. Diagnostic archives preserve successful as well as failed exact JUnit/raw inventories, reject a foreign
 protocol RANGE attribution, and remain `diagnosticOnly=true`, `authority=false`, and `selectionEligible=false`.
 Completed non-promotable and failed formal archives use distinct V5 identities; archiving never creates promotion
-authority.
+authority. An interrupted diagnostic may be byte-preserved with explicit `INTERRUPTED` status and incomplete JUnit
+inventory, but it cannot seal NADV5 or become a formal preflight input.
 
 The preserved full-suite diagnostic archive is
 `/Users/liusinan/Documents/Codex/2026-08-29/nereus-v2-m3-allocator/diagnostic-bb928a0b-v4-full-zero-drop-gate-miss-r1-archive2`

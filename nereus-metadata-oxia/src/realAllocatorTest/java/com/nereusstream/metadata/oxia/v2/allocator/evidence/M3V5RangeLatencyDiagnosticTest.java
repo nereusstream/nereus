@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
-/** Diagnostic-only replay of the first V5 RANGE_1024 row that failed at ten milliseconds. */
+/** Diagnostic-only replay of the V5 RANGE_1024 ten- and twenty-five-millisecond authority rows. */
 class M3V5RangeLatencyDiagnosticTest {
     private static final int POPULATION = 10_000;
 

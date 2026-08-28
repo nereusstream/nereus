@@ -1128,6 +1128,65 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
                 identity["rangeAttributions"],
             )
 
+            interrupted_diagnostic = root / "interrupted-diagnostic"
+            interrupted_diagnostic.mkdir()
+            (interrupted_diagnostic / "partial.json").write_text(
+                '{"diagnosticOnly":true,"authority":false,"selectionEligible":false}\n',
+                encoding="utf-8",
+            )
+            interrupted_junit = root / "interrupted-junit"
+            interrupted_junit.mkdir()
+            (interrupted_junit / "results-generic.bin").write_bytes(b"partial-junit-events")
+            interrupted_archive = root / "interrupted-archive"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(DIAGNOSTIC_ARCHIVER),
+                    "--diagnostic-output",
+                    str(interrupted_diagnostic),
+                    "--junit-directory",
+                    str(interrupted_junit),
+                    "--archive",
+                    str(interrupted_archive),
+                    "--protocol-version",
+                    "5",
+                    "--diagnostic-status",
+                    "INTERRUPTED",
+                    "--archived-on",
+                    "2026-08-29",
+                    "--source-commit",
+                    "d" * 40,
+                    "--plan-sha256",
+                    "e" * 64,
+                    "--executor-sha256",
+                    "f" * 64,
+                    "--run-id",
+                    "interrupted-r1",
+                    "--expected-tests",
+                    "0",
+                    "--expected-failures",
+                    "0",
+                    "--expected-errors",
+                    "0",
+                    "--expected-skipped",
+                    "0",
+                    "--expected-suites",
+                    "0",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            interrupted_identity = json.loads(
+                (interrupted_archive / "archive-identity.json").read_bytes()
+            )
+            self.assertEqual("INTERRUPTED", interrupted_identity["diagnosticStatus"])
+            self.assertEqual(
+                {"tests": 0, "failures": 0, "errors": 0, "skipped": 0, "suites": 0},
+                interrupted_identity["junit"],
+            )
+            self.assertFalse(interrupted_identity["nadvPresent"])
+
     def test_plan_only_is_byte_stable_and_freezes_all_independent_budgets(self) -> None:
         first = subprocess.run(
             [str(RUNNER), "--plan-only"],

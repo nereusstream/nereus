@@ -96,4 +96,7 @@ The accepted implementation fixes the V5 zero-decision plan digest at
 24-test/ten-suite JUnit manifest and an exact 19-JSON raw manifest; NARS5 preserves both digests. This implementation
 record is not diagnostic or formal evidence and does not select an allocator mode. The protocol-aware archive
 contracts preserve V3/V4 defaults while closing collisions, foreign-protocol RANGE attribution, noncanonical dates,
-and a PASSED diagnostic with any failure, error, or skip.
+and a PASSED diagnostic with any failure, error, or skip. Raw validation reconstructs the ten Native row ordinals and
+their population/latency/rate identities, and rechecks measured conservation, zero loss, warm-up terminal accounting,
+real concurrency, and lifecycle markers for STRICT, RANGE-16, RANGE-1024, and terminal-drain authority receipts.
+Interrupted partial diagnostics have an explicit non-authoritative archive status and cannot seal NADV5.

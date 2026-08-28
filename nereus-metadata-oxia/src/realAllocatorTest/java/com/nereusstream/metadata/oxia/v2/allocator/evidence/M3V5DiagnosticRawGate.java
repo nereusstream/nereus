@@ -94,6 +94,7 @@ final class M3V5DiagnosticRawGate {
             case "range16-formal-sequence.json" -> {
                 requireSchema(json, "NEREUS_V2_M3_ALLOCATOR_RANGE16_FORMAL_SEQUENCE_DIAGNOSTIC_V1");
                 requireSource(json, sourceCommit);
+                requireLegacyLosslessRow(json, "fixed1000", 1_000);
             }
             case "real-oxia-operation-diagnostic.json" ->
                 requireSchema(json, "NEREUS_V2_M3_ALLOCATOR_OPERATION_DIAGNOSTIC_V3");
@@ -102,6 +103,8 @@ final class M3V5DiagnosticRawGate {
             case "strict-formal-sequence.json" -> {
                 requireSchema(json, "NEREUS_V2_M3_ALLOCATOR_STRICT_FORMAL_SEQUENCE_DIAGNOSTIC_V1");
                 requireSource(json, sourceCommit);
+                requireLegacyLosslessRow(json, "fixed1000", 1_000);
+                requireLegacyLosslessRow(json, "derived800", 800);
             }
             case "v5-range1024-10ms-formal-sequence.json" ->
                 requireRangeReceipt(json, sourceCommit, 10);
@@ -217,6 +220,32 @@ final class M3V5DiagnosticRawGate {
                 "\"pendingPermitAtEnd\":0",
                 "\"actorLanesStopped\":true")) {
             requireLiteral(body, terminal);
+        }
+    }
+
+    private static void requireLegacyLosslessRow(String json, String name, int offeredRate) {
+        String body = match(Pattern.compile("\\\"" + name + "\\\":\\{([^}]*)}"), json, name + " legacy row")
+                .group(1);
+        long warmupOffered = longField(body, "warmupOffered");
+        long warmupCompleted = longField(body, "warmupCompleted");
+        long warmupLoadRejected = longField(body, "warmupLoadRejectedAfterAdmission");
+        long warmupUnexpectedFailed = longField(body, "warmupUnexpectedFailedAfterAdmission");
+        long warmupTimedOut = longField(body, "warmupTimedOutAfterAdmission");
+        long measuredOffered = longField(body, "measuredOffered");
+        if (warmupOffered != Math.multiplyExact((long) offeredRate, 10L)
+                || warmupOffered
+                        != warmupCompleted + warmupLoadRejected + warmupUnexpectedFailed + warmupTimedOut
+                || warmupUnexpectedFailed != 0
+                || warmupTimedOut != 0
+                || measuredOffered != Math.multiplyExact((long) offeredRate, 30L)
+                || longField(body, "measuredAdmitted") != measuredOffered
+                || longField(body, "measuredDroppedBeforeAdmission") != 0
+                || longField(body, "measuredCompleted") != measuredOffered
+                || longField(body, "measuredFailedAfterAdmission") != 0
+                || longField(body, "measuredTimedOutAfterAdmission") != 0
+                || longField(body, "globalOutstandingMaximum") <= 4
+                || !body.contains("\"actorLanesStoppedAtCleanupDeadline\":true")) {
+            throw new IllegalArgumentException("allocator V5 diagnostic raw " + name + " legacy hard gate failed");
         }
     }
 
