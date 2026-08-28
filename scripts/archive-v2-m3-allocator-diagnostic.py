@@ -148,9 +148,14 @@ def main() -> int:
     manifest = archive / "SHA256SUMS"
     write_new(manifest, "".join(sorted(manifest_rows)).encode("utf-8"))
     range_receipts = sorted(diagnostic.glob("v4-range1024-*-formal-sequence.json"))
-    if len(range_receipts) > 1:
-        raise ValueError("diagnostic archive contains multiple RANGE attribution receipts")
-    range_receipt = range_receipts[0] if range_receipts else None
+    range_receipt = range_receipts[0] if len(range_receipts) == 1 else None
+    range_attributions = [
+        {
+            "relativePath": receipt.name,
+            "sha256": sha256(receipt),
+        }
+        for receipt in range_receipts
+    ]
     identity = {
         "schema": SCHEMA,
         "archivedOn": args.archived_on,
@@ -171,6 +176,7 @@ def main() -> int:
         "junitXmlManifestSha256": hashlib.sha256("".join(junit_manifest_rows).encode()).hexdigest(),
         "rangeAttributionRelativePath": range_receipt.name if range_receipt is not None else None,
         "rangeAttributionSha256": sha256(range_receipt) if range_receipt is not None else None,
+        "rangeAttributions": range_attributions,
         "payloadFileCount": len(copied_files),
         "payloadTotalBytes": total_bytes,
         "manifestSha256": sha256(manifest),

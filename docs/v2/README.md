@@ -397,6 +397,7 @@ Accepted decisions:
 - [ADR 0134: M3 V4 independent installed-RANGE reservation amendment](../decisions/0134-v2-m3-allocator-v4-independent-installed-range-reservation-amendment.md)
 - [ADR 0135: M3 V4 RANGE-renewal acknowledged-proof reuse amendment](../decisions/0135-v2-m3-allocator-v4-range-renewal-acknowledged-proof-reuse-amendment.md)
 - [ADR 0136: M3 V4 controlled-delay scheduler capacity amendment](../decisions/0136-v2-m3-allocator-v4-controlled-delay-scheduler-capacity-amendment.md)
+- [ADR 0137: M3 V5 storm admission and diagnostic raw-integrity amendment](../decisions/0137-v2-m3-allocator-v5-storm-admission-and-diagnostic-raw-integrity-amendment.md)
 
 ## Open design gates
 
@@ -695,6 +696,11 @@ evidence semantics remain unchanged.
 scheduler firing lag reaches 11.323ms p99 despite 7.773ms real RTT and 102us callback lag. The shared formal/diagnostic
 latency injector now owns four bounded timer workers per actor and reports that source-governed value. This changes no
 production allocator authority, V4 plan/profile, workload, threshold, or evidence semantics.
+
+[ADR 0137](../decisions/0137-v2-m3-allocator-v5-storm-admission-and-diagnostic-raw-integrity-amendment.md) preserves
+the standalone lossless 25ms result and the later full-suite V4 zero-drop failure, fixes raw diagnostic enforcement,
+and versions the already-frozen 2R storm admission contract as bounded `4/128/512/1`. The implementation record is
+[Stage B V5 storm admission and diagnostic raw integrity](detailed_design/m3/stage-b-v5-storm-admission-and-diagnostic-raw-integrity.md).
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

@@ -43,10 +43,11 @@ class M3V4AllocatorProtocolMainTest {
     void diagnosticSealerBindsTheIndependentTwentyThreeTestNadv4Inventory() throws Exception {
         SourceBinding source = source();
         Path junit = diagnosticJUnitDirectory();
+        Path raw = diagnosticRawDirectory(source);
         Path output = temporaryDirectory.resolve("diagnostic.nadv4");
 
-        M3V4AllocatorProtocolMain.main(arguments("seal-diagnostic", junit, output, source));
-        M3V4AllocatorProtocolMain.main(arguments("validate-diagnostic", output, junit, source));
+        M3V4AllocatorProtocolMain.main(arguments("seal-diagnostic", junit, output, source, raw));
+        M3V4AllocatorProtocolMain.main(arguments("validate-diagnostic", output, junit, source, raw));
 
         var diagnostic = AllocatorCampaignPromotionGateV4.decodeDiagnostic(
                 CanonicalBytes.copyOf(Files.readAllBytes(output)));
@@ -60,15 +61,42 @@ class M3V4AllocatorProtocolMainTest {
                         CanonicalBytes.copyOf(Files.readAllBytes(output))))
                 .isInstanceOf(IllegalArgumentException.class);
 
+        Path twentyFiveMillis = raw.resolve("v4-range1024-25ms-formal-sequence.json");
+        String validTwentyFiveMillis = Files.readString(twentyFiveMillis);
+        Files.writeString(twentyFiveMillis, validTwentyFiveMillis.replaceFirst("\\\"dropped\\\":0", "\"dropped\":1"));
+        assertThatThrownBy(() -> M3V4AllocatorProtocolMain.main(
+                        arguments("validate-diagnostic", output, junit, source, raw)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("hard gate failed");
+        Files.writeString(twentyFiveMillis, validTwentyFiveMillis);
+
         Path v4Runner = junit.resolve("TEST-" + M3V4AsyncActorLaneRunnerTest.class.getName() + ".xml");
         Files.writeString(v4Runner, Files.readString(v4Runner).replaceFirst("/>", "><failure/></testcase>"));
         assertThatThrownBy(() -> M3V4AllocatorProtocolMain.main(arguments(
                         "seal-diagnostic",
                         junit,
                         temporaryDirectory.resolve("forged.nadv4"),
-                        source)))
+                        source,
+                        raw)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("summary");
+    }
+
+    private Path diagnosticRawDirectory(SourceBinding source) throws Exception {
+        Path directory = Files.createDirectory(temporaryDirectory.resolve("diagnostic-raw"));
+        for (int latencyMillis : new int[] {10, 25}) {
+            Files.writeString(
+                    directory.resolve("v4-range1024-" + latencyMillis + "ms-formal-sequence.json"),
+                    "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_RANGE_LATENCY_DIAGNOSTIC_V4\""
+                            + ",\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false"
+                            + ",\"sourceCommit\":\"" + source.nereusCommit() + "\""
+                            + ",\"latencyMillis\":" + latencyMillis
+                            + ",\"fixed1000\":{\"offeredRate\":1000,\"offered\":30000,\"admitted\":30000"
+                            + ",\"dropped\":0,\"completed\":30000,\"failed\":0,\"timedOut\":0}"
+                            + ",\"derived800\":{\"offeredRate\":800,\"offered\":24000,\"admitted\":24000"
+                            + ",\"dropped\":0,\"completed\":24000,\"failed\":0,\"timedOut\":0}}\n");
+        }
+        return directory;
     }
 
     private Path diagnosticJUnitDirectory() throws Exception {
@@ -98,7 +126,8 @@ class M3V4AllocatorProtocolMainTest {
         return directory;
     }
 
-    private static String[] arguments(String command, Path input, Path output, SourceBinding source) {
+    private static String[] arguments(
+            String command, Path input, Path output, SourceBinding source, Path diagnosticRaw) {
         List<String> args = new ArrayList<>();
         args.add(command);
         args.add(input.toString());
@@ -108,6 +137,7 @@ class M3V4AllocatorProtocolMainTest {
         args.add(source.dependencyLockDigest().toHex());
         args.add(source.executorDigest().toHex());
         args.add(source.workloadDigest().toHex());
+        args.add(diagnosticRaw.toString());
         return args.toArray(String[]::new);
     }
 

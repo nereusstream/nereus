@@ -745,6 +745,11 @@ formal/diagnostic latency injector uses four bounded timer workers per actor ins
 lane. Delayed items remain inside 64-per-actor/256-global Runner outstanding accounting; production authority, V4
 plan/profile, workload, thresholds, and the 23-test/nine-suite inventory do not change.
 
+[ADR 0137](../../../decisions/0137-v2-m3-allocator-v5-storm-admission-and-diagnostic-raw-integrity-amendment.md)
+records the complete V4 diagnostic's bounded storm-tail overload and raw-sealing gap. It preserves V4, requires a
+new `4/128/512/1` V5 admission identity, and is tracked by the
+[V5 storm admission and diagnostic raw-integrity record](stage-b-v5-storm-admission-and-diagnostic-raw-integrity.md).
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

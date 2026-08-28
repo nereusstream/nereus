@@ -843,11 +843,87 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             self.assertFalse(identity["promotableInput"])
             self.assertEqual(receipt.name, identity["rangeAttributionRelativePath"])
             self.assertEqual(hashlib.sha256(receipt.read_bytes()).hexdigest(), identity["rangeAttributionSha256"])
+            self.assertEqual(
+                [{"relativePath": receipt.name, "sha256": hashlib.sha256(receipt.read_bytes()).hexdigest()}],
+                identity["rangeAttributions"],
+            )
             self.assertEqual(receipt.read_bytes(), (archive / "payload" / "diagnostic-output" / receipt.name).read_bytes())
             self.assertEqual(xml.read_bytes(), (archive / "payload" / "junit" / xml.name).read_bytes())
             repeated = subprocess.run(command, check=False, capture_output=True, text=True)
             self.assertNotEqual(0, repeated.returncode)
             self.assertIn("archive target already exists", repeated.stderr)
+
+    def test_diagnostic_archiver_preserves_multiple_range_attributions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            diagnostic = root / "diagnostic"
+            diagnostic.mkdir()
+            receipts = [
+                diagnostic / "v4-range1024-10ms-formal-sequence.json",
+                diagnostic / "v4-range1024-25ms-formal-sequence.json",
+            ]
+            for receipt in receipts:
+                receipt.write_text(
+                    '{"diagnosticOnly":true,"authority":false,"selectionEligible":false}\n',
+                    encoding="utf-8",
+                )
+            junit = root / "junit"
+            junit.mkdir()
+            (junit / "TEST-example.xml").write_text(
+                '<testsuite tests="1" failures="0" errors="0" skipped="0">'
+                '<testcase name="passes"/></testsuite>\n',
+                encoding="utf-8",
+            )
+            archive = root / "archive"
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(DIAGNOSTIC_ARCHIVER),
+                    "--diagnostic-output",
+                    str(diagnostic),
+                    "--junit-directory",
+                    str(junit),
+                    "--archive",
+                    str(archive),
+                    "--archived-on",
+                    "2026-08-29",
+                    "--source-commit",
+                    "a" * 40,
+                    "--plan-sha256",
+                    "b" * 64,
+                    "--executor-sha256",
+                    "c" * 64,
+                    "--run-id",
+                    "diagnostic-r1",
+                    "--expected-tests",
+                    "1",
+                    "--expected-failures",
+                    "0",
+                    "--expected-errors",
+                    "0",
+                    "--expected-skipped",
+                    "0",
+                    "--expected-suites",
+                    "1",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            identity = json.loads((archive / "archive-identity.json").read_bytes())
+            self.assertIsNone(identity["rangeAttributionRelativePath"])
+            self.assertIsNone(identity["rangeAttributionSha256"])
+            self.assertEqual(
+                [
+                    {
+                        "relativePath": receipt.name,
+                        "sha256": hashlib.sha256(receipt.read_bytes()).hexdigest(),
+                    }
+                    for receipt in receipts
+                ],
+                identity["rangeAttributions"],
+            )
 
     def test_plan_only_is_byte_stable_and_freezes_all_independent_budgets(self) -> None:
         first = subprocess.run(

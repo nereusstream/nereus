@@ -85,6 +85,8 @@ class M3V4RangeLatencyDiagnosticTest {
                             + M3RealOxiaActors.CONTROLLED_DELAY_SCHEDULER_THREADS_PER_ACTOR
                             + ",\"fixed1000\":" + fixed.json()
                             + ",\"derived800\":" + derived.json() + "}\n");
+            assertZeroDropFailureTimeout("fixed1000", fixed);
+            assertZeroDropFailureTimeout("derived800", derived);
         } catch (Exception | Error failure) {
             executionFailure = failure;
             throw failure;
@@ -99,6 +101,14 @@ class M3V4RangeLatencyDiagnosticTest {
                 executionFailure.addSuppressed(termination);
             }
         }
+    }
+
+    private static void assertZeroDropFailureTimeout(String rowName, Row row) {
+        assertThat(row.dropped()).as(rowName + " dropped before admission").isZero();
+        assertThat(row.failed()).as(rowName + " failed after admission").isZero();
+        assertThat(row.timedOut()).as(rowName + " timed out after admission").isZero();
+        assertThat(row.admitted()).as(rowName + " admitted").isEqualTo(row.offered());
+        assertThat(row.completed()).as(rowName + " completed").isEqualTo(row.offered());
     }
 
     private static Row runRow(

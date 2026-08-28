@@ -103,7 +103,7 @@ public final class M3V4AllocatorProtocolMain {
     }
 
     private static void sealDiagnostic(String[] args) throws Exception {
-        requireLength(args, 8);
+        requireLength(args, 9);
         SourceBinding source = source(args, 3);
         if (!source.workloadDigest().equals(AllocatorCampaignPlanProfileV4.zeroDecisionPlanDigest())) {
             throw new IllegalArgumentException(
@@ -111,6 +111,7 @@ public final class M3V4AllocatorProtocolMain {
         }
         M3V3AllocatorProtocolMain.DiagnosticSuite junit = readDiagnosticSuite(Path.of(args[1]));
         requireExactDiagnosticJUnit(junit);
+        Sha256Digest rawManifest = M3V4DiagnosticRawGate.validate(Path.of(args[8]), source.nereusCommit());
         DiagnosticAttestation diagnostic = new DiagnosticAttestation(
                 source,
                 com.nereusstream.domain.registry.allocator.AllocatorNativeExecutionProfileV4
@@ -122,34 +123,37 @@ public final class M3V4AllocatorProtocolMain {
         AllocatorCampaignPromotionGateV4.decodeDiagnostic(encoded);
         M3V3AllocatorProtocolMain.writeCreateNew(Path.of(args[2]), encoded.toByteArray());
         System.out.printf(
-                "allocator V4 diagnostic sealed: tests=%d failures=0 errors=0 skips=0 junitSha256=%s%n",
-                junit.summary().tests(), diagnostic.receiptDigest().toHex());
+                "allocator V4 diagnostic sealed: tests=%d failures=0 errors=0 skips=0 junitSha256=%s rawSha256=%s%n",
+                junit.summary().tests(), diagnostic.receiptDigest().toHex(), rawManifest.toHex());
     }
 
     private static void validateDiagnostic(String[] args) throws Exception {
-        requireLength(args, 8);
+        requireLength(args, 9);
         CanonicalBytes encoded = readBounded(Path.of(args[1]), 4_096);
         DiagnosticAttestation diagnostic = AllocatorCampaignPromotionGateV4.decodeDiagnostic(encoded);
         M3V3AllocatorProtocolMain.DiagnosticSuite junit = readDiagnosticSuite(Path.of(args[2]));
         requireExactDiagnosticJUnit(junit);
         requireSource(diagnostic.source(), source(args, 3));
+        Sha256Digest rawManifest =
+                M3V4DiagnosticRawGate.validate(Path.of(args[8]), diagnostic.source().nereusCommit());
         if (!diagnostic.scenarios().equals(EnumSet.allOf(DiagnosticScenario.class))
                 || !diagnostic.receiptDigest().equals(junit.manifestDigest())) {
             throw new IllegalArgumentException("allocator V4 diagnostic attestation differs from its JUnit suite");
         }
         System.out.printf(
-                "allocator V4 diagnostic canonical: tests=%d failures=0 errors=0 skips=0 junitSha256=%s%n",
-                junit.summary().tests(), diagnostic.receiptDigest().toHex());
+                "allocator V4 diagnostic canonical: tests=%d failures=0 errors=0 skips=0 junitSha256=%s rawSha256=%s%n",
+                junit.summary().tests(), diagnostic.receiptDigest().toHex(), rawManifest.toHex());
     }
 
     private static void promotionCheck(String[] args) throws Exception {
-        requireLength(args, 13);
+        requireLength(args, 14);
         CanonicalBytes evaluation = readBounded(Path.of(args[1]), 4_096);
         CanonicalBytes checkpoint = readBounded(Path.of(args[2]), AllocatorCampaignCheckpointV4.MAX_ENCODED_BYTES);
         CanonicalBytes diagnosticBytes = readBounded(Path.of(args[3]), 4_096);
         DiagnosticAttestation diagnostic = AllocatorCampaignPromotionGateV4.decodeDiagnostic(diagnosticBytes);
         M3V3AllocatorProtocolMain.DiagnosticSuite diagnosticJUnit = readDiagnosticSuite(Path.of(args[4]));
         requireExactDiagnosticJUnit(diagnosticJUnit);
+        M3V4DiagnosticRawGate.validate(Path.of(args[13]), diagnostic.source().nereusCommit());
         byte[] formalJUnitBytes = M3V3AllocatorProtocolMain.readRegular(Path.of(args[5]), 16 * 1024 * 1024);
         M3V3AllocatorProtocolMain.ParsedJUnit formalJUnit =
                 M3V3AllocatorProtocolMain.parseJUnit(formalJUnitBytes);
@@ -185,13 +189,14 @@ public final class M3V4AllocatorProtocolMain {
     }
 
     private static void sealSelection(String[] args) throws Exception {
-        requireLength(args, 13);
+        requireLength(args, 14);
         CanonicalBytes evaluation = readBounded(Path.of(args[1]), 4_096);
         CanonicalBytes checkpoint = readBounded(Path.of(args[2]), AllocatorCampaignCheckpointV4.MAX_ENCODED_BYTES);
         CanonicalBytes diagnosticBytes = readBounded(Path.of(args[3]), 4_096);
         DiagnosticAttestation diagnostic = AllocatorCampaignPromotionGateV4.decodeDiagnostic(diagnosticBytes);
         M3V3AllocatorProtocolMain.DiagnosticSuite diagnosticJUnit = readDiagnosticSuite(Path.of(args[4]));
         requireExactDiagnosticJUnit(diagnosticJUnit);
+        M3V4DiagnosticRawGate.validate(Path.of(args[13]), diagnostic.source().nereusCommit());
         M3V3AllocatorProtocolMain.ParsedJUnit formalJUnit = M3V3AllocatorProtocolMain.parseJUnit(
                 M3V3AllocatorProtocolMain.readRegular(Path.of(args[5]), 16 * 1024 * 1024));
         AllocatorCampaignCheckpointV4 decodedCheckpoint = AllocatorCampaignCheckpointV4.decode(checkpoint);

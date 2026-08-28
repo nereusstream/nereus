@@ -950,6 +950,11 @@ diagnostic now share four source-governed timer workers per actor, with every de
 Runner outstanding inventory. The open question is whether a fresh exact-source 25ms receipt makes both rows
 zero-drop and allows canonical NADV4; no threshold, qualification, plan, or selection semantic has changed.
 
+ADR 0137 closes that attribution cycle. The standalone 25ms replay passed, while the complete `bb928a0...` suite
+reached V4's 256-global cap and dropped 124 fixed-storm requests. V4 bytes and that diagnostic remain immutable. The
+active implementation item is a strict V5 `4/128/512/1` admission/profile/codec boundary, storm-aware feasibility,
+raw-manifest-bound NADV5, and a complete zero-drop current-source diagnostic before any new formal campaign.
+
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

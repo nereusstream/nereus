@@ -48,6 +48,7 @@ if [[ "${1:-}" == "--bounded-adaptive-formal" ]]; then
   formal_diagnostic="${NEREUS_M3_ALLOCATOR_V4_DIAGNOSTIC_PATH:?set the exact-source NADV4 path}"
   formal_diagnostic_sha="${NEREUS_M3_ALLOCATOR_V4_DIAGNOSTIC_SHA256:?set the reviewed NADV4 SHA}"
   formal_diagnostic_junit="${NEREUS_M3_ALLOCATOR_V4_DIAGNOSTIC_JUNIT_DIRECTORY:?set the exact nine-suite V4 diagnostic JUnit directory}"
+  formal_diagnostic_output="${NEREUS_M3_ALLOCATOR_V4_DIAGNOSTIC_OUTPUT_DIRECTORY:?set the exact V4 diagnostic raw output directory}"
   formal_output="$2"
 
   test "$(git -C "$repo_root" rev-parse HEAD)" = "$formal_authorization"
@@ -103,6 +104,8 @@ if [[ "${1:-}" == "--bounded-adaptive-formal" ]]; then
   test "$(shasum -a 256 "$formal_diagnostic" | awk '{print $1}')" = "$formal_diagnostic_sha"
   test -d "$formal_diagnostic_junit"
   test ! -L "$formal_diagnostic_junit"
+  test -d "$formal_diagnostic_output"
+  test ! -L "$formal_diagnostic_output"
   test "$(docker image inspect "$formal_oxia_image" --format '{{.Id}}')" = "$formal_oxia_image_digest"
   test "$(docker image inspect "$formal_oxia_image" \
     --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$formal_oxia_server_commit"
@@ -128,6 +131,7 @@ if [[ "${1:-}" == "--bounded-adaptive-formal" ]]; then
     "-PpulsarCheckout=$formal_pulsar_checkout" \
     "-Pv2M3AllocatorV4DiagnosticPath=$formal_diagnostic" \
     "-Pv2M3AllocatorV4DiagnosticJUnitDirectory=$formal_diagnostic_junit" \
+    "-Pv2M3AllocatorV4DiagnosticOutput=$formal_diagnostic_output" \
     "-Pv2M3AllocatorV4NereusCommit=$formal_authorization" \
     "-Pv2M3AllocatorV4OxiaImageDigest=${formal_oxia_image_digest#sha256:}" \
     "-Pv2M3AllocatorV4DependencyLockDigest=$formal_dependency_lock_sha" \

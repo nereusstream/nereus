@@ -1289,6 +1289,7 @@ tasks.register<JavaExec>("sealRealAllocatorV4Diagnostic") {
                 required("v2M3AllocatorV4DependencyLockDigest"),
                 required("v2M3AllocatorV4ExecutorDigest"),
                 required("v2M3AllocatorV4WorkloadDigest"),
+                file(required("v2M3AllocatorV4DiagnosticOutput")).absolutePath,
             ),
         )
     }
@@ -1315,6 +1316,7 @@ tasks.register<JavaExec>("validateRealAllocatorV4Diagnostic") {
                 required("v2M3AllocatorV4DependencyLockDigest"),
                 required("v2M3AllocatorV4ExecutorDigest"),
                 required("v2M3AllocatorV4WorkloadDigest"),
+                file(required("v2M3AllocatorV4DiagnosticOutput")).absolutePath,
             ),
         )
     }
@@ -1341,6 +1343,7 @@ tasks.register<JavaExec>("validateExistingRealAllocatorV4Diagnostic") {
                 required("v2M3AllocatorV4DependencyLockDigest"),
                 required("v2M3AllocatorV4ExecutorDigest"),
                 required("v2M3AllocatorV4WorkloadDigest"),
+                file(required("v2M3AllocatorV4DiagnosticOutput")).absolutePath,
             ),
         )
     }
@@ -1546,6 +1549,7 @@ fun JavaExec.configureAllocatorV4PromotionCommand(command: String, outputPropert
                 required("v2M3AllocatorV4DependencyLockDigest"),
                 required("v2M3AllocatorV4ExecutorDigest"),
                 required("v2M3AllocatorV4WorkloadDigest"),
+                file(required("v2M3AllocatorV4DiagnosticOutput")).absolutePath,
             ),
         )
     }

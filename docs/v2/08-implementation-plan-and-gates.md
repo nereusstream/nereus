@@ -306,6 +306,11 @@ ADR 0136 records that exact `e50c455e...` reduces fixed-1000 drop to three, with
 remaining single-thread controlled-delay scheduler lag. The shared formal/diagnostic latency injector now has four
 source-governed timer workers per actor while every delayed item remains inside the existing Runner outstanding
 inventory. Both zero-drop 25ms rows, canonical NADV4, and all source gates remain mandatory before formal execution.
+ADR 0137 records the complete `bb928a0...` diagnostic: the 10ms row and both derived rows are lossless, but the 25ms
+fixed storm reaches the 256-global cap and drops 124 requests. Before further formal execution, implement the distinct
+V5 `4/128/512/1` admission/profile/codec/feasibility boundary, bind diagnostic raw manifests into NADV5, and require a
+complete zero-error, zero-skip, zero-drop V5 diagnostic. The preserved NADV4 is non-authoritative because its raw hard
+gate failed.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and
