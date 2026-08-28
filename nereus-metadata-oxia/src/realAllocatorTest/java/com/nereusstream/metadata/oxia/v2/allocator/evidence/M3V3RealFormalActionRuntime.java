@@ -53,6 +53,8 @@ import java.util.concurrent.atomic.AtomicLong;
 final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoCloseable {
     private final Path actionDirectory;
     private final String executionDiscriminator;
+    private final boolean terminalDrainV4;
+    private final String attachmentProtocol;
     private final ThreadPoolExecutor constructionAndFaultWorkers;
     private final M3RealOxiaActors actors;
     private final Map<Candidate, M3CandidateAllocatorPopulation> candidatePopulations = new EnumMap<>(Candidate.class);
@@ -62,11 +64,22 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
 
     M3V3RealFormalActionRuntime(Path outputDirectory, String oxiaServiceAddress, String executionDiscriminator)
             throws Exception {
+        this(outputDirectory, oxiaServiceAddress, executionDiscriminator, false);
+    }
+
+    M3V3RealFormalActionRuntime(
+            Path outputDirectory,
+            String oxiaServiceAddress,
+            String executionDiscriminator,
+            boolean terminalDrainV4)
+            throws Exception {
         Path exactOutput = Objects.requireNonNull(outputDirectory, "outputDirectory").toAbsolutePath().normalize();
         if (!Files.isDirectory(exactOutput) || Files.isSymbolicLink(exactOutput)) {
             throw new IllegalArgumentException("allocator V3 formal output directory is absent or a link");
         }
         this.executionDiscriminator = requireSafeIdentity(executionDiscriminator);
+        this.terminalDrainV4 = terminalDrainV4;
+        attachmentProtocol = terminalDrainV4 ? "V4" : "V3";
         actionDirectory = Files.createDirectory(exactOutput.resolve("actions"));
         constructionAndFaultWorkers = M3RealAllocatorEvidenceTest.exactWorkers();
         constructionAndFaultWorkers.prestartAllCoreThreads();
@@ -110,8 +123,11 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
         IntervalMeasurements measurements = new IntervalMeasurements(
                 candidateAllocatedLedgerIds.computeIfAbsent(
                         cell.candidate(), ignored -> ConcurrentHashMap.newKeySet()));
-        M3V3AllocatorFormalHarness harness = M3V3AllocatorFormalHarness.formalActors(
-                population.formalActorEndpointsV3(cell, measurements));
+        List<M3V3AllocatorFormalHarness.ActorEndpoint> endpoints =
+                population.formalActorEndpointsV3(cell, measurements);
+        M3V3AllocatorFormalHarness harness = terminalDrainV4
+                ? M3V3AllocatorFormalHarness.formalActorsV4(endpoints)
+                : M3V3AllocatorFormalHarness.formalActors(endpoints);
         List<M3V3AsyncActorLaneRunner.ScheduledOffer<M3V3AllocatorFormalHarness.CandidateRequest>> schedule =
                 candidateSchedule(cell.activeManagedLedgers(), offeredRate);
         M3V3AllocatorFormalHarness.HarnessResult result;
@@ -195,7 +211,8 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
         }
         actors.setControlledLatencyMillis(0);
         long elapsedMicros = candidatePopulation(row.candidate()).ensurePopulation(row.activeManagedLedgers());
-        String json = "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_SCALE_ACTION_V3\",\"candidate\":\""
+        String json = "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_SCALE_ACTION_" + attachmentProtocol
+                + "\",\"candidate\":\""
                 + row.candidate() + "\",\"activeManagedLedgers\":" + row.activeManagedLedgers()
                 + ",\"metadataLatencyP99Millis\":" + row.metadataLatencyP99Millis()
                 + ",\"elapsedMicros\":" + elapsedMicros
@@ -216,7 +233,7 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
 
     private M3V3NativeIntervalRuntime nativeIntervalRuntime() throws Exception {
         if (nativeIntervalRuntime == null) {
-            nativeIntervalRuntime = new M3V3NativeIntervalRuntime(nativePopulation());
+            nativeIntervalRuntime = new M3V3NativeIntervalRuntime(nativePopulation(), terminalDrainV4);
         }
         return nativeIntervalRuntime;
     }
@@ -303,9 +320,10 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
         return new Attachment(target, digest);
     }
 
-    private static String intervalJson(
+    private String intervalJson(
             IntervalEvidence value, M3V3AsyncActorLaneRunner.IntervalResult interval) {
-        return "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_INTERVAL_ACTION_V3\",\"contextId\":"
+        return "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_INTERVAL_ACTION_" + attachmentProtocol
+                + "\",\"contextId\":"
                 + value.cell().contextId() + ",\"offeredRate\":" + value.offeredRate()
                 + ",\"offered\":" + value.offered() + ",\"admitted\":"
                 + value.admitted() + ",\"overloadDroppedBeforeAdmission\":"

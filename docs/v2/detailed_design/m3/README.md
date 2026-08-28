@@ -677,6 +677,12 @@ derived-800 first dropped binding was offered on time 25ms before cutoff but rep
 40-second offer close from a final two-second admission deadline, equal to the existing maximum-starvation SLO, and
 then retains the exact zero-drop and five-second cleanup partitions. New NACP4/NAEV4/NARS4/NADV4, plan/profile digest,
 preflight, diagnostic, and formal gates are required before any selection or downstream Final input exists.
+The V4 protocol core binds plan digest
+`1121c56cb6cd59c319c7d2eacedc8de9978bcbc2edc0008f08ef87393e0eb975` and execution-profile digest
+`38a3bbda5b63365bc535a5669469728cfcd0c0189684a30c1d53f75b13b7fb35`. Its NACP4 envelope independently owns V4
+lineage, campaign ID, plan/profile and 42-second interval budget while retaining the V3 logical campaign algebra as a
+strictly nested implementation payload. NAEV4, NADV4, and NARS4 reference only NACP4 identities; NACP3/NAEV3/NADV3/
+NARS3 remain mutually rejected and cannot be wrapped when their workload digest is not the V4 plan.
 
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0

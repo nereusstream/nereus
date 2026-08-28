@@ -441,6 +441,7 @@ tasks.register<Test>("realAllocatorContractTest") {
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3FormalCampaignPlanTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AllocatorProtocolMainTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AdaptiveCampaignExecutorTest")
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V4AdaptiveCampaignExecutorTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AllocatorProtocolMainTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AdaptiveCampaignExecutorTest")
     }

@@ -244,6 +244,12 @@ as overload. V4 retains every request, rate, zero-drop/SLO rule, `4/64/256/1`, p
 queue. It adds only a two-second final admission drain equal to the existing starvation maximum, then applies the same
 pre-admission drop and five-second admitted cleanup partitions. Implementation must publish independent V4 wire,
 profile, feasibility, diagnostics, formal entry, promotion, and selection gates while V1/V2/V3 remain byte-stable.
+The source-bound V4 core now fixes zero-decision plan digest
+`1121c56cb6cd59c319c7d2eacedc8de9978bcbc2edc0008f08ef87393e0eb975` and execution-profile digest
+`38a3bbda5b63365bc535a5669469728cfcd0c0189684a30c1d53f75b13b7fb35`. NACP4 carries independent V4 lineage,
+campaign identity, plan/profile identity, and 42-second interval accounting around the already proved V3 logical
+planner payload; NAEV4/NADV4/NARS4 consume only that outer authority. Cross-version parsers reject every direct wire
+substitution, and the wrapper rejects any nested logical checkpoint not bound to the exact V4 plan digest.
 
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in

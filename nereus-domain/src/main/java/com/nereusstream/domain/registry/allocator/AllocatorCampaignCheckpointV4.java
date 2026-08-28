@@ -23,6 +23,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -76,6 +77,7 @@ public final class AllocatorCampaignCheckpointV4 {
         if ((logicalCheckpoint.checkpointSequence() == 0) != predecessorCheckpointDigest.isZero()) {
             throw invalid("allocator V4 checkpoint predecessor lineage differs from its sequence");
         }
+        validateLogicalBudgetAccounting(logicalCheckpoint);
         if (!remainingBudgets.equals(deriveBudgets(logicalCheckpoint))) {
             throw invalid("allocator V4 checkpoint budget does not match its logical action prefix");
         }
@@ -259,6 +261,60 @@ public final class AllocatorCampaignCheckpointV4 {
                 remainingV4,
                 inner.cleanupSeconds(),
                 inner.checkpointAndSealSeconds());
+    }
+
+    private static void validateLogicalBudgetAccounting(AllocatorCampaignCheckpointV3 logical) {
+        long intervalCount = logical.executionRecords().stream()
+                .map(ExecutionRecord::observation)
+                .filter(AllocatorCampaignV3.IntervalEvidence.class::isInstance)
+                .count();
+        long faultRows = logical.executionRecords().stream()
+                .map(ExecutionRecord::observation)
+                .filter(AllocatorCampaignV3.FaultEvidence.class::isInstance)
+                .count();
+        Set<AllocatorCampaignV3.Candidate> populatedTenThousand = new HashSet<>();
+        Set<AllocatorCampaignV3.Candidate> populatedHundredThousand = new HashSet<>();
+        logical.executionRecords().stream().map(ExecutionRecord::observation).forEach(observation -> {
+            AllocatorCampaignV3.Row row = observation instanceof AllocatorCampaignV3.IntervalEvidence interval
+                    ? interval.cell().row()
+                    : ((AllocatorCampaignV3.FaultEvidence) observation).row();
+            if (row.activeManagedLedgers() == 10_000) {
+                populatedTenThousand.add(row.candidate());
+            } else if (row.activeManagedLedgers() == 100_000) {
+                populatedHundredThousand.add(row.candidate());
+            }
+        });
+        AllocatorCampaignCheckpointV3.RemainingBudgets expected = new AllocatorCampaignCheckpointV3.RemainingBudgets(
+                logical.executionRecords().isEmpty() ? 900 : 0,
+                Math.subtractExact(5_400, Math.multiplyExact(900L, populatedTenThousand.size())),
+                Math.subtractExact(7_200, Math.multiplyExact(180L, faultRows)),
+                Math.subtractExact(5_400, Math.multiplyExact(900L, populatedHundredThousand.size())),
+                Math.subtractExact(V3_INTERVAL_BUDGET, Math.multiplyExact(V3_INTERVAL_CHARGE, intervalCount)),
+                Math.subtractExact(1_640, Math.multiplyExact(5L, intervalCount)),
+                600);
+        AllocatorCampaignCheckpointV3.RemainingBudgets actual = logical.remainingBudgets();
+        boolean sequenceCoversRecords =
+                logical.checkpointSequence() >= logical.executionRecords().size();
+        if ((logical.status() == Status.RUNNING || logical.status() == Status.COMPLETED)
+                && (!actual.equals(expected) || !sequenceCoversRecords)) {
+            throw invalid("allocator V4 logical checkpoint budget or sequence differs from executed actions");
+        }
+        if ((logical.status() == Status.INTERRUPTED || logical.status() == Status.INFRASTRUCTURE_FAILED)
+                && (!doesNotExceed(actual, expected) || !sequenceCoversRecords)) {
+            throw invalid("allocator V4 terminal logical checkpoint budget or sequence differs");
+        }
+    }
+
+    private static boolean doesNotExceed(
+            AllocatorCampaignCheckpointV3.RemainingBudgets actual,
+            AllocatorCampaignCheckpointV3.RemainingBudgets expected) {
+        return actual.setupSeconds() <= expected.setupSeconds()
+                && actual.populationSeconds() <= expected.populationSeconds()
+                && actual.faultSeconds() <= expected.faultSeconds()
+                && actual.scaleSeconds() <= expected.scaleSeconds()
+                && actual.intervalSeconds() <= expected.intervalSeconds()
+                && actual.cleanupSeconds() <= expected.cleanupSeconds()
+                && actual.checkpointAndSealSeconds() <= expected.checkpointAndSealSeconds();
     }
 
     private static Sha256Digest campaignId(SourceBinding source, Sha256Digest logicalCampaignId) {

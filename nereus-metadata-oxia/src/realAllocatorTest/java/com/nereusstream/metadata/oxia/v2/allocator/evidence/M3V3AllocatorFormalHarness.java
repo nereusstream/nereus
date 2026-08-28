@@ -66,6 +66,14 @@ final class M3V3AllocatorFormalHarness {
     }
 
     static M3V3AllocatorFormalHarness formalActors(List<ActorEndpoint> actors) {
+        return formalActors(actors, false);
+    }
+
+    static M3V3AllocatorFormalHarness formalActorsV4(List<ActorEndpoint> actors) {
+        return formalActors(actors, true);
+    }
+
+    private static M3V3AllocatorFormalHarness formalActors(List<ActorEndpoint> actors, boolean terminalDrainV4) {
         for (ActorEndpoint actor : List.copyOf(Objects.requireNonNull(actors, "actors"))) {
             if (!(actor.coordinatorIdentity() instanceof BoundedVirtualLedgerAllocatorWorkflowV2 workflow)
                     || !workflow.bounds().equals(BoundedVirtualLedgerAllocatorWorkflowV2.Bounds.formal())) {
@@ -73,13 +81,25 @@ final class M3V3AllocatorFormalHarness {
                         "allocator V3 formal actor is not an exact bounded production workflow");
             }
         }
-        return new M3V3AllocatorFormalHarness(M3V3AsyncActorLaneRunner.formal(), actors);
+        M3V3AsyncActorLaneRunner<CandidateRequest> runner = terminalDrainV4
+                ? M3V3AsyncActorLaneRunner.formalV4()
+                : M3V3AsyncActorLaneRunner.formal();
+        return new M3V3AllocatorFormalHarness(runner, actors);
     }
 
     static M3V3AllocatorFormalHarness forContractTest(
             Duration warmup, Duration measurement, Duration cleanupGrace, List<ActorEndpoint> actors) {
+        return forContractTest(warmup, measurement, Duration.ZERO, cleanupGrace, actors);
+    }
+
+    static M3V3AllocatorFormalHarness forContractTest(
+            Duration warmup,
+            Duration measurement,
+            Duration terminalAdmissionDrain,
+            Duration cleanupGrace,
+            List<ActorEndpoint> actors) {
         return new M3V3AllocatorFormalHarness(
-                new M3V3AsyncActorLaneRunner<>(warmup, measurement, cleanupGrace), actors);
+                new M3V3AsyncActorLaneRunner<>(warmup, measurement, terminalAdmissionDrain, cleanupGrace), actors);
     }
 
     HarnessResult runCandidate(
