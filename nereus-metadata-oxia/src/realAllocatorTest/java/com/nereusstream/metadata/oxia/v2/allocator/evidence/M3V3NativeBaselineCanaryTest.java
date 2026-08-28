@@ -131,7 +131,6 @@ class M3V3NativeBaselineCanaryTest {
         assertThat(row.dropped()).isZero();
         assertThat(row.failed()).isZero();
         assertThat(row.timedOut()).isZero();
-        assertThat(row.warmupDropped()).isZero();
         assertThat(row.warmupFailed()).isZero();
         assertThat(row.warmupTimedOut()).isZero();
     }

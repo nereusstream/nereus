@@ -116,3 +116,11 @@ fixed-1000 completed 30,000/30,000 with zero drop; the following derived-800 com
 the interval's p99 scheduler lag was 975 microseconds, while bounded queue depth/outstanding maxima were 135/229.
 Because offers fired on time and the remaining work was genuinely pre-admission at cutoff, Stage B.2 makes no runner
 or allocator workflow change from this result.
+
+The first complete diagnostic replay at exact source `8d9023d2409cbadf94b38c777336f880b31da3df` then stopped on
+one warm-up pre-admission drop in the observational 10k/1ms/500 row despite measured 15,000/15,000, zero measured
+drop/failure/timeout, and full drain. [ADR 0119](../../../decisions/0119-v2-m3-allocator-v3-native-representative-warmup-observation-amendment.md)
+preserves its 18-file/42,212-byte external archive and restores the accepted distinction: all eight 200-rps baseline
+warm-up and measured assertions remain hard gates, while a representative warm-up drop remains raw telemetry rather
+than an additional qualification row. Representative measured zero-drop/failure/timeout and lifecycle rules remain
+unchanged.

@@ -871,6 +871,9 @@ physical-to-logical attachment reconstruction and the current-source NADV3 plan 
 is whether the small first-elimination RANGE drops are intrinsic or caused by a concrete offer/admission/cutoff
 measurement defect. The exact-schedule diagnostic may answer only that attribution question; it cannot change the
 frozen qualification contract or authorize another formal run.
+ADR 0119 additionally prevents the two 500-rps Native extension rows from becoming undeclared qualification rows:
+their warm-up pre-admission drops remain visible observations, while all measured and lifecycle checks stay closed.
+The eight 200-rps baseline rows retain every zero-drop requirement.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

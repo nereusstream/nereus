@@ -638,6 +638,11 @@ Current-source NADV3 binds the full zero-decision plan digest rather than the em
 RANGE-16 cutoff diagnostic replays the exact fixed-1000/derived-800 formal schedule solely to attribute small
 pre-admission drops; it cannot create or modify formal evidence.
 
+[ADR 0119](../../../decisions/0119-v2-m3-allocator-v3-native-representative-warmup-observation-amendment.md) restores
+ADR 0109's exact Native canary split after a full diagnostic failed on one warm-up drop in an otherwise complete
+15,000/15,000 representative 500-rps row. Baseline 200-rps rows still require zero warm-up and measured drop;
+representative warm-up drop remains retained telemetry while measured and lifecycle assertions remain fail-closed.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1
