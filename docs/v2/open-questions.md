@@ -915,6 +915,12 @@ same-key reread, or CAS predecessor. The remaining open question is empirical: w
 the unchanged fixed-1000 and derived-800 10ms rows zero-drop in a canonical 22-test/nine-suite NADV4. Formal remains
 closed until that exact-source diagnostic passes.
 
+ADR 0128 closes that question with exact `83193069...-r1`: 10ms passes, but every RANGE is ultimately eliminated and
+RANGE-1024 derived-800 drops 6,402 offers at 25ms. Its operation/workflow p99 near 267ms is not yet attributable from
+formal attachments. The open question is now whether exact 25ms telemetry assigns that excess to real Oxia RTT, the
+single-thread per-actor controlled-delay scheduler, callback execution, or another stage. Current-source NADV4 is 23
+tests/nine suites; scheduler parallelism and further workflow changes remain closed until that measurement exists.
+
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.

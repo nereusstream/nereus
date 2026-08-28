@@ -52,7 +52,10 @@ public final class M3V4AllocatorProtocolMain {
                             "exactRange16FixedAndDerivedRowsDrainEveryOnTimeOfferWithoutLoss()"),
                     identity(
                             "M3V4RangeLatencyDiagnosticTest",
-                            "exactRange1024TenMillisSequenceAttributesOperationAndSchedulerCapacity()")));
+                            "exactRange1024TenMillisSequenceAttributesOperationAndSchedulerCapacity()"),
+                    identity(
+                            "M3V4RangeLatencyDiagnosticTest",
+                            "exactRange1024TwentyFiveMillisSequenceAttributesOperationAndSchedulerCapacity()")));
 
     private M3V4AllocatorProtocolMain() {}
 

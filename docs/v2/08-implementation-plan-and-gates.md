@@ -266,6 +266,11 @@ ADR 0127 accepts the measured correction: initial Cell/Head, pre-create Cell/Hea
 remain exact store operations but dispatch in three independent pairs. Create/CAS same-key rereads and all bounded
 reconcile/deadline guards remain unchanged. The current-source diagnostic gate remains 22 tests/nine suites and must
 prove both RANGE-1024 10ms rows have zero drop/failure/timeout before a new formal entry.
+ADR 0128 records that exact source `83193069...` passed that gate and moved the formal eliminating boundary to 25ms,
+but still sealed `NONE_QUALIFIED`. Before any scheduler change, the current-source NADV4 inventory becomes 23 tests
+in the same nine suites and must split the exact 25ms fixed/derived sequence into real RTT, injected-delay scheduler
+lag, callback lag, operation outstanding, workflow latency, and runner queue telemetry. No new formal entry is allowed
+until the measured cause is corrected on a new pushed exact source and the complete current-source diagnostic passes.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

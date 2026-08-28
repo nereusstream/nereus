@@ -201,6 +201,12 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn("M3V4AsyncActorLaneRunnerTest", protocol)
         self.assertIn("M3V4TerminalAdmissionDrainDiagnosticTest", protocol)
         self.assertIn("M3V4RangeLatencyDiagnosticTest", protocol)
+        self.assertIn(
+            "exactRange1024TwentyFiveMillisSequenceAttributesOperationAndSchedulerCapacity",
+            protocol,
+        )
+        self.assertIn('"v4-range1024-25ms-formal-sequence.json"', range_latency)
+        self.assertIn("runSequence(25", range_latency)
         self.assertIn("AllocatorCampaignPromotionGateV4", protocol)
         self.assertIn("AllocatorCampaignSelectionV4", protocol)
         self.assertIn("formalV4()", runner)
@@ -216,8 +222,8 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn(r'\"diagnosticOnly\":true', terminal)
         self.assertIn(r'\"authority\":false', terminal)
         self.assertIn(r'\"selectionEligible\":false', terminal)
-        self.assertIn("Cell.fixedRate(Candidate.RANGE_1024, POPULATION, LATENCY_MILLIS, 1_000)", range_latency)
-        self.assertIn("Cell.derived(Candidate.RANGE_1024, POPULATION, LATENCY_MILLIS)", range_latency)
+        self.assertIn("Cell.fixedRate(Candidate.RANGE_1024, POPULATION, latencyMillis, 1_000)", range_latency)
+        self.assertIn("Cell.derived(Candidate.RANGE_1024, POPULATION, latencyMillis)", range_latency)
         self.assertIn("M3V3RealFormalActionRuntime.candidateSchedule", range_latency)
         self.assertIn("beginSharedDiagnosticCapture", range_latency)
         self.assertIn("realOutstandingMaximum", range_latency)

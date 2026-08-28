@@ -709,6 +709,12 @@ reducing the uncontended chain from ten to seven stages. The associated
 scheduling dependency. No scheduler pool, protocol threshold, plan digest, selection rule, or historical evidence is
 changed.
 
+[ADR 0128](../../../decisions/0128-v2-m3-allocator-v4-25ms-operation-attribution-amendment.md) preserves exact
+`83193069...-r1` as `NONE_QUALIFIED` and moves attribution to the remaining 25ms boundary. The
+[25ms operation-attribution record](stage-b-v4-25ms-operation-attribution.md) adds a second exact RANGE-1024
+fixed/derived sequence and raises current-source NADV4 to 23 tests in the same nine suites. It changes no scheduler,
+allocator, plan, threshold, selection rule, or evidence wire until real RTT and scheduler/callback lag are measured.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

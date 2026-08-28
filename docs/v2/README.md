@@ -628,6 +628,12 @@ operations outstanding, ten metadata operations per request, and 171.980ms workf
 keeps every exact read and mutation while dispatching three independent authority-proof pairs concurrently. It does
 not alter the V4 plan, workload, qualification, or selection contract.
 
+[ADR 0128](../decisions/0128-v2-m3-allocator-v4-25ms-operation-attribution-amendment.md) preserves the resulting exact
+`83193069...-r1` V4 `NONE_QUALIFIED` campaign. RANGE-1024 now clears 10ms but its 25ms derived-800 action drops 6,402
+offers and reports operation/workflow p99 near 267ms. The current-source diagnostic adds an exact 25ms fixed/derived
+sequence, making NADV4 23 tests in the same nine suites, before any delay-scheduler or workflow correction is allowed.
+No V4 protocol, threshold, plan, selection rule, or historical evidence changes.
+
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.

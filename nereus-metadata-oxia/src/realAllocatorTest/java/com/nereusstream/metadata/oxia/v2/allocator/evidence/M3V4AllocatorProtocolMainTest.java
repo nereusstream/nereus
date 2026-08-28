@@ -40,7 +40,7 @@ class M3V4AllocatorProtocolMainTest {
     }
 
     @Test
-    void diagnosticSealerBindsTheIndependentTwentyTwoTestNadv4Inventory() throws Exception {
+    void diagnosticSealerBindsTheIndependentTwentyThreeTestNadv4Inventory() throws Exception {
         SourceBinding source = source();
         Path junit = diagnosticJUnitDirectory();
         Path output = temporaryDirectory.resolve("diagnostic.nadv4");
@@ -51,7 +51,7 @@ class M3V4AllocatorProtocolMainTest {
         var diagnostic = AllocatorCampaignPromotionGateV4.decodeDiagnostic(
                 CanonicalBytes.copyOf(Files.readAllBytes(output)));
         assertThat(M3V4AllocatorProtocolMain.DIAGNOSTIC_SUITES).hasSize(9);
-        assertThat(M3V4AllocatorProtocolMain.DIAGNOSTIC_TESTS).hasSize(22);
+        assertThat(M3V4AllocatorProtocolMain.DIAGNOSTIC_TESTS).hasSize(23);
         assertThat(diagnostic.source()).isEqualTo(source);
         assertThat(diagnostic.scenarios())
                 .containsExactlyInAnyOrderElementsOf(java.util.EnumSet.allOf(

@@ -32,10 +32,18 @@ import org.junit.jupiter.api.Test;
 /** Diagnostic-only replay of the first V4 RANGE_1024 row that failed at ten milliseconds. */
 class M3V4RangeLatencyDiagnosticTest {
     private static final int POPULATION = 10_000;
-    private static final int LATENCY_MILLIS = 10;
 
     @Test
     void exactRange1024TenMillisSequenceAttributesOperationAndSchedulerCapacity() throws Exception {
+        runSequence(10, "v4-range1024-10ms-formal-sequence.json");
+    }
+
+    @Test
+    void exactRange1024TwentyFiveMillisSequenceAttributesOperationAndSchedulerCapacity() throws Exception {
+        runSequence(25, "v4-range1024-25ms-formal-sequence.json");
+    }
+
+    private static void runSequence(int latencyMillis, String outputFile) throws Exception {
         String serviceAddress =
                 M3V3DiagnosticOutput.requiredProperty("nereus.m3.allocator.v3.oxiaServiceAddress");
         String sourceCommit = M3V3DiagnosticOutput.requiredProperty("nereus.m3.allocator.v3.nereusCommit");
@@ -49,28 +57,31 @@ class M3V4RangeLatencyDiagnosticTest {
             M3CandidateAllocatorPopulation population = new M3CandidateAllocatorPopulation(
                     AllocatorEvidenceCandidateV1.range(1_024),
                     4,
-                    "range1024-v4-latency-" + sourceCommit.substring(0, 16),
+                    "range1024-v4-latency-" + latencyMillis + "ms-" + sourceCommit.substring(0, 16),
                     actors,
                     workers);
             population.ensurePopulation(POPULATION);
-            actors.setControlledLatencyMillis(LATENCY_MILLIS);
+            actors.setControlledLatencyMillis(latencyMillis);
             Row fixed = runRow(
                     actors,
                     population,
-                    Cell.fixedRate(Candidate.RANGE_1024, POPULATION, LATENCY_MILLIS, 1_000),
-                    1_000);
+                    Cell.fixedRate(Candidate.RANGE_1024, POPULATION, latencyMillis, 1_000),
+                    1_000,
+                    latencyMillis);
             Row derived = runRow(
                     actors,
                     population,
-                    Cell.derived(Candidate.RANGE_1024, POPULATION, LATENCY_MILLIS),
-                    800);
+                    Cell.derived(Candidate.RANGE_1024, POPULATION, latencyMillis),
+                    800,
+                    latencyMillis);
             M3V3DiagnosticOutput.writeNew(
-                    "v4-range1024-10ms-formal-sequence.json",
+                    outputFile,
                     "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_RANGE_LATENCY_DIAGNOSTIC_V4\""
                             + ",\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false"
                             + ",\"sourceCommit\":" + M3V3DiagnosticOutput.jsonString(sourceCommit)
                             + ",\"candidate\":\"RANGE_1024\",\"activePopulation\":10000"
-                            + ",\"latencyMillis\":10,\"delaySchedulerThreadsPerActor\":1"
+                            + ",\"latencyMillis\":" + latencyMillis
+                            + ",\"delaySchedulerThreadsPerActor\":1"
                             + ",\"fixed1000\":" + fixed.json()
                             + ",\"derived800\":" + derived.json() + "}\n");
         } catch (Exception | Error failure) {
@@ -93,7 +104,8 @@ class M3V4RangeLatencyDiagnosticTest {
             M3RealOxiaActors actors,
             M3CandidateAllocatorPopulation population,
             Cell cell,
-            int offeredRate)
+            int offeredRate,
+            int latencyMillis)
             throws InterruptedException {
         actors.beginSharedDiagnosticCapture();
         AllocationObserver observer = new AllocationObserver();
@@ -120,7 +132,7 @@ class M3V4RangeLatencyDiagnosticTest {
                 .flatMap(snapshot -> snapshot.samples().stream())
                 .toList();
         assertThat(samples).isNotEmpty();
-        assertThat(samples).allMatch(sample -> sample.injectedLatencyMillis() == LATENCY_MILLIS);
+        assertThat(samples).allMatch(sample -> sample.injectedLatencyMillis() == latencyMillis);
         assertThat(sharedSnapshot.realOutstandingMaximum()).isGreaterThan(4);
         return Row.from(offeredRate, result, observer, sharedSnapshot, samples);
     }
