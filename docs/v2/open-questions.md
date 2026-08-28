@@ -865,6 +865,12 @@ callback failures caused by another request's exact transient RANGE reservation 
 failed attempt, keeps the harness-local proof reservation-free, and adds an exact RANGE-16 formal-sequence diagnostic
 to the six-suite/18-test NADV3 inventory. It changes no production allocator transition or qualification rule, so
 formal qualification remains unanswered pending a fresh exact-source terminal campaign.
+The following exact source `d22a693a...` did reach a formal terminal: valid non-promotable `NONE_QUALIFIED`, with no
+NARS3 and allocator mode still `UNSELECTED`. ADR 0118 preserves those bytes while closing the promotion verifier's
+physical-to-logical attachment reconstruction and the current-source NADV3 plan identity. The remaining open question
+is whether the small first-elimination RANGE drops are intrinsic or caused by a concrete offer/admission/cutoff
+measurement defect. The exact-schedule diagnostic may answer only that attribution question; it cannot change the
+frozen qualification contract or authorize another formal run.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

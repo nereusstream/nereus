@@ -378,6 +378,7 @@ Accepted decisions:
 - [ADR 0115: M3 V3 diagnostic inventory sealing amendment](../decisions/0115-v2-m3-allocator-v3-diagnostic-inventory-sealing-amendment.md)
 - [ADR 0116: M3 V3 diagnostic testcase identity amendment](../decisions/0116-v2-m3-allocator-v3-diagnostic-testcase-identity-amendment.md)
 - [ADR 0117: M3 V3 RANGE completion reservation-handoff amendment](../decisions/0117-v2-m3-allocator-v3-range-completion-reservation-handoff-amendment.md)
+- [ADR 0118: M3 V3 promotion-attachment and cutoff-attribution amendment](../decisions/0118-v2-m3-allocator-v3-promotion-attachment-and-cutoff-attribution-amendment.md)
 
 ## Open design gates
 
@@ -553,6 +554,15 @@ completion snapshot for its reservation-free population proof and still requires
 advance cursor/grant state. The current-source NADV3 inventory becomes six suites/18 tests by adding the exact
 RANGE-16 10k/1ms fixed-1000 formal schedule; production CAS/reread authority and every frozen campaign rule remain
 unchanged.
+
+The subsequent exact-source campaign at `d22a693a...` completed with 44 physical actions and 23 checkpoints. Final
+NACP3 `f7e44c95...1fbb` sealed canonical NAEV3 `0b0f3953...5726` as valid non-promotable `NONE_QUALIFIED`; no NARS3
+exists and allocator mode remains `UNSELECTED`. [ADR 0118](../decisions/0118-v2-m3-allocator-v3-promotion-attachment-and-cutoff-attribution-amendment.md)
+preserves that terminal and corrects two independent verification identities: current-source NADV3 binds the full
+zero-decision plan digest, and the promotion CLI reconstructs each logical execution-record digest from all exact
+physical interval, scale, and ordered fault files. A separate exact-schedule RANGE cutoff diagnostic attributes the
+small pre-admission drop boundary without changing cutoff, workload, SLO, or selection semantics. This is not formal
+rerun authorization.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

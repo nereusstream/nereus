@@ -195,6 +195,14 @@ reserved completion, advance only on cleared monotonic snapshots, and retain eve
 fail-closed interval rule. Publication requires the exact RANGE-16 formal schedule inside the six-suite/18-test
 NADV3 inventory, full source gates, fresh preflight, and a new exact-source formal directory.
 
+ADR 0118 governs post-terminal V3 verification. Exact source `d22a693a...` completed normally and produced valid
+non-promotable `NONE_QUALIFIED` NAEV3 `0b0f3953...5726`, with no NARS3. The immutable 44-file physical attachment
+inventory maps to 22 logical NACP3 execution records; the promotion CLI must reconstruct the exact interval/scale and
+ordered fault aggregates, validate filename/content hashes, and consume every file once. Current-source NADV3 must
+bind plan digest `5f94079e...b283`, not only schedule digest `b0e923a0...e798`. A diagnostic-only exact RANGE-16
+cutoff replay may attribute the first dropped ordinal and scheduler lag, but may not change physical cutoff, workload,
+qualification, or selection. This Stage B.2 recertification still stops before another formal campaign.
+
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

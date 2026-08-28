@@ -899,6 +899,45 @@ val realAllocatorV3DiagnosticJUnitDirectory = layout.buildDirectory.dir(
     "test-results/realAllocatorV3DiagnosticTest",
 )
 
+tasks.register<Test>("realAllocatorV3CandidateCutoffDiagnosticTest") {
+    group = "verification"
+    description = "Run the diagnostic-only exact RANGE cutoff attribution sequence; never emits formal evidence."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    testClassesDirs = realAllocatorTest.output.classesDirs
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    maxParallelForks = 1
+    maxHeapSize = "6144m"
+    timeout.set(Duration.ofMinutes(15))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3CandidateCutoffDiagnosticTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for the V3 candidate cutoff diagnostic")
+        val output = file(required("v2M3AllocatorV3CandidateCutoffDiagnosticOutput"))
+            .toPath()
+            .toAbsolutePath()
+            .normalize()
+        require(!Files.exists(output, LinkOption.NOFOLLOW_LINKS)) {
+            "V3 allocator candidate cutoff diagnostic output already exists: $output"
+        }
+        val parent = output.parent
+        require(parent != null && Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(parent)) {
+            "V3 allocator candidate cutoff diagnostic output parent is absent or nonregular: $parent"
+        }
+        Files.createDirectory(output)
+        systemProperty("nereus.m3.allocator.v3.oxiaServiceAddress", required("v2M3AllocatorOxiaServiceAddress"))
+        systemProperty("nereus.m3.allocator.v3.nereusCommit", required("v2M3AllocatorV3NereusCommit"))
+        systemProperty("nereus.m3.allocator.v3.diagnosticRunId", required("v2M3AllocatorV3CandidateCutoffRunId"))
+        systemProperty("nereus.m3.allocator.v3.diagnosticOutput", output.toString())
+    }
+}
+
 tasks.register<JavaExec>("sealRealAllocatorV3Diagnostic") {
     group = "verification"
     description = "Seal the complete current-source V3 diagnostic JUnit inventory as non-promotable NADV3."

@@ -630,6 +630,14 @@ reservation-free; only a cleared completion may advance its monotonic cursor/gra
 RANGE-16 10k/1ms sequence extends current-source NADV3 to six suites/18 tests. No production operation, shared Cell
 lock, workload, plan, SLO, disposition, or selection rule changes.
 
+[ADR 0118](../../../decisions/0118-v2-m3-allocator-v3-promotion-attachment-and-cutoff-attribution-amendment.md)
+records the canonical verification closure after exact source `d22a693a...` completed `NONE_QUALIFIED`. The immutable
+campaign has 44 physical attachments but 22 logical NACP3 execution records, so the promotion verifier now
+reconstructs each record's ordered attachment aggregate and proves that every physical file is consumed exactly once.
+Current-source NADV3 binds the full zero-decision plan digest rather than the embedded schedule digest. The added
+RANGE-16 cutoff diagnostic replays the exact fixed-1000/derived-800 formal schedule solely to attribute small
+pre-admission drops; it cannot create or modify formal evidence.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

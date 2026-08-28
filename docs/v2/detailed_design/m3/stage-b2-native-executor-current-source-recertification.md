@@ -94,3 +94,18 @@ Pulsar/Oxia worktrees. The exact pushed source must have no formal process, evid
 This record does not authorize a V3 formal campaign. It does not update allocator production source locks, child
 receipts, current-source M2 evidence, scenarios, or M3 Final. Stage B r2 requires a separate instruction naming the
 new exact clean source.
+
+## Subsequent terminal and verifier recertification
+
+The later exact-source campaign at `d22a693a45441493ae0df8e8b7b205e8f97cee38` completed normally with 44 physical
+actions and 23 checkpoints. Final NACP3 `f7e44c95...1fbb` sealed canonical NAEV3 `0b0f3953...5726` as
+`NONE_QUALIFIED`; it is valid, non-promotable, and permanently leaves allocator mode `UNSELECTED` without NARS3.
+Its byte-identical 69-file/5,944,545-byte external archive has manifest digest `aa318593...b5c9` and identity digest
+`578b9457...5be7`.
+
+[ADR 0118](../../../decisions/0118-v2-m3-allocator-v3-promotion-attachment-and-cutoff-attribution-amendment.md)
+records the post-campaign verification correction. Current-source NADV3 binds the complete zero-decision plan digest,
+while the promotion verifier reconstructs each logical execution-record digest from every exact physical interval,
+scale, and ordered fault attachment. A separate exact-schedule RANGE cutoff diagnostic attributes small measured
+pre-admission drops without changing cutoff, workload, SLO, or selection semantics. These corrections remain within
+diagnostic and verification conformance; they do not authorize a new formal campaign.
