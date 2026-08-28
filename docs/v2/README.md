@@ -603,6 +603,10 @@ lag was zero and rollover p99 was 132.270ms. V4 keeps every request, zero-drop r
 per-binding single-flight, but closes offers at 40s and gives already-offered work the existing two-second starvation
 bound to reach admission before the unchanged drop partition is finalized. Distinct NACP4/NAEV4/NARS4/NADV4 and a
 new source-bound plan prevent any reinterpretation of V3 evidence.
+The V4 diagnostic source gate is independently versioned: 21 tests across eight exact JUnit suites, comprising the
+unchanged V3 18-test inventory plus two V4 runner drain contracts and one real-Oxia RANGE-16 fixed/derived drain test.
+Only the V4 seal/validate tasks may turn that inventory into NADV4; it remains diagnostic-only and cannot select a
+mode.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

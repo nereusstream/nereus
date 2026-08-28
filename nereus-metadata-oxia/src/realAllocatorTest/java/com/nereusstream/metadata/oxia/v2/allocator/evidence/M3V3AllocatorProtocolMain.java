@@ -57,14 +57,14 @@ import org.w3c.dom.NodeList;
 public final class M3V3AllocatorProtocolMain {
     private static final Pattern SHA256_HEX = Pattern.compile("[0-9a-f]{64}");
     private static final String PACKAGE = "com.nereusstream.metadata.oxia.v2.allocator.evidence.";
-    private static final Set<String> DIAGNOSTIC_SUITES = Set.of(
+    static final Set<String> DIAGNOSTIC_SUITES = Set.of(
             PACKAGE + "M3RealAllocatorStrictIntervalDiagnosticTest",
             PACKAGE + "M3V3AsyncActorLaneRunnerTest",
             PACKAGE + "M3V3RealOxiaOperationDiagnosticTest",
             PACKAGE + "M3V3AllocatorWorkflowDiagnosticTest",
             PACKAGE + "M3V3NativePathDiagnosticTest",
             PACKAGE + "M3V3NativeBaselineCanaryTest");
-    private static final Set<String> DIAGNOSTIC_TESTS = Set.of(
+    static final Set<String> DIAGNOSTIC_TESTS = Set.of(
             identity(
                     "M3RealAllocatorStrictIntervalDiagnosticTest",
                     "replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()"),
@@ -296,8 +296,14 @@ public final class M3V3AllocatorProtocolMain {
     }
 
     private static DiagnosticSuite readDiagnosticSuite(Path directory) throws Exception {
+        return readDiagnosticSuite(directory, DIAGNOSTIC_SUITES, "V3");
+    }
+
+    static DiagnosticSuite readDiagnosticSuite(
+            Path directory, Set<String> expectedSuites, String protocolVersion) throws Exception {
         if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(directory)) {
-            throw new IllegalArgumentException("allocator V3 diagnostic JUnit directory is absent or a link");
+            throw new IllegalArgumentException(
+                    "allocator " + protocolVersion + " diagnostic JUnit directory is absent or a link");
         }
         List<Path> files;
         try (var stream = Files.list(directory)) {
@@ -305,17 +311,19 @@ public final class M3V3AllocatorProtocolMain {
                     .sorted(Comparator.comparing(path -> path.getFileName().toString()))
                     .toList();
         }
-        if (files.size() != DIAGNOSTIC_SUITES.size()) {
-            throw new IllegalArgumentException("allocator V3 diagnostic JUnit file inventory differs");
+        if (files.size() != expectedSuites.size()) {
+            throw new IllegalArgumentException(
+                    "allocator " + protocolVersion + " diagnostic JUnit file inventory differs");
         }
         Set<String> fileNames = files.stream()
                 .map(path -> path.getFileName().toString())
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
-        Set<String> expectedFileNames = DIAGNOSTIC_SUITES.stream()
+        Set<String> expectedFileNames = expectedSuites.stream()
                 .map(suite -> "TEST-" + suite + ".xml")
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
         if (!fileNames.equals(expectedFileNames)) {
-            throw new IllegalArgumentException("allocator V3 diagnostic JUnit file identity differs");
+            throw new IllegalArgumentException(
+                    "allocator " + protocolVersion + " diagnostic JUnit file identity differs");
         }
         long tests = 0;
         long failures = 0;
@@ -323,7 +331,8 @@ public final class M3V3AllocatorProtocolMain {
         long skips = 0;
         Set<String> suites = new HashSet<>();
         Set<String> testsSeen = new HashSet<>();
-        StringBuilder manifest = new StringBuilder("NEREUS_V2_M3_ALLOCATOR_DIAGNOSTIC_JUNIT_MANIFEST_V3\n");
+        StringBuilder manifest = new StringBuilder(
+                "NEREUS_V2_M3_ALLOCATOR_DIAGNOSTIC_JUNIT_MANIFEST_" + protocolVersion + '\n');
         for (Path file : files) {
             byte[] bytes = readRegular(file, 16 * 1024 * 1024);
             ParsedJUnit parsed = parseJUnit(bytes);
@@ -332,7 +341,8 @@ public final class M3V3AllocatorProtocolMain {
             errors = Math.addExact(errors, parsed.summary().errors());
             skips = Math.addExact(skips, parsed.summary().skips());
             if (!suites.addAll(parsed.suiteNames()) || !testsSeen.addAll(parsed.testcaseIdentities())) {
-                throw new IllegalArgumentException("allocator V3 diagnostic JUnit identities alias");
+                throw new IllegalArgumentException(
+                        "allocator " + protocolVersion + " diagnostic JUnit identities alias");
             }
             manifest.append(file.getFileName())
                     .append('\0')
@@ -349,22 +359,29 @@ public final class M3V3AllocatorProtocolMain {
 
     private static Set<Sha256Digest> attachmentDigests(CanonicalBytes checkpointBytes, Path directory)
             throws IOException {
+        AllocatorCampaignCheckpointV3 checkpoint = AllocatorCampaignCheckpointV3.decode(checkpointBytes);
+        return attachmentDigests(checkpoint.executionRecords(), directory, "V3");
+    }
+
+    static Set<Sha256Digest> attachmentDigests(
+            List<ExecutionRecord> executionRecords, Path directory, String protocolVersion) throws IOException {
         if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
-            throw new IllegalArgumentException("allocator V3 attachment directory is absent or a link");
+            throw new IllegalArgumentException(
+                    "allocator " + protocolVersion + " attachment directory is absent or a link");
         }
         List<Path> files;
         try (var stream = Files.list(directory)) {
             files = stream.sorted().toList();
         }
         if (files.isEmpty() || files.size() > 720) {
-            throw new IllegalArgumentException("allocator V3 attachment directory count differs");
+            throw new IllegalArgumentException(
+                    "allocator " + protocolVersion + " attachment directory count differs");
         }
 
-        AllocatorCampaignCheckpointV3 checkpoint = AllocatorCampaignCheckpointV3.decode(checkpointBytes);
         Set<Path> consumed = new HashSet<>();
         Set<Row> rowsWithIntervals = new HashSet<>();
         Set<Sha256Digest> aggregates = new HashSet<>();
-        for (ExecutionRecord record : checkpoint.executionRecords()) {
+        for (ExecutionRecord record : executionRecords) {
             List<Sha256Digest> physical = new java.util.ArrayList<>();
             if (record.observation() instanceof IntervalEvidence interval) {
                 Row row = interval.cell().row();
@@ -375,13 +392,15 @@ public final class M3V3AllocatorProtocolMain {
                             consumed,
                             "scale-" + row.candidate() + '-' + row.activeManagedLedgers() + '-'
                                     + row.metadataLatencyP99Millis() + '-',
-                            ".json"));
+                            ".json",
+                            protocolVersion));
                 }
                 physical.add(physicalAttachmentDigest(
                         files,
                         consumed,
                         "interval-" + interval.cell().contextId() + '-',
-                        ".json"));
+                        ".json",
+                        protocolVersion));
             } else if (record.observation() instanceof FaultEvidence fault) {
                 Row row = fault.row();
                 for (AllocatorFaultCutV1 cut : AllocatorFaultCutV1.values()) {
@@ -390,29 +409,35 @@ public final class M3V3AllocatorProtocolMain {
                             consumed,
                             "fault-" + row.candidate() + '-' + row.activeManagedLedgers() + '-'
                                     + row.metadataLatencyP99Millis() + '-' + cut + '-',
-                            ".nare1"));
+                            ".nare1",
+                            protocolVersion));
                 }
             } else {
-                throw new IllegalArgumentException("allocator V3 checkpoint contains an unknown attachment kind");
+                throw new IllegalArgumentException(
+                        "allocator " + protocolVersion + " checkpoint contains an unknown attachment kind");
             }
             ByteBuffer manifest = ByteBuffer.allocate(Math.multiplyExact(physical.size(), Sha256Digest.LENGTH));
             physical.forEach(digest -> manifest.put(digest.bytes().toByteArray()));
             Sha256Digest aggregate = Sha256Digest.hash(CanonicalBytes.copyOf(manifest.array()));
             if (!aggregate.equals(record.attachmentDigest())) {
-                throw new IllegalArgumentException("allocator V3 physical attachment aggregate differs");
+                throw new IllegalArgumentException(
+                        "allocator " + protocolVersion + " physical attachment aggregate differs");
             }
             if (!aggregates.add(aggregate)) {
-                throw new IllegalArgumentException("allocator V3 attachment aggregate aliases another record");
+                throw new IllegalArgumentException(
+                        "allocator " + protocolVersion + " attachment aggregate aliases another record");
             }
         }
         if (consumed.size() != files.size()) {
-            throw new IllegalArgumentException("allocator V3 attachment directory contains an unbound physical file");
+            throw new IllegalArgumentException(
+                    "allocator " + protocolVersion + " attachment directory contains an unbound physical file");
         }
         return Set.copyOf(aggregates);
     }
 
     private static Sha256Digest physicalAttachmentDigest(
-            List<Path> files, Set<Path> consumed, String prefix, String suffix) throws IOException {
+            List<Path> files, Set<Path> consumed, String prefix, String suffix, String protocolVersion)
+            throws IOException {
         List<Path> matches = files.stream()
                 .filter(path -> {
                     String name = path.getFileName().toString();
@@ -420,19 +445,21 @@ public final class M3V3AllocatorProtocolMain {
                 })
                 .toList();
         if (matches.size() != 1 || !consumed.add(matches.get(0))) {
-            throw new IllegalArgumentException("allocator V3 physical attachment identity differs: " + prefix);
+            throw new IllegalArgumentException(
+                    "allocator " + protocolVersion + " physical attachment identity differs: " + prefix);
         }
         Path path = matches.get(0);
         byte[] bytes = readRegular(path, 16 * 1024 * 1024);
         Sha256Digest digest = Sha256Digest.hash(CanonicalBytes.copyOf(bytes));
         String expectedName = prefix + digest.toHex() + suffix;
         if (!path.getFileName().toString().equals(expectedName)) {
-            throw new IllegalArgumentException("allocator V3 physical attachment filename digest differs");
+            throw new IllegalArgumentException(
+                    "allocator " + protocolVersion + " physical attachment filename digest differs");
         }
         return digest;
     }
 
-    private static ParsedJUnit parseJUnit(byte[] bytes) throws Exception {
+    static ParsedJUnit parseJUnit(byte[] bytes) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
@@ -544,7 +571,7 @@ public final class M3V3AllocatorProtocolMain {
         return CanonicalBytes.copyOf(readRegular(path, maximum));
     }
 
-    private static byte[] readRegular(Path path, int maximum) throws IOException {
+    static byte[] readRegular(Path path, int maximum) throws IOException {
         Objects.requireNonNull(path, "path");
         if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
             throw new IllegalArgumentException("allocator V3 input is absent, non-regular, or a link: " + path);
@@ -560,7 +587,7 @@ public final class M3V3AllocatorProtocolMain {
         return bytes;
     }
 
-    private static void writeCreateNew(Path path, byte[] bytes) throws IOException {
+    static void writeCreateNew(Path path, byte[] bytes) throws IOException {
         Path parent = path.toAbsolutePath().normalize().getParent();
         if (parent == null || !Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS)) {
             throw new IllegalArgumentException("allocator V3 output parent is absent or a link");
@@ -579,10 +606,10 @@ public final class M3V3AllocatorProtocolMain {
         return PACKAGE + className + '#' + testName;
     }
 
-    private record ParsedJUnit(
+    record ParsedJUnit(
             JUnitSummary summary, Set<String> suiteNames, Set<String> testcaseIdentities) {}
 
-    private record DiagnosticSuite(
+    record DiagnosticSuite(
             JUnitSummary summary,
             Set<String> suiteNames,
             Set<String> testcaseIdentities,

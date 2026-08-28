@@ -250,6 +250,11 @@ The source-bound V4 core now fixes zero-decision plan digest
 campaign identity, plan/profile identity, and 42-second interval accounting around the already proved V3 logical
 planner payload; NAEV4/NADV4/NARS4 consume only that outer authority. Cross-version parsers reject every direct wire
 substitution, and the wrapper rejects any nested logical checkpoint not bound to the exact V4 plan digest.
+Before V4 formal entry, `realAllocatorV4DiagnosticTest` must finish the exact 21-test/eight-suite inventory with zero
+failure/error/skip, including both V4 cutoff/drain runner contracts and the exact real-Oxia RANGE-16
+fixed-1000/derived-800 terminal-drain rows. `sealRealAllocatorV4Diagnostic` and
+`validateRealAllocatorV4Diagnostic` must then round-trip canonical NADV4 from that task's own XML directory; NADV3
+remains fixed at its prior 18-test/six-suite inventory and cannot satisfy the V4 gate.
 
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in

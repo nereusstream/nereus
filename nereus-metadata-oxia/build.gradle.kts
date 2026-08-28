@@ -438,8 +438,10 @@ tasks.register<Test>("realAllocatorContractTest") {
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3AllocatorEvidenceWiringTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2BoundedActorLaneRunnerTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AsyncActorLaneRunnerTest")
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V4AsyncActorLaneRunnerTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3FormalCampaignPlanTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AllocatorProtocolMainTest")
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V4AllocatorProtocolMainTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AdaptiveCampaignExecutorTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V4AdaptiveCampaignExecutorTest")
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V2AllocatorProtocolMainTest")
@@ -901,6 +903,63 @@ val realAllocatorV3DiagnosticJUnitDirectory = layout.buildDirectory.dir(
     "test-results/realAllocatorV3DiagnosticTest",
 )
 
+val realAllocatorV4DiagnosticTest = tasks.register<Test>("realAllocatorV4DiagnosticTest") {
+    group = "verification"
+    description = "Run the complete diagnostic-only ADR-0125 V4 current-source inventory."
+    dependsOn(realAllocatorEvidenceArtifactJar)
+    testClassesDirs = realAllocatorTest.output.classesDirs
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    maxParallelForks = 1
+    forkEvery = 1
+    maxHeapSize = "6144m"
+    timeout.set(Duration.ofMinutes(75))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AsyncActorLaneRunnerTest")
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V4AsyncActorLaneRunnerTest")
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3RealOxiaOperationDiagnosticTest",
+        )
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AllocatorWorkflowDiagnosticTest",
+        )
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3NativePathDiagnosticTest")
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3NativeBaselineCanaryTest",
+        )
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V4TerminalAdmissionDrainDiagnosticTest",
+        )
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3RealAllocatorStrictIntervalDiagnosticTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for the V4 allocator diagnostic")
+        val output = file(required("v2M3AllocatorV4DiagnosticOutput")).toPath().toAbsolutePath().normalize()
+        require(!Files.exists(output, LinkOption.NOFOLLOW_LINKS)) {
+            "V4 allocator diagnostic output already exists: $output"
+        }
+        val parent = output.parent
+        require(parent != null && Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(parent)) {
+            "V4 allocator diagnostic output parent is absent or nonregular: $parent"
+        }
+        Files.createDirectory(output)
+        systemProperty("nereus.m3.allocator.protocol", "V4")
+        systemProperty("nereus.m3.allocator.v3.oxiaServiceAddress", required("v2M3AllocatorOxiaServiceAddress"))
+        systemProperty("nereus.m3.allocator.v3.nereusCommit", required("v2M3AllocatorV4NereusCommit"))
+        systemProperty("nereus.m3.allocator.v3.diagnosticRunId", required("v2M3AllocatorV4DiagnosticRunId"))
+        systemProperty("nereus.m3.allocator.v3.diagnosticOutput", output.toString())
+    }
+}
+
+val realAllocatorV4DiagnosticJUnitDirectory = layout.buildDirectory.dir(
+    "test-results/realAllocatorV4DiagnosticTest",
+)
+
 tasks.register<Test>("realAllocatorV3CandidateCutoffDiagnosticTest") {
     group = "verification"
     description = "Run the diagnostic-only exact RANGE cutoff attribution sequence; never emits formal evidence."
@@ -987,6 +1046,58 @@ tasks.register<JavaExec>("validateRealAllocatorV3Diagnostic") {
                 required("v2M3AllocatorV3DependencyLockDigest"),
                 required("v2M3AllocatorV3ExecutorDigest"),
                 required("v2M3AllocatorV3WorkloadDigest"),
+            ),
+        )
+    }
+}
+
+tasks.register<JavaExec>("sealRealAllocatorV4Diagnostic") {
+    group = "verification"
+    description = "Seal the complete current-source V4 diagnostic JUnit inventory as non-promotable NADV4."
+    dependsOn(realAllocatorV4DiagnosticTest, realAllocatorEvidenceArtifactJar)
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    mainClass.set("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V4AllocatorProtocolMain")
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for V4 allocator diagnostic sealing")
+        setArgs(
+            listOf(
+                "seal-diagnostic",
+                realAllocatorV4DiagnosticJUnitDirectory.get().asFile.absolutePath,
+                file(required("v2M3AllocatorV4DiagnosticReceiptOutput")).absolutePath,
+                required("v2M3AllocatorV4NereusCommit"),
+                required("v2M3AllocatorV4OxiaImageDigest"),
+                required("v2M3AllocatorV4DependencyLockDigest"),
+                required("v2M3AllocatorV4ExecutorDigest"),
+                required("v2M3AllocatorV4WorkloadDigest"),
+            ),
+        )
+    }
+}
+
+tasks.register<JavaExec>("validateRealAllocatorV4Diagnostic") {
+    group = "verification"
+    description = "Parse-canonically revalidate the complete current-source V4 NADV4 and JUnit inventory."
+    dependsOn("sealRealAllocatorV4Diagnostic", realAllocatorEvidenceArtifactJar)
+    classpath = realAllocatorEvidenceRuntimeClasspath
+    mainClass.set("com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V4AllocatorProtocolMain")
+    outputs.upToDateWhen { false }
+    doFirst {
+        fun required(property: String): String = providers.gradleProperty(property)
+            .orNull
+            ?: error("$property is required for V4 allocator diagnostic validation")
+        setArgs(
+            listOf(
+                "validate-diagnostic",
+                file(required("v2M3AllocatorV4DiagnosticReceiptOutput")).absolutePath,
+                realAllocatorV4DiagnosticJUnitDirectory.get().asFile.absolutePath,
+                required("v2M3AllocatorV4NereusCommit"),
+                required("v2M3AllocatorV4OxiaImageDigest"),
+                required("v2M3AllocatorV4DependencyLockDigest"),
+                required("v2M3AllocatorV4ExecutorDigest"),
+                required("v2M3AllocatorV4WorkloadDigest"),
             ),
         )
     }

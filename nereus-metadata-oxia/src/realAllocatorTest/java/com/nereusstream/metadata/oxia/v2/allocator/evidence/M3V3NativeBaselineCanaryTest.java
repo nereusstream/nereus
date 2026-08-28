@@ -10,6 +10,7 @@ package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import com.nereusstream.domain.registry.allocator.AllocatorNativeExecutionProfileV3;
+import com.nereusstream.domain.registry.allocator.AllocatorNativeExecutionProfileV4;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -20,13 +21,14 @@ import org.junit.jupiter.api.Test;
 class M3V3NativeBaselineCanaryTest {
     @Test
     void exactFormalScheduleClearsAllNativeBaselinesAndRepresentativeRows() throws Exception {
+        boolean terminalDrainV4 = System.getProperty("nereus.m3.allocator.protocol", "V3").equals("V4");
         ThreadPoolExecutor constructionWorkers = M3RealAllocatorEvidenceTest.exactWorkers();
         constructionWorkers.prestartAllCoreThreads();
         List<Row> rows = new ArrayList<>();
         long runnerOutstandingMaximum = 0;
         long operationOutstandingMaximum = 0;
         try (M3NativePulsarPopulation population = new M3NativePulsarPopulation(constructionWorkers)) {
-            M3V3NativeIntervalRuntime runtime = new M3V3NativeIntervalRuntime(population);
+            M3V3NativeIntervalRuntime runtime = new M3V3NativeIntervalRuntime(population, terminalDrainV4);
             for (int activePopulation : M3AllocatorWorkloadPlan.ACTIVE_POPULATIONS) {
                 for (int latencyMillis : M3AllocatorWorkloadPlan.METADATA_LATENCY_P99_MILLIS) {
                     Row row = runRow(runtime, activePopulation, latencyMillis, 200);
@@ -59,7 +61,7 @@ class M3V3NativeBaselineCanaryTest {
         assertThat(operationOutstandingMaximum).isGreaterThan(4);
         M3V3DiagnosticOutput.writeNew(
                 "native-baseline-canary-summary.json",
-                summaryJson(rows, runnerOutstandingMaximum, operationOutstandingMaximum));
+                summaryJson(rows, runnerOutstandingMaximum, operationOutstandingMaximum, terminalDrainV4));
     }
 
     private static Row runRow(
@@ -149,12 +151,17 @@ class M3V3NativeBaselineCanaryTest {
         M3V3DiagnosticOutput.writeNew("native-baseline-row-%02d.json".formatted(ordinal), row.json());
     }
 
-    private static String summaryJson(List<Row> rows, long runnerMaximum, long operationMaximum) {
-        return "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_CANARY_V3\""
+    private static String summaryJson(
+            List<Row> rows, long runnerMaximum, long operationMaximum, boolean terminalDrainV4) {
+        String version = terminalDrainV4 ? "V4" : "V3";
+        String executionProfile = terminalDrainV4
+                ? AllocatorNativeExecutionProfileV4.executionProfileDigest().toHex()
+                : AllocatorNativeExecutionProfileV3.executionProfileDigest().toHex();
+        return "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_CANARY_" + version + "\""
                 + ",\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false"
                 + ",\"nativeExecutionModel\":\"" + AllocatorNativeExecutionProfileV3.MODEL + "\""
                 + ",\"nativeExecutionProfileSha256\":\""
-                + AllocatorNativeExecutionProfileV3.executionProfileDigest().toHex() + "\""
+                + executionProfile + "\""
                 + ",\"workloadScheduleSha256\":\""
                 + AllocatorNativeExecutionProfileV3.scheduleDigest().toHex() + "\""
                 + ",\"nativeBridgeWorkers\":0,\"nativeBridgeQueueCapacity\":0,\"hiddenDispatchQueue\":0"

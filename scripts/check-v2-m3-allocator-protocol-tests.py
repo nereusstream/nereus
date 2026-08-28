@@ -49,6 +49,11 @@ V3_CANDIDATE_CUTOFF_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
     "M3V3CandidateCutoffDiagnosticTest.java"
 )
 V3_PROTOCOL_MAIN = V3_FORMAL_RUNTIME.with_name("M3V3AllocatorProtocolMain.java")
+V4_PROTOCOL_MAIN = V3_FORMAL_RUNTIME.with_name("M3V4AllocatorProtocolMain.java")
+V4_RUNNER_TEST = V3_FORMAL_RUNTIME.with_name("M3V4AsyncActorLaneRunnerTest.java")
+V4_TERMINAL_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
+    "M3V4TerminalAdmissionDrainDiagnosticTest.java"
+)
 FORMAL_CAMPAIGN = (
     ROOT
     / "nereus-metadata-oxia"
@@ -67,6 +72,55 @@ FORMAL_CAMPAIGN = (
 
 
 class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
+    def test_v4_diagnostic_is_independent_exact_inventory_and_uses_the_formal_drain(self) -> None:
+        module = MODULE_BUILD.read_text()
+        runner = V3_ASYNC_RUNNER.read_text()
+        harness = V3_FORMAL_HARNESS.read_text()
+        native_runtime = V3_NATIVE_RUNTIME.read_text()
+        protocol = V4_PROTOCOL_MAIN.read_text()
+        runner_test = V4_RUNNER_TEST.read_text()
+        terminal = V4_TERMINAL_DIAGNOSTIC.read_text()
+
+        diagnostic = module.split(
+            'val realAllocatorV4DiagnosticTest = tasks.register<Test>("realAllocatorV4DiagnosticTest")',
+            1,
+        )[1].split("val realAllocatorV4DiagnosticJUnitDirectory", 1)[0]
+        for suite in (
+            "M3V3AsyncActorLaneRunnerTest",
+            "M3V4AsyncActorLaneRunnerTest",
+            "M3V3RealOxiaOperationDiagnosticTest",
+            "M3V3AllocatorWorkflowDiagnosticTest",
+            "M3V3NativePathDiagnosticTest",
+            "M3V3NativeBaselineCanaryTest",
+            "M3V4TerminalAdmissionDrainDiagnosticTest",
+            "M3RealAllocatorStrictIntervalDiagnosticTest",
+        ):
+            self.assertIn(suite, diagnostic)
+        self.assertIn("forkEvery = 1", diagnostic)
+        self.assertIn('systemProperty("nereus.m3.allocator.protocol", "V4")', diagnostic)
+        self.assertIn("sealRealAllocatorV4Diagnostic", module)
+        self.assertIn("validateRealAllocatorV4Diagnostic", module)
+        self.assertIn("NEREUS_V2_M3_ALLOCATOR_DIAGNOSTIC_JUNIT_MANIFEST_", V3_PROTOCOL_MAIN.read_text())
+        self.assertIn('readDiagnosticSuite(directory, DIAGNOSTIC_SUITES, "V3")', V3_PROTOCOL_MAIN.read_text())
+        self.assertIn('readDiagnosticSuite(directory, DIAGNOSTIC_SUITES, "V4")', protocol)
+        self.assertIn("M3V4AsyncActorLaneRunnerTest", protocol)
+        self.assertIn("M3V4TerminalAdmissionDrainDiagnosticTest", protocol)
+        self.assertIn("AllocatorCampaignPromotionGateV4", protocol)
+        self.assertIn("AllocatorCampaignSelectionV4", protocol)
+        self.assertIn("formalV4()", runner)
+        self.assertIn("terminalAdmissionDrain", runner)
+        self.assertIn("formalV4()", harness)
+        self.assertIn("formalV4()", native_runtime)
+        self.assertIn("admitsOnlyAlreadyOfferedWorkDuringTheTerminalDrain", runner_test)
+        self.assertIn("dropsAnOnTimeRequestStillBlockedAtTheFinalAdmissionDeadline", runner_test)
+        self.assertIn("Duration.ofSeconds(2)", terminal)
+        self.assertIn("M3V3RealFormalActionRuntime.candidateSchedule", terminal)
+        self.assertIn("assertFormalEquivalent(fixed, 30_000)", terminal)
+        self.assertIn("assertFormalEquivalent(derived, 24_000)", terminal)
+        self.assertIn(r'\"diagnosticOnly\":true', terminal)
+        self.assertIn(r'\"authority\":false', terminal)
+        self.assertIn(r'\"selectionEligible\":false', terminal)
+
     def test_v3_native_execution_plan_is_stable_source_bound_and_feasible(self) -> None:
         first = subprocess.run(
             [sys.executable, str(V3_PLAN)],

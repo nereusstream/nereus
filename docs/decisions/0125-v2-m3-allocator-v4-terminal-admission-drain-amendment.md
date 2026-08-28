@@ -118,6 +118,12 @@ timeout, complete drain, global concurrency above four, and unchanged p99/queue/
 `diagnosticOnly=true`, `authority=false`, and `selectionEligible=false`; it can seal only NADV4 and cannot select a
 mode.
 
+The canonical V4 diagnostic inventory is exactly 21 tests in eight JUnit suites: the unchanged 18-test/six-suite V3
+inventory plus two isolated terminal-drain runner contracts and one real-Oxia RANGE-16 fixed-1000/derived-800 drain
+test. `realAllocatorV4DiagnosticTest` forks once per class, and `sealRealAllocatorV4Diagnostic` plus
+`validateRealAllocatorV4Diagnostic` bind the exact XML file/testcase identities into the NADV4 receipt. These tasks do
+not alter or reseal the 18-test NADV3 inventory.
+
 Formal execution is default-off and requires a new exact clean pushed source, create-new `<source>-r1` directory,
 V4 plan/profile/NADV4 tuple, locked worktrees/JAR/image, and all current-source gates. A V4 formal result is handled by
 the same fail-closed rules: infrastructure failure produces no evaluation; NONE/BOTH remain legal non-promotable;
