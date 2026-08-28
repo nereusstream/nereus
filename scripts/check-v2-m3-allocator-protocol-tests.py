@@ -23,6 +23,8 @@ HARD_DEADLINE = ROOT / "scripts" / "run-v2-m3-with-hard-deadline.py"
 FORMAL_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-formal.py"
 FAILED_FORMAL_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-failed-formal.py"
 V3_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v3.py"
+V4_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v4.py"
+V4_LAUNCHER = ROOT / "scripts" / "run-v2-m3-real-allocator-evidence-v4.sh"
 V3_FORMAL_RUNTIME = (
     ROOT
     / "nereus-metadata-oxia"
@@ -54,6 +56,7 @@ V4_RUNNER_TEST = V3_FORMAL_RUNTIME.with_name("M3V4AsyncActorLaneRunnerTest.java"
 V4_TERMINAL_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
     "M3V4TerminalAdmissionDrainDiagnosticTest.java"
 )
+V4_FORMAL_CAMPAIGN = V3_FORMAL_RUNTIME.with_name("M3V4BoundedAdaptiveFormalCampaignTest.java")
 FORMAL_CAMPAIGN = (
     ROOT
     / "nereus-metadata-oxia"
@@ -72,6 +75,92 @@ FORMAL_CAMPAIGN = (
 
 
 class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
+    def test_v4_plan_formal_entry_and_native_rows_are_independently_source_bound(self) -> None:
+        first = subprocess.run(
+            [sys.executable, str(V4_PLAN)],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        second = subprocess.run(
+            [sys.executable, str(V4_PLAN)],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        self.assertEqual(first, second)
+        plan = json.loads(first)
+        self.assertEqual("NEREUS_V2_M3_ALLOCATOR_CAMPAIGN_PLAN_V4", plan["schema"])
+        self.assertEqual(
+            "1121c56cb6cd59c319c7d2eacedc8de9978bcbc2edc0008f08ef87393e0eb975",
+            plan["zeroDecisionPlanSha256"],
+        )
+        self.assertEqual(
+            "38a3bbda5b63365bc535a5669469728cfcd0c0189684a30c1d53f75b13b7fb35",
+            plan["nativeExecution"]["nativeExecutionProfileSha256"],
+        )
+        self.assertEqual(42, plan["interval"]["totalBudgetedSeconds"])
+        self.assertEqual(13_776, plan["interval"]["maximumSeconds"])
+        self.assertEqual(34_916, plan["independentPhaseBudgetsSeconds"]["sum"])
+        self.assertEqual(13_084, plan["independentPhaseBudgetsSeconds"]["hardCapHeadroom"])
+        self.assertEqual(
+            "TERMINAL_CENSORING_INFEASIBLE",
+            plan["terminalCensoringFeasibility"]["legacySingleCutoff"],
+        )
+        self.assertEqual("PLAN_FEASIBLE", plan["terminalCensoringFeasibility"]["status"])
+
+        module = MODULE_BUILD.read_text()
+        launcher = V4_LAUNCHER.read_text()
+        formal = V4_FORMAL_CAMPAIGN.read_text()
+        canary = V3_FORMAL_RUNTIME.with_name("M3V3NativeBaselineCanaryTest.java").read_text()
+        for token in (
+            "realAllocatorV4BoundedAdaptiveFormalCampaign",
+            "validateExistingRealAllocatorV4Diagnostic",
+            "validateRealAllocatorV4Checkpoint",
+            "sealRealAllocatorV4Evaluation",
+            "realAllocatorV4PromotionCheck",
+            "sealRealAllocatorV4Selection",
+            "realAllocatorV4PreCampaignCheck",
+        ):
+            self.assertIn(token, module)
+        self.assertIn("M3V4AdaptiveCampaignExecutor", formal)
+        self.assertIn("AllocatorCampaignCheckpointV4", formal)
+        self.assertIn("new M3V3RealFormalActionRuntime(", formal)
+        self.assertIn("commit.substring(0, 16),\n                true", formal)
+        self.assertIn("NEREUS_V2_M3_ALLOCATOR_CAMPAIGN_EXECUTION_V4", formal)
+        self.assertIn("NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_ROW_", canary)
+        self.assertIn('(terminalDrainV4 ? "V4" : "V3")', canary)
+        for token in (
+            "NEREUS_M3_ALLOCATOR_V4_FORMAL_AUTHORIZATION_SHA",
+            "NEREUS_M3_ALLOCATOR_V4_NATIVE_EXECUTION_PROFILE_SHA256",
+            "NEREUS_M3_ALLOCATOR_V4_DIAGNOSTIC_PATH",
+            "NEREUS_M3_ALLOCATOR_V4_DIAGNOSTIC_JUNIT_DIRECTORY",
+            ":nereus-metadata-oxia:realAllocatorV4PreCampaignCheck",
+            ":nereus-metadata-oxia:validateExistingRealAllocatorV4Diagnostic",
+            ":nereus-metadata-oxia:realAllocatorV4BoundedAdaptiveFormalCampaign",
+            "--hard-deadline-seconds 48000",
+            "--termination-grace-seconds 30",
+            "--no-configuration-cache",
+        ):
+            self.assertIn(token, launcher)
+
+        environment = dict(os.environ)
+        for name in tuple(environment):
+            if name.startswith("NEREUS_M3_ALLOCATOR_V4_"):
+                environment.pop(name)
+        output = ROOT / "build" / "never-created-v4-formal"
+        result = subprocess.run(
+            [str(V4_LAUNCHER), "--bounded-adaptive-formal", str(output)],
+            cwd=ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("separately authorized exact SHA", result.stderr)
+        self.assertFalse(output.exists())
+
     def test_v4_diagnostic_is_independent_exact_inventory_and_uses_the_formal_drain(self) -> None:
         module = MODULE_BUILD.read_text()
         runner = V3_ASYNC_RUNNER.read_text()

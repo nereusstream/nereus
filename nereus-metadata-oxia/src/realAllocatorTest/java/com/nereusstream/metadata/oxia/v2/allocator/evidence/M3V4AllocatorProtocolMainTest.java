@@ -32,6 +32,14 @@ class M3V4AllocatorProtocolMainTest {
     Path temporaryDirectory;
 
     @Test
+    void nativeBaselineRowsPreserveV3IdentityAndUseV4IdentityForTheDrainRuntime() {
+        assertThat(M3V3NativeBaselineCanaryTest.rowSchema(false))
+                .isEqualTo("NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_ROW_V3");
+        assertThat(M3V3NativeBaselineCanaryTest.rowSchema(true))
+                .isEqualTo("NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_ROW_V4");
+    }
+
+    @Test
     void diagnosticSealerBindsTheIndependentTwentyOneTestNadv4Inventory() throws Exception {
         SourceBinding source = source();
         Path junit = diagnosticJUnitDirectory();

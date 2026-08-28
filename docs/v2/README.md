@@ -607,6 +607,11 @@ The V4 diagnostic source gate is independently versioned: 21 tests across eight 
 unchanged V3 18-test inventory plus two V4 runner drain contracts and one real-Oxia RANGE-16 fixed/derived drain test.
 Only the V4 seal/validate tasks may turn that inventory into NADV4; it remains diagnostic-only and cannot select a
 mode.
+The accepted V4 source now has a separate pure plan, process-supervised launcher, default-off Gradle formal task, and
+offline NACP4/NAEV4/promotion/NARS4 commands. Both launcher and task bind clean pushed source, V4 plan/profile,
+locks/worktrees/JAR/image/executor, canonical NADV4 with its eight-suite JUnit inventory, and a create-new output
+directory. The shared Native canary emits V4 row schemas only when the V4 drain runtime is selected; V3 keeps its
+prior row bytes. This wiring is not a formal result or allocator selection.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

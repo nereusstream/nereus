@@ -33,7 +33,7 @@ class M3V3NativeBaselineCanaryTest {
                 for (int latencyMillis : M3AllocatorWorkloadPlan.METADATA_LATENCY_P99_MILLIS) {
                     Row row = runRow(runtime, activePopulation, latencyMillis, 200);
                     rows.add(row);
-                    writeRow(rows.size() - 1, row);
+                    writeRow(rows.size() - 1, row, terminalDrainV4);
                     assertBaseline(row);
                     runnerOutstandingMaximum = Math.max(runnerOutstandingMaximum, row.globalOutstandingMaximum());
                     operationOutstandingMaximum =
@@ -43,7 +43,7 @@ class M3V3NativeBaselineCanaryTest {
                     for (int latencyMillis : List.of(1, 25)) {
                         Row row = runRow(runtime, activePopulation, latencyMillis, 500);
                         rows.add(row);
-                        writeRow(rows.size() - 1, row);
+                        writeRow(rows.size() - 1, row, terminalDrainV4);
                         assertRepresentative(row);
                         runnerOutstandingMaximum =
                                 Math.max(runnerOutstandingMaximum, row.globalOutstandingMaximum());
@@ -147,8 +147,13 @@ class M3V3NativeBaselineCanaryTest {
         assertThat(row.actorLanesStopped()).isTrue();
     }
 
-    private static void writeRow(int ordinal, Row row) throws Exception {
-        M3V3DiagnosticOutput.writeNew("native-baseline-row-%02d.json".formatted(ordinal), row.json());
+    private static void writeRow(int ordinal, Row row, boolean terminalDrainV4) throws Exception {
+        M3V3DiagnosticOutput.writeNew(
+                "native-baseline-row-%02d.json".formatted(ordinal), row.json(terminalDrainV4));
+    }
+
+    static String rowSchema(boolean terminalDrainV4) {
+        return "NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_ROW_" + (terminalDrainV4 ? "V4" : "V3");
     }
 
     private static String summaryJson(
@@ -208,8 +213,8 @@ class M3V3NativeBaselineCanaryTest {
             long ageP99Micros,
             long schedulerLagP99Micros,
             long callbackLagP99Micros) {
-        private String json() {
-            return "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_ROW_V3\""
+        private String json(boolean terminalDrainV4) {
+            return "{\"schema\":\"" + rowSchema(terminalDrainV4) + "\""
                     + ",\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false"
                     + ",\"activePopulation\":" + activePopulation + ",\"latencyMillis\":" + latencyMillis
                     + ",\"offeredRate\":" + offeredRate + ",\"offered\":" + offered

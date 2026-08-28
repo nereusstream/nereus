@@ -891,6 +891,15 @@ ADR 0124 isolates each full-diagnostic class in a fresh serial worker after the 
 same class inherited unrelated suite state inside the complete task and lost five final representative offers. The
 ten Native rows remain one shared-runtime class, and the allocator qualification question remains open for a later
 explicitly authorized formal campaign.
+ADR 0125 preserves the exact `0cc962e9...` V3 `NONE_QUALIFIED` terminal and moves only the infeasible terminal
+offer/admission boundary into source-bound V4. V4 keeps the frozen workload and zero-drop/SLO selection contract,
+closes offers at 40 seconds, admits only already-offered bounded work for two further seconds, and then applies the
+unchanged five-second cleanup. The independent NACP4/NAEV4/NADV4/NARS4 codecs, plan/profile, 21-test/eight-suite
+diagnostic gate, pure plan-only projection, default-off supervised formal launcher, checkpoint/evaluation/promotion/
+selection commands, and exact-source Gradle entry are implemented. An earlier diagnostic-only run that numerically
+passed but labeled its V4 Native raw rows with the V3 schema remains non-authoritative history; current-source NADV4
+must be regenerated after that identity correction. The open question is now solely the outcome of one valid V4
+formal campaign on that final clean pushed source, not permission to reinterpret or resample any V3 result.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

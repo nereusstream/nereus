@@ -255,6 +255,13 @@ failure/error/skip, including both V4 cutoff/drain runner contracts and the exac
 fixed-1000/derived-800 terminal-drain rows. `sealRealAllocatorV4Diagnostic` and
 `validateRealAllocatorV4Diagnostic` must then round-trip canonical NADV4 from that task's own XML directory; NADV3
 remains fixed at its prior 18-test/six-suite inventory and cannot satisfy the V4 gate.
+The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
+`run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
+canonical current-source NADV4 before creating either the service or output directory, and
+`realAllocatorV4BoundedAdaptiveFormalCampaign` runs only the V4 wrapper/runtime. Checkpoint, evaluation, promotion,
+and optional selection use independent V4 Gradle/CLI commands and reject V3 bytes. The first V4 run may begin only
+after the final source SHA has rerun the complete real-Oxia diagnostic and all source/documentation gates; an earlier
+diagnostic with V3-labeled Native row raw identity is retained as diagnostic history but is not reusable authority.
 
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in

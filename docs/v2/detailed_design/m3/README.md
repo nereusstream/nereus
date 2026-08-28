@@ -687,6 +687,10 @@ The V4 diagnostic entry is a create-new, diagnostic-only 21-test/eight-suite inv
 testcase identities, adds a separate two-test V4 runner suite plus the exact real-Oxia RANGE-16 fixed-1000/derived-800
 terminal-drain suite, and seals/parse-validates only NADV4. The V3 task and NADV3 manifest remain six suites and 18
 tests, so adding V4 coverage cannot silently change historical diagnostic authority.
+The [V4 terminal-drain formal-entry implementation record](stage-b-v4-terminal-drain-formal-entry.md) fixes the
+create-new execution path, exact authorization tuple, offline post-run commands, and the V3/V4 Native row-schema
+boundary. It is source wiring only until the final exact clean source reruns the 21-test diagnostic, seals NADV4, and
+executes a separately source-bound formal campaign.
 
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0

@@ -130,6 +130,21 @@ the same fail-closed rules: infrastructure failure produces no evaluation; NONE/
 only one deterministic STRICT or smallest RANGE result can seal NARS4 and unlock downstream source-lock, child,
 scenario, and Final governance.
 
+The executable entry is independently versioned. `v2-m3-allocator-plan-v4.py` is the pure no-service projection;
+`run-v2-m3-real-allocator-evidence-v4.sh --bounded-adaptive-formal` is the only process-supervised launcher; and
+`realAllocatorV4BoundedAdaptiveFormalCampaign` is the only Gradle Test entry. The launcher and task both fail closed
+on clean pushed source, V4 plan/profile, source/dependency locks, all three dedicated worktrees, locked client JAR,
+Oxia image/revision, executor JAR, canonical NADV4 plus its exact eight-suite JUnit inventory, and create-new output.
+The task invokes `M3V4AdaptiveCampaignExecutor` and the shared real action runtime with V4 terminal drain enabled; it
+persists only NACP4 checkpoints and V4-labeled physical attachments. Offline
+`validateRealAllocatorV4Checkpoint`, `sealRealAllocatorV4Evaluation`, `realAllocatorV4PromotionCheck`, and
+`sealRealAllocatorV4Selection` are the only accepted post-run commands.
+
+Native diagnostic summary and row identities must agree with the selected runtime. Reusing the shared canary under
+V4 therefore emits `NEREUS_V2_M3_ALLOCATOR_NATIVE_BASELINE_ROW_V4`; the unchanged V3 task continues to emit the V3
+row schema. A diagnostic whose V4 summary contains V3-labeled native rows is non-authoritative diagnostic history and
+cannot satisfy a later V4 formal tuple, even if its numeric observations passed.
+
 ## Consequences
 
 - Every historical V3 result remains truthful and permanently non-promotable.
