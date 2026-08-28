@@ -851,6 +851,9 @@ attempt and adds separate first-unexpected attribution plus an exact consecutive
 diagnostic. It neither reclassifies an exception nor changes interval bytes, candidate qualification, workload,
 budget, SLO, disposition, or selection semantics. The allocator selection question therefore remains open pending a
 new exact-source formal terminal.
+The first current-source replay at `372ca975...` completed the expanded diagnostic inventory at 17/0/0/0 but created
+no NADV3 because the sealer still expected five suite files. ADR 0115 preserves that diagnostic and closes the
+allowlist at six suites/17 tests without changing the still-open formal qualification question.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

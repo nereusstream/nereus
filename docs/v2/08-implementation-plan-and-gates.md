@@ -131,6 +131,9 @@ NADV3 to bind the complete diagnostic JUnit XML inventory. Stage B.2 stops befor
 The shared schedule/profile digests are `b0e923a0...e798` and `4b11530b...d751`; their source-bound V3 plan digest is
 `5f94079e...b283`, with the existing 328/360/32/720 action limits and 48,000-second hard cap unchanged. Publication
 also requires canonical revalidation of the complete five-suite, 16-test NADV3 JUnit inventory.
+For ADR 0114 and later current sources, ADR 0115 extends that closed inventory to exactly six suites and 17 tests by
+including the formal-equivalent STRICT fixed-1000/derived-800 diagnostic; historical five-suite receipts remain
+unchanged and parse-compatible.
 
 ADR 0110 governs the next V3 formal harness correction. The `e60327ae...-r1` attempt remains immutable
 `INFRASTRUCTURE_FAILED` evidence with no evaluation or selection. Candidate warm-up typed load rejection must remain
@@ -170,6 +173,11 @@ the first unexpected summary separately, and the complete current-source diagnos
 fixed-1000 then derived-800 formal schedules on one real-Oxia population with zero unexpected warm-up failure, zero
 warm-up timeout, full drain, and real concurrency above four. Classification, interval bytes, frozen plan, workload,
 budgets, SLOs, dispositions, and selection rules remain unchanged.
+
+ADR 0115 governs the NADV3 inventory closure exposed at exact source `372ca975...`. The full real-Oxia diagnostic
+completed six suites at 17/0/0/0, but sealing correctly rejected the stale five-suite allowlist. The failed diagnostic,
+JUnit, Gradle log, and exit status are immutable in an external read-only archive. Current-source sealing must bind
+the exact six-suite/17-test inventory and still reject missing, extra, aliased, failed, errored, or skipped testcases.
 
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in

@@ -485,7 +485,7 @@ async ManagedLedger runtime with no admission-after hidden queue. Stage B.2 is d
 rerun, source-lock, child, current-source M2, scenario, or Final update.
 The amended source-bound schedule/profile identities are `b0e923a0...e798` and `4b11530b...d751`, yielding plan
 digest `5f94079e...b283` without changing the V3 logical action inventory or any qualification rule. Its NADV3 gate
-seals and parse-canonically revalidates all five diagnostic suites and 16 exact testcase identities.
+seals and parse-canonically revalidates all six diagnostic suites and 17 exact testcase identities.
 
 The next authorized attempt at exact source `e60327ae...` established all eight Native baselines at 1000 requests per
 second, then failed infrastructure classification after its first STRICT row because bounded typed warm-up rejection
@@ -523,6 +523,12 @@ preserves the 22-file failed attempt and external archive. The async runner now 
 separately from the first failure overall, and the current-source diagnostic inventory replays the exact consecutive
 fixed-1000 and derived-800 formal schedules on one real-Oxia population. This changes no attachment bytes,
 classification, workload, retry bound, threshold, SLO, budget, disposition, or selection rule.
+
+The first clean-source ADR-0114 diagnostic at `372ca975...` completed all six suites at 17/0/0/0, including the
+formal-equivalent STRICT sequence, but the closed NADV3 allowlist still named the pre-ADR-0114 five-suite/16-test
+inventory. [ADR 0115](../decisions/0115-v2-m3-allocator-v3-diagnostic-inventory-sealing-amendment.md) preserves the
+unsealed diagnostic and corrects only the exact suite/test allowlist. It changes no diagnostic wire bytes, workload,
+formal planner, qualification, or selection semantics.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

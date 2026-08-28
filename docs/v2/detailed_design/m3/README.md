@@ -559,8 +559,8 @@ diagnostic used another executor. Stage B.2 replaces both compositions with one 
 ManagedLedger async chain, rejects the old hidden-queue profile, runs an exact-schedule Native-only canary, and seals
 the complete diagnostic JUnit inventory. It does not authorize a formal rerun or any downstream promotion.
 The schedule/profile hashes are `b0e923a0...e798` and `4b11530b...d751`; the resulting amended zero-decision plan is
-`5f94079e...b283`. Formal and diagnostic construct `M3V3NativeIntervalRuntime` directly, and the NADV3 validator
-requires the exact five-XML/16-test suite manifest rather than accepting one selected test result.
+`5f94079e...b283`. Formal and diagnostic construct `M3V3NativeIntervalRuntime` directly, and the current NADV3
+validator requires the exact six-XML/17-test suite manifest rather than accepting one selected test result.
 
 [ADR 0110](../../../decisions/0110-v2-m3-allocator-candidate-warmup-load-rejection-classification-amendment.md)
 records the subsequent candidate-boundary correction. Exact source `e60327ae...` completed all eight Native baselines
@@ -605,6 +605,13 @@ summary for infrastructure detail, while leaving interval attachment bytes and t
 current-source real-Oxia diagnostic runs the formal 10+30-second fixed-1000 and derived-800 schedules consecutively on
 one population and requires zero unexpected warm-up failure, zero warm-up timeout, complete drain, and concurrency
 above four. It is diagnostic-only and cannot qualify or select a mode.
+
+[ADR 0115](../../../decisions/0115-v2-m3-allocator-v3-diagnostic-inventory-sealing-amendment.md) records the
+current-source NADV3 allowlist correction. Exact source `372ca975...` produced six JUnit XML suites with 17 tests and
+zero failure/error/skip, but the sealer still expected the earlier five-suite inventory and therefore created no
+receipt. The archived diagnostic remains non-authoritative. The corrected allowlist includes the exact STRICT
+sequence suite while retaining create-new sealing, canonical parsing, source/executor binding, and fail-closed
+rejection of every missing, extra, aliased, failed, errored, or skipped testcase.
 
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0

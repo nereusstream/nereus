@@ -52,12 +52,16 @@ public final class M3V3AllocatorProtocolMain {
     private static final Pattern SHA256_HEX = Pattern.compile("[0-9a-f]{64}");
     private static final String PACKAGE = "com.nereusstream.metadata.oxia.v2.allocator.evidence.";
     private static final Set<String> DIAGNOSTIC_SUITES = Set.of(
+            PACKAGE + "M3RealAllocatorStrictIntervalDiagnosticTest",
             PACKAGE + "M3V3AsyncActorLaneRunnerTest",
             PACKAGE + "M3V3RealOxiaOperationDiagnosticTest",
             PACKAGE + "M3V3AllocatorWorkflowDiagnosticTest",
             PACKAGE + "M3V3NativePathDiagnosticTest",
             PACKAGE + "M3V3NativeBaselineCanaryTest");
     private static final Set<String> DIAGNOSTIC_TESTS = Set.of(
+            identity(
+                    "M3RealAllocatorStrictIntervalDiagnosticTest",
+                    "strictFixedThenDerivedFormalSchedulesDrainWithoutUnexpectedWarmupFailure()"),
             identity(
                     "M3V3AsyncActorLaneRunnerTest",
                     "evidenceAdmissionCapIsDerivedFromFrozenRateLatencyAndActorCount()"),

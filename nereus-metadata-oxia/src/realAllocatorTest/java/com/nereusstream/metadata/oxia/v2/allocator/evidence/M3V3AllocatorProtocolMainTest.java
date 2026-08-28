@@ -277,6 +277,10 @@ class M3V3AllocatorProtocolMainTest {
         Path directory = Files.createDirectory(temporaryDirectory.resolve(name));
         writeSuite(
                 directory,
+                M3RealAllocatorStrictIntervalDiagnosticTest.class,
+                List.of("strictFixedThenDerivedFormalSchedulesDrainWithoutUnexpectedWarmupFailure()"));
+        writeSuite(
+                directory,
                 M3V3AsyncActorLaneRunnerTest.class,
                 List.of(
                         "evidenceAdmissionCapIsDerivedFromFrozenRateLatencyAndActorCount()",

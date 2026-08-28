@@ -45,6 +45,7 @@ V3_FORMAL_HARNESS = V3_FORMAL_RUNTIME.with_name("M3V3AllocatorFormalHarness.java
 V3_STRICT_SEQUENCE_DIAGNOSTIC = V3_FORMAL_RUNTIME.with_name(
     "M3RealAllocatorStrictIntervalDiagnosticTest.java"
 )
+V3_PROTOCOL_MAIN = V3_FORMAL_RUNTIME.with_name("M3V3AllocatorProtocolMain.java")
 FORMAL_CAMPAIGN = (
     ROOT
     / "nereus-metadata-oxia"
@@ -189,6 +190,12 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             1,
         )[1].split("val realAllocatorV3NativeCanaryTest", 1)[0]
         self.assertIn("M3RealAllocatorStrictIntervalDiagnosticTest", full_diagnostic)
+        protocol_main = V3_PROTOCOL_MAIN.read_text()
+        self.assertIn('PACKAGE + "M3RealAllocatorStrictIntervalDiagnosticTest"', protocol_main)
+        self.assertIn(
+            '"strictFixedThenDerivedFormalSchedulesDrainWithoutUnexpectedWarmupFailure()"',
+            protocol_main,
+        )
 
     def test_formal_archiver_is_create_new_byte_exact_and_collision_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
