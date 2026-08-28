@@ -21,6 +21,7 @@ ROOT_BUILD = ROOT / "build.gradle.kts"
 MODULE_BUILD = ROOT / "nereus-metadata-oxia" / "build.gradle.kts"
 HARD_DEADLINE = ROOT / "scripts" / "run-v2-m3-with-hard-deadline.py"
 FORMAL_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-formal.py"
+FAILED_FORMAL_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-failed-formal.py"
 V3_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v3.py"
 V3_FORMAL_RUNTIME = (
     ROOT
@@ -133,6 +134,10 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn('maxHeapSize = "6144m"', diagnostic)
         self.assertIn("timeout.set(Duration.ofMinutes(60))", diagnostic)
         self.assertIn("validateRealAllocatorV3Diagnostic", module)
+        harness = V3_FORMAL_RUNTIME.with_name("M3V3AllocatorFormalHarness.java").read_text()
+        self.assertIn("candidateInfrastructureValid(interval)", harness)
+        self.assertIn("warmupLoadRejectedAfterAdmission", formal)
+        self.assertIn("warmupUnexpectedFailedAfterAdmission", formal)
 
     def test_formal_archiver_is_create_new_byte_exact_and_collision_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -201,6 +206,81 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             self.assertIn("archive target already exists", second.stderr)
             self.assertEqual(manifest_before, (archive / "SHA256SUMS").read_bytes())
             self.assertIn('"sourceAndPayloadByteIdentical": true', first.stdout)
+
+    def test_failed_formal_archiver_preserves_terminal_payload_and_junit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "failed-formal"
+            checkpoints = source / "checkpoints"
+            checkpoints.mkdir(parents=True)
+            checkpoint = checkpoints / "last.nacp"
+            checkpoint.write_bytes(b"failed-checkpoint")
+            campaign = source / "campaign-result.json"
+            campaign.write_text(
+                json.dumps(
+                    {
+                        "status": "INFRASTRUCTURE_FAILED",
+                        "terminalReason": "INFRASTRUCTURE_FAILED",
+                        "terminalDetail": "typed warmup rejection",
+                        "checkpointSequence": 1,
+                        "evaluationCreated": False,
+                        "selectionCreated": False,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            junit = root / "formal-junit.xml"
+            junit.write_text(
+                '<testsuite tests="1" failures="1" errors="0" skipped="0"/>\n',
+                encoding="utf-8",
+            )
+            files = sorted(path for path in source.rglob("*") if path.is_file())
+            archive = root / "archive"
+            command = [
+                sys.executable,
+                str(FAILED_FORMAL_ARCHIVER),
+                "--source",
+                str(source),
+                "--archive",
+                str(archive),
+                "--archived-on",
+                "2026-08-28",
+                "--source-commit",
+                "a" * 40,
+                "--plan-sha256",
+                "b" * 64,
+                "--campaign-result-sha256",
+                hashlib.sha256(campaign.read_bytes()).hexdigest(),
+                "--final-checkpoint-relative-path",
+                checkpoint.relative_to(source).as_posix(),
+                "--final-checkpoint-sha256",
+                hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
+                "--formal-junit",
+                str(junit),
+                "--formal-junit-sha256",
+                hashlib.sha256(junit.read_bytes()).hexdigest(),
+                "--expected-file-count",
+                str(len(files)),
+                "--expected-total-bytes",
+                str(sum(path.stat().st_size for path in files)),
+                "--terminal-status",
+                "INFRASTRUCTURE_FAILED",
+            ]
+
+            subprocess.run(command, check=True, capture_output=True, text=True)
+            identity = json.loads((archive / "archive-identity.json").read_bytes())
+            self.assertEqual("INFRASTRUCTURE_FAILED", identity["campaignStatus"])
+            self.assertFalse(identity["evaluationCreated"])
+            self.assertFalse(identity["selectionCreated"])
+            self.assertFalse(identity["promotableInput"])
+            self.assertEqual(junit.read_bytes(), (archive / "formal-junit.xml").read_bytes())
+            for source_file in files:
+                relative = source_file.relative_to(source)
+                self.assertEqual(source_file.read_bytes(), (archive / "payload" / relative).read_bytes())
+            repeated = subprocess.run(command, check=False, capture_output=True, text=True)
+            self.assertNotEqual(0, repeated.returncode)
+            self.assertIn("archive target already exists", repeated.stderr)
 
     def test_plan_only_is_byte_stable_and_freezes_all_independent_budgets(self) -> None:
         first = subprocess.run(

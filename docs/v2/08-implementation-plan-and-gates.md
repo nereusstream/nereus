@@ -131,6 +131,13 @@ NADV3 to bind the complete diagnostic JUnit XML inventory. Stage B.2 stops befor
 The shared schedule/profile digests are `b0e923a0...e798` and `4b11530b...d751`; their source-bound V3 plan digest is
 `5f94079e...b283`, with the existing 328/360/32/720 action limits and 48,000-second hard cap unchanged. Publication
 also requires canonical revalidation of the complete five-suite, 15-test NADV3 JUnit inventory.
+
+ADR 0110 governs the next V3 formal harness correction. The `e60327ae...-r1` attempt remains immutable
+`INFRASTRUCTURE_FAILED` evidence with no evaluation or selection. Candidate warm-up typed load rejection must remain
+fully counted and attached but may not prevent the complete measured failed row from driving deterministic rate
+descent. Unexpected warm-up failure, timeout, incomplete drain, and every measured drop/failure/timeout remain
+fail-closed. A rerun requires a new exact clean pushed source, fresh executor/NADV3/preflight identities, and a new
+`<source>-r1` directory; the failed attempt is never resumed or copied.
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

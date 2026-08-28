@@ -562,6 +562,16 @@ The schedule/profile hashes are `b0e923a0...e798` and `4b11530b...d751`; the res
 `5f94079e...b283`. Formal and diagnostic construct `M3V3NativeIntervalRuntime` directly, and the NADV3 validator
 requires the exact five-XML/15-test suite manifest rather than accepting one selected test result.
 
+[ADR 0110](../../../decisions/0110-v2-m3-allocator-candidate-warmup-load-rejection-classification-amendment.md)
+records the subsequent candidate-boundary correction. Exact source `e60327ae...` completed all eight Native baselines
+at 1000 requests per second, but its first STRICT 1000-rate action exposed typed bounded warm-up rejection. The
+measured row was complete and failed its frozen qualification, yet the harness incorrectly emitted
+`INFRASTRUCTURE_FAILED` before the planner could descend. V3 now partitions warm-up failure into source-enumerated
+load rejection and unexpected failure, emits both in the action attachment, and permits only typed load rejection to
+continue to measured validation. Warm-up timeout, unexpected failure, incomplete cleanup, and all measured failures
+remain fail-closed. The failed 20-file attempt and JUnit are byte-exact in a read-only external archive and cannot be
+resumed or promoted.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

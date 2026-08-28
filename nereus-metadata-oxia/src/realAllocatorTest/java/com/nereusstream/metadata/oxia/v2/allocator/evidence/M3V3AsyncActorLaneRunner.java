@@ -352,6 +352,8 @@ final class M3V3AsyncActorLaneRunner<T> {
             long warmupDroppedBeforeAdmission,
             long warmupCompleted,
             long warmupFailedAfterAdmission,
+            long warmupLoadRejectedAfterAdmission,
+            long warmupUnexpectedFailedAfterAdmission,
             long warmupTimedOutAfterAdmission,
             String warmupFirstFailure,
             boolean actorLanesStoppedAtCleanupDeadline,
@@ -376,6 +378,9 @@ final class M3V3AsyncActorLaneRunner<T> {
                     || measuredTerminals.size() != Math.toIntExact(offered)
                     || measuredTelemetry.size() != Math.toIntExact(offered)
                     || warmupOffered != Math.addExact(warmupDroppedBeforeAdmission, warmupTerminal)
+                    || warmupFailedAfterAdmission
+                            != Math.addExact(
+                                    warmupLoadRejectedAfterAdmission, warmupUnexpectedFailedAfterAdmission)
                     || (warmupFailedAfterAdmission == 0) != warmupFirstFailure.isEmpty()) {
                 throw new IllegalArgumentException("allocator V3 asynchronous inventory differs");
             }
@@ -629,6 +634,8 @@ final class M3V3AsyncActorLaneRunner<T> {
         private long warmupDropped;
         private long warmupCompleted;
         private long warmupFailed;
+        private long warmupLoadRejected;
+        private long warmupUnexpectedFailed;
         private long warmupTimedOut;
         private String warmupFirstFailure = "";
 
@@ -759,6 +766,11 @@ final class M3V3AsyncActorLaneRunner<T> {
                     case COMPLETED -> warmupCompleted++;
                     case FAILED_AFTER_ADMISSION -> {
                         warmupFailed++;
+                        if (isWarmupLoadRejection(terminalFailure)) {
+                            warmupLoadRejected++;
+                        } else {
+                            warmupUnexpectedFailed++;
+                        }
                         if (warmupFirstFailure.isEmpty()) {
                             warmupFirstFailure = failureSummary(terminalFailure);
                         }
@@ -829,11 +841,37 @@ final class M3V3AsyncActorLaneRunner<T> {
                     warmupDropped,
                     warmupCompleted,
                     warmupFailed,
+                    warmupLoadRejected,
+                    warmupUnexpectedFailed,
                     warmupTimedOut,
                     warmupFirstFailure,
                     lanesStopped,
                     terminals,
                     telemetry);
+        }
+
+        private static boolean isWarmupLoadRejection(Throwable failure) {
+            Throwable exact = unwrap(Objects.requireNonNull(failure, "terminalFailure"));
+            if (!(exact instanceof AllocatorProtocolException protocolFailure)) {
+                return false;
+            }
+            return switch (protocolFailure.code()) {
+                case RESERVATION_BUSY,
+                        RANGE_TAIL_NOT_EXHAUSTED,
+                        CELL_STATE_DRIFT,
+                        HEAD_STATE_DRIFT,
+                        OWNER_FENCED,
+                        GRANT_NOT_INSTALLED,
+                        RANGE_EXHAUSTED,
+                        CANDIDATE_CONFLICT,
+                        CANDIDATE_OCCUPANCY_NOT_PROVEN,
+                        STALE_CANDIDATE_REQUIRED,
+                        DESCRIPTOR_MISMATCH,
+                        RECONCILE_RETRY_EXHAUSTED,
+                        WORKFLOW_DEADLINE_EXCEEDED,
+                        RETRY_BACKOFF_EXCEEDED -> true;
+                default -> false;
+            };
         }
 
         private static String failureSummary(Throwable failure) {

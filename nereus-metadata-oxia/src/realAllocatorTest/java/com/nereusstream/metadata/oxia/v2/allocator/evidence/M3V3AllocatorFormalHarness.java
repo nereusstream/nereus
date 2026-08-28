@@ -125,7 +125,7 @@ final class M3V3AllocatorFormalHarness {
                 interval.globalOutstandingAtEnd(),
                 interval.pendingPermitAtEnd());
         AllocatorCampaignValidatorV3.validateIntervalConservation(evidence);
-        boolean infrastructureValid = infrastructureValid(interval);
+        boolean infrastructureValid = candidateInfrastructureValid(interval);
         return new HarnessResult(evidence, interval, infrastructureValid);
     }
 
@@ -136,6 +136,13 @@ final class M3V3AllocatorFormalHarness {
                 && interval.warmupTimedOutAfterAdmission() == 0;
     }
 
+    static boolean candidateInfrastructureValid(M3V3AsyncActorLaneRunner.IntervalResult interval) {
+        Objects.requireNonNull(interval, "interval");
+        return interval.actorLanesStoppedAtCleanupDeadline()
+                && interval.warmupUnexpectedFailedAfterAdmission() == 0
+                && interval.warmupTimedOutAfterAdmission() == 0;
+    }
+
     static String infrastructureDetail(M3V3AsyncActorLaneRunner.IntervalResult interval) {
         Objects.requireNonNull(interval, "interval");
         return "actorLanesStoppedAtCleanupDeadline=" + interval.actorLanesStoppedAtCleanupDeadline()
@@ -143,6 +150,8 @@ final class M3V3AllocatorFormalHarness {
                 + ",warmupDroppedBeforeAdmission=" + interval.warmupDroppedBeforeAdmission()
                 + ",warmupCompleted=" + interval.warmupCompleted()
                 + ",warmupFailedAfterAdmission=" + interval.warmupFailedAfterAdmission()
+                + ",warmupLoadRejectedAfterAdmission=" + interval.warmupLoadRejectedAfterAdmission()
+                + ",warmupUnexpectedFailedAfterAdmission=" + interval.warmupUnexpectedFailedAfterAdmission()
                 + ",warmupTimedOutAfterAdmission=" + interval.warmupTimedOutAfterAdmission()
                 + ",warmupFirstFailure="
                 + (interval.warmupFirstFailure().isEmpty() ? "NONE" : interval.warmupFirstFailure());

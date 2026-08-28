@@ -370,6 +370,7 @@ Accepted decisions:
 - [ADR 0107: M3 allocator bounded-adaptive formal-entry wiring amendment](../decisions/0107-v2-m3-allocator-bounded-adaptive-formal-entry-wiring-amendment.md)
 - [ADR 0108: M3 allocator protocol feasibility, asynchronous admission, and baseline amendment](../decisions/0108-v2-m3-allocator-protocol-feasibility-async-admission-baseline-amendment.md)
 - [ADR 0109: M3 Native baseline executor composition and formal-diagnostic equivalence amendment](../decisions/0109-v2-m3-native-baseline-executor-composition-formal-diagnostic-equivalence-amendment.md)
+- [ADR 0110: M3 candidate warm-up load-rejection classification amendment](../decisions/0110-v2-m3-allocator-candidate-warmup-load-rejection-classification-amendment.md)
 
 ## Open design gates
 
@@ -484,6 +485,13 @@ rerun, source-lock, child, current-source M2, scenario, or Final update.
 The amended source-bound schedule/profile identities are `b0e923a0...e798` and `4b11530b...d751`, yielding plan
 digest `5f94079e...b283` without changing the V3 logical action inventory or any qualification rule. Its NADV3 gate
 seals and parse-canonically revalidates all five diagnostic suites and 15 exact testcase identities.
+
+The next authorized attempt at exact source `e60327ae...` established all eight Native baselines at 1000 requests per
+second, then failed infrastructure classification after its first STRICT row because bounded typed warm-up rejection
+was treated as a launcher/runtime failure. [ADR 0110](../decisions/0110-v2-m3-allocator-candidate-warmup-load-rejection-classification-amendment.md)
+preserves that 20-file attempt and its external archive, partitions warm-up failures into explicit load rejection and
+unexpected failure, and lets only the former reach the unchanged measured validator and adaptive rate descent. Every
+warm-up counter is emitted in the action attachment; measured zero-drop/failure/timeout qualification is unchanged.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

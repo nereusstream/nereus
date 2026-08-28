@@ -11,6 +11,7 @@ package com.nereusstream.metadata.oxia.v2.allocator.evidence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.registry.allocator.AllocatorEvidenceAdmissionPolicyV3;
+import com.nereusstream.domain.registry.allocator.AllocatorProtocolException;
 import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -291,6 +292,43 @@ class M3V3AsyncActorLaneRunnerTest {
         List<Class<?>> forbidden = List.of(Lock.class, java.util.concurrent.ThreadPoolExecutor.class);
         assertThat(Arrays.stream(M3V3AsyncActorLaneRunner.class.getDeclaredFields()).map(Field::getType))
                 .noneMatch(type -> forbidden.stream().anyMatch(forbiddenType -> forbiddenType.isAssignableFrom(type)));
+    }
+
+    @Test
+    void candidateWarmupLoadRejectionAllowsAdaptiveDescentButUnexpectedFailureDoesNot() throws Exception {
+        List<M3V3AsyncActorLaneRunner.ScheduledOffer<String>> schedule = List.of(
+                new M3V3AsyncActorLaneRunner.ScheduledOffer<>(0, 0, 0, 0, false, "warmup"),
+                new M3V3AsyncActorLaneRunner.ScheduledOffer<>(
+                        1, 1, 1, TimeUnit.MILLISECONDS.toNanos(10), true, "measured"));
+        M3V3AsyncActorLaneRunner<String> runner = new M3V3AsyncActorLaneRunner<>(
+                Duration.ofMillis(10), Duration.ofMillis(20), Duration.ofMillis(100));
+
+        var loadRejected = runner.run(200, schedule, (actor, request, context) -> {
+            if (request.equals("warmup")) {
+                return CompletableFuture.failedFuture(new AllocatorProtocolException(
+                        AllocatorProtocolException.Code.RECONCILE_RETRY_EXHAUSTED,
+                        "expected overload probe"));
+            }
+            return CompletableFuture.completedFuture(null);
+        });
+
+        assertThat(loadRejected.warmupFailedAfterAdmission()).isEqualTo(1);
+        assertThat(loadRejected.warmupLoadRejectedAfterAdmission()).isEqualTo(1);
+        assertThat(loadRejected.warmupUnexpectedFailedAfterAdmission()).isZero();
+        assertThat(M3V3AllocatorFormalHarness.infrastructureValid(loadRejected)).isFalse();
+        assertThat(M3V3AllocatorFormalHarness.candidateInfrastructureValid(loadRejected)).isTrue();
+        assertThat(M3V3AllocatorFormalHarness.infrastructureDetail(loadRejected))
+                .contains("warmupLoadRejectedAfterAdmission=1")
+                .contains("warmupUnexpectedFailedAfterAdmission=0")
+                .contains("AllocatorProtocolException[RECONCILE_RETRY_EXHAUSTED]");
+
+        var unexpected = runner.run(200, schedule, (actor, request, context) -> request.equals("warmup")
+                ? CompletableFuture.failedFuture(new IllegalStateException("unexpected wiring failure"))
+                : CompletableFuture.completedFuture(null));
+
+        assertThat(unexpected.warmupLoadRejectedAfterAdmission()).isZero();
+        assertThat(unexpected.warmupUnexpectedFailedAfterAdmission()).isEqualTo(1);
+        assertThat(M3V3AllocatorFormalHarness.candidateInfrastructureValid(unexpected)).isFalse();
     }
 
     private static void assertBindingConcurrency(

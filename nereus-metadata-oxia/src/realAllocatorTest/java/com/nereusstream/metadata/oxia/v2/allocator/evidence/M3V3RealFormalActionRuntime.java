@@ -90,7 +90,7 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
                 0,
                 0,
                 interval.rolloverP99Micros());
-        Attachment attachment = writeJsonAttachment("interval-" + cell.contextId(), intervalJson(evidence));
+        Attachment attachment = writeJsonAttachment("interval-" + cell.contextId(), intervalJson(evidence, interval));
         boolean infrastructureValid = M3V3AllocatorFormalHarness.infrastructureValid(interval);
         return new IntervalActionResult(
                 evidence,
@@ -131,7 +131,8 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
         } finally {
             actors.setControlledLatencyMillis(0);
         }
-        Attachment attachment = writeJsonAttachment("interval-" + cell.contextId(), intervalJson(result.evidence()));
+        Attachment attachment = writeJsonAttachment(
+                "interval-" + cell.contextId(), intervalJson(result.evidence(), result.runnerResult()));
         return new IntervalActionResult(
                 result.evidence(),
                 attachment.digest(),
@@ -295,7 +296,8 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
         return new Attachment(target, digest);
     }
 
-    private static String intervalJson(IntervalEvidence value) {
+    private static String intervalJson(
+            IntervalEvidence value, M3V3AsyncActorLaneRunner.IntervalResult interval) {
         return "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_INTERVAL_ACTION_V3\",\"contextId\":"
                 + value.cell().contextId() + ",\"offeredRate\":" + value.offeredRate()
                 + ",\"offered\":" + value.offered() + ",\"admitted\":"
@@ -311,7 +313,20 @@ final class M3V3RealFormalActionRuntime implements RealActionRuntime, AutoClosea
                 + ",\"starvationMaximumMicros\":" + value.starvationMaximumMicros()
                 + ",\"appendStallP99Micros\":" + value.appendStallP99Micros() + ",\"backlogAtEnd\":"
                 + value.backlogAtEnd() + ",\"inFlightAtEnd\":" + value.inFlightAtEnd()
-                + ",\"waiterCountAtEnd\":" + value.waiterCountAtEnd() + "}\n";
+                + ",\"waiterCountAtEnd\":" + value.waiterCountAtEnd() + ",\"warmupOffered\":"
+                + interval.warmupOffered() + ",\"warmupDroppedBeforeAdmission\":"
+                + interval.warmupDroppedBeforeAdmission() + ",\"warmupCompleted\":"
+                + interval.warmupCompleted() + ",\"warmupFailedAfterAdmission\":"
+                + interval.warmupFailedAfterAdmission() + ",\"warmupLoadRejectedAfterAdmission\":"
+                + interval.warmupLoadRejectedAfterAdmission() + ",\"warmupUnexpectedFailedAfterAdmission\":"
+                + interval.warmupUnexpectedFailedAfterAdmission() + ",\"warmupTimedOutAfterAdmission\":"
+                + interval.warmupTimedOutAfterAdmission() + ",\"warmupFirstFailure\":"
+                + jsonString(interval.warmupFirstFailure()) + ",\"actorLanesStoppedAtCleanupDeadline\":"
+                + interval.actorLanesStoppedAtCleanupDeadline() + "}\n";
+    }
+
+    private static String jsonString(String value) {
+        return '"' + value.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
     }
 
     private static String requireSafeIdentity(String value) {

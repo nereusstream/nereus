@@ -827,6 +827,11 @@ remaining open question is still formal candidate qualification on the later exp
 B.2 diagnostic conformance cannot select a mode or promote a scenario.
 The Stage B.2 profile is closed at schedule digest `b0e923a0...e798`, execution digest `4b11530b...d751`, and plan
 digest `5f94079e...b283`; only a later exact-SHA formal authorization may answer that remaining qualification question.
+That authorization first ran at `e60327ae...`: all Native baselines were valid at 1000 requests per second, while the
+first STRICT row produced a complete measured failure inventory plus expected typed warm-up contention. ADR 0110
+freezes the failed attempt and corrects only the infrastructure classifier so the validator can consume the failed
+measured row and descend. It does not turn warm-up rejection into PASS, change any rate or threshold, or answer the
+still-open candidate-selection question.
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
 ADR-0097 image.
