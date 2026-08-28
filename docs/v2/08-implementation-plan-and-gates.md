@@ -220,6 +220,11 @@ row passed 6,000/6,000, but a later 100k/10ms/200 row failed only the separate `
 measured 6,000/6,000 and full drain. Warm-up pre-admission remains raw telemetry for all rows; measured
 drop/failure/timeout=0 remains mandatory for all eight baselines.
 
+ADR 0122 records that per-actor producers alone did not close the final timer/wake handoff: exact `100e5358...`
+retained ordinals 7,998/7,999 as measured drops after about 5.4ms scheduler lag. A bounded final-50ms precision wait
+and immediate non-blocking dispatch fast path remove that runner artifact without changing any target, cutoff, queue,
+permit, outcome, or baseline zero-drop requirement.
+
 The exact `9f88fbfb...` 10k RANGE Cell-proof diagnostic passes one testcase with zero failure/error/skip, but remains
 non-promotable. The exact `e739799f...` RANGE-1024 10k-to-100k construction-only guard then passes one testcase in
 459.537 seconds with zero failure/error/skip against the locked real Oxia image and unchanged 120/600-second caps.

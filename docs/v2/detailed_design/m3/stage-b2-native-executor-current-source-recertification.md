@@ -137,3 +137,9 @@ stopped after the 100k/10ms/200 row reported one separate `warmupDropped` beside
 failure/timeout, and complete drain. ADR 0121 preserves the 12-file/12,575-byte attempt and aligns the JUnit gate with
 the already versioned row schema: warm-up pre-admission pressure remains telemetry; every baseline measured
 drop/failure/timeout remains a hard failure.
+
+The next exact source `100e5358...` stopped earlier on a measured hard gate: the final two 10k/5ms/200 offers woke
+about 5.4 milliseconds late and missed dispatch before cutoff. ADR 0122 preserves its 5-file/4,769-byte archive and
+closes both remaining handoff costs. Each producer spins only for targets in the final 50ms and immediately performs
+async dispatch when the unchanged queue is empty and permit available; every busy/full/late request stays in the same
+bounded pre-admission/drop path.

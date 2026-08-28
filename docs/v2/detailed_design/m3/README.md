@@ -653,6 +653,11 @@ Native JUnit gate with its versioned row schema after `7dcab4be...` passed the c
 but stopped on one separate warm-up pre-admission observation. Baseline measured zero-drop/failure/timeout and full
 drain remain mandatory; `warmupDropped` stays explicit non-measured telemetry.
 
+[ADR 0122](../../../decisions/0122-v2-m3-allocator-v3-final-offer-dispatch-precision-amendment.md) closes the residual
+final timer and producer-to-lane wake-up exposed by two measured drops at `100e5358...`. Only the last 50ms of each
+actor schedule uses a precise target wait, and an empty-queue/available-permit offer dispatches its existing async
+operation directly. No request is offered early and late/full/busy requests retain the same drop semantics.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

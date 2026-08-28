@@ -43,6 +43,7 @@ final class M3V3AsyncActorLaneRunner<T> {
     static final Duration FORMAL_WARMUP = Duration.ofSeconds(10);
     static final Duration FORMAL_MEASUREMENT = Duration.ofSeconds(30);
     static final Duration FORMAL_CLEANUP_GRACE = Duration.ofSeconds(5);
+    private static final long FINAL_OFFER_PRECISION_WINDOW_NANOS = TimeUnit.MILLISECONDS.toNanos(50);
 
     private final Duration warmup;
     private final Duration measurement;
@@ -89,7 +90,9 @@ final class M3V3AsyncActorLaneRunner<T> {
             offerers = startOfferers(
                     exactSchedule,
                     startNanos,
+                    cutoffNanos,
                     state,
+                    operation,
                     measurementReady,
                     measurementRelease,
                     offererStops,
@@ -155,7 +158,9 @@ final class M3V3AsyncActorLaneRunner<T> {
     private List<Thread> startOfferers(
             List<ScheduledOffer<T>> schedule,
             long startNanos,
+            long cutoffNanos,
             RunState<T> state,
+            ActorOperation<T> operation,
             CountDownLatch measurementReady,
             CountDownLatch measurementRelease,
             CountDownLatch offererStops,
@@ -172,13 +177,16 @@ final class M3V3AsyncActorLaneRunner<T> {
                     () -> runOfferer(
                             byActor.get(exactActorId),
                             startNanos,
+                            cutoffNanos,
                             state,
+                            operation,
                             measurementReady,
                             measurementRelease,
                             offererStops,
                             offererFailure),
                     "m3-v3-allocator-offer-actor-" + actorId);
             thread.setDaemon(true);
+            thread.setPriority(Math.min(Thread.MAX_PRIORITY, Thread.NORM_PRIORITY + 1));
             threads.add(thread);
             thread.start();
         }
@@ -188,7 +196,9 @@ final class M3V3AsyncActorLaneRunner<T> {
     private void runOfferer(
             List<ScheduledOffer<T>> offers,
             long startNanos,
+            long cutoffNanos,
             RunState<T> state,
+            ActorOperation<T> operation,
             CountDownLatch measurementReady,
             CountDownLatch measurementRelease,
             CountDownLatch offererStops,
@@ -202,8 +212,11 @@ final class M3V3AsyncActorLaneRunner<T> {
                     measurementRelease.await();
                 }
                 long targetNanos = Math.addExact(startNanos, offer.arrivalOffsetNanos());
-                waitUntil(targetNanos);
-                state.offer(offer, targetNanos);
+                waitUntilOffer(targetNanos, cutoffNanos);
+                AdmittedRequest<T> admitted = state.offer(offer, targetNanos);
+                if (admitted != null) {
+                    dispatch(state, admitted, operation);
+                }
             }
             if (!measurementBarrierReached) {
                 measurementReady.countDown();
@@ -251,23 +264,28 @@ final class M3V3AsyncActorLaneRunner<T> {
             if (admitted == null) {
                 return;
             }
-            state.firstDispatch(admitted);
-            try {
-                CompletionStage<?> stage = Objects.requireNonNull(
-                        operation.execute(actorId, admitted.offer().request(), admitted.context()),
-                        "allocator V3 actor operation stage");
-                stage.whenComplete((ignored, failure) -> {
-                    admitted.context().markOperationCompleted();
-                    state.finish(
-                            admitted,
-                            failure == null ? TerminalOutcome.COMPLETED : TerminalOutcome.FAILED_AFTER_ADMISSION,
-                            failure == null ? null : unwrap(failure));
-                });
-            } catch (RuntimeException failure) {
-                state.finish(admitted, TerminalOutcome.FAILED_AFTER_ADMISSION, unwrap(failure));
-            } catch (Error failure) {
-                state.finish(admitted, TerminalOutcome.FAILED_AFTER_ADMISSION, failure);
-            }
+            dispatch(state, admitted, operation);
+        }
+    }
+
+    private void dispatch(RunState<T> state, AdmittedRequest<T> admitted, ActorOperation<T> operation) {
+        state.firstDispatch(admitted);
+        try {
+            CompletionStage<?> stage = Objects.requireNonNull(
+                    operation.execute(
+                            admitted.offer().actorId(), admitted.offer().request(), admitted.context()),
+                    "allocator V3 actor operation stage");
+            stage.whenComplete((ignored, failure) -> {
+                admitted.context().markOperationCompleted();
+                state.finish(
+                        admitted,
+                        failure == null ? TerminalOutcome.COMPLETED : TerminalOutcome.FAILED_AFTER_ADMISSION,
+                        failure == null ? null : unwrap(failure));
+            });
+        } catch (RuntimeException failure) {
+            state.finish(admitted, TerminalOutcome.FAILED_AFTER_ADMISSION, unwrap(failure));
+        } catch (Error failure) {
+            state.finish(admitted, TerminalOutcome.FAILED_AFTER_ADMISSION, failure);
         }
     }
 
@@ -314,6 +332,19 @@ final class M3V3AsyncActorLaneRunner<T> {
             if (Thread.interrupted()) {
                 throw new InterruptedException("allocator V3 interval coordinator was interrupted");
             }
+        }
+    }
+
+    private static void waitUntilOffer(long targetNanos, long cutoffNanos) throws InterruptedException {
+        if (cutoffNanos - targetNanos > FINAL_OFFER_PRECISION_WINDOW_NANOS) {
+            waitUntil(targetNanos);
+            return;
+        }
+        while (targetNanos - System.nanoTime() > 0) {
+            if (Thread.interrupted()) {
+                throw new InterruptedException("allocator V3 offer producer was interrupted");
+            }
+            Thread.onSpinWait();
         }
     }
 
@@ -540,18 +571,22 @@ final class M3V3AsyncActorLaneRunner<T> {
             notifyAll();
         }
 
-        private synchronized void offer(ScheduledOffer<T> offer, long targetNanos) {
+        private synchronized AdmittedRequest<T> offer(ScheduledOffer<T> offer, long targetNanos) {
             long now = System.nanoTime();
             long schedulerLag = Math.max(0, now - targetNanos);
             metrics.offered(offer.measured(), schedulerLag);
             ArrayDeque<QueuedRequest<T>> queue = queues.get(offer.actorId());
             if (!accepting || now >= cutoffNanos || queue.size() >= laneCapacities.get(offer.actorId())) {
                 metrics.dropped(offer, schedulerLag);
-                return;
+                return null;
             }
             queue.addLast(new QueuedRequest<>(offer, now, schedulerLag));
             metrics.enqueued();
+            AdmittedRequest<T> admitted = queue.size() == 1 && canAdmit(offer)
+                    ? admitHead(offer.actorId(), queue)
+                    : null;
             notifyAll();
+            return admitted;
         }
 
         private synchronized AdmittedRequest<T> admitNext(int actorId) throws InterruptedException {
@@ -577,22 +612,26 @@ final class M3V3AsyncActorLaneRunner<T> {
                         continue;
                     }
                     setWaiting(actorId, false);
-                    queue.removeFirst();
-                    metrics.dequeued();
-                    long now = System.nanoTime();
-                    OperationContext context = new OperationContext(cleanupDeadlineNanos);
-                    AdmittedRequest<T> admitted = new AdmittedRequest<>(queued, now, context);
-                    if (active.putIfAbsent(queued.offer().ordinal(), admitted) != null) {
-                        throw new IllegalStateException("allocator V3 active ordinal aliases another request");
-                    }
-                    actorOutstanding[actorId]++;
-                    bindingOutstanding.merge(queued.offer().bindingOrdinal(), 1, Math::addExact);
-                    metrics.admitted(admitted, active.size(), actorOutstanding, bindingOutstanding.size());
-                    return admitted;
+                    return admitHead(actorId, queue);
                 }
             } finally {
                 setWaiting(actorId, false);
             }
+        }
+
+        private AdmittedRequest<T> admitHead(int actorId, ArrayDeque<QueuedRequest<T>> queue) {
+            QueuedRequest<T> queued = queue.removeFirst();
+            metrics.dequeued();
+            long now = System.nanoTime();
+            OperationContext context = new OperationContext(cleanupDeadlineNanos);
+            AdmittedRequest<T> admitted = new AdmittedRequest<>(queued, now, context);
+            if (active.putIfAbsent(queued.offer().ordinal(), admitted) != null) {
+                throw new IllegalStateException("allocator V3 active ordinal aliases another request");
+            }
+            actorOutstanding[actorId]++;
+            bindingOutstanding.merge(queued.offer().bindingOrdinal(), 1, Math::addExact);
+            metrics.admitted(admitted, active.size(), actorOutstanding, bindingOutstanding.size());
+            return admitted;
         }
 
         private boolean canAdmit(ScheduledOffer<T> offer) {

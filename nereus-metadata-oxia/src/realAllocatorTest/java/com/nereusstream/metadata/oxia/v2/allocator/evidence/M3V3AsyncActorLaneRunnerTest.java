@@ -51,9 +51,11 @@ class M3V3AsyncActorLaneRunnerTest {
             M3V3AsyncActorLaneRunner<String> runner = runner(Duration.ofMillis(40), Duration.ofMillis(400));
             List<CompletableFuture<Void>> completions = futures(total);
             CountDownLatch dispatched = new CountDownLatch(total);
+            List<String> dispatchThreads = Collections.synchronizedList(new ArrayList<>());
             Thread release = releaseInReverseWhenStarted(dispatched, completions);
 
             var result = runner.run(Math.max(2, total / 2), uniqueSchedule(total), (actor, request, context) -> {
+                dispatchThreads.add(Thread.currentThread().getName());
                 dispatched.countDown();
                 return completions.get(Integer.parseInt(request));
             });
@@ -67,6 +69,8 @@ class M3V3AsyncActorLaneRunnerTest {
             assertThat(result.measuredTerminals())
                     .extracting(M3V3AsyncActorLaneRunner.TerminalRecord::ordinal)
                     .containsExactlyElementsOf(longRange(total));
+            assertThat(dispatchThreads)
+                    .allMatch(threadName -> threadName.startsWith("m3-v3-allocator-offer-actor-"));
             assertConservation(result);
             OUTSTANDING_ROWS.add("{\"outstandingPerActor\":" + outstandingPerActor
                     + ",\"actorOutstandingMax\":"

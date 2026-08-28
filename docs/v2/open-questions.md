@@ -881,6 +881,9 @@ remains an open later-stage question.
 ADR 0121 does not answer that question or relax a baseline: it only keeps `warmupDropped` separate from the measured
 zero-drop field already used by qualification. All eight Native baselines still require measured
 drop/failure/timeout=0 and complete drain.
+ADR 0122 further removes final timer/wake-up jitter as a runner artifact through a bounded precision window and
+immediate async dispatch when existing permits allow it. This does not change the still-open formal qualification
+question or permit post-cutoff admission.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
