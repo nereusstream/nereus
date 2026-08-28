@@ -392,6 +392,7 @@ Accepted decisions:
 - [ADR 0129: M3 V4 installed-RANGE proof-reuse amendment](../decisions/0129-v2-m3-allocator-v4-installed-range-proof-reuse-amendment.md)
 - [ADR 0130: M3 V4 applied-mutation acknowledgement amendment](../decisions/0130-v2-m3-allocator-v4-applied-mutation-acknowledgement-amendment.md)
 - [ADR 0131: M3 V4 applied-mutation instrumentation forwarding amendment](../decisions/0131-v2-m3-allocator-v4-applied-mutation-instrumentation-forwarding-amendment.md)
+- [ADR 0132: M3 V4 evidence-store specialized mutation forwarding amendment](../decisions/0132-v2-m3-allocator-v4-evidence-store-specialized-mutation-forwarding-amendment.md)
 
 ## Open design gates
 
@@ -661,6 +662,12 @@ the exact `3bc11088...` diagnostic and identifies why it still measured six oper
 fell back to interface-default legacy mutations and discarded the acknowledgement. Formal and diagnostic wrappers now
 forward the exact result through latency/loss/crash instrumentation. Production semantics and every V4 threshold stay
 unchanged.
+
+[ADR 0132](../decisions/0132-v2-m3-allocator-v4-evidence-store-specialized-mutation-forwarding-amendment.md)
+preserves the exact `e53b3af8...` diagnostic: acknowledgements reached the wrappers and eliminated reconcile retries,
+but the outer evidence-store decorator inherited SPI defaults and re-entered the ordinary mutation path. The decorator
+now forwards both installed-RANGE specialized methods through the same exact-key and fault telemetry helper; production
+semantics, V4 plan, and every threshold stay unchanged.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

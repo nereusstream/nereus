@@ -135,6 +135,24 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
     }
 
     @Override
+    public CompletionStage<ConditionalCasResult<VersionedManagedLedgerAllocatorHeadV1>>
+            compareAndSetHeadAfterStoreObservedRangeNode(
+                    Sha256Digest namespaceId,
+                    Sha256Digest sliceAssignmentId,
+                    VersionedManagedLedgerAllocatorHeadV1 exactPredecessor,
+                    ManagedLedgerAllocatorHeadV1 candidate) {
+        ManagedLedgerIncarnationIdV1 incarnation = exactPredecessor.value().managedLedgerIncarnation();
+        String key = keys.headKey(namespaceId, sliceAssignmentId, incarnation);
+        return mutation(
+                key,
+                traces.trace(incarnation),
+                traces.headMutationKind(incarnation),
+                delegate -> delegate.compareAndSetHeadAfterStoreObservedRangeNode(
+                        namespaceId, sliceAssignmentId, exactPredecessor, candidate),
+                result -> outcome(result.outcome()));
+    }
+
+    @Override
     public CompletionStage<Optional<VersionedVirtualLedgerCandidateNodeV1>> readNode(
             Sha256Digest namespaceId,
             Sha256Digest sliceAssignmentId,
@@ -159,6 +177,23 @@ final class M3EvidenceAllocatorStore implements PulsarVirtualLedgerAllocatorStor
                 traces.trace(candidate.managedLedgerIncarnation()),
                 OxiaOperationKind.NODE_CREATE,
                 delegate -> delegate.createNode(namespaceId, sliceAssignmentId, candidate),
+                result -> outcome(result.outcome()));
+    }
+
+    @Override
+    public CompletionStage<CreateMutationResult<VersionedVirtualLedgerCandidateNodeV1>>
+            createNodeAfterStoreObservedRangeAuthorities(
+                    Sha256Digest namespaceId,
+                    Sha256Digest sliceAssignmentId,
+                    VirtualLedgerCandidateNodeV1 candidate) {
+        String key = keys.nodeKey(
+                namespaceId, sliceAssignmentId, candidate.managedLedgerIncarnation(), candidate.ledgerId());
+        return mutation(
+                key,
+                traces.trace(candidate.managedLedgerIncarnation()),
+                OxiaOperationKind.NODE_CREATE,
+                delegate -> delegate.createNodeAfterStoreObservedRangeAuthorities(
+                        namespaceId, sliceAssignmentId, candidate),
                 result -> outcome(result.outcome()));
     }
 

@@ -284,6 +284,11 @@ ADR 0131 records that exact `3bc11088...` still measured six operations because 
 client used the interface-default empty acknowledgement. Both wrapper levels must forward acknowledgement values
 through the same latency/loss/crash/telemetry chain. A deterministic no-legacy-fallback contract plus a fresh exact
 25ms receipt and complete canonical NADV4 are required before formal execution.
+ADR 0132 records that exact `e53b3af8...` reached zero derived reconcile retries but still measured six operations
+because the outer evidence-store decorator inherited the specialized SPI defaults and routed both mutations back to
+the ordinary proofful methods. The decorator must forward both installed-RANGE specialized operations through its
+unchanged exact-key/fault telemetry helper. A deterministic zero-legacy/zero-read decorator contract, fresh exact
+25ms receipt, and complete canonical NADV4 remain required before formal execution.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

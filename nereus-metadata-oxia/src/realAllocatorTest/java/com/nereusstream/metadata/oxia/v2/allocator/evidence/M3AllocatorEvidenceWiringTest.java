@@ -26,18 +26,24 @@ import com.nereusstream.domain.registry.allocator.AllocatorEvidenceContextV1;
 import com.nereusstream.domain.registry.allocator.AllocatorFaultCutV1;
 import com.nereusstream.domain.registry.allocator.AllocatorHeadStateV1;
 import com.nereusstream.domain.registry.allocator.AllocatorModeV1;
+import com.nereusstream.domain.registry.allocator.AllocatorProtocolV1;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.EventKind;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.EventOutcome;
 import com.nereusstream.domain.registry.allocator.AllocatorRawEvidenceEventV1.OxiaOperationKind;
 import com.nereusstream.domain.registry.allocator.CellAllocatorReservationV1;
 import com.nereusstream.domain.registry.allocator.ChainPointerV1;
+import com.nereusstream.domain.registry.allocator.ManagedLedgerAllocatorHeadV1;
 import com.nereusstream.domain.registry.allocator.ManagedLedgerIncarnationIdV1;
+import com.nereusstream.domain.registry.allocator.VirtualLedgerCandidateNodeV1;
 import com.nereusstream.domain.registry.allocator.VirtualLedgerCellAllocatorStateV1;
+import com.nereusstream.metadata.oxia.v2.allocator.OxiaVirtualLedgerAllocatorKeys;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
+import com.nereusstream.metadata.oxia.v2.mutation.MetadataVersionMapper;
 import com.nereusstream.metadata.oxia.v2.mutation.MutationAcknowledgement;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
 import com.nereusstream.metadata.spi.allocator.VersionedAllocatorCellStateV1;
+import com.nereusstream.metadata.spi.allocator.VersionedManagedLedgerAllocatorHeadV1;
 import com.nereusstream.metadata.spi.model.MetadataVersion;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -374,6 +380,62 @@ class M3AllocatorEvidenceWiringTest {
     }
 
     @Test
+    void evidenceStorePreservesInstalledRangeSpecializedMutationPaths() throws Exception {
+        AcknowledgedConditionalClient delegate = new AcknowledgedConditionalClient();
+        M3EvidenceAllocatorStore.TraceRegistry traces = new M3EvidenceAllocatorStore.TraceRegistry();
+        String root = "/nereus/v2/m3/evidence-store-forwarding";
+        Sha256Digest namespaceId = digest("evidence-store-namespace");
+        Sha256Digest sliceAssignmentId = digest("evidence-store-assignment");
+        ManagedLedgerIncarnationIdV1 incarnation =
+                new ManagedLedgerIncarnationIdV1(digest("evidence-store-incarnation"));
+        long rangeStart = VirtualLedgerSliceAssignmentV1.RESERVED_START_INCLUSIVE;
+        ManagedLedgerAllocatorHeadV1 predecessor = new ManagedLedgerAllocatorHeadV1(
+                VirtualLedgerCellAllocatorStateV1.PROTOCOL_VERSION,
+                incarnation,
+                1,
+                ChainPointerV1.absent(),
+                1,
+                rangeStart,
+                rangeStart + 1024,
+                rangeStart);
+        VirtualLedgerCandidateNodeV1 node =
+                AllocatorProtocolV1.candidate(predecessor, digest("evidence-store-descriptor"));
+        OxiaVirtualLedgerAllocatorKeys keys = new OxiaVirtualLedgerAllocatorKeys(root);
+        VersionedManagedLedgerAllocatorHeadV1 exactPredecessor = new VersionedManagedLedgerAllocatorHeadV1(
+                namespaceId,
+                sliceAssignmentId,
+                keys.headKey(namespaceId, sliceAssignmentId, incarnation),
+                predecessor,
+                MetadataVersionMapper.fromOxia(6));
+
+        try (M3RealOxiaActors.InstrumentedClient client =
+                new M3RealOxiaActors.InstrumentedClient(3, delegate)) {
+            client.beginDiagnosticCapture();
+            M3EvidenceAllocatorStore store = new M3EvidenceAllocatorStore(root, client, traces);
+
+            var created = store.createNodeAfterStoreObservedRangeAuthorities(namespaceId, sliceAssignmentId, node)
+                    .toCompletableFuture()
+                    .join();
+            ManagedLedgerAllocatorHeadV1 successor = AllocatorProtocolV1.publish(predecessor, node);
+            var applied = store.compareAndSetHeadAfterStoreObservedRangeNode(
+                            namespaceId, sliceAssignmentId, exactPredecessor, successor)
+                    .toCompletableFuture()
+                    .join();
+            M3RealOxiaActors.InstrumentedClient.OperationDiagnosticSnapshot snapshot =
+                    client.endDiagnosticCapture();
+
+            assertThat(created.exactSnapshot().orElseThrow().value()).isEqualTo(node);
+            assertThat(applied.exactSnapshot().orElseThrow().value()).isEqualTo(successor);
+            assertThat(delegate.acknowledgedCreates).isOne();
+            assertThat(delegate.acknowledgedCas).isOne();
+            assertThat(delegate.legacyMutations).isZero();
+            assertThat(snapshot.samples())
+                    .extracting(M3RealOxiaActors.InstrumentedClient.OperationSample::kind)
+                    .containsExactly("CREATE_IF_ABSENT", "COMPARE_AND_SET");
+        }
+    }
+
+    @Test
     void drainsEverySubmittedCompletionBeforeRethrowingTheFirstFailure() throws Exception {
         ExecutorService workers = Executors.newFixedThreadPool(2);
         CompletionService<Void> completions = new ExecutorCompletionService<>(workers);
@@ -624,6 +686,10 @@ class M3AllocatorEvidenceWiringTest {
                 + M3AllocatorVerificationSealMain.TEST_CLASS
                 + "\"/>\n"
                 + "</testsuite>\n";
+    }
+
+    private static Sha256Digest digest(String value) {
+        return Sha256Digest.hash(CanonicalBytes.copyOf(value.getBytes(StandardCharsets.UTF_8)));
     }
 
     private static final class PendingConditionalClient implements OxiaConditionalClient {
