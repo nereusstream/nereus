@@ -88,7 +88,7 @@ class M3V5AllocatorProtocolMainTest {
     }
 
     @Test
-    void diagnosticSealerBindsTheIndependentTwentyFourTestNadv5InventoryAndRawManifest() throws Exception {
+    void diagnosticSealerBindsTheIndependentTwentySixTestNadv5InventoryAndRawManifest() throws Exception {
         SourceBinding source = source();
         Path junit = diagnosticJUnitDirectory();
         Path raw = diagnosticRawDirectory(source);
@@ -100,7 +100,7 @@ class M3V5AllocatorProtocolMainTest {
         var diagnostic = AllocatorCampaignPromotionGateV5.decodeDiagnostic(
                 CanonicalBytes.copyOf(Files.readAllBytes(output)));
         assertThat(M3V5AllocatorProtocolMain.DIAGNOSTIC_SUITES).hasSize(10);
-        assertThat(M3V5AllocatorProtocolMain.DIAGNOSTIC_TESTS).hasSize(24);
+        assertThat(M3V5AllocatorProtocolMain.DIAGNOSTIC_TESTS).hasSize(26);
         assertThat(diagnostic.source()).isEqualTo(source);
         assertThat(diagnostic.rawManifestDigest())
                 .isEqualTo(M3V5DiagnosticRawGate.validate(raw, source.nereusCommit()));

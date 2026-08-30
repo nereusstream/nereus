@@ -315,7 +315,8 @@ admission/profile/codec/feasibility boundary is now implemented with plan digest
 digest `76d9bc38ce6f...`, strict NACP5/NAEV5/NADV5/NARS5 bytes, a 19-file canonical raw manifest, and independent
 V5 launcher/Gradle entrypoints. ADR 0138 preserves the subsequent exact `a1664de9...` FAILED V5 diagnostic: Native,
 RANGE-16, RANGE-1024, and terminal drain are lossless, while STRICT accurately records bounded candidate loss. The
-compatibility rows now use the formal-equivalent V5 runner/drain. A fresh 24-test/ten-suite diagnostic must pass with
+compatibility rows now use the formal-equivalent V5 runner/drain. ADR 0144 adds the two frozen-target boundary
+contracts to new-source authority. A fresh 26-test/ten-suite diagnostic must pass with
 zero failure/error/skip, complete raw accounting, lossless RANGE/Native authority rows, and canonical NADV5 before
 formal execution. STRICT still needs zero loss and every unchanged SLO to qualify in formal evaluation; diagnostic
 accounting does not preselect it. The preserved NADV4 and FAILED V5 attempts are non-authoritative.

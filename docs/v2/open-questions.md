@@ -960,7 +960,8 @@ strict V5 `4/128/512/1` admission/profile/codec boundary, storm-aware feasibilit
 formal launcher are implemented. ADR 0138 preserves the exact `a1664de9...` FAILED diagnostic and corrects its
 qualification boundary: STRICT's conserved loss is a candidate result, while RANGE/Native feasibility and all
 lifecycle/source gates remain mandatory. At the ADR-0138 source cut, the active evidence item was a fresh complete
-24-test/ten-suite current-source diagnostic with a parse-canonical NADV5 before any formal campaign.
+At the ADR-0138 source cut that meant 24 tests; ADR 0144 now requires a 26-test/ten-suite current-source diagnostic
+with a parse-canonical NADV5 before any formal campaign.
 
 ADR 0139 records that the fresh `8a60d931...` diagnostic passed and its first V5 formal completed with canonical
 `RANGE_SELECTED(RANGE_64)`, but promotion rejected a valid 27.20 MiB 100k mass-takeover attachment under a V3-era

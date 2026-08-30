@@ -508,6 +508,14 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn('"terminalAdmissionDrainSeconds\\\":2"', strict_sequence)
         self.assertIn("MAX_GLOBAL_OUTSTANDING", runner_test)
         self.assertIn("containsExactly(128, 128, 128, 128)", runner_test)
+        self.assertIn(
+            "frozenTargetMayArrivePhysicallyLateButStillEnterTheV5AdmissionDrain",
+            protocol,
+        )
+        self.assertIn(
+            "frozenTargetDeliveredAfterTheV5AdmissionDeadlineStillDrops",
+            protocol,
+        )
 
         launcher = V5_LAUNCHER.read_text()
         for token in (

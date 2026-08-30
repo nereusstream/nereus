@@ -3968,6 +3968,11 @@ def validate_allocator_v5_campaign_verification(
         ALLOCATOR_V5_EXTERNAL_MAX_BYTES,
         ("executorArtifact",),
     )
+    expected_diagnostic_tests = (
+        ALLOCATOR_V5.LEGACY_DIAGNOSTIC_TESTS
+        if tested_commit in ALLOCATOR_V5.LEGACY_DIAGNOSTIC_SOURCE_COMMITS
+        else ALLOCATOR_V5.DIAGNOSTIC_TESTS
+    )
     diagnostic_junit_rows = _allocator_v5_file_rows(
         root,
         wrapper["diagnosticJunitFiles"],
@@ -3975,7 +3980,7 @@ def validate_allocator_v5_campaign_verification(
         10,
         ALLOCATOR_V2_JUNIT_MAX_BYTES,
         tuple(sorted(f"TEST-{suite}.xml" for suite in {
-            identity.split("#", 1)[0] for identity in ALLOCATOR_V5.DIAGNOSTIC_TESTS
+            identity.split("#", 1)[0] for identity in expected_diagnostic_tests
         })),
     )
     diagnostic_raw_rows = _allocator_v5_file_rows(
@@ -4021,7 +4026,8 @@ def validate_allocator_v5_campaign_verification(
             ALLOCATOR_V5.diagnostic_junit_manifest(
                 _allocator_v5_external_bytes(
                     root, diagnostic_junit_rows, ALLOCATOR_V2_JUNIT_MAX_BYTES
-                )
+                ),
+                expected_diagnostic_tests,
             )
         )
         diagnostic_raw_manifest = ALLOCATOR_V5.diagnostic_raw_manifest(

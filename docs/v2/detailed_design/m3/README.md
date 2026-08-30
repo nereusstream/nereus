@@ -804,6 +804,12 @@ next Final.
 deadline. Its [implementation record](stage-b-v5-frozen-target-delivery.md) changes no workload, cap, threshold,
 wire, or selection rule. The failed 24-test/one-failure attempt has no NADV5 and authorizes no formal execution.
 
+[ADR 0144](../../../decisions/0144-v2-m3-allocator-v5-frozen-target-diagnostic-inventory-amendment.md) preserves the
+subsequent `a981e612...` 26/0/0/0 diagnostic as non-authoritative because its sealer still expected 24 tests. The two
+ADR-0143 boundary contracts now extend only new exact-source diagnostics to a closed 26-test/ten-suite inventory;
+the old selected-source children retain an exact-source legacy verifier. No V5 wire, plan, profile, workload,
+threshold, or selection semantic changes, and a fresh canonical NADV5 is still required before formal execution.
+
 | Slice | Design or output | Status at this documentation cut |
 | --- | --- | --- |
 | M3-I0 | [NWG1 implementation-input closure](m3-i0-nwg1-implementation-input-closure.md), [ADR 0089 Header amendment](../../../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and [ADR 0090 mutation-call profiles](../../../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md) | accepted documentation-only input with exact Header offsets and explicit X0/XU call caps; no codec, runner, trace harness, Provider evidence, receipt, or scenario PASS |

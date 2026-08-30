@@ -408,6 +408,7 @@ Accepted decisions:
 - [ADR 0141: M3 Final common-tested-source recertification amendment](../decisions/0141-v2-m3-final-common-tested-source-recertification-amendment.md)
 - [ADR 0142: M3 Final documentation scenario closure amendment](../decisions/0142-v2-m3-final-documentation-scenario-closure-amendment.md)
 - [ADR 0143: M3 V5 frozen-target delivery amendment](../decisions/0143-v2-m3-allocator-v5-frozen-target-delivery-amendment.md)
+- [ADR 0144: M3 V5 frozen-target diagnostic inventory amendment](../decisions/0144-v2-m3-allocator-v5-frozen-target-diagnostic-inventory-amendment.md)
 
 ## Open design gates
 
@@ -455,7 +456,10 @@ amendments and `ae8e3f7f...` common-source recertification closed `RANGE_SELECTE
 promotions, and canonical Final `1089d4f6...` for that immutable source. ADR 0142 corrects the documentation gate's
 closed M3 group and therefore requires a new exact-source recertification without changing selection semantics. ADR
 0143 preserves the failed `af2f6039...` diagnostic and removes host-scheduler nondeterminism from V5 frozen-target
-delivery without changing the workload, zero-drop rule, admission caps, SLOs, or selector.
+delivery without changing the workload, zero-drop rule, admission caps, SLOs, or selector. ADR 0144 preserves the
+subsequent lossless `a981e612...` run as diagnostic-only because its old 24-test sealer omitted the two new boundary
+contracts; new-source NADV5 authority now requires the exact 26-test inventory while the two prior selected sources
+retain an explicit legacy verification path.
 ADR 0089 amends that input before any production NWG1 bytes exist with the gap-free exact 256-byte Header table. It
 retains `wireVersion=1`, removes node session and any duplicate packing-class field from the Header, fixes Object digest
 `SHA-256/v1=1/1` plus close-reason codes `1..12`, and requires the future projection to mechanically transcribe the ADR.
@@ -718,7 +722,7 @@ the standalone lossless 25ms result and the later full-suite V4 zero-drop failur
 and versions the already-frozen 2R storm admission contract as bounded `4/128/512/1`. The implementation record is
 [Stage B V5 storm admission and diagnostic raw integrity](detailed_design/m3/stage-b-v5-storm-admission-and-diagnostic-raw-integrity.md).
 V5 now has strict source-bound plan/profile/codec/launcher entrypoints and a canonical 19-file diagnostic raw
-manifest. A fresh 24-test/ten-suite current-source diagnostic and its NADV5 must pass before the launcher can create a
+manifest. A fresh 26-test/ten-suite current-source diagnostic and its NADV5 must pass before the launcher can create a
 formal output; no V5 formal evaluation or selection exists at this cut.
 
 [ADR 0138](../decisions/0138-v2-m3-allocator-v5-diagnostic-candidate-outcome-boundary-amendment.md) preserves the

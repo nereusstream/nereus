@@ -74,7 +74,7 @@ DIAGNOSTIC_RAW_NAMES = (
     "v5-terminal-admission-drain-diagnostic.json",
 )
 
-DIAGNOSTIC_TESTS = {
+LEGACY_DIAGNOSTIC_TESTS = {
     "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3RealAllocatorStrictIntervalDiagnosticTest#replaysTheExactFormalSequenceWithoutUnexpectedWarmupFailure()",
     "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3RealAllocatorStrictIntervalDiagnosticTest#replaysTheExactRange16ScaleThenFixedIntervalWithoutRetainingReservations()",
     "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V3AsyncActorLaneRunnerTest#evidenceAdmissionCapIsDerivedFromFrozenRateLatencyAndActorCount()",
@@ -99,6 +99,14 @@ DIAGNOSTIC_TESTS = {
     "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V5TerminalAdmissionDrainDiagnosticTest#exactRange16FixedAndDerivedRowsDrainEveryOnTimeOfferWithoutLoss()",
     "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V5RangeLatencyDiagnosticTest#exactRange1024TenMillisSequenceAttributesOperationAndSchedulerCapacity()",
     "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V5RangeLatencyDiagnosticTest#exactRange1024TwentyFiveMillisSequenceAttributesOperationAndSchedulerCapacity()",
+}
+DIAGNOSTIC_TESTS = LEGACY_DIAGNOSTIC_TESTS | {
+    "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V5AsyncActorLaneRunnerTest#frozenTargetMayArrivePhysicallyLateButStillEnterTheV5AdmissionDrain()",
+    "com.nereusstream.metadata.oxia.v2.allocator.evidence.M3V5AsyncActorLaneRunnerTest#frozenTargetDeliveredAfterTheV5AdmissionDeadlineStillDrops()",
+}
+LEGACY_DIAGNOSTIC_SOURCE_COMMITS = {
+    "54d0ca7c329248acb3eaaaef9d4bffd138dad061",
+    "ae8e3f7f489f5ba167d4155bc5d7c191586a4eb6",
 }
 
 
@@ -823,7 +831,10 @@ def parse_junit(raw: bytes) -> tuple[dict[str, int], set[str]]:
     return summary, identities
 
 
-def diagnostic_junit_manifest(files: list[tuple[str, bytes]]) -> tuple[str, dict[str, int]]:
+def diagnostic_junit_manifest(
+    files: list[tuple[str, bytes]],
+    expected_tests: set[str] = DIAGNOSTIC_TESTS,
+) -> tuple[str, dict[str, int]]:
     if len(files) != 10 or [name for name, _ in files] != sorted(name for name, _ in files):
         raise V5Error("allocator V5 diagnostic JUnit file inventory differs")
     manifest = bytearray(b"NEREUS_V2_M3_ALLOCATOR_DIAGNOSTIC_JUNIT_MANIFEST_V5\n")
@@ -842,7 +853,13 @@ def diagnostic_junit_manifest(files: list[tuple[str, bytes]]) -> tuple[str, dict
         manifest.extend(b"\0")
         manifest.extend(sha256(raw).encode("ascii"))
         manifest.extend(b"\n")
-    if identities != DIAGNOSTIC_TESTS or totals != {"tests": 24, "failures": 0, "errors": 0, "skipped": 0}:
+    expected_totals = {
+        "tests": len(expected_tests),
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+    }
+    if identities != expected_tests or totals != expected_totals:
         raise V5Error("allocator V5 diagnostic JUnit inventory/result differs")
     return sha256(bytes(manifest)), totals
 

@@ -36,3 +36,16 @@ The failed diagnostic is externally preserved at
 `/Users/liusinan/Documents/Codex/2026-08-30/nereus-v2-m3-allocator/diagnostic-af2f6039-v5-native-terminal-cutoff-failed-r1`
 with identity `a2715b4b...ea19` and manifest `d2d704ec...873c`. It contains 24 tests/one failure/ten suites, no NADV5,
 and no formal authority. A fresh exact-source diagnostic and canonical NADV5 are required before formal execution.
+
+At exact clean source `a981e61281bce85b076b7416972e729498d82adc`, the corrected runner then passed every real
+diagnostic row: 26 tests in ten suites, zero failure/error/skip, 19 complete raw receipts, and Native runner/real
+ManagedLedger concurrency 83 with hidden queue depth zero. The 100k/10ms/200 row was exactly 6,000 offered/admitted/
+completed with zero drop/failure/timeout. Sealing still failed before NADV5 because the two contracts above were not
+yet in the 24-test canonical allowlist.
+
+[ADR 0144](../../../decisions/0144-v2-m3-allocator-v5-frozen-target-diagnostic-inventory-amendment.md) closes that
+source-governed inventory mismatch. The failed a981 attempt remains immutable at
+`/Users/liusinan/Documents/Codex/2026-08-30/nereus-v2-m3-allocator/diagnostic-a981e612-v5-junit-inventory-failed-r1`
+with identity `bd8df423...ff8a`, manifest `d5ae2e23...e702`, 31 files, and 62,034 bytes. New-source diagnostics require
+the exact 26-test/ten-suite inventory; only the two already-published selected sources retain their explicit legacy
+24-test child-verification path. Plan, profile, wire, raw inventory, and formal semantics are unchanged.

@@ -52,6 +52,12 @@ public final class M3V5AllocatorProtocolMain {
                             "M3V5AsyncActorLaneRunnerTest",
                             "reachesTheBoundedStormAdmissionCapWithoutChangingPerBindingSingleFlight()"),
                     identity(
+                            "M3V5AsyncActorLaneRunnerTest",
+                            "frozenTargetMayArrivePhysicallyLateButStillEnterTheV5AdmissionDrain()"),
+                    identity(
+                            "M3V5AsyncActorLaneRunnerTest",
+                            "frozenTargetDeliveredAfterTheV5AdmissionDeadlineStillDrops()"),
+                    identity(
                             "M3V5TerminalAdmissionDrainDiagnosticTest",
                             "exactRange16FixedAndDerivedRowsDrainEveryOnTimeOfferWithoutLoss()"),
                     identity(
