@@ -117,7 +117,7 @@ final class M3V3AllocatorFormalHarness {
             Duration cleanupGrace,
             List<ActorEndpoint> actors) {
         return new M3V3AllocatorFormalHarness(
-                new M3V3AsyncActorLaneRunner<>(
+                M3V3AsyncActorLaneRunner.v5(
                         warmup,
                         measurement,
                         terminalAdmissionDrain,

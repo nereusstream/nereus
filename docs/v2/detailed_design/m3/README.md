@@ -96,7 +96,9 @@ tests, and external fork commits are not M3 evidence and do not promote a scenar
   evidence, and the exact 26 promoted scenarios. Its canonical Final
   `1089d4f66a5c5b1288b4451a86ad3665baaa3abf52904fe3d07589b3418333e3` remains immutable. ADR 0142 corrects a
   source-governed documentation-checker omission, so the new exact source must repeat the full freshness chain before
-  M3 returns to `Verified`; M6 activation and M8 parity remain excluded.
+  M3 returns to `Verified`. The first `af2f6039...` recertification diagnostic then exposed four Native requests whose
+  frozen targets preceded offer close but whose producer was descheduled past it; ADR 0143 source-binds the V5
+  frozen-target delivery deadline before the next diagnostic. M6 activation and M8 parity remain excluded.
 
 The first full M2 regression diagnostic at exact source `eb2db10d2d5d41834d67d2c03f4a427f4432ec69` correctly
 stopped at K1 because the historical gate hashed the whole source-lock document after the disjoint M3 allocator member
@@ -796,6 +798,11 @@ formal evidence and cannot remove the selection, post-selection freshness, scena
 `ae8e3f7f...` result below as immutable prior-source evidence while correcting the documentation gate's missing M3
 promotion group. None of those receipts is rebound to the new source; every row must be freshly reproduced before the
 next Final.
+
+[ADR 0143](../../../decisions/0143-v2-m3-allocator-v5-frozen-target-delivery-amendment.md) records the failed
+`af2f6039...` V5 diagnostic and makes the frozen target offset authoritative through the existing final-admission
+deadline. Its [implementation record](stage-b-v5-frozen-target-delivery.md) changes no workload, cap, threshold,
+wire, or selection rule. The failed 24-test/one-failure attempt has no NADV5 and authorizes no formal execution.
 
 | Slice | Design or output | Status at this documentation cut |
 | --- | --- | --- |

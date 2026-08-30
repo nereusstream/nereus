@@ -21,6 +21,8 @@ public final class AllocatorNativeExecutionProfileV5 {
             AllocatorNativeExecutionProfileV4.NATIVE_BRIDGE_QUEUE_CAPACITY;
     public static final int HIDDEN_DISPATCH_QUEUE = AllocatorNativeExecutionProfileV4.HIDDEN_DISPATCH_QUEUE;
     public static final String SCHEDULE_SCHEMA = AllocatorNativeExecutionProfileV4.SCHEDULE_SCHEMA;
+    public static final String SCHEDULED_OFFER_AUTHORITY = "FROZEN_TARGET_OFFSET";
+    public static final String SCHEDULED_OFFER_DELIVERY_DEADLINE = "FINAL_ADMISSION_DEADLINE";
 
     private AllocatorNativeExecutionProfileV5() {}
 
@@ -49,6 +51,8 @@ public final class AllocatorNativeExecutionProfileV5 {
                 + "terminalAdmissionDrainSeconds="
                 + AllocatorEvidenceAdmissionPolicyV5.TERMINAL_ADMISSION_DRAIN_SECONDS + '\n'
                 + "cleanupGraceSeconds=" + AllocatorEvidenceAdmissionPolicyV5.CLEANUP_GRACE_SECONDS + '\n'
+                + "scheduledOfferAuthority=" + SCHEDULED_OFFER_AUTHORITY + '\n'
+                + "scheduledOfferDeliveryDeadline=" + SCHEDULED_OFFER_DELIVERY_DEADLINE + '\n'
                 + "scheduleProfileSha256=" + scheduleDigest().toHex() + '\n';
     }
 }

@@ -53,6 +53,7 @@ final class M3V3AsyncActorLaneRunner<T> {
     private final Duration cleanupGrace;
     private final int maxOutstandingPerActor;
     private final int maxGlobalOutstanding;
+    private final boolean frozenTargetAuthoritativeDuringAdmissionDrain;
 
     M3V3AsyncActorLaneRunner(Duration warmup, Duration measurement, Duration cleanupGrace) {
         this(
@@ -82,6 +83,24 @@ final class M3V3AsyncActorLaneRunner<T> {
             Duration cleanupGrace,
             int maxOutstandingPerActor,
             int maxGlobalOutstanding) {
+        this(
+                warmup,
+                measurement,
+                terminalAdmissionDrain,
+                cleanupGrace,
+                maxOutstandingPerActor,
+                maxGlobalOutstanding,
+                false);
+    }
+
+    private M3V3AsyncActorLaneRunner(
+            Duration warmup,
+            Duration measurement,
+            Duration terminalAdmissionDrain,
+            Duration cleanupGrace,
+            int maxOutstandingPerActor,
+            int maxGlobalOutstanding,
+            boolean frozenTargetAuthoritativeDuringAdmissionDrain) {
         this.warmup = requirePositiveOrZero(warmup, "warmup");
         this.measurement = requirePositive(measurement, "measurement");
         this.terminalAdmissionDrain = requirePositiveOrZero(terminalAdmissionDrain, "terminal admission drain");
@@ -93,6 +112,7 @@ final class M3V3AsyncActorLaneRunner<T> {
         }
         this.maxOutstandingPerActor = maxOutstandingPerActor;
         this.maxGlobalOutstanding = maxGlobalOutstanding;
+        this.frozenTargetAuthoritativeDuringAdmissionDrain = frozenTargetAuthoritativeDuringAdmissionDrain;
     }
 
     static <T> M3V3AsyncActorLaneRunner<T> formal() {
@@ -110,13 +130,30 @@ final class M3V3AsyncActorLaneRunner<T> {
     }
 
     static <T> M3V3AsyncActorLaneRunner<T> formalV5() {
-        return new M3V3AsyncActorLaneRunner<>(
+        return v5(
                 FORMAL_WARMUP,
                 FORMAL_MEASUREMENT,
                 Duration.ofSeconds(AllocatorEvidenceAdmissionPolicyV5.TERMINAL_ADMISSION_DRAIN_SECONDS),
                 FORMAL_CLEANUP_GRACE,
                 AllocatorEvidenceAdmissionPolicyV5.MAX_ASYNC_OUTSTANDING_PER_ACTOR,
                 AllocatorEvidenceAdmissionPolicyV5.MAX_GLOBAL_OUTSTANDING);
+    }
+
+    static <T> M3V3AsyncActorLaneRunner<T> v5(
+            Duration warmup,
+            Duration measurement,
+            Duration terminalAdmissionDrain,
+            Duration cleanupGrace,
+            int maxOutstandingPerActor,
+            int maxGlobalOutstanding) {
+        return new M3V3AsyncActorLaneRunner<>(
+                warmup,
+                measurement,
+                terminalAdmissionDrain,
+                cleanupGrace,
+                maxOutstandingPerActor,
+                maxGlobalOutstanding,
+                true);
     }
 
     IntervalResult run(
@@ -142,7 +179,8 @@ final class M3V3AsyncActorLaneRunner<T> {
                 cleanupDeadlineNanos,
                 admissionMode,
                 maxOutstandingPerActor,
-                maxGlobalOutstanding);
+                maxGlobalOutstanding,
+                frozenTargetAuthoritativeDuringAdmissionDrain);
         CountDownLatch laneStops = new CountDownLatch(ACTOR_COUNT);
         List<Thread> lanes = startLanes(state, operation, laneStops);
         CountDownLatch measurementReady = new CountDownLatch(ACTOR_COUNT);
@@ -601,6 +639,7 @@ final class M3V3AsyncActorLaneRunner<T> {
         private final AdmissionMode admissionMode;
         private final int maxOutstandingPerActor;
         private final int maxGlobalOutstanding;
+        private final boolean frozenTargetAuthoritativeDuringAdmissionDrain;
         private final List<Integer> laneCapacities;
         private final List<ArrayDeque<QueuedRequest<T>>> queues = new ArrayList<>(ACTOR_COUNT);
         private final Map<Long, AdmittedRequest<T>> active = new LinkedHashMap<>();
@@ -617,7 +656,8 @@ final class M3V3AsyncActorLaneRunner<T> {
                 long cleanupDeadlineNanos,
                 AdmissionMode admissionMode,
                 int maxOutstandingPerActor,
-                int maxGlobalOutstanding) {
+                int maxGlobalOutstanding,
+                boolean frozenTargetAuthoritativeDuringAdmissionDrain) {
             this.queueCapacity = queueCapacity;
             this.offerCutoffNanos = offerCutoffNanos;
             this.admissionCutoffNanos = admissionCutoffNanos;
@@ -625,6 +665,7 @@ final class M3V3AsyncActorLaneRunner<T> {
             this.admissionMode = admissionMode;
             this.maxOutstandingPerActor = maxOutstandingPerActor;
             this.maxGlobalOutstanding = maxGlobalOutstanding;
+            this.frozenTargetAuthoritativeDuringAdmissionDrain = frozenTargetAuthoritativeDuringAdmissionDrain;
             this.metrics = new Metrics(maxOutstandingPerActor, maxGlobalOutstanding);
             List<Integer> capacities = new ArrayList<>(ACTOR_COUNT);
             int base = queueCapacity / ACTOR_COUNT;
@@ -657,7 +698,13 @@ final class M3V3AsyncActorLaneRunner<T> {
             long schedulerLag = Math.max(0, now - targetNanos);
             metrics.offered(offer.measured(), schedulerLag);
             ArrayDeque<QueuedRequest<T>> queue = queues.get(offer.actorId());
-            if (!accepting || now >= offerCutoffNanos || queue.size() >= laneCapacities.get(offer.actorId())) {
+            long deliveryDeadlineNanos = frozenTargetAuthoritativeDuringAdmissionDrain
+                    ? admissionCutoffNanos
+                    : offerCutoffNanos;
+            if (!accepting
+                    || targetNanos >= offerCutoffNanos
+                    || now >= deliveryDeadlineNanos
+                    || queue.size() >= laneCapacities.get(offer.actorId())) {
                 metrics.dropped(offer, schedulerLag);
                 return null;
             }

@@ -63,3 +63,14 @@ RANGE-64, but ADR 0139 records the post-campaign promotion-integrity failure at 
 and the byte-exact promotion-invalid archive. No promotion decision or NARS5 exists. Production allocator mode remains
 `UNSELECTED`; the existing production source lock, child receipts, current-source M2 regression, scenarios, and M3
 Final are unchanged.
+
+## Current-source frozen-target amendment
+
+The ADR-0137 digests above remain the immutable identity used by earlier V5 evidence. ADR 0143 does not rewrite them.
+For new exact-source execution, the profile additionally binds
+`scheduledOfferAuthority=FROZEN_TARGET_OFFSET` and
+`scheduledOfferDeliveryDeadline=FINAL_ADMISSION_DEADLINE`; its profile digest is
+`0bfa9670b8e3b1721ab83f03bd34ed368814e914288a5af772d17dec67ee3449` and plan digest is
+`974857cab839ba9cfd02ad8694a51976cf0279a4f61d11fe767aef5518a72dea`. See
+[the frozen-target delivery implementation record](stage-b-v5-frozen-target-delivery.md). Logical inventory,
+budgets, admission caps, thresholds, wires, and selection algebra are unchanged.

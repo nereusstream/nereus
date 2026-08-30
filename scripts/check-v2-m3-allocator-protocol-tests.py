@@ -418,12 +418,17 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         plan = json.loads(first)
         self.assertEqual("NEREUS_V2_M3_ALLOCATOR_CAMPAIGN_PLAN_V5", plan["schema"])
         self.assertEqual(
-            "3e0aea42527e85c58276a51f5953af0ffaba5029b8916e7bbd85f377f434d23a",
+            "974857cab839ba9cfd02ad8694a51976cf0279a4f61d11fe767aef5518a72dea",
             plan["zeroDecisionPlanSha256"],
         )
         self.assertEqual(
-            "76d9bc38ce6fa9c47b2fed926c9485db828adaee3e1533b962ab6e9c1157e1ce",
+            "0bfa9670b8e3b1721ab83f03bd34ed368814e914288a5af772d17dec67ee3449",
             plan["nativeExecution"]["nativeExecutionProfileSha256"],
+        )
+        self.assertEqual("FROZEN_TARGET_OFFSET", plan["nativeExecution"]["scheduledOfferAuthority"])
+        self.assertEqual(
+            "FINAL_ADMISSION_DEADLINE",
+            plan["nativeExecution"]["scheduledOfferDeliveryDeadline"],
         )
         self.assertEqual(
             {

@@ -23,6 +23,8 @@ EXECUTION_PROFILE_SCHEMA = "NEREUS_V2_M3_ALLOCATOR_NATIVE_EXECUTION_PROFILE_V5"
 OFFER_HORIZON_SECONDS = 40
 TERMINAL_ADMISSION_DRAIN_SECONDS = 2
 CLEANUP_GRACE_SECONDS = 5
+SCHEDULED_OFFER_AUTHORITY = "FROZEN_TARGET_OFFSET"
+SCHEDULED_OFFER_DELIVERY_DEADLINE = "FINAL_ADMISSION_DEADLINE"
 INTERVAL_PHASE_BUDGET_SECONDS = 13_776
 PHASE_BUDGETS = (900, 5_400, 7_200, 5_400, 13_776, 1_640, 600)
 
@@ -41,6 +43,8 @@ def native_execution_profile_canonical() -> str:
         f"offerHorizonSeconds={OFFER_HORIZON_SECONDS}",
         f"terminalAdmissionDrainSeconds={TERMINAL_ADMISSION_DRAIN_SECONDS}",
         f"cleanupGraceSeconds={CLEANUP_GRACE_SECONDS}",
+        f"scheduledOfferAuthority={SCHEDULED_OFFER_AUTHORITY}",
+        f"scheduledOfferDeliveryDeadline={SCHEDULED_OFFER_DELIVERY_DEADLINE}",
         f"scheduleProfileSha256={V3.workload_schedule_sha256()}",
     )
     return "\n".join(fields) + "\n"
@@ -97,6 +101,8 @@ def plan() -> dict[str, object]:
                 "offerHorizonSeconds": OFFER_HORIZON_SECONDS,
                 "terminalAdmissionDrainSeconds": TERMINAL_ADMISSION_DRAIN_SECONDS,
                 "cleanupGraceSeconds": CLEANUP_GRACE_SECONDS,
+                "scheduledOfferAuthority": SCHEDULED_OFFER_AUTHORITY,
+                "scheduledOfferDeliveryDeadline": SCHEDULED_OFFER_DELIVERY_DEADLINE,
             },
             "interval": {
                 "warmupSeconds": 10,

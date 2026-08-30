@@ -129,9 +129,9 @@ class AllocatorCampaignProtocolV5Test {
                 .hasSize(720)
                 .doesNotHaveDuplicates();
         assertThat(AllocatorCampaignPlanProfileV5.zeroDecisionPlanDigest().toHex())
-                .isEqualTo("3e0aea42527e85c58276a51f5953af0ffaba5029b8916e7bbd85f377f434d23a");
+                .isEqualTo("974857cab839ba9cfd02ad8694a51976cf0279a4f61d11fe767aef5518a72dea");
         assertThat(AllocatorNativeExecutionProfileV5.executionProfileDigest().toHex())
-                .isEqualTo("76d9bc38ce6fa9c47b2fed926c9485db828adaee3e1533b962ab6e9c1157e1ce");
+                .isEqualTo("0bfa9670b8e3b1721ab83f03bd34ed368814e914288a5af772d17dec67ee3449");
     }
 
     private static SourceBinding source(String digit) {

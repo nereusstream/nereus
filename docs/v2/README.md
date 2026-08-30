@@ -128,7 +128,9 @@ performance-first BookKeeper WAL.
   Root/Pointer, `NWKCP1`, and Provider/KMS/native-reference children. The common tested source `ae8e3f7f...` also
   supplied canonical V5 `RANGE_SELECTED(RANGE_64)`, all fresh Final children, 26 scenario promotions, and canonical
   M3 Final `1089d4f6...` at `ae8e3f7f...`. ADR 0142's later documentation-checker correction requires a new
-  common-source freshness chain; native broker/controller activation remains M6.
+  common-source freshness chain. Its first `af2f6039...` diagnostic failed on four scheduler-late Native tail
+  requests with frozen targets before offer close; ADR 0143 binds V5 delivery to those frozen targets only through
+  the unchanged final-admission deadline. Native broker/controller activation remains M6.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and an 11-test formal-runner contract gate now exist. This does not
   change the preceding M3-I0 claim or supply the
@@ -405,6 +407,7 @@ Accepted decisions:
 - [ADR 0140: M3 V5 selection, child, and Final source-binding amendment](../decisions/0140-v2-m3-allocator-v5-selection-child-final-source-binding-amendment.md)
 - [ADR 0141: M3 Final common-tested-source recertification amendment](../decisions/0141-v2-m3-final-common-tested-source-recertification-amendment.md)
 - [ADR 0142: M3 Final documentation scenario closure amendment](../decisions/0142-v2-m3-final-documentation-scenario-closure-amendment.md)
+- [ADR 0143: M3 V5 frozen-target delivery amendment](../decisions/0143-v2-m3-allocator-v5-frozen-target-delivery-amendment.md)
 
 ## Open design gates
 
@@ -450,7 +453,9 @@ golden/mutation/trace contracts, and evidence taxonomy. Later M3 descendants imp
 immutable bytes, production codec, executable ordinary gates, and exact-source receipts. Later accepted allocator
 amendments and `ae8e3f7f...` common-source recertification closed `RANGE_SELECTED(RANGE_64)`, all M3 scenario
 promotions, and canonical Final `1089d4f6...` for that immutable source. ADR 0142 corrects the documentation gate's
-closed M3 group and therefore requires a new exact-source recertification without changing selection semantics.
+closed M3 group and therefore requires a new exact-source recertification without changing selection semantics. ADR
+0143 preserves the failed `af2f6039...` diagnostic and removes host-scheduler nondeterminism from V5 frozen-target
+delivery without changing the workload, zero-drop rule, admission caps, SLOs, or selector.
 ADR 0089 amends that input before any production NWG1 bytes exist with the gap-free exact 256-byte Header table. It
 retains `wireVersion=1`, removes node session and any duplicate packing-class field from the Header, fixes Object digest
 `SHA-256/v1=1/1` plus close-reason codes `1..12`, and requires the future projection to mechanically transcribe the ADR.
