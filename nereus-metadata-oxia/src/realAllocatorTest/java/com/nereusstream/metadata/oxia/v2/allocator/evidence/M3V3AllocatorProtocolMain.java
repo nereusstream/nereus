@@ -57,6 +57,8 @@ import org.w3c.dom.NodeList;
 public final class M3V3AllocatorProtocolMain {
     private static final Pattern SHA256_HEX = Pattern.compile("[0-9a-f]{64}");
     private static final String PACKAGE = "com.nereusstream.metadata.oxia.v2.allocator.evidence.";
+    static final int LEGACY_PHYSICAL_ATTACHMENT_MAX_BYTES = 16 * 1024 * 1024;
+    static final int V5_PHYSICAL_ATTACHMENT_MAX_BYTES = 32 * 1024 * 1024;
     static final Set<String> DIAGNOSTIC_SUITES = Set.of(
             PACKAGE + "M3RealAllocatorStrictIntervalDiagnosticTest",
             PACKAGE + "M3V3AsyncActorLaneRunnerTest",
@@ -435,7 +437,7 @@ public final class M3V3AllocatorProtocolMain {
         return Set.copyOf(aggregates);
     }
 
-    private static Sha256Digest physicalAttachmentDigest(
+    static Sha256Digest physicalAttachmentDigest(
             List<Path> files, Set<Path> consumed, String prefix, String suffix, String protocolVersion)
             throws IOException {
         List<Path> matches = files.stream()
@@ -449,7 +451,7 @@ public final class M3V3AllocatorProtocolMain {
                     "allocator " + protocolVersion + " physical attachment identity differs: " + prefix);
         }
         Path path = matches.get(0);
-        byte[] bytes = readRegular(path, 16 * 1024 * 1024);
+        byte[] bytes = readRegular(path, physicalAttachmentMaxBytes(protocolVersion));
         Sha256Digest digest = Sha256Digest.hash(CanonicalBytes.copyOf(bytes));
         String expectedName = prefix + digest.toHex() + suffix;
         if (!path.getFileName().toString().equals(expectedName)) {
@@ -457,6 +459,15 @@ public final class M3V3AllocatorProtocolMain {
                     "allocator " + protocolVersion + " physical attachment filename digest differs");
         }
         return digest;
+    }
+
+    static int physicalAttachmentMaxBytes(String protocolVersion) {
+        return switch (protocolVersion) {
+            case "V3", "V4" -> LEGACY_PHYSICAL_ATTACHMENT_MAX_BYTES;
+            case "V5" -> V5_PHYSICAL_ATTACHMENT_MAX_BYTES;
+            default -> throw new IllegalArgumentException(
+                    "allocator physical attachment protocol version differs: " + protocolVersion);
+        };
     }
 
     static ParsedJUnit parseJUnit(byte[] bytes) throws Exception {

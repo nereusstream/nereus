@@ -399,6 +399,7 @@ Accepted decisions:
 - [ADR 0136: M3 V4 controlled-delay scheduler capacity amendment](../decisions/0136-v2-m3-allocator-v4-controlled-delay-scheduler-capacity-amendment.md)
 - [ADR 0137: M3 V5 storm admission and diagnostic raw-integrity amendment](../decisions/0137-v2-m3-allocator-v5-storm-admission-and-diagnostic-raw-integrity-amendment.md)
 - [ADR 0138: M3 V5 diagnostic candidate-outcome boundary amendment](../decisions/0138-v2-m3-allocator-v5-diagnostic-candidate-outcome-boundary-amendment.md)
+- [ADR 0139: M3 V5 100k fault-attachment bound amendment](../decisions/0139-v2-m3-allocator-v5-100k-fault-attachment-bound-amendment.md)
 
 ## Open design gates
 
@@ -712,6 +713,13 @@ STRICT and RANGE-16 compatibility rows now use the exact V5 admission/drain fact
 every terminal and drain fully, but its loss remains a formal candidate outcome rather than a pre-campaign failure.
 RANGE-16, RANGE-1024, Native, and terminal-drain lossless gates remain unchanged. No threshold, SLO, plan, selection
 rule, source lock, or production mode changes.
+
+[ADR 0139](../decisions/0139-v2-m3-allocator-v5-100k-fault-attachment-bound-amendment.md) preserves the first complete
+V5 formal at exact `8a60d931...`. Its canonical NAEV5 reports RANGE-64, but the subsequent promotion gate rejected a
+valid 27,203,520-byte 100k mass-takeover attachment at the inherited V3 16 MiB file cap before writing any promotion
+decision or NARS5. The immutable promotion-invalid archive binds all 158 formal files and the exact JUnit. V3/V4 keep
+16 MiB; V5 alone uses a tested 32 MiB closed physical-attachment cap. A fresh exact-source diagnostic and formal run
+remain required, and allocator mode is still `UNSELECTED`.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

@@ -16,11 +16,15 @@ import com.nereusstream.domain.registry.allocator.AllocatorCampaignCheckpointV3.
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignPlanProfileV5;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignPromotionGateV3;
 import com.nereusstream.domain.registry.allocator.AllocatorCampaignPromotionGateV5;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -30,6 +34,48 @@ import org.junit.jupiter.api.io.TempDir;
 class M3V5AllocatorProtocolMainTest {
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void physicalAttachmentCapPreservesV3V4AndAdmitsTheBoundedV5MassTakeoverPayload()
+            throws Exception {
+        assertThat(M3V3AllocatorProtocolMain.physicalAttachmentMaxBytes("V3"))
+                .isEqualTo(16 * 1024 * 1024);
+        assertThat(M3V3AllocatorProtocolMain.physicalAttachmentMaxBytes("V4"))
+                .isEqualTo(16 * 1024 * 1024);
+        assertThat(M3V3AllocatorProtocolMain.physicalAttachmentMaxBytes("V5"))
+                .isEqualTo(32 * 1024 * 1024);
+        assertThatThrownBy(() -> M3V3AllocatorProtocolMain.physicalAttachmentMaxBytes("V6"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("protocol version differs");
+
+        String prefix = "fault-RANGE_64-100000-1-BROKER_SESSION_CRASH_MASS_TAKEOVER-";
+        String suffix = ".nare1";
+        byte[] payload = new byte[M3V3AllocatorProtocolMain.LEGACY_PHYSICAL_ATTACHMENT_MAX_BYTES + 1];
+        Sha256Digest digest = Sha256Digest.hash(CanonicalBytes.copyOf(payload));
+        Path boundedV5 = temporaryDirectory.resolve(prefix + digest.toHex() + suffix);
+        Files.write(boundedV5, payload, StandardOpenOption.CREATE_NEW);
+
+        assertThat(M3V3AllocatorProtocolMain.physicalAttachmentDigest(
+                        List.of(boundedV5), new HashSet<>(), prefix, suffix, "V5"))
+                .isEqualTo(digest);
+        for (String legacy : List.of("V3", "V4")) {
+            assertThatThrownBy(() -> M3V3AllocatorProtocolMain.physicalAttachmentDigest(
+                            List.of(boundedV5), new HashSet<>(), prefix, suffix, legacy))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("outside its cap");
+        }
+
+        Path aboveV5 = temporaryDirectory.resolve(prefix + "0".repeat(64) + suffix);
+        try (FileChannel channel = FileChannel.open(
+                aboveV5, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+            channel.position(M3V3AllocatorProtocolMain.V5_PHYSICAL_ATTACHMENT_MAX_BYTES);
+            channel.write(ByteBuffer.wrap(new byte[] {0}));
+        }
+        assertThatThrownBy(() -> M3V3AllocatorProtocolMain.physicalAttachmentDigest(
+                        List.of(aboveV5), new HashSet<>(), prefix, suffix, "V5"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("outside its cap");
+    }
 
     @Test
     void nativeBaselineRowsPreserveV3V4IdentityAndUseIndependentV5Identity() {

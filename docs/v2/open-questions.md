@@ -955,8 +955,14 @@ reached V4's 256-global cap and dropped 124 fixed-storm requests. V4 bytes and t
 strict V5 `4/128/512/1` admission/profile/codec boundary, storm-aware feasibility, raw-manifest-bound NADV5, and
 formal launcher are implemented. ADR 0138 preserves the exact `a1664de9...` FAILED diagnostic and corrects its
 qualification boundary: STRICT's conserved loss is a candidate result, while RANGE/Native feasibility and all
-lifecycle/source gates remain mandatory. The active evidence item is a fresh complete 24-test/ten-suite current-source
-diagnostic with a parse-canonical NADV5 before any formal campaign; no V5 formal result exists yet.
+lifecycle/source gates remain mandatory. At the ADR-0138 source cut, the active evidence item was a fresh complete
+24-test/ten-suite current-source diagnostic with a parse-canonical NADV5 before any formal campaign.
+
+ADR 0139 records that the fresh `8a60d931...` diagnostic passed and its first V5 formal completed with canonical
+`RANGE_SELECTED(RANGE_64)`, but promotion rejected a valid 27.20 MiB 100k mass-takeover attachment under a V3-era
+16 MiB reader cap. The entire attempt is immutable and non-promotable; it has no decision or NARS5. V3/V4 retain
+16 MiB while V5 uses a closed, boundary-tested 32 MiB physical-attachment cap. The open evidence item is therefore a
+fresh exact-source V5 diagnostic and campaign whose promotion/NARS5 validate; the old evaluation cannot be reused.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

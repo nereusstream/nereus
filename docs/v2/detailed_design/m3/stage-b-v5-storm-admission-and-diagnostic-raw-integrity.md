@@ -1,7 +1,7 @@
 # Stage B V5 storm admission and diagnostic raw integrity
 
-- Design status: Accepted through ADR 0138
-- Evidence status: first complete V5 diagnostic preserved as FAILED; corrected current-source diagnostic pending
+- Design status: Accepted through ADR 0139
+- Evidence status: corrected diagnostic passed; first V5 formal is immutable promotion-invalid history
 - Production allocator mode: `UNSELECTED`
 
 The V4 full-suite RANGE-1024 25ms row reached the source-governed 256-global outstanding cap and dropped 124 of
@@ -57,6 +57,9 @@ with identity SHA-256 `404f9bddc87f0f47cf4d272fa64bdc94254d903038d8d54593cdeddc4
 
 The first complete V5 diagnostic at exact source `a1664de9...` executed 24/0/0/0 but failed NADV5 sealing because
 STRICT candidate loss had been promoted incorrectly into a diagnostic prerequisite. ADR 0138 preserves that attempt
-at the external archive recorded there and corrects the boundary without changing qualification. No V5 formal
-campaign has run. Production allocator mode remains `UNSELECTED`; the existing production source lock, child
-receipts, current-source M2 regression, scenarios, and M3 Final are unchanged.
+at the external archive recorded there and corrects the boundary without changing qualification. Exact
+`8a60d931...` then passed the corrected 24-test/ten-suite NADV5 gate and completed formal. Its NAEV5 uniquely reports
+RANGE-64, but ADR 0139 records the post-campaign promotion-integrity failure at the inherited 16 MiB attachment cap
+and the byte-exact promotion-invalid archive. No promotion decision or NARS5 exists. Production allocator mode remains
+`UNSELECTED`; the existing production source lock, child receipts, current-source M2 regression, scenarios, and M3
+Final are unchanged.

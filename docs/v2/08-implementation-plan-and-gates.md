@@ -316,6 +316,11 @@ compatibility rows now use the formal-equivalent V5 runner/drain. A fresh 24-tes
 zero failure/error/skip, complete raw accounting, lossless RANGE/Native authority rows, and canonical NADV5 before
 formal execution. STRICT still needs zero loss and every unchanged SLO to qualify in formal evaluation; diagnostic
 accounting does not preselect it. The preserved NADV4 and FAILED V5 attempts are non-authoritative.
+Exact `8a60d931...` subsequently passed that V5 diagnostic and completed formal with 123 physical actions, 33
+checkpoints, and canonical `RANGE_SELECTED(RANGE_64)` NAEV5. Promotion failed closed before decision/NARS5 because
+the shared verifier applied V3's 16 MiB cap to a valid 27.20 MiB V5 100k mass-takeover attachment. ADR 0139 preserves
+the complete attempt as promotion-invalid and versions only the physical-file cap: V3/V4 remain 16 MiB and V5 is
+32 MiB. A new exact-source diagnostic, preflight, and formal campaign remain required before source-lock transition.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

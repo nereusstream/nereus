@@ -756,6 +756,13 @@ the exact FAILED `a1664de9...` attempt, moves STRICT qualification back to forma
 compatibility replay use the V5 runner/drain. Current-source diagnostic and formal execution remain pending;
 allocator mode is still `UNSELECTED`.
 
+[ADR 0139](../../../decisions/0139-v2-m3-allocator-v5-100k-fault-attachment-bound-amendment.md) and the
+[V5 100k fault-attachment bound record](stage-b-v5-100k-fault-attachment-bound.md) preserve the completed
+`8a60d931...` formal and canonical RANGE-64 evaluation as promotion-invalid. A valid 27.20 MiB mass-takeover file
+exceeded the inherited V3 16 MiB verifier cap before promotion decision/NARS5 creation. V3/V4 remain at 16 MiB; V5
+uses a closed 32 MiB physical-action cap with real boundary tests. Fresh exact-source diagnostic/formal evidence is
+still required and production remains `UNSELECTED`.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1

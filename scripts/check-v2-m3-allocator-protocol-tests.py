@@ -22,6 +22,9 @@ MODULE_BUILD = ROOT / "nereus-metadata-oxia" / "build.gradle.kts"
 HARD_DEADLINE = ROOT / "scripts" / "run-v2-m3-with-hard-deadline.py"
 FORMAL_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-formal.py"
 FAILED_FORMAL_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-failed-formal.py"
+PROMOTION_INVALID_FORMAL_ARCHIVER = (
+    ROOT / "scripts" / "archive-v2-m3-allocator-promotion-invalid-formal.py"
+)
 DIAGNOSTIC_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-diagnostic.py"
 V3_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v3.py"
 V4_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v4.py"
@@ -141,6 +144,19 @@ FORMAL_CAMPAIGN = (
 
 
 class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
+    def test_v5_physical_attachment_cap_is_versioned_without_changing_v3_v4(self) -> None:
+        protocol = V3_PROTOCOL_MAIN.read_text()
+        v4_protocol = V4_PROTOCOL_MAIN.read_text()
+        v5_protocol = V5_PROTOCOL_MAIN.read_text()
+        self.assertIn("LEGACY_PHYSICAL_ATTACHMENT_MAX_BYTES = 16 * 1024 * 1024", protocol)
+        self.assertIn("V5_PHYSICAL_ATTACHMENT_MAX_BYTES = 32 * 1024 * 1024", protocol)
+        self.assertIn("readRegular(path, physicalAttachmentMaxBytes(protocolVersion))", protocol)
+        self.assertIn('case "V3", "V4" -> LEGACY_PHYSICAL_ATTACHMENT_MAX_BYTES', protocol)
+        self.assertIn('case "V5" -> V5_PHYSICAL_ATTACHMENT_MAX_BYTES', protocol)
+        self.assertIn('Path.of(args[6]), "V4"', v4_protocol)
+        self.assertIn('Path.of(args[6]), "V5"', v5_protocol)
+        self.assertTrue(PROMOTION_INVALID_FORMAL_ARCHIVER.is_file())
+
     def test_v4_installed_range_fast_path_reuses_only_exact_store_and_mutation_authority(self) -> None:
         allocator = PRODUCTION_ALLOCATOR.read_text()
         workflow = BOUNDED_WORKFLOW.read_text()
@@ -985,6 +1001,127 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
                 "NEREUS_V2_M3_ALLOCATOR_FAILED_FORMAL_ARCHIVE_IDENTITY_V2",
                 v5_identity["schema"],
             )
+
+    def test_promotion_invalid_archiver_preserves_selected_evaluation_without_authority(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "promotion-invalid-formal"
+            checkpoints = source / "checkpoints"
+            actions = source / "actions"
+            checkpoints.mkdir(parents=True)
+            actions.mkdir()
+            checkpoint = checkpoints / "last.nacp5"
+            checkpoint.write_bytes(b"completed-checkpoint")
+            campaign = source / "campaign-result.json"
+            campaign.write_text(
+                json.dumps(
+                    {
+                        "status": "COMPLETED",
+                        "terminalReason": "COMPLETED",
+                        "checkpointSequence": 32,
+                        "evaluationCreated": False,
+                        "selectionCreated": False,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            evaluation = source / "evaluation.naev5"
+            evaluation.write_bytes(b"range-selected-evaluation")
+            attachment_bytes = b"x" * (16 * 1024 * 1024 + 1)
+            attachment_digest = hashlib.sha256(attachment_bytes).hexdigest()
+            attachment = actions / (
+                "fault-RANGE_64-100000-1-BROKER_SESSION_CRASH_MASS_TAKEOVER-"
+                + attachment_digest
+                + ".nare1"
+            )
+            attachment.write_bytes(attachment_bytes)
+            junit = root / "formal-junit.xml"
+            junit.write_text(
+                '<testsuite tests="1" failures="0" errors="0" skipped="0"/>' + "\n",
+                encoding="utf-8",
+            )
+            files = sorted(path for path in source.rglob("*") if path.is_file())
+            archive = root / "archive"
+            failure_detail = "allocator V3 input length is outside its cap: actions/fault-RANGE_64.nare1"
+            command = [
+                sys.executable,
+                str(PROMOTION_INVALID_FORMAL_ARCHIVER),
+                "--source",
+                str(source),
+                "--archive",
+                str(archive),
+                "--archived-on",
+                "2026-08-30",
+                "--source-commit",
+                "a" * 40,
+                "--plan-sha256",
+                "b" * 64,
+                "--campaign-result-sha256",
+                hashlib.sha256(campaign.read_bytes()).hexdigest(),
+                "--final-checkpoint-relative-path",
+                checkpoint.relative_to(source).as_posix(),
+                "--final-checkpoint-sha256",
+                hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
+                "--evaluation-sha256",
+                hashlib.sha256(evaluation.read_bytes()).hexdigest(),
+                "--attachment-root-sha256",
+                "c" * 64,
+                "--formal-junit",
+                str(junit),
+                "--formal-junit-sha256",
+                hashlib.sha256(junit.read_bytes()).hexdigest(),
+                "--expected-file-count",
+                str(len(files)),
+                "--expected-total-bytes",
+                str(sum(path.stat().st_size for path in files)),
+                "--evaluation-status",
+                "RANGE_SELECTED",
+                "--selected-candidate",
+                "RANGE_64",
+                "--failed-attachment-relative-path",
+                attachment.relative_to(source).as_posix(),
+                "--failed-attachment-sha256",
+                attachment_digest,
+                "--failed-attachment-bytes",
+                str(len(attachment_bytes)),
+                "--promotion-failure-code",
+                "PHYSICAL_ATTACHMENT_SIZE_CAP",
+                "--promotion-failure-detail",
+                failure_detail,
+            ]
+
+            invalid = command.copy()
+            invalid[invalid.index("--selected-candidate") + 1] = "STRICT"
+            rejected = subprocess.run(invalid, check=False, capture_output=True, text=True)
+            self.assertNotEqual(0, rejected.returncode)
+            self.assertIn("does not belong", rejected.stderr)
+            self.assertFalse(archive.exists())
+
+            subprocess.run(command, check=True, capture_output=True, text=True)
+            identity = json.loads((archive / "archive-identity.json").read_bytes())
+            self.assertEqual(
+                "NEREUS_V2_M3_ALLOCATOR_PROMOTION_INVALID_FORMAL_ARCHIVE_IDENTITY_V1",
+                identity["schema"],
+            )
+            self.assertEqual("COMPLETED", identity["campaignStatus"])
+            self.assertEqual("RANGE_SELECTED", identity["evaluationStatus"])
+            self.assertEqual("RANGE_64", identity["selectedCandidate"])
+            self.assertTrue(identity["selectionEligible"])
+            self.assertEqual("UNSELECTED", identity["allocatorMode"])
+            self.assertFalse(identity["nars5Present"])
+            self.assertFalse(identity["promotionIntegrityValidated"])
+            self.assertFalse(identity["promotableInput"])
+            self.assertFalse(identity["futureCampaignInput"])
+            self.assertEqual(16 * 1024 * 1024, identity["legacyAttachmentCapBytes"])
+            self.assertEqual(32 * 1024 * 1024, identity["correctedV5AttachmentCapBytes"])
+            self.assertEqual(junit.read_bytes(), (archive / "formal-junit.xml").read_bytes())
+            for source_file in files:
+                relative = source_file.relative_to(source)
+                self.assertEqual(source_file.read_bytes(), (archive / "payload" / relative).read_bytes())
+            repeated = subprocess.run(command, check=False, capture_output=True, text=True)
+            self.assertNotEqual(0, repeated.returncode)
+            self.assertIn("archive target already exists", repeated.stderr)
 
     def test_diagnostic_archiver_preserves_output_and_exact_junit_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
