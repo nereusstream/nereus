@@ -125,8 +125,10 @@ performance-first BookKeeper WAL.
   duplicate class field; `laneId` is the permanent class ID, Object digest is SHA-256/v1 code `1/1`, and all twelve
   first-satisfied close reasons are distinct. That M3-I0 acceptance was documentation-only; later accepted ADRs and
   exact-source implementation descendants now supply the production codec/manifests/runners/harnesses,
-  Root/Pointer, `NWKCP1`, and preselection Provider/KMS/native-reference children. Allocator selection, post-selection
-  freshness, scenario promotion, and M3 Final remain open.
+  Root/Pointer, `NWKCP1`, and Provider/KMS/native-reference children. The common tested source `ae8e3f7f...` also
+  supplied canonical V5 `RANGE_SELECTED(RANGE_64)`, all fresh Final children, 26 scenario promotions, and canonical
+  M3 Final `1089d4f6...` at `ae8e3f7f...`. ADR 0142's later documentation-checker correction requires a new
+  common-source freshness chain; native broker/controller activation remains M6.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and an 11-test formal-runner contract gate now exist. This does not
   change the preceding M3-I0 claim or supply the
@@ -402,6 +404,7 @@ Accepted decisions:
 - [ADR 0139: M3 V5 100k fault-attachment bound amendment](../decisions/0139-v2-m3-allocator-v5-100k-fault-attachment-bound-amendment.md)
 - [ADR 0140: M3 V5 selection, child, and Final source-binding amendment](../decisions/0140-v2-m3-allocator-v5-selection-child-final-source-binding-amendment.md)
 - [ADR 0141: M3 Final common-tested-source recertification amendment](../decisions/0141-v2-m3-final-common-tested-source-recertification-amendment.md)
+- [ADR 0142: M3 Final documentation scenario closure amendment](../decisions/0142-v2-m3-final-documentation-scenario-closure-amendment.md)
 
 ## Open design gates
 
@@ -444,8 +447,10 @@ BK/Object protocol checkpoint carriers with a terminal selection Head, without s
 queue/checkpoint/waiter bounds. M2 owns the BK carrier; M3 owns exact `NWKCP1`; M6 owns native Kafka integration.
 ADR 0088 closes `V2-OPEN-OBJ-17` at the documentation/input layer by freezing the NWG1 v1 structures, caps, crypto,
 golden/mutation/trace contracts, and evidence taxonomy. Later M3 descendants implement its machine projections,
-immutable bytes, production codec, executable ordinary gates, and preselection receipts; allocator selection,
-post-selection freshness, all M3 scenario promotion, and Final remain implementation/evidence work.
+immutable bytes, production codec, executable ordinary gates, and exact-source receipts. Later accepted allocator
+amendments and `ae8e3f7f...` common-source recertification closed `RANGE_SELECTED(RANGE_64)`, all M3 scenario
+promotions, and canonical Final `1089d4f6...` for that immutable source. ADR 0142 corrects the documentation gate's
+closed M3 group and therefore requires a new exact-source recertification without changing selection semantics.
 ADR 0089 amends that input before any production NWG1 bytes exist with the gap-free exact 256-byte Header table. It
 retains `wireVersion=1`, removes node session and any duplicate packing-class field from the Header, fixes Object digest
 `SHA-256/v1=1/1` plus close-reason codes `1..12`, and requires the future projection to mechanically transcribe the ADR.

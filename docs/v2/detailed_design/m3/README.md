@@ -91,9 +91,12 @@ tests, and external fork commits are not M3 evidence and do not promote a scenar
   modules at the source-qualified coordinate, verifies their POM/Gradle metadata/BOM closure, and compiles an
   independent consumer. This is ordinary current-source implementation evidence, not a child receipt or scenario
   promotion.
-- W1 has complete non-promotable current-source M2 regression checkpoints, and the later selected source has canonical
-  V5 RANGE-64 selection plus a governed allocator child. Final still requires a fresh common-source W1, all children,
-  scenario promotions, and aggregate receipt. `implementationStatus: InProgress` therefore remains authoritative.
+- Exact common tested source `ae8e3f7f489f5ba167d4155bc5d7c191586a4eb6` reproduced canonical V5 RANGE-64
+  selection, a 25-gate/688-test current-source M2 regression, all ten other fresh children, real Provider/KMS
+  evidence, and the exact 26 promoted scenarios. Its canonical Final
+  `1089d4f66a5c5b1288b4451a86ad3665baaa3abf52904fe3d07589b3418333e3` remains immutable. ADR 0142 corrects a
+  source-governed documentation-checker omission, so the new exact source must repeat the full freshness chain before
+  M3 returns to `Verified`; M6 activation and M8 parity remain excluded.
 
 The first full M2 regression diagnostic at exact source `eb2db10d2d5d41834d67d2c03f4a427f4432ec69` correctly
 stopped at K1 because the historical gate hashed the whole source-lock document after the disjoint M3 allocator member
@@ -789,19 +792,24 @@ formal evidence and cannot remove the selection, post-selection freshness, scena
 
 ## Current boundary
 
+[ADR 0142](../../../decisions/0142-v2-m3-final-documentation-scenario-closure-amendment.md) preserves every
+`ae8e3f7f...` result below as immutable prior-source evidence while correcting the documentation gate's missing M3
+promotion group. None of those receipts is rebound to the new source; every row must be freshly reproduced before the
+next Final.
+
 | Slice | Design or output | Status at this documentation cut |
 | --- | --- | --- |
 | M3-I0 | [NWG1 implementation-input closure](m3-i0-nwg1-implementation-input-closure.md), [ADR 0089 Header amendment](../../../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and [ADR 0090 mutation-call profiles](../../../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md) | accepted documentation-only input with exact Header offsets and explicit X0/XU call caps; no codec, runner, trace harness, Provider evidence, receipt, or scenario PASS |
-| M3-W1 | current-source M2 regression plus M3 module/API input gate | M3 inputs and the eleven-module source-qualified API closure pass; historical M2 Final remains immutable; ADR 0098 closes the M3-only prerequisite projection; the exact-source `89a76612…` formal profile publishes 25/25 children and 687 zero-failure/error/skip tests as a non-promotable W1 checkpoint, while Final still requires a freshness rerun at its eventual exact tested source |
-| M3-W2 | NWG1 production encoder/decoder, projection, six-vector A corpus, and exact wire gate | exact `f0a3310d...` A/B evidence passes 20/0/0/0 and publishes non-promotable child `26c50098...e14b`, binding the six-vector/two-fixture canonical manifest and exact 114-row TSV; a fresh Final-source rerun remains required after allocator selection |
-| M3-W3 | 84-record/240-path B mutation manifest and runner | the same exact-source A/B child binds 84 authored records/240 paths, 25/25 rejection codes, and 16/16 validation stages with no generated inventory; a fresh Final-source rerun remains required after allocator selection |
-| M3-C1 | 50-trace Object-WAL kernel harness | exact `1d181dc6...` evidence passes 7/0/0/0 and publishes non-promotable child `ed5b131e...2f4a`, binding all 50 authored traces and 21 outcomes; native U/P children are separately published, while a fresh post-selection Final-source rerun remains open |
-| M3-D1 | local capacity conformance and exact Provider C1/C2 evidence | exact `2b9636dd...` local-cap evidence publishes non-promotable 12/0/0/0 D1 child `6769769b...2a78` and explicitly claims no Provider/KMS execution; exact `e4d207e3...` real Provider/KMS plus ordinary session evidence passes 4/0/0/0 and publishes non-promotable C1 child `184fa0e2...a180`; exact `c27c2f3f...` C2 evidence-only execution passes 1/0/0/0 and publishes child `b55114e4...485e` while retaining the C1-substitute and production-allowlist exclusions; fresh Final-source reruns remain required after allocator selection, and C2 remains non-promotable without independent benefit evidence |
-| M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | exact `35e6784d...` evidence passes 9/0/0/0 and publishes non-promotable child `1863f293...8f90`, binding the closed eight-row recovery manifest; native U/P children are separately published and post-selection Final-source freshness remains open |
-| M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | exact `fc7aa790...` evidence passes 5/0/0/0 and publishes non-promotable child `864fdedc...0c7f`, binding the production-codec 324-byte Object and 434-byte OPEN/TERMINAL Heads; the Kafka native child is separately published and post-selection K freshness remains open |
-| M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | exact `53361fe2...` execution seals five closed suites at 41/0/0/0 and 52 source artifacts against dedicated Kafka `323e0351...`, publishing non-promotable child `3dcb5e9e...52dd` with derived totals 82/0/0/0; post-selection freshness remains required and native broker/controller activation remains M6 |
-| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | exact `54d0ca7c...` completes the selected-source V5 diagnostic/formal, independently accounts for 22 interval cells, ten fault rows, 306 dispositions, and 123 physical files, and seals canonical `RANGE_SELECTED(RANGE_64)` NAEV5 plus NARS5. Its governed allocator child is published at `6133ab88...`; both are immutable intermediate authority. ADR 0141 requires the final common source to reproduce them before scenario PASS or Final. |
-| M3-FINAL | exact-source aggregate and scenario promotion | fail-closed child/final checker and publisher contracts are implemented. Selected-source allocator evidence and an intermediate 25-child/688-test W1 receipt pass, but Final remains open. The last non-evidence source cut must produce fresh allocator evidence, current-source M2, all ten children, and the exact M3 scenario allowlist before the aggregate can publish. |
+| M3-W1 | current-source M2 regression plus M3 module/API input gate | final common source `ae8e3f7f...` publishes current-source M2 child `ccd74937...` with all 25 gates and 688/0/0/0 tests; the historical M2 Final remains immutable. |
+| M3-W2 | NWG1 production encoder/decoder, projection, six-vector A corpus, and exact wire gate | final common source publishes A/B child `eb02c175...` with 20/0/0/0 tests and the complete canonical wire/mutation inventory. |
+| M3-W3 | 84-record/240-path B mutation manifest and runner | the same `eb02c175...` child binds all 84 authored records, 240 paths, 25 rejection codes, and 16 validation stages. |
+| M3-C1 | 50-trace Object-WAL kernel harness | final common source publishes state-trace child `abfed429...` with 7/0/0/0 tests over all 50 traces and 21 outcomes. |
+| M3-D1 | local capacity conformance and exact Provider C1/C2 evidence | final common source publishes local-cap `7af24414...` (12/0/0/0), real Provider/KMS `f5f9578a...` (39/0/0/0), and C2 `1435cd04...` (1/0/0/0); C2 retains its non-promotable/substitute exclusions. |
+| M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | final common source publishes control-recovery child `ac69ce31...` with 46/0/0/0 tests and the closed recovery manifest. |
+| M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | final common source publishes NWKCP1 child `303819aa...` with 25/0/0/0 tests and the production-codec fixture. |
+| M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | final common source publishes Kafka Object-WAL child `6ffa75ea...` with 82/0/0/0 tests; native broker/controller activation remains M6. |
+| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | final common source publishes Pulsar child `e9225d50...` with 92/0/0/0 tests and allocator child `46f16997...` with 26/0/0/0 tests. The latter independently verifies canonical V5 `RANGE_SELECTED(RANGE_64)` and NARS5; native broker/controller activation remains M6. |
+| M3-FINAL | exact-source aggregate and scenario promotion | `ae8e3f7f...` completed an immutable 25-gate/688-test W1, all eleven children, 26 promoted scenarios, and canonical Final `1089d4f6...`. ADR 0142 then changes source-governed documentation validation, resets current scenarios to `PLANNED`, and requires the same complete chain at the next exact source before a new non-overwriting Final path can publish. |
 
 Slice names are execution labels, not new durable wire codes. Implementations may split reviewable commits more
 finely, but may not merge authority, evidence, or promotion boundaries merely to reduce the number of commits.
@@ -820,9 +828,9 @@ runtime artifacts, reparses exact JUnit XML, replays queue/interval/fault facts,
 packaged domain/SPI/Oxia JARs. Request-keyed writer shards preserve one request's async endpoint order without
 inventing a global file order. Formal candidates traverse the same production coordinator but remain
 `runtimeActivated=false`. Its 48 ordinary allocator tests and deterministic `8 workloads x 9 cuts` schedule are local
-implementation conformance only until the exact-source verification run records zero failure/error/skip.
-`V2-OPEN-PUL-OBJ-09` remains evidence-blocked until real multi-broker/native 10k/100k execution selects an exact RANGE
-size and at most one mode.
+implementation conformance. The later `ae8e3f7f...` source-bound V5 campaign, NARS5, recertification, governed
+allocator child, and Final closed `V2-OPEN-PUL-OBJ-09` with exactly `RANGE_64` for that immutable source. ADR 0142
+changes no selection semantics but requires current-source freshness for the corrected aggregate gate.
 
 ## Required execution order
 

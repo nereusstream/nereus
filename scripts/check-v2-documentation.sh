@@ -234,6 +234,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0139-v2-m3-allocator-v5-100k-fault-attachment-bound-amendment.md"
     "$repo_root/docs/decisions/0140-v2-m3-allocator-v5-selection-child-final-source-binding-amendment.md"
     "$repo_root/docs/decisions/0141-v2-m3-final-common-tested-source-recertification-amendment.md"
+    "$repo_root/docs/decisions/0142-v2-m3-final-documentation-scenario-closure-amendment.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b2-native-executor-current-source-recertification.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-terminal-drain-formal-entry.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-range-latency-attribution.md"
@@ -260,6 +261,7 @@ done
 require_literal "nereusVersion=0.2.0-SNAPSHOT" "gradle.properties"
 require_literal "Designed / deferred from the 0.2 runtime and release gates" "docs/v1/design/nereus-future5-kop-compatibility.md"
 require_literal 'every descendant through Final must satisfy the existing Final checker' "docs/decisions/0141-v2-m3-final-common-tested-source-recertification-amendment.md"
+require_literal 'accepts either none of that group or the complete group' "docs/decisions/0142-v2-m3-final-documentation-scenario-closure-amendment.md"
 require_literal 'The next exact clean source therefore reruns the diagnostic/formal, W1, all' "docs/v2/detailed_design/m3/README.md"
 require_literal "v0.1@a14d925da5763f36208f8ddca7bef31f3eb90b0b" "docs/v2/README.md"
 require_literal "191fbbe5a0430cc4c88b9a2be61cb5a492ec3494" "docs/v2/source-locks.json"
@@ -1899,7 +1901,51 @@ if passed_pulsar_m2:
         if item["id"] in promotable_pulsar_m2 and item.get("evidenceReceipt") != expected_pulsar_receipt:
             fail(f"{item['id']} does not bind the exact Pulsar M2 Final receipt")
 
-recognized_current = promotable_m1 | promotable_kafka_m2 | promotable_pulsar_m2
+promotable_m3_ordered = (
+    "V2-FABRIC-002",
+    "V2-OBJ-001", "V2-OBJ-002", "V2-OBJ-003", "V2-OBJ-004", "V2-OBJ-005",
+    "V2-OBJ-006", "V2-OBJ-007", "V2-OBJ-008", "V2-OBJ-009", "V2-OBJ-010",
+    "V2-OBJ-012", "V2-OBJ-013", "V2-OBJ-016", "V2-OBJ-017", "V2-OBJ-019",
+    "V2-OBJ-021", "V2-OBJ-023", "V2-OBJ-024",
+    "V2-POSITION-012", "V2-POSITION-013", "V2-POSITION-014", "V2-POSITION-015",
+    "V2-POSITION-016", "V2-POSITION-017", "V2-POSITION-018",
+)
+promotable_m3 = set(promotable_m3_ordered)
+passed_m3 = passed_current & promotable_m3
+if passed_m3 not in (set(), promotable_m3):
+    fail(
+        "M3 Final must promote either none or the exact M3 scenario set, "
+        f"found {sorted(passed_m3)}"
+    )
+if passed_m3:
+    m3_rows = [item for item in scenarios["scenarios"] if item["id"] in promotable_m3]
+    receipt_paths = {item.get("evidenceReceipt") for item in m3_rows}
+    if len(receipt_paths) != 1:
+        fail("M3 scenarios do not bind one exact Final receipt")
+    receipt_value = next(iter(receipt_paths))
+    if not isinstance(receipt_value, str) or "\\" in receipt_value:
+        fail("M3 scenarios bind an invalid Final receipt path")
+    receipt_path = pathlib.PurePosixPath(receipt_value)
+    if (
+        receipt_path.is_absolute()
+        or any(part in ("", ".", "..") for part in receipt_value.split("/"))
+        or receipt_path.parts[:5] != ("docs", "v2", "evidence", "v2-m3", "final")
+    ):
+        fail("M3 scenarios bind a Final receipt outside the closed evidence prefix")
+    try:
+        m3_final = json.loads((root / receipt_path).read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"M3 Final receipt cannot be parsed: {error}")
+    if (
+        m3_final.get("schema") != "NEREUS_V2_M3_FINAL_V1"
+        or m3_final.get("kind") != "V2_M3_FINAL"
+        or m3_final.get("result") != "PASS_V2_M3_FINAL"
+        or m3_final.get("promotionEligible") is not True
+        or tuple(m3_final.get("scenarios", ())) != promotable_m3_ordered
+    ):
+        fail("M3 scenarios do not bind the closed M3 Final identity and scenario inventory")
+
+recognized_current = promotable_m1 | promotable_kafka_m2 | promotable_pulsar_m2 | promotable_m3
 unexpected_current = passed_current - recognized_current
 if unexpected_current:
     fail(f"current-source scenario promotion lacks a closed receipt group: {sorted(unexpected_current)}")
