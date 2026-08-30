@@ -523,7 +523,7 @@
     "evidenceStatus": "ACCEPTED_INPUT_ONLY"
   },
   "m3EvidenceBindings": {
-    "allocatorMode": "UNSELECTED",
+    "allocatorMode": "RANGE",
     "bindings": [
       {
         "backend": "OXIA_AND_PULSAR",

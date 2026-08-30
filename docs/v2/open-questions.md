@@ -712,9 +712,10 @@ Resolved by [ADR 0054](../decisions/0054-v2-pulsar-virtual-ledger-bootstrap-geom
 allocation requires a new immutable compatibility namespace backed by a disjoint ledger-ID space, or an independent
 deployment/cluster.
 
-### `V2-OPEN-PUL-OBJ-09`: virtual-ledger allocator reservation and head publication
+### `V2-OPEN-PUL-OBJ-09`: resolved virtual-ledger allocator selection; freshness remains
 
-This remains open only at the real evidence/selection boundary. ADR 0091 now fixes exact 384-byte `NVAC1`, 192-byte
+The product choice is resolved by ADR 0140 and canonical V5 selection; downstream source freshness is not. ADR 0091
+fixes exact 384-byte `NVAC1`, 192-byte
 `NVAH1`, and 256-byte `NVAN1` records, 512-byte-capped versioned Oxia keys, STRICT's four successful writes, RANGE's
 allowed `[2,2^40]` size domain, ACTIVE versioned-slice admission, exact-reread reconciliation, same-RESERVED takeover,
 and one stale-candidate ID burn. STRICT has no separate install transition and cannot clear an unconsumed reservation;
@@ -741,13 +742,13 @@ operations concurrent through shared exact-Cell proof phases while Cell-mutating
 phase; the failed `d819500f...` matrix is diagnostic only and selected nothing. ADR 0104 supersedes the one-JVM lock
 as formal performance authority and replaces exhaustive execution with a validator-proof adaptive V2 campaign over
 the unchanged 288 logical cells. The interrupted `full-matrix-16254510-r1` and all earlier V1 products remain
-immutable diagnostic-only and cannot be resumed or promoted. The remaining gate must execute that source-qualified
-multi-broker/native 10,000/100,000 protocol with zero skip, select the smallest qualifying RANGE size if RANGE alone
-qualifies, and select at most one persisted mode. Until then both modes remain unselected and no
-`V2-POSITION-013/014/017/018` scenario may cite a local or diagnostic result as PASS.
-ADR 0105 records this state as source-lock mode `UNSELECTED`; it permits unrelated non-allocator child evidence but
-explicitly rejects allocator sealing and Final until a completed uniquely qualified V2 evaluation changes the lock
-to `STRICT` or `RANGE` and all Final-owned evidence is refreshed.
+immutable diagnostic-only and cannot be resumed or promoted. The later source-qualified V5 campaign executed the
+10,000/100,000 protocol, selected the smallest qualifying RANGE candidate, and persisted only that one mode. No
+`V2-POSITION-013/014/017/018` scenario may cite the selection alone as PASS before its fresh child/scenario chain.
+ADR 0105 records the historical preselection state. Exact `d5b3569b...` later produced canonical
+`RANGE_SELECTED(RANGE_64)` NAEV5, a promotable decision, and canonical NARS5; ADR 0140 therefore changes the source
+lock to `RANGE`. The selected-source V5 campaign, allocator child, current-source M2, every other fresh child,
+scenario promotion, and Final still fail closed until regenerated against the published selected source.
 
 ### `V2-OPEN-PUL-OBJ-10`: allocator target-scale evidence protocol
 
@@ -963,6 +964,12 @@ ADR 0139 records that the fresh `8a60d931...` diagnostic passed and its first V5
 16 MiB reader cap. The entire attempt is immutable and non-promotable; it has no decision or NARS5. V3/V4 retain
 16 MiB while V5 uses a closed, boundary-tested 32 MiB physical-attachment cap. The open evidence item is therefore a
 fresh exact-source V5 diagnostic and campaign whose promotion/NARS5 validate; the old evaluation cannot be reused.
+
+ADR 0140 closes that evidence item at exact `d5b3569b...`: the complete diagnostic is canonical, the formal campaign
+independently accounts for every logical and physical action, NAEV5 uniquely selects RANGE-64, promotion is
+`PROMOTABLE`, and NARS5 is canonical. The immutable selected archive authorizes the source lock to move to `RANGE`.
+The remaining item is source freshness, not product choice: publish the selected-source cut, reproduce NADV5 and a
+unique formal NARS5 at that exact clean source, then regenerate current-source M2, all children, scenarios, and Final.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

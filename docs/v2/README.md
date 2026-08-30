@@ -400,6 +400,7 @@ Accepted decisions:
 - [ADR 0137: M3 V5 storm admission and diagnostic raw-integrity amendment](../decisions/0137-v2-m3-allocator-v5-storm-admission-and-diagnostic-raw-integrity-amendment.md)
 - [ADR 0138: M3 V5 diagnostic candidate-outcome boundary amendment](../decisions/0138-v2-m3-allocator-v5-diagnostic-candidate-outcome-boundary-amendment.md)
 - [ADR 0139: M3 V5 100k fault-attachment bound amendment](../decisions/0139-v2-m3-allocator-v5-100k-fault-attachment-bound-amendment.md)
+- [ADR 0140: M3 V5 selection, child, and Final source-binding amendment](../decisions/0140-v2-m3-allocator-v5-selection-child-final-source-binding-amendment.md)
 
 ## Open design gates
 
@@ -451,7 +452,8 @@ Target/linger selection remains owned by `V2-OPEN-OBJ-19` evidence.
 ADR 0091 closes the production virtual-ledger allocator wire/key/transition input with exact fixed-width
 `NVAC1`/`NVAH1`/`NVAN1`, STRICT's four-write path, RANGE same-RESERVED takeover/one-ID burn, bounded versioned Oxia
 keys, and receipt-only exact-source activation. Its 27 local tests and deterministic `8 x 9` schedule are not
-real/native 10k/100k evidence. `V2-OPEN-PUL-OBJ-09` remains open for exact RANGE-size and at-most-one-mode selection.
+real/native 10k/100k evidence. ADR 0140 later resolves `V2-OPEN-PUL-OBJ-09` with canonical RANGE-64 selection while
+retaining selected-source and downstream Final freshness as evidence gates.
 ADR 0101 retains the exact-current-Cell proof while giving installed RANGE paths a shared proof phase and Cell-mutating
 grant chains an exclusive measured phase; its focused/diagnostic gates cannot substitute for the complete raw matrix.
 ADR 0102 retains the fixed 16-MiB JUnit cap and filters only the exact expected native-harness cleanup WARN while
@@ -719,7 +721,15 @@ V5 formal at exact `8a60d931...`. Its canonical NAEV5 reports RANGE-64, but the 
 valid 27,203,520-byte 100k mass-takeover attachment at the inherited V3 16 MiB file cap before writing any promotion
 decision or NARS5. The immutable promotion-invalid archive binds all 158 formal files and the exact JUnit. V3/V4 keep
 16 MiB; V5 alone uses a tested 32 MiB closed physical-attachment cap. A fresh exact-source diagnostic and formal run
-remain required, and allocator mode is still `UNSELECTED`.
+remained required at that source boundary.
+
+[ADR 0140](../decisions/0140-v2-m3-allocator-v5-selection-child-final-source-binding-amendment.md) records the fresh
+exact `d5b3569b...` 24-test/ten-suite NADV5 and completed formal campaign. Independent replay verifies 22 intervals,
+ten fault rows, 306 dispositions, 123 physical files, canonical `RANGE_SELECTED(RANGE_64)` NAEV5, a promotable
+decision, and canonical NARS5. The selected archive binds 160 files and remains immutable. The production source
+lock therefore moves to `RANGE`, while the V5 governed wrapper and `ALLOCATOR_SELECTION` child profile require a
+fresh diagnostic/formal run at the new exact selected source before any downstream child, scenario, or Final can be
+fresh. See [Stage B V5 selection, child, and Final source binding](detailed_design/m3/stage-b-v5-selection-child-final-source-binding.md).
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
