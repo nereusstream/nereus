@@ -401,6 +401,7 @@ Accepted decisions:
 - [ADR 0138: M3 V5 diagnostic candidate-outcome boundary amendment](../decisions/0138-v2-m3-allocator-v5-diagnostic-candidate-outcome-boundary-amendment.md)
 - [ADR 0139: M3 V5 100k fault-attachment bound amendment](../decisions/0139-v2-m3-allocator-v5-100k-fault-attachment-bound-amendment.md)
 - [ADR 0140: M3 V5 selection, child, and Final source-binding amendment](../decisions/0140-v2-m3-allocator-v5-selection-child-final-source-binding-amendment.md)
+- [ADR 0141: M3 Final common-tested-source recertification amendment](../decisions/0141-v2-m3-final-common-tested-source-recertification-amendment.md)
 
 ## Open design gates
 
@@ -452,8 +453,9 @@ Target/linger selection remains owned by `V2-OPEN-OBJ-19` evidence.
 ADR 0091 closes the production virtual-ledger allocator wire/key/transition input with exact fixed-width
 `NVAC1`/`NVAH1`/`NVAN1`, STRICT's four-write path, RANGE same-RESERVED takeover/one-ID burn, bounded versioned Oxia
 keys, and receipt-only exact-source activation. Its 27 local tests and deterministic `8 x 9` schedule are not
-real/native 10k/100k evidence. ADR 0140 later resolves `V2-OPEN-PUL-OBJ-09` with canonical RANGE-64 selection while
-retaining selected-source and downstream Final freshness as evidence gates.
+real/native 10k/100k evidence. ADR 0140 later resolves `V2-OPEN-PUL-OBJ-09` with canonical RANGE-64 selection, and
+ADR 0141 records completed selected-source recertification while retaining one common-tested-source Final chain as an
+evidence gate.
 ADR 0101 retains the exact-current-Cell proof while giving installed RANGE paths a shared proof phase and Cell-mutating
 grant chains an exclusive measured phase; its focused/diagnostic gates cannot substitute for the complete raw matrix.
 ADR 0102 retains the fixed 16-MiB JUnit cap and filters only the exact expected native-harness cleanup WARN while
@@ -730,6 +732,12 @@ decision, and canonical NARS5. The selected archive binds 160 files and remains 
 lock therefore moves to `RANGE`, while the V5 governed wrapper and `ALLOCATOR_SELECTION` child profile require a
 fresh diagnostic/formal run at the new exact selected source before any downstream child, scenario, or Final can be
 fresh. See [Stage B V5 selection, child, and Final source binding](detailed_design/m3/stage-b-v5-selection-child-final-source-binding.md).
+
+[ADR 0141](../decisions/0141-v2-m3-final-common-tested-source-recertification-amendment.md) records that exact
+`54d0ca7c...` then completed the selected-source V5 diagnostic/formal, reproduced canonical RANGE-64 selection, and
+published its source-bound allocator child; a subsequent intermediate W1 run passed 25 children and 688 tests. Those
+immutable receipts remain valid at their own sources. The remaining gate is a fresh diagnostic/formal, W1, all ten
+children, scenarios, and Final at one common tested source after the last non-evidence documentation change.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

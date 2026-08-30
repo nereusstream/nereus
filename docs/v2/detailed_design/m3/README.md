@@ -91,9 +91,9 @@ tests, and external fork commits are not M3 evidence and do not promote a scenar
   modules at the source-qualified coordinate, verifies their POM/Gradle metadata/BOM closure, and compiles an
   independent consumer. This is ordinary current-source implementation evidence, not a child receipt or scenario
   promotion.
-- W1 now has a complete non-promotable current-source M2 regression receipt. Fresh Provider/KMS/allocator and the
-  remaining M3 child receipts, aggregate Final, and Markdown/JSON scenario promotions do not yet exist.
-  `implementationStatus: InProgress` therefore remains authoritative.
+- W1 has complete non-promotable current-source M2 regression checkpoints, and the later selected source has canonical
+  V5 RANGE-64 selection plus a governed allocator child. Final still requires a fresh common-source W1, all children,
+  scenario promotions, and aggregate receipt. `implementationStatus: InProgress` therefore remains authoritative.
 
 The first full M2 regression diagnostic at exact source `eb2db10d2d5d41834d67d2c03f4a427f4432ec69` correctly
 stopped at K1 because the historical gate hashed the whole source-lock document after the disjoint M3 allocator member
@@ -462,10 +462,10 @@ post-selection Final-source rerun.
 
 Serial continuation order completed the ADR-0104 V2 schema/planner/validator/selector, bounded CAS/reconcile workflow,
 bounded four-actor Runner, checkpoint/resume/sealer/promotion implementation, and required short real-Oxia diagnostic
-slices. The present execution authority still explicitly prohibits any full formal allocator campaign even though
-these prerequisite gates are clean. Work therefore continues with the remaining non-matrix M3 closure and child
-receipts; final-source Provider/KMS and M2 regression freshness, scenario synchronization, and M3 Final remain open.
-Each stable boundary must be committed and pushed before the next evidence-bearing boundary is evaluated.
+slices. At that historical documentation cut, execution authority still prohibited a full formal allocator campaign.
+Later accepted amendments and exact-source evidence supersede only that execution status; the implementation and
+immutable historical evidence remain unchanged. Each stable boundary must be committed and pushed before the next
+evidence-bearing boundary is evaluated.
 
 The authoritative `v2M3ModuleApiSourceCheck` now defaults to `v2M3PulsarEvidenceWorktree` (or
 `NEREUS_M3_PULSAR_EVIDENCE_WORKTREE`) and the dedicated `pulsar-worktrees/nereus-v2-m3` path. It no longer inherits
@@ -771,6 +771,14 @@ governed V5 wrapper replays the nested planner, physical aggregates, diagnostic 
 selection. Final freshness begins only after that source-lock change is published and a fresh selected-source
 diagnostic/formal campaign reproduces a valid unique selection.
 
+[ADR 0141](../../../decisions/0141-v2-m3-final-common-tested-source-recertification-amendment.md) records the closed
+selected-source sequence at exact `54d0ca7c...`. Its 24/0/0/0 diagnostic seals canonical NADV5; its completed formal
+campaign accounts for 32 records, 33 checkpoints, 123 physical actions, and 306 dispositions and seals canonical
+RANGE-64 NAEV5/NARS5. The governed allocator child is published at `6133ab88...`, and an intermediate current-source
+M2 regression published at `b6116a1a...` passes 25 children and 688 tests. These receipts remain immutable but cannot
+cross a later non-evidence source change. The next exact clean source therefore reruns the diagnostic/formal, W1, all
+children, scenarios, and Final as one common tested-source chain.
+
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0
 governance contracts, eleven source-qualified artifact publications plus independent consumer compilation, NWG1
@@ -792,8 +800,8 @@ formal evidence and cannot remove the selection, post-selection freshness, scena
 | M3-R1 | WalRun Root/Pointer/checkpoint/Seal and Provider/KMS session implementation | exact `35e6784d...` evidence passes 9/0/0/0 and publishes non-promotable child `1863f293...8f90`, binding the closed eight-row recovery manifest; native U/P children are separately published and post-selection Final-source freshness remains open |
 | M3-K1 | Object `NWKCP1` plus `KafkaProtocolCheckpointHeadV1` | exact `fc7aa790...` evidence passes 5/0/0/0 and publishes non-promotable child `864fdedc...0c7f`, binding the production-codec 324-byte Object and 434-byte OPEN/TERMINAL Heads; the Kafka native child is separately published and post-selection K freshness remains open |
 | M3-U1 | M2 publication bridge, active-tail locators, Binding frontiers, recovery, and source protection | exact `53361fe2...` execution seals five closed suites at 41/0/0/0 and 52 source artifacts against dedicated Kafka `323e0351...`, publishing non-promotable child `3dcb5e9e...52dd` with derived totals 82/0/0/0; post-selection freshness remains required and native broker/controller activation remains M6 |
-| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | exact `d5b3569b...` passes the complete V5 diagnostic and formal campaign, independently accounts for 22 interval cells, ten fault rows, 306 dispositions, and 123 physical files, and seals canonical `RANGE_SELECTED(RANGE_64)` NAEV5 plus NARS5. ADR 0140 records the immutable selected archive, moves `allocatorMode` to `RANGE`, and adds a mutually exclusive V5 governed child profile. A fresh selected-source diagnostic/formal and source-bound allocator child remain mandatory before scenario PASS or Final. |
-| M3-FINAL | exact-source aggregate and scenario promotion | fail-closed child/final checker and publisher contracts are implemented and exact `848dd2db...` passes 100 governance tests plus 937 ordinary module tests, eleven-module artifact/consumer closure, 3 NWG1 mutation tests, 17 NWG1 wire tests, and 7 Object-WAL trace tests with zero failure/error/skip; the aggregate rejects the absent Final receipt; Final remains open and requires the allocator selection child, post-selection current-source M2 and all child freshness, and the exact M3 scenario allowlist |
+| M3-P1 | Pulsar fixed-slice Object-WAL path and allocator evidence/selection | exact `54d0ca7c...` completes the selected-source V5 diagnostic/formal, independently accounts for 22 interval cells, ten fault rows, 306 dispositions, and 123 physical files, and seals canonical `RANGE_SELECTED(RANGE_64)` NAEV5 plus NARS5. Its governed allocator child is published at `6133ab88...`; both are immutable intermediate authority. ADR 0141 requires the final common source to reproduce them before scenario PASS or Final. |
+| M3-FINAL | exact-source aggregate and scenario promotion | fail-closed child/final checker and publisher contracts are implemented. Selected-source allocator evidence and an intermediate 25-child/688-test W1 receipt pass, but Final remains open. The last non-evidence source cut must produce fresh allocator evidence, current-source M2, all ten children, and the exact M3 scenario allowlist before the aggregate can publish. |
 
 Slice names are execution labels, not new durable wire codes. Implementations may split reviewable commits more
 finely, but may not merge authority, evidence, or promotion boundaries merely to reduce the number of commits.

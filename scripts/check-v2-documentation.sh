@@ -233,6 +233,7 @@ required_domain_docs=(
     "$repo_root/docs/decisions/0138-v2-m3-allocator-v5-diagnostic-candidate-outcome-boundary-amendment.md"
     "$repo_root/docs/decisions/0139-v2-m3-allocator-v5-100k-fault-attachment-bound-amendment.md"
     "$repo_root/docs/decisions/0140-v2-m3-allocator-v5-selection-child-final-source-binding-amendment.md"
+    "$repo_root/docs/decisions/0141-v2-m3-final-common-tested-source-recertification-amendment.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b2-native-executor-current-source-recertification.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-terminal-drain-formal-entry.md"
     "$repo_root/docs/v2/detailed_design/m3/stage-b-v4-range-latency-attribution.md"
@@ -258,6 +259,8 @@ done
 
 require_literal "nereusVersion=0.2.0-SNAPSHOT" "gradle.properties"
 require_literal "Designed / deferred from the 0.2 runtime and release gates" "docs/v1/design/nereus-future5-kop-compatibility.md"
+require_literal 'every descendant through Final must satisfy the existing Final checker' "docs/decisions/0141-v2-m3-final-common-tested-source-recertification-amendment.md"
+require_literal 'The next exact clean source therefore reruns the diagnostic/formal, W1, all' "docs/v2/detailed_design/m3/README.md"
 require_literal "v0.1@a14d925da5763f36208f8ddca7bef31f3eb90b0b" "docs/v2/README.md"
 require_literal "191fbbe5a0430cc4c88b9a2be61cb5a492ec3494" "docs/v2/source-locks.json"
 require_literal "v2DocumentationCheck" "build.gradle.kts"

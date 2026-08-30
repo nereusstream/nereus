@@ -714,7 +714,8 @@ deployment/cluster.
 
 ### `V2-OPEN-PUL-OBJ-09`: resolved virtual-ledger allocator selection; freshness remains
 
-The product choice is resolved by ADR 0140 and canonical V5 selection; downstream source freshness is not. ADR 0091
+The product choice is resolved by ADR 0140 and canonical V5 selection; ADR 0141 records selected-source
+recertification, while common-tested-source Final freshness remains open. ADR 0091
 fixes exact 384-byte `NVAC1`, 192-byte
 `NVAH1`, and 256-byte `NVAN1` records, 512-byte-capped versioned Oxia keys, STRICT's four successful writes, RANGE's
 allowed `[2,2^40]` size domain, ACTIVE versioned-slice admission, exact-reread reconciliation, same-RESERVED takeover,
@@ -747,8 +748,10 @@ immutable diagnostic-only and cannot be resumed or promoted. The later source-qu
 `V2-POSITION-013/014/017/018` scenario may cite the selection alone as PASS before its fresh child/scenario chain.
 ADR 0105 records the historical preselection state. Exact `d5b3569b...` later produced canonical
 `RANGE_SELECTED(RANGE_64)` NAEV5, a promotable decision, and canonical NARS5; ADR 0140 therefore changes the source
-lock to `RANGE`. The selected-source V5 campaign, allocator child, current-source M2, every other fresh child,
-scenario promotion, and Final still fail closed until regenerated against the published selected source.
+lock to `RANGE`. Exact `54d0ca7c...` subsequently reproduced the V5 selection and published an allocator child, while
+an intermediate W1 run passed 25 children and 688 tests. ADR 0141 retains those immutable receipts and requires the
+diagnostic/formal, W1, every child, scenario promotion, and Final to be regenerated at one common tested source after
+the last non-evidence change.
 
 ### `V2-OPEN-PUL-OBJ-10`: allocator target-scale evidence protocol
 
@@ -968,8 +971,10 @@ fresh exact-source V5 diagnostic and campaign whose promotion/NARS5 validate; th
 ADR 0140 closes that evidence item at exact `d5b3569b...`: the complete diagnostic is canonical, the formal campaign
 independently accounts for every logical and physical action, NAEV5 uniquely selects RANGE-64, promotion is
 `PROMOTABLE`, and NARS5 is canonical. The immutable selected archive authorizes the source lock to move to `RANGE`.
-The remaining item is source freshness, not product choice: publish the selected-source cut, reproduce NADV5 and a
-unique formal NARS5 at that exact clean source, then regenerate current-source M2, all children, scenarios, and Final.
+Exact `54d0ca7c...` closes that selected-source recertification with a fresh canonical NADV5, unique formal NARS5, and
+source-bound allocator child. Its subsequent intermediate W1 passes 25 children and 688 tests. ADR 0141 retains both
+receipts as immutable audit checkpoints but requires one final common tested source to reproduce the allocator
+diagnostic/formal, current-source M2, every child, scenarios, and Final after accepted-documentation synchronization.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and
