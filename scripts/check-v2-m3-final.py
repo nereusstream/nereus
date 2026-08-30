@@ -52,6 +52,7 @@ ATTACHMENT_KINDS = {
     "ALLOCATOR_SCALE_100000_SUMMARY",
     "ALLOCATOR_SCALE_10000_SUMMARY",
     "ALLOCATOR_V2_CAMPAIGN_VERIFICATION",
+    "ALLOCATOR_V5_CAMPAIGN_VERIFICATION",
     "CURRENT_SOURCE_M2_GATE_RESULT",
     "JUNIT_SUMMARY",
     "KMS_REAL_RECEIPT",
@@ -87,6 +88,7 @@ ALLOCATOR_V1_AUTHORITY_ATTACHMENTS = {
     "ALLOCATOR_SCALE_100000_SUMMARY",
 }
 ALLOCATOR_V2_AUTHORITY_ATTACHMENTS = {"ALLOCATOR_V2_CAMPAIGN_VERIFICATION"}
+ALLOCATOR_V5_AUTHORITY_ATTACHMENTS = {"ALLOCATOR_V5_CAMPAIGN_VERIFICATION"}
 REQUIRED_TYPED_ATTACHMENTS = {
     "W1_CURRENT_SOURCE_M2_REGRESSION": {"CURRENT_SOURCE_M2_GATE_RESULT"},
     "AB_NWG1_WIRE": {
@@ -409,11 +411,14 @@ def _validate_child_shape(value: object, expected_kind: str, final_commit: str) 
         kinds = {row["kind"] for row in validated}
         v1 = kinds.intersection(ALLOCATOR_V1_AUTHORITY_ATTACHMENTS)
         v2 = kinds.intersection(ALLOCATOR_V2_AUTHORITY_ATTACHMENTS)
-        if v2:
-            if v2 != ALLOCATOR_V2_AUTHORITY_ATTACHMENTS or v1:
-                raise FinalError("allocator child mixes or incompletely supplies V1/V2 authority attachments")
-        elif v1 != ALLOCATOR_V1_AUTHORITY_ATTACHMENTS:
-            raise FinalError("allocator child lacks one complete V1 or V2 authority attachment profile")
+        v5 = kinds.intersection(ALLOCATOR_V5_AUTHORITY_ATTACHMENTS)
+        supplied = sum(bool(profile) for profile in (v1, v2, v5))
+        if supplied != 1:
+            raise FinalError("allocator child lacks exactly one complete V1, V2, or V5 authority profile")
+        if (v1 and v1 != ALLOCATOR_V1_AUTHORITY_ATTACHMENTS) or (
+            v2 and v2 != ALLOCATOR_V2_AUTHORITY_ATTACHMENTS
+        ) or (v5 and v5 != ALLOCATOR_V5_AUTHORITY_ATTACHMENTS):
+            raise FinalError("allocator child incompletely supplies its versioned authority profile")
     return child
 
 

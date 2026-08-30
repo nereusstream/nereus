@@ -1421,7 +1421,7 @@ class M3ChildCheckerTest(unittest.TestCase):
         )
         receipt["attachments"].sort(key=lambda row: row["kind"])
         self.fixture.rewrite(output, receipt)
-        with self.assertRaisesRegex(CONTRACT.ChildError, "mixes or incompletely"):
+        with self.assertRaisesRegex(CONTRACT.ChildError, "exactly one complete V1, V2, or V5"):
             CONTRACT.build_final_child_identity(
                 self.fixture.root, output, "ALLOCATOR_SELECTION", self.fixture.tested
             )
@@ -1852,7 +1852,7 @@ class M3ChildCheckerTest(unittest.TestCase):
         output, _ = self.fixture.build(
             "ALLOCATOR_SELECTION", omit={"ALLOCATOR_SCALE_100000_SUMMARY"}
         )
-        with self.assertRaisesRegex(CONTRACT.ChildError, "complete V1 or V2 authority"):
+        with self.assertRaisesRegex(CONTRACT.ChildError, "incompletely supplies the V1 authority"):
             CONTRACT.build_final_child_identity(
                 self.fixture.root, output, "ALLOCATOR_SELECTION", self.fixture.tested
             )

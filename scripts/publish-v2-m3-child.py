@@ -167,6 +167,7 @@ def _derive_summary(
     _, bindings = CONTRACT.source_bindings(root, tested_commit)
     allocator_authority: dict[str, Any] | None = None
     allocator_v2_authority: dict[str, Any] | None = None
+    allocator_v5_authority: dict[str, Any] | None = None
     allocator_profile = (
         CONTRACT.allocator_authority_profile({item[0] for item in sources})
         if kind == "ALLOCATOR_SELECTION"
@@ -192,7 +193,7 @@ def _derive_summary(
             root,
             tested_commit,
         )
-    elif kind == "ALLOCATOR_SELECTION":
+    elif kind == "ALLOCATOR_SELECTION" and allocator_profile == "V2":
         raw = next(
             value
             for attachment_kind, _, value in sources
@@ -203,6 +204,21 @@ def _derive_summary(
                 raw,
                 "allocator governed V2 campaign verification",
                 CONTRACT.ALLOCATOR_V2_VERIFICATION_MAX_BYTES,
+            ),
+            root,
+            tested_commit,
+        )
+    elif kind == "ALLOCATOR_SELECTION":
+        raw = next(
+            value
+            for attachment_kind, _, value in sources
+            if attachment_kind == "ALLOCATOR_V5_CAMPAIGN_VERIFICATION"
+        )
+        allocator_v5_authority = CONTRACT.validate_allocator_v5_campaign_verification(
+            CONTRACT.load_canonical_json(
+                raw,
+                "allocator governed V5 campaign verification",
+                CONTRACT.ALLOCATOR_V5_VERIFICATION_MAX_BYTES,
             ),
             root,
             tested_commit,
@@ -254,6 +270,9 @@ def _derive_summary(
         elif attachment_kind == "ALLOCATOR_V2_CAMPAIGN_VERIFICATION":
             assert allocator_v2_authority is not None
             summaries.append(allocator_v2_authority["summary"])
+        elif attachment_kind == "ALLOCATOR_V5_CAMPAIGN_VERIFICATION":
+            assert allocator_v5_authority is not None
+            summaries.append(allocator_v5_authority["summary"])
         elif attachment_kind in CONTRACT.ALLOCATOR_DERIVED_KINDS:
             assert allocator_authority is not None
             CONTRACT.validate_allocator_derived_evidence(
@@ -299,7 +318,9 @@ def build_generic_receipt(
     allocator_profile: str | None = None
     if kind == "ALLOCATOR_SELECTION":
         input_kinds = set(kinds)
-        if "ALLOCATOR_V2_CAMPAIGN_VERIFICATION" in input_kinds:
+        if input_kinds.intersection(
+            {"ALLOCATOR_V2_CAMPAIGN_VERIFICATION", "ALLOCATOR_V5_CAMPAIGN_VERIFICATION"}
+        ):
             allocator_profile = CONTRACT.allocator_authority_profile(input_kinds)
         elif "ALLOCATOR_RAW_VERIFICATION" in input_kinds:
             allocator_profile = "V1"
@@ -328,6 +349,7 @@ def build_generic_receipt(
             or attachment_kind == "NATIVE_RESULT"
             or attachment_kind == "ALLOCATOR_RAW_VERIFICATION"
             or attachment_kind == "ALLOCATOR_V2_CAMPAIGN_VERIFICATION"
+            or attachment_kind == "ALLOCATOR_V5_CAMPAIGN_VERIFICATION"
         ):
             maximum = (
                 CONTRACT.SEALED_JUNIT_MAX_BYTES
@@ -341,7 +363,11 @@ def build_generic_receipt(
                         else (
                             CONTRACT.ALLOCATOR_V2_VERIFICATION_MAX_BYTES
                             if attachment_kind == "ALLOCATOR_V2_CAMPAIGN_VERIFICATION"
-                            else CONTRACT.MAX_CANONICAL_BYTES
+                            else (
+                                CONTRACT.ALLOCATOR_V5_VERIFICATION_MAX_BYTES
+                                if attachment_kind == "ALLOCATOR_V5_CAMPAIGN_VERIFICATION"
+                                else CONTRACT.MAX_CANONICAL_BYTES
+                            )
                         )
                     )
                 )
@@ -405,6 +431,7 @@ def build_generic_receipt(
             or attachment_kind in CONTRACT.NORMALIZED_TYPED_KINDS
             or attachment_kind == "ALLOCATOR_RAW_VERIFICATION"
             or attachment_kind == "ALLOCATOR_V2_CAMPAIGN_VERIFICATION"
+            or attachment_kind == "ALLOCATOR_V5_CAMPAIGN_VERIFICATION"
             or attachment_kind == "LOCAL_CAP_RESULT"
         )
         destination = (
@@ -624,6 +651,51 @@ def seal_allocator_v2_verification(
     return raw
 
 
+def seal_allocator_v5_verification(
+    root: Path,
+    tested_commit: str,
+    checkpoint_path: Path,
+    evaluation_path: Path,
+    diagnostic_path: Path,
+    selection_path: Path,
+    formal_junit_path: Path,
+    promotion_decision_path: Path,
+    executor_artifact_path: Path,
+    diagnostic_junit_paths: list[Path],
+    diagnostic_raw_paths: list[Path],
+    execution_attachment_paths: list[Path],
+    output_path: Path,
+) -> bytes:
+    root = CONTRACT.ensure_root(root)
+    _clean_exact_head(root, tested_commit)
+    embedded_paths = (
+        checkpoint_path,
+        evaluation_path,
+        diagnostic_path,
+        selection_path,
+        formal_junit_path,
+        promotion_decision_path,
+    )
+    raw_inputs = {path: _read_external(path) for path in embedded_paths}
+    receipt = CONTRACT.seal_allocator_v5_campaign_verification_receipt(
+        root,
+        tested_commit,
+        raw_inputs[checkpoint_path],
+        raw_inputs[evaluation_path],
+        raw_inputs[diagnostic_path],
+        raw_inputs[selection_path],
+        raw_inputs[formal_junit_path],
+        raw_inputs[promotion_decision_path],
+        _governed_allocator_v2_path(root, executor_artifact_path),
+        [_governed_allocator_v2_path(root, path) for path in diagnostic_junit_paths],
+        [_governed_allocator_v2_path(root, path) for path in diagnostic_raw_paths],
+        [_governed_allocator_v2_path(root, path) for path in execution_attachment_paths],
+    )
+    raw = CONTRACT.canonical_bytes(receipt)
+    _write_external_once(output_path, raw, "governed allocator V5 campaign verification receipt")
+    return raw
+
+
 def seal_junit_execution(
     root: Path,
     child_kind: str,
@@ -655,6 +727,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--seal-junit-kind", choices=sorted(CONTRACT.GENERIC_CHILD_KINDS))
     parser.add_argument("--seal-allocator-verification", action="store_true")
     parser.add_argument("--seal-allocator-v2-verification", action="store_true")
+    parser.add_argument("--seal-allocator-v5-verification", action="store_true")
     parser.add_argument("--raw-evidence", type=Path)
     parser.add_argument("--junit-xml", type=Path)
     parser.add_argument(
@@ -681,12 +754,92 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--allocator-v2-execution-attachment", action="append", type=Path, default=[]
     )
+    parser.add_argument("--allocator-v5-checkpoint", type=Path)
+    parser.add_argument("--allocator-v5-evaluation", type=Path)
+    parser.add_argument("--allocator-v5-diagnostic", type=Path)
+    parser.add_argument("--allocator-v5-selection", type=Path)
+    parser.add_argument("--allocator-v5-formal-junit", type=Path)
+    parser.add_argument("--allocator-v5-promotion-decision", type=Path)
+    parser.add_argument("--allocator-v5-executor-artifact", type=Path)
+    parser.add_argument(
+        "--allocator-v5-diagnostic-junit", action="append", type=Path, default=[]
+    )
+    parser.add_argument(
+        "--allocator-v5-diagnostic-raw", action="append", type=Path, default=[]
+    )
+    parser.add_argument(
+        "--allocator-v5-execution-attachment", action="append", type=Path, default=[]
+    )
     return parser.parse_args(argv[1:])
 
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
     try:
+        allocator_v5_values = (
+            args.allocator_v5_checkpoint,
+            args.allocator_v5_evaluation,
+            args.allocator_v5_diagnostic,
+            args.allocator_v5_selection,
+            args.allocator_v5_formal_junit,
+            args.allocator_v5_promotion_decision,
+            args.allocator_v5_executor_artifact,
+        )
+        if args.seal_allocator_v5_verification:
+            if (
+                args.kind is not None
+                or args.output is not None
+                or args.attachment
+                or args.m2_child_result
+                or args.seal_real_kind is not None
+                or args.seal_native_kind is not None
+                or args.seal_junit_kind is not None
+                or args.seal_allocator_verification
+                or args.seal_allocator_v2_verification
+                or args.raw_evidence is not None
+                or args.junit_xml is not None
+                or args.native_junit_xml
+                or args.child_junit_xml
+                or args.allocator_external_file
+                or any(value is None for value in allocator_v5_values)
+                or len(args.allocator_v5_diagnostic_junit) != 10
+                or len(args.allocator_v5_diagnostic_raw) != 19
+                or not args.allocator_v5_execution_attachment
+                or args.sealed_output is None
+            ):
+                raise CONTRACT.ChildError(
+                    "governed allocator V5 verification mode has incomplete or mixed arguments"
+                )
+            raw = seal_allocator_v5_verification(
+                args.repo_root,
+                args.tested_commit,
+                args.allocator_v5_checkpoint,
+                args.allocator_v5_evaluation,
+                args.allocator_v5_diagnostic,
+                args.allocator_v5_selection,
+                args.allocator_v5_formal_junit,
+                args.allocator_v5_promotion_decision,
+                args.allocator_v5_executor_artifact,
+                args.allocator_v5_diagnostic_junit,
+                args.allocator_v5_diagnostic_raw,
+                args.allocator_v5_execution_attachment,
+                args.sealed_output,
+            )
+            print(
+                "V2 M3 allocator V5 campaign verification sealed: "
+                f"tested={args.tested_commit} output={args.sealed_output} "
+                f"bytes={len(raw)} sha256={CONTRACT.sha256(raw)}"
+            )
+            return 0
+        if (
+            any(value is not None for value in allocator_v5_values)
+            or args.allocator_v5_diagnostic_junit
+            or args.allocator_v5_diagnostic_raw
+            or args.allocator_v5_execution_attachment
+        ):
+            raise CONTRACT.ChildError(
+                "allocator V5 verification arguments require --seal-allocator-v5-verification"
+            )
         allocator_v2_values = (
             args.allocator_v2_checkpoint,
             args.allocator_v2_evaluation,

@@ -1712,16 +1712,24 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn('"127.0.0.1:$oxiaBoundPort"', module)
         self.assertIn("v2M3AllocatorV2OxiaContainerName=$formal_container", block)
 
-    def test_allocator_child_gate_defaults_to_v2_and_keeps_v1_compatibility_separate(self) -> None:
+    def test_allocator_child_gate_defaults_to_v5_and_keeps_v1_v2_compatibility_separate(self) -> None:
         source = ROOT_BUILD.read_text()
         v2_block = source.split('tasks.register<Exec>("v2M3AllocatorV2VerificationSeal")', 1)[1]
         v2_block = v2_block.split('tasks.register("v2M3AllocatorV1CompatibilityCheck")', 1)[0]
         self.assertIn('dependsOn(":nereus-metadata-oxia:realAllocatorV2PromotionCheck")', v2_block)
         self.assertIn('"--seal-allocator-v2-verification"', v2_block)
         self.assertIn('"--allocator-v2-execution-attachment"', v2_block)
+        v5_block = source.split('tasks.register<Exec>("v2M3AllocatorV5VerificationSeal")', 1)[1]
+        v5_block = v5_block.split('tasks.register("v2M3AllocatorV1CompatibilityCheck")', 1)[0]
+        self.assertIn('"--seal-allocator-v5-verification"', v5_block)
+        self.assertIn('"--allocator-v5-diagnostic-junit"', v5_block)
+        self.assertIn('"--allocator-v5-diagnostic-raw"', v5_block)
+        self.assertIn('"--allocator-v5-execution-attachment"', v5_block)
+        self.assertIn("32L * 1024L * 1024L", v5_block)
         default_block = source.split('tasks.register("v2M3AllocatorCheck")', 1)[1]
         default_block = default_block.split('val v2M3LocalCapEvidenceOutputDirectory', 1)[0]
-        self.assertIn('dependsOn("v2M3AllocatorV2VerificationSeal")', default_block)
+        self.assertIn('dependsOn("v2M3AllocatorV5VerificationSeal")', default_block)
+        self.assertNotIn('dependsOn("v2M3AllocatorV2VerificationSeal")', default_block)
         self.assertNotIn('dependsOn("v2M3AllocatorVerificationSeal")', default_block)
 
 

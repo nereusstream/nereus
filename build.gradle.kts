@@ -1353,6 +1353,7 @@ val v2M3OxiaClientEvidenceWorktree = providers.gradleProperty("v2M3OxiaClientEvi
 val v2M3GovernanceTaskProviders = linkedMapOf(
     "v2M3ModuleApiContractTest" to "scripts/check-v2-m3-module-api-tests.py",
     "v2M3AllocatorProtocolContractTest" to "scripts/check-v2-m3-allocator-protocol-tests.py",
+    "v2M3AllocatorV5CheckerContractTest" to "scripts/check-v2-m3-allocator-v5-tests.py",
     "v2M3InputsContractTest" to "scripts/check-v2-m3-inputs-tests.py",
     "v2M3M2RegressionContractTest" to "scripts/check-v2-m3-m2-regression-tests.py",
     "v2M3M2RegressionPublisherContractTest" to "scripts/publish-v2-m3-m2-regression-tests.py",
@@ -1655,6 +1656,101 @@ tasks.register<Exec>("v2M3AllocatorV2VerificationSeal") {
     }
 }
 
+val v2M3AllocatorV5CheckpointPath = providers.gradleProperty("v2M3AllocatorV5CheckpointPath")
+val v2M3AllocatorV5EvaluationPath = providers.gradleProperty("v2M3AllocatorV5EvaluationPath")
+val v2M3AllocatorV5DiagnosticPath = providers.gradleProperty("v2M3AllocatorV5DiagnosticPath")
+val v2M3AllocatorV5SelectionPath = providers.gradleProperty("v2M3AllocatorV5SelectionPath")
+val v2M3AllocatorV5FormalJUnitPath = providers.gradleProperty("v2M3AllocatorV5FormalJUnitPath")
+val v2M3AllocatorV5PromotionOutput = providers.gradleProperty("v2M3AllocatorV5PromotionOutput")
+val v2M3AllocatorV5ExecutorArtifact = providers.gradleProperty("v2M3AllocatorV5ExecutorArtifact")
+val v2M3AllocatorV5DiagnosticJUnitDirectory =
+    providers.gradleProperty("v2M3AllocatorV5DiagnosticJUnitDirectory")
+val v2M3AllocatorV5DiagnosticRawDirectory =
+    providers.gradleProperty("v2M3AllocatorV5DiagnosticRawDirectory")
+val v2M3AllocatorV5AttachmentDirectory = providers.gradleProperty("v2M3AllocatorV5AttachmentDirectory")
+val v2M3AllocatorV5VerificationReceiptOutput =
+    providers.gradleProperty("v2M3AllocatorV5VerificationReceiptOutput")
+
+tasks.register<Exec>("v2M3AllocatorV5VerificationSeal") {
+    group = "verification"
+    description =
+        "Independently replay and seal source-bound NACP5/NAEV5/NADV5/NARS5/JUnit/raw/physical authority."
+    workingDir = layout.projectDirectory.asFile
+    doFirst {
+        fun exactFiles(directory: File, suffix: String, count: Int, maximum: Long): List<File> {
+            check(directory.isDirectory && !java.nio.file.Files.isSymbolicLink(directory.toPath())) {
+                "allocator V5 governed directory is absent or a link: $directory"
+            }
+            val files = directory.listFiles()
+                ?.filter { it.name.endsWith(suffix) }
+                ?.sortedBy { it.name }
+                ?: emptyList()
+            check(files.size == count && files.all {
+                it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) && it.length() in 1..maximum
+            }) {
+                "allocator V5 governed $suffix inventory differs: directory=$directory count=${files.size}"
+            }
+            return files
+        }
+        val junit = exactFiles(
+            file(v2M3AllocatorV5DiagnosticJUnitDirectory.get()).canonicalFile,
+            ".xml",
+            10,
+            16L * 1024L * 1024L,
+        )
+        val raw = exactFiles(
+            file(v2M3AllocatorV5DiagnosticRawDirectory.get()).canonicalFile,
+            ".json",
+            19,
+            16L * 1024L * 1024L,
+        )
+        val attachmentDirectory = file(v2M3AllocatorV5AttachmentDirectory.get()).canonicalFile
+        check(attachmentDirectory.isDirectory && !java.nio.file.Files.isSymbolicLink(attachmentDirectory.toPath())) {
+            "allocator V5 physical attachment directory is absent or a link: $attachmentDirectory"
+        }
+        val attachments = attachmentDirectory.listFiles()?.sortedBy { it.name } ?: emptyList()
+        check(attachments.size in 1..720 && attachments.all {
+            it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) &&
+                it.length() in 1..(32L * 1024L * 1024L)
+        }) {
+            "allocator V5 physical attachment inventory is empty, oversized, or not regular"
+        }
+        val command = mutableListOf(
+            "python3",
+            "scripts/publish-v2-m3-child.py",
+            "--repo-root",
+            layout.projectDirectory.asFile.absolutePath,
+            "--tested-commit",
+            v2M3TestedCommit.get(),
+            "--seal-allocator-v5-verification",
+            "--allocator-v5-checkpoint",
+            file(v2M3AllocatorV5CheckpointPath.get()).absolutePath,
+            "--allocator-v5-evaluation",
+            file(v2M3AllocatorV5EvaluationPath.get()).absolutePath,
+            "--allocator-v5-diagnostic",
+            file(v2M3AllocatorV5DiagnosticPath.get()).absolutePath,
+            "--allocator-v5-selection",
+            file(v2M3AllocatorV5SelectionPath.get()).absolutePath,
+            "--allocator-v5-formal-junit",
+            file(v2M3AllocatorV5FormalJUnitPath.get()).absolutePath,
+            "--allocator-v5-promotion-decision",
+            file(v2M3AllocatorV5PromotionOutput.get()).absolutePath,
+            "--allocator-v5-executor-artifact",
+            file(v2M3AllocatorV5ExecutorArtifact.get()).absolutePath,
+        )
+        junit.forEach { command.addAll(listOf("--allocator-v5-diagnostic-junit", it.absolutePath)) }
+        raw.forEach { command.addAll(listOf("--allocator-v5-diagnostic-raw", it.absolutePath)) }
+        attachments.forEach { command.addAll(listOf("--allocator-v5-execution-attachment", it.absolutePath)) }
+        command.addAll(
+            listOf(
+                "--sealed-output",
+                file(v2M3AllocatorV5VerificationReceiptOutput.get()).absolutePath,
+            ),
+        )
+        commandLine(command)
+    }
+}
+
 tasks.register("v2M3AllocatorV1CompatibilityCheck") {
     group = "verification"
     description = "Retain the strict V1 NARS1/NAEA1 governed parser path as compatibility-only authority."
@@ -1663,8 +1759,8 @@ tasks.register("v2M3AllocatorV1CompatibilityCheck") {
 
 tasks.register("v2M3AllocatorCheck") {
     group = "verification"
-    description = "Require one completed, uniquely selected ADR-0104 V2 campaign and its governed verification receipt."
-    dependsOn("v2M3AllocatorV2VerificationSeal")
+    description = "Require one completed, uniquely selected V5 campaign and its source-bound governed verification."
+    dependsOn("v2M3AllocatorV5VerificationSeal")
 }
 
 val v2M3LocalCapEvidenceOutputDirectory = providers.gradleProperty("v2M3LocalCapEvidenceOutputDirectory")

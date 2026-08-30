@@ -42,6 +42,9 @@ def _load(name: str, path: Path):
 
 FINAL = _load("check_v2_m3_final_for_child", SCRIPT_DIR / "check-v2-m3-final.py")
 M2 = _load("check_v2_m3_m2_for_child", SCRIPT_DIR / "check-v2-m3-m2-regression.py")
+ALLOCATOR_V5 = _load(
+    "check_v2_m3_allocator_v5_for_child", SCRIPT_DIR / "check-v2-m3-allocator-v5.py"
+)
 
 SCHEMA = "NEREUS_V2_M3_CHILD_EVIDENCE_V1"
 JUNIT_SCHEMA = "NEREUS_V2_M3_GOVERNED_JUNIT_EXECUTION_RECEIPT_V1"
@@ -102,6 +105,7 @@ ALLOCATOR_DERIVED_KINDS = {
 }
 ALLOCATOR_V1_AUTHORITY_ATTACHMENTS = set(FINAL.ALLOCATOR_V1_AUTHORITY_ATTACHMENTS)
 ALLOCATOR_V2_AUTHORITY_ATTACHMENTS = set(FINAL.ALLOCATOR_V2_AUTHORITY_ATTACHMENTS)
+ALLOCATOR_V5_AUTHORITY_ATTACHMENTS = set(FINAL.ALLOCATOR_V5_AUTHORITY_ATTACHMENTS)
 REAL_RECEIPT_KINDS = {"PROVIDER_REAL_RECEIPT", "KMS_REAL_RECEIPT"}
 
 REAL_PROVIDER_BACKENDS = {
@@ -438,6 +442,12 @@ ALLOCATOR_V2_DIAGNOSTIC_TESTS = {
     "rangeRenewalUsesCellCas()",
     "conflictStormUsesFourIndependentCoordinators()",
 }
+ALLOCATOR_V5_VERIFICATION_SCHEMA = (
+    "NEREUS_V2_M3_GOVERNED_ALLOCATOR_CAMPAIGN_VERIFICATION_V5"
+)
+ALLOCATOR_V5_PROMOTION_SCHEMA = "NEREUS_V2_M3_ALLOCATOR_PROMOTION_DECISION_V5"
+ALLOCATOR_V5_VERIFICATION_MAX_BYTES = 64 * 1024 * 1024
+ALLOCATOR_V5_EXTERNAL_MAX_BYTES = 32 * 1024 * 1024
 ALLOCATOR_NAEA_HEADER_BYTES = 360
 ALLOCATOR_NAEA_MAX_BYTES = (8 << 30) + ALLOCATOR_NAEA_HEADER_BYTES
 ALLOCATOR_SOURCE_ARTIFACT_MAX_BYTES = 2 << 30
@@ -468,17 +478,20 @@ ALLOCATOR_EXTERNAL_NAMES = (
 def allocator_authority_profile(kinds: set[str]) -> str:
     v1 = kinds.intersection(ALLOCATOR_V1_AUTHORITY_ATTACHMENTS)
     v2 = kinds.intersection(ALLOCATOR_V2_AUTHORITY_ATTACHMENTS)
-    if v2:
-        if v2 != ALLOCATOR_V2_AUTHORITY_ATTACHMENTS or v1:
-            raise ChildError(
-                "allocator child mixes or incompletely supplies V1/V2 authority attachments"
-            )
-        return "V2"
-    if v1 != ALLOCATOR_V1_AUTHORITY_ATTACHMENTS:
-        raise ChildError(
-            "allocator child lacks one complete V1 or V2 authority attachment profile"
-        )
-    return "V1"
+    v5 = kinds.intersection(ALLOCATOR_V5_AUTHORITY_ATTACHMENTS)
+    supplied = sum(bool(profile) for profile in (v1, v2, v5))
+    if supplied != 1:
+        raise ChildError("allocator child lacks exactly one complete V1, V2, or V5 authority profile")
+    for name, actual, expected in (
+        ("V1", v1, ALLOCATOR_V1_AUTHORITY_ATTACHMENTS),
+        ("V2", v2, ALLOCATOR_V2_AUTHORITY_ATTACHMENTS),
+        ("V5", v5, ALLOCATOR_V5_AUTHORITY_ATTACHMENTS),
+    ):
+        if actual:
+            if actual != expected:
+                raise ChildError(f"allocator child incompletely supplies the {name} authority profile")
+            return name
+    raise AssertionError("allocator authority profile did not fail closed")
 PULSAR_NATIVE_COMMAND = (
     "./gradlew :nereus-pulsar-offload:test :nereus-pulsar-offload:spotlessCheck "
     ":nereus-pulsar-offload:checkstyleMain :nereus-pulsar-offload:checkstyleTest"
@@ -3794,6 +3807,354 @@ def seal_allocator_v2_campaign_verification_receipt(
     return receipt
 
 
+def _allocator_v5_file_rows(
+    root: Path,
+    rows: object,
+    label: str,
+    maximum_count: int,
+    maximum_bytes: int,
+    required_names: tuple[str, ...] | None = None,
+) -> list[dict[str, Any]]:
+    if not isinstance(rows, list) or not 1 <= len(rows) <= maximum_count:
+        raise ChildError(f"{label} file count is outside its cap")
+    validated: list[dict[str, Any]] = []
+    for index, value in enumerate(rows):
+        members = {"bytes", "path", "sha256"}
+        if required_names is not None:
+            members.add("name")
+        row = _exact_members(value, members, f"{label}[{index}]")
+        path = _allocator_external_path(row["path"], f"{label}[{index}].path", True)
+        size, digest, _, _ = _allocator_stream_identity(
+            root, path, maximum_bytes, allow_absolute=True
+        )
+        if row["bytes"] != size or row["sha256"] != digest:
+            raise ChildError(f"{label}[{index}] bytes/SHA differ from the exact file")
+        validated.append(row)
+    paths = [row["path"] for row in validated]
+    if len(paths) != len(set(paths)):
+        raise ChildError(f"{label} paths are duplicated")
+    if required_names is None:
+        if paths != sorted(paths):
+            raise ChildError(f"{label} paths are not sorted")
+    elif [row["name"] for row in validated] != list(required_names):
+        raise ChildError(f"{label} logical-name inventory differs")
+    return validated
+
+
+def _allocator_v5_embedded(
+    wrapper: dict[str, Any], prefix: str, maximum: int
+) -> bytes:
+    raw = _decode_sealed_bytes(
+        wrapper[f"{prefix}Base64"], f"allocator V5 {prefix}", maximum
+    )
+    if wrapper[f"{prefix}Sha256"] != sha256(raw):
+        raise ChildError(f"allocator V5 {prefix} embedded bytes/SHA differ")
+    return raw
+
+
+def _allocator_v5_dependency_lock(root: Path, tested_commit: str) -> str:
+    paths = (
+        "gradle/libs.versions.toml",
+        "gradle/wrapper/gradle-wrapper.properties",
+        "gradle/locked-artifacts/oxia-client-java/"
+        "091a42c2780d92da56e9ec1f02ce1c3d988adc16/m2/io/github/oxia-db/"
+        "oxia-client/0.9.4/oxia-client-0.9.4.jar",
+    )
+    manifest = bytearray()
+    for path in paths:
+        raw = git(root, "show", f"{tested_commit}:{path}")
+        assert isinstance(raw, bytes)
+        manifest.extend(path.encode("ascii"))
+        manifest.extend(b"\0")
+        manifest.extend(sha256(raw).encode("ascii"))
+        manifest.extend(b"\n")
+    return sha256(bytes(manifest))
+
+
+def _allocator_v5_expected_source(
+    root: Path, tested_commit: str, executor: dict[str, Any]
+) -> dict[str, str]:
+    locks = _source_locks(root, tested_commit)
+    allocator = _required_object(
+        locks.get("m3AllocatorEvidenceBinding"), "m3AllocatorEvidenceBinding"
+    )
+    image = _required_string(
+        allocator.get("oxiaServerImageDigest"),
+        "m3AllocatorEvidenceBinding.oxiaServerImageDigest",
+    )
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", image):
+        raise ChildError("allocator V5 locked Oxia image digest differs")
+    return {
+        "nereusCommit": tested_commit,
+        "oxiaImageDigest": image.removeprefix("sha256:"),
+        "dependencyLockDigest": _allocator_v5_dependency_lock(root, tested_commit),
+        "executorDigest": executor["sha256"],
+        "workloadDigest": ALLOCATOR_V5.PLAN_DIGEST,
+    }
+
+
+def _allocator_v5_external_bytes(
+    root: Path, rows: list[dict[str, Any]], maximum: int
+) -> list[tuple[str, bytes]]:
+    result: list[tuple[str, bytes]] = []
+    for row in rows:
+        path = _allocator_external_path(row["path"], "allocator V5 external path", True)
+        absolute = Path(path) if path.is_absolute() else root.joinpath(*path.parts)
+        raw = absolute.read_bytes()
+        if not raw or len(raw) > maximum:
+            raise ChildError(f"allocator V5 external bytes outside cap: {path}")
+        result.append((row.get("name", absolute.name), raw))
+    return result
+
+
+def _allocator_v5_unsigned(value: dict[str, Any]) -> dict[str, Any]:
+    unsigned = dict(value)
+    unsigned["receiptSha256"] = "0" * 64
+    return unsigned
+
+
+def validate_allocator_v5_campaign_verification(
+    value: object, root: Path, tested_commit: str
+) -> dict[str, Any]:
+    members = {
+        "checkpointBase64",
+        "checkpointSha256",
+        "diagnosticBase64",
+        "diagnosticJunitFiles",
+        "diagnosticRawFiles",
+        "diagnosticSha256",
+        "evaluationBase64",
+        "evaluationSha256",
+        "executionAttachments",
+        "executorArtifact",
+        "formalJunitBase64",
+        "formalJunitSha256",
+        "promotionDecisionBase64",
+        "promotionDecisionSha256",
+        "receiptSha256",
+        "schema",
+        "selectionBase64",
+        "selectionSha256",
+        "testedCommit",
+    }
+    wrapper = _exact_members(value, members, "governed allocator V5 campaign verification")
+    if (
+        wrapper["schema"] != ALLOCATOR_V5_VERIFICATION_SCHEMA
+        or wrapper["testedCommit"] != tested_commit
+    ):
+        raise ChildError("governed allocator V5 verification schema/source differs")
+    _sha_text(wrapper["receiptSha256"], "governed allocator V5 verification receipt SHA")
+    if wrapper["receiptSha256"] != sha256(canonical_bytes(_allocator_v5_unsigned(wrapper))):
+        raise ChildError("governed allocator V5 verification self-hash differs")
+
+    checkpoint_raw = _allocator_v5_embedded(
+        wrapper, "checkpoint", ALLOCATOR_V5.MAX_CHECKPOINT_BYTES
+    )
+    evaluation_raw = _allocator_v5_embedded(wrapper, "evaluation", 4_096)
+    diagnostic_raw = _allocator_v5_embedded(wrapper, "diagnostic", 4_096)
+    selection_raw = _allocator_v5_embedded(wrapper, "selection", 4_096)
+    formal_junit_raw = _allocator_v5_embedded(
+        wrapper, "formalJunit", ALLOCATOR_V2_JUNIT_MAX_BYTES
+    )
+    promotion_raw = _allocator_v5_embedded(
+        wrapper, "promotionDecision", MAX_CANONICAL_BYTES
+    )
+
+    executor_rows = _allocator_v5_file_rows(
+        root,
+        [wrapper["executorArtifact"]],
+        "allocator V5 executor artifact",
+        1,
+        ALLOCATOR_V5_EXTERNAL_MAX_BYTES,
+        ("executorArtifact",),
+    )
+    diagnostic_junit_rows = _allocator_v5_file_rows(
+        root,
+        wrapper["diagnosticJunitFiles"],
+        "allocator V5 diagnostic JUnit files",
+        10,
+        ALLOCATOR_V2_JUNIT_MAX_BYTES,
+        tuple(sorted(f"TEST-{suite}.xml" for suite in {
+            identity.split("#", 1)[0] for identity in ALLOCATOR_V5.DIAGNOSTIC_TESTS
+        })),
+    )
+    diagnostic_raw_rows = _allocator_v5_file_rows(
+        root,
+        wrapper["diagnosticRawFiles"],
+        "allocator V5 diagnostic raw files",
+        19,
+        ALLOCATOR_V2_EXTERNAL_MAX_BYTES,
+        tuple(sorted(ALLOCATOR_V5.DIAGNOSTIC_RAW_NAMES)),
+    )
+    execution_rows = _allocator_v5_file_rows(
+        root,
+        wrapper["executionAttachments"],
+        "allocator V5 physical execution attachments",
+        ALLOCATOR_V5.MAX_PHYSICAL_FILES,
+        ALLOCATOR_V5_EXTERNAL_MAX_BYTES,
+    )
+    all_paths = [
+        executor_rows[0]["path"],
+        *(row["path"] for row in diagnostic_junit_rows),
+        *(row["path"] for row in diagnostic_raw_rows),
+        *(row["path"] for row in execution_rows),
+    ]
+    if len(all_paths) != len(set(all_paths)):
+        raise ChildError("allocator V5 governed external inventories alias paths")
+
+    try:
+        checkpoint = ALLOCATOR_V5.parse_checkpoint(checkpoint_raw)
+        if checkpoint["source"] != _allocator_v5_expected_source(
+            root, tested_commit, executor_rows[0]
+        ):
+            raise ChildError("allocator V5 NACP5 source tuple differs from exact locks/executor")
+        physical = _allocator_v5_external_bytes(
+            root, execution_rows, ALLOCATOR_V5_EXTERNAL_MAX_BYTES
+        )
+        if ALLOCATOR_V5.physical_aggregates(checkpoint, physical) != checkpoint["aggregates"]:
+            raise ChildError("allocator V5 physical aggregate inventory differs")
+        evaluation = ALLOCATOR_V5.parse_evaluation(evaluation_raw, checkpoint)
+        diagnostic = ALLOCATOR_V5.parse_diagnostic(diagnostic_raw)
+        if diagnostic["source"] != checkpoint["source"]:
+            raise ChildError("allocator V5 diagnostic source differs from checkpoint")
+        diagnostic_junit_manifest, diagnostic_summary = (
+            ALLOCATOR_V5.diagnostic_junit_manifest(
+                _allocator_v5_external_bytes(
+                    root, diagnostic_junit_rows, ALLOCATOR_V2_JUNIT_MAX_BYTES
+                )
+            )
+        )
+        diagnostic_raw_manifest = ALLOCATOR_V5.diagnostic_raw_manifest(
+            _allocator_v5_external_bytes(
+                root, diagnostic_raw_rows, ALLOCATOR_V2_EXTERNAL_MAX_BYTES
+            ),
+            tested_commit,
+        )
+        if (
+            diagnostic["junitManifest"] != diagnostic_junit_manifest
+            or diagnostic["rawManifest"] != diagnostic_raw_manifest
+        ):
+            raise ChildError("allocator V5 NADV5 manifest links differ")
+        formal_summary, formal_identities = ALLOCATOR_V5.parse_junit(formal_junit_raw)
+        if (
+            formal_summary != {"tests": 1, "failures": 0, "errors": 0, "skipped": 0}
+            or len(formal_identities) != 1
+        ):
+            raise ChildError("allocator V5 formal JUnit inventory/result differs")
+        selection = ALLOCATOR_V5.parse_selection(
+            selection_raw, checkpoint, evaluation, diagnostic, formal_summary
+        )
+    except ALLOCATOR_V5.V5Error as error:
+        raise ChildError(str(error)) from error
+
+    decision = _exact_members(
+        load_external_json(
+            promotion_raw, "allocator V5 promotion decision", MAX_CANONICAL_BYTES
+        ),
+        {
+            "checkpointSha256",
+            "diagnosticJUnitSha256",
+            "diagnosticRawManifestSha256",
+            "diagnosticSha256",
+            "evaluationSha256",
+            "formalJUnitSha256",
+            "schema",
+            "selectedCandidate",
+            "status",
+        },
+        "allocator V5 promotion decision",
+    )
+    expected_decision = ALLOCATOR_V5.promotion_decision_expected(
+        checkpoint_raw,
+        evaluation_raw,
+        diagnostic_raw,
+        diagnostic_junit_manifest,
+        diagnostic_raw_manifest,
+        formal_junit_raw,
+        selection["candidate"],
+    )
+    locked_mode, _ = source_bindings(root, tested_commit)
+    if decision != expected_decision or selection["mode"] != locked_mode:
+        raise ChildError("allocator V5 promotion decision/selection/source-lock mode differs")
+    return {
+        "mode": locked_mode,
+        "selectedCandidate": selection["candidate"],
+        "selectedRangeSize": ALLOCATOR_V5.RANGE_SIZES[selection["candidate"]],
+        "selectionSha256": selection["digest"],
+        "summary": _sum_summaries([formal_summary, diagnostic_summary]),
+    }
+
+
+def seal_allocator_v5_campaign_verification_receipt(
+    root: Path,
+    tested_commit: str,
+    checkpoint_raw: bytes,
+    evaluation_raw: bytes,
+    diagnostic_raw: bytes,
+    selection_raw: bytes,
+    formal_junit_raw: bytes,
+    promotion_raw: bytes,
+    executor_path: object,
+    diagnostic_junit_paths: list[object],
+    diagnostic_raw_paths: list[object],
+    execution_paths: list[object],
+) -> dict[str, Any]:
+    def file_row(raw_path: object, name: str | None, maximum: int) -> dict[str, Any]:
+        path = _allocator_external_path(raw_path, "allocator V5 governed external path", True)
+        size, digest, _, _ = _allocator_stream_identity(
+            root, path, maximum, allow_absolute=True
+        )
+        row: dict[str, Any] = {"bytes": size, "path": str(path), "sha256": digest}
+        if name is not None:
+            row["name"] = name
+        return row
+
+    executor = file_row(executor_path, "executorArtifact", ALLOCATOR_V5_EXTERNAL_MAX_BYTES)
+    diagnostic_junit_files = sorted(
+        (
+            file_row(path, Path(path).name, ALLOCATOR_V2_JUNIT_MAX_BYTES)
+            for path in diagnostic_junit_paths
+        ),
+        key=lambda row: row["name"],
+    )
+    diagnostic_raw_files = sorted(
+        (
+            file_row(path, Path(path).name, ALLOCATOR_V2_EXTERNAL_MAX_BYTES)
+            for path in diagnostic_raw_paths
+        ),
+        key=lambda row: row["name"],
+    )
+    execution_files = sorted(
+        (file_row(path, None, ALLOCATOR_V5_EXTERNAL_MAX_BYTES) for path in execution_paths),
+        key=lambda row: row["path"],
+    )
+    load_external_json(promotion_raw, "allocator V5 promotion decision", MAX_CANONICAL_BYTES)
+    receipt: dict[str, Any] = {
+        "checkpointBase64": base64.b64encode(checkpoint_raw).decode("ascii"),
+        "checkpointSha256": sha256(checkpoint_raw),
+        "diagnosticBase64": base64.b64encode(diagnostic_raw).decode("ascii"),
+        "diagnosticJunitFiles": diagnostic_junit_files,
+        "diagnosticRawFiles": diagnostic_raw_files,
+        "diagnosticSha256": sha256(diagnostic_raw),
+        "evaluationBase64": base64.b64encode(evaluation_raw).decode("ascii"),
+        "evaluationSha256": sha256(evaluation_raw),
+        "executionAttachments": execution_files,
+        "executorArtifact": executor,
+        "formalJunitBase64": base64.b64encode(formal_junit_raw).decode("ascii"),
+        "formalJunitSha256": sha256(formal_junit_raw),
+        "promotionDecisionBase64": base64.b64encode(promotion_raw).decode("ascii"),
+        "promotionDecisionSha256": sha256(promotion_raw),
+        "receiptSha256": "0" * 64,
+        "schema": ALLOCATOR_V5_VERIFICATION_SCHEMA,
+        "selectionBase64": base64.b64encode(selection_raw).decode("ascii"),
+        "selectionSha256": sha256(selection_raw),
+        "testedCommit": tested_commit,
+    }
+    receipt["receiptSha256"] = sha256(canonical_bytes(receipt))
+    validate_allocator_v5_campaign_verification(receipt, root, tested_commit)
+    return receipt
+
+
 def _native_ordered_projection(
     row: dict[str, Any], counter_keys: tuple[str, ...], receipt_sha256: str | None = None
 ) -> dict[str, Any]:
@@ -4442,6 +4803,7 @@ def validate_generic_value(
     _, bindings = source_bindings(root, tested)
     allocator_authority: dict[str, Any] | None = None
     allocator_v2_authority: dict[str, Any] | None = None
+    allocator_v5_authority: dict[str, Any] | None = None
     if kind == "ALLOCATOR_SELECTION" and allocator_profile == "V1":
         raw_row = next(
             (row for row in rows if row["kind"] == "ALLOCATOR_RAW_VERIFICATION"),
@@ -4458,7 +4820,7 @@ def validate_generic_value(
             root,
             tested,
         )
-    elif kind == "ALLOCATOR_SELECTION":
+    elif kind == "ALLOCATOR_SELECTION" and allocator_profile == "V2":
         v2_row = next(
             (row for row in rows if row["kind"] == "ALLOCATOR_V2_CAMPAIGN_VERIFICATION"),
             None,
@@ -4470,6 +4832,22 @@ def validate_generic_value(
         allocator_v2_authority = validate_allocator_v2_campaign_verification(
             load_canonical_json(
                 v2_bytes, str(v2_path), ALLOCATOR_V2_VERIFICATION_MAX_BYTES
+            ),
+            root,
+            tested,
+        )
+    elif kind == "ALLOCATOR_SELECTION":
+        v5_row = next(
+            (row for row in rows if row["kind"] == "ALLOCATOR_V5_CAMPAIGN_VERIFICATION"),
+            None,
+        )
+        if v5_row is None:
+            raise ChildError("allocator V5 child lacks governed campaign verification")
+        v5_path = safe_relative(v5_row["path"], "allocator V5 verification path")
+        v5_bytes = read_safe_file(root, v5_path, ALLOCATOR_V5_VERIFICATION_MAX_BYTES)
+        allocator_v5_authority = validate_allocator_v5_campaign_verification(
+            load_canonical_json(
+                v5_bytes, str(v5_path), ALLOCATOR_V5_VERIFICATION_MAX_BYTES
             ),
             root,
             tested,
@@ -4527,6 +4905,9 @@ def validate_generic_value(
         elif row["kind"] == "ALLOCATOR_V2_CAMPAIGN_VERIFICATION":
             assert allocator_v2_authority is not None
             normalized.append(allocator_v2_authority["summary"])
+        elif row["kind"] == "ALLOCATOR_V5_CAMPAIGN_VERIFICATION":
+            assert allocator_v5_authority is not None
+            normalized.append(allocator_v5_authority["summary"])
         elif row["kind"] in ALLOCATOR_DERIVED_KINDS:
             assert allocator_authority is not None
             validate_allocator_derived_evidence(
