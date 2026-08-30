@@ -320,6 +320,11 @@ contracts to new-source authority. A fresh 26-test/ten-suite diagnostic must pas
 zero failure/error/skip, complete raw accounting, lossless RANGE/Native authority rows, and canonical NADV5 before
 formal execution. STRICT still needs zero loss and every unchanged SLO to qualify in formal evaluation; diagnostic
 accounting does not preselect it. The preserved NADV4 and FAILED V5 attempts are non-authoritative.
+ADR 0145 then records exact `3b96a298...` as another immutable infrastructure-invalid attempt: its RANGE-64 100k
+construction finished all 90,000 Head creates and 84,118/89,424 initial grants before the legacy 600-second harness
+cutoff. New exact-source V5 execution binds that runtime cutoff to the already-frozen 900-second construction budget.
+The real-Oxia RANGE-1024 100k guard, canonical 26-test diagnostic, full source closure, and a fresh create-new formal
+directory remain mandatory; no old action or checkpoint is reusable.
 Exact `8a60d931...` subsequently passed that V5 diagnostic and completed formal with 123 physical actions, 33
 checkpoints, and canonical `RANGE_SELECTED(RANGE_64)` NAEV5. Promotion failed closed before decision/NARS5 because
 the shared verifier applied V3's 16 MiB cap to a valid 27.20 MiB V5 100k mass-takeover attachment. ADR 0139 preserves

@@ -21,14 +21,14 @@ class M3V4AsyncActorLaneRunnerTest {
     void admitsOnlyAlreadyOfferedWorkDuringTheTerminalDrain() throws Exception {
         M3V3AsyncActorLaneRunner<String> runner = new M3V3AsyncActorLaneRunner<>(
                 Duration.ZERO,
-                Duration.ofMillis(40),
-                Duration.ofMillis(100),
-                Duration.ofMillis(120));
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(2));
         CompletableFuture<Void> first = new CompletableFuture<>();
         AtomicInteger calls = new AtomicInteger();
         Thread release = new Thread(() -> {
             try {
-                Thread.sleep(70);
+                Thread.sleep(1_500);
                 first.complete(null);
             } catch (InterruptedException failure) {
                 Thread.currentThread().interrupt();
@@ -40,7 +40,7 @@ class M3V4AsyncActorLaneRunnerTest {
                 2,
                 List.of(
                         offer(0, 0, 7, 0, "owner"),
-                        offer(1, 0, 7, TimeUnit.MILLISECONDS.toNanos(30), "waiting")),
+                        offer(1, 0, 7, TimeUnit.MILLISECONDS.toNanos(500), "waiting")),
                 (actor, request, context) -> {
                     calls.incrementAndGet();
                     return request.equals("owner") ? first : CompletableFuture.completedFuture(null);

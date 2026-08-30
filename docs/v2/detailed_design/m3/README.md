@@ -810,6 +810,14 @@ ADR-0143 boundary contracts now extend only new exact-source diagnostics to a cl
 the old selected-source children retain an exact-source legacy verifier. No V5 wire, plan, profile, workload,
 threshold, or selection semantic changes, and a fresh canonical NADV5 is still required before formal execution.
 
+[ADR 0145](../../../decisions/0145-v2-m3-allocator-v5-population-construction-budget-alignment-amendment.md) preserves
+the exact `3b96a298...` diagnostic authority but records its single formal attempt as immutable
+`INFRASTRUCTURE_FAILED`. RANGE-64's 100k prerequisite completed 90,000/90,000 Heads and 84,118/89,424 initial grants
+before an older 600-second harness cutoff, despite the formal path already charging 900 seconds. The
+[implementation record](stage-b-v5-population-construction-budget-alignment.md) binds the runtime cutoff and both
+construction charges to one 900-second constant without changing plan/profile bytes, workload, SLOs, action totals,
+qualification, or selection. A fresh 100k real-Oxia guard and complete exact-source evidence chain remain required.
+
 | Slice | Design or output | Status at this documentation cut |
 | --- | --- | --- |
 | M3-I0 | [NWG1 implementation-input closure](m3-i0-nwg1-implementation-input-closure.md), [ADR 0089 Header amendment](../../../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and [ADR 0090 mutation-call profiles](../../../decisions/0090-v2-m3-nwg1-mutation-external-call-profiles.md) | accepted documentation-only input with exact Header offsets and explicit X0/XU call caps; no codec, runner, trace harness, Provider evidence, receipt, or scenario PASS |

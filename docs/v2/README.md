@@ -409,6 +409,7 @@ Accepted decisions:
 - [ADR 0142: M3 Final documentation scenario closure amendment](../decisions/0142-v2-m3-final-documentation-scenario-closure-amendment.md)
 - [ADR 0143: M3 V5 frozen-target delivery amendment](../decisions/0143-v2-m3-allocator-v5-frozen-target-delivery-amendment.md)
 - [ADR 0144: M3 V5 frozen-target diagnostic inventory amendment](../decisions/0144-v2-m3-allocator-v5-frozen-target-diagnostic-inventory-amendment.md)
+- [ADR 0145: M3 V5 population-construction budget alignment amendment](../decisions/0145-v2-m3-allocator-v5-population-construction-budget-alignment-amendment.md)
 
 ## Open design gates
 
@@ -460,6 +461,12 @@ delivery without changing the workload, zero-drop rule, admission caps, SLOs, or
 subsequent lossless `a981e612...` run as diagnostic-only because its old 24-test sealer omitted the two new boundary
 contracts; new-source NADV5 authority now requires the exact 26-test inventory while the two prior selected sources
 retain an explicit legacy verification path.
+ADR 0145 preserves the subsequent exact `3b96a298...` campaign as immutable infrastructure-invalid evidence. Its
+RANGE-64 100k prerequisite completed every Head and 84,118/89,424 initial grants before an older 600-second harness
+cutoff, while the accepted path already charged 900 seconds. New exact-source V5 execution uses one shared
+900-second charge/runtime constant without changing plan/profile bytes, workload, SLOs, candidates, qualification,
+or selection. The failed 106-file/17,569,678-byte attempt is externally bound by archive identity
+`27b28916...91de`; a fresh 100k guard, canonical diagnostic, and formal remain required.
 ADR 0089 amends that input before any production NWG1 bytes exist with the gap-free exact 256-byte Header table. It
 retains `wireVersion=1`, removes node session and any duplicate packing-class field from the Header, fixes Object digest
 `SHA-256/v1=1/1` plus close-reason codes `1..12`, and requires the future projection to mechanically transcribe the ADR.

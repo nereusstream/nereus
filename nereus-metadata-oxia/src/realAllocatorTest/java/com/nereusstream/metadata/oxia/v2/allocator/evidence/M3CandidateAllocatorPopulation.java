@@ -69,7 +69,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 final class M3CandidateAllocatorPopulation {
     private static final long INITIAL_OWNER_EPOCH = 1;
     private static final long OPERATION_TIMEOUT_SECONDS = 120;
-    private static final long POPULATION_DRAIN_TIMEOUT_SECONDS = 600;
+    static final long POPULATION_DRAIN_TIMEOUT_SECONDS =
+            M3V3FormalActionExecutorAdapter.CONSTRUCTION_PATH_SECONDS;
     private static final Duration FORMAL_RETRY_BACKOFF_BASE = Duration.ofMillis(20);
 
     private final AllocatorEvidenceCandidateV1 candidate;

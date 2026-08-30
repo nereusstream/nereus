@@ -51,6 +51,7 @@ V3_FORMAL_RUNTIME = (
 )
 V3_NATIVE_RUNTIME = V3_FORMAL_RUNTIME.with_name("M3V3NativeIntervalRuntime.java")
 V3_CANDIDATE_POPULATION = V3_FORMAL_RUNTIME.with_name("M3CandidateAllocatorPopulation.java")
+V3_FORMAL_ADAPTER = V3_FORMAL_RUNTIME.with_name("M3V3FormalActionExecutorAdapter.java")
 V3_ASYNC_RUNNER = V3_FORMAL_RUNTIME.with_name("M3V3AsyncActorLaneRunner.java")
 V3_FORMAL_HARNESS = V3_FORMAL_RUNTIME.with_name("M3V3AllocatorFormalHarness.java")
 REAL_OXIA_ACTORS = V3_FORMAL_RUNTIME.with_name("M3RealOxiaActors.java")
@@ -674,6 +675,18 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn("if (observed.value().reservation().isPresent())", population)
         self.assertIn("return current;", population)
         self.assertIn("workflow Cell cursor/grant ordering diverged", population)
+
+    def test_population_construction_bound_is_the_charged_900_second_path(self) -> None:
+        population = V3_CANDIDATE_POPULATION.read_text()
+        adapter = V3_FORMAL_ADAPTER.read_text()
+        self.assertIn("static final long CONSTRUCTION_PATH_SECONDS = 900;", adapter)
+        self.assertNotIn("POPULATION_PATH_SECONDS", adapter)
+        self.assertNotIn("SCALE_PATH_SECONDS", adapter)
+        self.assertIn(
+            "M3V3FormalActionExecutorAdapter.CONSTRUCTION_PATH_SECONDS;",
+            population,
+        )
+        self.assertNotIn("POPULATION_DRAIN_TIMEOUT_SECONDS = 600", population)
 
     def test_v3_unexpected_warmup_failure_is_attributed_and_formal_sequence_is_replayed(self) -> None:
         runner = V3_ASYNC_RUNNER.read_text()

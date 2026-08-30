@@ -963,6 +963,12 @@ lifecycle/source gates remain mandatory. At the ADR-0138 source cut, the active 
 At the ADR-0138 source cut that meant 24 tests; ADR 0144 now requires a 26-test/ten-suite current-source diagnostic
 with a parse-canonical NADV5 before any formal campaign.
 
+ADR 0145 records the next exact-source formal infrastructure failure. Exact `3b96a298...` completed every RANGE-64
+100k Head and 84,118/89,424 initial grants before the old 600-second construction cutoff. Because the accepted formal
+budget already charged 900 seconds to that finite path, the new source uses one shared 900-second charge/runtime
+constant. This changes no measurement or selection contract. The open evidence item is a new exact-source 100k guard,
+canonical diagnostic, formal campaign, and complete common-source Final chain.
+
 ADR 0139 records that the fresh `8a60d931...` diagnostic passed and its first V5 formal completed with canonical
 `RANGE_SELECTED(RANGE_64)`, but promotion rejected a valid 27.20 MiB 100k mass-takeover attachment under a V3-era
 16 MiB reader cap. The entire attempt is immutable and non-promotable; it has no decision or NARS5. V3/V4 retain

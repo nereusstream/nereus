@@ -44,9 +44,8 @@ import java.util.Objects;
  */
 final class M3V3FormalActionExecutorAdapter implements ActionExecutor {
     private static final long SETUP_SECONDS = 900;
-    private static final long POPULATION_PATH_SECONDS = 900;
+    static final long CONSTRUCTION_PATH_SECONDS = 900;
     private static final long FAULT_ACTION_SECONDS = 20;
-    private static final long SCALE_PATH_SECONDS = 900;
     private static final long INTERVAL_SECONDS = 40;
     private static final long CLEANUP_SECONDS = 5;
 
@@ -62,8 +61,8 @@ final class M3V3FormalActionExecutorAdapter implements ActionExecutor {
         PopulationKey key = populationKey(action);
         boolean firstPopulationAction = key != null && firstPopulationAction(action);
         long setup = firstCampaignAction(action) ? SETUP_SECONDS : 0;
-        long population = firstPopulationAction && key.population() == 10_000 ? POPULATION_PATH_SECONDS : 0;
-        long scale = firstPopulationAction && key.population() == 100_000 ? SCALE_PATH_SECONDS : 0;
+        long population = firstPopulationAction && key.population() == 10_000 ? CONSTRUCTION_PATH_SECONDS : 0;
+        long scale = firstPopulationAction && key.population() == 100_000 ? CONSTRUCTION_PATH_SECONDS : 0;
         long fault = action.kind() == ActionKind.FAULT_ACTION ? FAULT_ACTION_SECONDS : 0;
         long interval = action.kind().interval() ? INTERVAL_SECONDS : 0;
         long cleanup = action.kind().interval() ? CLEANUP_SECONDS : 0;

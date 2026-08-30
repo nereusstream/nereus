@@ -235,6 +235,13 @@ class M3AllocatorEvidenceWiringTest {
     }
 
     @Test
+    void bindsPopulationConstructionTimeoutToTheChargedFormalPathBudget() {
+        assertThat(M3CandidateAllocatorPopulation.POPULATION_DRAIN_TIMEOUT_SECONDS)
+                .isEqualTo(M3V3FormalActionExecutorAdapter.CONSTRUCTION_PATH_SECONDS)
+                .isEqualTo(900);
+    }
+
+    @Test
     void recordsLateFreshOwnerAdmissionAsExactRecoveryProofAndTypedTimeout() {
         List<AllocatorRawEvidenceEventV1> events = new java.util.ArrayList<>();
         M3AllocatorRequestTelemetry telemetry = new M3AllocatorRequestTelemetry(events::add, System.nanoTime());
