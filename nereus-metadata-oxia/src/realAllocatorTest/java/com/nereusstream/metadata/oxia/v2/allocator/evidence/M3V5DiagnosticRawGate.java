@@ -94,6 +94,7 @@ final class M3V5DiagnosticRawGate {
             case "range16-formal-sequence.json" -> {
                 requireSchema(json, "NEREUS_V2_M3_ALLOCATOR_RANGE16_FORMAL_SEQUENCE_DIAGNOSTIC_V1");
                 requireSource(json, sourceCommit);
+                requireFormalTiming(json);
                 requireLegacyLosslessRow(json, "fixed1000", 1_000);
             }
             case "real-oxia-operation-diagnostic.json" ->
@@ -103,8 +104,9 @@ final class M3V5DiagnosticRawGate {
             case "strict-formal-sequence.json" -> {
                 requireSchema(json, "NEREUS_V2_M3_ALLOCATOR_STRICT_FORMAL_SEQUENCE_DIAGNOSTIC_V1");
                 requireSource(json, sourceCommit);
-                requireLegacyLosslessRow(json, "fixed1000", 1_000);
-                requireLegacyLosslessRow(json, "derived800", 800);
+                requireFormalTiming(json);
+                requireLegacyAuditableRow(json, "fixed1000", 1_000);
+                requireLegacyAuditableRow(json, "derived800", 800);
             }
             case "v5-range1024-10ms-formal-sequence.json" ->
                 requireRangeReceipt(json, sourceCommit, 10);
@@ -224,29 +226,62 @@ final class M3V5DiagnosticRawGate {
     }
 
     private static void requireLegacyLosslessRow(String json, String name, int offeredRate) {
+        requireLegacyAuditableRow(json, name, offeredRate);
+        String body = match(Pattern.compile("\\\"" + name + "\\\":\\{([^}]*)}"), json, name + " legacy row")
+                .group(1);
+        if (longField(body, "warmupDroppedBeforeAdmission") != 0
+                || longField(body, "warmupLoadRejectedAfterAdmission") != 0
+                || longField(body, "measuredDroppedBeforeAdmission") != 0
+                || longField(body, "measuredFailedAfterAdmission") != 0
+                || longField(body, "measuredTimedOutAfterAdmission") != 0) {
+            throw new IllegalArgumentException("allocator V5 diagnostic raw " + name + " lossless gate failed");
+        }
+    }
+
+    private static void requireLegacyAuditableRow(String json, String name, int offeredRate) {
         String body = match(Pattern.compile("\\\"" + name + "\\\":\\{([^}]*)}"), json, name + " legacy row")
                 .group(1);
         long warmupOffered = longField(body, "warmupOffered");
+        long warmupDropped = longField(body, "warmupDroppedBeforeAdmission");
         long warmupCompleted = longField(body, "warmupCompleted");
         long warmupLoadRejected = longField(body, "warmupLoadRejectedAfterAdmission");
         long warmupUnexpectedFailed = longField(body, "warmupUnexpectedFailedAfterAdmission");
         long warmupTimedOut = longField(body, "warmupTimedOutAfterAdmission");
         long measuredOffered = longField(body, "measuredOffered");
+        long measuredAdmitted = longField(body, "measuredAdmitted");
+        long measuredDropped = longField(body, "measuredDroppedBeforeAdmission");
+        long measuredCompleted = longField(body, "measuredCompleted");
+        long measuredFailed = longField(body, "measuredFailedAfterAdmission");
+        long measuredTimedOut = longField(body, "measuredTimedOutAfterAdmission");
         if (warmupOffered != Math.multiplyExact((long) offeredRate, 10L)
                 || warmupOffered
-                        != warmupCompleted + warmupLoadRejected + warmupUnexpectedFailed + warmupTimedOut
+                        != warmupDropped
+                                + warmupCompleted
+                                + warmupLoadRejected
+                                + warmupUnexpectedFailed
+                                + warmupTimedOut
                 || warmupUnexpectedFailed != 0
                 || warmupTimedOut != 0
                 || measuredOffered != Math.multiplyExact((long) offeredRate, 30L)
-                || longField(body, "measuredAdmitted") != measuredOffered
-                || longField(body, "measuredDroppedBeforeAdmission") != 0
-                || longField(body, "measuredCompleted") != measuredOffered
-                || longField(body, "measuredFailedAfterAdmission") != 0
-                || longField(body, "measuredTimedOutAfterAdmission") != 0
+                || measuredOffered != measuredAdmitted + measuredDropped
+                || measuredAdmitted != measuredCompleted + measuredFailed + measuredTimedOut
                 || longField(body, "globalOutstandingMaximum") <= 4
                 || !body.contains("\"actorLanesStoppedAtCleanupDeadline\":true")) {
-            throw new IllegalArgumentException("allocator V5 diagnostic raw " + name + " legacy hard gate failed");
+            throw new IllegalArgumentException("allocator V5 diagnostic raw " + name + " accounting gate failed");
         }
+        for (String terminal : List.of(
+                "\"queueDepthAtEnd\":0",
+                "\"globalOutstandingAtEnd\":0",
+                "\"bindingBusyAtEnd\":0",
+                "\"pendingPermitAtEnd\":0")) {
+            requireLiteral(body, terminal);
+        }
+    }
+
+    private static void requireFormalTiming(String json) {
+        requireLiteral(json, "\"offerHorizonSeconds\":40");
+        requireLiteral(json, "\"terminalAdmissionDrainSeconds\":2");
+        requireLiteral(json, "\"cleanupGraceSeconds\":5");
     }
 
     private static void requireSchema(String json, String schema) {

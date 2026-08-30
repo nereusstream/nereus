@@ -953,8 +953,10 @@ zero-drop and allows canonical NADV4; no threshold, qualification, plan, or sele
 ADR 0137 closes that attribution cycle. The standalone 25ms replay passed, while the complete `bb928a0...` suite
 reached V4's 256-global cap and dropped 124 fixed-storm requests. V4 bytes and that diagnostic remain immutable. The
 strict V5 `4/128/512/1` admission/profile/codec boundary, storm-aware feasibility, raw-manifest-bound NADV5, and
-formal launcher are implemented. The active evidence item is a complete 24-test/ten-suite, zero-drop current-source
-diagnostic with a parse-canonical NADV5 before any new formal campaign; no V5 diagnostic or formal result exists yet.
+formal launcher are implemented. ADR 0138 preserves the exact `a1664de9...` FAILED diagnostic and corrects its
+qualification boundary: STRICT's conserved loss is a candidate result, while RANGE/Native feasibility and all
+lifecycle/source gates remain mandatory. The active evidence item is a fresh complete 24-test/ten-suite current-source
+diagnostic with a parse-canonical NADV5 before any formal campaign; no V5 formal result exists yet.
 
 ADR 0105 additionally prevents the typed-evidence source lock from preselecting a mode: the V2 lock schema accepts
 `UNSELECTED` only for non-allocator children and derives native/allocator provenance from the dedicated M3 forks and

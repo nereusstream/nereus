@@ -310,9 +310,12 @@ ADR 0137 records the complete `bb928a0...` diagnostic: the 10ms row and both der
 fixed storm reaches the 256-global cap and drops 124 requests. The distinct V5 `4/128/512/1`
 admission/profile/codec/feasibility boundary is now implemented with plan digest `3e0aea42527e...`, execution-profile
 digest `76d9bc38ce6f...`, strict NACP5/NAEV5/NADV5/NARS5 bytes, a 19-file canonical raw manifest, and independent
-V5 launcher/Gradle entrypoints. The complete 24-test/ten-suite V5 diagnostic must still pass with zero
-failure/error/skip and zero fixed/derived drop before any formal execution. The preserved NADV4 is non-authoritative
-because its raw hard gate failed.
+V5 launcher/Gradle entrypoints. ADR 0138 preserves the subsequent exact `a1664de9...` FAILED V5 diagnostic: Native,
+RANGE-16, RANGE-1024, and terminal drain are lossless, while STRICT accurately records bounded candidate loss. The
+compatibility rows now use the formal-equivalent V5 runner/drain. A fresh 24-test/ten-suite diagnostic must pass with
+zero failure/error/skip, complete raw accounting, lossless RANGE/Native authority rows, and canonical NADV5 before
+formal execution. STRICT still needs zero loss and every unchanged SLO to qualify in formal evaluation; diagnostic
+accounting does not preselect it. The preserved NADV4 and FAILED V5 attempts are non-authoritative.
 The V4 formal source entry is now explicit and default-off: the pure plan script reports the accepted plan/profile,
 `run-v2-m3-real-allocator-evidence-v4.sh` validates the exact clean pushed source, all locked external inputs and a
 canonical current-source NADV4 before creating either the service or output directory, and

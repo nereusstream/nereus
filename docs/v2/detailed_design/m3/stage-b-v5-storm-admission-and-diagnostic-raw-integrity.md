@@ -1,7 +1,7 @@
 # Stage B V5 storm admission and diagnostic raw integrity
 
-- Design status: Accepted through ADR 0137
-- Evidence status: V5 wire, launcher, feasibility, admission, and raw-integrity gates implemented; current-source diagnostic pending
+- Design status: Accepted through ADR 0138
+- Evidence status: first complete V5 diagnostic preserved as FAILED; corrected current-source diagnostic pending
 - Production allocator mode: `UNSELECTED`
 
 The V4 full-suite RANGE-1024 25ms row reached the source-governed 256-global outstanding cap and dropped 124 of
@@ -25,11 +25,14 @@ zero failure, zero timeout, and exact completion. V5 extends the canonical diagn
 raw-output manifests. `NADV5` has a new fixed wire and binds the JUnit manifest digest separately from the canonical
 raw manifest digest; `NARS5` carries both through selection. The raw manifest has an exact 19-JSON inventory, hashes
 every byte, and independently rechecks Native execution/workload identity, ten Native rows, source-bound STRICT,
-RANGE and terminal-drain receipts, fixed/derived conservation, zero drop/failure/timeout, and zero lifecycle residue.
+RANGE and terminal-drain receipts, fixed/derived conservation, and zero lifecycle residue. RANGE/Native authority
+rows retain zero drop/failure/timeout. STRICT retains exact terminal accounting but may record a non-qualifying
+candidate outcome; only formal evaluation applies its unchanged zero-loss qualification rule.
 Unexpected/missing JSON, a symlink, digest substitution, or any raw hard-gate mismatch fails sealing, validation,
-promotion, and selection. Native row ordinals reconstruct the exact population/latency/rate matrix; legacy STRICT and
-RANGE-16 compatibility receipts independently prove warm-up conservation, zero unexpected warm-up terminal, exact
-measured conservation, zero measured loss, real concurrency above four, and stopped actor lanes.
+promotion, and selection. Native row ordinals reconstruct the exact population/latency/rate matrix. STRICT and
+RANGE-16 compatibility receipts use the exact V5 admission/drain and prove warm-up/measured conservation, zero
+unexpected warm-up terminal, real concurrency above four, and stopped actor lanes; RANGE-16 additionally remains
+lossless.
 
 The V5 zero-decision plan digest is
 `3e0aea42527e85c58276a51f5953af0ffaba5029b8916e7bbd85f377f434d23a`; its Native execution-profile digest is
@@ -52,6 +55,8 @@ The preserved full-suite diagnostic archive is
 with identity SHA-256 `404f9bddc87f0f47cf4d272fa64bdc94254d903038d8d54593cdeddc46f20cd7` and manifest SHA-256
 `2010a324159902472945dd018ab64d457770e9c190270e6dcae1ec05b1462a80`. It is never formal or selection input.
 
-No V5 diagnostic or formal campaign has run at this implementation cut. Production allocator mode remains
-`UNSELECTED`; the existing production source lock, child receipts, current-source M2 regression, scenarios, and M3
-Final are unchanged.
+The first complete V5 diagnostic at exact source `a1664de9...` executed 24/0/0/0 but failed NADV5 sealing because
+STRICT candidate loss had been promoted incorrectly into a diagnostic prerequisite. ADR 0138 preserves that attempt
+at the external archive recorded there and corrects the boundary without changing qualification. No V5 formal
+campaign has run. Production allocator mode remains `UNSELECTED`; the existing production source lock, child
+receipts, current-source M2 regression, scenarios, and M3 Final are unchanged.

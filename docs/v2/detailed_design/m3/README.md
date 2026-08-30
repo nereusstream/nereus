@@ -751,7 +751,10 @@ new `4/128/512/1` V5 admission identity, and is tracked by the
 [V5 storm admission and diagnostic raw-integrity record](stage-b-v5-storm-admission-and-diagnostic-raw-integrity.md).
 The V5 codec/plan/launcher implementation now owns distinct NACP5/NAEV5/NADV5/NARS5 bytes, deterministic plan and
 execution-profile digests, a complete 19-JSON raw manifest, and an exact 24-test/ten-suite diagnostic inventory.
-Current-source diagnostic and formal execution remain pending; allocator mode is still `UNSELECTED`.
+[ADR 0138](../../../decisions/0138-v2-m3-allocator-v5-diagnostic-candidate-outcome-boundary-amendment.md) preserves
+the exact FAILED `a1664de9...` attempt, moves STRICT qualification back to formal evaluation, and makes its
+compatibility replay use the V5 runner/drain. Current-source diagnostic and formal execution remain pending;
+allocator mode is still `UNSELECTED`.
 
 At exact clean published source `848dd2db2f63646e4aea0ef8aabac0917ae83762`, the complete current-source
 `v2M3SourceCheck` passes in 6 minutes 39 seconds. It retains 937 ordinary tests across ten modules, 100/0/0/0

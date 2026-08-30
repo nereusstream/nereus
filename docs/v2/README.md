@@ -398,6 +398,7 @@ Accepted decisions:
 - [ADR 0135: M3 V4 RANGE-renewal acknowledged-proof reuse amendment](../decisions/0135-v2-m3-allocator-v4-range-renewal-acknowledged-proof-reuse-amendment.md)
 - [ADR 0136: M3 V4 controlled-delay scheduler capacity amendment](../decisions/0136-v2-m3-allocator-v4-controlled-delay-scheduler-capacity-amendment.md)
 - [ADR 0137: M3 V5 storm admission and diagnostic raw-integrity amendment](../decisions/0137-v2-m3-allocator-v5-storm-admission-and-diagnostic-raw-integrity-amendment.md)
+- [ADR 0138: M3 V5 diagnostic candidate-outcome boundary amendment](../decisions/0138-v2-m3-allocator-v5-diagnostic-candidate-outcome-boundary-amendment.md)
 
 ## Open design gates
 
@@ -704,6 +705,13 @@ and versions the already-frozen 2R storm admission contract as bounded `4/128/51
 V5 now has strict source-bound plan/profile/codec/launcher entrypoints and a canonical 19-file diagnostic raw
 manifest. A fresh 24-test/ten-suite current-source diagnostic and its NADV5 must pass before the launcher can create a
 formal output; no V5 formal evaluation or selection exists at this cut.
+
+[ADR 0138](../decisions/0138-v2-m3-allocator-v5-diagnostic-candidate-outcome-boundary-amendment.md) preserves the
+exact `a1664de9...` FAILED diagnostic and separates candidate qualification from diagnostic infrastructure validity.
+STRICT and RANGE-16 compatibility rows now use the exact V5 admission/drain factory; STRICT raw bytes must conserve
+every terminal and drain fully, but its loss remains a formal candidate outcome rather than a pre-campaign failure.
+RANGE-16, RANGE-1024, Native, and terminal-drain lossless gates remain unchanged. No threshold, SLO, plan, selection
+rule, source lock, or production mode changes.
 
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,

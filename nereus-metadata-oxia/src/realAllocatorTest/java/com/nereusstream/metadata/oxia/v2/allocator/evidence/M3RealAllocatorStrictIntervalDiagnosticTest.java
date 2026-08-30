@@ -117,6 +117,8 @@ class M3RealAllocatorStrictIntervalDiagnosticTest {
                             + ",\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false"
                             + ",\"sourceCommit\":"
                             + M3V3DiagnosticOutput.jsonString(sourceCommit)
+                            + ",\"offerHorizonSeconds\":40,\"terminalAdmissionDrainSeconds\":2"
+                            + ",\"cleanupGraceSeconds\":5"
                             + ",\"fixed1000\":"
                             + intervalJson(fixed.runnerResult())
                             + "}\n");
@@ -154,6 +156,8 @@ class M3RealAllocatorStrictIntervalDiagnosticTest {
         return "{\"schema\":\"NEREUS_V2_M3_ALLOCATOR_STRICT_FORMAL_SEQUENCE_DIAGNOSTIC_V1\""
                 + ",\"diagnosticOnly\":true,\"authority\":false,\"selectionEligible\":false"
                 + ",\"sourceCommit\":" + M3V3DiagnosticOutput.jsonString(sourceCommit)
+                + ",\"offerHorizonSeconds\":40,\"terminalAdmissionDrainSeconds\":2"
+                + ",\"cleanupGraceSeconds\":5"
                 + ",\"fixed1000\":" + intervalJson(fixed)
                 + ",\"derived800\":" + intervalJson(derived) + "}\n";
     }
@@ -165,6 +169,7 @@ class M3RealAllocatorStrictIntervalDiagnosticTest {
                 .findFirst()
                 .orElse(null);
         return "{\"warmupOffered\":" + result.warmupOffered()
+                + ",\"warmupDroppedBeforeAdmission\":" + result.warmupDroppedBeforeAdmission()
                 + ",\"warmupCompleted\":" + result.warmupCompleted()
                 + ",\"warmupLoadRejectedAfterAdmission\":" + result.warmupLoadRejectedAfterAdmission()
                 + ",\"warmupUnexpectedFailedAfterAdmission\":"
@@ -187,15 +192,20 @@ class M3RealAllocatorStrictIntervalDiagnosticTest {
                 + ",\"firstDroppedBindingOrdinal\":" + (firstDrop == null ? -1 : firstDrop.bindingOrdinal())
                 + ",\"firstDroppedSchedulerLagMicros\":"
                 + (firstDrop == null ? 0 : firstDrop.schedulerFiringLagMicros())
+                + ",\"queueDepthAtEnd\":" + result.queueDepthAtEnd()
+                + ",\"globalOutstandingAtEnd\":" + result.globalOutstandingAtEnd()
+                + ",\"bindingBusyAtEnd\":" + result.bindingBusyAtEnd()
+                + ",\"pendingPermitAtEnd\":" + result.pendingPermitAtEnd()
                 + ",\"actorLanesStoppedAtCleanupDeadline\":"
                 + result.actorLanesStoppedAtCleanupDeadline() + '}';
     }
 
     private static M3V3AllocatorFormalHarness.HarnessResult runInterval(
             M3CandidateAllocatorPopulation population, Cell cell, int offeredRate) throws InterruptedException {
-        M3V3AllocatorFormalHarness harness = M3V3AllocatorFormalHarness.forContractTest(
+        M3V3AllocatorFormalHarness harness = M3V3AllocatorFormalHarness.forContractTestV5(
                 Duration.ofSeconds(10),
                 Duration.ofSeconds(30),
+                Duration.ofSeconds(2),
                 Duration.ofSeconds(5),
                 population.formalActorEndpointsV3(cell, new NoopObserver()));
         List<M3V3AsyncActorLaneRunner.ScheduledOffer<M3V3AllocatorFormalHarness.CandidateRequest>> schedule =

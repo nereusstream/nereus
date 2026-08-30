@@ -88,12 +88,12 @@ class M3V5AllocatorProtocolMainTest {
         Files.writeString(
                 strict,
                 validStrict.replaceFirst(
-                        "\"measuredDroppedBeforeAdmission\":0",
-                        "\"measuredDroppedBeforeAdmission\":1"));
+                        "\"measuredDroppedBeforeAdmission\":26000",
+                        "\"measuredDroppedBeforeAdmission\":25999"));
         assertThatThrownBy(() -> M3V5AllocatorProtocolMain.main(
                         arguments("validate-diagnostic", output, junit, source, raw)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("legacy hard gate failed");
+                .hasMessageContaining("accounting gate failed");
         Files.writeString(strict, validStrict);
 
         Path v5Runner = junit.resolve("TEST-" + M3V5AsyncActorLaneRunnerTest.class.getName() + ".xml");
@@ -153,6 +153,7 @@ class M3V5AllocatorProtocolMainTest {
                 diagnostic(
                         "NEREUS_V2_M3_ALLOCATOR_RANGE16_FORMAL_SEQUENCE_DIAGNOSTIC_V1",
                         ",\"sourceCommit\":\"" + source.nereusCommit() + "\""
+                                + formalTiming()
                                 + ",\"fixed1000\":" + legacyLosslessRow(1_000)));
         Files.writeString(
                 directory.resolve("real-oxia-operation-diagnostic.json"),
@@ -165,8 +166,9 @@ class M3V5AllocatorProtocolMainTest {
                 diagnostic(
                         "NEREUS_V2_M3_ALLOCATOR_STRICT_FORMAL_SEQUENCE_DIAGNOSTIC_V1",
                         ",\"sourceCommit\":\"" + source.nereusCommit() + "\""
-                                + ",\"fixed1000\":" + legacyLosslessRow(1_000)
-                                + ",\"derived800\":" + legacyLosslessRow(800)));
+                                + formalTiming()
+                                + ",\"fixed1000\":" + legacyNonQualifyingRow(1_000)
+                                + ",\"derived800\":" + legacyNonQualifyingRow(800)));
         for (int latencyMillis : new int[] {10, 25}) {
             Files.writeString(
                     directory.resolve("v5-range1024-" + latencyMillis + "ms-formal-sequence.json"),
@@ -212,13 +214,41 @@ class M3V5AllocatorProtocolMainTest {
     private static String legacyLosslessRow(int rate) {
         long warmup = Math.multiplyExact((long) rate, 10L);
         long measured = Math.multiplyExact((long) rate, 30L);
-        return "{\"warmupOffered\":" + warmup + ",\"warmupCompleted\":" + warmup
+        return "{\"warmupOffered\":" + warmup + ",\"warmupDroppedBeforeAdmission\":0"
+                + ",\"warmupCompleted\":" + warmup
                 + ",\"warmupLoadRejectedAfterAdmission\":0"
                 + ",\"warmupUnexpectedFailedAfterAdmission\":0,\"warmupTimedOutAfterAdmission\":0"
                 + ",\"measuredOffered\":" + measured + ",\"measuredAdmitted\":" + measured
                 + ",\"measuredDroppedBeforeAdmission\":0,\"measuredCompleted\":" + measured
                 + ",\"measuredFailedAfterAdmission\":0,\"measuredTimedOutAfterAdmission\":0"
-                + ",\"globalOutstandingMaximum\":16,\"actorLanesStoppedAtCleanupDeadline\":true}";
+                + ",\"globalOutstandingMaximum\":16"
+                + legacyLifecycle() + "}";
+    }
+
+    private static String legacyNonQualifyingRow(int rate) {
+        long warmup = Math.multiplyExact((long) rate, 10L);
+        long measured = Math.multiplyExact((long) rate, 30L);
+        long warmupDropped = warmup - 2_000;
+        long measuredAdmitted = 4_000;
+        return "{\"warmupOffered\":" + warmup
+                + ",\"warmupDroppedBeforeAdmission\":" + warmupDropped
+                + ",\"warmupCompleted\":1000,\"warmupLoadRejectedAfterAdmission\":1000"
+                + ",\"warmupUnexpectedFailedAfterAdmission\":0,\"warmupTimedOutAfterAdmission\":0"
+                + ",\"measuredOffered\":" + measured + ",\"measuredAdmitted\":" + measuredAdmitted
+                + ",\"measuredDroppedBeforeAdmission\":" + (measured - measuredAdmitted)
+                + ",\"measuredCompleted\":1000,\"measuredFailedAfterAdmission\":3000"
+                + ",\"measuredTimedOutAfterAdmission\":0,\"globalOutstandingMaximum\":256"
+                + legacyLifecycle() + "}";
+    }
+
+    private static String legacyLifecycle() {
+        return ",\"queueDepthAtEnd\":0,\"globalOutstandingAtEnd\":0,\"bindingBusyAtEnd\":0"
+                + ",\"pendingPermitAtEnd\":0,\"actorLanesStoppedAtCleanupDeadline\":true";
+    }
+
+    private static String formalTiming() {
+        return ",\"offerHorizonSeconds\":40,\"terminalAdmissionDrainSeconds\":2"
+                + ",\"cleanupGraceSeconds\":5";
     }
 
     private Path diagnosticJUnitDirectory() throws Exception {

@@ -432,6 +432,7 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         raw_gate = V5_RAW_GATE.read_text()
         runner_test = V5_RUNNER_TEST.read_text()
         range_latency = V5_RANGE_LATENCY_DIAGNOSTIC.read_text()
+        strict_sequence = V3_STRICT_SEQUENCE_DIAGNOSTIC.read_text()
         for token in (
             "realAllocatorV5BoundedAdaptiveFormalCampaign",
             "realAllocatorV5DiagnosticTest",
@@ -472,9 +473,15 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
         self.assertIn('"v5-range1024-25ms-formal-sequence.json"', raw_gate)
         self.assertIn("requireLosslessRow(json, \"fixed1000\", 1_000, true)", raw_gate)
         self.assertIn("requireLosslessRow(json, \"derived800\", 800, true)", raw_gate)
+        self.assertIn("requireLegacyAuditableRow(json, \"fixed1000\", 1_000)", raw_gate)
+        self.assertIn("requireLegacyAuditableRow(json, \"derived800\", 800)", raw_gate)
+        self.assertIn("warmupDroppedBeforeAdmission", raw_gate)
         self.assertIn("native-baseline-row-09.json", raw_gate)
         self.assertIn("actorLanesStopped", raw_gate)
         self.assertIn("forContractTestV5", range_latency)
+        self.assertIn("forContractTestV5", strict_sequence)
+        self.assertIn('Duration.ofSeconds(2)', strict_sequence)
+        self.assertIn('"terminalAdmissionDrainSeconds\\\":2"', strict_sequence)
         self.assertIn("MAX_GLOBAL_OUTSTANDING", runner_test)
         self.assertIn("containsExactly(128, 128, 128, 128)", runner_test)
 

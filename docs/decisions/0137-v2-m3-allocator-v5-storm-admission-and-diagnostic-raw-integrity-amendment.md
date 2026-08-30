@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-29
 - Amends: ADRs 0108, 0125, and 0136 for a new allocator evidence protocol only
+- Amended by: ADR 0138 for the diagnostic candidate-outcome boundary
 - Preserves: every V1/V2/V3/V4 canonical byte and terminal result; the frozen workload, candidates, rates, latency
   rows, zero-drop rule, p99/fault/scale SLOs, qualification thresholds, selection preference, and M6 activation boundary
 
