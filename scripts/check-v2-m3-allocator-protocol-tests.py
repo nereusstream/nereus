@@ -25,6 +25,9 @@ FAILED_FORMAL_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-failed-form
 PROMOTION_INVALID_FORMAL_ARCHIVER = (
     ROOT / "scripts" / "archive-v2-m3-allocator-promotion-invalid-formal.py"
 )
+SELECTED_FORMAL_ARCHIVER = (
+    ROOT / "scripts" / "archive-v2-m3-allocator-selected-formal.py"
+)
 DIAGNOSTIC_ARCHIVER = ROOT / "scripts" / "archive-v2-m3-allocator-diagnostic.py"
 V3_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v3.py"
 V4_PLAN = ROOT / "scripts" / "v2-m3-allocator-plan-v4.py"
@@ -1119,6 +1122,159 @@ class M3AllocatorProtocolConfigurationTest(unittest.TestCase):
             for source_file in files:
                 relative = source_file.relative_to(source)
                 self.assertEqual(source_file.read_bytes(), (archive / "payload" / relative).read_bytes())
+            repeated = subprocess.run(command, check=False, capture_output=True, text=True)
+            self.assertNotEqual(0, repeated.returncode)
+            self.assertIn("archive target already exists", repeated.stderr)
+
+    def test_selected_formal_archiver_preserves_promotion_validated_nars5(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "selected-formal"
+            checkpoints = source / "checkpoints"
+            checkpoints.mkdir(parents=True)
+            checkpoint = checkpoints / "last.nacp5"
+            checkpoint.write_bytes(b"completed-checkpoint")
+            checkpoint_sha = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+            campaign = source / "campaign-result.json"
+            campaign.write_text(
+                json.dumps({"status": "COMPLETED", "terminalReason": "COMPLETED"}) + "\n",
+                encoding="utf-8",
+            )
+            evaluation = source / "evaluation.naev5"
+            evaluation.write_bytes(b"range-selected-evaluation")
+            evaluation_sha = hashlib.sha256(evaluation.read_bytes()).hexdigest()
+            junit = root / "formal-junit.xml"
+            junit.write_text(
+                '<testsuite tests="1" failures="0" errors="0" skipped="0"/>\n',
+                encoding="utf-8",
+            )
+            junit_sha = hashlib.sha256(junit.read_bytes()).hexdigest()
+            promotion = source / "promotion-decision.json"
+            diagnostic_sha = "d" * 64
+            diagnostic_junit_sha = "e" * 64
+            diagnostic_raw_sha = "f" * 64
+            promotion.write_text(
+                json.dumps(
+                    {
+                        "schema": "NEREUS_V2_M3_ALLOCATOR_PROMOTION_DECISION_V5",
+                        "status": "PROMOTABLE",
+                        "selectedCandidate": "RANGE_64",
+                        "checkpointSha256": checkpoint_sha,
+                        "evaluationSha256": evaluation_sha,
+                        "diagnosticSha256": diagnostic_sha,
+                        "diagnosticJUnitSha256": diagnostic_junit_sha,
+                        "diagnosticRawManifestSha256": diagnostic_raw_sha,
+                        "formalJUnitSha256": junit_sha,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            source_commit = "a" * 40
+            attachment_root = "c" * 64
+            selection_bytes = bytearray(500)
+            selection_bytes[:10] = b"NARS5\0\0\0\0\x05"
+            selection_bytes[10] = 3
+            selection_bytes[12:52] = source_commit.encode("ascii")
+            selection_bytes[148:180] = bytes.fromhex("b" * 64)
+            selection_bytes[180:212] = bytes.fromhex("1" * 64)
+            selection_bytes[212:244] = bytes.fromhex("b" * 64)
+            selection_bytes[244:276] = bytes.fromhex("2" * 64)
+            selection_bytes[276:308] = bytes.fromhex(checkpoint_sha)
+            selection_bytes[308:340] = bytes.fromhex(evaluation_sha)
+            selection_bytes[340:372] = bytes.fromhex(attachment_root)
+            selection_bytes[372:404] = bytes.fromhex(diagnostic_sha)
+            selection_bytes[404:436] = bytes.fromhex(diagnostic_junit_sha)
+            selection_bytes[436:468] = bytes.fromhex(diagnostic_raw_sha)
+            selection_bytes[468:500] = bytes.fromhex("3" * 64)
+            selection = source / "selection.nars5"
+            selection.write_bytes(selection_bytes)
+            files = sorted(path for path in source.rglob("*") if path.is_file())
+            archive = root / "archive"
+            command = [
+                sys.executable,
+                str(SELECTED_FORMAL_ARCHIVER),
+                "--source",
+                str(source),
+                "--archive",
+                str(archive),
+                "--archived-on",
+                "2026-08-30",
+                "--source-commit",
+                source_commit,
+                "--plan-sha256",
+                "b" * 64,
+                "--campaign-result-sha256",
+                hashlib.sha256(campaign.read_bytes()).hexdigest(),
+                "--final-checkpoint-relative-path",
+                checkpoint.relative_to(source).as_posix(),
+                "--final-checkpoint-sha256",
+                checkpoint_sha,
+                "--evaluation-sha256",
+                evaluation_sha,
+                "--attachment-root-sha256",
+                attachment_root,
+                "--promotion-decision-sha256",
+                hashlib.sha256(promotion.read_bytes()).hexdigest(),
+                "--selection-sha256",
+                hashlib.sha256(selection.read_bytes()).hexdigest(),
+                "--formal-junit",
+                str(junit),
+                "--formal-junit-sha256",
+                junit_sha,
+                "--expected-file-count",
+                str(len(files)),
+                "--expected-total-bytes",
+                str(sum(path.stat().st_size for path in files)),
+                "--evaluation-status",
+                "RANGE_SELECTED",
+                "--selected-candidate",
+                "RANGE_64",
+            ]
+
+            subprocess.run(command, check=True, capture_output=True, text=True)
+            identity = json.loads((archive / "archive-identity.json").read_bytes())
+            self.assertEqual(
+                "NEREUS_V2_M3_ALLOCATOR_SELECTED_FORMAL_ARCHIVE_IDENTITY_V1",
+                identity["schema"],
+            )
+            self.assertEqual("RANGE_64", identity["selectedCandidate"])
+            self.assertEqual("RANGE", identity["allocatorMode"])
+            self.assertTrue(identity["nars5Present"])
+            self.assertTrue(identity["promotionIntegrityValidated"])
+            self.assertTrue(identity["promotableInput"])
+            self.assertFalse(identity["futureCampaignInput"])
+            self.assertEqual(junit.read_bytes(), (archive / "formal-junit.xml").read_bytes())
+            for source_file in files:
+                relative = source_file.relative_to(source)
+                self.assertEqual(source_file.read_bytes(), (archive / "payload" / relative).read_bytes())
+
+            invalid = command.copy()
+            invalid[invalid.index("--selected-candidate") + 1] = "STRICT"
+            second_archive = root / "invalid-archive"
+            invalid[invalid.index("--archive") + 1] = str(second_archive)
+            rejected = subprocess.run(invalid, check=False, capture_output=True, text=True)
+            self.assertNotEqual(0, rejected.returncode)
+            self.assertIn("does not belong", rejected.stderr)
+            self.assertFalse(second_archive.exists())
+
+            wrong_wire = command.copy()
+            wire_archive = root / "wrong-wire-archive"
+            wrong_wire[wrong_wire.index("--archive") + 1] = str(wire_archive)
+            selection_bytes[372] ^= 1
+            selection.write_bytes(selection_bytes)
+            wrong_wire[wrong_wire.index("--selection-sha256") + 1] = hashlib.sha256(
+                selection.read_bytes()
+            ).hexdigest()
+            rejected_wire = subprocess.run(
+                wrong_wire, check=False, capture_output=True, text=True
+            )
+            self.assertNotEqual(0, rejected_wire.returncode)
+            self.assertIn("fixed source/digest wire differs", rejected_wire.stderr)
+            self.assertFalse(wire_archive.exists())
+            selection_bytes[372] ^= 1
+            selection.write_bytes(selection_bytes)
+
             repeated = subprocess.run(command, check=False, capture_output=True, text=True)
             self.assertNotEqual(0, repeated.returncode)
             self.assertIn("archive target already exists", repeated.stderr)
