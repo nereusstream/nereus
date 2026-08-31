@@ -262,8 +262,9 @@ pooling is optional and remains below the independently owned sessions.
 8. [Metadata backends and handoff](06-metadata-backends-and-handoff.md)
 9. [Protocol integrations and product gates](07-protocol-integrations.md)
 10. [Implementation plan and gates](08-implementation-plan-and-gates.md)
-11. [M1 execution index](detailed_design/m1/README.md), [M2 detailed-design index](detailed_design/m2/README.md), and
-    [M3 closed execution index](detailed_design/m3/README.md); the M4 charter is the next design artifact
+11. [M1 execution index](detailed_design/m1/README.md), [M2 detailed-design index](detailed_design/m2/README.md),
+    [M3 closed execution index](detailed_design/m3/README.md), and
+    [M4 detailed-design index](detailed_design/m4/README.md)
 12. [Scenario evidence matrix](09-scenario-evidence-matrix.md)
 13. [Architecture tradeoffs](tradeoffs.md)
 14. [Open questions](open-questions.md) and [grill session records](grill-notes/)
