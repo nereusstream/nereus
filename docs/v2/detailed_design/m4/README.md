@@ -17,7 +17,7 @@ ticket, or a second physical-object pin authority.
 ## Current design state
 
 - [M4-A read-view authority and batch lifetime](m4-a-read-view-authority.md) is accepted design input from Grill 32.
-- Grill 33 must close the protocol/profile-specific source-validation and fallback decision matrix.
+- [M4-B typed source plan and fallback](m4-b-source-plan-and-fallback.md) is accepted design input from Grill 33.
 - Grill 34 must close the physical hazard-slot, cancellation, drain, and reclamation race matrix without weakening
   ADRs 0070/0072.
 - Grill 35 must freeze M4/M5 predicate ownership, receipt hierarchy, the historical M3 dependency contract, and the
@@ -44,7 +44,7 @@ For each bounded Binding-scoped protocol read batch, M4 must:
 ```text
 M4 stable read path
 ├── A. Binding read-view authority and lifetime          ACCEPTED INPUT (Grill 32)
-├── B. protocol/profile source plan and fallback matrix PENDING (Grill 33)
+├── B. protocol/profile source plan and fallback matrix ACCEPTED INPUT (Grill 33)
 ├── C. hazard-slot and reclamation race closure         PENDING (Grill 34)
 └── D. M4/M5 evidence and frozen-dependency boundary    PENDING (Grill 35)
     └── hard-frozen M4 design                           NOT REACHED
