@@ -116,8 +116,8 @@ performance-first BookKeeper WAL.
   replication with hard-bounded Observed/Applied eligibility, election-bounded tail adoption, profile-neutral BK/Object
   protocol checkpoints with an independent terminal Head, coherent/delayed Fetch, native read-committed metadata, and
   semantic compaction. `NBKE2` checkpoint carriage is M2, exact Object `NWKCP1` bytes/Head/key caps are M3, and native
-  Kafka transport/process activation is M6. The M2 carrier is now verified by M2 Final; `NWKCP1` remains M3 work and
-  native transport/process activation remains M6 work.
+  Kafka transport/process activation is M6. The M2 carrier is verified by M2 Final, and M3 Final closes the exact
+  `NWKCP1` scope; native transport/process activation remains M6 work.
 - ADR 0088, [ADR 0089's exact Header amendment](../decisions/0089-v2-m3-nwg1-v1-header-layout-amendment.md), and the
   accepted [M3-I0 NWG1 input closure](detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md) freeze the exact
   256-byte Header offsets, 116/104/96/48-byte NWG1 rows, strict code/cap/crypto tables, six-vector/114-component A corpus,
@@ -125,17 +125,16 @@ performance-first BookKeeper WAL.
   duplicate class field; `laneId` is the permanent class ID, Object digest is SHA-256/v1 code `1/1`, and all twelve
   first-satisfied close reasons are distinct. That M3-I0 acceptance was documentation-only; later accepted ADRs and
   exact-source implementation descendants now supply the production codec/manifests/runners/harnesses,
-  Root/Pointer, `NWKCP1`, and Provider/KMS/native-reference children. The common tested source `ae8e3f7f...` also
-  supplied canonical V5 `RANGE_SELECTED(RANGE_64)`, all fresh Final children, 26 scenario promotions, and canonical
-  M3 Final `1089d4f6...` at `ae8e3f7f...`. ADR 0142's later documentation-checker correction requires a new
-  common-source freshness chain. Its first `af2f6039...` diagnostic failed on four scheduler-late Native tail
-  requests with frozen targets before offer close; ADR 0143 binds V5 delivery to those frozen targets only through
-  the unchanged final-admission deadline. Native broker/controller activation remains M6.
+  Root/Pointer, `NWKCP1`, and Provider/KMS/native-reference children. The later common tested source
+  `e5e53e62865c21845621037bea5f18c092bd4259` supplies canonical V5 `RANGE_SELECTED(RANGE_64)`, all eleven fresh Final
+  children, 26 scenario promotions, and immutable M3 Final
+  `docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json` with SHA-256
+  `81c7004a923e5b96cab0a3c8b4f1fa26d71606a2208bbabe779f0d872f84f84a`. M3 is closed and hard-frozen; native
+  broker/controller activation remains M6.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
-  SPI/transitions, 48 ordinary allocator tests, and an 11-test formal-runner contract gate now exist. This does not
-  change the preceding M3-I0 claim or supply the
-  missing real/native allocator evidence, exact RANGE-size selection, selected mode, scenario PASS, or native broker
-  activation.
+  SPI/transitions, 48 ordinary allocator tests, and formal-runner contracts. It did not by itself select a mode or
+  promote a scenario; the later e5 Final closes those evidence obligations with `RANGE_64`. It still does not activate
+  a native broker process.
 - The initial foundation supplied Java-17/JDK-only domain values, NPC1/NTI1/NPN1 plus NTB1/NSE1 goldens, direct
   aggregate validation, exactly four metadata capabilities, closed create/CAS outcomes, production dependency/API
   guards, and reproducible JAR/source-JAR/POM hashes. It deliberately made no NTA1, Registry, P1/R1, real-backend, or
@@ -264,7 +263,7 @@ pooling is optional and remains below the independently owned sessions.
 9. [Protocol integrations and product gates](07-protocol-integrations.md)
 10. [Implementation plan and gates](08-implementation-plan-and-gates.md)
 11. [M1 execution index](detailed_design/m1/README.md), [M2 detailed-design index](detailed_design/m2/README.md), and
-    [M3 detailed-design index](detailed_design/m3/README.md)
+    [M3 closed execution index](detailed_design/m3/README.md); the M4 charter is the next design artifact
 12. [Scenario evidence matrix](09-scenario-evidence-matrix.md)
 13. [Architecture tradeoffs](tradeoffs.md)
 14. [Open questions](open-questions.md) and [grill session records](grill-notes/)
@@ -466,7 +465,8 @@ RANGE-64 100k prerequisite completed every Head and 84,118/89,424 initial grants
 cutoff, while the accepted path already charged 900 seconds. New exact-source V5 execution uses one shared
 900-second charge/runtime constant without changing plan/profile bytes, workload, SLOs, candidates, qualification,
 or selection. The failed 106-file/17,569,678-byte attempt is externally bound by archive identity
-`27b28916...91de`; a fresh 100k guard, canonical diagnostic, and formal remain required.
+`27b28916...91de`. At that historical cut a fresh 100k guard, canonical diagnostic, and formal remained required; the
+later e5 common-source chain completed those obligations and published the hard-frozen M3 Final identified above.
 ADR 0089 amends that input before any production NWG1 bytes exist with the gap-free exact 256-byte Header table. It
 retains `wireVersion=1`, removes node session and any duplicate packing-class field from the Header, fixes Object digest
 `SHA-256/v1=1/1` plus close-reason codes `1..12`, and requires the future projection to mechanically transcribe the ADR.

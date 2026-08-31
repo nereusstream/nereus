@@ -1,17 +1,34 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: InProgress
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeExecutionIndex
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json
 ---
 
 # M3 detailed-design index
 
 M3 implements the one-Cell Object WAL carrier over the accepted M1 identities/metadata authorities and M2 protocol
-state machines. The M3-I0 review closes the NWG1 implementation inputs; it does not make the whole milestone
-implementation-ready by assertion and does not convert any `PLANNED` scenario into evidence.
+state machines. M3 is now closed and hard-frozen by the exact e5 source-bound Final; the M3-I0 and execution records
+below remain the traceable path to that closure rather than alternate current states.
+
+## Hard-frozen closure
+
+- common production and test source: `e5e53e62865c21845621037bea5f18c092bd4259`;
+- production allocator lock: `RANGE`, selected candidate `RANGE_64`;
+- Final: `docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json`;
+- Final SHA-256: `81c7004a923e5b96cab0a3c8b4f1fa26d71606a2208bbabe779f0d872f84f84a`;
+- eleven child receipts and 26 promoted scenarios;
+- selected-formal archive manifest SHA-256:
+  `a6c12ad7e642cedaf806b495d88f9e6685f665dc4d07c94357f9aa05638e84ba`;
+- exclusions retained by Final: `M6_PROCESS_ACTIVATION` and `M8_NATIVE_PARITY`.
+
+No navigation, M4 design, reader implementation, validator, pin, or scenario addition reopens M3. Reopening requires
+an explicit invalidation of the frozen source/selection/protocol/evidence identity described in the implementation
+plan. The evidence files, source locks, allocator sources, workload, harness, and formal archive are untouched by this
+navigation transition.
 
 ## Working implementation snapshot (2026-08-24, non-promotable)
 
@@ -792,7 +809,7 @@ mutation 3/0/0/0 over 84 records/240 paths/50 roots, NWG1 wire 17/0/0/0 over 114
 `docs/v2/evidence/v2-m3/final/m3-final.json`; it does not synthesize a receipt. This source closure is not allocator
 formal evidence and cannot remove the selection, post-selection freshness, scenario, or Final blockers.
 
-## Current boundary
+## Historical pre-e5 boundary
 
 [ADR 0142](../../../decisions/0142-v2-m3-final-documentation-scenario-closure-amendment.md) preserves every
 `ae8e3f7f...` result below as immutable prior-source evidence while correcting the documentation gate's missing M3

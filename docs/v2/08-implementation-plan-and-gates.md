@@ -16,19 +16,42 @@ sourceTuple: v2-m1
 | M0 | V1 archive references, Context Map/glossaries, V2 ADRs/contracts, open-question/session logs, source/scenario manifests, tradeoff register, documentation gate | DocumentationGated | `v2M0Check` |
 | M1 | pure V2 active graph; Java-17/JDK-only domain and exact four-capability metadata SPI; NTB1/NSE1 identities and strict NTA1 aggregate; complete Kafka API-key-32000 KRaft record/image/CreateTopics pseudo-config/resolution/sizing/projection/publication authority; Pulsar selector CAS plus authoritative ABA-safe ownership witness, gap-safe stale-install exclusion, and local atomic ACTIVE fence; compatibility-namespace Registry, complete writer-set/interlock, versioned derived slice view, and `REGISTRY_CONFORMANCE`; allocator `HARNESS_CONFORMANCE_ONLY` with no mode selection; remove every active V1 runtime/gate | **Promotion-derived: implementation and pure-V2 prune are complete; current completion is exactly the trusted N3 receipts/scenario state accepted by `v2M1FinalCheck`** | `v2M1FinalCheck` |
 | M2 | Owner Epoch lane and typed frontier; Kafka BookKeeper per-partition leader-epoch-bound run chain, NBKE2 DATA/control frames, packed RecordBatch range indexes, pre-position reservation, bounded overlapping writes and fenced ordered locator/producer/transaction/leader-epoch publication; distinct Allocated/Durable/LEO/HW/LSO state, native duplicate semantics plus storage-retry digests, speculative producer deltas, profile-neutral checkpoint kernel with BK implementation, compact follower-descriptor/Observed/Applied/election-adoption primitives with hard journal/source/apply-lag eligibility, targeted floor+coverage+successor Fetch, delayed-wakeup seam, sequential cursor, bounded suffix recovery, async-Object source switch, and 10k/100k evidence; Pulsar deterministic NPD1-data/NPO1-root pair with checked 16-byte-row/streaming envelope and provider admission plus native-relative block-policy evidence; ManagedLedger-owned dual-source handle/read pins/final-delete revalidation and persisted BK_DELETE state/retention policy | **Promotion-derived: the global current-source receipt binds exact Kafka/Pulsar Final child roots and the disjoint 21-scenario union accepted by `v2M2Check`; M3 Object WAL, M6 process activation, M8 parity, and mixed/downstream rows remain excluded** | `v2M2Check` |
-| M3 | one-cell NWG1 Object WAL groups; binding-context epoch authority, exact per-commit Kafka leader epoch, and commit-set co-location; run-key/per-Object AEAD; final class/lane leaf grammar and post-plan sequence allocation; up to three lazy lanes under one Root/pointer; provider-resolved physical frontier plus owner-local per-binding typed frontier; physical-only de-duplicated checkpoint rows/Seal; separate bounded Root-bound NWKCP1 Kafka protocol-checkpoint family selected by an independent publisher-fenced OPEN/TERMINAL Head; one publisher-epoch-fenced physical vector chain; pre-position tracker/locator reservation and local tickets; shared-verified range-aggregated fenced active-tail publication before ACK; Root-fixed NONE/optional bounded provider-proof mode; provider-absent cuts; conservative bounded prefix/LIST recovery with no partial skip vector; provider/session evidence; fixed-slice Pulsar virtual-ledger path with RANGE evidence | **In progress for current-source recertification. Exact `ae8e3f7f...` has immutable canonical M3 Final `1089d4f6...`, `RANGE_SELECTED(RANGE_64)`, all eleven fresh children, and 26 promoted scenarios. ADR 0142 corrects the documentation gate's missing M3 promotion group. The first `af2f6039...` V5 diagnostic then failed on four scheduler-late Native tail offers; ADR 0143 makes their frozen target authoritative only through the unchanged final-admission deadline. A new exact source must pass the complete diagnostic/formal/freshness chain before a non-overwriting Final can become current.** | `v2M3Check` |
-| M4 | manifest, protocol-position/timestamp indexes, Storage Epoch resolver, logical Binding read snapshot, bounded sharded generation-tagged hazard slots, ABA-safe lease word and terminal source drain, `ADMITTING/STOPPED` Binding selector with fused fallback-removal/E+1 cut, small inline closure-anchor set plus emergency STOPPED envelope, closed-verifier terminal publication and async batched prune, per-source first/shared-last intervals, deterministic on-demand proofs/window, exact inline/reference activation, explicit bounded O(N) reconciliation, and two-stage retirement | Planned | `v2M4Check` |
+| M3 | one-cell NWG1 Object WAL groups; binding-context epoch authority, exact per-commit Kafka leader epoch, and commit-set co-location; run-key/per-Object AEAD; final class/lane leaf grammar and post-plan sequence allocation; up to three lazy lanes under one Root/pointer; provider-resolved physical frontier plus owner-local per-binding typed frontier; physical-only de-duplicated checkpoint rows/Seal; separate bounded Root-bound NWKCP1 Kafka protocol-checkpoint family selected by an independent publisher-fenced OPEN/TERMINAL Head; one publisher-epoch-fenced physical vector chain; pre-position tracker/locator reservation and local tickets; shared-verified range-aggregated fenced active-tail publication before ACK; Root-fixed NONE/optional bounded provider-proof mode; provider-absent cuts; conservative bounded prefix/LIST recovery with no partial skip vector; provider/session evidence; fixed-slice Pulsar virtual-ledger path with RANGE evidence | **CLOSED / hard-frozen. Exact common tested source `e5e53e62865c21845621037bea5f18c092bd4259` binds `RANGE_SELECTED(RANGE_64)`, eleven child receipts, 26 promoted scenarios, and immutable Final SHA-256 `81c7004a923e5b96cab0a3c8b4f1fa26d71606a2208bbabe779f0d872f84f84a`. M6 process activation and M8 native parity remain excluded.** | `v2M3Check` |
+| M4 | stable `ReadSnapshot/readVersion`; deterministic BK/Object candidate validation and `ReadPathDecision`; safe BK fallback and trusted-Object continuation; read pin plus physical-object `readingSlot`; proof-window consumption; head reclaim decision; M4-owned evidence without M5 physical deletion | **Design charter is the next milestone artifact; implementation and evidence have not started.** | `v2M4Check` |
 | M5 | materialization, compaction, retention, immutable capability-evidence verification, exact per-source protection release, irreversible same-key `FULL_V1 -> RETIRED_V1` batch compaction with permanent compact tombstone, retained-source/batch/tombstone admission and alerting, per-cell cache/task isolation, physical GC | Planned | `v2M5Check` |
 | M6 | Kafka/Pulsar broker/controller process integration; native Kafka Produce/Fetch/Admin, replica-Fetch compact descriptor transport, durable observation journal, hard-bounded Observed/Applied ISR eligibility, native election adoption, ISR/minISR/HW/LSO, delayed-Fetch purgatory, native duplicate/error semantics, transactions/control markers, leader-epoch truncation, restart/catch-up/snapshot, and protocol compatibility evidence over the M1/M2/M3 authorities; Pulsar native process integration | Planned | `v2M6Check` |
 | M7 | fencing, planned handoff, bounded recovery, cell-local drain/close isolation, mixed-profile operations | Planned | `v2M7Check` |
 | M8 | scale, shared-infrastructure/noisy-neighbor chaos, exact-source AutoMQ comparison, Pulsar native parity, release evidence | Planned | `v2M8Check` and `v2FinalCheck` |
 
-M0, M1 and M2 gates are registered, and the current M1/M2 Final evidence is complete. M3 source, governance, evidence,
-and aggregate task names are registered. The `ae8e3f7f...` Final proves its immutable source-bound scope, while ADR
-0142 requires one new common-source freshness chain for the corrected aggregate documentation gate. ADR 0143 records
-the failed `af2f6039...` diagnostic and repairs the V5 logical-target/physical-delivery boundary before that chain.
-Intermediate
-focused gates remain explicitly non-promotable; M4-M8 task names remain future contracts until implemented.
+M0, M1, M2, and M3 are closed by their respective aggregate evidence. M3's current closure is the immutable e5 Final
+identified below; its historical diagnostics and earlier Finals remain history rather than alternate current
+authority. M4 design is the next milestone boundary; no M4 implementation, scenario promotion, receipt, or Final is
+implied. Intermediate focused gates remain explicitly non-promotable; M5-M8 task names remain future contracts until
+implemented.
+
+## Closed milestone: M3
+
+The M3-to-M4 transition fixes the following immutable closure identity:
+
+| Item | Frozen value |
+| --- | --- |
+| Production and exact test source | `e5e53e62865c21845621037bea5f18c092bd4259` |
+| Production allocator lock | `m3EvidenceBindings.allocatorMode=RANGE` in `docs/v2/source-locks.json` |
+| Selected allocator | `RANGE_64` |
+| Final | `docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json` |
+| Final SHA-256 | `81c7004a923e5b96cab0a3c8b4f1fa26d71606a2208bbabe779f0d872f84f84a` |
+| Child/scenario closure | eleven child receipts; 26 promoted scenarios |
+| Formal archive manifest SHA-256 | `a6c12ad7e642cedaf806b495d88f9e6685f665dc4d07c94357f9aa05638e84ba` |
+| Formal selection SHA-256 | `92c13584eb2ca08e38b299d4facc6e65cab5cd6e4e6b7bec12aaf83356f8e2fe` |
+| Exclusions | `M6_PROCESS_ACTIVATION`, `M8_NATIVE_PARITY` |
+
+M3 reopens only if its production source lock, selected allocator, workload/qualification/RANGE-size/harness,
+canonical protocol or persistent bytes, Final/archive identity, or certified-source equality is invalidated. M4 reader,
+validator, pin, scenario, or ordinary refactoring work does not reopen M3. Ordinary M4 CI verifies M3 identities and
+affected contracts; it does not rerun the formal allocator campaign.
+
+The remaining M3 implementation chronology below is retained as an audit trail. Any statement there that described a
+then-pending rerun is historical and is superseded by the closure identity above.
 
 The accepted
 [M2-K0 Kafka implementation-input closure](detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) fixed
