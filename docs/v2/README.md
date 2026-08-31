@@ -131,6 +131,11 @@ performance-first BookKeeper WAL.
   `docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json` with SHA-256
   `81c7004a923e5b96cab0a3c8b4f1fa26d71606a2208bbabe779f0d872f84f84a`. M3 is closed and hard-frozen; native
   broker/controller activation remains M6.
+- The accepted [M4 design index](detailed_design/m4/README.md) and M4-A/B/C/D preserve the complete fixed-reviewer
+  responses from Grills 32 through 35 and hard-freeze the logical read view, typed source plan, hazard lifetime,
+  read-quiescence proof, exact protection-generation release, M4/M5 ownership, and future evidence hierarchy.
+  `v2M4DesignCheck` proves exactly `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`; all M4 scenarios remain `PLANNED`, no
+  M4 receipt/Final exists, and evidence-selected physical representations/caps remain OPEN.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and formal-runner contracts. It did not by itself select a mode or
   promote a scenario; the later e5 Final closes those evidence obligations with `RANGE_64`. It still does not activate

@@ -64,6 +64,11 @@ required_v2_docs=(
     detailed_design/m2/pulsar-m2-final-evidence.md
     detailed_design/m3/README.md
     detailed_design/m3/m3-i0-nwg1-implementation-input-closure.md
+    detailed_design/m4/README.md
+    detailed_design/m4/m4-a-read-view-authority.md
+    detailed_design/m4/m4-b-source-plan-and-fallback.md
+    detailed_design/m4/m4-c-hazard-slot-reclamation.md
+    detailed_design/m4/m4-d-evidence-ownership-and-freeze.md
     open-questions.md
     tradeoffs.md
 )

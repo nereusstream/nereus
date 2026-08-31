@@ -264,10 +264,10 @@ fused durable PWF E -> PO E+1
 ```
 
 M4 proves hazard admission, terminal drain, local drained-through cuts, absence of current-owner fallback-bearing
-slots, read-side capability/epoch identities, and proof-window/head/fold candidates/measurements. The existing index
-assigns protection-release execution/reconciliation and final provider deletion/recovery to M5. Round 35 freezes the
-terminal/proof/fold writer, contiguous-coverage receipt, and closed release-precondition verifier ownership; M4-C does
-not preselect them. P4 remains a separate M2 native authority.
+slots, read-side capability/epoch identities, proof-window/head/fold authority, contiguous historical coverage, and
+the exact per-source release predicate; it also executes/reconciles the exact protection-generation release CAS. M5
+begins only from exact `RELEASED` state and owns final provider revalidation, deletion, and GC. M4-C does not preselect
+physical writer/module placement. P4 remains a separate M2 native authority.
 
 ## Performance and OPEN choices
 
@@ -289,7 +289,7 @@ The following stay OPEN:
 - lease packing/allocation, wrap-test thresholds, and physical lifecycle family;
 - provider cancel/termination mapping, attempt state, transport-buffer accounting, and response-observability cut;
 - admission, lifetime, quarantine, retained-storage, and other numeric caps; and
-- the Round 35 M4/M5 terminal/proof/fold writer, verifier, and receipt boundary.
+- exact physical writer/module placement and receipt encoding within the frozen M4/M5 ownership boundary.
 
 `V2-READ-001/004/005/007` remain `PLANNED`. `V2-BK-010` retains only its existing M2
 `PASSED_CURRENT_SOURCE` scope.

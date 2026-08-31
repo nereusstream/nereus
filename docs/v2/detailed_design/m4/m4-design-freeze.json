@@ -1,0 +1,38 @@
+{
+  "schema": "NEREUS_V2_M4_DESIGN_FREEZE_V1",
+  "result": "DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED",
+  "documents": [
+    {
+      "path": "docs/v2/detailed_design/m4/m4-a-read-view-authority.md",
+      "sha256": "b045c5ff03cabe7d47d4a97912de90a7de716c130de3741cf491ebab52f2e984"
+    },
+    {
+      "path": "docs/v2/detailed_design/m4/m4-b-source-plan-and-fallback.md",
+      "sha256": "0a32effe5c9b1047901ac1dc29a29db6a4ee158f31be7b43b4c03243809a6ad1"
+    },
+    {
+      "path": "docs/v2/detailed_design/m4/m4-c-hazard-slot-reclamation.md",
+      "sha256": "8aa282ec5972751a303b08c5833b3d2abad782957efada00f22361929522f370"
+    },
+    {
+      "path": "docs/v2/detailed_design/m4/m4-d-evidence-ownership-and-freeze.md",
+      "sha256": "150bed19e2bc224e98a72d502f881f1cae6b6a6cba4ceddc17db7e7c7f3cea96"
+    },
+    {
+      "path": "docs/v2/grill-notes/32-m4-read-snapshot-authority.md",
+      "sha256": "be2c84a282437b3e92af9545ba18345ee43efd208e0a0b30c65c74b9259797ce"
+    },
+    {
+      "path": "docs/v2/grill-notes/33-m4-read-path-fallback-matrix.md",
+      "sha256": "3ca30a530fc25d9b6003f85bbacfea3387720076b973718f99c4b6fdcf91304c"
+    },
+    {
+      "path": "docs/v2/grill-notes/34-m4-hazard-slot-reclamation-races.md",
+      "sha256": "4c835c7eef14c8cc43b2448d9b4cf4c9079a9c4f0799c52b93dae51c2cb45376"
+    },
+    {
+      "path": "docs/v2/grill-notes/35-m4-final-design-freeze.md",
+      "sha256": "5edc58e7874a0fa5781cdd1a3e56eddb57b667681ec56fe732176f4cbc60601c"
+    }
+  ]
+}

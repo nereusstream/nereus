@@ -440,13 +440,23 @@ missing/revoked evidence retains protection. Exact encoding/admitted backends re
 
 This is evidence-blocked. M4 must compare bounded physical representations and numeric limits for the ADR-0073 logical
 window without introducing a mutable record per retirement batch. It must preserve contiguous per-epoch coverage,
-capability binding, bounded bytes/count/age, response-loss recovery, and proof reuse.
+capability binding, bounded bytes/count/age, response-loss recovery, proof reuse, fold cost, and terminal-row
+retirement. The gate does not block M4 implementation candidates or design freeze, but it blocks physical
+representation selection, activation of the release path that depends on it, `QUIESCENCE_PROTECTION_RELEASE`, and M4
+Final. No prose-selected candidate is authoritative.
 
 ### `V2-OPEN-READ-09`: capability/receipt encoding and backend admission evidence
 
-This is evidence-blocked. M4/M5 must freeze canonical binary encodings and hard caps, verifier availability/revocation
-cuts, conformance receipt identities, and actual Kafka/Pulsar backend admission generations. Until then missing
-evidence remains `RETAIN` and no backend is promoted by prose alone.
+This is evidence-blocked. M4 must prove canonical proof/capability/receipt encodings and hard caps,
+verifier availability/revocation cuts, conformance receipt identities, and actual Kafka/Pulsar backend admission
+generations; M5 later consumes those exact identities without reinterpreting them. The gate does not block fail-closed
+codec/verifier implementation or design freeze, but it blocks production capability admission, release activation,
+final wire selection, and related M4/M5 Finals. Until then missing/revoked evidence is `RETAIN` and no backend is
+promoted by prose alone.
+
+M4 Grill 35 moved exact protection-generation release execution into M4 because all authorizing read-quiescence
+predicates are M4-owned; M5 begins from exact `RELEASED` and owns physical deletion/GC. That milestone split is frozen
+in [M4-D](detailed_design/m4/m4-d-evidence-ownership-and-freeze.md) without closing this evidence gate.
 
 ### `V2-OPEN-READ-10`: resolved fallback-capable epoch interval
 

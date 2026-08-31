@@ -1,6 +1,6 @@
 ---
 productLine: V2
-designStatus: Proposed
+designStatus: Accepted
 implementationStatus: NotStarted
 evidenceStatus: NotRun
 authority: NormativeDesignIndex
@@ -9,22 +9,22 @@ sourceTuple: v2-m1
 
 # M4 detailed-design index
 
-M4 closes the stable Binding read view, deterministic source plan, complete asynchronous source lifetime, and the
-read-side prerequisites for later protection release. It starts from the accepted read contracts in ADRs 0069 through
-0080 and the protocol-specific M2/M3 authorities. It does not introduce a global metadata snapshot, a per-read durable
-ticket, or a second physical-object pin authority.
+M4 closes the stable Binding read view, deterministic source plan, complete asynchronous source lifetime, durable
+read-quiescence proof, and exact protection-generation release. It starts from the accepted read contracts in ADRs
+0069 through 0080 and the protocol-specific M2/M3 authorities. It does not introduce a global metadata snapshot, a
+per-read durable ticket, a second physical-object pin authority, or physical source deletion.
 
 ## Current design state
 
 - [M4-A read-view authority and batch lifetime](m4-a-read-view-authority.md) is accepted design input from Grill 32.
 - [M4-B typed source plan and fallback](m4-b-source-plan-and-fallback.md) is accepted design input from Grill 33.
 - [M4-C hazard-slot and reclamation races](m4-c-hazard-slot-reclamation.md) is accepted design input from Grill 34.
-- Grill 35 must freeze M4/M5 predicate ownership, receipt hierarchy, the historical M3 dependency contract, and the
-  design gate.
+- [M4-D evidence ownership and freeze](m4-d-evidence-ownership-and-freeze.md) is accepted design input from Grill 35.
+- The governance-only [freeze manifest](m4-design-freeze.json) binds the eight immutable design/review records.
 - Implementation, runtime evidence, scenario promotion, and M4 Final have not started.
 
-The M4 design is not hard-frozen until all remaining decision nodes above are closed, the evidence-blocked descendants
-are explicitly separated from implementation inputs, and the design gate passes on the exact freeze commit.
+The blocking design frontier is empty. The design is hard-frozen when `v2M4DesignCheck` passes on the clean pushed
+freeze commit and local `HEAD` equals `origin/main`. Evidence-selected descendants remain explicitly OPEN.
 
 ## Goal
 
@@ -36,7 +36,8 @@ For each bounded Binding-scoped protocol read batch, M4 must:
 3. preserve atomic append-unit and declared whole-range source purity while allowing captured disjoint ranges to use
    different sources;
 4. retain its exact hazard lease through provider retry/fallback, decode, and the final source-backed-buffer use; and
-5. expose fail-closed read-side eligibility facts to M5 without performing or claiming physical deletion.
+5. publish/verify terminal, proof-window/fold, capability, and per-source interval facts, then execute/reconcile the
+   exact protection-generation release CAS without performing or claiming physical deletion.
 
 ## Design tree
 
@@ -45,13 +46,13 @@ M4 stable read path
 ├── A. Binding read-view authority and lifetime          ACCEPTED INPUT (Grill 32)
 ├── B. protocol/profile source plan and fallback matrix ACCEPTED INPUT (Grill 33)
 ├── C. hazard-slot and reclamation race closure         ACCEPTED INPUT (Grill 34)
-└── D. M4/M5 evidence and frozen-dependency boundary    PENDING (Grill 35)
-    └── hard-frozen M4 design                           NOT REACHED
+└── D. M4/M5 evidence and frozen-dependency boundary    ACCEPTED INPUT (Grill 35)
+    └── hard-frozen M4 design                           READY / DESIGN-ONLY GATED
 ```
 
-Later rounds may refine only descendants whose prerequisites are closed. A tentative physical representation or
-numeric value remains an open evidence item; it is not promoted into this normative index merely because it appeared
-in a grill response.
+A bound design change requires explicit reviewed amendment and freeze-manifest update. A tentative physical
+representation or numeric value remains an OPEN evidence item and is never promoted merely because it appeared in a
+grill response.
 
 ## Frozen M3 dependency
 
@@ -69,7 +70,7 @@ M4 depends on, but does not regenerate or reinterpret, the following immutable M
 
 The historical path `docs/v2/evidence/v2-m3/final/m3-final.json` is not an alias for the e5 Final. Normal M4 work does
 not broaden the M3 evidence-only descendant allowlist, rewrite the M3 tested source, or rerun the allocator campaign.
-Grill 35 owns the separate M4 dependency-check shape.
+`v2M4HistoricalM3DependencyCheck` validates the exact immutable history without claiming current HEAD was M3-tested.
 
 ## Scope
 
@@ -79,9 +80,12 @@ M4 owns:
 - bounded cross-Binding hazard-slot admission, ABA-safe lease ownership, and complete terminal source drain;
 - exact source-range candidate validation and deterministic per-range route/fallback planning;
 - read-side corruption/quarantine signals and fail-safe dual-source exhaustion behavior;
+- fused selector/anchor/terminal/proof-window/fold/capability writers and closed verifiers;
+- exact per-source `[first_i,sharedLast]` release verification, protection-generation release CAS, and response-loss
+  reconciliation;
 - the physical proof-window/head/fold candidates and measurements required by `V2-OPEN-READ-08`;
-- capability/receipt encoding inputs shared with M5 under `V2-OPEN-READ-09`; and
-- M4-owned or M4-partial receipts for the scenario predicates frozen in Grill 35.
+- capability/receipt encoding inputs under `V2-OPEN-READ-09`; and
+- the four future semantic evidence children and exact scenario/predicate ownership frozen in M4-D.
 
 M4 does not own:
 
@@ -89,7 +93,8 @@ M4 does not own:
 - a global `readVersion`, deep-copy snapshot, synchronous metadata read, or durable ACK per read;
 - a per-physical-Object `readingSlot` beside the accepted Binding/generation hazard slot;
 - a proof-window lookup on the ordinary read hot path;
-- M5 protection-release execution, fold/cleanup completion, full GC executor, orphan scan, or physical deletion;
+- M5 `FULL_V1 -> RETIRED_V1` compaction, final provider/source revalidation, GC executor, orphan scan, or physical
+  deletion;
 - M6 broker/controller process activation; or
 - M8 native parity and scale claims.
 
@@ -102,7 +107,7 @@ references. The cross-protocol contract is `BindingReadViewSnapshot`. A singular
 
 ## Design-close conditions
 
-M4 design becomes hard-frozen only when:
+The freeze commit must prove:
 
 1. Grills 32 through 35 have complete preserved review responses and synchronized normative descendants;
 2. the source/fallback matrix is deterministic for every admitted protocol/profile state and returns no silent data;
@@ -111,7 +116,9 @@ M4 design becomes hard-frozen only when:
 4. M4/M5 scenario predicates and receipt ownership are exact and non-overlapping;
 5. `V2-OPEN-READ-08/09/15` remain OPEN wherever current evidence is absent rather than being closed by prose;
 6. the separate M4 historical-M3 dependency contract is exact and does not weaken `v2M3Check`; and
-7. the documentation/design gate passes on a clean commit pushed to `origin/main`.
+7. `v2DocumentationCheck`, `v2M4HistoricalM3DependencyCheck`, its contract tests, and `v2M4DesignCheck` pass on a clean
+   commit pushed to `origin/main` with local/remote equality.
 
-Hard freeze authorizes implementation to start. It is not an implementation, receipt, scenario PASS, M4 Final, M5
-physical-GC authority, M6 activation, or M8 parity result.
+The design-only result is exactly `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Hard freeze authorizes implementation to
+start. It is not an implementation, receipt, scenario PASS, M4 Final, protection-release execution, M5 physical-GC
+authority, M6 activation, or M8 parity result.

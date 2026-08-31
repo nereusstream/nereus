@@ -148,6 +148,11 @@ retires, full metadata changes only by exact-version same-key `FULL_V1 -> RETIRE
 cannot release protection or authorize GC. Missing/revoked evidence retains protection and consumes Cell
 count/bytes/age admission.
 
+M4 owns that complete read-quiescence chain through each exact protection-generation release CAS and response-loss
+reread. M5 starts only from the resulting exact `RELEASED` state, performs final provider/source revalidation, and
+owns physical deletion/GC. A controller request, local scan, receipt, derived batch completion, or tombstone never
+substitutes another release-eligibility authority.
+
 ## Timestamp and protocol-position indexes
 
 Kafka Offset, Pulsar Position/entry, batch, and timestamp indexes are first-class descriptor members where their
@@ -178,7 +183,7 @@ Logical trim advances a binding-scoped typed Trim Frontier independently from ph
   Migration Link still requires the source;
 - Object-WAL retirement has durable `PREFERRED_ONLY`, current-slot terminal drain, contiguous required Read Admission
   Epoch proof coverage per source interval, selector-carried closure anchors, irreversible terminal cuts, and exact
-  historical capability-evidence binding;
+  historical capability-evidence binding, followed by exact M4-owned protection-generation `RELEASED` state;
 - Protocol Cell, Cell Provider Scope, physical-delete capability, Owner Epoch, worker epoch, and Storage Epoch are
   revalidated;
 - response-loss state has converged and grace has elapsed;
