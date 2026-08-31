@@ -251,56 +251,56 @@
       "milestone": "M3",
       "contract": "production Pulsar Object WAL publishes explicit virtual Ledger Chain authority while Object identity never becomes a position",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-POSITION-013",
       "milestone": "M3",
       "contract": "a production allocator issues increasing IDs only inside the admitted non-overlapping native-excluded Cell slice",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-POSITION-014",
       "milestone": "M3",
       "contract": "slice retirement preserves existing-ledger readability and proves RETIRING→RETIRED without permitting later allocation or reuse",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-POSITION-015",
       "milestone": "M3",
       "contract": "production slice exhaustion fails before allocation and never resizes, borrows, wraps, or migrates a topic automatically",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-POSITION-016",
       "milestone": "M3",
       "contract": "production provisioning accepts additional capacity only from a new immutable compatibility namespace with a proven disjoint ledger-ID space or an independent cluster",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-POSITION-017",
       "milestone": "M3",
       "contract": "allocator selection requires maximum sustainable rollover RPS with every frozen SLO, realistic storm/crash/mass-takeover cut, and native Pulsar comparison",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-POSITION-018",
       "milestone": "M3",
       "contract": "any production-admitted RANGE candidate preserves grants across owner takeover, burns at most one stale candidate, and keeps clear off installed-range use",
       "ownerDoc": "docs/v2/04-bookkeeper-and-pulsar.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-MULTIPROTOCOL-001",
@@ -323,8 +323,8 @@
       "milestone": "M3",
       "contract": "Object WAL groups never cross Protocol Cells and cell-local throttle, credential, drain, or close faults cannot mutate another provider session",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-FABRIC-003",
@@ -355,80 +355,80 @@
       "milestone": "M3",
       "contract": "Object WAL ACK waits for verified group durability and SHA256 v1 over the canonical request body",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-002",
       "milestone": "M3",
       "contract": "provider resolved physical lane progress checkpoint is independent from each binding typed frontier so one predecessor gap cannot block another binding",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-003",
       "milestone": "M3",
       "contract": "lost PUT response accepts only version bound SHA256 FULL_OBJECT provider proof or bounded full GET",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-004",
       "milestone": "M3",
       "contract": "CRC32C v1 covers exact assigned Kafka batch bytes or exact Pulsar ManagedLedger entry bytes after outer Object decode",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-005",
       "milestone": "M3",
       "contract": "one pre open WalRun root plus one digit class lane post plan sequence directory prefix end length SHA leaf keys and bounded strong LIST discovers every provider resolved open run group without per group metadata",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-006",
       "milestone": "M3",
       "contract": "one Kafka frame is one assigned RecordBatch and one partition append is an all or none commit set while one Pulsar entry is one frame commit set",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-007",
       "milestone": "M3",
       "contract": "a multi binding WalRun Root remains physical while bounded NWG1 binding contexts carry each frame exact incarnation and Storage and Owner Epochs",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-008",
       "milestone": "M3",
       "contract": "process loss recovery verifies provider present groups stops and seals the run on a proven absent never ACKed lane gap preserves other lanes provider resolved extents and advanced binding frontiers and never claims local journal or deterministic nonce replay",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-009",
       "milestone": "M3",
       "contract": "every WalRun has immutable count byte age and predecessor bounds and rolls over before any bound is crossed",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-010",
       "milestone": "M3",
       "contract": "normal ACK and admission preserve one cumulative worst case recovery envelope and fallback never resets counters",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-011",
@@ -443,16 +443,16 @@
       "milestone": "M3",
       "contract": "NWG1 keeps one authoritative in body context directory co locates every Kafka commit set and independently decodes frame blocks",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-013",
       "milestone": "M3",
       "contract": "NWG1 uses one KMS wrapped WalRun key post plan laneId laneSequence bound unique HKDF derived Object keys and disjoint authenticated directory and frame nonce domains",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-014",
@@ -475,16 +475,16 @@
       "milestone": "M3",
       "contract": "NWG1 hard caps header directory prefix before deriving frame capacity and routine Root bound directory frame AEAD range reads do not require ProviderObjectProof full GET",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-017",
       "milestone": "M3",
       "contract": "every NWG1 leaf carries a bounded exclusive directory prefix end while structured descriptors reconstruct its Root scoped key and the hint never authenticates offsets",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-018",
@@ -499,8 +499,8 @@
       "milestone": "M3",
       "contract": "class lane IDs 0 1 2 permanently mean OBJECT_LATENCY OBJECT_BALANCED OBJECT_COST and final leaf sequence allocates only after immutable group plan admission before HKDF final body seal",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-020",
@@ -515,8 +515,8 @@
       "milestone": "M3",
       "contract": "LaneExtentResolvedThrough is physical while owner local binding completion uses pre reserved bounded rings and Position Domain frontiers without persisted gaps tickets payload retention or remote metadata",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-022",
@@ -531,16 +531,16 @@
       "milestone": "M3",
       "contract": "tracker slot and active tail locator budget reserve atomically before position allocation and one checked 64 bit owner local ticket represents one complete protocol commit unit",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-OBJ-024",
       "milestone": "M3",
       "contract": "WalRun Root defaults provider proof mode to NONE and conditionally admits one bounded canonical binary version bound FULL_OBJECT SHA256 tag without duplicating Root or identity fields",
       "ownerDoc": "docs/v2/03-object-wal.md",
-      "status": "PLANNED",
-      "evidenceReceipt": null
+      "status": "PASSED_CURRENT_SOURCE",
+      "evidenceReceipt": "docs/v2/evidence/v2-m3/final/e5e53e62865c21845621037bea5f18c092bd4259/m3-final.json"
     },
     {
       "id": "V2-BK-001",
