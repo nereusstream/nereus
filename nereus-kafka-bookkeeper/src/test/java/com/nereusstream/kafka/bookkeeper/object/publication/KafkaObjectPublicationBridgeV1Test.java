@@ -30,6 +30,7 @@ import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectBindingReadAdapt
 import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectWalM4ReaderV1;
 import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectWalM4ReaderV1.ValidatedRange;
 import com.nereusstream.kafka.bookkeeper.pipeline.KafkaOffsetAssignedAppendV1;
+import com.nereusstream.storage.object.read.BindingReadAsyncExecutorV1;
 import com.nereusstream.storage.object.read.BindingReadBatchContextV1;
 import com.nereusstream.storage.object.read.BindingReadHazardPoolV1;
 import com.nereusstream.storage.object.read.BindingReadHazardPoolV1.CaptureOutcome;
@@ -38,13 +39,19 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Admis
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
+import java.lang.management.ManagementFactory;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class KafkaObjectPublicationBridgeV1Test {
@@ -277,6 +284,122 @@ class KafkaObjectPublicationBridgeV1Test {
             KafkaObjectCoherentProtocolSnapshotV1 retired =
                     context.coordinator.retireObjectTail(protection, plan, context.tracker);
             assertThat(retired.activeTail().locators()).isEmpty();
+        } finally {
+            eventLoop.shutdownNow();
+        }
+    }
+
+    @Test
+    void m4KafkaCurrentSourceLatencyAllocationAndCapacityAreBounded() throws Exception {
+        Context context = context(ignored -> {});
+        KafkaSpeculativeCommitV1 commit = ObjectKafkaTestFixtures.commit(0);
+        stage(context.coordinator, commit);
+        Ready ready = ready(context, commit);
+        KafkaObjectCoherentProtocolSnapshotV1 published =
+                context.bridge.publishNext(() -> {}).orElseThrow();
+        KafkaObjectSourceProtectionTrackerV1 protection = new KafkaObjectSourceProtectionTrackerV1(
+                binding(), ready.locator.extent().walRunRootSha());
+        BindingReadHazardPoolV1 pool = new BindingReadHazardPoolV1(8, 4);
+        CanonicalBytes payload = CanonicalBytes.copyOf(new byte[] {1, 2, 3});
+        AtomicReference<CompletableFuture<CanonicalBytes>> providerGate = new AtomicReference<>();
+        AtomicInteger providerCalls = new AtomicInteger();
+        AtomicReference<Thread> ownerThread = new AtomicReference<>();
+        ExecutorService eventLoop = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "m4-kafka-current-source-owner");
+            ownerThread.set(thread);
+            return thread;
+        });
+        try {
+            KafkaObjectWalM4ReaderV1 reader = new KafkaObjectWalM4ReaderV1(
+                    published,
+                    m4Selector(published),
+                    protection,
+                    (locator, start, end) -> {
+                        providerCalls.incrementAndGet();
+                        CompletableFuture<CanonicalBytes> gate = providerGate.get();
+                        CompletableFuture<CanonicalBytes> bytes =
+                                gate == null ? CompletableFuture.completedFuture(payload) : gate;
+                        return bytes.thenApply(value -> new ValidatedRange(locator, start, end, value));
+                    },
+                    pool,
+                    eventLoop);
+            for (int index = 0; index < 200; index++) {
+                reader.read(0, 1, 1).get(10, TimeUnit.SECONDS);
+            }
+
+            com.sun.management.ThreadMXBean bean =
+                    (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
+            assertThat(bean.isThreadAllocatedMemorySupported()).isTrue();
+            bean.setThreadAllocatedMemoryEnabled(true);
+            int operations = 1_000;
+            long[] latencyNanos = new long[operations];
+            long callerThreadId = Thread.currentThread().getId();
+            long ownerThreadId = ownerThread.get().getId();
+            long callerAllocatedBefore = bean.getThreadAllocatedBytes(callerThreadId);
+            long ownerAllocatedBefore = bean.getThreadAllocatedBytes(ownerThreadId);
+            long elapsedStart = System.nanoTime();
+            for (int index = 0; index < operations; index++) {
+                long started = System.nanoTime();
+                assertThat(reader.read(0, 1, 1).get(10, TimeUnit.SECONDS).ranges())
+                        .hasSize(1);
+                latencyNanos[index] = System.nanoTime() - started;
+            }
+            long elapsedNanos = System.nanoTime() - elapsedStart;
+            long callerAllocatedBytes = bean.getThreadAllocatedBytes(callerThreadId) - callerAllocatedBefore;
+            long ownerAllocatedBytes = bean.getThreadAllocatedBytes(ownerThreadId) - ownerAllocatedBefore;
+            long callerAllocatedBytesPerOperation = Math.floorDiv(callerAllocatedBytes, operations);
+            long ownerAllocatedBytesPerOperation = Math.floorDiv(ownerAllocatedBytes, operations);
+            long measuredAllocatedBytes = Math.addExact(callerAllocatedBytes, ownerAllocatedBytes);
+            long measuredAllocatedBytesPerOperation = Math.floorDiv(measuredAllocatedBytes, operations);
+            Arrays.sort(latencyNanos);
+            long p99Nanos = percentile(latencyNanos, 99);
+            long measuredThroughput = throughput(operations, elapsedNanos);
+            assertThat(p99Nanos).isLessThan(50_000_000);
+            assertThat(measuredThroughput).isGreaterThan(100);
+            assertThat(callerAllocatedBytesPerOperation).isLessThan(1_048_576);
+            assertThat(ownerAllocatedBytesPerOperation).isLessThan(1_048_576);
+            assertThat(measuredAllocatedBytesPerOperation).isLessThan(2_097_152);
+
+            CompletableFuture<CanonicalBytes> blockedProvider = new CompletableFuture<>();
+            providerGate.set(blockedProvider);
+            int beforeCapacityCalls = providerCalls.get();
+            List<CompletableFuture<KafkaObjectWalM4ReaderV1.ReadResult>> pending = new ArrayList<>();
+            for (int index = 0; index < pool.capacity(); index++) {
+                pending.add(reader.read(0, 1, 1));
+            }
+            awaitProviderCalls(providerCalls, beforeCapacityCalls + pool.capacity());
+            CompletableFuture<KafkaObjectWalM4ReaderV1.ReadResult> rejected = reader.read(0, 1, 1);
+            assertThatThrownBy(rejected::join)
+                    .hasRootCauseInstanceOf(BindingReadAsyncExecutorV1.AdmissionException.class)
+                    .hasRootCauseMessage("M4 read admission failed before source I/O: EXHAUSTED");
+            blockedProvider.complete(payload);
+            for (CompletableFuture<KafkaObjectWalM4ReaderV1.ReadResult> read : pending) {
+                assertThat(read.get(10, TimeUnit.SECONDS).ranges()).hasSize(1);
+            }
+            assertThat(pool.scan(published.root().fence().bindingId(), 1)).isEqualTo(ScanOutcome.CLEAN);
+            System.out.printf(
+                    Locale.ROOT,
+                    "M4_METRIC KAFKA_CURRENT_SOURCE operations=%d elapsedNanos=%d p50Nanos=%d p99Nanos=%d "
+                            + "maxNanos=%d throughputOpsPerSecond=%d callerAllocatedBytes=%d "
+                            + "callerAllocatedBytesPerOperation=%d ownerAllocatedBytes=%d "
+                            + "ownerAllocatedBytesPerOperation=%d measuredAllocatedBytes=%d "
+                            + "measuredAllocatedBytesPerOperation=%d hazardCapacity=%d peakInFlight=%d "
+                            + "rejectedAtCapacity=1 outerHazardCasPerRead=2 perCallbackSlotCas=0 "
+                            + "reusablePlanCapacity=256%n",
+                    operations,
+                    elapsedNanos,
+                    percentile(latencyNanos, 50),
+                    p99Nanos,
+                    latencyNanos[latencyNanos.length - 1],
+                    measuredThroughput,
+                    callerAllocatedBytes,
+                    callerAllocatedBytesPerOperation,
+                    ownerAllocatedBytes,
+                    ownerAllocatedBytesPerOperation,
+                    measuredAllocatedBytes,
+                    measuredAllocatedBytesPerOperation,
+                    pool.capacity(),
+                    pool.capacity());
         } finally {
             eventLoop.shutdownNow();
         }
@@ -524,6 +647,23 @@ class KafkaObjectPublicationBridgeV1Test {
                 new CapabilityBinding(1, ObjectKafkaTestFixtures.digest(22)),
                 List.of(),
                 List.of());
+    }
+
+    private static void awaitProviderCalls(AtomicInteger calls, int expected) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (calls.get() < expected && System.nanoTime() < deadline) {
+            Thread.onSpinWait();
+        }
+        assertThat(calls).hasValue(expected);
+    }
+
+    private static long percentile(long[] sortedNanos, int percentile) {
+        int index = Math.floorDiv(Math.addExact(Math.multiplyExact(sortedNanos.length, percentile), 99), 100) - 1;
+        return sortedNanos[Math.max(0, Math.min(index, sortedNanos.length - 1))];
+    }
+
+    private static long throughput(long operations, long elapsedNanos) {
+        return Math.max(1, Math.floorDiv(Math.multiplyExact(operations, 1_000_000_000L), elapsedNanos));
     }
 
     private record Context(

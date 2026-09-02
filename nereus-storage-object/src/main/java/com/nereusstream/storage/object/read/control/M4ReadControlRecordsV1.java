@@ -28,6 +28,7 @@ public final class M4ReadControlRecordsV1 {
     public static final int MAX_ACTIVE_BATCHES = 8;
     public static final int MAX_SOURCES_PER_BATCH = 64;
     public static final int MAX_PROOF_WINDOW = 64;
+    public static final int PROOF_FOLD_ENTRIES = 32;
     public static final int MAX_PROOF_FOLDS = 64;
     public static final long MAX_PROOF_INTERVAL_EPOCHS = 4_096;
 
@@ -340,7 +341,10 @@ public final class M4ReadControlRecordsV1 {
     public record ProofFold(long firstEpoch, long lastEpoch, Sha256Digest orderedProofsSha256) {
         public ProofFold {
             requireDigest(orderedProofsSha256, "orderedProofsSha256");
-            if (firstEpoch <= 0 || lastEpoch < firstEpoch || lastEpoch - firstEpoch >= MAX_PROOF_INTERVAL_EPOCHS) {
+            if (firstEpoch <= 0
+                    || lastEpoch < firstEpoch
+                    || lastEpoch - firstEpoch + 1 != PROOF_FOLD_ENTRIES
+                    || lastEpoch - firstEpoch >= MAX_PROOF_INTERVAL_EPOCHS) {
                 throw new IllegalArgumentException("proof fold interval is outside its hard bound");
             }
         }

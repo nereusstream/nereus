@@ -14,12 +14,14 @@
 
 package com.nereusstream.storage.object.read;
 
+import java.util.ArrayDeque;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /**
  * Event-loop adapter that holds one outer generation lease through real async source completion.
@@ -48,9 +50,24 @@ public final class BindingReadAsyncExecutorV1 {
     }
 
     private final Executor ownerExecutor;
+    private final ArrayDeque<BindingReadBatchContextV1> reusableBatchContexts;
 
-    public BindingReadAsyncExecutorV1(Executor ownerExecutor) {
+    public BindingReadAsyncExecutorV1(Executor ownerExecutor, int maximumInFlightReads) {
+        this(ownerExecutor, maximumInFlightReads, BindingReadBatchContextV1::new);
+    }
+
+    BindingReadAsyncExecutorV1(
+            Executor ownerExecutor, int maximumInFlightReads, Supplier<BindingReadBatchContextV1> batchContextFactory) {
         this.ownerExecutor = Objects.requireNonNull(ownerExecutor, "ownerExecutor");
+        Objects.requireNonNull(batchContextFactory, "batchContextFactory");
+        if (maximumInFlightReads <= 0 || maximumInFlightReads > 65_536) {
+            throw new IllegalArgumentException("reusable read-context capacity is outside the admitted bound");
+        }
+        reusableBatchContexts = new ArrayDeque<>(maximumInFlightReads);
+        for (int index = 0; index < maximumInFlightReads; index++) {
+            reusableBatchContexts.addLast(
+                    Objects.requireNonNull(batchContextFactory.get(), "reusable read-batch context"));
+        }
     }
 
     public <T> CompletableFuture<T> execute(
@@ -86,7 +103,7 @@ public final class BindingReadAsyncExecutorV1 {
         private final CapturedOperation<T> operation;
         private final Runnable afterTerminalDrain;
         private final CompletableFuture<T> result;
-        private final BindingReadBatchContextV1 batch = new BindingReadBatchContextV1();
+        private BindingReadBatchContextV1 batch;
         private boolean terminal;
 
         private State(
@@ -107,9 +124,16 @@ public final class BindingReadAsyncExecutorV1 {
                 terminal = true;
                 return;
             }
+            batch = reusableBatchContexts.pollFirst();
+            if (batch == null) {
+                terminal = true;
+                result.completeExceptionally(new AdmissionException(BindingReadHazardPoolV1.CaptureOutcome.EXHAUSTED));
+                return;
+            }
             BindingReadHazardPoolV1.CaptureOutcome capture = hazardPool.tryCapture(currentAuthority, batch);
             if (capture != BindingReadHazardPoolV1.CaptureOutcome.CAPTURED) {
                 terminal = true;
+                releaseReusableBatch();
                 result.completeExceptionally(new AdmissionException(capture));
                 return;
             }
@@ -119,6 +143,7 @@ public final class BindingReadAsyncExecutorV1 {
                 if (!batch.terminalClearExactLease()) {
                     throw new IllegalStateException("unused M4 async lease did not clear");
                 }
+                releaseReusableBatch();
                 result.completeExceptionally(new IllegalStateException("M4 source attempt did not start"));
                 return;
             }
@@ -133,7 +158,7 @@ public final class BindingReadAsyncExecutorV1 {
         }
 
         private void requestCancellation() {
-            if (!terminal && batch.active()) {
+            if (!terminal && batch != null && batch.active()) {
                 batch.closeNewSourceUse();
             }
         }
@@ -153,6 +178,7 @@ public final class BindingReadAsyncExecutorV1 {
                 }
                 return;
             }
+            releaseReusableBatch();
             try {
                 afterTerminalDrain.run();
             } catch (Throwable reconciliationFailure) {
@@ -168,6 +194,14 @@ public final class BindingReadAsyncExecutorV1 {
                 result.complete(value);
             } else {
                 result.completeExceptionally(unwrap(failure));
+            }
+        }
+
+        private void releaseReusableBatch() {
+            BindingReadBatchContextV1 released = batch;
+            batch = null;
+            if (released != null) {
+                reusableBatchContexts.addLast(released);
             }
         }
     }

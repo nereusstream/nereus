@@ -110,14 +110,17 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
@@ -125,6 +128,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class PulsarObjectWalBridgeV1Test {
@@ -1023,6 +1027,92 @@ class PulsarObjectWalBridgeV1Test {
     }
 
     @Test
+    void m4PulsarCurrentSourceLatencyAndAllocationAreBounded() throws Exception {
+        Fixture fixture = fixture(START);
+        fixture.activate(BINDING_A, START);
+        AppendAck ack = verifiedAck(fixture.bridge
+                .appendShared(List.of(input(BINDING_A, "m4-performance-value")))
+                .toCompletableFuture()
+                .join()
+                .get(0));
+        BindingReadHazardPoolV1 pool = new BindingReadHazardPoolV1(8, 4);
+        AtomicReference<Thread> ownerThread = new AtomicReference<>();
+        ExecutorService eventLoop = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "m4-pulsar-current-source-owner");
+            ownerThread.set(thread);
+            return thread;
+        });
+        try {
+            PulsarObjectWalM4ReaderV1 reader =
+                    new PulsarObjectWalM4ReaderV1(fixture.bridge, BINDING_A, m4Selector(), pool, eventLoop);
+            for (int index = 0; index < 200; index++) {
+                assertThat(reader.read(ack.position()).get(10, TimeUnit.SECONDS).source())
+                        .isEqualTo(ReadSource.ACTIVE_TAIL);
+            }
+            com.sun.management.ThreadMXBean bean =
+                    (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
+            assertThat(bean.isThreadAllocatedMemorySupported()).isTrue();
+            bean.setThreadAllocatedMemoryEnabled(true);
+            int operations = 1_000;
+            long[] latencyNanos = new long[operations];
+            long callerThreadId = Thread.currentThread().getId();
+            long ownerThreadId = ownerThread.get().getId();
+            long callerAllocatedBefore = bean.getThreadAllocatedBytes(callerThreadId);
+            long ownerAllocatedBefore = bean.getThreadAllocatedBytes(ownerThreadId);
+            long elapsedStart = System.nanoTime();
+            for (int index = 0; index < operations; index++) {
+                long started = System.nanoTime();
+                assertThat(reader.read(ack.position()).get(10, TimeUnit.SECONDS).source())
+                        .isEqualTo(ReadSource.ACTIVE_TAIL);
+                latencyNanos[index] = System.nanoTime() - started;
+            }
+            long elapsedNanos = System.nanoTime() - elapsedStart;
+            long callerAllocatedBytes = bean.getThreadAllocatedBytes(callerThreadId) - callerAllocatedBefore;
+            long ownerAllocatedBytes = bean.getThreadAllocatedBytes(ownerThreadId) - ownerAllocatedBefore;
+            long callerAllocatedBytesPerOperation = Math.floorDiv(callerAllocatedBytes, operations);
+            long ownerAllocatedBytesPerOperation = Math.floorDiv(ownerAllocatedBytes, operations);
+            long measuredAllocatedBytes = Math.addExact(callerAllocatedBytes, ownerAllocatedBytes);
+            long measuredAllocatedBytesPerOperation = Math.floorDiv(measuredAllocatedBytes, operations);
+            Arrays.sort(latencyNanos);
+            long p99Nanos = percentile(latencyNanos, 99);
+            long measuredThroughput = throughput(operations, elapsedNanos);
+            assertThat(p99Nanos).isLessThan(50_000_000);
+            assertThat(measuredThroughput).isGreaterThan(100);
+            assertThat(callerAllocatedBytesPerOperation).isLessThan(1_048_576);
+            assertThat(ownerAllocatedBytesPerOperation).isLessThan(1_048_576);
+            assertThat(measuredAllocatedBytesPerOperation).isLessThan(2_097_152);
+            assertThat(pool.scan(
+                            PulsarObjectBindingReadAdapterV1.bindingIdentity(BINDING_A)
+                                    .bindingId(),
+                            1))
+                    .isEqualTo(ScanOutcome.CLEAN);
+            System.out.printf(
+                    Locale.ROOT,
+                    "M4_METRIC PULSAR_CURRENT_SOURCE operations=%d elapsedNanos=%d p50Nanos=%d "
+                            + "p99Nanos=%d maxNanos=%d throughputOpsPerSecond=%d callerAllocatedBytes=%d "
+                            + "callerAllocatedBytesPerOperation=%d ownerAllocatedBytes=%d "
+                            + "ownerAllocatedBytesPerOperation=%d measuredAllocatedBytes=%d "
+                            + "measuredAllocatedBytesPerOperation=%d hazardCapacity=%d outerHazardCasPerRead=2 "
+                            + "perCallbackSlotCas=0 reusablePlanCapacity=1%n",
+                    operations,
+                    elapsedNanos,
+                    percentile(latencyNanos, 50),
+                    p99Nanos,
+                    latencyNanos[latencyNanos.length - 1],
+                    measuredThroughput,
+                    callerAllocatedBytes,
+                    callerAllocatedBytesPerOperation,
+                    ownerAllocatedBytes,
+                    ownerAllocatedBytesPerOperation,
+                    measuredAllocatedBytes,
+                    measuredAllocatedBytesPerOperation,
+                    pool.capacity());
+        } finally {
+            eventLoop.shutdownNow();
+        }
+    }
+
+    @Test
     void recoveredActiveTailMustBeBoundedAndExactlyContiguous() {
         Fixture fixture = fixture(START);
         ExtentIdentity identity = identity(ROOT_A, WalLaneId.OBJECT_BALANCED, 0, "object-wal/run/lane-1/0");
@@ -1753,6 +1843,15 @@ class PulsarObjectWalBridgeV1Test {
 
     private static String key(PulsarBindingKey binding, PulsarObjectWalBridgeV1.PulsarPosition position) {
         return binding.topicBindingId() + ':' + position.virtualLedgerId() + ':' + position.entryId();
+    }
+
+    private static long percentile(long[] sortedNanos, int percentile) {
+        int index = Math.floorDiv(Math.addExact(Math.multiplyExact(sortedNanos.length, percentile), 99), 100) - 1;
+        return sortedNanos[Math.max(0, Math.min(index, sortedNanos.length - 1))];
+    }
+
+    private static long throughput(long operations, long elapsedNanos) {
+        return Math.max(1, Math.floorDiv(Math.multiplyExact(operations, 1_000_000_000L), elapsedNanos));
     }
 
     private static List<AppendAck> verifiedAcks(List<MemberAppendResult> results) {

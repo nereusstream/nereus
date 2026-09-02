@@ -194,6 +194,11 @@ tasks.register<Test>("v2M4CurrentSourceKafkaTest") {
                 "KafkaObjectPublicationBridgeV1Test." +
                 "m4CurrentSourceReadPinsExactM3LocatorUntilProviderAndOuterLeaseDrain",
         )
+        includeTestsMatching(
+            "com.nereusstream.kafka.bookkeeper.object.publication." +
+                "KafkaObjectPublicationBridgeV1Test." +
+                "m4KafkaCurrentSourceLatencyAllocationAndCapacityAreBounded",
+        )
     }
     outputs.upToDateWhen { false }
 }

@@ -74,7 +74,7 @@ class Fixture:
     def cleanup(self) -> None:
         self.temporary.cleanup()
 
-    def _xml(self, class_name: str, names: set[str]) -> bytes:
+    def _xml(self, class_name: str, names: set[str], task: str) -> bytes:
         root = ET.Element(
             "testsuite",
             name=class_name,
@@ -85,7 +85,51 @@ class Fixture:
         )
         for name in sorted(names):
             ET.SubElement(root, "testcase", name=f"{name}()", classname=class_name, time="0.000001")
+        metric_lines = self._metric_lines(task)
+        if metric_lines:
+            ET.SubElement(root, "system-out").text = "\n".join(metric_lines) + "\n"
         return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+    @staticmethod
+    def _metric_lines(task: str) -> list[str]:
+        if task == ":nereus-storage-object:v2M4ReadViewHazardEvidenceTest":
+            return [
+                "M4_METRIC HOT_PATH operations=100000 allocatedBytes=0 elapsedNanos=100000000 "
+                "p50Nanos=100 p99Nanos=200 maxNanos=500 throughputOpsPerSecond=1000000 "
+                "atomicCasPerOperation=2 fullFencesPerOperation=1 authorityAcquireLoadsPerOperation=2 "
+                "perCallbackSlotCas=0 ordinaryReadRemoteMetadataOperations=0",
+                "M4_METRIC CONCURRENT_HAZARD threads=4 operations=80000 elapsedNanos=80000000 "
+                "p50Nanos=100 p99Nanos=300 maxNanos=600 throughputOpsPerSecond=1000000 scans=100 "
+                "pinnedScans=50 cleanScans=40 inconclusiveScans=10 poolCapacity=16",
+            ]
+        if task == ":nereus-storage-object:v2M4QuiescenceProtectionReleaseEvidenceTest":
+            return [
+                "M4_METRIC CONTROL_CAPACITY attemptedProofs=2113 admittedProofs=2112 folds=64 "
+                "windowEntries=64 stoppedEpoch=2113 pendingProofRows=1 elapsedNanos=2113000000 "
+                "p99Nanos=1000 throughputOpsPerSecond=1000 metadataMutations=4226 proofIntervalEpochCap=4096",
+                "M4_METRIC CONTROL_CLEANUP plannedRows=32 terminalRowsRetirable=32 proofRowsRetirable=32 "
+                "removedFolds=1 successorWindowEntries=33 blockedReferenceKinds=6 "
+                "referenceGenerationBound=1 publicationFenceShaBound=1 cleanupBatchCap=32",
+            ]
+        if task == ":nereus-kafka-bookkeeper:v2M4CurrentSourceKafkaTest":
+            return [
+                "M4_METRIC KAFKA_CURRENT_SOURCE operations=1000 elapsedNanos=100000000 p50Nanos=1000 "
+                "p99Nanos=2000 maxNanos=3000 throughputOpsPerSecond=10000 callerAllocatedBytes=1000000 "
+                "callerAllocatedBytesPerOperation=1000 ownerAllocatedBytes=2000000 "
+                "ownerAllocatedBytesPerOperation=2000 measuredAllocatedBytes=3000000 "
+                "measuredAllocatedBytesPerOperation=3000 hazardCapacity=8 peakInFlight=8 rejectedAtCapacity=1 "
+                "outerHazardCasPerRead=2 perCallbackSlotCas=0 reusablePlanCapacity=256"
+            ]
+        if task == ":nereus-pulsar-offload:v2M4CurrentSourcePulsarTest":
+            return [
+                "M4_METRIC PULSAR_CURRENT_SOURCE operations=1000 elapsedNanos=125000000 p50Nanos=1000 "
+                "p99Nanos=2000 maxNanos=3000 throughputOpsPerSecond=8000 callerAllocatedBytes=900000 "
+                "callerAllocatedBytesPerOperation=900 ownerAllocatedBytes=1800000 "
+                "ownerAllocatedBytesPerOperation=1800 measuredAllocatedBytes=2700000 "
+                "measuredAllocatedBytesPerOperation=2700 hazardCapacity=8 outerHazardCasPerRead=2 "
+                "perCallbackSlotCas=0 reusablePlanCapacity=1"
+            ]
+        return []
 
     def _write_children(self) -> list[PurePosixPath]:
         paths = []
@@ -95,7 +139,7 @@ class Fixture:
             suite_items = list(CONTRACT.EXPECTED_SUITES[kind].items())
             for task, class_name in suite_items:
                 names = CONTRACT.EXPECTED_SUITE_TESTS[kind][task]
-                xml = self._xml(class_name, names)
+                xml = self._xml(class_name, names, task)
                 suites.append({
                     "bytes": len(xml),
                     "task": task,
@@ -109,10 +153,11 @@ class Fixture:
                 "testedCommit": self.tested,
             }
             summary = CONTRACT.validate_junit(junit, kind, self.tested)
+            metrics = CONTRACT.junit_metrics(junit, kind)
             attachments = []
             for index, attachment_kind in enumerate(CONTRACT.ATTACHMENTS[kind]):
                 value = junit if attachment_kind == "JUNIT_SUMMARY" else RUNNER.fact_value(
-                    kind, attachment_kind, self.tested, self.bindings, summary
+                    kind, attachment_kind, self.tested, self.bindings, summary, metrics
                 )
                 raw = CONTRACT.canonical_bytes(value)
                 relative = child_root / f"{ordinal:02d}-{kind}" / "attachments" / f"{index:02d}-{attachment_kind}.json"
@@ -242,6 +287,19 @@ class M4EvidenceContractTest(unittest.TestCase):
         git(self.fixture.root, "commit", "-m", "invalid behavior descendant")
         with self.assertRaisesRegex(CONTRACT.EvidenceError, "non-evidence change"):
             CONTRACT.validate_descendants(self.fixture.root, self.fixture.tested)
+
+    def test_rejects_tampered_governed_performance_metric(self) -> None:
+        receipt = json.loads((self.fixture.root / self.fixture.child_paths[0]).read_text())
+        junit_path = self.fixture.root / receipt["attachments"][0]["path"]
+        junit = json.loads(junit_path.read_text())
+        suite = junit["suites"][0]
+        xml = base64.b64decode(suite["xmlBase64"])
+        xml = xml.replace(b"p99Nanos=200", b"p99Nanos=5000001", 1)
+        suite["bytes"] = len(xml)
+        suite["xmlBase64"] = base64.b64encode(xml).decode()
+        suite["xmlSha256"] = CONTRACT.sha256(xml)
+        with self.assertRaisesRegex(CONTRACT.EvidenceError, "latency percentiles|hot-path metric"):
+            CONTRACT.junit_metrics(junit, "READ_VIEW_HAZARD")
 
 
 if __name__ == "__main__":

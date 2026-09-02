@@ -127,7 +127,9 @@ tasks.register<Test>("v2M4ReadViewHazardEvidenceTest") {
             "scanTreatsClaimedLeaseWithUnpublishedPayloadAsInconclusive",
             "asyncCancellationClosesGateButRetainsLeaseUntilRealProviderCompletion",
             "asyncSuccessReleasesExactLeaseBeforeMakingHeapOwnedResultObservable",
+            "asyncExecutorPreallocatesAndReusesBoundedBatchContexts",
             "steadyCapturePlanAndClearAllocateNoHeapBytesOnCurrentThread",
+            "concurrentCaptureAndStableScanMeetBoundedLatencyAndThroughput",
         ).forEach { includeTestsMatching(testClass + it) }
     }
     outputs.upToDateWhen { false }

@@ -97,6 +97,7 @@ public final class KafkaObjectWalM4ReaderV1 {
     private final ExtentReader extentReader;
     private final BindingReadHazardPoolV1 hazardPool;
     private final BindingReadAsyncExecutorV1 asyncExecutor;
+    private final BindingReadPlanBufferV1 reusablePlan = new BindingReadPlanBufferV1(MAX_PLAN_INTERVALS);
     private final AtomicReference<BindingReadAuthorityV1> current = new AtomicReference<>();
 
     public KafkaObjectWalM4ReaderV1(
@@ -109,7 +110,7 @@ public final class KafkaObjectWalM4ReaderV1 {
         this.locatorPin = Objects.requireNonNull(locatorPin, "locatorPin");
         this.extentReader = Objects.requireNonNull(extentReader, "extentReader");
         this.hazardPool = Objects.requireNonNull(hazardPool, "hazardPool");
-        asyncExecutor = new BindingReadAsyncExecutorV1(ownerEventLoop);
+        asyncExecutor = new BindingReadAsyncExecutorV1(ownerEventLoop, hazardPool.capacity());
         refresh(initialSnapshot, initialSelector);
     }
 
@@ -149,15 +150,18 @@ public final class KafkaObjectWalM4ReaderV1 {
             if (!(authority.publicationCell().protocolStateReference() instanceof ReadCell cell)) {
                 throw new IllegalStateException("captured Kafka authority lacks its M3 current-source cell");
             }
-            BindingReadPlanBufferV1 plan = new BindingReadPlanBufferV1(MAX_PLAN_INTERVALS);
             BindingReadPlannerV1.Outcome outcome = BindingReadPlannerV1.plan(
-                    authority.publicationCell(), startOffset, endOffsetExclusive, protocolUpperBoundExclusive, plan);
+                    authority.publicationCell(),
+                    startOffset,
+                    endOffsetExclusive,
+                    protocolUpperBoundExclusive,
+                    reusablePlan);
             if (outcome != BindingReadPlannerV1.Outcome.PLANNED) {
                 throw new IllegalStateException("captured Kafka source plan failed closed: " + outcome);
             }
             return executePlan(
                     cell,
-                    plan,
+                    reusablePlan,
                     authority.sourceGeneration(),
                     startOffset,
                     Math.min(endOffsetExclusive, protocolUpperBoundExclusive));

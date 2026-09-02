@@ -38,6 +38,7 @@ public final class PulsarObjectWalM4ReaderV1 {
     private final PulsarBindingKey binding;
     private final BindingReadHazardPoolV1 hazardPool;
     private final BindingReadAsyncExecutorV1 asyncExecutor;
+    private final PulsarBindingReadPlanBufferV1 reusablePlan = new PulsarBindingReadPlanBufferV1(1);
     private final AtomicReference<BindingReadAuthorityV1> current = new AtomicReference<>();
 
     public PulsarObjectWalM4ReaderV1(
@@ -49,7 +50,7 @@ public final class PulsarObjectWalM4ReaderV1 {
         this.bridge = Objects.requireNonNull(bridge, "bridge");
         this.binding = Objects.requireNonNull(binding, "binding");
         this.hazardPool = Objects.requireNonNull(hazardPool, "hazardPool");
-        asyncExecutor = new BindingReadAsyncExecutorV1(ownerEventLoop);
+        asyncExecutor = new BindingReadAsyncExecutorV1(ownerEventLoop, hazardPool.capacity());
         refresh(initialSelector);
         bridge.registerM4RetirementGuard(
                 binding,
@@ -84,18 +85,17 @@ public final class PulsarObjectWalM4ReaderV1 {
                                 "captured Pulsar authority lacks its typed current-source cell");
                     }
                     PulsarObjectWalReadViewV1.LedgerView ledger = cell.view().requireLedger(position.virtualLedgerId());
-                    PulsarBindingReadPlanBufferV1 plan = new PulsarBindingReadPlanBufferV1(1);
                     BindingReadPlannerV1.Outcome outcome = PulsarBindingReadPlannerV1.plan(
                             cell.routes(),
                             position.virtualLedgerId(),
                             position.entryId(),
                             Math.addExact(position.entryId(), 1),
                             Math.addExact(ledger.readableThrough(), 1),
-                            plan);
-                    if (outcome != BindingReadPlannerV1.Outcome.PLANNED || plan.size() != 1) {
+                            reusablePlan);
+                    if (outcome != BindingReadPlannerV1.Outcome.PLANNED || reusablePlan.size() != 1) {
                         throw new IllegalStateException("captured Pulsar source plan failed closed: " + outcome);
                     }
-                    PhysicalRoute expected = cell.requirePhysical(plan.route(0));
+                    PhysicalRoute expected = cell.requirePhysical(reusablePlan.route(0));
                     return bridge.readCaptured(cell.view(), binding, position).thenApply(result -> {
                         if (!result.binding().equals(binding)
                                 || !result.position().equals(position)

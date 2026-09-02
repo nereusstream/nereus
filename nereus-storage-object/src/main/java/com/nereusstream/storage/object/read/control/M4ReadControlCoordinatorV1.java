@@ -62,8 +62,6 @@ public final class M4ReadControlCoordinatorV1 {
         QUARANTINED_INVALID_OCCUPANT
     }
 
-    private static final int FOLD_BATCH_SIZE = 32;
-
     private final CanonicalControlMetadataStore metadata;
     private final BindingIdentity binding;
     private final M4ReadControlKeysV1 keys;
@@ -328,6 +326,7 @@ public final class M4ReadControlCoordinatorV1 {
     public Outcome publishProof(ReadQuiescenceProof proof) {
         requireBinding(proof.binding());
         requireCapabilityAdmitted(proof.capability());
+        readSelector().orElseThrow(() -> new IllegalStateException("quiescence proof lacks its Binding selector"));
         CanonicalBytes terminalBytes = metadata.get(keys.terminal(proof.readAdmissionEpoch()))
                 .orElseThrow(() -> new IllegalStateException("quiescence proof lacks its exact terminal cut"));
         ReadAdmissionEpochTerminalCut terminal = M4ReadControlCodecV1.decodeTerminal(terminalBytes);
@@ -557,16 +556,16 @@ public final class M4ReadControlCoordinatorV1 {
         List<ProofEntry> window = new ArrayList<>(current.window());
         if (window.size() == M4ReadControlRecordsV1.MAX_PROOF_WINDOW) {
             if (folds.size() == M4ReadControlRecordsV1.MAX_PROOF_FOLDS
-                    || !isContiguous(window.subList(0, FOLD_BATCH_SIZE))) {
-                return Outcome.STOPPED;
+                    || !isContiguous(window.subList(0, M4ReadControlRecordsV1.PROOF_FOLD_ENTRIES))) {
+                return stopSelectorForProofCapacity();
             }
-            List<ProofEntry> folded = List.copyOf(window.subList(0, FOLD_BATCH_SIZE));
+            List<ProofEntry> folded = List.copyOf(window.subList(0, M4ReadControlRecordsV1.PROOF_FOLD_ENTRIES));
             folds.add(new ProofFold(
                     folded.get(0).readAdmissionEpoch(),
                     folded.get(folded.size() - 1).readAdmissionEpoch(),
                     orderedProofsSha(
                             folded.stream().map(ProofEntry::proofSha256).toList())));
-            window = new ArrayList<>(window.subList(FOLD_BATCH_SIZE, window.size()));
+            window = new ArrayList<>(window.subList(M4ReadControlRecordsV1.PROOF_FOLD_ENTRIES, window.size()));
         }
         window.add(newEntry);
         long nextGeneration = currentBytes.isEmpty() ? 1 : Math.addExact(current.generation(), 1);
@@ -745,6 +744,74 @@ public final class M4ReadControlCoordinatorV1 {
         }
         CanonicalBytes stoppedBytes;
         try {
+            stoppedBytes = M4ReadControlCodecV1.encodeSelector(stopped);
+        } catch (IllegalArgumentException exhausted) {
+            return Outcome.RETAIN;
+        }
+        Outcome outcome = reconcileSelectorCas(M4ReadControlCodecV1.encodeSelector(expected), stoppedBytes, true);
+        return outcome == Outcome.APPLIED || outcome == Outcome.EXISTING_EXACT ? Outcome.STOPPED : outcome;
+    }
+
+    /** Closes read admission when the bounded durable proof authority cannot accept another epoch. */
+    private Outcome stopSelectorForProofCapacity() {
+        BindingReadSelector expected;
+        try {
+            expected = readSelector().orElseThrow();
+        } catch (RuntimeException missingOrInvalidSelector) {
+            return Outcome.RETAIN;
+        }
+        if (expected.admissionState() == AdmissionState.STOPPED) {
+            return Outcome.STOPPED;
+        }
+        BindingReadSelector stoppedCore = new BindingReadSelector(
+                binding,
+                expected.selectedViewSha256(),
+                expected.ownerEpoch(),
+                Math.addExact(expected.readAdmissionEpoch(), 1),
+                expected.sourceGeneration(),
+                expected.mode(),
+                AdmissionState.STOPPED,
+                expected.fallbackSetSha256(),
+                expected.capability(),
+                List.of(),
+                List.of());
+        List<ClosureAnchor> anchors = expected.pendingAnchors();
+        if (expected.mode() == SelectorMode.PREFERRED_WITH_FALLBACK) {
+            Sha256Digest predecessorCore = M4ReadControlCodecV1.selectorCoreSha256(expected);
+            Sha256Digest stoppedCoreSha = M4ReadControlCodecV1.selectorCoreSha256(stoppedCore);
+            ClosureAnchor stoppedAnchor = new ClosureAnchor(
+                    expected.readAdmissionEpoch(),
+                    expected.ownerEpoch(),
+                    predecessorCore,
+                    stoppedCoreSha,
+                    hashLongsAndDigests(
+                            "M4-PROOF-CAPACITY-STOPPED-V1",
+                            List.of(
+                                    predecessorCore,
+                                    stoppedCoreSha,
+                                    expected.fallbackSetSha256().orElseThrow())),
+                    expected.capability());
+            try {
+                anchors = append(anchors, stoppedAnchor);
+            } catch (IllegalArgumentException exhausted) {
+                return Outcome.RETAIN;
+            }
+        }
+        BindingReadSelector stopped;
+        CanonicalBytes stoppedBytes;
+        try {
+            stopped = new BindingReadSelector(
+                    binding,
+                    expected.selectedViewSha256(),
+                    expected.ownerEpoch(),
+                    Math.addExact(expected.readAdmissionEpoch(), 1),
+                    expected.sourceGeneration(),
+                    expected.mode(),
+                    AdmissionState.STOPPED,
+                    expected.fallbackSetSha256(),
+                    expected.capability(),
+                    anchors,
+                    expected.activeBatches());
             stoppedBytes = M4ReadControlCodecV1.encodeSelector(stopped);
         } catch (IllegalArgumentException exhausted) {
             return Outcome.RETAIN;

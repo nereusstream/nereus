@@ -28,6 +28,8 @@ import com.nereusstream.storage.object.read.BindingReadHazardPoolV1;
 import com.nereusstream.storage.object.read.BindingReadProtocolV1;
 import com.nereusstream.storage.object.read.BindingReadPublicationCellV1;
 import com.nereusstream.storage.object.read.BindingReadRouteTableV1;
+import com.nereusstream.storage.object.read.control.M4ProofCleanupPlannerV1.EpochInterval;
+import com.nereusstream.storage.object.read.control.M4ProofCleanupPlannerV1.ReferenceSnapshot;
 import com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1.Outcome;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
@@ -51,6 +53,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -331,6 +334,7 @@ class M4ReadControlCoordinatorV1Test {
     void proofIntervalUsesEachHistoricalCapabilityAndRevocationFailsSafe() {
         Fixture fixture = new Fixture(CapabilityKind.DURABLE_DRAIN_ONLY_V1);
         fixture.coordinator.createCapability(fixture.capabilityEvidence);
+        fixture.coordinator.createSelector(fixture.preferredSelector(3, 7));
         CapabilityEvidence secondEvidence = fixture.capabilityEvidence(2, CapabilityKind.AUTHORITY_EXPIRY_V1);
         CapabilityBinding second = fixture.binding(secondEvidence);
         assertThat(fixture.coordinator.createCapability(secondEvidence)).isEqualTo(Outcome.APPLIED);
@@ -357,6 +361,7 @@ class M4ReadControlCoordinatorV1Test {
     void proofHeadFoldsBoundedContiguousEntriesAndRejectsAGap() {
         Fixture fixture = new Fixture(CapabilityKind.DURABLE_DRAIN_ONLY_V1);
         fixture.coordinator.createCapability(fixture.capabilityEvidence);
+        fixture.coordinator.createSelector(fixture.preferredSelector(66, 7));
         for (long epoch = 1; epoch <= M4ReadControlRecordsV1.MAX_PROOF_WINDOW + 1L; epoch++) {
             ReadAdmissionEpochTerminalCut terminal = fixture.detachedTerminal(epoch, fixture.capability);
             fixture.store.put(fixture.keys.terminal(epoch), M4ReadControlCodecV1.encodeTerminal(terminal));
@@ -376,6 +381,7 @@ class M4ReadControlCoordinatorV1Test {
 
         Fixture gap = new Fixture(CapabilityKind.DURABLE_DRAIN_ONLY_V1);
         gap.coordinator.createCapability(gap.capabilityEvidence);
+        gap.coordinator.createSelector(gap.preferredSelector(4, 7));
         for (long epoch : new long[] {1, 3}) {
             ReadAdmissionEpochTerminalCut terminal = gap.detachedTerminal(epoch, gap.capability);
             gap.store.put(gap.keys.terminal(epoch), M4ReadControlCodecV1.encodeTerminal(terminal));
@@ -386,6 +392,214 @@ class M4ReadControlCoordinatorV1Test {
                 .map(M4ReadControlCodecV1::decodeHead)
                 .orElseThrow();
         assertThat(gap.coordinator.verifyInterval(gapHead, 1, 3)).isFalse();
+
+        Fixture selectorless = new Fixture(CapabilityKind.DURABLE_DRAIN_ONLY_V1);
+        selectorless.coordinator.createCapability(selectorless.capabilityEvidence);
+        ReadAdmissionEpochTerminalCut detached = selectorless.detachedTerminal(1, selectorless.capability);
+        selectorless.store.put(selectorless.keys.terminal(1), M4ReadControlCodecV1.encodeTerminal(detached));
+        assertThatThrownBy(() -> selectorless.coordinator.publishProof(selectorless.proof(detached, 1, 1_000)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Binding selector");
+    }
+
+    @Test
+    void proofCapacityStopsSelectorWithoutDroppingOrSkippingAnEpoch() {
+        Fixture fixture = new Fixture(CapabilityKind.DURABLE_DRAIN_ONLY_V1);
+        assertThat(fixture.coordinator.createCapability(fixture.capabilityEvidence))
+                .isEqualTo(Outcome.APPLIED);
+        long admittedEpochs = M4ReadControlRecordsV1.MAX_PROOF_FOLDS * (long) M4ReadControlRecordsV1.PROOF_FOLD_ENTRIES
+                + M4ReadControlRecordsV1.MAX_PROOF_WINDOW;
+        assertThat(fixture.coordinator.createSelector(fixture.preferredSelector(admittedEpochs + 1, 7)))
+                .isEqualTo(Outcome.APPLIED);
+        long[] latencyNanos = new long[Math.toIntExact(admittedEpochs + 1)];
+        long mutationBaseline = fixture.store.mutations;
+        long elapsedStart = System.nanoTime();
+        for (long epoch = 1; epoch <= admittedEpochs + 1; epoch++) {
+            ReadAdmissionEpochTerminalCut terminal = fixture.detachedTerminal(epoch, fixture.capability);
+            fixture.store.put(fixture.keys.terminal(epoch), M4ReadControlCodecV1.encodeTerminal(terminal));
+            long started = System.nanoTime();
+            Outcome outcome = fixture.coordinator.publishProof(fixture.proof(terminal, epoch, 1_000));
+            latencyNanos[Math.toIntExact(epoch - 1)] = System.nanoTime() - started;
+            if (epoch <= admittedEpochs) {
+                assertThat(outcome).isIn(Outcome.APPLIED, Outcome.EXISTING_EXACT);
+            } else {
+                assertThat(outcome).isEqualTo(Outcome.STOPPED);
+            }
+        }
+        long elapsedNanos = System.nanoTime() - elapsedStart;
+        QuiescenceProofHead head = fixture.store
+                .get(fixture.keys.proofHead())
+                .map(M4ReadControlCodecV1::decodeHead)
+                .orElseThrow();
+        BindingReadSelector stopped = fixture.coordinator.readSelector().orElseThrow();
+        assertThat(head.folds()).hasSize(M4ReadControlRecordsV1.MAX_PROOF_FOLDS);
+        assertThat(head.window()).hasSize(M4ReadControlRecordsV1.MAX_PROOF_WINDOW);
+        assertThat(head.folds().get(0).firstEpoch()).isOne();
+        assertThat(head.window().get(head.window().size() - 1).readAdmissionEpoch())
+                .isEqualTo(admittedEpochs);
+        assertThat(stopped.admissionState()).isEqualTo(AdmissionState.STOPPED);
+        assertThat(stopped.readAdmissionEpoch()).isEqualTo(admittedEpochs + 2);
+        assertThat(fixture.store.get(fixture.keys.proof(admittedEpochs + 1))).isPresent();
+        Arrays.sort(latencyNanos);
+        long p99Nanos = percentile(latencyNanos, 99);
+        long measuredThroughput = throughput(admittedEpochs + 1, elapsedNanos);
+        assertThat(p99Nanos).isLessThan(10_000_000);
+        assertThat(measuredThroughput).isGreaterThan(100);
+        System.out.printf(
+                Locale.ROOT,
+                "M4_METRIC CONTROL_CAPACITY attemptedProofs=%d admittedProofs=%d folds=%d "
+                        + "windowEntries=%d stoppedEpoch=%d pendingProofRows=1 elapsedNanos=%d p99Nanos=%d "
+                        + "throughputOpsPerSecond=%d metadataMutations=%d proofIntervalEpochCap=%d%n",
+                admittedEpochs + 1,
+                admittedEpochs,
+                head.folds().size(),
+                head.window().size(),
+                admittedEpochs + 1,
+                elapsedNanos,
+                p99Nanos,
+                measuredThroughput,
+                fixture.store.mutations - mutationBaseline,
+                M4ReadControlRecordsV1.MAX_PROOF_INTERVAL_EPOCHS);
+    }
+
+    @Test
+    void pureCleanupPlannerRequiresDurableFoldAndEveryReferenceClassToDisappear() {
+        Fixture fixture = new Fixture(CapabilityKind.DURABLE_DRAIN_ONLY_V1);
+        assertThat(fixture.coordinator.createCapability(fixture.capabilityEvidence))
+                .isEqualTo(Outcome.APPLIED);
+        BindingReadSelector selector = fixture.preferredSelector(100, 7);
+        assertThat(fixture.coordinator.createSelector(selector)).isEqualTo(Outcome.APPLIED);
+        List<ReadAdmissionEpochTerminalCut> terminals = new ArrayList<>();
+        List<ReadQuiescenceProof> proofs = new ArrayList<>();
+        for (long epoch = 1; epoch <= M4ReadControlRecordsV1.MAX_PROOF_WINDOW + 1L; epoch++) {
+            ReadAdmissionEpochTerminalCut terminal = fixture.detachedTerminal(epoch, fixture.capability);
+            ReadQuiescenceProof proof = fixture.proof(terminal, epoch, 1_000);
+            terminals.add(terminal);
+            proofs.add(proof);
+            fixture.store.put(fixture.keys.terminal(epoch), M4ReadControlCodecV1.encodeTerminal(terminal));
+            assertThat(fixture.coordinator.publishProof(proof)).isIn(Outcome.APPLIED, Outcome.EXISTING_EXACT);
+        }
+        QuiescenceProofHead head = fixture.store
+                .get(fixture.keys.proofHead())
+                .map(M4ReadControlCodecV1::decodeHead)
+                .orElseThrow();
+        ReferenceSnapshot none = references(fixture.binding, 1, List.of(), List.of(), List.of(), List.of());
+        M4ProofCleanupPlannerV1.CleanupPlan plan = M4ProofCleanupPlannerV1.plan(
+                        selector,
+                        head,
+                        terminals,
+                        proofs,
+                        List.of(fixture.capabilityEvidence),
+                        none,
+                        M4ProofCleanupPlannerV1.MAX_CLEANUP_RECORDS)
+                .orElseThrow();
+        assertThat(plan.rows()).hasSize(32);
+        assertThat(plan.references()).isEqualTo(none);
+        assertThat(plan.rows())
+                .extracting(row -> row.readAdmissionEpoch())
+                .containsExactlyElementsOf(
+                        java.util.stream.LongStream.rangeClosed(1, 32).boxed().toList());
+        QuiescenceProofHead successor = M4ReadControlCodecV1.decodeHead(plan.successorHeadBytes());
+        assertThat(successor.generation()).isEqualTo(head.generation() + 1);
+        assertThat(successor.folds()).isEmpty();
+        assertThat(successor.window()).hasSize(33);
+        ReferenceSnapshot wrongBinding = references(
+                new BindingIdentity(
+                        new TopicBindingId(digest("other-binding")),
+                        digest("other-incarnation"),
+                        digest("other-epoch")),
+                2,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of());
+        assertThatThrownBy(() -> M4ProofCleanupPlannerV1.plan(
+                        selector,
+                        head,
+                        terminals,
+                        proofs,
+                        List.of(fixture.capabilityEvidence),
+                        wrongBinding,
+                        M4ProofCleanupPlannerV1.MAX_CLEANUP_RECORDS))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("snapshot Binding");
+
+        List<ReferenceSnapshot> externalBlocks = List.of(
+                references(fixture.binding, 2, List.of(new EpochInterval(1, 1)), List.of(), List.of(), List.of()),
+                references(fixture.binding, 3, List.of(), List.of(1L), List.of(), List.of()),
+                references(fixture.binding, 4, List.of(), List.of(), List.of(1L), List.of()),
+                references(fixture.binding, 5, List.of(), List.of(), List.of(), List.of(1L)));
+        for (ReferenceSnapshot blocked : externalBlocks) {
+            assertThat(M4ProofCleanupPlannerV1.plan(
+                            selector,
+                            head,
+                            terminals,
+                            proofs,
+                            List.of(fixture.capabilityEvidence),
+                            blocked,
+                            M4ProofCleanupPlannerV1.MAX_CLEANUP_RECORDS))
+                    .isEmpty();
+        }
+
+        BindingReadSelector anchorReferenced = new BindingReadSelector(
+                selector.binding(),
+                selector.selectedViewSha256(),
+                selector.ownerEpoch(),
+                selector.readAdmissionEpoch(),
+                selector.sourceGeneration(),
+                selector.mode(),
+                selector.admissionState(),
+                selector.fallbackSetSha256(),
+                selector.capability(),
+                List.of(fixture.anchor(1)),
+                List.of());
+        assertThat(M4ProofCleanupPlannerV1.plan(
+                        anchorReferenced,
+                        head,
+                        terminals,
+                        proofs,
+                        List.of(fixture.capabilityEvidence),
+                        none,
+                        M4ProofCleanupPlannerV1.MAX_CLEANUP_RECORDS))
+                .isEmpty();
+
+        Fixture batchFixture = new Fixture(CapabilityKind.DURABLE_DRAIN_ONLY_V1);
+        SourceProtectionIdentity source = batchFixture.source("cleanup-active-source", 1, 1, 7);
+        BindingReadSelector fallback = batchFixture.fallbackSelector(List.of(source), List.of(), List.of(), 1);
+        batchFixture.install(fallback, List.of(source));
+        assertThat(batchFixture.coordinator.closeFallback(fallback, digest("cleanup-preferred"), 8, List.of(source)))
+                .isEqualTo(Outcome.APPLIED);
+        BindingReadSelector batchReferenced =
+                batchFixture.coordinator.readSelector().orElseThrow();
+        assertThat(M4ProofCleanupPlannerV1.plan(
+                        batchReferenced,
+                        head,
+                        terminals,
+                        proofs,
+                        List.of(fixture.capabilityEvidence),
+                        none,
+                        M4ProofCleanupPlannerV1.MAX_CLEANUP_RECORDS))
+                .isEmpty();
+        assertThatThrownBy(() -> M4ProofCleanupPlannerV1.plan(
+                        selector,
+                        head,
+                        terminals,
+                        proofs,
+                        List.of(fixture.capabilityEvidence.revoke()),
+                        none,
+                        M4ProofCleanupPlannerV1.MAX_CLEANUP_RECORDS))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("capability");
+        System.out.printf(
+                Locale.ROOT,
+                "M4_METRIC CONTROL_CLEANUP plannedRows=%d terminalRowsRetirable=%d proofRowsRetirable=%d "
+                        + "removedFolds=1 successorWindowEntries=%d blockedReferenceKinds=6 "
+                        + "referenceGenerationBound=1 publicationFenceShaBound=1 cleanupBatchCap=%d%n",
+                plan.rows().size(),
+                plan.rows().size(),
+                plan.rows().size(),
+                successor.window().size(),
+                M4ProofCleanupPlannerV1.MAX_CLEANUP_RECORDS);
     }
 
     private static final class Fixture {
@@ -586,6 +800,7 @@ class M4ReadControlCoordinatorV1Test {
     private static final class MapStore implements CanonicalControlMetadataStore {
         private final Map<String, CanonicalBytes> values = new LinkedHashMap<>();
         private NextMode nextMode = NextMode.NORMAL;
+        private long mutations;
 
         @Override
         public Optional<CanonicalBytes> get(String key) {
@@ -594,6 +809,7 @@ class M4ReadControlCoordinatorV1Test {
 
         @Override
         public ControlMutationOutcome putIfAbsent(String key, CanonicalBytes exactValue) {
+            mutations++;
             if (nextMode == NextMode.UNKNOWN_WITHOUT_APPLY) {
                 nextMode = NextMode.NORMAL;
                 return ControlMutationOutcome.RESPONSE_UNKNOWN;
@@ -609,6 +825,7 @@ class M4ReadControlCoordinatorV1Test {
         @Override
         public ControlMutationOutcome compareAndSet(
                 String key, Optional<CanonicalBytes> exactExpected, CanonicalBytes exactCandidate) {
+            mutations++;
             if (nextMode == NextMode.UNKNOWN_WITHOUT_APPLY) {
                 nextMode = NextMode.NORMAL;
                 return ControlMutationOutcome.RESPONSE_UNKNOWN;
@@ -632,5 +849,31 @@ class M4ReadControlCoordinatorV1Test {
 
     private static Sha256Digest digest(String value) {
         return Sha256Digest.hash(CanonicalBytes.copyOf(value.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static ReferenceSnapshot references(
+            BindingIdentity binding,
+            long generation,
+            List<EpochInterval> active,
+            List<Long> recovery,
+            List<Long> responseLoss,
+            List<Long> audit) {
+        return new ReferenceSnapshot(
+                binding,
+                generation,
+                digest("cleanup-reference-fence-" + generation),
+                active,
+                recovery,
+                responseLoss,
+                audit);
+    }
+
+    private static long percentile(long[] sortedNanos, int percentile) {
+        int index = Math.floorDiv(Math.addExact(Math.multiplyExact(sortedNanos.length, percentile), 99), 100) - 1;
+        return sortedNanos[Math.max(0, Math.min(index, sortedNanos.length - 1))];
+    }
+
+    private static long throughput(long operations, long elapsedNanos) {
+        return Math.max(1, Math.floorDiv(Math.multiplyExact(operations, 1_000_000_000L), elapsedNanos));
     }
 }

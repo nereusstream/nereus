@@ -192,6 +192,10 @@ tasks.register<Test>("v2M4CurrentSourcePulsarTest") {
             "com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test." +
                 "m4OuterHazardAloneClosesCaptureToP4InnerPinRetirementRace",
         )
+        includeTestsMatching(
+            "com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test." +
+                "m4PulsarCurrentSourceLatencyAndAllocationAreBounded",
+        )
     }
     outputs.upToDateWhen { false }
 }

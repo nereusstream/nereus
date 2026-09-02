@@ -94,13 +94,26 @@ SHARED_PREDICATES = (
     "V2-READ-015",
 )
 PHYSICAL_SELECTION = {
+    "cleanupBatchRecords": 32,
+    "cleanupReferenceRows": 4096,
+    "cleanupReferenceAuthority": "BINDING_GENERATION_AND_PUBLICATION_FENCE_SHA256",
+    "concurrentHazardP99NanosMax": 10_000_000,
+    "controlPublishP99NanosMax": 10_000_000,
+    "currentSourceCallerAllocatedBytesPerOperationMax": 1_048_576,
+    "currentSourceOwnerAllocatedBytesPerOperationMax": 1_048_576,
+    "currentSourceMeasuredAllocatedBytesPerOperationMax": 2_097_152,
+    "currentSourceP99NanosMax": 50_000_000,
     "emergencyStoppedReserveBytes": 2048,
+    "hotPathP99NanosMax": 5_000_000,
     "maxActiveBatches": 8,
     "maxPendingAnchors": 8,
     "maxProofFolds": 64,
     "maxProofIntervalEpochs": 4096,
     "maxSourcesPerBatch": 64,
+    "normalPathAtomicCasPerRead": 2,
+    "normalPathFullFencesPerRead": 1,
     "ordinaryReadRemoteMetadataOperations": 0,
+    "perCallbackSlotCas": 0,
     "proofFoldEntries": 32,
     "proofWindowEntries": 64,
     "selectorMaxBytes": 32768,
@@ -119,6 +132,8 @@ EXPECTED_TESTS = {
         "scanTreatsClaimedLeaseWithUnpublishedPayloadAsInconclusive",
         "asyncCancellationClosesGateButRetainsLeaseUntilRealProviderCompletion",
         "asyncSuccessReleasesExactLeaseBeforeMakingHeapOwnedResultObservable",
+        "asyncExecutorPreallocatesAndReusesBoundedBatchContexts",
+        "concurrentCaptureAndStableScanMeetBoundedLatencyAndThroughput",
         "steadyCapturePlanAndClearAllocateNoHeapBytesOnCurrentThread",
     },
     "SOURCE_PLAN_EXECUTION": {
@@ -139,6 +154,8 @@ EXPECTED_TESTS = {
         "localAdmissionClosesBeforeUnknownSelectorResponseAndOldCapturedGenerationSurvives",
         "proofIntervalUsesEachHistoricalCapabilityAndRevocationFailsSafe",
         "proofHeadFoldsBoundedContiguousEntriesAndRejectsAGap",
+        "proofCapacityStopsSelectorWithoutDroppingOrSkippingAnEpoch",
+        "pureCleanupPlannerRequiresDurableFoldAndEveryReferenceClassToDisappear",
         "acceptsOnlyTheClosedCellShardControlFamilies",
         "putIfAbsentConvergesExactResponseLossAndClosesConflicts",
         "compareAndSetMapsExactExpectedBytesToTheOxiaVersionFence",
@@ -150,8 +167,10 @@ EXPECTED_TESTS = {
     },
     "CURRENT_SOURCE_INTEGRATION_PERFORMANCE": {
         "m4CurrentSourceReadPinsExactM3LocatorUntilProviderAndOuterLeaseDrain",
+        "m4KafkaCurrentSourceLatencyAllocationAndCapacityAreBounded",
         "m4CapturedActiveSourceSurvivesManifestSwitchAndNewReadUsesManifest",
         "m4OuterHazardAloneClosesCaptureToP4InnerPinRetirementRace",
+        "m4PulsarCurrentSourceLatencyAndAllocationAreBounded",
     },
 }
 EXPECTED_SUITES = {
@@ -194,6 +213,8 @@ EXPECTED_SUITE_TESTS = {
             "localAdmissionClosesBeforeUnknownSelectorResponseAndOldCapturedGenerationSurvives",
             "proofIntervalUsesEachHistoricalCapabilityAndRevocationFailsSafe",
             "proofHeadFoldsBoundedContiguousEntriesAndRejectsAGap",
+            "proofCapacityStopsSelectorWithoutDroppingOrSkippingAnEpoch",
+            "pureCleanupPlannerRequiresDurableFoldAndEveryReferenceClassToDisappear",
         },
         ":nereus-metadata-oxia:v2M4ReadControlOxiaAdapterTest": {
             "acceptsOnlyTheClosedCellShardControlFamilies",
@@ -209,15 +230,67 @@ EXPECTED_SUITE_TESTS = {
     "CURRENT_SOURCE_INTEGRATION_PERFORMANCE": {
         ":nereus-kafka-bookkeeper:v2M4CurrentSourceKafkaTest": {
             "m4CurrentSourceReadPinsExactM3LocatorUntilProviderAndOuterLeaseDrain",
+            "m4KafkaCurrentSourceLatencyAllocationAndCapacityAreBounded",
         },
         ":nereus-pulsar-offload:v2M4CurrentSourcePulsarTest": {
             "m4CapturedActiveSourceSurvivesManifestSwitchAndNewReadUsesManifest",
             "m4OuterHazardAloneClosesCaptureToP4InnerPinRetirementRace",
+            "m4PulsarCurrentSourceLatencyAndAllocationAreBounded",
         },
     },
 }
 COMMIT_RE = re.compile(r"[0-9a-f]{40}")
 SHA_RE = re.compile(r"[0-9a-f]{64}")
+METRIC_LINE_RE = re.compile(
+    r"M4_METRIC ([A-Z_]+) ((?:[A-Za-z][A-Za-z0-9]*=(?:0|[1-9][0-9]*))(?: [A-Za-z][A-Za-z0-9]*=(?:0|[1-9][0-9]*))*)"
+)
+METRIC_TASKS = {
+    "HOT_PATH": ":nereus-storage-object:v2M4ReadViewHazardEvidenceTest",
+    "CONCURRENT_HAZARD": ":nereus-storage-object:v2M4ReadViewHazardEvidenceTest",
+    "CONTROL_CAPACITY": ":nereus-storage-object:v2M4QuiescenceProtectionReleaseEvidenceTest",
+    "CONTROL_CLEANUP": ":nereus-storage-object:v2M4QuiescenceProtectionReleaseEvidenceTest",
+    "KAFKA_CURRENT_SOURCE": ":nereus-kafka-bookkeeper:v2M4CurrentSourceKafkaTest",
+    "PULSAR_CURRENT_SOURCE": ":nereus-pulsar-offload:v2M4CurrentSourcePulsarTest",
+}
+EXPECTED_METRICS = {
+    "READ_VIEW_HAZARD": {"HOT_PATH", "CONCURRENT_HAZARD"},
+    "SOURCE_PLAN_EXECUTION": set(),
+    "QUIESCENCE_PROTECTION_RELEASE": {"CONTROL_CAPACITY", "CONTROL_CLEANUP"},
+    "CURRENT_SOURCE_INTEGRATION_PERFORMANCE": {"KAFKA_CURRENT_SOURCE", "PULSAR_CURRENT_SOURCE"},
+}
+METRIC_KEYS = {
+    "HOT_PATH": {
+        "operations", "allocatedBytes", "elapsedNanos", "p50Nanos", "p99Nanos", "maxNanos",
+        "throughputOpsPerSecond", "atomicCasPerOperation", "fullFencesPerOperation",
+        "authorityAcquireLoadsPerOperation", "perCallbackSlotCas", "ordinaryReadRemoteMetadataOperations",
+    },
+    "CONCURRENT_HAZARD": {
+        "threads", "operations", "elapsedNanos", "p50Nanos", "p99Nanos", "maxNanos",
+        "throughputOpsPerSecond", "scans", "pinnedScans", "cleanScans", "inconclusiveScans", "poolCapacity",
+    },
+    "CONTROL_CAPACITY": {
+        "attemptedProofs", "admittedProofs", "folds", "windowEntries", "stoppedEpoch", "pendingProofRows",
+        "elapsedNanos", "p99Nanos", "throughputOpsPerSecond", "metadataMutations", "proofIntervalEpochCap",
+    },
+    "CONTROL_CLEANUP": {
+        "plannedRows", "terminalRowsRetirable", "proofRowsRetirable", "removedFolds",
+        "successorWindowEntries", "blockedReferenceKinds", "referenceGenerationBound",
+        "publicationFenceShaBound", "cleanupBatchCap",
+    },
+    "KAFKA_CURRENT_SOURCE": {
+        "operations", "elapsedNanos", "p50Nanos", "p99Nanos", "maxNanos", "throughputOpsPerSecond",
+        "callerAllocatedBytes", "callerAllocatedBytesPerOperation", "hazardCapacity", "peakInFlight",
+        "ownerAllocatedBytes", "ownerAllocatedBytesPerOperation", "measuredAllocatedBytes",
+        "measuredAllocatedBytesPerOperation", "rejectedAtCapacity", "outerHazardCasPerRead",
+        "perCallbackSlotCas", "reusablePlanCapacity",
+    },
+    "PULSAR_CURRENT_SOURCE": {
+        "operations", "elapsedNanos", "p50Nanos", "p99Nanos", "maxNanos", "throughputOpsPerSecond",
+        "callerAllocatedBytes", "callerAllocatedBytesPerOperation", "hazardCapacity", "outerHazardCasPerRead",
+        "ownerAllocatedBytes", "ownerAllocatedBytesPerOperation", "measuredAllocatedBytes",
+        "measuredAllocatedBytesPerOperation", "perCallbackSlotCas", "reusablePlanCapacity",
+    },
+}
 
 
 class EvidenceError(RuntimeError):
@@ -481,7 +554,141 @@ def validate_junit(value: object, kind: str, tested: str) -> dict[str, int]:
     return {"durationMicros": duration, "errors": errors, "failures": failures, "skipped": skipped, "tests": tests}
 
 
-def validate_fact(value: object, attachment_kind: str, child_kind: str, tested: str, bindings: dict[str, Any], summary: dict[str, int]) -> None:
+def junit_metrics(value: object, kind: str) -> dict[str, dict[str, int]]:
+    doc = exact(value, {"childKind", "schema", "suites", "testedCommit"}, "JUNIT_SUMMARY metrics")
+    metrics: dict[str, dict[str, int]] = {}
+    for index, suite in enumerate(doc["suites"]):
+        task = suite["task"]
+        try:
+            root = ET.fromstring(base64.b64decode(suite["xmlBase64"], validate=True))
+        except (ValueError, TypeError, ET.ParseError) as error:
+            raise EvidenceError(f"cannot parse governed metric XML: {kind}/{index}") from error
+        output = root.find("system-out")
+        for line in (output.text or "").splitlines() if output is not None else ():
+            if not line.startswith("M4_METRIC "):
+                continue
+            match = METRIC_LINE_RE.fullmatch(line)
+            if match is None:
+                raise EvidenceError(f"M4 metric line is not canonical: {kind}")
+            name = match.group(1)
+            if name in metrics or METRIC_TASKS.get(name) != task:
+                raise EvidenceError(f"M4 metric identity is duplicate or in the wrong suite: {kind}/{name}")
+            values: dict[str, int] = {}
+            for item in match.group(2).split(" "):
+                key, raw = item.split("=", 1)
+                if key in values:
+                    raise EvidenceError(f"M4 metric key is duplicated: {name}/{key}")
+                value_int = int(raw)
+                if value_int > MAX_SAFE_INTEGER:
+                    raise EvidenceError(f"M4 metric value exceeds the safe integer domain: {name}/{key}")
+                values[key] = value_int
+            if set(values) != METRIC_KEYS[name]:
+                raise EvidenceError(f"M4 metric member set differs: {name}")
+            validate_metric(name, values)
+            metrics[name] = values
+    if set(metrics) != EXPECTED_METRICS[kind]:
+        raise EvidenceError(f"M4 governed metric inventory differs: {kind}")
+    return metrics
+
+
+def validate_metric(name: str, values: dict[str, int]) -> None:
+    if name in {"HOT_PATH", "CONCURRENT_HAZARD", "KAFKA_CURRENT_SOURCE", "PULSAR_CURRENT_SOURCE"}:
+        if not 0 < values["p50Nanos"] <= values["p99Nanos"] <= values["maxNanos"]:
+            raise EvidenceError(f"M4 latency percentiles are invalid: {name}")
+        if values["elapsedNanos"] <= 0 or values["operations"] <= 0:
+            raise EvidenceError(f"M4 measured work is empty: {name}")
+        expected_throughput = values["operations"] * 1_000_000_000 // values["elapsedNanos"]
+        if values["throughputOpsPerSecond"] != max(1, expected_throughput):
+            raise EvidenceError(f"M4 throughput does not derive from measured work: {name}")
+    if name == "HOT_PATH":
+        expected = {
+            "operations": PHYSICAL_SELECTION["warmedCapturePlanClearOperations"],
+            "allocatedBytes": PHYSICAL_SELECTION["warmedCapturePlanClearAllocatedBytes"],
+            "atomicCasPerOperation": PHYSICAL_SELECTION["normalPathAtomicCasPerRead"],
+            "fullFencesPerOperation": PHYSICAL_SELECTION["normalPathFullFencesPerRead"],
+            "authorityAcquireLoadsPerOperation": 2,
+            "perCallbackSlotCas": PHYSICAL_SELECTION["perCallbackSlotCas"],
+            "ordinaryReadRemoteMetadataOperations": PHYSICAL_SELECTION["ordinaryReadRemoteMetadataOperations"],
+        }
+        if any(values[key] != expected_value for key, expected_value in expected.items()) \
+                or values["p99Nanos"] > PHYSICAL_SELECTION["hotPathP99NanosMax"]:
+            raise EvidenceError("M4 hot-path metric violates the selected budget")
+    elif name == "CONCURRENT_HAZARD":
+        if (
+            values["threads"] != 4
+            or values["operations"] != 80_000
+            or values["poolCapacity"] != 16
+            or values["scans"] <= 0
+            or values["scans"] != values["pinnedScans"] + values["cleanScans"] + values["inconclusiveScans"]
+            or values["p99Nanos"] > PHYSICAL_SELECTION["concurrentHazardP99NanosMax"]
+        ):
+            raise EvidenceError("M4 concurrent-hazard metric violates the selected budget")
+    elif name == "CONTROL_CAPACITY":
+        expected = {
+            "attemptedProofs": 2113,
+            "admittedProofs": 2112,
+            "folds": PHYSICAL_SELECTION["maxProofFolds"],
+            "windowEntries": PHYSICAL_SELECTION["proofWindowEntries"],
+            "stoppedEpoch": 2113,
+            "pendingProofRows": 1,
+            "metadataMutations": 4226,
+            "proofIntervalEpochCap": PHYSICAL_SELECTION["maxProofIntervalEpochs"],
+        }
+        if any(values[key] != expected_value for key, expected_value in expected.items()):
+            raise EvidenceError("M4 control-capacity identity differs")
+        if (
+            values["elapsedNanos"] <= 0
+            or values["p99Nanos"] <= 0
+            or values["p99Nanos"] > PHYSICAL_SELECTION["controlPublishP99NanosMax"]
+            or values["throughputOpsPerSecond"]
+                != max(1, values["attemptedProofs"] * 1_000_000_000 // values["elapsedNanos"])
+        ):
+            raise EvidenceError("M4 control-capacity performance violates the selected budget")
+    elif name == "CONTROL_CLEANUP":
+        if values != {
+            "plannedRows": PHYSICAL_SELECTION["cleanupBatchRecords"],
+            "terminalRowsRetirable": PHYSICAL_SELECTION["cleanupBatchRecords"],
+            "proofRowsRetirable": PHYSICAL_SELECTION["cleanupBatchRecords"],
+            "removedFolds": 1,
+            "successorWindowEntries": 33,
+            "blockedReferenceKinds": 6,
+            "referenceGenerationBound": 1,
+            "publicationFenceShaBound": 1,
+            "cleanupBatchCap": PHYSICAL_SELECTION["cleanupBatchRecords"],
+        }:
+            raise EvidenceError("M4 cleanup predicate metric differs")
+    elif name in {"KAFKA_CURRENT_SOURCE", "PULSAR_CURRENT_SOURCE"}:
+        expected_plan = 256 if name == "KAFKA_CURRENT_SOURCE" else 1
+        if (
+            values["operations"] != 1_000
+            or values["hazardCapacity"] != 8
+            or values["outerHazardCasPerRead"] != PHYSICAL_SELECTION["normalPathAtomicCasPerRead"]
+            or values["perCallbackSlotCas"] != PHYSICAL_SELECTION["perCallbackSlotCas"]
+            or values["reusablePlanCapacity"] != expected_plan
+            or values["p99Nanos"] > PHYSICAL_SELECTION["currentSourceP99NanosMax"]
+            or values["callerAllocatedBytesPerOperation"]
+                != values["callerAllocatedBytes"] // values["operations"]
+            or values["callerAllocatedBytesPerOperation"]
+                > PHYSICAL_SELECTION["currentSourceCallerAllocatedBytesPerOperationMax"]
+            or values["ownerAllocatedBytesPerOperation"]
+                != values["ownerAllocatedBytes"] // values["operations"]
+            or values["ownerAllocatedBytesPerOperation"]
+                > PHYSICAL_SELECTION["currentSourceOwnerAllocatedBytesPerOperationMax"]
+            or values["measuredAllocatedBytes"]
+                != values["callerAllocatedBytes"] + values["ownerAllocatedBytes"]
+            or values["measuredAllocatedBytesPerOperation"]
+                != values["measuredAllocatedBytes"] // values["operations"]
+            or values["measuredAllocatedBytesPerOperation"]
+                > PHYSICAL_SELECTION["currentSourceMeasuredAllocatedBytesPerOperationMax"]
+        ):
+            raise EvidenceError(f"M4 current-source metric violates the selected budget: {name}")
+        if name == "KAFKA_CURRENT_SOURCE" and (
+            values["peakInFlight"] != values["hazardCapacity"] or values["rejectedAtCapacity"] != 1
+        ):
+            raise EvidenceError("M4 Kafka capacity metric differs")
+
+
+def validate_fact(value: object, attachment_kind: str, child_kind: str, tested: str, bindings: dict[str, Any], summary: dict[str, int], metrics: dict[str, dict[str, int]]) -> None:
     doc = exact(value, {"childKind", "evidenceKind", "facts", "result", "schema", "testedCommit"}, attachment_kind)
     if (
         doc["schema"] != FACT_SCHEMA
@@ -494,10 +701,8 @@ def validate_fact(value: object, attachment_kind: str, child_kind: str, tested: 
     facts = doc["facts"]
     if attachment_kind == "HOT_PATH_MEASUREMENT":
         expected = {
-            "allocatedBytes": 0,
-            "durationMicros": summary["durationMicros"],
-            "operations": 100000,
-            "ordinaryReadRemoteMetadataOperations": 0,
+            "concurrentHazard": metrics["CONCURRENT_HAZARD"],
+            "stableCapturePlanClear": metrics["HOT_PATH"],
             "zeroAllocationAssertion": "steadyCapturePlanAndClearAllocateNoHeapBytesOnCurrentThread",
         }
     elif attachment_kind == "SOURCE_PLAN_MATRIX":
@@ -511,7 +716,13 @@ def validate_fact(value: object, attachment_kind: str, child_kind: str, tested: 
             "routeOrder": "POSITION_ASCENDING",
         }
     elif attachment_kind == "CONTROL_PHYSICAL_SELECTION":
-        expected = bindings["physicalSelection"]
+        expected = {
+            "measurements": {
+                "capacity": metrics["CONTROL_CAPACITY"],
+                "cleanup": metrics["CONTROL_CLEANUP"],
+            },
+            "selection": bindings["physicalSelection"],
+        }
     elif attachment_kind == "BACKEND_ADMISSION":
         expected = {
             "admissions": bindings["backendAdmissions"],
@@ -522,9 +733,11 @@ def validate_fact(value: object, attachment_kind: str, child_kind: str, tested: 
         expected = {
             "affectedHistoricalM3Seam": True,
             "frozenM3FinalSha256": M3_FINAL_SHA256,
-            "kafkaTests": 1,
+            "kafka": metrics["KAFKA_CURRENT_SOURCE"],
+            "kafkaTests": 2,
             "pulsarSourceCommit": "a14e0e6f4e49be0677318b4ceefc7b85b445823b",
-            "pulsarTests": 2,
+            "pulsar": metrics["PULSAR_CURRENT_SOURCE"],
+            "pulsarTests": 3,
             "totalDurationMicros": summary["durationMicros"],
         }
     else:
@@ -554,6 +767,7 @@ def validate_child_value(root: Path, receipt: object, expected_kind: str | None 
         raise EvidenceError(f"M4 child attachment inventory differs: {kind}")
     seen: set[str] = set()
     junit_summary: dict[str, int] | None = None
+    governed_metrics: dict[str, dict[str, int]] | None = None
     facts: list[tuple[str, dict[str, Any]]] = []
     total = 0
     ordinal = CHILD_KINDS.index(kind) + 1
@@ -575,16 +789,17 @@ def validate_child_value(root: Path, receipt: object, expected_kind: str | None 
         value = load_canonical(raw, str(path))
         if row["kind"] == "JUNIT_SUMMARY":
             junit_summary = validate_junit(value, kind, tested)
+            governed_metrics = junit_metrics(value, kind)
         else:
             facts.append((row["kind"], value))
         total += len(raw)
-    if junit_summary is None:
+    if junit_summary is None or governed_metrics is None:
         raise EvidenceError(f"M4 child lacks governed JUnit summary: {kind}")
     summary = exact(doc["testSummary"], {"durationMicros", "errors", "failures", "skipped", "tests"}, f"{kind}.testSummary")
     if summary != junit_summary:
         raise EvidenceError(f"M4 child test summary differs from governed JUnit: {kind}")
     for attachment_kind, value in facts:
-        validate_fact(value, attachment_kind, kind, tested, bindings, summary)
+        validate_fact(value, attachment_kind, kind, tested, bindings, summary, governed_metrics)
     if total > MAX_TOTAL_BYTES:
         raise EvidenceError(f"M4 child evidence exceeds total cap: {kind}")
     return kind, tested, bindings

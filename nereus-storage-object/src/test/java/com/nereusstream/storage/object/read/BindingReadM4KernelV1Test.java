@@ -28,12 +28,16 @@ import com.nereusstream.storage.object.read.BindingReadRouteV1.SourcePurity;
 import com.nereusstream.storage.object.read.BindingReadSourceRefV1.SourceKind;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
@@ -295,7 +299,7 @@ class BindingReadM4KernelV1Test {
         Fixture fixture = fixture(1, true, List.of(route(0, 10, false)));
         ExecutorService eventLoop = Executors.newSingleThreadExecutor();
         try {
-            BindingReadAsyncExecutorV1 executor = new BindingReadAsyncExecutorV1(eventLoop);
+            BindingReadAsyncExecutorV1 executor = new BindingReadAsyncExecutorV1(eventLoop, fixture.pool.capacity());
             CompletableFuture<String> provider = new CompletableFuture<>();
             CountDownLatch started = new CountDownLatch(1);
             CompletableFuture<String> result = executor.execute(fixture.current, fixture.pool, authority -> {
@@ -321,7 +325,7 @@ class BindingReadM4KernelV1Test {
         Fixture fixture = fixture(1, true, List.of(route(0, 10, false)));
         ExecutorService eventLoop = Executors.newSingleThreadExecutor();
         try {
-            BindingReadAsyncExecutorV1 executor = new BindingReadAsyncExecutorV1(eventLoop);
+            BindingReadAsyncExecutorV1 executor = new BindingReadAsyncExecutorV1(eventLoop, fixture.pool.capacity());
             CompletableFuture<String> result = executor.execute(
                     fixture.current, fixture.pool, authority -> CompletableFuture.completedFuture("value"));
 
@@ -330,6 +334,31 @@ class BindingReadM4KernelV1Test {
         } finally {
             eventLoop.shutdownNow();
         }
+    }
+
+    @Test
+    void asyncExecutorPreallocatesAndReusesBoundedBatchContexts() {
+        Fixture fixture = fixture(1, true, List.of(route(0, 10, false)));
+        AtomicInteger created = new AtomicInteger();
+        BindingReadAsyncExecutorV1 executor =
+                new BindingReadAsyncExecutorV1(Runnable::run, fixture.pool.capacity(), () -> {
+                    created.incrementAndGet();
+                    return new BindingReadBatchContextV1();
+                });
+
+        assertThat(executor.execute(
+                                fixture.current,
+                                fixture.pool,
+                                authority -> CompletableFuture.completedFuture(authority.sourceGeneration()))
+                        .join())
+                .isOne();
+        assertThat(executor.execute(
+                                fixture.current,
+                                fixture.pool,
+                                authority -> CompletableFuture.completedFuture(authority.sourceGeneration()))
+                        .join())
+                .isOne();
+        assertThat(created).hasValue(1);
     }
 
     @Test
@@ -342,17 +371,135 @@ class BindingReadM4KernelV1Test {
         Fixture fixture = fixture(1, true, List.of(route(0, 10, false)));
         BindingReadBatchContextV1 batch = new BindingReadBatchContextV1();
         BindingReadPlanBufferV1 plan = new BindingReadPlanBufferV1(1);
+        int operations = 100_000;
+        long[] latencyNanos = new long[operations];
         for (int index = 0; index < 20_000; index++) {
             runSteadyIteration(fixture, batch, plan);
         }
 
         long threadId = Thread.currentThread().getId();
         long before = bean.getThreadAllocatedBytes(threadId);
-        for (int index = 0; index < 100_000; index++) {
+        long elapsedStart = System.nanoTime();
+        for (int index = 0; index < operations; index++) {
+            long started = System.nanoTime();
             runSteadyIteration(fixture, batch, plan);
+            latencyNanos[index] = System.nanoTime() - started;
         }
+        long elapsedNanos = System.nanoTime() - elapsedStart;
         long allocated = bean.getThreadAllocatedBytes(threadId) - before;
         assertThat(allocated).isZero();
+        Arrays.sort(latencyNanos);
+        long p50Nanos = percentile(latencyNanos, 50);
+        long p99Nanos = percentile(latencyNanos, 99);
+        long throughput = throughput(operations, elapsedNanos);
+        assertThat(p99Nanos).isLessThan(5_000_000);
+        assertThat(throughput).isGreaterThan(1_000);
+        System.out.printf(
+                Locale.ROOT,
+                "M4_METRIC HOT_PATH operations=%d allocatedBytes=%d elapsedNanos=%d p50Nanos=%d "
+                        + "p99Nanos=%d maxNanos=%d throughputOpsPerSecond=%d atomicCasPerOperation=2 "
+                        + "fullFencesPerOperation=1 authorityAcquireLoadsPerOperation=2 perCallbackSlotCas=0 "
+                        + "ordinaryReadRemoteMetadataOperations=0%n",
+                operations,
+                allocated,
+                elapsedNanos,
+                p50Nanos,
+                p99Nanos,
+                latencyNanos[latencyNanos.length - 1],
+                throughput);
+    }
+
+    @Test
+    void concurrentCaptureAndStableScanMeetBoundedLatencyAndThroughput() throws Exception {
+        int readers = 4;
+        int operationsPerReader = 20_000;
+        int operations = readers * operationsPerReader;
+        Fixture fixture = fixture(16, true, List.of(route(0, 10, false)));
+        long[] latencyNanos = new long[operations];
+        CountDownLatch ready = new CountDownLatch(readers + 1);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch finished = new CountDownLatch(readers + 1);
+        AtomicInteger readersRemaining = new AtomicInteger(readers);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        AtomicLong scans = new AtomicLong();
+        AtomicLong pinnedScans = new AtomicLong();
+        AtomicLong cleanScans = new AtomicLong();
+        AtomicLong inconclusiveScans = new AtomicLong();
+        ExecutorService workers = Executors.newFixedThreadPool(readers + 1);
+        try {
+            for (int reader = 0; reader < readers; reader++) {
+                int offset = reader * operationsPerReader;
+                workers.execute(() -> {
+                    BindingReadBatchContextV1 batch = new BindingReadBatchContextV1();
+                    BindingReadPlanBufferV1 plan = new BindingReadPlanBufferV1(1);
+                    ready.countDown();
+                    try {
+                        await(start);
+                        for (int index = 0; index < operationsPerReader; index++) {
+                            long started = System.nanoTime();
+                            runSteadyIteration(fixture, batch, plan);
+                            latencyNanos[offset + index] = System.nanoTime() - started;
+                        }
+                    } catch (Throwable error) {
+                        failure.compareAndSet(null, error);
+                    } finally {
+                        readersRemaining.decrementAndGet();
+                        finished.countDown();
+                    }
+                });
+            }
+            workers.execute(() -> {
+                ready.countDown();
+                try {
+                    await(start);
+                    while (readersRemaining.get() != 0) {
+                        ScanOutcome outcome = fixture.pool.scan(fixture.binding, 1);
+                        scans.incrementAndGet();
+                        switch (outcome) {
+                            case PINNED -> pinnedScans.incrementAndGet();
+                            case CLEAN -> cleanScans.incrementAndGet();
+                            case INCONCLUSIVE -> inconclusiveScans.incrementAndGet();
+                        }
+                    }
+                } catch (Throwable error) {
+                    failure.compareAndSet(null, error);
+                } finally {
+                    finished.countDown();
+                }
+            });
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            long elapsedStart = System.nanoTime();
+            start.countDown();
+            assertThat(finished.await(30, TimeUnit.SECONDS)).isTrue();
+            long elapsedNanos = System.nanoTime() - elapsedStart;
+            assertThat(failure.get()).isNull();
+            assertThat(scans).hasPositiveValue();
+            assertThat(fixture.pool.scan(fixture.binding, 1)).isEqualTo(ScanOutcome.CLEAN);
+            Arrays.sort(latencyNanos);
+            long p99Nanos = percentile(latencyNanos, 99);
+            long measuredThroughput = throughput(operations, elapsedNanos);
+            assertThat(p99Nanos).isLessThan(10_000_000);
+            assertThat(measuredThroughput).isGreaterThan(1_000);
+            System.out.printf(
+                    Locale.ROOT,
+                    "M4_METRIC CONCURRENT_HAZARD threads=%d operations=%d elapsedNanos=%d p50Nanos=%d "
+                            + "p99Nanos=%d maxNanos=%d throughputOpsPerSecond=%d scans=%d pinnedScans=%d "
+                            + "cleanScans=%d inconclusiveScans=%d poolCapacity=%d%n",
+                    readers,
+                    operations,
+                    elapsedNanos,
+                    percentile(latencyNanos, 50),
+                    p99Nanos,
+                    latencyNanos[latencyNanos.length - 1],
+                    measuredThroughput,
+                    scans.get(),
+                    pinnedScans.get(),
+                    cleanScans.get(),
+                    inconclusiveScans.get(),
+                    fixture.pool.capacity());
+        } finally {
+            workers.shutdownNow();
+        }
     }
 
     @Test
@@ -378,6 +525,15 @@ class BindingReadM4KernelV1Test {
         if (!batch.terminalClearExactLease()) {
             throw new AssertionError("steady terminal clear failed");
         }
+    }
+
+    private static long percentile(long[] sortedNanos, int percentile) {
+        int index = Math.floorDiv(Math.addExact(Math.multiplyExact(sortedNanos.length, percentile), 99), 100) - 1;
+        return sortedNanos[Math.max(0, Math.min(index, sortedNanos.length - 1))];
+    }
+
+    private static long throughput(long operations, long elapsedNanos) {
+        return Math.max(1, Math.floorDiv(Math.multiplyExact(operations, 1_000_000_000L), elapsedNanos));
     }
 
     private static Fixture fixture(int capacity, boolean admitting, List<BindingReadRouteV1> routes) {

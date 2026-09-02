@@ -49,7 +49,7 @@ def write_new(path: Path, raw: bytes) -> None:
         output.write(raw)
 
 
-def junit_value(root: Path, kind: str, tested: str) -> tuple[dict, dict[str, int]]:
+def junit_value(root: Path, kind: str, tested: str) -> tuple[dict, dict[str, int], dict[str, dict[str, int]]]:
     suites = []
     for module, task in TASK_RESULTS[kind]:
         directory = root / module / "build" / "test-results" / task
@@ -75,16 +75,21 @@ def junit_value(root: Path, kind: str, tested: str) -> tuple[dict, dict[str, int
         "testedCommit": tested,
     }
     summary = CONTRACT.validate_junit(value, kind, tested)
-    return value, summary
+    metrics = CONTRACT.junit_metrics(value, kind)
+    return value, summary, metrics
 
 
-def fact_value(kind: str, evidence_kind: str, tested: str, bindings: dict, summary: dict[str, int]) -> dict:
+def fact_value(
+        kind: str,
+        evidence_kind: str,
+        tested: str,
+        bindings: dict,
+        summary: dict[str, int],
+        metrics: dict[str, dict[str, int]]) -> dict:
     if evidence_kind == "HOT_PATH_MEASUREMENT":
         facts = {
-            "allocatedBytes": 0,
-            "durationMicros": summary["durationMicros"],
-            "operations": 100000,
-            "ordinaryReadRemoteMetadataOperations": 0,
+            "concurrentHazard": metrics["CONCURRENT_HAZARD"],
+            "stableCapturePlanClear": metrics["HOT_PATH"],
             "zeroAllocationAssertion": "steadyCapturePlanAndClearAllocateNoHeapBytesOnCurrentThread",
         }
     elif evidence_kind == "SOURCE_PLAN_MATRIX":
@@ -98,7 +103,13 @@ def fact_value(kind: str, evidence_kind: str, tested: str, bindings: dict, summa
             "routeOrder": "POSITION_ASCENDING",
         }
     elif evidence_kind == "CONTROL_PHYSICAL_SELECTION":
-        facts = bindings["physicalSelection"]
+        facts = {
+            "measurements": {
+                "capacity": metrics["CONTROL_CAPACITY"],
+                "cleanup": metrics["CONTROL_CLEANUP"],
+            },
+            "selection": bindings["physicalSelection"],
+        }
     elif evidence_kind == "BACKEND_ADMISSION":
         facts = {
             "admissions": bindings["backendAdmissions"],
@@ -109,9 +120,11 @@ def fact_value(kind: str, evidence_kind: str, tested: str, bindings: dict, summa
         facts = {
             "affectedHistoricalM3Seam": True,
             "frozenM3FinalSha256": CONTRACT.M3_FINAL_SHA256,
-            "kafkaTests": 1,
+            "kafka": metrics["KAFKA_CURRENT_SOURCE"],
+            "kafkaTests": 2,
             "pulsarSourceCommit": "a14e0e6f4e49be0677318b4ceefc7b85b445823b",
-            "pulsarTests": 2,
+            "pulsar": metrics["PULSAR_CURRENT_SOURCE"],
+            "pulsarTests": 3,
             "totalDurationMicros": summary["durationMicros"],
         }
     else:
@@ -124,7 +137,7 @@ def fact_value(kind: str, evidence_kind: str, tested: str, bindings: dict, summa
         "schema": CONTRACT.FACT_SCHEMA,
         "testedCommit": tested,
     }
-    CONTRACT.validate_fact(value, evidence_kind, kind, tested, bindings, summary)
+    CONTRACT.validate_fact(value, evidence_kind, kind, tested, bindings, summary, metrics)
     return value
 
 
@@ -138,10 +151,10 @@ def build_package(root: Path, output: Path, tested: str, source_sha: str, bindin
                 f"docs/v2/evidence/v2-m4/children/final-source-{tested}/{ordinal:02d}-{kind}"
             )
             attachment_rows = []
-            junit, summary = junit_value(root, kind, tested)
+            junit, summary, metrics = junit_value(root, kind, tested)
             for attachment_index, attachment_kind in enumerate(CONTRACT.ATTACHMENTS[kind]):
                 value = junit if attachment_kind == "JUNIT_SUMMARY" else fact_value(
-                    kind, attachment_kind, tested, bindings, summary
+                    kind, attachment_kind, tested, bindings, summary, metrics
                 )
                 raw = CONTRACT.canonical_bytes(value)
                 relative = child_relative / "attachments" / f"{attachment_index:02d}-{attachment_kind}.json"
