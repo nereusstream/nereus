@@ -40,6 +40,13 @@ class OxiaCanonicalControlMetadataStoreTest {
             + "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private static final String KAFKA_HEAD =
             "v2/object-wal/shards/0000000007/runs/00000000000000000011/protocol/kafka/nwkcp1-v1/head";
+    private static final String M4_PREFIX = "v2/object-wal/shards/0000000007/read-m4/" + "a".repeat(64);
+    private static final String M4_SELECTOR = M4_PREFIX + "/selector";
+    private static final String M4_CAPABILITY = M4_PREFIX + "/capabilities/00000000000000000001";
+    private static final String M4_TERMINAL = M4_PREFIX + "/terminals/00000000000000000003";
+    private static final String M4_PROOF = M4_PREFIX + "/proofs/00000000000000000003";
+    private static final String M4_PROOF_HEAD = M4_PREFIX + "/proof-head";
+    private static final String M4_PROTECTION = M4_PREFIX + "/protections/" + "b".repeat(64) + "-00000000000000000009";
     private static final CanonicalBytes FIRST = bytes("first");
     private static final CanonicalBytes SECOND = bytes("second");
     private static final CanonicalBytes DIFFERENT = bytes("different");
@@ -55,7 +62,20 @@ class OxiaCanonicalControlMetadataStoreTest {
 
     @Test
     void acceptsOnlyTheClosedCellShardControlFamilies() {
-        for (String key : new String[] {POINTER, ROOT, SEAL, CHECKPOINT_HEAD, CHECKPOINT_PAGE, KAFKA_HEAD}) {
+        for (String key : new String[] {
+            POINTER,
+            ROOT,
+            SEAL,
+            CHECKPOINT_HEAD,
+            CHECKPOINT_PAGE,
+            KAFKA_HEAD,
+            M4_SELECTOR,
+            M4_CAPABILITY,
+            M4_TERMINAL,
+            M4_PROOF,
+            M4_PROOF_HEAD,
+            M4_PROTECTION
+        }) {
             assertThat(store.putIfAbsent(key, FIRST)).isEqualTo(ControlMutationOutcome.APPLIED);
             assertThat(store.get(key)).contains(FIRST);
             assertThat(client.stored(CELL_ROOT + "/" + key)).isPresent();
@@ -68,16 +88,20 @@ class OxiaCanonicalControlMetadataStoreTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> store.get("v2/object-wal/shards/0000000007/runs/00000000000000000011/../seal"))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.get(M4_PREFIX + "/batches/00000000000000000001"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.get(M4_PREFIX + "/protections/" + "b".repeat(63) + "-00000000000000000009"))
+                .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new OxiaCanonicalControlMetadataStore(client, "/nereus//cell-a", 7))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new OxiaCanonicalControlMetadataStore(client, "/nereus/单元", 7))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        int exactRootLength = 512 - 1 - CHECKPOINT_PAGE.length();
+        int exactRootLength = 512 - 1 - M4_PROTECTION.length();
         String exactBoundaryRoot = "/" + "a".repeat(exactRootLength - 1);
         var exactBoundaryStore = new OxiaCanonicalControlMetadataStore(client, exactBoundaryRoot, 7);
-        assertThat(exactBoundaryStore.putIfAbsent(CHECKPOINT_PAGE, FIRST)).isEqualTo(ControlMutationOutcome.APPLIED);
-        assertThat(client.stored(exactBoundaryRoot + "/" + CHECKPOINT_PAGE)).isPresent();
+        assertThat(exactBoundaryStore.putIfAbsent(M4_PROTECTION, FIRST)).isEqualTo(ControlMutationOutcome.APPLIED);
+        assertThat(client.stored(exactBoundaryRoot + "/" + M4_PROTECTION)).isPresent();
         assertThatThrownBy(() -> new OxiaCanonicalControlMetadataStore(client, exactBoundaryRoot + "a", 7))
                 .isInstanceOf(IllegalArgumentException.class);
     }

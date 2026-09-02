@@ -107,6 +107,19 @@ tasks.register<Test>("v2M4ReadKernelTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("v2M4ControlPlaneTest") {
+    group = "verification"
+    description = "Run the deterministic M4 selector, capability, proof, fold, and protection-release suite."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true

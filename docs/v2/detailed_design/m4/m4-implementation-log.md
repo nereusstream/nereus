@@ -39,3 +39,32 @@ source. `V2-OPEN-READ-08/09` remain open, every M4 scenario remains `PLANNED`, a
 After implementation begins, `v2M4FrozenDesignInputsCheck` verifies the immutable manifest bytes, preserved Grill
 records, M4-D ownership literals, and historical M3 dependency without repeating the pre-start-only
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED` claim. The original `v2M4DesignCheck` remains the freeze-commit gate.
+
+## Milestone 2: durable selector and quiescence-control candidate
+
+The second implementation slice adds a fail-closed canonical M4 control-plane candidate below the existing exact-byte
+`CanonicalControlMetadataStore` and expands the source-locked Oxia adapter's closed key grammar only for those M4
+families. It selects:
+
+- one inline canonical `BindingReadSelector` capped at 32 KiB, seven ordinarily consumable pending-anchor/batch slots,
+  an eighth emergency slot, and a dedicated 2 KiB `STOPPED` byte reserve;
+- one exact selector CAS for takeover, fallback introduction, membership-neutral view publication, the fused
+  `PWF E -> PO E+1` closure/anchor/batch transition, bounded anchor pruning, and fresh-epoch recovery from `STOPPED`;
+- immutable capability generations that bind backend admission/configuration, adapter, admission contract, verifier,
+  receipt identity/SHA, time semantics, and numeric lifetime/skew/grace bounds; revocation preserves the evidence
+  digest and fails later verification closed;
+- create-only terminal/proof rows, typed planned-drain versus qualified-expiry facts, deterministic proof identities,
+  a 64-entry live proof window, 32-entry contiguous folds, 64-fold cap, and a 4,096-epoch interval bound; and
+- exact-generation source protection with per-source `[first_i, sharedLast]` verification, current hazard-scan drain,
+  capability-qualified historical proof revalidation, irreversible release CAS, and exact reread convergence after
+  response loss.
+
+The deterministic suites cover all canonical record round trips, non-canonical rejection, all selector transition
+families, stale closure conflict, applied-but-unknown convergence, emergency stop/resume, valid terminal substitution,
+invalid-occupant quarantine, proof gaps/folding, historical capability changes and revocation, local hazard retention,
+and release response loss. The Oxia test additionally proves the exact M4 key allowlist and rejects neighboring or
+malformed key families.
+
+This remains a candidate implementation, not activation or formal evidence. The frozen `V2-OPEN-READ-08/09` gates are
+not closed until the final evidence run binds these exact encodings, limits, tests, and measurements to one tested
+source. M4 still performs no physical deletion; M5 batch compaction and provider GC remain absent.

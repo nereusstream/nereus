@@ -32,9 +32,9 @@ import java.util.regex.Pattern;
  * Synchronous exact-byte M3 control adapter over one source-locked O1 client.
  *
  * <p>The public key is the accepted relative Object-WAL key. The backend key is always rooted below
- * one immutable Cell authority root, and the adapter accepts only the Root, Pointer, Seal,
- * checkpoint page/head, and Kafka protocol-head families for its configured shard. It does not
- * expose a general Oxia key/value capability.
+ * one immutable Cell authority root, and the adapter accepts only the M3 run-control and M4
+ * Binding read-control families for its configured shard. It does not expose a general Oxia
+ * key/value capability.
  */
 public final class OxiaCanonicalControlMetadataStore implements CanonicalControlMetadataStore {
     private static final int MAX_RELATIVE_KEY_BYTES = 1_024;
@@ -44,6 +44,9 @@ public final class OxiaCanonicalControlMetadataStore implements CanonicalControl
     private static final String RUN = "/runs/[0-9]{20}";
     private static final String PAGE = "/checkpoint/pages/[0-9]{20}-[0-9a-f]{64}";
     private static final String KAFKA_HEAD = "/protocol/kafka/nwkcp1-v1/head";
+    private static final String M4_BINDING = "/read-m4/[0-9a-f]{64}";
+    private static final String M4_ORDINAL = "/[0-9]{20}";
+    private static final String M4_PROTECTION = "/protections/[0-9a-f]{64}-[0-9]{20}";
 
     private final OxiaConditionalClient client;
     private final MutationFailureClassifier failureClassifier;
@@ -64,8 +67,11 @@ public final class OxiaCanonicalControlMetadataStore implements CanonicalControl
         }
         String shard = String.format(java.util.Locale.ROOT, "%010d", shardId);
         String prefix = "v2/object-wal/shards/" + shard;
-        String longestRelativeKey =
+        String longestRunKey =
                 prefix + "/runs/" + "0".repeat(20) + "/checkpoint/pages/" + "0".repeat(20) + "-" + "0".repeat(64);
+        String longestM4Key =
+                prefix + "/read-m4/" + "0".repeat(64) + "/protections/" + "0".repeat(64) + "-" + "0".repeat(20);
+        String longestRelativeKey = longestRunKey.length() >= longestM4Key.length() ? longestRunKey : longestM4Key;
         if (this.cellAuthorityRoot.length() + 1 + longestRelativeKey.length() > MAX_OXIA_KEY_BYTES) {
             throw new IllegalArgumentException("Cell authority root leaves insufficient room for bounded Oxia keys");
         }
@@ -76,6 +82,16 @@ public final class OxiaCanonicalControlMetadataStore implements CanonicalControl
                 + PAGE
                 + "|"
                 + KAFKA_HEAD
+                + ")|"
+                + M4_BINDING
+                + "(?:/selector|/proof-head|/capabilities"
+                + M4_ORDINAL
+                + "|/terminals"
+                + M4_ORDINAL
+                + "|/proofs"
+                + M4_ORDINAL
+                + "|"
+                + M4_PROTECTION
                 + "))");
     }
 

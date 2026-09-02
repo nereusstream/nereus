@@ -1912,6 +1912,22 @@ tasks.register("v2M4ReadKernelCheck") {
     )
 }
 
+tasks.register("v2M4ControlPlaneCheck") {
+    group = "verification"
+    description = "Run M4 durable read-control, Oxia adapter, style, and frozen-design prerequisite checks."
+    dependsOn(
+        "v2M4FrozenDesignInputsCheck",
+        ":nereus-storage-object:v2M4ControlPlaneTest",
+        ":nereus-metadata-oxia:v2M4ReadControlOxiaAdapterTest",
+        ":nereus-storage-object:spotlessCheck",
+        ":nereus-storage-object:checkstyleMain",
+        ":nereus-storage-object:checkstyleTest",
+        ":nereus-metadata-oxia:spotlessCheck",
+        ":nereus-metadata-oxia:checkstyleMain",
+        ":nereus-metadata-oxia:checkstyleTest",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

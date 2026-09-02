@@ -2306,6 +2306,21 @@ tasks.register<Test>("m3ObjectWalMetadataTest") {
     }
 }
 
+tasks.register<Test>("v2M4ReadControlOxiaAdapterTest") {
+    group = "verification"
+    description = "Run the exact-key Oxia adapter suite including the closed M4 read-control grammar."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.objectwal.OxiaCanonicalControlMetadataStoreTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.register<Test>("m3ObjectWalOxiaIntegrationTest") {
     group = "verification"
     description = "Run the M3 Object-WAL exact-byte control-metadata gate against source-locked real Oxia."
