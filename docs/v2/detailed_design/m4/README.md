@@ -1,10 +1,11 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
-evidenceStatus: NotRun
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: NormativeDesignIndex
 sourceTuple: v2-m1
+receipt: docs/v2/evidence/v2-m4/final/canonical/m4-final.json
 ---
 
 # M4 detailed-design index
@@ -21,10 +22,14 @@ per-read durable ticket, a second physical-object pin authority, or physical sou
 - [M4-C hazard-slot and reclamation races](m4-c-hazard-slot-reclamation.md) is accepted design input from Grill 34.
 - [M4-D evidence ownership and freeze](m4-d-evidence-ownership-and-freeze.md) is accepted design input from Grill 35.
 - The governance-only [freeze manifest](m4-design-freeze.json) binds the eight immutable design/review records.
-- Implementation, runtime evidence, scenario promotion, and M4 Final have not started.
+- Implementation and formal evidence are complete at exact tested source
+  `0a855a7354631f8eb42adac0d93eacb9ac591027`; the canonical immutable
+  [M4 Final](../../evidence/v2-m4/final/canonical/m4-final.json) has SHA-256
+  `ee95aa54a43847044e5bdd466edd3d3ac507494028967f529917265bcf4909fe`.
 
-The blocking design frontier is empty. The design is hard-frozen when `v2M4DesignCheck` passes on the clean pushed
-freeze commit and local `HEAD` equals `origin/main`. Evidence-selected descendants remain explicitly OPEN.
+The design remains hard-frozen and unchanged. `v2M4DesignCheck` records the clean pre-implementation freeze;
+`v2M4Check` is the post-publication authority. M5 physical deletion, M6 process activation, M8 native parity, and
+production deployment authority remain excluded.
 
 ## Goal
 
@@ -83,8 +88,8 @@ M4 owns:
 - fused selector/anchor/terminal/proof-window/fold/capability writers and closed verifiers;
 - exact per-source `[first_i,sharedLast]` release verification, protection-generation release CAS, and response-loss
   reconciliation;
-- the physical proof-window/head/fold candidates and measurements required by `V2-OPEN-READ-08`;
-- capability/receipt encoding inputs under `V2-OPEN-READ-09`; and
+- the physical proof-window/head/fold representation and measurements now selected by the M4 Final;
+- the capability/receipt encodings and backend admissions now selected by the M4 Final; and
 - the four future semantic evidence children and exact scenario/predicate ownership frozen in M4-D.
 
 M4 does not own:
@@ -114,7 +119,7 @@ The freeze commit must prove:
 3. the race matrix proves no physical source can be deleted while an accepted read may still use it, including
    quarantine and process-loss boundaries;
 4. M4/M5 scenario predicates and receipt ownership are exact and non-overlapping;
-5. `V2-OPEN-READ-08/09/15` remain OPEN wherever current evidence is absent rather than being closed by prose;
+5. before formal evidence, `V2-OPEN-READ-08/09/15` remain OPEN wherever evidence is absent rather than being closed by prose;
 6. the separate M4 historical-M3 dependency contract is exact and does not weaken `v2M3Check`; and
 7. `v2DocumentationCheck`, `v2M4HistoricalM3DependencyCheck`, its contract tests, and `v2M4DesignCheck` pass on a clean
    commit pushed to `origin/main` with local/remote equality.
