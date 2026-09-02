@@ -17,6 +17,7 @@ package com.nereusstream.storage.object.read;
 import com.nereusstream.domain.identity.TopicBindingId;
 import java.lang.invoke.VarHandle;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.AtomicReference;
@@ -44,10 +45,20 @@ public final class BindingReadHazardPoolV1 {
     private final AtomicReferenceArray<TopicBindingId> bindingIds;
     private final AtomicIntegerArray retired;
     private final int maximumCaptureRetries;
+    private final Runnable afterLeaseClaimBeforePayload;
+    private final AtomicBoolean admissionClosed = new AtomicBoolean();
 
     public BindingReadHazardPoolV1(int capacity, int maximumCaptureRetries) {
+        this(capacity, maximumCaptureRetries, 1, null);
+    }
+
+    BindingReadHazardPoolV1(
+            int capacity, int maximumCaptureRetries, long initialLeaseWord, Runnable afterLeaseClaimBeforePayload) {
         if (capacity <= 0 || capacity > 65_536 || maximumCaptureRetries <= 0 || maximumCaptureRetries > 64) {
             throw new IllegalArgumentException("hazard-pool capacity/retry cap is outside the admitted bound");
+        }
+        if (initialLeaseWord <= 0) {
+            throw new IllegalArgumentException("initial lease word must be positive");
         }
         leaseWords = new AtomicLongArray(capacity);
         nextLeaseWords = new AtomicLongArray(capacity);
@@ -56,13 +67,19 @@ public final class BindingReadHazardPoolV1 {
         bindingIds = new AtomicReferenceArray<>(capacity);
         retired = new AtomicIntegerArray(capacity);
         this.maximumCaptureRetries = maximumCaptureRetries;
+        this.afterLeaseClaimBeforePayload = afterLeaseClaimBeforePayload;
         for (int index = 0; index < capacity; index++) {
-            nextLeaseWords.set(index, 1);
+            nextLeaseWords.set(index, initialLeaseWord);
         }
     }
 
     public int capacity() {
         return leaseWords.length();
+    }
+
+    /** Stops new capture without clearing, reassigning, or otherwise weakening any live lease. */
+    public void closeAdmission() {
+        admissionClosed.set(true);
     }
 
     public CaptureOutcome tryCapture(
@@ -73,6 +90,9 @@ public final class BindingReadHazardPoolV1 {
             throw new IllegalArgumentException("capture target already owns a lease");
         }
         for (int retry = 0; retry < maximumCaptureRetries; retry++) {
+            if (admissionClosed.get()) {
+                return CaptureOutcome.ADMISSION_CLOSED;
+            }
             BindingReadAuthorityV1 authority = currentAuthority.get();
             if (authority == null || !authority.admitting()) {
                 return CaptureOutcome.ADMISSION_CLOSED;
@@ -173,6 +193,9 @@ public final class BindingReadHazardPoolV1 {
             long candidate = nextLeaseWords.get(index);
             if (candidate <= 0 || !leaseWords.compareAndSet(index, 0, candidate)) {
                 continue;
+            }
+            if (afterLeaseClaimBeforePayload != null) {
+                afterLeaseClaimBeforePayload.run();
             }
             bindingIds.set(index, bindingId);
             sourceGenerations.set(index, sourceGeneration);

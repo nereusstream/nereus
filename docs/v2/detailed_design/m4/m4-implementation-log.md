@@ -68,3 +68,26 @@ malformed key families.
 This remains a candidate implementation, not activation or formal evidence. The frozen `V2-OPEN-READ-08/09` gates are
 not closed until the final evidence run binds these exact encodings, limits, tests, and measurements to one tested
 source. M4 still performs no physical deletion; M5 batch compaction and provider GC remain absent.
+
+## Milestone 3: typed protocol planning and local selector coupling
+
+The third implementation slice closes two implementation-level gaps without changing the frozen authority:
+
+- Pulsar planning now preserves `(virtualLedgerId, entryId)` as a typed two-coordinate position. It never flattens a
+  ledger and entry into the Kafka `long` offset domain, and it fails closed on gaps, overlap, range, or caller-owned
+  capacity limits.
+- Source attempt identities are caller-selected and monotonically increasing across every interval in one batch.
+  Successful nonterminal intervals leave the source-use gate open, and observability is scoped to the affected
+  source-purity unit, so an earlier completed interval cannot incorrectly forbid an already-planned fallback for a
+  later disjoint interval.
+- `BindingReadSelectorRuntimeV1` closes owner-local admission before dispatching the fused durable fallback closure.
+  Unknown or conflicting outcomes keep the old epoch locally closed; only an exact durable successor can reopen the
+  successor epoch. An already-captured predecessor generation remains pinned and usable under its frozen rules.
+- Planned pool close rejects new capture but never clears a live lease. Deterministic tests also select permanent slot
+  retirement at lease-word wrap and require `INCONCLUSIVE` while a claimed lease has not yet published a stable
+  payload.
+
+Focused tests cover a near-`Long.MAX_VALUE` Pulsar ledger, typed range gaps and plan capacity, multi-interval fallback,
+local close-before-unknown-response ordering, old-generation survival, pool close, lease wrap, and the exact
+lease/payload publication race. These are still focused implementation results: current-source Kafka/Pulsar adapters,
+formal child receipts, final measurements, OPEN-gate synchronization, scenario promotion, and M4 Final remain ahead.

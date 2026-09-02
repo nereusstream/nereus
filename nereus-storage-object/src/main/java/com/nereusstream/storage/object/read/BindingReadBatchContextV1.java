@@ -28,7 +28,7 @@ public final class BindingReadBatchContextV1 {
     private long attemptIdentity;
     private int outstandingSourceUses;
     private boolean gateOpen;
-    private boolean observable;
+    private boolean currentPurityUnitObservable;
     private boolean quarantined;
 
     public BindingReadBatchContextV1() {
@@ -63,7 +63,7 @@ public final class BindingReadBatchContextV1 {
         attemptIdentity = 0;
         outstandingSourceUses = 0;
         gateOpen = true;
-        observable = false;
+        currentPurityUnitObservable = false;
         quarantined = false;
     }
 
@@ -96,6 +96,7 @@ public final class BindingReadBatchContextV1 {
         }
         attemptIdentity = exactAttemptIdentity;
         outstandingSourceUses = 1;
+        currentPurityUnitObservable = false;
         return true;
     }
 
@@ -113,12 +114,15 @@ public final class BindingReadBatchContextV1 {
 
     public void markObservable() {
         requireOwner();
-        observable = true;
+        if (outstandingSourceUses != 1) {
+            throw new IllegalStateException("only an active source-purity unit can become observable");
+        }
+        currentPurityUnitObservable = true;
     }
 
     public boolean observable() {
         requireActive();
-        return observable;
+        return currentPurityUnitObservable;
     }
 
     public void closeNewSourceUse() {
@@ -172,7 +176,7 @@ public final class BindingReadBatchContextV1 {
         attemptIdentity = 0;
         outstandingSourceUses = 0;
         gateOpen = false;
-        observable = false;
+        currentPurityUnitObservable = false;
         quarantined = false;
     }
 

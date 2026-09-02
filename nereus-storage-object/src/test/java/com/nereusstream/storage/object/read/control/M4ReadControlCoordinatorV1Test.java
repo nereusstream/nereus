@@ -278,6 +278,56 @@ class M4ReadControlCoordinatorV1Test {
     }
 
     @Test
+    void localAdmissionClosesBeforeUnknownSelectorResponseAndOldCapturedGenerationSurvives() {
+        Fixture fixture = new Fixture(CapabilityKind.DURABLE_DRAIN_ONLY_V1);
+        SourceProtectionIdentity source = fixture.source("source-a", 1, 1, 7);
+        BindingReadSelector predecessor = fixture.fallbackSelector(List.of(source), List.of(), List.of(), 1);
+        fixture.install(predecessor, List.of(source));
+        BindingReadAuthorityV1 predecessorAuthority =
+                fixture.authority(predecessor.selectedViewSha256(), predecessor.ownerEpoch(), 1, true, 7);
+        BindingReadAuthorityV1 successorAuthority =
+                fixture.authority(digest("preferred-only"), predecessor.ownerEpoch(), 2, true, 8);
+        BindingReadSelectorRuntimeV1 runtime = new BindingReadSelectorRuntimeV1(
+                fixture.binding, fixture.coordinator, predecessor, predecessorAuthority);
+        BindingReadHazardPoolV1 hazards = new BindingReadHazardPoolV1(2, 4);
+        BindingReadBatchContextV1 oldRead = new BindingReadBatchContextV1();
+        assertThat(hazards.tryCapture(runtime.currentAuthority(), oldRead))
+                .isEqualTo(BindingReadHazardPoolV1.CaptureOutcome.CAPTURED);
+
+        fixture.store.nextMode = NextMode.UNKNOWN_WITHOUT_APPLY;
+        assertThat(runtime.closeFallback(
+                        predecessor,
+                        predecessorAuthority,
+                        successorAuthority,
+                        digest("preferred-only"),
+                        8,
+                        List.of(source)))
+                .isEqualTo(Outcome.RETRY_EXACT_PREDECESSOR);
+        assertThat(runtime.currentAuthority().get().admitting()).isFalse();
+        assertThat(hazards.tryCapture(runtime.currentAuthority(), new BindingReadBatchContextV1()))
+                .isEqualTo(BindingReadHazardPoolV1.CaptureOutcome.ADMISSION_CLOSED);
+        assertThat(hazards.scan(fixture.binding.bindingId(), 7)).isEqualTo(BindingReadHazardPoolV1.ScanOutcome.PINNED);
+
+        assertThat(runtime.closeFallback(
+                        predecessor,
+                        predecessorAuthority,
+                        successorAuthority,
+                        digest("preferred-only"),
+                        8,
+                        List.of(source)))
+                .isEqualTo(Outcome.APPLIED);
+        BindingReadBatchContextV1 newRead = new BindingReadBatchContextV1();
+        assertThat(hazards.tryCapture(runtime.currentAuthority(), newRead))
+                .isEqualTo(BindingReadHazardPoolV1.CaptureOutcome.CAPTURED);
+        assertThat(hazards.scan(fixture.binding.bindingId(), 8)).isEqualTo(BindingReadHazardPoolV1.ScanOutcome.PINNED);
+
+        oldRead.closeNewSourceUse();
+        assertThat(oldRead.terminalClearExactLease()).isTrue();
+        newRead.closeNewSourceUse();
+        assertThat(newRead.terminalClearExactLease()).isTrue();
+    }
+
+    @Test
     void proofIntervalUsesEachHistoricalCapabilityAndRevocationFailsSafe() {
         Fixture fixture = new Fixture(CapabilityKind.DURABLE_DRAIN_ONLY_V1);
         fixture.coordinator.createCapability(fixture.capabilityEvidence);
@@ -504,6 +554,24 @@ class M4ReadControlCoordinatorV1Test {
                     1,
                     true,
                     sourceGeneration,
+                    capability.evidenceSha256(),
+                    cell);
+        }
+
+        private BindingReadAuthorityV1 authority(
+                Sha256Digest view, long ownerEpoch, long readAdmissionEpoch, boolean admitting, long sourceGeneration) {
+            BindingReadPublicationCellV1 cell = new BindingReadPublicationCellV1(
+                    sourceGeneration, 10, sourceGeneration, new BindingReadRouteTableV1(List.of()), List.of());
+            return new BindingReadAuthorityV1(
+                    binding.bindingId(),
+                    binding.incarnationSha256(),
+                    new StorageEpochId(binding.storageEpochSha256()),
+                    BindingReadProtocolV1.KAFKA_OFFSET,
+                    view,
+                    ownerEpoch,
+                    readAdmissionEpoch,
+                    admitting,
+                    capability.generation(),
                     capability.evidenceSha256(),
                     cell);
         }

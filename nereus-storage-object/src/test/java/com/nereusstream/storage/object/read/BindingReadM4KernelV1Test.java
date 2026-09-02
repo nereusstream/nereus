@@ -29,6 +29,8 @@ import com.nereusstream.storage.object.read.BindingReadSourceRefV1.SourceKind;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
@@ -102,6 +104,30 @@ class BindingReadM4KernelV1Test {
     }
 
     @Test
+    void pulsarPlannerPreservesTypedVirtualLedgerAndNeverFlattensLargePositions() {
+        long ledger = Long.MAX_VALUE - 17;
+        PulsarBindingReadRouteV1 first = pulsarRoute(ledger, 0, 4, false);
+        PulsarBindingReadRouteV1 second = pulsarRoute(ledger, 4, 9, true);
+        PulsarBindingReadRouteTableV1 table = new PulsarBindingReadRouteTableV1(List.of(first, second));
+        PulsarBindingReadPlanBufferV1 output = new PulsarBindingReadPlanBufferV1(2);
+
+        assertThat(PulsarBindingReadPlannerV1.plan(table, ledger, 1, 20, 9, output))
+                .isEqualTo(BindingReadPlannerV1.Outcome.PLANNED);
+        assertThat(output.size()).isEqualTo(2);
+        assertThat(output.startEntryIdInclusive(0)).isEqualTo(1);
+        assertThat(output.endEntryIdExclusive(1)).isEqualTo(9);
+        assertThat(output.route(1).virtualLedgerId()).isEqualTo(ledger);
+
+        PulsarBindingReadRouteTableV1 gap =
+                new PulsarBindingReadRouteTableV1(List.of(first, pulsarRoute(ledger, 5, 9, false)));
+        assertThat(PulsarBindingReadPlannerV1.plan(gap, ledger, 0, 9, 9, output))
+                .isEqualTo(BindingReadPlannerV1.Outcome.SAFE_FAILURE_GAP_OR_AMBIGUITY);
+        assertThat(output.size()).isZero();
+        assertThat(PulsarBindingReadPlannerV1.plan(table, ledger, 0, 9, 9, new PulsarBindingReadPlanBufferV1(1)))
+                .isEqualTo(BindingReadPlannerV1.Outcome.SAFE_FAILURE_CAPACITY);
+    }
+
+    @Test
     void fallbackIsSingleTransferPreObservabilityAndPreservesPrimaryCause() {
         Fixture fixture = fixture(1, true, List.of(route(0, 10, true)));
         BindingReadBatchContextV1 batch = new BindingReadBatchContextV1();
@@ -115,6 +141,28 @@ class BindingReadM4KernelV1Test {
         assertThat(attempt.startFallback()).isTrue();
         assertThat(attempt.completeFallback(null, true)).isEqualTo(Outcome.FALLBACK);
         assertThat(attempt.primaryFailure()).isEqualTo(FailureClass.CORRUPT_OR_FORMAT);
+        assertThat(batch.terminalClearExactLease()).isTrue();
+    }
+
+    @Test
+    void completedEarlierIntervalDoesNotCloseBatchOrForbidLaterIntervalFallback() {
+        Fixture fixture = fixture(1, true, List.of(route(0, 5, false), route(5, 10, true)));
+        BindingReadBatchContextV1 batch = new BindingReadBatchContextV1();
+        assertThat(fixture.pool.tryCapture(fixture.current, batch)).isEqualTo(CaptureOutcome.CAPTURED);
+
+        BindingReadAttemptControllerV1 first = new BindingReadAttemptControllerV1(
+                batch, fixture.current.get().publicationCell().routes().route(0), 1, 2, false);
+        assertThat(first.startPrimary()).isTrue();
+        batch.markObservable();
+        assertThat(first.completePrimary(null, true)).isEqualTo(Outcome.PRIMARY);
+        assertThat(batch.newSourceUseOpen()).isTrue();
+
+        BindingReadAttemptControllerV1 second = new BindingReadAttemptControllerV1(
+                batch, fixture.current.get().publicationCell().routes().route(1), 3, 4, true);
+        assertThat(second.startPrimary()).isTrue();
+        assertThat(second.completePrimary(FailureClass.UNAVAILABLE, true)).isEqualTo(Outcome.FALLBACK_READY);
+        assertThat(second.startFallback()).isTrue();
+        assertThat(second.completeFallback(null, true)).isEqualTo(Outcome.FALLBACK);
         assertThat(batch.terminalClearExactLease()).isTrue();
     }
 
@@ -182,6 +230,61 @@ class BindingReadM4KernelV1Test {
         assertThat(failure.get()).isInstanceOf(IllegalStateException.class);
         batch.closeNewSourceUse();
         assertThat(batch.terminalClearExactLease()).isTrue();
+    }
+
+    @Test
+    void plannedPoolCloseRejectsNewAdmissionWithoutForceClearingLiveLease() {
+        Fixture fixture = fixture(1, true, List.of(route(0, 10, false)));
+        BindingReadBatchContextV1 live = new BindingReadBatchContextV1();
+        assertThat(fixture.pool.tryCapture(fixture.current, live)).isEqualTo(CaptureOutcome.CAPTURED);
+
+        fixture.pool.closeAdmission();
+
+        assertThat(fixture.pool.tryCapture(fixture.current, new BindingReadBatchContextV1()))
+                .isEqualTo(CaptureOutcome.ADMISSION_CLOSED);
+        assertThat(fixture.pool.scan(fixture.binding, 1)).isEqualTo(ScanOutcome.PINNED);
+        live.closeNewSourceUse();
+        assertThat(live.terminalClearExactLease()).isTrue();
+        assertThat(fixture.pool.scan(fixture.binding, 1)).isEqualTo(ScanOutcome.CLEAN);
+    }
+
+    @Test
+    void leaseGenerationWrapRetiresSlotInsteadOfReusingAbaIdentity() {
+        TopicBindingId binding = binding("wrap");
+        BindingReadHazardPoolV1 pool = new BindingReadHazardPoolV1(1, 1, Long.MAX_VALUE, null);
+        AtomicReference<BindingReadAuthorityV1> current =
+                new AtomicReference<>(authority(binding, 1, true, List.of(route(0, 10, false))));
+        BindingReadBatchContextV1 finalLease = new BindingReadBatchContextV1();
+
+        assertThat(pool.tryCapture(current, finalLease)).isEqualTo(CaptureOutcome.CAPTURED);
+        assertThat(finalLease.leaseWord()).isEqualTo(Long.MAX_VALUE);
+        finalLease.closeNewSourceUse();
+        assertThat(finalLease.terminalClearExactLease()).isTrue();
+        assertThat(pool.tryCapture(current, new BindingReadBatchContextV1())).isEqualTo(CaptureOutcome.EXHAUSTED);
+    }
+
+    @Test
+    void scanTreatsClaimedLeaseWithUnpublishedPayloadAsInconclusive() throws Exception {
+        CountDownLatch leaseClaimed = new CountDownLatch(1);
+        CountDownLatch publishPayload = new CountDownLatch(1);
+        TopicBindingId binding = binding("inconclusive");
+        BindingReadHazardPoolV1 pool = new BindingReadHazardPoolV1(1, 1, 1, () -> {
+            leaseClaimed.countDown();
+            await(publishPayload);
+        });
+        AtomicReference<BindingReadAuthorityV1> current =
+                new AtomicReference<>(authority(binding, 1, true, List.of(route(0, 10, false))));
+        BindingReadBatchContextV1 batch = new BindingReadBatchContextV1();
+        AtomicReference<CaptureOutcome> capture = new AtomicReference<>();
+        Thread reader = new Thread(() -> capture.set(pool.tryCapture(current, batch)));
+
+        reader.start();
+        assertThat(leaseClaimed.await(10, TimeUnit.SECONDS)).isTrue();
+        assertThat(pool.scan(binding, 1)).isEqualTo(ScanOutcome.INCONCLUSIVE);
+        publishPayload.countDown();
+        reader.join();
+        assertThat(capture.get()).isEqualTo(CaptureOutcome.CAPTURED);
+        assertThat(pool.scan(binding, 1)).isEqualTo(ScanOutcome.PINNED);
     }
 
     @Test
@@ -266,6 +369,15 @@ class BindingReadM4KernelV1Test {
         return new BindingReadRouteV1(start, end, primary, secondary, mask, SourcePurity.KAFKA_APPEND_UNIT);
     }
 
+    private static PulsarBindingReadRouteV1 pulsarRoute(long ledger, long start, long end, boolean fallback) {
+        BindingReadSourceRefV1 primary = source(SourceKind.OBJECT, "pulsar-object-" + start, "pulsar-" + start, 1);
+        BindingReadSourceRefV1 secondary =
+                fallback ? source(SourceKind.BOOKKEEPER, "pulsar-bk-" + start, "pulsar-" + start, 2) : null;
+        int mask = fallback ? FailureClass.MISSING.mask() | FailureClass.UNAVAILABLE.mask() : 0;
+        return new PulsarBindingReadRouteV1(
+                ledger, start, end, primary, secondary, mask, SourcePurity.PULSAR_WHOLE_REQUEST);
+    }
+
     private static BindingReadSourceRefV1 source(
             SourceKind kind, String identity, String semantic, long protectionGeneration) {
         return new BindingReadSourceRefV1(
@@ -278,6 +390,17 @@ class BindingReadM4KernelV1Test {
 
     private static Sha256Digest digest(String value) {
         return Sha256Digest.hash(CanonicalBytes.copyOf(value.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                throw new AssertionError("timed out waiting for deterministic hazard race");
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("interrupted while waiting for deterministic hazard race", interrupted);
+        }
     }
 
     private record Fixture(

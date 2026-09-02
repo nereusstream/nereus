@@ -29,21 +29,53 @@ public final class BindingReadAttemptControllerV1 {
         QUARANTINED
     }
 
-    private static final long PRIMARY_ATTEMPT = 1;
-    private static final long FALLBACK_ATTEMPT = 2;
-
     private final BindingReadBatchContextV1 batch;
-    private final BindingReadRouteV1 route;
+    private final boolean fallbackPresent;
+    private final int fallbackFailureMask;
+    private final long primaryAttemptIdentity;
+    private final long fallbackAttemptIdentity;
+    private final boolean terminalInterval;
     private Outcome outcome;
     private FailureClass primaryFailure;
 
     public BindingReadAttemptControllerV1(BindingReadBatchContextV1 batch, BindingReadRouteV1 route) {
+        this(batch, route, 1, 2, true);
+    }
+
+    public BindingReadAttemptControllerV1(
+            BindingReadBatchContextV1 batch,
+            BindingReadRouteV1 route,
+            long primaryAttemptIdentity,
+            long fallbackAttemptIdentity,
+            boolean terminalInterval) {
         this.batch = Objects.requireNonNull(batch, "batch");
-        this.route = Objects.requireNonNull(route, "route");
+        Objects.requireNonNull(route, "route");
+        fallbackPresent = route.fallback() != null;
+        fallbackFailureMask = route.fallbackFailureMask();
+        validateAttemptIdentities(primaryAttemptIdentity, fallbackAttemptIdentity);
+        this.primaryAttemptIdentity = primaryAttemptIdentity;
+        this.fallbackAttemptIdentity = fallbackAttemptIdentity;
+        this.terminalInterval = terminalInterval;
+    }
+
+    public BindingReadAttemptControllerV1(
+            BindingReadBatchContextV1 batch,
+            PulsarBindingReadRouteV1 route,
+            long primaryAttemptIdentity,
+            long fallbackAttemptIdentity,
+            boolean terminalInterval) {
+        this.batch = Objects.requireNonNull(batch, "batch");
+        Objects.requireNonNull(route, "route");
+        fallbackPresent = route.fallback() != null;
+        fallbackFailureMask = route.fallbackFailureMask();
+        validateAttemptIdentities(primaryAttemptIdentity, fallbackAttemptIdentity);
+        this.primaryAttemptIdentity = primaryAttemptIdentity;
+        this.fallbackAttemptIdentity = fallbackAttemptIdentity;
+        this.terminalInterval = terminalInterval;
     }
 
     public boolean startPrimary() {
-        if (outcome != null || !batch.beginAttempt(PRIMARY_ATTEMPT)) {
+        if (outcome != null || !batch.beginAttempt(primaryAttemptIdentity)) {
             return false;
         }
         outcome = Outcome.PRIMARY_IN_FLIGHT;
@@ -52,18 +84,18 @@ public final class BindingReadAttemptControllerV1 {
 
     public Outcome completePrimary(FailureClass failure, boolean cleanupAndBufferDrainProven) {
         requireOutcome(Outcome.PRIMARY_IN_FLIGHT);
-        if (!cleanupAndBufferDrainProven || !batch.endAttempt(PRIMARY_ATTEMPT)) {
+        if (!cleanupAndBufferDrainProven || !batch.endAttempt(primaryAttemptIdentity)) {
             batch.quarantine();
             outcome = Outcome.QUARANTINED;
             return outcome;
         }
         if (failure == null) {
-            batch.closeNewSourceUse();
+            closeAfterTerminalInterval();
             outcome = Outcome.PRIMARY;
             return outcome;
         }
         primaryFailure = failure;
-        if (!batch.observable() && route.allowsFallback(failure)) {
+        if (!batch.observable() && allowsFallback(failure)) {
             outcome = Outcome.FALLBACK_READY;
             return outcome;
         }
@@ -74,7 +106,7 @@ public final class BindingReadAttemptControllerV1 {
 
     public boolean startFallback() {
         requireOutcome(Outcome.FALLBACK_READY);
-        if (!batch.beginAttempt(FALLBACK_ATTEMPT)) {
+        if (!batch.beginAttempt(fallbackAttemptIdentity)) {
             batch.closeNewSourceUse();
             outcome = Outcome.SAFE_FAILURE;
             return false;
@@ -85,13 +117,18 @@ public final class BindingReadAttemptControllerV1 {
 
     public Outcome completeFallback(FailureClass failure, boolean cleanupAndBufferDrainProven) {
         requireOutcome(Outcome.FALLBACK_IN_FLIGHT);
-        if (!cleanupAndBufferDrainProven || !batch.endAttempt(FALLBACK_ATTEMPT)) {
+        if (!cleanupAndBufferDrainProven || !batch.endAttempt(fallbackAttemptIdentity)) {
             batch.quarantine();
             outcome = Outcome.QUARANTINED;
             return outcome;
         }
-        batch.closeNewSourceUse();
-        outcome = failure == null ? Outcome.FALLBACK : Outcome.SAFE_FAILURE;
+        if (failure == null) {
+            closeAfterTerminalInterval();
+            outcome = Outcome.FALLBACK;
+        } else {
+            batch.closeNewSourceUse();
+            outcome = Outcome.SAFE_FAILURE;
+        }
         return outcome;
     }
 
@@ -109,6 +146,22 @@ public final class BindingReadAttemptControllerV1 {
     private void requireOutcome(Outcome expected) {
         if (outcome != expected) {
             throw new IllegalStateException("read attempt state differs: expected=" + expected + " actual=" + outcome);
+        }
+    }
+
+    private boolean allowsFallback(FailureClass failure) {
+        return fallbackPresent && (fallbackFailureMask & failure.mask()) != 0;
+    }
+
+    private void closeAfterTerminalInterval() {
+        if (terminalInterval) {
+            batch.closeNewSourceUse();
+        }
+    }
+
+    private static void validateAttemptIdentities(long primary, long fallback) {
+        if (primary <= 0 || fallback <= primary) {
+            throw new IllegalArgumentException("attempt identities must be positive and monotonically increasing");
         }
     }
 }
