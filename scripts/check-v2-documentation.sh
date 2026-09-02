@@ -855,14 +855,29 @@ for active_gate in \
     V2-OPEN-PUL-OBJ-09 \
     V2-OPEN-OBJ-22 \
     V2-OPEN-OBJ-24 \
-    V2-OPEN-READ-08 \
-    V2-OPEN-READ-09 \
     V2-OPEN-READ-15; do
     require_literal "\`$active_gate\`" "docs/v2/open-questions.md"
     if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
         fail "$active_gate is missing from the active gate table"
     fi
 done
+
+m4_final="$repo_root/docs/v2/evidence/v2-m4/final/canonical/m4-final.json"
+if [[ -f "$m4_final" ]]; then
+    for resolved_gate in V2-OPEN-READ-08 V2-OPEN-READ-09; do
+        require_literal "\`$resolved_gate\`" "docs/v2/open-questions.md"
+        if rg -Fq "| \`$resolved_gate\` |" "$repo_root/docs/v2/README.md"; then
+            fail "$resolved_gate remains active after canonical M4 Final publication"
+        fi
+    done
+else
+    for active_gate in V2-OPEN-READ-08 V2-OPEN-READ-09; do
+        require_literal "\`$active_gate\`" "docs/v2/open-questions.md"
+        if ! rg -Fq "| \`$active_gate\` |" "$repo_root/docs/v2/README.md"; then
+            fail "$active_gate is missing before canonical M4 Final publication"
+        fi
+    done
+fi
 
 for evidence_frontier_gate in V2-OPEN-READ-08 V2-OPEN-READ-09 V2-OPEN-READ-15; do
     require_literal "\`$evidence_frontier_gate\`" "docs/v2/grill-notes/21-restarted-grill-2-round-19-evidence-frontier.md"
