@@ -120,11 +120,12 @@ candidate closed-verifier terminal safety, and asynchronous batched prune in ADR
 irreversible same-key `FULL_V1 -> RETIRED_V1` compaction and permanent 0.2 compact tombstone. It explicitly did not
 accept tombstone deletion or a retired-through/frontier authority.
 
-The pure-document M0 decision frontier for this branch is exhausted. M4 Final closes
-`V2-OPEN-READ-08/09`; the remaining descendant below requires later M5 evidence:
+The pure-document M0 decision frontier for this branch is exhausted. The remaining descendants require evidence:
 
 | Gate | Evidence required before another design decision |
 | --- | --- | --- |
+| `V2-OPEN-READ-08` | M4 proof-window/head/fold representation, terminal-row retirement, response-loss, capacity, and throughput receipt |
+| `V2-OPEN-READ-09` | M4/M5 capability/receipt encoding, verifier lifetime/revocation, and admitted backend-generation receipt |
 | `V2-OPEN-READ-15` | M4/M5 tombstone lifetime/capacity plus a concrete backend's gap-free activation history, monotonic conditional authority, lineage, stale-create, and recovery receipt before any deletion authority is reconsidered |
 
 The adjusted response is preserved in
@@ -425,37 +426,37 @@ Resolved at the logical proof-authority level by
 [ADR 0073](../decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md). One monotonic
 Binding Read Admission Epoch order, immutable retirement interval, and at most one reusable source-independent proof
 per epoch replace the rejected mutable per-batch accumulator. Continuous interval coverage is mandatory; exact
-physical proof-window/head/fold representation is selected by the canonical M4 Final described below.
+physical proof-window/head/fold representation remains evidence gate `V2-OPEN-READ-08`.
 
 ### `V2-OPEN-READ-07`: backend quiescence capability record
 
 Resolved by [ADR 0074](../decisions/0074-v2-quiescence-capability-evidence-and-historical-binding.md).
 `DURABLE_DRAIN_ONLY_V1` and `AUTHORITY_EXPIRY_V1` are closed discriminators whose authorization comes only from one
 immutable admission-generation evidence digest. Every historical grant/epoch/proof/fold/batch/release binds it;
-missing/revoked evidence retains protection. The M4 Final selects the exact encoding and admitted backend
-generations without granting production deployment or M5 deletion authority.
+missing/revoked evidence retains protection. Exact encoding/admitted backends remain evidence gate
+`V2-OPEN-READ-09`.
 
 ### `V2-OPEN-READ-08`: proof-window/head/fold physical evidence
 
-Resolved by the canonical M4 Final at exact tested source
-`fe0ca24bbb01f2db5320bd8e001b3e0820fd95dc`. The selected representation is a 64-entry live window, exact
-32-entry contiguous folds, at most 64 folds, a 4,096-epoch verification interval, and bounded 32-row cleanup plans.
-Capacity exhaustion preserves the pending proof and closes selector admission to `STOPPED`. Cleanup is an
-M4-semantic pure predicate bound to exact selector/head bytes plus a Binding-scoped reference generation and
-publication-fence SHA; it grants neither protection release nor physical source deletion.
+This is evidence-blocked. M4 must compare bounded physical representations and numeric limits for the ADR-0073 logical
+window without introducing a mutable record per retirement batch. It must preserve contiguous per-epoch coverage,
+capability binding, bounded bytes/count/age, response-loss recovery, proof reuse, fold cost, and terminal-row
+retirement. The gate does not block M4 implementation candidates or design freeze, but it blocks physical
+representation selection, activation of the release path that depends on it, `QUIESCENCE_PROTECTION_RELEASE`, and M4
+Final. No prose-selected candidate is authoritative.
 
 ### `V2-OPEN-READ-09`: capability/receipt encoding and backend admission evidence
 
-Resolved for M4 by the canonical Final and its `QUIESCENCE_PROTECTION_RELEASE` child. Canonical
-proof/capability/receipt encodings, hard caps, verifier revocation behavior, and admission generation 1 are bound for
-Kafka/BookKeeper Object WAL, Pulsar Object WAL at source
-`a14e0e6f4e49be0677318b4ceefc7b85b445823b`, and the locked Oxia adapter, all under
-`DURABLE_DRAIN_ONLY_V1`. `AUTHORITY_EXPIRY_V1` remains non-admitted; missing or revoked evidence remains
-`RETAIN`. M5 must consume these identities unchanged, and production deployment/physical deletion remain excluded.
+This is evidence-blocked. M4 must prove canonical proof/capability/receipt encodings and hard caps,
+verifier availability/revocation cuts, conformance receipt identities, and actual Kafka/Pulsar backend admission
+generations; M5 later consumes those exact identities without reinterpreting them. The gate does not block fail-closed
+codec/verifier implementation or design freeze, but it blocks production capability admission, release activation,
+final wire selection, and related M4/M5 Finals. Until then missing/revoked evidence is `RETAIN` and no backend is
+promoted by prose alone.
 
 M4 Grill 35 moved exact protection-generation release execution into M4 because all authorizing read-quiescence
-predicates are M4-owned; M5 begins from exact `RELEASED` and owns physical deletion/GC. That milestone split remains
-frozen in [M4-D](detailed_design/m4/m4-d-evidence-ownership-and-freeze.md).
+predicates are M4-owned; M5 begins from exact `RELEASED` and owns physical deletion/GC. That milestone split is frozen
+in [M4-D](detailed_design/m4/m4-d-evidence-ownership-and-freeze.md) without closing this evidence gate.
 
 ### `V2-OPEN-READ-10`: resolved fallback-capable epoch interval
 
@@ -490,8 +491,7 @@ retires without becoming source-GC authority.
 Resolved by [ADR 0079](../decisions/0079-v2-bounded-inline-closure-anchors-and-terminal-publication.md). The selector
 logically owns one small bounded inline canonical unresolved-anchor set and preserves a dedicated emergency STOPPED
 envelope. Terminal correctness comes from the exact immutable candidate and one closed verifier rather than a racy
-non-transactional owner check; eligible anchors prune asynchronously in batches. M4 Final selects
-`K=8`, a 32-KiB selector cap, and a dedicated 2-KiB emergency `STOPPED` reserve.
+non-transactional owner check; eligible anchors prune asynchronously in batches. K and bytes remain evidence-selected.
 
 ### `V2-OPEN-READ-15`: compact batch metadata retirement
 

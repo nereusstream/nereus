@@ -135,12 +135,8 @@ performance-first BookKeeper WAL.
   responses from Grills 32 through 35 and hard-freeze the logical read view, typed source plan, hazard lifetime,
   read-quiescence proof, exact protection-generation release, M4/M5 ownership, and evidence hierarchy. Runtime,
   current-source Kafka/Pulsar integration, four exclusive evidence tasks, and fail-closed child/Final validation are
-  implemented without amending those inputs. Exact tested source
-  `fe0ca24bbb01f2db5320bd8e001b3e0820fd95dc` now binds four exclusive children and canonical
-  [M4 Final](evidence/v2-m4/final/canonical/m4-final.json) SHA-256
-  `83b3f64edf7d3e4402ed11e6b2d4bb6aaf014e2aec9002448bf1318e14317603`. Exactly
-  `V2-READ-001/003/004/005/007` are promoted; shared M4/M5 rows remain `PLANNED`. `v2M4Check` is Final
-  authority while `v2M4DesignCheck` remains the historical design-only gate.
+  implemented without amending those inputs. Formal execution and publication remain pending, so all M4 scenarios
+  remain `PLANNED` and `v2M4DesignCheck` remains a historical design-only gate rather than Final authority.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and formal-runner contracts. It did not by itself select a mode or
   promote a scenario; the later e5 Final closes those evidence obligations with `RANGE_64`. It still does not activate
@@ -774,8 +770,8 @@ children, scenarios, and Final at one common tested source after the last non-ev
 M2-P6 closes `V2-OPEN-BK-11/13`: the selected NPD1 hard envelope is 4 GiB/1,024 parts/64-MiB entry and decoded
 block/65,536 entries per block; the typed catalog is 1/4/8 MiB with 4 MiB as the Deployment base default. LocalStack,
 fixed MinIO, and pinned-native receipts preserve their provider/benchmark claim boundaries.
-Partial recovery omission, remaining numeric caps,
-and any tombstone-deletion authority remain evidence gates. The rows below
+Partial recovery omission, numeric caps,
+physical proof-fold/capability encodings, and any tombstone-deletion authority remain evidence gates. The rows below
 are the remaining active 0.2 evidence gates.
 
 | Gate | Required decision/evidence | Must close before |
@@ -784,6 +780,8 @@ are the remaining active 0.2 evidence gates.
 | `V2-OPEN-PUL-OBJ-09` | execute current-source real multi-broker/native 10k/100k evidence against ADR 0091, prove all reservation/head/node/concurrency/takeover/cut SLOs with zero skip, select an exact RANGE size if eligible, and select at most one allocator mode | M3 virtual-ledger allocator activation |
 | `V2-OPEN-OBJ-22` | execute bounded recovery and skip-hit evidence; only an SLO miss may reopen a whole-WalRun-first, Root/Seal-bound recovery omission certificate | M3/M7 recovery optimization decision |
 | `V2-OPEN-OBJ-24` | admit a Provider version token only after canonical-binary cap, immutable-version, FULL_OBJECT SHA-256, rows/page, and range-benefit evidence; otherwise retain Root mode NONE | M3 checkpoint provider-proof admission |
+| `V2-OPEN-READ-08` | execute M4 evidence and freeze the bounded proof-window/head/fold physical representation and numeric caps without a per-batch accumulator | M4 durable proof wire freeze |
+| `V2-OPEN-READ-09` | execute M4/M5 evidence and freeze canonical capability/receipt encodings, verifier availability/revocation behavior, and admitted backend generations | M4/M5 takeover and GC capability freeze |
 | `V2-OPEN-READ-15` | execute M4/M5 tombstone lifetime/capacity and concrete-backend ordered-history/lineage/stale-create evidence before reconsidering a metadata-only tombstone-deletion authority; 0.2 otherwise retains `RETIRED_V1` permanently | M4/M5 optional metadata-retirement authority |
 | `V2-OPEN-BK-02` | implement M2-K0's exact NBKE2/index/footer/checkpoint bytes, hard parser/admission caps, module/provider surfaces, and non-promotable input gate; then use M2-K9 evidence to select apply-lag/pipeline/recovery/waiter/cursor/rollover defaults and validate the accepted one-ledger-chain-per-partition layout at 10k/100k partitions; exact Object `NWKCP1` bytes/Head/key caps remain M3, and pooled lanes or storage-native ISR require a new ADR | M2 Kafka BookKeeper implementation and evidence admission |
 | `V2-OPEN-KAF-DATA-01` | select an explicit evidence-backed initial profile for `__share_group_state`; it cannot inherit a tenant default, while `__consumer_offsets` and `__transaction_state` are already fixed to `BOOKKEEPER_WAL_ONLY` | M6/release internal-topic admission |

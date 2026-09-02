@@ -29,6 +29,15 @@ M4 = load_module(SCRIPT, "nereus_v2_m4_design_contract_tests")
 
 
 class M4DesignContractTest(unittest.TestCase):
+    @staticmethod
+    def design_freeze_scenario_fixture() -> dict[str, object]:
+        value = json.loads((ROOT / M4.SCENARIO_PATH).read_text(encoding="utf-8"))
+        for row in value["scenarios"]:
+            if row["id"] in M4.READ_MILESTONES:
+                row["status"] = "PLANNED"
+                row["evidenceReceipt"] = None
+        return value
+
     def test_accepts_current_design_freeze(self) -> None:
         manifest = M4.load_json(
             M4.read_bytes(ROOT, M4.MANIFEST_PATH), str(M4.MANIFEST_PATH)
@@ -84,7 +93,7 @@ class M4DesignContractTest(unittest.TestCase):
             M4.validate_design_document(text, "fixture")
 
     def test_scenario_rejects_premature_m4_pass(self) -> None:
-        value = json.loads((ROOT / M4.SCENARIO_PATH).read_text(encoding="utf-8"))
+        value = self.design_freeze_scenario_fixture()
         changed = copy.deepcopy(value)
         row = next(row for row in changed["scenarios"] if row["id"] == "V2-READ-001")
         row["status"] = "PASSED_CURRENT_SOURCE"
@@ -93,7 +102,7 @@ class M4DesignContractTest(unittest.TestCase):
             M4.validate_scenarios_value(changed)
 
     def test_scenario_rejects_changed_existing_m2_receipt(self) -> None:
-        value = json.loads((ROOT / M4.SCENARIO_PATH).read_text(encoding="utf-8"))
+        value = self.design_freeze_scenario_fixture()
         changed = copy.deepcopy(value)
         row = next(row for row in changed["scenarios"] if row["id"] == "V2-BK-010")
         row["evidenceReceipt"] = None

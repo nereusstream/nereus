@@ -859,8 +859,8 @@
       "milestone": "M4",
       "contract": "one binding scoped logical read snapshot survives active tail manifest publication protected fallback and two stage reclamation",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m4/final/canonical/m4-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-002",
@@ -875,24 +875,24 @@
       "milestone": "M3/M4",
       "contract": "Object WAL ACK reuses one shared VerifiedExtent publishes compact protocol range active tail locators before Readable Durable frontiers and retires them only after exact manifest coverage plus safe pins",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m4/final/canonical/m4-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-004",
       "milestone": "M4",
       "contract": "BindingReadViewSnapshot is a logical allocation free read batch capture append publishes no snapshot source handoff uses bounded generations and pins and locator protection retirement requires separate drains",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m4/final/canonical/m4-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-005",
       "milestone": "M4",
       "contract": "each unfinished Binding read batch owns one bounded cross Binding hazard slot StoreLoad and pointer revalidation precede generation tagged coherent publication capture and pin lifetime covers every async source use",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m4/final/canonical/m4-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-006",
@@ -907,8 +907,8 @@
       "milestone": "M4",
       "contract": "one atomic free pinned SlotLeaseWord fences reuse callbacks equality check cancellation stops new source use and only complete terminal source drain clears it",
       "ownerDoc": "docs/v2/05-manifest-read-retention-gc.md",
-      "status": "PASSED_CURRENT_SOURCE",
-      "evidenceReceipt": "docs/v2/evidence/v2-m4/final/canonical/m4-final.json"
+      "status": "PLANNED",
+      "evidenceReceipt": null
     },
     {
       "id": "V2-READ-008",

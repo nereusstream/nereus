@@ -1972,6 +1972,7 @@ val v2M4FinalReceipt = providers.gradleProperty("v2M4FinalReceipt")
 tasks.register<Exec>("v2M4FinalSourceCheck") {
     group = "verification"
     description = "Reparse all four M4 children, governed XML, selections, source locks, lineage, and exact scenarios."
+    notCompatibleWithConfigurationCache("M4 Final validation resolves receipt and tested-source inputs at execution time")
     workingDir = layout.projectDirectory.asFile
     doFirst {
         val arguments = mutableListOf(
