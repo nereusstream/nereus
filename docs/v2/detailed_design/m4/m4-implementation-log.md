@@ -1,17 +1,18 @@
 ---
 productLine: V2
 designStatus: AcceptedInputUnchanged
-implementationStatus: InProgress
-evidenceStatus: FocusedTestsOnly
+implementationStatus: Verified
+evidenceStatus: CurrentSourceReceipt
 authority: CurrentImplementationRecord
 sourceTuple: current-m4-source
+receipt: docs/v2/evidence/v2-m4/final/canonical/m4-final.json
 ---
 
 # M4 implementation and evidence log
 
-This living record describes current implementation descendants of the immutable M4-A/B/C/D and Grill 32-35 hard
-freeze. It does not amend those files, close an OPEN evidence gate, publish a child receipt, promote a scenario, or
-grant M5 physical-deletion authority.
+This record describes the completed implementation descendants of the immutable M4-A/B/C/D and Grill 32-35 hard
+freeze. It does not amend those files or grant M5 physical-deletion, M6 process-activation, M8 native-parity, or
+production-deployment authority.
 
 ## Milestone 1: read-view hazard and source-plan kernel
 
@@ -138,3 +139,20 @@ M8 authority.
 This milestone installs the formal runner/publishers and negative contract tests. The values do not close
 `V2-OPEN-READ-08/09`, create a child receipt, or promote a scenario until a clean immutable tested source executes the
 formal run and publishes a validated Final.
+
+## Milestone 6: formal exact-source closure
+
+Exact tested source `fe0ca24bbb01f2db5320bd8e001b3e0820fd95dc` executed the four mutually exclusive evidence
+children against source-lock SHA-256 `02601b3de76857d5f0c8657b285bc91584486d08077e201a4d9fd34f377b07a2`.
+The child totals are 13, 6, 19, and 5 tests with zero failure, error, or skip.
+
+The governed measurements include zero allocated bytes across 100,000 warmed capture/plan/clear iterations, 84-ns
+hot-path p99, 80,000 concurrent hazard operations at 14,583-ns p99, proof capacity through 2,112 admitted epochs with
+selector stop on attempt 2,113, and a 32-row cleanup plan blocked by all six reference classes. Current-source
+end-to-end p99 is 160,208 ns for Kafka and 164,083 ns for Pulsar; measured caller-plus-owner allocation is 2,045 and
+9,565 bytes per operation respectively.
+
+The canonical immutable [M4 Final](../../evidence/v2-m4/final/canonical/m4-final.json) has SHA-256
+`83b3f64edf7d3e4402ed11e6b2d4bb6aaf014e2aec9002448bf1318e14317603`. It closes
+`V2-OPEN-READ-08/09` and promotes exactly `V2-READ-001/003/004/005/007`. `V2-READ-002` and shared
+`V2-READ-006/008..015` remain `PLANNED` with null receipts. M5 physical deletion remains outside M4.
