@@ -29,7 +29,10 @@ import com.nereusstream.storage.object.read.BindingReadSourceRefV1.SourceKind;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -288,6 +291,48 @@ class BindingReadM4KernelV1Test {
     }
 
     @Test
+    void asyncCancellationClosesGateButRetainsLeaseUntilRealProviderCompletion() throws Exception {
+        Fixture fixture = fixture(1, true, List.of(route(0, 10, false)));
+        ExecutorService eventLoop = Executors.newSingleThreadExecutor();
+        try {
+            BindingReadAsyncExecutorV1 executor = new BindingReadAsyncExecutorV1(eventLoop);
+            CompletableFuture<String> provider = new CompletableFuture<>();
+            CountDownLatch started = new CountDownLatch(1);
+            CompletableFuture<String> result = executor.execute(fixture.current, fixture.pool, authority -> {
+                started.countDown();
+                return provider;
+            });
+
+            assertThat(started.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(fixture.pool.scan(fixture.binding, 1)).isEqualTo(ScanOutcome.PINNED);
+            assertThat(result.cancel(false)).isTrue();
+            assertThat(fixture.pool.scan(fixture.binding, 1)).isEqualTo(ScanOutcome.PINNED);
+
+            provider.complete("late-value");
+            awaitClean(fixture.pool, fixture.binding, 1);
+            assertThat(result).isCancelled();
+        } finally {
+            eventLoop.shutdownNow();
+        }
+    }
+
+    @Test
+    void asyncSuccessReleasesExactLeaseBeforeMakingHeapOwnedResultObservable() throws Exception {
+        Fixture fixture = fixture(1, true, List.of(route(0, 10, false)));
+        ExecutorService eventLoop = Executors.newSingleThreadExecutor();
+        try {
+            BindingReadAsyncExecutorV1 executor = new BindingReadAsyncExecutorV1(eventLoop);
+            CompletableFuture<String> result = executor.execute(
+                    fixture.current, fixture.pool, authority -> CompletableFuture.completedFuture("value"));
+
+            assertThat(result.get(10, TimeUnit.SECONDS)).isEqualTo("value");
+            assertThat(fixture.pool.scan(fixture.binding, 1)).isEqualTo(ScanOutcome.CLEAN);
+        } finally {
+            eventLoop.shutdownNow();
+        }
+    }
+
+    @Test
     void steadyCapturePlanAndClearAllocateNoHeapBytesOnCurrentThread() {
         com.sun.management.ThreadMXBean bean = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
         if (!bean.isThreadAllocatedMemorySupported()) {
@@ -401,6 +446,17 @@ class BindingReadM4KernelV1Test {
             Thread.currentThread().interrupt();
             throw new AssertionError("interrupted while waiting for deterministic hazard race", interrupted);
         }
+    }
+
+    private static void awaitClean(BindingReadHazardPoolV1 pool, TopicBindingId binding, long generation) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            if (pool.scan(binding, generation) == ScanOutcome.CLEAN) {
+                return;
+            }
+            Thread.onSpinWait();
+        }
+        throw new AssertionError("timed out waiting for exact async lease drain");
     }
 
     private record Fixture(

@@ -1928,6 +1928,23 @@ tasks.register("v2M4ControlPlaneCheck") {
     )
 }
 
+tasks.register("v2M4CurrentSourceIntegrationCheck") {
+    group = "verification"
+    description = "Run fresh current-source M4 Kafka/Pulsar Object-WAL integration and affected M3 seam regressions."
+    dependsOn(
+        "v2M4FrozenDesignInputsCheck",
+        "v2M4ReadKernelCheck",
+        ":nereus-kafka-bookkeeper:v2M4CurrentSourceKafkaTest",
+        ":nereus-pulsar-offload:v2M4CurrentSourcePulsarTest",
+        ":nereus-kafka-bookkeeper:spotlessCheck",
+        ":nereus-kafka-bookkeeper:checkstyleMain",
+        ":nereus-kafka-bookkeeper:checkstyleTest",
+        ":nereus-pulsar-offload:spotlessCheck",
+        ":nereus-pulsar-offload:checkstyleMain",
+        ":nereus-pulsar-offload:checkstyleTest",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

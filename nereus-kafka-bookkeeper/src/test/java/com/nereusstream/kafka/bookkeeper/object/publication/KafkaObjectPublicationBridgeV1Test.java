@@ -16,6 +16,7 @@ package com.nereusstream.kafka.bookkeeper.object.publication;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaBatchDuplicateIdentityV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaCoherentCommitCoordinatorV1;
@@ -25,9 +26,24 @@ import com.nereusstream.kafka.bookkeeper.commit.KafkaSpeculativeCommitV1;
 import com.nereusstream.kafka.bookkeeper.commit.KafkaTransactionBatchKindV1;
 import com.nereusstream.kafka.bookkeeper.object.ObjectKafkaTestFixtures;
 import com.nereusstream.kafka.bookkeeper.object.control.KafkaObjectWholeSuffixRollbackV1;
+import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectBindingReadAdapterV1;
+import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectWalM4ReaderV1;
+import com.nereusstream.kafka.bookkeeper.object.read.KafkaObjectWalM4ReaderV1.ValidatedRange;
 import com.nereusstream.kafka.bookkeeper.pipeline.KafkaOffsetAssignedAppendV1;
+import com.nereusstream.storage.object.read.BindingReadBatchContextV1;
+import com.nereusstream.storage.object.read.BindingReadHazardPoolV1;
+import com.nereusstream.storage.object.read.BindingReadHazardPoolV1.CaptureOutcome;
+import com.nereusstream.storage.object.read.BindingReadHazardPoolV1.ScanOutcome;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
@@ -194,6 +210,76 @@ class KafkaObjectPublicationBridgeV1Test {
         assertThat(retired.activeTail().locators()).isEmpty();
         assertThat(context.tracker.retainedLocatorBytes()).isZero();
         assertThat(context.tracker.reservedLocatorBytes()).isZero();
+    }
+
+    @Test
+    void m4CurrentSourceReadPinsExactM3LocatorUntilProviderAndOuterLeaseDrain() throws Exception {
+        Context context = context(ignored -> {});
+        KafkaSpeculativeCommitV1 commit = ObjectKafkaTestFixtures.commit(0);
+        stage(context.coordinator, commit);
+        Ready ready = ready(context, commit);
+        KafkaObjectCoherentProtocolSnapshotV1 published =
+                context.bridge.publishNext(() -> {}).orElseThrow();
+        KafkaObjectSourceProtectionTrackerV1 protection = new KafkaObjectSourceProtectionTrackerV1(
+                binding(), ready.locator.extent().walRunRootSha());
+        BindingReadHazardPoolV1 pool = new BindingReadHazardPoolV1(8, 4);
+        CompletableFuture<CanonicalBytes> provider = new CompletableFuture<>();
+        CompletableFuture<Void> providerStarted = new CompletableFuture<>();
+        ExecutorService eventLoop = Executors.newSingleThreadExecutor();
+        try {
+            KafkaObjectWalM4ReaderV1 reader = new KafkaObjectWalM4ReaderV1(
+                    published,
+                    m4Selector(published),
+                    protection,
+                    (locator, start, end) -> {
+                        providerStarted.complete(null);
+                        return provider.thenApply(bytes -> new ValidatedRange(locator, start, end, bytes));
+                    },
+                    pool,
+                    eventLoop);
+
+            BindingReadBatchContextV1 capturedBeforeInnerPin = new BindingReadBatchContextV1();
+            assertThat(pool.tryCapture(reader.currentAuthority(), capturedBeforeInnerPin))
+                    .isEqualTo(CaptureOutcome.CAPTURED);
+            assertThatThrownBy(() -> protection.prepareManifestRetirement(
+                            published.activeTail(),
+                            1,
+                            "manifests/sha256-v1-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.nwm",
+                            ObjectKafkaTestFixtures.digest(21)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("M4 read pin");
+            capturedBeforeInnerPin.closeNewSourceUse();
+            assertThat(capturedBeforeInnerPin.terminalClearExactLease()).isTrue();
+
+            CompletableFuture<KafkaObjectWalM4ReaderV1.ReadResult> read = reader.read(0, 1, 1);
+            providerStarted.get(10, TimeUnit.SECONDS);
+            assertThat(pool.scan(published.root().fence().bindingId(), 1)).isEqualTo(ScanOutcome.PINNED);
+            assertThatThrownBy(() -> protection.prepareManifestRetirement(
+                            published.activeTail(),
+                            1,
+                            "manifests/sha256-v1-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.nwm",
+                            ObjectKafkaTestFixtures.digest(21)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("read pin");
+
+            provider.complete(CanonicalBytes.copyOf(new byte[] {1, 2, 3}));
+            assertThat(read.get(10, TimeUnit.SECONDS).ranges())
+                    .singleElement()
+                    .extracting(ValidatedRange::locator)
+                    .isEqualTo(ready.locator);
+            assertThat(pool.scan(published.root().fence().bindingId(), 1)).isEqualTo(ScanOutcome.CLEAN);
+
+            var plan = protection.prepareManifestRetirement(
+                    published.activeTail(),
+                    1,
+                    "manifests/sha256-v1-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.nwm",
+                    ObjectKafkaTestFixtures.digest(21));
+            KafkaObjectCoherentProtocolSnapshotV1 retired =
+                    context.coordinator.retireObjectTail(protection, plan, context.tracker);
+            assertThat(retired.activeTail().locators()).isEmpty();
+        } finally {
+            eventLoop.shutdownNow();
+        }
     }
 
     @Test
@@ -423,6 +509,21 @@ class KafkaObjectPublicationBridgeV1Test {
         var fence = ObjectKafkaTestFixtures.fence();
         return new KafkaObjectBindingKeyV1(
                 fence.bindingId(), fence.topicIncarnation().topicId(), fence.partitionId(), fence.storageEpochId());
+    }
+
+    private static BindingReadSelector m4Selector(KafkaObjectCoherentProtocolSnapshotV1 snapshot) {
+        return new BindingReadSelector(
+                KafkaObjectBindingReadAdapterV1.bindingIdentity(snapshot),
+                ObjectKafkaTestFixtures.digest(20),
+                snapshot.root().fence().ownerEpoch(),
+                1,
+                1,
+                SelectorMode.PREFERRED_ONLY,
+                AdmissionState.ADMITTING,
+                Optional.empty(),
+                new CapabilityBinding(1, ObjectKafkaTestFixtures.digest(22)),
+                List.of(),
+                List.of());
     }
 
     private record Context(

@@ -180,3 +180,20 @@ tasks.register<JavaExec>("nwkcp1ProtocolFixtureEmitter") {
     args(providers.gradleProperty("nwkcp1ProtocolFixtureOutput").get())
     outputs.upToDateWhen { false }
 }
+
+tasks.register<Test>("v2M4CurrentSourceKafkaTest") {
+    group = "verification"
+    description = "Run the fresh M4 Kafka coherent-root, active-locator, and pin-safe retirement regression."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.bookkeeper.object.publication." +
+                "KafkaObjectPublicationBridgeV1Test." +
+                "m4CurrentSourceReadPinsExactM3LocatorUntilProviderAndOuterLeaseDrain",
+        )
+    }
+    outputs.upToDateWhen { false }
+}

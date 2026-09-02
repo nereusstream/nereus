@@ -71,6 +71,7 @@ import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
 
 /**
@@ -88,6 +89,7 @@ public final class PulsarObjectWalBridgeV1 {
     private final ObjectWalExtentStore extentStore;
     private final Object monitor = new Object();
     private final Map<PulsarBindingKey, BindingState> bindings = new HashMap<>();
+    private final Map<PulsarBindingKey, BooleanSupplier> m4RetirementGuards = new HashMap<>();
     private final Map<String, FailedPlan> failedPlans = new HashMap<>();
     private final Map<String, PendingSuccessorRollover> pendingSuccessorRollovers = new HashMap<>();
     private final Map<String, SealedSuccessorRollover> sealedSuccessorRollovers = new HashMap<>();
@@ -468,12 +470,14 @@ public final class PulsarObjectWalBridgeV1 {
         return Objects.requireNonNull(verification, "manifest handoff verification")
                 .thenApply(verified -> {
                     synchronized (monitor) {
-                        LedgerState ledger = requireBinding(request.binding()).requireLedger(request.virtualLedgerId());
+                        BindingState state = requireBinding(request.binding());
+                        LedgerState ledger = state.requireLedger(request.virtualLedgerId());
                         ledger.requireManifestHandoff(request);
                         ledger.manifestGeneration = request.manifestGeneration();
                         ledger.manifestThrough = request.throughEntryId();
                         ledger.manifestSource = verified.source();
-                        ledger.releaseCoveredUnpinnedLocators();
+                        releaseCoveredUnpinnedLocators(request.binding(), ledger);
+                        state.advanceReadView();
                         return ledger.frontiers(request.binding());
                     }
                 });
@@ -562,7 +566,68 @@ public final class PulsarObjectWalBridgeV1 {
             return validated.whenComplete((ignored, error) -> {
                 synchronized (monitor) {
                     pinnedLedger.unpinActiveRead(pinnedEntryId);
-                    pinnedLedger.releaseCoveredUnpinnedLocators();
+                    releaseCoveredUnpinnedLocators(binding, pinnedLedger);
+                }
+            });
+        } catch (Throwable error) {
+            return failed(error);
+        }
+    }
+
+    /**
+     * Reads only the exact source named by an accepted M4 view; a later manifest handoff cannot
+     * silently replan the operation. Active-tail use is admitted only if the exact locator can be
+     * pinned under the bridge monitor before retirement.
+     */
+    public CompletionStage<ReadEntry> readCaptured(
+            PulsarObjectWalReadViewV1 captured, PulsarBindingKey binding, PulsarPosition position) {
+        final CompletionStage<ReadEntry> read;
+        final LedgerState pinnedLedger;
+        final long pinnedEntryId;
+        try {
+            Objects.requireNonNull(captured, "captured");
+            Objects.requireNonNull(binding, "binding");
+            Objects.requireNonNull(position, "position");
+            if (!captured.binding().equals(binding)) {
+                throw rejected(BridgeRejectionCode.FENCED, "captured M4 view belongs to another Pulsar binding");
+            }
+            PulsarObjectWalReadViewV1.LedgerView capturedLedger = captured.requireLedger(position.virtualLedgerId());
+            PulsarObjectWalReadViewV1.SourceInterval interval = capturedLedger.requireInterval(position.entryId());
+            synchronized (monitor) {
+                if (interval.source() == ReadSource.MANIFEST) {
+                    ManifestSource source = interval.manifest().orElseThrow();
+                    read = Objects.requireNonNull(
+                            extentStore.readManifest(binding, position, capturedLedger.manifestGeneration(), source),
+                            "captured manifest read stage");
+                    pinnedLedger = null;
+                    pinnedEntryId = -1;
+                } else {
+                    ExtentLocator locator = interval.activeLocator().orElseThrow();
+                    LedgerState currentLedger = requireBinding(binding).requireLedger(position.virtualLedgerId());
+                    if (!locator.equals(currentLedger.activeTail.get(position.entryId()))) {
+                        throw rejected(
+                                BridgeRejectionCode.ACTIVE_TAIL_LOCATOR_MISSING,
+                                "captured M4 active locator retired before exact pin admission");
+                    }
+                    currentLedger.pinActiveRead(position.entryId());
+                    try {
+                        read = Objects.requireNonNull(extentStore.readActive(locator), "captured active read stage");
+                    } catch (Throwable error) {
+                        currentLedger.unpinActiveRead(position.entryId());
+                        throw error;
+                    }
+                    pinnedLedger = currentLedger;
+                    pinnedEntryId = position.entryId();
+                }
+            }
+            CompletionStage<ReadEntry> validated = read.thenApply(result -> validateRead(binding, position, result));
+            if (pinnedLedger == null) {
+                return validated;
+            }
+            return validated.whenComplete((ignored, error) -> {
+                synchronized (monitor) {
+                    pinnedLedger.unpinActiveRead(pinnedEntryId);
+                    releaseCoveredUnpinnedLocators(binding, pinnedLedger);
                 }
             });
         } catch (Throwable error) {
@@ -573,6 +638,54 @@ public final class PulsarObjectWalBridgeV1 {
     public LedgerFrontiers frontiers(PulsarBindingKey binding) {
         synchronized (monitor) {
             return requireBinding(binding).currentFrontiers();
+        }
+    }
+
+    /** Captures one immutable current-source view for low-frequency M4 authority publication. */
+    public PulsarObjectWalReadViewV1 captureReadView(PulsarBindingKey binding) {
+        synchronized (monitor) {
+            return requireBinding(binding).captureReadView(binding);
+        }
+    }
+
+    /** Registers the binding-wide M4 hazard scan that closes the capture-to-inner-pin race. */
+    public void registerM4RetirementGuard(PulsarBindingKey binding, BooleanSupplier guard) {
+        Objects.requireNonNull(binding, "binding");
+        Objects.requireNonNull(guard, "guard");
+        synchronized (monitor) {
+            requireBinding(binding);
+            BooleanSupplier previous = m4RetirementGuards.putIfAbsent(binding, guard);
+            if (previous != null && previous != guard) {
+                throw new IllegalStateException("Pulsar binding already has another M4 retirement guard");
+            }
+        }
+    }
+
+    /** Rechecks retained manifest-covered locators after the exact outer M4 lease drains. */
+    public void reconcileM4Retirement(PulsarBindingKey binding) {
+        synchronized (monitor) {
+            BindingState state = requireBinding(binding);
+            if (m4AllowsRetirement(binding)) {
+                state.ledgers.values().forEach(LedgerState::releaseCoveredUnpinnedLocators);
+            }
+        }
+    }
+
+    private void releaseCoveredUnpinnedLocators(PulsarBindingKey binding, LedgerState ledger) {
+        if (m4AllowsRetirement(binding)) {
+            ledger.releaseCoveredUnpinnedLocators();
+        }
+    }
+
+    private boolean m4AllowsRetirement(PulsarBindingKey binding) {
+        BooleanSupplier guard = m4RetirementGuards.get(binding);
+        if (guard == null) {
+            return true;
+        }
+        try {
+            return guard.getAsBoolean();
+        } catch (Throwable failure) {
+            return false;
         }
     }
 
@@ -3549,6 +3662,7 @@ public final class PulsarObjectWalBridgeV1 {
         private OpenedLedger current;
         private final NavigableMap<Long, LedgerState> ledgers = new TreeMap<>();
         private final CompletionTrackerRing completionRing;
+        private long readViewVersion = 1;
         private String inFlightPlanId;
         private PulsarPosition inFlightPosition;
         private CompletionTicket inFlightTicket;
@@ -3752,6 +3866,7 @@ public final class PulsarObjectWalBridgeV1 {
             completionRing.requireCompletionRelease(ticket, position, locator);
             ledger.readableThrough = position.entryId();
             ledger.durableThrough = position.entryId();
+            advanceReadView();
             completionRing.completeAndRelease(ticket, position, locator);
             inFlightPlanId = null;
             inFlightPosition = null;
@@ -3784,6 +3899,7 @@ public final class PulsarObjectWalBridgeV1 {
             ledgers.put(
                     next.virtualLedgerId(),
                     new LedgerState(next.virtualLedgerId(), -1, -1, -1, 0, null, new TreeMap<>()));
+            advanceReadView();
             inFlightPlanId = null;
             inFlightPosition = null;
             inFlightTicket = null;
@@ -3796,6 +3912,46 @@ public final class PulsarObjectWalBridgeV1 {
             if (inFlightPlanId != null || gapPlanId != null) {
                 throw rejected(BridgeRejectionCode.BINDING_APPEND_IN_FLIGHT, "cannot rollover an in-flight append");
             }
+        }
+
+        void advanceReadView() {
+            readViewVersion = Math.addExact(readViewVersion, 1);
+        }
+
+        PulsarObjectWalReadViewV1 captureReadView(PulsarBindingKey binding) {
+            List<PulsarObjectWalReadViewV1.LedgerView> views = new ArrayList<>(ledgers.size());
+            for (LedgerState ledger : ledgers.values()) {
+                List<PulsarObjectWalReadViewV1.SourceInterval> intervals = new ArrayList<>();
+                if (ledger.manifestThrough >= 0) {
+                    intervals.add(new PulsarObjectWalReadViewV1.SourceInterval(
+                            ledger.virtualLedgerId,
+                            0,
+                            Math.addExact(ledger.manifestThrough, 1),
+                            ReadSource.MANIFEST,
+                            Optional.of(Objects.requireNonNull(ledger.manifestSource, "manifest source")),
+                            Optional.empty()));
+                }
+                for (ExtentLocator locator : ledger.activeTail.values()) {
+                    if (locator.position().entryId() <= ledger.readableThrough
+                            && locator.position().entryId() > ledger.manifestThrough) {
+                        intervals.add(new PulsarObjectWalReadViewV1.SourceInterval(
+                                ledger.virtualLedgerId,
+                                locator.position().entryId(),
+                                Math.addExact(locator.position().entryId(), 1),
+                                ReadSource.ACTIVE_TAIL,
+                                Optional.empty(),
+                                Optional.of(locator)));
+                    }
+                }
+                views.add(new PulsarObjectWalReadViewV1.LedgerView(
+                        ledger.virtualLedgerId,
+                        ledger.manifestThrough,
+                        ledger.readableThrough,
+                        ledger.durableThrough,
+                        ledger.manifestGeneration,
+                        intervals));
+            }
+            return new PulsarObjectWalReadViewV1(binding, current.node().ownerEpoch(), readViewVersion, views);
         }
 
         void discardAfterFence(long fencedOwnerEpoch) {

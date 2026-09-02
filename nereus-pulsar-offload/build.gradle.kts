@@ -176,6 +176,26 @@ tasks.register<JavaExec>("v2M3PulsarNativeReceiptCheck") {
     }
 }
 
+tasks.register<Test>("v2M4CurrentSourcePulsarTest") {
+    group = "verification"
+    description = "Run fresh M4 Pulsar P4 captured-source and locator-retirement regressions."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test." +
+                "m4CapturedActiveSourceSurvivesManifestSwitchAndNewReadUsesManifest",
+        )
+        includeTestsMatching(
+            "com.nereusstream.pulsar.offload.objectwal.PulsarObjectWalBridgeV1Test." +
+                "m4OuterHazardAloneClosesCaptureToP4InnerPinRetirementRace",
+        )
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true

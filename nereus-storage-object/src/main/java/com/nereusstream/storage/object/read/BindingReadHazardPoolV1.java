@@ -164,6 +164,34 @@ public final class BindingReadHazardPoolV1 {
         return ScanOutcome.CLEAN;
     }
 
+    /** Conservative binding-wide scan used by locator retirement while inner source pin admission races. */
+    public ScanOutcome scanBinding(TopicBindingId bindingId) {
+        Objects.requireNonNull(bindingId, "bindingId");
+        for (int index = 0; index < leaseWords.length(); index++) {
+            if (retired.get(index) != 0) {
+                continue;
+            }
+            long firstLease = leaseWords.get(index);
+            if (firstLease == 0) {
+                continue;
+            }
+            long payloadLease = payloadLeaseWords.get(index);
+            TopicBindingId observedBinding = bindingIds.get(index);
+            long observedGeneration = sourceGenerations.get(index);
+            long secondLease = leaseWords.get(index);
+            if (firstLease != secondLease
+                    || payloadLease != firstLease
+                    || observedBinding == null
+                    || observedGeneration <= 0) {
+                return ScanOutcome.INCONCLUSIVE;
+            }
+            if (bindingId.equals(observedBinding)) {
+                return ScanOutcome.PINNED;
+            }
+        }
+        return ScanOutcome.CLEAN;
+    }
+
     boolean leaseEquals(int slotIndex, long exactLease) {
         return exactLease != 0 && leaseWords.get(slotIndex) == exactLease;
     }

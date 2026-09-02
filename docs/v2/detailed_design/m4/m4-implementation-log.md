@@ -91,3 +91,26 @@ Focused tests cover a near-`Long.MAX_VALUE` Pulsar ledger, typed range gaps and 
 local close-before-unknown-response ordering, old-generation survival, pool close, lease wrap, and the exact
 lease/payload publication race. These are still focused implementation results: current-source Kafka/Pulsar adapters,
 formal child receipts, final measurements, OPEN-gate synchronization, scenario promotion, and M4 Final remain ahead.
+
+## Milestone 4: current-source Object-WAL read integration
+
+The fourth implementation slice connects the M4 cell and lifetime rules to the actual M3/P4 Object-WAL structures:
+
+- `BindingReadAsyncExecutorV1` serializes capture, cancellation-gate closure, provider completion, exact lease clear,
+  and post-drain retirement reconciliation on one owner event loop. Cancellation never equates a cancel request with
+  provider termination and cannot force-clear a lease.
+- Kafka publishes routes only from an exact `KafkaObjectCoherentProtocolSnapshotV1`, verifies the root-bound active
+  tail digest, retains the actual `KafkaObjectExtentLocatorV1`, takes the existing M3 source-protection pin before
+  provider use, and holds both inner pin and outer generation lease through validated range completion.
+- Pulsar publishes typed routes from an immutable bridge read view, retains the exact manifest source or active
+  locator, and calls `readCaptured` so a concurrent manifest handoff cannot silently replan an accepted read. The
+  existing P4 inner pin remains the source-specific lifetime authority.
+- Both integrations register a conservative Binding-wide M4 hazard guard around locator retirement. This closes the
+  capture-to-inner-pin race: a visible outer lease or an inconclusive slot retains the locator, then a post-terminal
+  reconciliation releases manifest-covered locators only after the exact outer lease has drained.
+
+The fresh affected regressions exercise the shared M3 coherent root and active-tail digest, Kafka locator
+publication/readability, provider-lifetime pinning and root-CAS retirement, plus Pulsar P4 active-to-manifest switching,
+old captured-source survival, and the outer-hazard/inner-pin admission race. Full Kafka and Pulsar module suites pass.
+This is not yet a child receipt or scenario promotion; formal source-bound evidence and the remaining OPEN selections
+still follow.

@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 
 /** Binding-local read-pin tracker and exact manifest retirement authority issuer. */
 public final class KafkaObjectSourceProtectionTrackerV1 {
@@ -99,6 +100,8 @@ public final class KafkaObjectSourceProtectionTrackerV1 {
     private final Map<KafkaObjectExtentLocatorV1, Integer> activePins = new LinkedHashMap<>();
     private final Map<RetirementPlan, Boolean> issuedPlans = new IdentityHashMap<>();
     private RetirementPlan pendingPlan;
+    private BooleanSupplier m4RetirementGuard = () -> true;
+    private boolean m4RetirementGuardRegistered;
 
     public KafkaObjectSourceProtectionTrackerV1(KafkaObjectBindingKeyV1 binding, Sha256Digest walRunRootSha) {
         this.binding = Objects.requireNonNull(binding, "binding");
@@ -115,6 +118,16 @@ public final class KafkaObjectSourceProtectionTrackerV1 {
         }
         activePins.merge(locator, 1, Math::addExact);
         return new ReadPin(locator);
+    }
+
+    /** Registers the M4 binding-wide hazard scan used before any active-locator retirement plan. */
+    public synchronized void registerM4RetirementGuard(BooleanSupplier guard) {
+        Objects.requireNonNull(guard, "guard");
+        if (m4RetirementGuardRegistered) {
+            throw new IllegalStateException("Kafka source protection already has an M4 retirement guard");
+        }
+        m4RetirementGuard = guard;
+        m4RetirementGuardRegistered = true;
     }
 
     /** Issues a plan only when the exact manifest-covered prefix has no live read pin. */
@@ -136,6 +149,9 @@ public final class KafkaObjectSourceProtectionTrackerV1 {
         }
         if (pendingPlan != null) {
             throw new IllegalStateException("a manifest retirement root CAS is already pending");
+        }
+        if (!m4AllowsRetirement()) {
+            throw new IllegalStateException("manifest-covered Kafka Object locator still has an M4 read pin");
         }
         List<KafkaObjectExtentLocatorV1> retired = before.locators().stream()
                 .filter(locator -> locator.endOffsetExclusive() <= replacementCoveredThrough)
@@ -240,5 +256,13 @@ public final class KafkaObjectSourceProtectionTrackerV1 {
             throw new IllegalStateException("Kafka Object read pin is not active");
         }
         return count;
+    }
+
+    private boolean m4AllowsRetirement() {
+        try {
+            return m4RetirementGuard.getAsBoolean();
+        } catch (Throwable failure) {
+            return false;
+        }
     }
 }

@@ -97,6 +97,14 @@ import com.nereusstream.storage.object.provider.ObjectIdentity;
 import com.nereusstream.storage.object.provider.ObjectProviderCapabilities;
 import com.nereusstream.storage.object.provider.ObjectProviderTransport;
 import com.nereusstream.storage.object.provider.ProviderObjectOutcome;
+import com.nereusstream.storage.object.read.BindingReadBatchContextV1;
+import com.nereusstream.storage.object.read.BindingReadHazardPoolV1;
+import com.nereusstream.storage.object.read.BindingReadHazardPoolV1.CaptureOutcome;
+import com.nereusstream.storage.object.read.BindingReadHazardPoolV1.ScanOutcome;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
 import com.nereusstream.storage.object.recovery.RecoveryEnvelopeLimits;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -114,6 +122,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 class PulsarObjectWalBridgeV1Test {
@@ -925,6 +936,93 @@ class PulsarObjectWalBridgeV1Test {
     }
 
     @Test
+    void m4CapturedActiveSourceSurvivesManifestSwitchAndNewReadUsesManifest() throws Exception {
+        Fixture fixture = fixture(START);
+        fixture.activate(BINDING_A, START);
+        AppendAck ack = verifiedAck(fixture.bridge
+                .appendShared(List.of(input(BINDING_A, "m4-pinned-value")))
+                .toCompletableFuture()
+                .join()
+                .get(0));
+        fixture.store.manifestValues.put(
+                key(BINDING_A, ack.position()), "m4-pinned-value".getBytes(StandardCharsets.UTF_8));
+        fixture.store.activeReadGate = new CompletableFuture<>();
+        fixture.store.activeReadStarted = new CompletableFuture<>();
+        BindingReadHazardPoolV1 pool = new BindingReadHazardPoolV1(8, 4);
+        ExecutorService eventLoop = Executors.newSingleThreadExecutor();
+        try {
+            PulsarObjectWalM4ReaderV1 reader =
+                    new PulsarObjectWalM4ReaderV1(fixture.bridge, BINDING_A, m4Selector(), pool, eventLoop);
+            CompletableFuture<ReadEntry> oldRead = reader.read(ack.position());
+            fixture.store.activeReadStarted.get(10, TimeUnit.SECONDS);
+            assertThat(pool.scan(
+                            PulsarObjectBindingReadAdapterV1.bindingIdentity(BINDING_A)
+                                    .bindingId(),
+                            1))
+                    .isEqualTo(ScanOutcome.PINNED);
+
+            fixture.bridge
+                    .installManifestHandoff(new PulsarObjectWalBridgeV1.ManifestHandoffRequest(BINDING_A, START, 0, 1))
+                    .toCompletableFuture()
+                    .join();
+            reader.refresh(m4Selector());
+            assertThat(fixture.bridge.frontiers(BINDING_A).activeTailLocatorCount())
+                    .isOne();
+
+            fixture.store.activeReadGate.complete(null);
+            assertThat(oldRead.get(10, TimeUnit.SECONDS).source()).isEqualTo(ReadSource.ACTIVE_TAIL);
+            assertThat(fixture.bridge.frontiers(BINDING_A).activeTailLocatorCount())
+                    .isZero();
+            assertThat(reader.read(ack.position()).get(10, TimeUnit.SECONDS).source())
+                    .isEqualTo(ReadSource.MANIFEST);
+            assertThat(pool.scan(
+                            PulsarObjectBindingReadAdapterV1.bindingIdentity(BINDING_A)
+                                    .bindingId(),
+                            1))
+                    .isEqualTo(ScanOutcome.CLEAN);
+        } finally {
+            eventLoop.shutdownNow();
+        }
+    }
+
+    @Test
+    void m4OuterHazardAloneClosesCaptureToP4InnerPinRetirementRace() {
+        Fixture fixture = fixture(START);
+        fixture.activate(BINDING_A, START);
+        AppendAck ack = verifiedAck(fixture.bridge
+                .appendShared(List.of(input(BINDING_A, "m4-gap-value")))
+                .toCompletableFuture()
+                .join()
+                .get(0));
+        fixture.store.manifestValues.put(
+                key(BINDING_A, ack.position()), "m4-gap-value".getBytes(StandardCharsets.UTF_8));
+        BindingReadHazardPoolV1 pool = new BindingReadHazardPoolV1(8, 4);
+        ExecutorService eventLoop = Executors.newSingleThreadExecutor();
+        try {
+            PulsarObjectWalM4ReaderV1 reader =
+                    new PulsarObjectWalM4ReaderV1(fixture.bridge, BINDING_A, m4Selector(), pool, eventLoop);
+            BindingReadBatchContextV1 capturedBeforeInnerPin = new BindingReadBatchContextV1();
+            assertThat(pool.tryCapture(reader.currentAuthority(), capturedBeforeInnerPin))
+                    .isEqualTo(CaptureOutcome.CAPTURED);
+
+            fixture.bridge
+                    .installManifestHandoff(new PulsarObjectWalBridgeV1.ManifestHandoffRequest(BINDING_A, START, 0, 1))
+                    .toCompletableFuture()
+                    .join();
+            assertThat(fixture.bridge.frontiers(BINDING_A).activeTailLocatorCount())
+                    .isOne();
+
+            capturedBeforeInnerPin.closeNewSourceUse();
+            assertThat(capturedBeforeInnerPin.terminalClearExactLease()).isTrue();
+            fixture.bridge.reconcileM4Retirement(BINDING_A);
+            assertThat(fixture.bridge.frontiers(BINDING_A).activeTailLocatorCount())
+                    .isZero();
+        } finally {
+            eventLoop.shutdownNow();
+        }
+    }
+
+    @Test
     void recoveredActiveTailMustBeBoundedAndExactlyContiguous() {
         Fixture fixture = fixture(START);
         ExtentIdentity identity = identity(ROOT_A, WalLaneId.OBJECT_BALANCED, 0, "object-wal/run/lane-1/0");
@@ -1609,6 +1707,21 @@ class PulsarObjectWalBridgeV1Test {
                 "cell-1", "binding-" + suffix, "incarnation-" + suffix, "storage-epoch-1", "position-domain-" + suffix);
     }
 
+    private static BindingReadSelector m4Selector() {
+        return new BindingReadSelector(
+                PulsarObjectBindingReadAdapterV1.bindingIdentity(BINDING_A),
+                digest('e'),
+                7,
+                1,
+                1,
+                SelectorMode.PREFERRED_ONLY,
+                AdmissionState.ADMITTING,
+                Optional.empty(),
+                new CapabilityBinding(1, digest('f')),
+                List.of(),
+                List.of());
+    }
+
     private static ExtentLocator locator(
             PulsarBindingKey binding, long ledgerId, long entryId, ExtentIdentity identity, int frameOrdinal) {
         return new ExtentLocator(
@@ -1899,6 +2012,7 @@ class PulsarObjectWalBridgeV1Test {
         private int recoveryVerifications;
         private PulsarObjectWalBridgeV1.ActiveTailRecoveryRequest lastRecoveryRequest;
         private CompletableFuture<Void> activeReadGate;
+        private CompletableFuture<Void> activeReadStarted;
         private PulsarObjectWalBridgeV1.ManifestSource lastManifestSource;
         private final List<PulsarObjectWalBridgeV1.PulsarPosition> resumePositions = new ArrayList<>();
         private final Map<String, byte[]> activeValues = new HashMap<>();
@@ -1993,6 +2107,9 @@ class PulsarObjectWalBridgeV1Test {
             }
             CompletableFuture<Void> gate =
                     activeReadGate == null ? CompletableFuture.completedFuture(null) : activeReadGate;
+            if (activeReadStarted != null) {
+                activeReadStarted.complete(null);
+            }
             return gate.thenApply(ignored -> {
                 byte[] value = activeValues.get(key(locator.binding(), locator.position()));
                 return new ReadEntry(
