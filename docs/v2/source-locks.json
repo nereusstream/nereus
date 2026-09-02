@@ -592,6 +592,56 @@
     ],
     "schema": "NEREUS_V2_M3_EVIDENCE_SOURCE_LOCKS_V2"
   },
+  "m4EvidenceBindings": {
+    "schema": "NEREUS_V2_M4_EVIDENCE_SOURCE_LOCKS_V1",
+    "receiptSchema": "NEREUS_V2_M4_CHILD_EVIDENCE_V1",
+    "physicalSelection": {
+      "selectorMaxBytes": 32768,
+      "emergencyStoppedReserveBytes": 2048,
+      "maxPendingAnchors": 8,
+      "maxActiveBatches": 8,
+      "maxSourcesPerBatch": 64,
+      "proofWindowEntries": 64,
+      "proofFoldEntries": 32,
+      "maxProofFolds": 64,
+      "maxProofIntervalEpochs": 4096,
+      "ordinaryReadRemoteMetadataOperations": 0,
+      "warmedCapturePlanClearOperations": 100000,
+      "warmedCapturePlanClearAllocatedBytes": 0
+    },
+    "backendAdmissions": [
+      {
+        "backend": "KAFKA_BOOKKEEPER_OBJECT_WAL",
+        "capabilityKind": "DURABLE_DRAIN_ONLY_V1",
+        "admissionGeneration": 1,
+        "sourceIdentity": "NEREUS_TESTED_COMMIT|kafkaClients=org.apache.kafka:kafka-clients:3.9.0|bookkeeper=org.apache.bookkeeper:bookkeeper-server:4.18.0",
+        "productionDeploymentAuthority": false
+      },
+      {
+        "backend": "PULSAR_OBJECT_WAL",
+        "capabilityKind": "DURABLE_DRAIN_ONLY_V1",
+        "admissionGeneration": 1,
+        "sourceIdentity": "PULSAR_SOURCE_COMPOSITE|repository=https://github.com/nereusstream/pulsar.git|branch=nereus/v2-m2-pulsar-native-offload|commit=a14e0e6f4e49be0677318b4ceefc7b85b445823b",
+        "productionDeploymentAuthority": false
+      },
+      {
+        "backend": "OXIA_CANONICAL_CONTROL_METADATA",
+        "capabilityKind": "DURABLE_DRAIN_ONLY_V1",
+        "admissionGeneration": 1,
+        "sourceIdentity": "OXIA_CLIENT_LOCKED_ARTIFACT|commit=091a42c2780d92da56e9ec1f02ce1c3d988adc16|jarSha256=0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5",
+        "productionDeploymentAuthority": false
+      }
+    ],
+    "nonAdmittedCapabilities": [
+      "AUTHORITY_EXPIRY_V1"
+    ],
+    "exclusions": [
+      "M5_PHYSICAL_DELETION",
+      "M6_PROCESS_ACTIVATION",
+      "M8_NATIVE_PARITY",
+      "PRODUCTION_DEPLOYMENT_AUTHORITY"
+    ]
+  },
   "localImplementationEvidenceBindings": {
     "m1.1aO2Scaffold": {
       "nereusImplementationCommit": "050f908afa1832694b99bd156b17c9e06b9e9a6c",

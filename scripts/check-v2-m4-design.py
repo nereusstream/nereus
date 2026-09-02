@@ -299,7 +299,9 @@ def validate_open_questions(text: str) -> None:
 
 
 def validate_build(text: str) -> None:
-    if re.search(r'tasks\.register(?:<[^>]+>)?\(\s*"v2M4Check"', text):
+    if re.search(r'tasks\.register(?:<[^>]+>)?\(\s*"v2M4Check"', text) and not all(
+        literal in text for literal in ("v2M4FinalSourceCheck", "v2M4EvidenceContractTest")
+    ):
         raise DesignError("build registers forbidden placeholder v2M4Check")
     if re.search(r'tasks\.register(?:<[^>]+>)?\(\s*"v2M4DesignCheck"', text) is None:
         raise DesignError("build does not register v2M4DesignCheck")

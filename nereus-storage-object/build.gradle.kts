@@ -107,9 +107,69 @@ tasks.register<Test>("v2M4ReadKernelTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("v2M4ReadViewHazardEvidenceTest") {
+    group = "verification"
+    description = "Run the exclusive M4 read-view, hazard, ABA, cancellation, and allocation evidence slice."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    val testClass = "com.nereusstream.storage.object.read.BindingReadM4KernelV1Test."
+    filter {
+        listOf(
+            "capturedGenerationRemainsPinnedThroughProviderAndBufferDrain",
+            "authoritySwitchRejectsOldAdmissionAndNewCaptureUsesSuccessorGeneration",
+            "stoppedAuthorityAndExhaustedPoolFailBeforeSourceUse",
+            "multiBindingReservationReleasesEveryPartialLease",
+            "lifecycleRejectsCrossThreadMutation",
+            "plannedPoolCloseRejectsNewAdmissionWithoutForceClearingLiveLease",
+            "leaseGenerationWrapRetiresSlotInsteadOfReusingAbaIdentity",
+            "scanTreatsClaimedLeaseWithUnpublishedPayloadAsInconclusive",
+            "asyncCancellationClosesGateButRetainsLeaseUntilRealProviderCompletion",
+            "asyncSuccessReleasesExactLeaseBeforeMakingHeapOwnedResultObservable",
+            "steadyCapturePlanAndClearAllocateNoHeapBytesOnCurrentThread",
+        ).forEach { includeTestsMatching(testClass + it) }
+    }
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("v2M4SourcePlanExecutionEvidenceTest") {
+    group = "verification"
+    description = "Run the exclusive M4 typed route, purity, fallback, failure, and observability evidence slice."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    val testClass = "com.nereusstream.storage.object.read.BindingReadM4KernelV1Test."
+    filter {
+        listOf(
+            "deterministicPlanRejectsGapsAndCapacityWithoutRepairReads",
+            "pulsarPlannerPreservesTypedVirtualLedgerAndNeverFlattensLargePositions",
+            "fallbackIsSingleTransferPreObservabilityAndPreservesPrimaryCause",
+            "completedEarlierIntervalDoesNotCloseBatchOrForbidLaterIntervalFallback",
+            "observabilityForbidsFallbackAndUnprovedTerminationQuarantinesLease",
+            "sourceRouteRejectsNotEligibleFallbackAndSemanticMismatch",
+        ).forEach { includeTestsMatching(testClass + it) }
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.register<Test>("v2M4ControlPlaneTest") {
     group = "verification"
     description = "Run the deterministic M4 selector, capability, proof, fold, and protection-release suite."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("v2M4QuiescenceProtectionReleaseEvidenceTest") {
+    group = "verification"
+    description = "Run the exclusive M4 selector, epoch, proof, capability, fold, release, and response-loss evidence slice."
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     maxParallelForks = 1

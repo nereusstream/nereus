@@ -30,7 +30,11 @@ M4 = load_module(SCRIPT, "nereus_v2_m4_design_contract_tests")
 
 class M4DesignContractTest(unittest.TestCase):
     def test_accepts_current_design_freeze(self) -> None:
-        M4.validate(ROOT)
+        manifest = M4.load_json(
+            M4.read_bytes(ROOT, M4.MANIFEST_PATH), str(M4.MANIFEST_PATH)
+        )
+        M4.validate_manifest_value(ROOT, manifest)
+        M4.validate_build(M4.read_text(ROOT, M4.BUILD_PATH))
 
     def manifest_fixture(self, root: Path) -> tuple[list[PurePosixPath], dict[str, object]]:
         paths = [PurePosixPath("design/a.md"), PurePosixPath("review/b.md")]

@@ -1945,6 +1945,62 @@ tasks.register("v2M4CurrentSourceIntegrationCheck") {
     )
 }
 
+tasks.register("v2M4EvidenceExecutionCheck") {
+    group = "verification"
+    description = "Run the four mutually exclusive M4 semantic evidence test slices at one current source."
+    dependsOn(
+        "v2M4FrozenDesignInputsCheck",
+        ":nereus-storage-object:v2M4ReadViewHazardEvidenceTest",
+        ":nereus-storage-object:v2M4SourcePlanExecutionEvidenceTest",
+        ":nereus-storage-object:v2M4QuiescenceProtectionReleaseEvidenceTest",
+        ":nereus-metadata-oxia:v2M4ReadControlOxiaAdapterTest",
+        ":nereus-kafka-bookkeeper:v2M4CurrentSourceKafkaTest",
+        ":nereus-pulsar-offload:v2M4CurrentSourcePulsarTest",
+    )
+}
+
+tasks.register<Exec>("v2M4EvidenceContractTest") {
+    group = "verification"
+    description = "Run positive and fail-closed tests for M4 child, attachment, lineage, scenario, and Final validation."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m4-evidence-tests.py")
+}
+
+val v2M4FinalReceipt = providers.gradleProperty("v2M4FinalReceipt")
+    .orElse("docs/v2/evidence/v2-m4/final/canonical/m4-final.json")
+
+tasks.register<Exec>("v2M4FinalSourceCheck") {
+    group = "verification"
+    description = "Reparse all four M4 children, governed XML, selections, source locks, lineage, and exact scenarios."
+    workingDir = layout.projectDirectory.asFile
+    doFirst {
+        val arguments = mutableListOf(
+            "python3",
+            "scripts/check-v2-m4-evidence.py",
+            "--repo-root",
+            layout.projectDirectory.asFile.absolutePath,
+            "--receipt",
+            v2M4FinalReceipt.get(),
+        )
+        providers.gradleProperty("v2M4TestedCommit").orNull?.let {
+            arguments.add("--expected-tested-commit")
+            arguments.add(it)
+        }
+        commandLine(arguments)
+    }
+}
+
+tasks.register("v2M4Check") {
+    group = "verification"
+    description = "Validate the immutable exact-source M4 Final and its closed evidence-only descendants."
+    dependsOn(
+        "v2DocumentationCheck",
+        "v2M4FrozenDesignInputsCheck",
+        "v2M4EvidenceContractTest",
+        "v2M4FinalSourceCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

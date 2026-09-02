@@ -133,9 +133,10 @@ performance-first BookKeeper WAL.
   broker/controller activation remains M6.
 - The accepted [M4 design index](detailed_design/m4/README.md) and M4-A/B/C/D preserve the complete fixed-reviewer
   responses from Grills 32 through 35 and hard-freeze the logical read view, typed source plan, hazard lifetime,
-  read-quiescence proof, exact protection-generation release, M4/M5 ownership, and future evidence hierarchy.
-  `v2M4DesignCheck` proves exactly `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`; all M4 scenarios remain `PLANNED`, no
-  M4 receipt/Final exists, and evidence-selected physical representations/caps remain OPEN.
+  read-quiescence proof, exact protection-generation release, M4/M5 ownership, and evidence hierarchy. Runtime,
+  current-source Kafka/Pulsar integration, four exclusive evidence tasks, and fail-closed child/Final validation are
+  implemented without amending those inputs. Formal execution and publication remain pending, so all M4 scenarios
+  remain `PLANNED` and `v2M4DesignCheck` remains a historical design-only gate rather than Final authority.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and formal-runner contracts. It did not by itself select a mode or
   promote a scenario; the later e5 Final closes those evidence obligations with `RANGE_64`. It still does not activate

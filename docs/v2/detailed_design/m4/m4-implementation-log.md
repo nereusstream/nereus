@@ -114,3 +114,27 @@ publication/readability, provider-lifetime pinning and root-CAS retirement, plus
 old captured-source survival, and the outer-hazard/inner-pin admission race. Full Kafka and Pulsar module suites pass.
 This is not yet a child receipt or scenario promotion; formal source-bound evidence and the remaining OPEN selections
 still follow.
+
+## Milestone 5: exact-source evidence contract and physical selection candidate
+
+The fifth implementation slice makes the frozen four-child hierarchy executable without changing its ownership:
+
+- `READ_VIEW_HAZARD` and `SOURCE_PLAN_EXECUTION` use disjoint method-level selectors over the M4 kernel suite;
+- `QUIESCENCE_PROTECTION_RELEASE` composes the control coordinator with the exact-key Oxia adapter suite;
+- `CURRENT_SOURCE_INTEGRATION_PERFORMANCE` owns only the fresh Kafka/Pulsar Object-WAL integration regressions;
+- every child contains governed raw JUnit XML plus closed typed facts, is individually non-promotable, and binds one
+  exact tested Nereus commit and that commit's `source-locks.json` SHA-256; and
+- the Final validator reopens all child/attachment bytes, verifies the immutable M3 identity, permits only a linear
+  evidence-only descendant chain, promotes exactly five M4-only scenarios, and preserves all shared rows as
+  `PLANNED` with null receipts.
+
+The tested candidate parameters are source-locked as 32 KiB selector bytes, 2 KiB dedicated STOPPED reserve, eight
+anchors, eight active batches, 64 sources per batch, a 64-entry proof window, 32-entry contiguous folds, 64 folds,
+and at most 4,096 epochs per verified interval. Kafka/BookKeeper Object-WAL, the exact Pulsar source composite, and the
+locked Oxia client adapter are admitted only for `DURABLE_DRAIN_ONLY_V1`; `AUTHORITY_EXPIRY_V1` remains non-admitted
+despite codec/verifier coverage. None of these admissions grants production deployment, M5 physical deletion, M6, or
+M8 authority.
+
+This milestone installs the formal runner/publishers and negative contract tests. The values do not close
+`V2-OPEN-READ-08/09`, create a child receipt, or promote a scenario until a clean immutable tested source executes the
+formal run and publishes a validated Final.
