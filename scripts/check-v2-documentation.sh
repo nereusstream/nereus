@@ -1973,7 +1973,41 @@ if passed_m3:
     ):
         fail("M3 scenarios do not bind the closed M3 Final identity and scenario inventory")
 
-recognized_current = promotable_m1 | promotable_kafka_m2 | promotable_pulsar_m2 | promotable_m3
+promotable_m4_ordered = (
+    "V2-READ-001",
+    "V2-READ-003",
+    "V2-READ-004",
+    "V2-READ-005",
+    "V2-READ-007",
+)
+promotable_m4 = set(promotable_m4_ordered)
+passed_m4 = passed_current & promotable_m4
+if passed_m4 not in (set(), promotable_m4):
+    fail(
+        "M4 Final must promote either none or the exact M4 scenario set, "
+        f"found {sorted(passed_m4)}"
+    )
+if passed_m4:
+    expected_m4_receipt = "docs/v2/evidence/v2-m4/final/canonical/m4-final.json"
+    for item in scenarios["scenarios"]:
+        if item["id"] in promotable_m4 and item.get("evidenceReceipt") != expected_m4_receipt:
+            fail(f"{item['id']} does not bind the canonical M4 Final receipt")
+    try:
+        m4_final = json.loads((root / expected_m4_receipt).read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"M4 Final receipt cannot be parsed: {error}")
+    expected_shared_m4 = tuple(f"V2-READ-{ordinal:03d}" for ordinal in range(6, 16) if ordinal != 7)
+    if (
+        m4_final.get("schema") != "NEREUS_V2_M4_FINAL_V1"
+        or m4_final.get("kind") != "V2_M4_FINAL"
+        or m4_final.get("result") != "PASS_V2_M4_FINAL"
+        or m4_final.get("promotionEligible") is not True
+        or tuple(m4_final.get("scenarios", ())) != promotable_m4_ordered
+        or tuple(m4_final.get("sharedPredicates", ())) != expected_shared_m4
+    ):
+        fail("M4 scenarios do not bind the closed M4 Final identity and scenario inventory")
+
+recognized_current = promotable_m1 | promotable_kafka_m2 | promotable_pulsar_m2 | promotable_m3 | promotable_m4
 unexpected_current = passed_current - recognized_current
 if unexpected_current:
     fail(f"current-source scenario promotion lacks a closed receipt group: {sorted(unexpected_current)}")
