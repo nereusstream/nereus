@@ -1882,6 +1882,36 @@ tasks.register("v2M4DesignCheck") {
     )
 }
 
+tasks.register<Exec>("v2M4FrozenDesignInputsSourceCheck") {
+    group = "verification"
+    description = "Verify immutable M4-A/B/C/D and Grill 32-35 bytes after implementation starts."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m4-frozen-inputs.py")
+}
+
+tasks.register("v2M4FrozenDesignInputsCheck") {
+    group = "verification"
+    description = "Verify frozen M4 inputs and immutable historical M3 without repeating the pre-start status claim."
+    dependsOn(
+        "v2M4HistoricalM3DependencyContractTest",
+        "v2M4HistoricalM3DependencyCheck",
+        "v2M4DesignContractTest",
+        "v2M4FrozenDesignInputsSourceCheck",
+    )
+}
+
+tasks.register("v2M4ReadKernelCheck") {
+    group = "verification"
+    description = "Run the M4 hot-path kernel, allocation, style, and frozen-design prerequisite checks."
+    dependsOn(
+        "v2M4FrozenDesignInputsCheck",
+        ":nereus-storage-object:v2M4ReadKernelTest",
+        ":nereus-storage-object:spotlessCheck",
+        ":nereus-storage-object:checkstyleMain",
+        ":nereus-storage-object:checkstyleTest",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

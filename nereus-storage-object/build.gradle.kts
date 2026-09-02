@@ -94,6 +94,19 @@ tasks.register<JavaExec>("v2M3LocalCapEvidenceEmit") {
     }
 }
 
+tasks.register<Test>("v2M4ReadKernelTest") {
+    group = "verification"
+    description = "Run the allocation-free M4 capture, source-plan, fallback, drain, and hazard-scan kernel suite."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.storage.object.read.BindingReadM4KernelV1Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
