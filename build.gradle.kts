@@ -2347,6 +2347,34 @@ tasks.register("v2M5BookKeeperDeleteCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5OrphanAdmissionContractTest") {
+    group = "verification"
+    description = "Test the fail-closed focused M5-D orphan and per-Cell admission checker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-orphan-admission-tests.py")
+}
+
+tasks.register<Exec>("v2M5OrphanAdmissionSourceCheck") {
+    group = "verification"
+    description = "Validate the closed orphan taxonomy, mark protocol, and hard per-Cell budgets."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-orphan-admission.py")
+}
+
+tasks.register("v2M5OrphanAdmissionCheck") {
+    group = "verification"
+    description = "Run the focused non-promotable M5-D orphan and per-Cell admission core gate."
+    dependsOn(
+        "v2M5BookKeeperDeleteSourceCheck",
+        "v2M5OrphanAdmissionContractTest",
+        "v2M5OrphanAdmissionSourceCheck",
+        ":nereus-storage-object:test",
+        ":nereus-storage-object:checkstyleMain",
+        ":nereus-storage-object:checkstyleTest",
+        ":nereus-storage-object:spotlessCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

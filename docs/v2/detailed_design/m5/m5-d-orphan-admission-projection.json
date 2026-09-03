@@ -1,0 +1,67 @@
+{
+  "schema": "NEREUS_V2_M5_D_ORPHAN_ADMISSION_PROJECTION_V1",
+  "status": "ORPHAN_AND_CELL_ADMISSION_CORE_IMPLEMENTED_NON_PROMOTABLE",
+  "implementationAncestor": "21110c8d340f4020039fbbd57b154bd359ee441e",
+  "closedOrphanClasses": [
+    "PHYSICAL_OUTPUT_ORPHAN_CANDIDATE",
+    "MULTIPART_RESIDUE_CANDIDATE",
+    "RELEASED_SOURCE_CANDIDATE",
+    "PERMANENT_METADATA_FENCE",
+    "ALLOCATOR_NO_REUSE_EVIDENCE",
+    "UNKNOWN_OR_FOREIGN"
+  ],
+  "classesAllowedToMark": [
+    "PHYSICAL_OUTPUT_ORPHAN_CANDIDATE",
+    "MULTIPART_RESIDUE_CANDIDATE",
+    "RELEASED_SOURCE_CANDIDATE"
+  ],
+  "permanentRetainClasses": [
+    "PERMANENT_METADATA_FENCE",
+    "ALLOCATOR_NO_REUSE_EVIDENCE"
+  ],
+  "quarantineOnlyClasses": [
+    "UNKNOWN_OR_FOREIGN"
+  ],
+  "markProtocol": {
+    "sequence": [
+      "DISCOVERED",
+      "ORPHAN_MARK",
+      "AUTHORITY_TIME_GRACE",
+      "FULL_RESCAN",
+      "FUTURE_INTENT_CANDIDATE"
+    ],
+    "listingIsAuthority": false,
+    "responseUnknownCreateCanOrphan": false,
+    "liveDeterministicOwnerIsAdopted": true,
+    "markRootRevalidated": true,
+    "futureIntentCandidateIsDispatchAuthority": false
+  },
+  "perCellAdmission": {
+    "hardIdentityIsolation": true,
+    "reservedMinimumBoundedByHardLimit": true,
+    "overflowFailsClosed": true,
+    "accountedGroups": [
+      "candidate_intent_done_counts_and_bytes",
+      "delete_reconciliation_unknown_queues_and_age",
+      "object_multipart_bookkeeper_oxia_kms_network_concurrency",
+      "request_byte_io_retry_rates",
+      "cache_entries_bytes_and_target_buffers",
+      "scanner_pages_keys_bytes",
+      "quarantine_count_bytes_age"
+    ]
+  },
+  "focusedTests": {
+    "orphanProtocolTests": 7,
+    "cellAdmissionTests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "externalDeleteApiPresent": false,
+  "intentMutationApiPresent": false,
+  "fullM5DGatePresent": false,
+  "sourceBoundReceiptPresent": false,
+  "physicalDeleteAuthority": false,
+  "scenarioPromotionAuthority": false,
+  "productionAuthority": false
+}

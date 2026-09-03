@@ -290,9 +290,44 @@ The adapter deliberately exposes no intent creation or dispatch-authority method
 future complete M5-D coordinator after its exact persisted intent/fences authorize dispatch. This focused result is
 not a source-bound child and grants no physical-delete, scenario-promotion, staging, or production authority.
 
+## M5-D physical orphan and per-Cell admission core
+
+Status: pure orphan/admission slice implemented; it has no external mutation transport and the complete M5-D gate has
+not run.
+
+- `M5PhysicalOrphanProtocolV1` closes the exact six-class taxonomy. Only physical output, multipart residue, and
+  released-source candidates may enter mark; permanent metadata fences and allocator no-reuse evidence are always
+  retained, while unknown/foreign identity is quarantine-only;
+- mark requires authoritative owner-absent/released proof, a complete all-reference-absent scan, reconciled unknown
+  create paths, and current fences. A live deterministic owner is adopted, contradictory facts quarantine, and LIST
+  discovery or age alone retains;
+- the immutable mark binds physical identity/content/version roots, the first complete scan, task/manifest versions,
+  fences, response-loss root, and authority-time grace. Only a second complete exact rescan at or after the deadline
+  produces `FUTURE_INTENT_CANDIDATE`;
+- `M5PhysicalGcCellAdmissionV1` accounts candidate/intent/done inventory, delete/reconciliation/unknown queues, every
+  Object/multipart/BookKeeper/Oxia/KMS/network concurrency class, rates/retries, cache/buffers, scanner work, and
+  quarantine separately per Cell; and
+- reserved minima cannot exceed the same Cell's hard limit, identities cannot cross-borrow, every cap and arithmetic
+  overflow fails closed, while another Cell continues inside its own envelope.
+
+Focused gate:
+
+```text
+./gradlew --no-daemon --no-configuration-cache v2M5OrphanAdmissionCheck --rerun-tasks
+PASS_V2_M5_BOOKKEEPER_DELETE_ADAPTER_NON_PROMOTABLE
+PASS_V2_M5_ORPHAN_ADMISSION_CORE_NON_PROMOTABLE
+M5PhysicalOrphanProtocolV1Test: 7 tests, 0 failures, 0 errors, 0 skipped
+M5PhysicalGcCellAdmissionV1Test: 5 tests, 0 failures, 0 errors, 0 skipped
+17 actionable tasks: 17 executed
+```
+
+The public protocol methods are only classify, mark, and rescan; readiness is explicitly a candidate for the future
+persisted intent transaction, not authority to create intent or dispatch deletion. No receipt, scenario promotion,
+physical-delete, staging, or production authority follows from this result.
+
 ## Remaining ordered work
 
-1. Complete M5-D intent/done, orphan reconciliation, and Pulsar cleanup above the admitted Object/BookKeeper adapters.
+1. Complete M5-D intent/done and Pulsar cleanup above the admitted Object/BookKeeper and pure orphan/admission cores.
 2. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
    `v2M5Check`.
 
