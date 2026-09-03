@@ -156,6 +156,22 @@ fence, and one exact Oxia single-key retirement CAS. Until that new path and its
 retirement families remain non-promotable. Logical trim and admission remain metadata-only; no M4 release, physical
 deletion, scenario promotion, staging certification, or production authority is granted.
 
+The first amended implementation slice now passes `v2M5BindingAuthorityCheck` with these bounded surfaces:
+
+- canonical `M5R1` `BindingRetirementAuthorityV1` at the existing M4 selector key, including byte-exact legacy
+  selector migration, never-reused full/retired BatchId slots, predecessor/canonical digests, and hard value/count
+  caps;
+- a transparent M4 metadata facade that projects only activation-ordered `FULL_V1` slots, preserves all M5-only
+  fields on every selector CAS, blocks M4 control mutation under a scan fence, and admits no second batch key;
+- explicit enrollment of every closed floor/reference writer class before ticket or fence acquisition;
+- durable target tickets, a zero-ticket `REFERENCE_SCAN_FENCED_V1` transition, exact M4 member-release reread, stable
+  proof-vector reread, one exact single-key retirement CAS, and same-key response-loss convergence; and
+- regression tests proving exact M4 projection, both ticket/fence orders, lost response, permanent tombstone
+  projection removal, zero transaction calls, and no separate batch-key creation.
+
+This is still a focused non-promotable slice. The complete per-kind writer integrations, Pulsar aggregate authority,
+full M5-C gate, source-bound child receipt, M5-D, and aggregate Final remain outstanding.
+
 ## Remaining ordered work
 
 1. Implement and gate the accepted single-Binding authority envelope, ticket/fence protocol, M4 selector projection,

@@ -2169,6 +2169,35 @@ tasks.register("v2M5RetentionCoreCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5BindingAuthorityContractTest") {
+    group = "verification"
+    description = "Test the fail-closed focused M5-C single-Binding authority checker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-binding-authority-tests.py")
+}
+
+tasks.register<Exec>("v2M5BindingAuthoritySourceCheck") {
+    group = "verification"
+    description = "Validate the M5-C authority envelope, ticket/fence protocol, and exact single-key CAS shape."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-binding-authority.py")
+}
+
+tasks.register("v2M5BindingAuthorityCheck") {
+    group = "verification"
+    description = "Run the non-promotable M5-C single-Binding authority implementation gate."
+    dependsOn(
+        "v2M5DesignAmendmentCheck",
+        "v2M5RetentionCoreCheck",
+        "v2M5BindingAuthorityContractTest",
+        "v2M5BindingAuthoritySourceCheck",
+        ":nereus-storage-object:v2M5BindingAuthorityTest",
+        ":nereus-storage-object:checkstyleMain",
+        ":nereus-storage-object:checkstyleTest",
+        ":nereus-storage-object:spotlessCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

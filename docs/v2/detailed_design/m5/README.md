@@ -50,6 +50,10 @@ scenario promotion, physical deletion, or production deployment authority is cre
   reference/admission inventories and the source-locked Oxia adapter's fail-closed lack of the required atomic
   multi-key transaction. It is preserved rejected evidence for the pre-amendment design and is not the future M5-C
   retirement gate.
+- The implementation-selected [M5-C Binding authority projection](m5-c-binding-authority-projection.json) fixes the
+  `M5R1` envelope, exact legacy migration, M4 projection, closed writer enrollment, durable tickets, one scan fence,
+  hard caps, and real Oxia single-key CAS used by the first amended implementation slice. Its
+  `v2M5BindingAuthorityCheck` result is focused and non-promotable; the full M5-C retirement gate remains absent.
 
 The design result is exactly `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. All 17 scenario rows whose milestone names
 M5 remain `PLANNED` with null receipts. `docs/v2/evidence/v2-m5/`, `v2M5EvidenceExecutionCheck`,

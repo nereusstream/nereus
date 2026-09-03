@@ -32,6 +32,8 @@ import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.E
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.MutationOutcome;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.TransactionOutcome;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
+import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
+import com.nereusstream.storage.object.control.ControlMutationOutcome;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IdentityEnvelope;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PositionDomain;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.ProtocolCoverage;
@@ -45,6 +47,10 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Selec
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtection;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceRetirementBatch;
+import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.BindingAuthorityStateV1;
+import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.BindingRetirementAuthorityV1;
+import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.ReferenceMutationTicketV1;
+import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.ReferenceWriterEnrollmentV1;
 import com.nereusstream.storage.object.retention.M5LogicalTrimCoordinatorV1.Outcome;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.BatchMetadataStateV1;
@@ -182,6 +188,245 @@ class M5RetentionRetirementV1Test {
         assertThatThrownBy(() -> new M5RetentionPlannerV1().plan(snapshot(metadata, 100, 99), result.exactFrontier()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("regress");
+    }
+
+    @Test
+    void singleBindingAuthorityMigrationPreservesExactM4Projection() {
+        RetirementFixture fixture = retirementFixture(false);
+        M5BindingRetirementCoordinatorV1 coordinator = new M5BindingRetirementCoordinatorV1(fixture.metadata);
+
+        assertThat(coordinator
+                        .migrateLegacy(new M5BindingRetirementCoordinatorV1.MigrationRequest(
+                                fixture.selectorKey, fixture.exactSelector))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+
+        VersionedValue stored = fixture.metadata.readNow(fixture.selectorKey);
+        BindingRetirementAuthorityV1 authority =
+                M5BindingAuthorityCodecV1.decodeAuthority(stored.canonicalStoredBytes());
+        assertThat(M4ReadControlCodecV1.encodeSelector(authority.selectorProjection()))
+                .isEqualTo(fixture.exactSelector.canonicalStoredBytes());
+        assertThat(authority.batchSlots()).singleElement().satisfies(slot -> {
+            assertThat(slot.state()).isEqualTo(BatchMetadataStateV1.FULL_V1);
+            assertThat(slot.fullBatch()).isEqualTo(fixture.batch);
+        });
+        assertThat(authority.authorityGeneration()).isEqualTo(1);
+        assertThat(authority.predecessorValueSha256()).contains(fixture.exactSelector.canonicalStoredSha256());
+        assertThat(authority.writerEnrollment()).isEmpty();
+        assertThat(fixture.metadata.transactionCalls).isZero();
+    }
+
+    @Test
+    void writerEnrollmentRejectsEveryMissingClosedClass() {
+        for (FloorClassV1 missing : FloorClassV1.values()) {
+            List<FloorClassV1> floors = new ArrayList<>(List.of(FloorClassV1.values()));
+            floors.remove(missing);
+            assertThatThrownBy(() -> new ReferenceWriterEnrollmentV1(
+                            CAPABILITY, floors, List.of(ReferenceKindV1.values()), digest("missing-floor-" + missing)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("closed proof inventory");
+        }
+        for (ReferenceKindV1 missing : ReferenceKindV1.values()) {
+            List<ReferenceKindV1> references = new ArrayList<>(List.of(ReferenceKindV1.values()));
+            references.remove(missing);
+            assertThatThrownBy(() -> new ReferenceWriterEnrollmentV1(
+                            CAPABILITY,
+                            List.of(FloorClassV1.values()),
+                            references,
+                            digest("missing-reference-" + missing)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("closed proof inventory");
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(ReferenceKindV1.class)
+    void ticketAndFenceRaceHasOnlyOneWinningAuthorityCas(ReferenceKindV1 referenceKind) {
+        RetirementFixture fixture = retirementFixture(false);
+        M5BindingRetirementCoordinatorV1 coordinator = new M5BindingRetirementCoordinatorV1(fixture.metadata);
+        coordinator
+                .migrateLegacy(new M5BindingRetirementCoordinatorV1.MigrationRequest(
+                        fixture.selectorKey, fixture.exactSelector))
+                .toCompletableFuture()
+                .join();
+        VersionedValue open = fixture.metadata.readNow(fixture.selectorKey);
+        ReferenceMutationTicketV1 ticket = new ReferenceMutationTicketV1(
+                ReferenceTargetKindV1.RETIREMENT_BATCH,
+                fixture.batch.batchIdSha256(),
+                referenceKind,
+                CAPABILITY,
+                digest("ticket-operation-" + referenceKind),
+                digest("ticket-external-root-" + referenceKind));
+
+        assertThat(coordinator
+                        .acquireTicket(
+                                new M5BindingRetirementCoordinatorV1.TicketRequest(fixture.selectorKey, open, ticket))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.RETAIN);
+        assertThat(coordinator
+                        .enrollWriters(new M5BindingRetirementCoordinatorV1.EnrollmentRequest(
+                                fixture.selectorKey, open, writerEnrollment()))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+        open = fixture.metadata.readNow(fixture.selectorKey);
+        assertThat(coordinator
+                        .acquireTicket(
+                                new M5BindingRetirementCoordinatorV1.TicketRequest(fixture.selectorKey, open, ticket))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+        VersionedValue ticketed = fixture.metadata.readNow(fixture.selectorKey);
+        assertThat(coordinator
+                        .fence(new M5BindingRetirementCoordinatorV1.FenceRequest(
+                                fixture.selectorKey,
+                                ticketed,
+                                fixture.batch.batchIdSha256(),
+                                digest("fence-attempt"),
+                                fixture.releases))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.RETAIN);
+
+        assertThat(coordinator
+                        .clearTicket(new M5BindingRetirementCoordinatorV1.TicketRequest(
+                                fixture.selectorKey, ticketed, ticket))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+        VersionedValue reopened = fixture.metadata.readNow(fixture.selectorKey);
+        assertThat(coordinator
+                        .fence(new M5BindingRetirementCoordinatorV1.FenceRequest(
+                                fixture.selectorKey,
+                                reopened,
+                                fixture.batch.batchIdSha256(),
+                                digest("fence-attempt"),
+                                fixture.releases))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+        VersionedValue fenced = fixture.metadata.readNow(fixture.selectorKey);
+        assertThat(M5BindingAuthorityCodecV1.decodeAuthority(fenced.canonicalStoredBytes())
+                        .state())
+                .isEqualTo(BindingAuthorityStateV1.REFERENCE_SCAN_FENCED_V1);
+        assertThat(coordinator
+                        .acquireTicket(
+                                new M5BindingRetirementCoordinatorV1.TicketRequest(fixture.selectorKey, fenced, ticket))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.RETAIN);
+        assertThat(fixture.metadata.transactionCalls).isZero();
+    }
+
+    @Test
+    void fencedBatchRetiresInOneSingleKeyCasAndLostResponseConverges() {
+        RetirementFixture fixture = retirementFixture(false);
+        M5BindingRetirementCoordinatorV1 coordinator = new M5BindingRetirementCoordinatorV1(fixture.metadata);
+        coordinator
+                .migrateLegacy(new M5BindingRetirementCoordinatorV1.MigrationRequest(
+                        fixture.selectorKey, fixture.exactSelector))
+                .toCompletableFuture()
+                .join();
+        VersionedValue open = fixture.metadata.readNow(fixture.selectorKey);
+        coordinator
+                .enrollWriters(new M5BindingRetirementCoordinatorV1.EnrollmentRequest(
+                        fixture.selectorKey, open, writerEnrollment()))
+                .toCompletableFuture()
+                .join();
+        open = fixture.metadata.readNow(fixture.selectorKey);
+        coordinator
+                .fence(new M5BindingRetirementCoordinatorV1.FenceRequest(
+                        fixture.selectorKey,
+                        open,
+                        fixture.batch.batchIdSha256(),
+                        digest("retirement-attempt"),
+                        fixture.releases))
+                .toCompletableFuture()
+                .join();
+        VersionedValue fenced = fixture.metadata.readNow(fixture.selectorKey);
+        ReferenceFreeProofV1 proof = proof(
+                fixture.metadata,
+                "/single-key-proof",
+                ReferenceTargetKindV1.RETIREMENT_BATCH,
+                fixture.batch.batchIdSha256(),
+                fenced,
+                fixture.releases);
+        M5BindingRetirementCoordinatorV1.RetirementRequest request =
+                new M5BindingRetirementCoordinatorV1.RetirementRequest(fixture.selectorKey, fenced, proof);
+
+        fixture.metadata.failReadAfterCas = true;
+        assertThat(coordinator.retire(request).toCompletableFuture().join())
+                .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.RESPONSE_UNKNOWN);
+        assertThat(coordinator.retire(request).toCompletableFuture().join())
+                .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.EXISTING_EXACT);
+
+        BindingRetirementAuthorityV1 retired = M5BindingAuthorityCodecV1.decodeAuthority(
+                fixture.metadata.readNow(fixture.selectorKey).canonicalStoredBytes());
+        assertThat(retired.state()).isEqualTo(BindingAuthorityStateV1.OPEN_V1);
+        assertThat(retired.selectorProjection().activeBatches()).isEmpty();
+        assertThat(retired.batchSlots()).singleElement().satisfies(slot -> {
+            assertThat(slot.state()).isEqualTo(BatchMetadataStateV1.RETIRED_V1);
+            assertThat(slot.retiredTombstone()).isPresent();
+        });
+        assertThat(fixture.metadata.transactionCalls).isZero();
+        assertThat(fixture.metadata.readOptional(fixture.batchKey)).isEmpty();
+    }
+
+    @Test
+    void m4ControlMutationCannotBypassReferenceScanFence() {
+        RetirementFixture fixture = retirementFixture(false);
+        M5BindingRetirementCoordinatorV1 retirement = new M5BindingRetirementCoordinatorV1(fixture.metadata);
+        retirement
+                .migrateLegacy(new M5BindingRetirementCoordinatorV1.MigrationRequest(
+                        fixture.selectorKey, fixture.exactSelector))
+                .toCompletableFuture()
+                .join();
+        VersionedValue open = fixture.metadata.readNow(fixture.selectorKey);
+        retirement
+                .enrollWriters(new M5BindingRetirementCoordinatorV1.EnrollmentRequest(
+                        fixture.selectorKey, open, writerEnrollment()))
+                .toCompletableFuture()
+                .join();
+        open = fixture.metadata.readNow(fixture.selectorKey);
+        retirement
+                .fence(new M5BindingRetirementCoordinatorV1.FenceRequest(
+                        fixture.selectorKey,
+                        open,
+                        fixture.batch.batchIdSha256(),
+                        digest("m4-blocking-fence"),
+                        fixture.releases))
+                .toCompletableFuture()
+                .join();
+        CanonicalBytes exactFenced =
+                fixture.metadata.readNow(fixture.selectorKey).canonicalStoredBytes();
+        String selectorKey = "/m4-selector-authority";
+        ControlStore store = new ControlStore();
+        store.values.put(selectorKey, exactFenced);
+        M5BindingAuthorityControlMetadataStoreV1 m4Facade =
+                new M5BindingAuthorityControlMetadataStoreV1(store, selectorKey);
+        BindingReadSelector expected =
+                M4ReadControlCodecV1.decodeSelector(m4Facade.get(selectorKey).orElseThrow());
+        BindingReadSelector candidate = new BindingReadSelector(
+                expected.binding(),
+                digest("fenced-successor-view"),
+                expected.ownerEpoch() + 1,
+                expected.readAdmissionEpoch() + 1,
+                expected.sourceGeneration() + 1,
+                expected.mode(),
+                expected.admissionState(),
+                expected.fallbackSetSha256(),
+                expected.capability(),
+                expected.pendingAnchors(),
+                expected.activeBatches());
+
+        assertThat(m4Facade.compareAndSet(
+                        selectorKey,
+                        Optional.of(M4ReadControlCodecV1.encodeSelector(expected)),
+                        M4ReadControlCodecV1.encodeSelector(candidate)))
+                .isEqualTo(ControlMutationOutcome.DEFINITIVE_CONFLICT);
+        assertThat(store.values.get(selectorKey)).isEqualTo(exactFenced);
     }
 
     @Test
@@ -1116,6 +1361,14 @@ class M5RetentionRetirementV1Test {
         return new AuthorityFactV1(value.key(), value.metadataVersion(), value.canonicalStoredSha256());
     }
 
+    private static ReferenceWriterEnrollmentV1 writerEnrollment() {
+        return new ReferenceWriterEnrollmentV1(
+                CAPABILITY,
+                List.of(FloorClassV1.values()),
+                List.of(ReferenceKindV1.values()),
+                digest("ticket-protocol-writer-enrollment"));
+    }
+
     private static CanonicalBytes bytes(String value) {
         return CanonicalBytes.copyOf(value.getBytes(StandardCharsets.UTF_8));
     }
@@ -1145,6 +1398,33 @@ class M5RetentionRetirementV1Test {
                     Optional.empty(),
                     fullBatch,
                     proof);
+        }
+    }
+
+    private static final class ControlStore implements CanonicalControlMetadataStore {
+        private final Map<String, CanonicalBytes> values = new LinkedHashMap<>();
+
+        @Override
+        public Optional<CanonicalBytes> get(String key) {
+            return Optional.ofNullable(values.get(key));
+        }
+
+        @Override
+        public ControlMutationOutcome putIfAbsent(String key, CanonicalBytes exactValue) {
+            return values.putIfAbsent(key, exactValue) == null
+                    ? ControlMutationOutcome.APPLIED
+                    : ControlMutationOutcome.DEFINITIVE_CONFLICT;
+        }
+
+        @Override
+        public ControlMutationOutcome compareAndSet(
+                String key, Optional<CanonicalBytes> exactExpected, CanonicalBytes exactCandidate) {
+            Optional<CanonicalBytes> current = Optional.ofNullable(values.get(key));
+            if (!current.equals(exactExpected)) {
+                return ControlMutationOutcome.DEFINITIVE_CONFLICT;
+            }
+            values.put(key, exactCandidate);
+            return ControlMutationOutcome.APPLIED;
         }
     }
 

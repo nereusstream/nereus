@@ -38,6 +38,7 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Sourc
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceRetirementBatch;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.TerminalKind;
+import com.nereusstream.storage.object.retention.M5BindingAuthorityControlMetadataStoreV1;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -67,9 +68,10 @@ public final class M4ReadControlCoordinatorV1 {
     private final M4ReadControlKeysV1 keys;
 
     public M4ReadControlCoordinatorV1(CanonicalControlMetadataStore metadata, int shardId, BindingIdentity binding) {
-        this.metadata = Objects.requireNonNull(metadata, "metadata");
         this.binding = Objects.requireNonNull(binding, "binding");
         keys = new M4ReadControlKeysV1(shardId, binding);
+        this.metadata = new M5BindingAuthorityControlMetadataStoreV1(
+                Objects.requireNonNull(metadata, "metadata"), keys.selector());
     }
 
     public Outcome createCapability(CapabilityEvidence capability) {
@@ -820,7 +822,7 @@ public final class M4ReadControlCoordinatorV1 {
         return outcome == Outcome.APPLIED || outcome == Outcome.EXISTING_EXACT ? Outcome.STOPPED : outcome;
     }
 
-    private static void requireAdmissionCapacity(BindingReadSelector selector, CanonicalBytes encoded) {
+    private void requireAdmissionCapacity(BindingReadSelector selector, CanonicalBytes encoded) {
         if (selector.admissionState() != AdmissionState.ADMITTING) {
             return;
         }
@@ -829,6 +831,9 @@ public final class M4ReadControlCoordinatorV1 {
                 || encoded.length() + M4ReadControlCodecV1.EMERGENCY_STOPPED_RESERVE_BYTES
                         > M4ReadControlCodecV1.MAX_SELECTOR_BYTES) {
             throw new IllegalArgumentException("ADMITTING selector consumes its emergency STOPPED envelope");
+        }
+        if (metadata instanceof M5BindingAuthorityControlMetadataStoreV1 authorityStore) {
+            authorityStore.requireSelectorCapacity(selector);
         }
     }
 

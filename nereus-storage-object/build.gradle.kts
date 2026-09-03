@@ -210,6 +210,20 @@ tasks.register<Test>("v2M5RetentionCoreTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("v2M5BindingAuthorityTest") {
+    group = "verification"
+    description = "Run M4 projection and M5-C selector-authority migration, ticket, fence, and retirement tests."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1Test")
+        includeTestsMatching("com.nereusstream.storage.object.retention.M5RetentionRetirementV1Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
