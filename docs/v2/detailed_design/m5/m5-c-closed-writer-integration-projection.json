@@ -1,0 +1,69 @@
+{
+  "schema": "NEREUS_V2_M5_C_CLOSED_WRITER_INTEGRATION_PROJECTION_V1",
+  "status": "CLOSED_WRITER_GUARD_IMPLEMENTED_NON_PROMOTABLE",
+  "amendmentManifestSha256": "1f769b44740d9bfb2fa5d5d29fe2207d1cc72cb9e1ea5a8384223a6da143b452",
+  "registry": {
+    "canonical": true,
+    "maximumWriterClasses": 64,
+    "maximumWriterClassBytes": 1024,
+    "duplicateOwnership": "FORBIDDEN",
+    "mixedCapability": "FORBIDDEN",
+    "missingClass": "FAIL_CLOSED",
+    "implementationSourceSha256Required": true,
+    "floorClasses": [
+      "BINDING_EPOCH_POLICY",
+      "KAFKA_CONSUMER_GROUP",
+      "KAFKA_PRODUCER_TRANSACTION",
+      "KAFKA_REPLICATION_RECOVERY",
+      "PULSAR_CURSOR_SUBSCRIPTION",
+      "GENERATION_READ",
+      "LIFECYCLE_TASK",
+      "SHARED_PHYSICAL_SOURCE",
+      "PROJECTION_MIGRATION",
+      "AUDIT_GRACE"
+    ],
+    "referenceKinds": [
+      "MANIFEST_SELECTED",
+      "MANIFEST_FALLBACK",
+      "READ_GENERATION_PIN_OR_OPEN_HANDLE",
+      "SOURCE_PROTECTION",
+      "KAFKA_GROUP_RETENTION",
+      "KAFKA_PRODUCER_RECOVERY",
+      "KAFKA_TRANSACTION_OR_ABORTED_RECOVERY",
+      "KAFKA_REPLICA_OR_LEADER_EPOCH_RECOVERY",
+      "PULSAR_SUBSCRIPTION_OR_REPLICATION_CURSOR",
+      "RECOVERY_CHECKPOINT_OR_SNAPSHOT",
+      "MATERIALIZATION_OR_COMPACTION_TASK",
+      "RETIREMENT_OR_DELETE_RECONCILIATION",
+      "SHARED_PHYSICAL_MEMBER",
+      "PROJECTION_MIGRATION_OR_EXPORT",
+      "AUDIT_GRACE"
+    ]
+  },
+  "guardProtocol": {
+    "supportedAuthorityFamilies": [
+      "M5R1_BINDING_BATCH",
+      "M5PA_PULSAR_AGGREGATE"
+    ],
+    "order": [
+      "READ_EXACT_ENROLLED_OPEN_AUTHORITY",
+      "CAS_DURABLE_TICKET",
+      "REREAD_VISIBLE_EXACT_TICKET",
+      "DISPATCH_EXTERNAL_MUTATION",
+      "REREAD_AUTHORITATIVE_EXTERNAL_RESULT",
+      "CAS_CLEAR_EXACT_TICKET"
+    ],
+    "ticketResponseLoss": "SAME_AUTHORITY_KEY_REREAD",
+    "ambiguousExternalMutation": "KEEP_TICKET_AND_RETAIN_TARGET",
+    "failedTicketClear": "KEEP_OR_TREAT_TICKET_STATE_AS_UNKNOWN_AND_RETAIN_TARGET",
+    "fenceWins": "DO_NOT_DISPATCH_EXTERNAL_MUTATION",
+    "externalAuthorityRootMismatch": "KEEP_TICKET_AND_RETAIN_TARGET",
+    "timeoutOrLocalCompletionClear": "FORBIDDEN"
+  },
+  "closedWriterIntegrationGatePresent": true,
+  "fullRetirementGatePresent": false,
+  "sourceBoundReceiptPresent": false,
+  "physicalDeleteAuthority": false,
+  "scenarioPromotionAuthority": false,
+  "productionAuthority": false
+}

@@ -184,8 +184,24 @@ The distinct Pulsar aggregate implementation slice now passes `v2M5PulsarAggrega
   `M5PR`, with response-loss convergence from that same key and zero multi-key transaction calls; and
 - Object-WAL `M5R1` and Pulsar `M5PA`/`M5PR` remain different codecs and authority cells.
 
-This focused gate deliberately does not implement or certify M5-D cleanup. Complete per-kind writer integration, the
-full M5-C gate and source-bound receipt, M5-D, scenario promotion, and aggregate Final remain outstanding.
+That Pulsar-focused gate deliberately did not implement or certify M5-D cleanup, and it left closed writer
+integration to the next ordered slice.
+
+The closed writer integration slice now passes `v2M5ClosedWriterIntegrationCheck`:
+
+- a canonical source-digest-bound registry assigns exactly one owner to every one of the 10 floor classes and 15
+  reference kinds; missing, duplicate, mixed-capability, unknown, or oversized writer declarations fail before
+  enrollment;
+- the registry root becomes the exact enrollment implementation root in both `M5R1` and `M5PA` authorities;
+- one shared guard exact-reads the enrolled authority, installs and rereads a durable target ticket, and only then
+  dispatches the external mutation for the registered writer;
+- only an exact authoritative terminal result with the ticket-bound external key-set root can clear the ticket;
+  response loss, exceptions, partial/conflicting results, root mismatch, or failed clear retain the target; and
+- exhaustive floor/reference ownership tests, all-reference ticket response-loss tests, ambiguous-retry recovery,
+  fence-first no-dispatch, and both authority families run with no multi-key transaction fallback.
+
+This remains a focused integration contract rather than a source-bound child receipt. M5-C exact-source execution and
+receipt assembly, M5-D, scenario promotion, and aggregate Final remain outstanding.
 
 ## Remaining ordered work
 

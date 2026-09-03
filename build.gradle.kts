@@ -2229,6 +2229,34 @@ tasks.register("v2M5PulsarAggregateAuthorityCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5ClosedWriterIntegrationContractTest") {
+    group = "verification"
+    description = "Test the fail-closed focused M5-C closed-writer integration checker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-closed-writer-integration-tests.py")
+}
+
+tasks.register<Exec>("v2M5ClosedWriterIntegrationSourceCheck") {
+    group = "verification"
+    description = "Validate the exact writer registry and ticket-before-external-mutation guard."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-closed-writer-integration.py")
+}
+
+tasks.register("v2M5ClosedWriterIntegrationCheck") {
+    group = "verification"
+    description = "Run the non-promotable M5-C closed writer integration gate."
+    dependsOn(
+        "v2M5PulsarAggregateAuthorityCheck",
+        "v2M5ClosedWriterIntegrationContractTest",
+        "v2M5ClosedWriterIntegrationSourceCheck",
+        ":nereus-storage-object:v2M5ClosedWriterIntegrationTest",
+        ":nereus-storage-object:checkstyleMain",
+        ":nereus-storage-object:checkstyleTest",
+        ":nereus-storage-object:spotlessCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

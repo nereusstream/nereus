@@ -59,6 +59,11 @@ scenario promotion, physical deletion, or production deployment authority is cre
   permanent exact `DELETED(generation)` selector binding, and the post-cleanup one-key transition to `M5PR`. Its
   `v2M5PulsarAggregateAuthorityCheck` result is also focused and non-promotable: it implements no M5-D cleanup and
   grants no physical-delete, scenario-promotion, or production authority.
+- The [M5-C closed writer integration projection](m5-c-closed-writer-integration-projection.json) fixes the canonical
+  ownership registry for all 10 floor and 15 reference classes and the shared ticket-before-dispatch guard for both
+  authority families. `v2M5ClosedWriterIntegrationCheck` proves missing/duplicate ownership, ticket response loss,
+  ambiguous external outcomes, and fence-first races fail closed. It is still a focused, non-promotable gate rather
+  than the source-bound `RETENTION_METADATA_RETIREMENT` child.
 
 The design result is exactly `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. All 17 scenario rows whose milestone names
 M5 remain `PLANNED` with null receipts. `docs/v2/evidence/v2-m5/`, `v2M5EvidenceExecutionCheck`,

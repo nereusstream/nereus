@@ -67,9 +67,14 @@ import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.Bin
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.BindingRetirementAuthorityV1;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.ReferenceMutationTicketV1;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.ReferenceWriterEnrollmentV1;
+import com.nereusstream.storage.object.retention.M5ClosedWriterRegistryV1.WriterDeclarationV1;
 import com.nereusstream.storage.object.retention.M5LogicalTrimCoordinatorV1.Outcome;
 import com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityRecordsV1.PulsarAggregateAuthorityStateV1;
 import com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityRecordsV1.PulsarAggregateRetirementAuthorityV1;
+import com.nereusstream.storage.object.retention.M5ReferenceMutationGuardV1.ExternalMutationOutcomeV1;
+import com.nereusstream.storage.object.retention.M5ReferenceMutationGuardV1.ExternalMutationResultV1;
+import com.nereusstream.storage.object.retention.M5ReferenceMutationGuardV1.GuardOutcomeV1;
+import com.nereusstream.storage.object.retention.M5ReferenceMutationGuardV1.GuardedMutationRequestV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.BatchMetadataStateV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.FloorClassV1;
@@ -100,6 +105,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -256,6 +262,70 @@ class M5RetentionRetirementV1Test {
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("closed proof inventory");
         }
+    }
+
+    @ParameterizedTest
+    @EnumSource(FloorClassV1.class)
+    void closedWriterRegistryRejectsEveryMissingFloorOwner(FloorClassV1 missing) {
+        assertThatThrownBy(() ->
+                        new M5ClosedWriterRegistryV1(closedWriterDeclarations(Optional.of(missing), Optional.empty())))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @ParameterizedTest
+    @EnumSource(ReferenceKindV1.class)
+    void closedWriterRegistryRejectsEveryMissingReferenceOwner(ReferenceKindV1 missing) {
+        assertThatThrownBy(() ->
+                        new M5ClosedWriterRegistryV1(closedWriterDeclarations(Optional.empty(), Optional.of(missing))))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void closedWriterRegistryRejectsMalformedOrConflictingDeclarations() {
+        List<WriterDeclarationV1> duplicateOwnership =
+                new ArrayList<>(closedWriterDeclarations(Optional.empty(), Optional.empty()));
+        WriterDeclarationV1 last = duplicateOwnership.get(duplicateOwnership.size() - 1);
+        duplicateOwnership.set(
+                duplicateOwnership.size() - 1,
+                new WriterDeclarationV1(
+                        last.writerClass(),
+                        last.capability(),
+                        last.floorClasses(),
+                        List.of(last.referenceKinds().get(0), ReferenceKindV1.MANIFEST_SELECTED),
+                        last.implementationSourceSha256()));
+        assertThatThrownBy(() -> new M5ClosedWriterRegistryV1(duplicateOwnership))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("more than one writer owner");
+
+        List<WriterDeclarationV1> mixedCapability =
+                new ArrayList<>(closedWriterDeclarations(Optional.empty(), Optional.empty()));
+        WriterDeclarationV1 first = mixedCapability.get(0);
+        mixedCapability.set(
+                0,
+                new WriterDeclarationV1(
+                        first.writerClass(),
+                        new CapabilityBinding(8, digest("different-capability")),
+                        first.floorClasses(),
+                        first.referenceKinds(),
+                        first.implementationSourceSha256()));
+        assertThatThrownBy(() -> new M5ClosedWriterRegistryV1(mixedCapability))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("mixed capability");
+
+        List<FloorClassV1> nullFloor = new ArrayList<>(List.of(FloorClassV1.values()));
+        nullFloor.set(0, null);
+        assertThatThrownBy(() -> new WriterDeclarationV1(
+                        "malformed-null-floor", CAPABILITY, nullFloor, List.of(), digest("malformed-null-source")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not unique enum members");
+        assertThatThrownBy(() -> new WriterDeclarationV1(
+                        "x".repeat(M5ClosedWriterRegistryV1.MAX_WRITER_CLASS_BYTES + 1),
+                        CAPABILITY,
+                        List.of(FloorClassV1.BINDING_EPOCH_POLICY),
+                        List.of(),
+                        digest("oversized-writer-source")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exceeds its hard cap");
     }
 
     @ParameterizedTest
@@ -641,6 +711,223 @@ class M5RetentionRetirementV1Test {
         assertThat(tombstone.aggregatePredecessorValueSha256()).isEqualTo(fenced.canonicalStoredSha256());
         assertThat(fixture.metadata.readNow(fixture.selectorKey)).isEqualTo(fixture.exactSelector);
         assertThat(fixture.metadata.transactionCalls).isZero();
+    }
+
+    @ParameterizedTest
+    @EnumSource(ReferenceKindV1.class)
+    void guardedBindingMutationDispatchesOnlyWithVisibleRegisteredTicket(ReferenceKindV1 referenceKind) {
+        RetirementFixture fixture = retirementFixture(false);
+        M5ClosedWriterRegistryV1 registry = closedWriterRegistry();
+        M5BindingRetirementCoordinatorV1 coordinator = new M5BindingRetirementCoordinatorV1(fixture.metadata);
+        coordinator
+                .migrateLegacy(new M5BindingRetirementCoordinatorV1.MigrationRequest(
+                        fixture.selectorKey, fixture.exactSelector))
+                .toCompletableFuture()
+                .join();
+        VersionedValue open = fixture.metadata.readNow(fixture.selectorKey);
+        coordinator
+                .enrollWriters(new M5BindingRetirementCoordinatorV1.EnrollmentRequest(
+                        fixture.selectorKey, open, registry.enrollment()))
+                .toCompletableFuture()
+                .join();
+        M5ReferenceMutationGuardV1 guard = M5ReferenceMutationGuardV1.forBindingBatch(
+                registry, coordinator, fixture.selectorKey, fixture.batch.batchIdSha256());
+        Sha256Digest externalRoot = digest("guarded-binding-root-" + referenceKind);
+        GuardedMutationRequestV1 request = new GuardedMutationRequestV1(
+                registry.writerFor(referenceKind),
+                ReferenceTargetKindV1.RETIREMENT_BATCH,
+                fixture.batch.batchIdSha256(),
+                digest("guarded-binding-operation-" + referenceKind),
+                externalRoot);
+        AtomicInteger dispatched = new AtomicInteger();
+        fixture.metadata.casResponseUnknownAfterApply = true;
+
+        var result = guard.execute(request, () -> {
+                    dispatched.incrementAndGet();
+                    BindingRetirementAuthorityV1 ticketed = M5BindingAuthorityCodecV1.decodeAuthority(
+                            fixture.metadata.readNow(fixture.selectorKey).canonicalStoredBytes());
+                    assertThat(ticketed.referenceMutationTickets())
+                            .singleElement()
+                            .satisfies(
+                                    ticket -> assertThat(ticket.referenceKind()).isEqualTo(referenceKind));
+                    return CompletableFuture.completedFuture(
+                            new ExternalMutationResultV1(ExternalMutationOutcomeV1.APPLIED_EXACT, externalRoot));
+                })
+                .toCompletableFuture()
+                .join();
+
+        assertThat(result.outcome()).isEqualTo(GuardOutcomeV1.MUTATION_APPLIED_AND_TICKET_CLEARED);
+        assertThat(result.externalMutationDispatched()).isTrue();
+        assertThat(dispatched).hasValue(1);
+        assertThat(M5BindingAuthorityCodecV1.decodeAuthority(
+                                fixture.metadata.readNow(fixture.selectorKey).canonicalStoredBytes())
+                        .referenceMutationTickets())
+                .isEmpty();
+    }
+
+    @Test
+    void ambiguousGuardedMutationRetainsTicketAndVetoesFence() {
+        RetirementFixture fixture = retirementFixture(false);
+        M5ClosedWriterRegistryV1 registry = closedWriterRegistry();
+        M5BindingRetirementCoordinatorV1 coordinator = new M5BindingRetirementCoordinatorV1(fixture.metadata);
+        coordinator
+                .migrateLegacy(new M5BindingRetirementCoordinatorV1.MigrationRequest(
+                        fixture.selectorKey, fixture.exactSelector))
+                .toCompletableFuture()
+                .join();
+        VersionedValue open = fixture.metadata.readNow(fixture.selectorKey);
+        coordinator
+                .enrollWriters(new M5BindingRetirementCoordinatorV1.EnrollmentRequest(
+                        fixture.selectorKey, open, registry.enrollment()))
+                .toCompletableFuture()
+                .join();
+        M5ReferenceMutationGuardV1 guard = M5ReferenceMutationGuardV1.forBindingBatch(
+                registry, coordinator, fixture.selectorKey, fixture.batch.batchIdSha256());
+        Sha256Digest externalRoot = digest("ambiguous-external-root");
+        GuardedMutationRequestV1 request = new GuardedMutationRequestV1(
+                registry.writerFor(ReferenceKindV1.RETIREMENT_OR_DELETE_RECONCILIATION),
+                ReferenceTargetKindV1.RETIREMENT_BATCH,
+                fixture.batch.batchIdSha256(),
+                digest("ambiguous-operation"),
+                externalRoot);
+
+        var result = guard.execute(
+                        request,
+                        () -> CompletableFuture.completedFuture(
+                                new ExternalMutationResultV1(ExternalMutationOutcomeV1.RESPONSE_UNKNOWN, externalRoot)))
+                .toCompletableFuture()
+                .join();
+        VersionedValue ticketed = fixture.metadata.readNow(fixture.selectorKey);
+
+        assertThat(result.outcome()).isEqualTo(GuardOutcomeV1.RETAINED_AMBIGUOUS_EXTERNAL_MUTATION);
+        assertThat(M5BindingAuthorityCodecV1.decodeAuthority(ticketed.canonicalStoredBytes())
+                        .referenceMutationTickets())
+                .hasSize(1);
+        assertThat(coordinator
+                        .fence(new M5BindingRetirementCoordinatorV1.FenceRequest(
+                                fixture.selectorKey,
+                                ticketed,
+                                fixture.batch.batchIdSha256(),
+                                digest("ambiguous-veto-fence"),
+                                fixture.releases))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.RETAIN);
+
+        var mismatchedRoot = guard.execute(
+                        request,
+                        () -> CompletableFuture.completedFuture(new ExternalMutationResultV1(
+                                ExternalMutationOutcomeV1.APPLIED_EXACT, digest("mismatched-external-root"))))
+                .toCompletableFuture()
+                .join();
+        assertThat(mismatchedRoot.outcome()).isEqualTo(GuardOutcomeV1.RETAINED_AMBIGUOUS_EXTERNAL_MUTATION);
+        assertThat(M5BindingAuthorityCodecV1.decodeAuthority(
+                                fixture.metadata.readNow(fixture.selectorKey).canonicalStoredBytes())
+                        .referenceMutationTickets())
+                .hasSize(1);
+
+        var recovered = guard.execute(
+                        request,
+                        () -> CompletableFuture.completedFuture(
+                                new ExternalMutationResultV1(ExternalMutationOutcomeV1.EXISTING_EXACT, externalRoot)))
+                .toCompletableFuture()
+                .join();
+        assertThat(recovered.outcome()).isEqualTo(GuardOutcomeV1.MUTATION_APPLIED_AND_TICKET_CLEARED);
+        assertThat(M5BindingAuthorityCodecV1.decodeAuthority(
+                                fixture.metadata.readNow(fixture.selectorKey).canonicalStoredBytes())
+                        .referenceMutationTickets())
+                .isEmpty();
+    }
+
+    @Test
+    void winningFencePreventsGuardedExternalMutationDispatch() {
+        RetirementFixture fixture = retirementFixture(false);
+        M5ClosedWriterRegistryV1 registry = closedWriterRegistry();
+        M5BindingRetirementCoordinatorV1 coordinator = new M5BindingRetirementCoordinatorV1(fixture.metadata);
+        coordinator
+                .migrateLegacy(new M5BindingRetirementCoordinatorV1.MigrationRequest(
+                        fixture.selectorKey, fixture.exactSelector))
+                .toCompletableFuture()
+                .join();
+        VersionedValue open = fixture.metadata.readNow(fixture.selectorKey);
+        coordinator
+                .enrollWriters(new M5BindingRetirementCoordinatorV1.EnrollmentRequest(
+                        fixture.selectorKey, open, registry.enrollment()))
+                .toCompletableFuture()
+                .join();
+        open = fixture.metadata.readNow(fixture.selectorKey);
+        coordinator
+                .fence(new M5BindingRetirementCoordinatorV1.FenceRequest(
+                        fixture.selectorKey,
+                        open,
+                        fixture.batch.batchIdSha256(),
+                        digest("winning-fence-before-guard"),
+                        fixture.releases))
+                .toCompletableFuture()
+                .join();
+        M5ReferenceMutationGuardV1 guard = M5ReferenceMutationGuardV1.forBindingBatch(
+                registry, coordinator, fixture.selectorKey, fixture.batch.batchIdSha256());
+        AtomicInteger dispatched = new AtomicInteger();
+        Sha256Digest externalRoot = digest("blocked-external-root");
+
+        var result = guard.execute(
+                        new GuardedMutationRequestV1(
+                                registry.writerFor(ReferenceKindV1.MANIFEST_SELECTED),
+                                ReferenceTargetKindV1.RETIREMENT_BATCH,
+                                fixture.batch.batchIdSha256(),
+                                digest("blocked-operation"),
+                                externalRoot),
+                        () -> {
+                            dispatched.incrementAndGet();
+                            return CompletableFuture.completedFuture(new ExternalMutationResultV1(
+                                    ExternalMutationOutcomeV1.APPLIED_EXACT, externalRoot));
+                        })
+                .toCompletableFuture()
+                .join();
+
+        assertThat(result.outcome()).isEqualTo(GuardOutcomeV1.RETAINED_BEFORE_EXTERNAL_MUTATION);
+        assertThat(result.externalMutationDispatched()).isFalse();
+        assertThat(dispatched).hasValue(0);
+    }
+
+    @Test
+    void pulsarGuardUsesTheSameClosedWriterTicketProtocol() {
+        PulsarAuthorityFixture fixture = pulsarAuthorityFixture();
+        M5ClosedWriterRegistryV1 registry = closedWriterRegistry();
+        M5PulsarAggregateRetirementCoordinatorV1 coordinator =
+                new M5PulsarAggregateRetirementCoordinatorV1(fixture.metadata);
+        coordinator
+                .migrateLegacy(new M5PulsarAggregateRetirementCoordinatorV1.MigrationRequest(
+                        fixture.aggregateKey, fixture.exactAggregate, CAPABILITY))
+                .toCompletableFuture()
+                .join();
+        VersionedValue open = fixture.metadata.readNow(fixture.aggregateKey);
+        coordinator
+                .enrollWriters(new M5PulsarAggregateRetirementCoordinatorV1.EnrollmentRequest(
+                        fixture.aggregateKey, open, registry.enrollment()))
+                .toCompletableFuture()
+                .join();
+        M5ReferenceMutationGuardV1 guard = M5ReferenceMutationGuardV1.forPulsarAggregate(
+                registry, coordinator, fixture.aggregateKey, fixture.exactAggregate.canonicalStoredSha256());
+        Sha256Digest externalRoot = digest("pulsar-guard-root");
+
+        var result = guard.execute(
+                        new GuardedMutationRequestV1(
+                                registry.writerFor(ReferenceKindV1.PULSAR_SUBSCRIPTION_OR_REPLICATION_CURSOR),
+                                ReferenceTargetKindV1.PULSAR_AGGREGATE,
+                                fixture.exactAggregate.canonicalStoredSha256(),
+                                digest("pulsar-guard-operation"),
+                                externalRoot),
+                        () -> CompletableFuture.completedFuture(
+                                new ExternalMutationResultV1(ExternalMutationOutcomeV1.EXISTING_EXACT, externalRoot)))
+                .toCompletableFuture()
+                .join();
+
+        assertThat(result.outcome()).isEqualTo(GuardOutcomeV1.MUTATION_APPLIED_AND_TICKET_CLEARED);
+        assertThat(M5PulsarAggregateAuthorityCodecV1.decodeAuthority(
+                                fixture.metadata.readNow(fixture.aggregateKey).canonicalStoredBytes())
+                        .referenceMutationTickets())
+                .isEmpty();
     }
 
     @Test
@@ -1643,6 +1930,34 @@ class M5RetentionRetirementV1Test {
                 List.of(FloorClassV1.values()),
                 List.of(ReferenceKindV1.values()),
                 digest("ticket-protocol-writer-enrollment"));
+    }
+
+    private static M5ClosedWriterRegistryV1 closedWriterRegistry() {
+        return new M5ClosedWriterRegistryV1(closedWriterDeclarations(Optional.empty(), Optional.empty()));
+    }
+
+    private static List<WriterDeclarationV1> closedWriterDeclarations(
+            Optional<FloorClassV1> missingFloor, Optional<ReferenceKindV1> missingReference) {
+        List<WriterDeclarationV1> declarations = new ArrayList<>();
+        ReferenceKindV1[] references = ReferenceKindV1.values();
+        FloorClassV1[] floors = FloorClassV1.values();
+        for (int index = 0; index < references.length; index++) {
+            ReferenceKindV1 reference = references[index];
+            Optional<FloorClassV1> floor = index < floors.length ? Optional.of(floors[index]) : Optional.empty();
+            List<ReferenceKindV1> ownedReferences =
+                    missingReference.filter(value -> value == reference).isPresent() ? List.of() : List.of(reference);
+            List<FloorClassV1> ownedFloors = floor.filter(
+                            value -> missingFloor.filter(value::equals).isEmpty())
+                    .map(List::of)
+                    .orElseGet(List::of);
+            declarations.add(new WriterDeclarationV1(
+                    String.format(java.util.Locale.ROOT, "proof-bound-writer-%02d", index),
+                    CAPABILITY,
+                    ownedFloors,
+                    ownedReferences,
+                    digest("writer-source-" + index)));
+        }
+        return declarations;
     }
 
     private static CanonicalBytes bytes(String value) {

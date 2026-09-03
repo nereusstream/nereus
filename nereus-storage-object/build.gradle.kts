@@ -224,6 +224,31 @@ tasks.register<Test>("v2M5BindingAuthorityTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("v2M5ClosedWriterIntegrationTest") {
+    group = "verification"
+    description = "Run the closed writer registry and ticket-guard integration matrix for both M5-C authorities."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        listOf(
+            "closedWriterRegistryRejectsEveryMissingFloorOwner",
+            "closedWriterRegistryRejectsEveryMissingReferenceOwner",
+            "closedWriterRegistryRejectsMalformedOrConflictingDeclarations",
+            "guardedBindingMutationDispatchesOnlyWithVisibleRegisteredTicket",
+            "ambiguousGuardedMutationRetainsTicketAndVetoesFence",
+            "winningFencePreventsGuardedExternalMutationDispatch",
+            "pulsarGuardUsesTheSameClosedWriterTicketProtocol",
+        ).forEach { method ->
+            includeTestsMatching(
+                "com.nereusstream.storage.object.retention.M5RetentionRetirementV1Test.$method",
+            )
+        }
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
