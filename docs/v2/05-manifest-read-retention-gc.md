@@ -174,10 +174,13 @@ byte identity with the pre-compaction generation is neither required nor claimed
 Planner input is a frozen manifest/source root. A local metadata snapshot may schedule work but final publication
 revalidates durable authority. A newer generation or policy invalidates stale work before activation.
 
-The accepted [M5 detailed-design index](detailed_design/m5/README.md) freezes the complete implementation boundary:
+The accepted [M5 detailed-design index](detailed_design/m5/README.md) freezes the complete implementation boundary,
+with the later [single-Binding retirement authority amendment](detailed_design/m5/m5-c-single-binding-retirement-authority-amendment.md)
+replacing only the unavailable multi-key externalization mechanism:
 M5-A selects deterministic `REFERENCE_REUSE`, `INDEX_ONLY_GENERATION`, or `REWRITE_GENERATION`; M5-B owns the Kafka
-semantic rewrite and every rebuilt index; M5-C owns typed retention, reference-free proof, inline-batch
-externalization, both permanent metadata-retirement families, and admission; M5-D alone owns conditional physical
+semantic rewrite and every rebuilt index; M5-C owns typed retention, reference-free proof, the selector-key
+single-Binding authority envelope with ticket/fence serialization and exact single-key CAS, both permanent
+metadata-retirement families, and admission; M5-D alone owns conditional physical
 delete/orphan/GC; and M5-E owns current-source evidence and scenario boundaries. This is design-only authority with
 result `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`; no M5 runtime, evidence, scenario PASS, or deletion exists at this
 cut.

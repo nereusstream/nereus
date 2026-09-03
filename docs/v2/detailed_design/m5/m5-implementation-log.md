@@ -100,11 +100,11 @@ KafkaSemanticCompactorV1Test: 8 tests, 0 failures, 0 errors, 0 skipped
 This focused result is not the future `KAFKA_COMPACTION_INDEX_REBUILD` child receipt. It does not promote
 `V2-KAF-DATA-012/013/022`, close fallback, release M4 protection, retire metadata, or authorize physical deletion.
 
-## M5-C retention core and metadata capability boundary
+## M5-C retention core, rejected capability path, and accepted amendment
 
-Status: retention/proof/admission core implemented at a focused, non-promotable gate; the complete M5-C retirement
-transition is blocked because the source-locked Oxia Java 0.9.4 client exposes single-key operations but no atomic
-conditional multi-key transaction primitive required by the accepted design.
+Status: retention/proof/admission core implemented at a focused, non-promotable gate. The original multi-key
+retirement path remains rejected evidence. ADR 0146 and the accepted single-Binding authority amendment now authorize
+an exact single-key CAS implementation, but that implementation is not yet complete.
 
 Direct source revalidation distinguishes Oxia's internal write batching from the required transaction. At client
 commit `091a42c2780d92da56e9ec1f02ce1c3d988adc16`, `AsyncOxiaClient` exposes only individual key operations and
@@ -148,15 +148,18 @@ Oxia09ExactMetadataTransactionStoreV1Test: 2 tests, 0 failures, 0 errors, 0 skip
 ```
 
 This result deliberately does not create the reserved `v2M5RetentionRetirementCheck`, does not declare M5-C
-implementation-complete, and is not a child receipt. Until an accepted design amendment or a source-locked backend
-primitive supplies the required atomic transition, inline externalization and both permanent retirement families
-return `UNSUPPORTED` on the selected Oxia adapter. Logical trim and admission remain metadata-only; no M4 release,
-physical deletion, scenario promotion, staging certification, or production authority is granted.
+implementation-complete, and is not a child receipt. The accepted
+[ADR 0146](../../../decisions/0146-v2-m5-single-binding-retirement-authority-amendment.md) and
+[M5-C amendment](m5-c-single-binding-retirement-authority-amendment.md) preserve this failed path as a counterexample
+and replace it with one Binding-scoped selector authority cell, durable reference-mutation tickets, a target scan
+fence, and one exact Oxia single-key retirement CAS. Until that new path and its gate are implemented, both permanent
+retirement families remain non-promotable. Logical trim and admission remain metadata-only; no M4 release, physical
+deletion, scenario promotion, staging certification, or production authority is granted.
 
 ## Remaining ordered work
 
-1. Resolve the accepted-design/source-locked-Oxia atomic multi-key transaction mismatch, then complete and gate the
-   real M5-C permanent metadata retirement transition.
+1. Implement and gate the accepted single-Binding authority envelope, ticket/fence protocol, M4 selector projection,
+   and exact Oxia single-key permanent metadata retirement transition.
 2. M5-D conditional physical delete, orphan reconciliation, and BookKeeper/Pulsar cleanup.
 3. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
    `v2M5Check`.

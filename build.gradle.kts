@@ -2053,6 +2053,31 @@ tasks.register("v2M5DesignCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5DesignAmendmentContractTest") {
+    group = "verification"
+    description = "Run fail-closed contract tests for the accepted M5-C single-Binding authority amendment."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-design-amendment-tests.py")
+}
+
+tasks.register<Exec>("v2M5DesignAmendmentSourceCheck") {
+    group = "verification"
+    description = "Validate the additive M5-C authority amendment and its immutable base freeze."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-design-amendment.py")
+}
+
+tasks.register("v2M5DesignAmendmentCheck") {
+    group = "verification"
+    description = "Accept the M5-C single-Binding authority design without runtime or evidence promotion."
+    dependsOn(
+        "v2DocumentationCheck",
+        "v2M5HistoricalM4DependencyCheck",
+        "v2M5DesignAmendmentContractTest",
+        "v2M5DesignAmendmentSourceCheck",
+    )
+}
+
 tasks.register<Exec>("v2M5MaterializationContractTest") {
     group = "verification"
     description = "Test the fail-closed non-promotable M5-A implementation checker."

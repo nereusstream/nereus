@@ -152,6 +152,10 @@ performance-first BookKeeper WAL.
   dispositions, the complete eight-index rebuild, semantic/suppression roots, Cell admission, and final freshness
   fencing pass `v2M5KafkaCompactionCheck`. Both are focused implementation results only: M5-C/D, all five source-bound
   children, the M5 Final, every M5 scenario promotion, and physical deletion remain outstanding.
+- [ADR 0146](../decisions/0146-v2-m5-single-binding-retirement-authority-amendment.md) and the accepted
+  [M5-C amendment](detailed_design/m5/m5-c-single-binding-retirement-authority-amendment.md) preserve the failed
+  multi-key Oxia path as rejected evidence and select a single-Binding retirement authority, durable ticket/fence
+  serialization, and exact single-key CAS. This authorizes implementation only; M5-C is not yet complete.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and formal-runner contracts. It did not by itself select a mode or
   promote a scenario; the later e5 Final closes those evidence obligations with `RANGE_64`. It still does not activate
@@ -432,6 +436,7 @@ Accepted decisions:
 - [ADR 0143: M3 V5 frozen-target delivery amendment](../decisions/0143-v2-m3-allocator-v5-frozen-target-delivery-amendment.md)
 - [ADR 0144: M3 V5 frozen-target diagnostic inventory amendment](../decisions/0144-v2-m3-allocator-v5-frozen-target-diagnostic-inventory-amendment.md)
 - [ADR 0145: M3 V5 population-construction budget alignment amendment](../decisions/0145-v2-m3-allocator-v5-population-construction-budget-alignment-amendment.md)
+- [ADR 0146: M5 single-Binding retirement authority amendment](../decisions/0146-v2-m5-single-binding-retirement-authority-amendment.md)
 
 ## Open design gates
 

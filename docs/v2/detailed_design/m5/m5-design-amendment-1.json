@@ -1,0 +1,18 @@
+{
+  "schema": "NEREUS_V2_M5_DESIGN_AMENDMENT_V1",
+  "result": "DESIGN_AMENDMENT_ACCEPTED_IMPLEMENTATION_IN_PROGRESS",
+  "amendmentId": "M5-C-SINGLE_BINDING_RETIREMENT_AUTHORITY",
+  "authorizedDate": "2026-09-03",
+  "baseDesignCommit": "c86fde3ed6f4319642987fd599022bd32e2cca5e",
+  "baseFreezeManifestSha256": "1b510471a49876ae047420ebd4e4196381ee47e69ef0756ef950d68c6e78c5f3",
+  "documents": [
+    {
+      "path": "docs/decisions/0146-v2-m5-single-binding-retirement-authority-amendment.md",
+      "sha256": "c53c6da30b4b92627a60aa94b17ec1400d146e2bcf9c95666f1d5824c6fa1d1b"
+    },
+    {
+      "path": "docs/v2/detailed_design/m5/m5-c-single-binding-retirement-authority-amendment.md",
+      "sha256": "23fa416d8691f3271d3a0ba2d24869e0b52959942c418e86d79f8f5418582834"
+    }
+  ]
+}

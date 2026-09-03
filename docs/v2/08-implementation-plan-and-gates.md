@@ -56,7 +56,7 @@ it does not weaken or replace current-source `v2M4Check`.
 | --- | --- |
 | Frozen predecessor | M4 Final at tested source `595c8b34779d1e88187eb0084bf18e65ab2dd742`, SHA-256 `31235c738400c71252e1c1c923aabda6f66545767b01c20962c0a881303e1b07` |
 | Design phases | I0; A materialization/publication; B Kafka compaction/indexes; C retention/reference-free/metadata retirement; D physical delete/orphan/GC; E evidence/freeze |
-| Mutable read authority | existing exact `BindingReadSelector` CAS; no second current-manifest pointer |
+| Mutable read authority | existing selector key upgraded to the single-Binding retirement authority; deterministic M4 selector projection; no second pointer or batch key |
 | Materialization modes | `REFERENCE_REUSE`, `INDEX_ONLY_GENERATION`, `REWRITE_GENERATION` |
 | Release boundary | exact M4 protection key/generation/value in `RELEASED`; no inferred substitute |
 | Metadata retirement families | Object-WAL batch `FULL_V1 -> RETIRED_V1`; Pulsar full aggregate to permanent incarnation tombstone after physical cleanup |
@@ -64,6 +64,7 @@ it does not weaken or replace current-source `v2M4Check`.
 | M6-deferred shared rows | `V2-KAF-DATA-012/013/022`, still `PLANNED` |
 | Open gate | `V2-OPEN-READ-15` remains active for optional tombstone deletion; 0.2 permanent tombstones are frozen |
 | Design result | `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED` |
+| Accepted amendment | ADR 0146 plus `m5-design-amendment-1.json`: durable ticket/fence serialization and exact single-key CAS; implementation still incomplete |
 | Exclusions | runtime implementation, M5 evidence/Final, physical deletion, M6/M7/M8, tombstone deletion, allocator-orphan GC, production authority |
 
 Implementation must proceed A, B, C, D, then current-source evidence. The detailed design freezes semantic state,
@@ -71,7 +72,10 @@ identity, ordering, veto, module, and ownership rules; exact codec offsets/caps,
 capability, and performance thresholds remain later implementation/evidence selections inside that envelope.
 
 The current [M5 implementation log](detailed_design/m5/m5-implementation-log.md) records the M5-A and M5-B descendants
-without changing the immutable freeze. `v2M5MaterializationCheck` and `v2M5KafkaCompactionCheck` are deliberately
+without changing the immutable freeze. The additive
+[single-Binding retirement authority amendment](detailed_design/m5/m5-c-single-binding-retirement-authority-amendment.md)
+is accepted and source-bound separately; it grants no M5-C PASS before its runtime and exact Oxia evidence exist.
+`v2M5MaterializationCheck` and `v2M5KafkaCompactionCheck` are deliberately
 non-promotable: they prove production source shape and focused deterministic tests, but neither is a future
 real-boundary child receipt or the M5 Final.
 

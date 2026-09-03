@@ -29,11 +29,17 @@ scenario promotion, physical deletion, or production deployment authority is cre
 - [M5-C retention, reference-free proof, and metadata retirement](m5-c-retention-reference-free-and-metadata-retirement.md)
   freezes logical trim, the complete veto inventory, inline-batch externalization, irreversible batch compaction,
   Pulsar aggregate retirement, and permanent tombstone admission.
+- The accepted [M5-C single-Binding retirement authority amendment](m5-c-single-binding-retirement-authority-amendment.md)
+  and [ADR 0146](../../../decisions/0146-v2-m5-single-binding-retirement-authority-amendment.md) replace only the
+  unavailable multi-key externalization mechanism with one existing authority key, ticket/fence serialization, and
+  exact Oxia single-key CAS. The original freeze remains the immutable base.
 - [M5-D physical delete, orphan, and GC](m5-d-physical-delete-orphan-and-gc.md) freezes exact M4 `RELEASED`
   consumption, final revalidation, Object/BookKeeper deletion protocols, orphan taxonomy, and per-Cell isolation.
 - [M5-E evidence ownership and freeze](m5-e-evidence-ownership-and-freeze.md) freezes child ownership, scenario
   promotion boundaries, exact-source rules, future gate hierarchy, and exclusions.
 - The governance-only [freeze manifest](m5-design-freeze.json) binds I0 and A through E by exact SHA-256.
+- The additive [amendment manifest](m5-design-amendment-1.json) binds the immutable base manifest, ADR 0146, and the
+  exact amendment bytes without rewriting the original I0/A-E records.
 - The later [implementation log](m5-implementation-log.md) tracks ordered implementation descendants without
   changing the frozen I0/A-E bytes or promoting focused results.
 - The implementation-selected [M5-A wire projection](m5-a-wire-projection.json) fixes the version-1 physical codes,
@@ -42,7 +48,8 @@ scenario promotion, physical deletion, or production deployment authority is cre
   caps, seven disposition codes, complete eight-index set, gap lookup, fallback suppression, and publication rule.
 - The implementation-selected [M5-C capability projection](m5-c-capability-projection.json) records the closed
   reference/admission inventories and the source-locked Oxia adapter's fail-closed lack of the required atomic
-  multi-key transaction; it is not the future M5-C retirement gate.
+  multi-key transaction. It is preserved rejected evidence for the pre-amendment design and is not the future M5-C
+  retirement gate.
 
 The design result is exactly `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. All 17 scenario rows whose milestone names
 M5 remain `PLANNED` with null receipts. `docs/v2/evidence/v2-m5/`, `v2M5EvidenceExecutionCheck`,
