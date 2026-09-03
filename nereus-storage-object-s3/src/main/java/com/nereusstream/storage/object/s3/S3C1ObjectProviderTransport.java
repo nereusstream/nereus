@@ -20,6 +20,7 @@ import com.nereusstream.storage.object.provider.ObjectProviderCapabilities;
 import com.nereusstream.storage.object.provider.ObjectProviderTransport;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,12 +37,15 @@ import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.BucketVersioningStatus;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetBucketVersioningRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListMultipartUploadsRequest;
+import software.amazon.awssdk.services.s3.model.ListMultipartUploadsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -54,13 +58,17 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
     public static final int EVIDENCED_MAXIMUM_RANGE_BYTES = 64 * 1024 * 1024;
     public static final int DEFAULT_MAXIMUM_LIST_PAGE_KEYS = 1_000;
     public static final int MAXIMUM_DELETE_VERSION_TOKEN_BYTES = 1_024;
+    public static final int MAXIMUM_MULTIPART_UPLOAD_ID_BYTES = 2_048;
+    public static final int MAXIMUM_MULTIPART_CONTINUATION_TOKEN_BYTES = 4_096;
     public static final String ADAPTER_VERSION = "nereus-s3-c1-v1/aws-sdk-s3-2.47.5";
+    private static final byte[] MULTIPART_TOKEN_MAGIC = "M5MP1".getBytes(StandardCharsets.US_ASCII);
 
     private final S3Client client;
     private final String bucket;
     private final boolean closeClient;
     private final ObjectProviderCapabilities capabilities;
     private final boolean versionMatchDeleteAdmitted;
+    private final boolean multipartCleanupAdmitted;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public S3C1ObjectProviderTransport(
@@ -69,7 +77,7 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
             String exactProviderIdentity,
             boolean closeClient,
             int maximumListPageKeys) {
-        this(client, bucket, exactProviderIdentity, closeClient, maximumListPageKeys, false);
+        this(client, bucket, exactProviderIdentity, closeClient, maximumListPageKeys, false, false);
     }
 
     private S3C1ObjectProviderTransport(
@@ -78,11 +86,13 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
             String exactProviderIdentity,
             boolean closeClient,
             int maximumListPageKeys,
-            boolean versionMatchDeleteAdmitted) {
+            boolean versionMatchDeleteAdmitted,
+            boolean multipartCleanupAdmitted) {
         this.client = Objects.requireNonNull(client, "client");
         this.bucket = requireNonBlank(bucket, "bucket");
         this.closeClient = closeClient;
         this.versionMatchDeleteAdmitted = versionMatchDeleteAdmitted;
+        this.multipartCleanupAdmitted = multipartCleanupAdmitted;
         if (maximumListPageKeys <= 0 || maximumListPageKeys > DEFAULT_MAXIMUM_LIST_PAGE_KEYS) {
             throw new IllegalArgumentException("maximumListPageKeys must be in [1,1000]");
         }
@@ -120,7 +130,36 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
             throw mapped("bucket-versioning admission", failure);
         }
         return new S3C1ObjectProviderTransport(
-                client, canonicalBucket, exactProviderIdentity, closeClient, maximumListPageKeys, true);
+                client, canonicalBucket, exactProviderIdentity, closeClient, maximumListPageKeys, true, false);
+    }
+
+    /** Admits exact upload-id abort only after an exact live multipart LIST succeeds against the selected bucket. */
+    public static S3C1ObjectProviderTransport admitMultipartCleanupV1(
+            S3Client client, String bucket, String exactProviderIdentity, boolean closeClient, int maximumListPageKeys)
+            throws IOException {
+        Objects.requireNonNull(client, "client");
+        String canonicalBucket = requireNonBlank(bucket, "bucket");
+        requireNonBlank(exactProviderIdentity, "exactProviderIdentity");
+        if (maximumListPageKeys <= 0 || maximumListPageKeys > DEFAULT_MAXIMUM_LIST_PAGE_KEYS) {
+            throw new IllegalArgumentException("maximumListPageKeys must be in [1,1000]");
+        }
+        try {
+            ListMultipartUploadsResponse response = client.listMultipartUploads(ListMultipartUploadsRequest.builder()
+                    .bucket(canonicalBucket)
+                    .maxUploads(1)
+                    .build());
+            if (response == null || response.uploads() == null) {
+                throw new S3C1ProviderException(
+                        S3C1ProviderException.Kind.INTEGRITY,
+                        "EXACT_UPLOAD_ID_ABORT_V1 admission returned no multipart inventory");
+            }
+        } catch (S3C1ProviderException failure) {
+            throw failure;
+        } catch (Throwable failure) {
+            throw mapped("multipart cleanup admission", failure);
+        }
+        return new S3C1ObjectProviderTransport(
+                client, canonicalBucket, exactProviderIdentity, closeClient, maximumListPageKeys, false, true);
     }
 
     @Override
@@ -139,6 +178,21 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
                         true,
                         MAXIMUM_DELETE_VERSION_TOKEN_BYTES)
                 : ObjectDeleteCapabilities.unsupported(capabilities.providerIdentity());
+    }
+
+    @Override
+    public MultipartCleanupCapabilities multipartCleanupCapabilities() {
+        return multipartCleanupAdmitted
+                ? new MultipartCleanupCapabilities(
+                        capabilities.providerIdentity(),
+                        "EXACT_UPLOAD_ID_ABORT_V1",
+                        true,
+                        true,
+                        true,
+                        MAXIMUM_MULTIPART_UPLOAD_ID_BYTES,
+                        MAXIMUM_MULTIPART_CONTINUATION_TOKEN_BYTES,
+                        capabilities.maximumListPageKeys())
+                : MultipartCleanupCapabilities.unsupported(capabilities.providerIdentity());
     }
 
     @Override
@@ -300,6 +354,74 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
     }
 
     @Override
+    public MultipartListPage listMultipartUploads(
+            String prefix, Optional<CanonicalBytes> continuationToken, int maximumUploads) throws IOException {
+        requireOpen();
+        validateKey(prefix);
+        Objects.requireNonNull(continuationToken, "continuationToken");
+        if (!multipartCleanupAdmitted) {
+            throw new S3C1ProviderException(
+                    S3C1ProviderException.Kind.UNSUPPORTED_OPERATION, "multipart cleanup is not admitted");
+        }
+        if (maximumUploads <= 0 || maximumUploads > capabilities.maximumListPageKeys()) {
+            throw new IllegalArgumentException("maximumUploads exceeds the admitted page cap");
+        }
+        ListMultipartUploadsRequest.Builder request = ListMultipartUploadsRequest.builder()
+                .bucket(bucket)
+                .prefix(prefix)
+                .maxUploads(maximumUploads);
+        continuationToken.ifPresent(token -> {
+            MultipartMarkers markers = decodeMultipartContinuation(token);
+            markers.keyMarker().ifPresent(request::keyMarker);
+            markers.uploadIdMarker().ifPresent(request::uploadIdMarker);
+        });
+        ListMultipartUploadsResponse response;
+        try {
+            response = client.listMultipartUploads(request.build());
+        } catch (Throwable failure) {
+            throw mapped("multipart LIST", failure);
+        }
+        List<MultipartUploadIdentity> uploads =
+                new ArrayList<>(response.uploads().size());
+        response.uploads()
+                .forEach(upload -> uploads.add(new MultipartUploadIdentity(
+                        requireNonBlank(upload.key(), "multipart key"),
+                        canonicalMultipartUploadId(upload.uploadId()))));
+        Optional<CanonicalBytes> next;
+        if (response.isTruncated()) {
+            next = Optional.of(encodeMultipartContinuation(
+                    optionalMarker(response.nextKeyMarker()), optionalMarker(response.nextUploadIdMarker())));
+        } else {
+            next = Optional.empty();
+        }
+        return new MultipartListPage(uploads, next);
+    }
+
+    @Override
+    public ExactMultipartAbortResult abortMultipartUploadExact(String key, CanonicalBytes exactUploadId)
+            throws IOException {
+        requireOpen();
+        validateKey(key);
+        Objects.requireNonNull(exactUploadId, "exactUploadId");
+        if (!multipartCleanupAdmitted) {
+            return ExactMultipartAbortResult.UNSUPPORTED;
+        }
+        String uploadId = decodeMultipartUploadId(exactUploadId);
+        try {
+            client.abortMultipartUpload(AbortMultipartUploadRequest.builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .uploadId(uploadId)
+                    .build());
+            return ExactMultipartAbortResult.ABORT_ACCEPTED;
+        } catch (S3Exception failure) {
+            return classifyMultipartAbortFailure(failure);
+        } catch (SdkClientException | CancellationException failure) {
+            return ExactMultipartAbortResult.RESPONSE_UNKNOWN;
+        }
+    }
+
+    @Override
     public FailureKind classifyFailure(IOException failure) {
         if (!(failure instanceof S3C1ProviderException typed)) {
             return FailureKind.FATAL;
@@ -341,6 +463,108 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
 
     private static String decodeOpaqueToken(CanonicalBytes token) {
         return decodeUtf8(token, "continuation token");
+    }
+
+    private static CanonicalBytes canonicalMultipartUploadId(String uploadId) {
+        String canonical = requireNonBlank(uploadId, "multipart upload id");
+        CanonicalBytes encoded = CanonicalBytes.copyOf(canonical.getBytes(StandardCharsets.UTF_8));
+        if (encoded.length() > MAXIMUM_MULTIPART_UPLOAD_ID_BYTES
+                || !canonical.equals(new String(encoded.toByteArray(), StandardCharsets.UTF_8))) {
+            throw new IllegalArgumentException("multipart upload id is malformed or oversized");
+        }
+        return encoded;
+    }
+
+    private static String decodeMultipartUploadId(CanonicalBytes token) {
+        if (token.length() > MAXIMUM_MULTIPART_UPLOAD_ID_BYTES) {
+            throw new IllegalArgumentException("multipart upload id is oversized");
+        }
+        return decodeUtf8(token, "multipart upload id");
+    }
+
+    private static CanonicalBytes encodeMultipartContinuation(
+            Optional<String> keyMarker, Optional<String> uploadIdMarker) {
+        Objects.requireNonNull(keyMarker, "keyMarker");
+        Objects.requireNonNull(uploadIdMarker, "uploadIdMarker");
+        if (keyMarker.isEmpty() && uploadIdMarker.isEmpty()) {
+            throw new IllegalArgumentException("truncated multipart LIST returned no continuation markers");
+        }
+        byte[] key = keyMarker
+                .map(value -> canonicalMarkerBytes(value, "key marker"))
+                .orElseGet(() -> new byte[0]);
+        byte[] upload = uploadIdMarker
+                .map(value -> canonicalMarkerBytes(value, "upload-id marker"))
+                .orElseGet(() -> new byte[0]);
+        if (key.length > 1_024 || upload.length > MAXIMUM_MULTIPART_UPLOAD_ID_BYTES) {
+            throw new IllegalArgumentException("multipart continuation marker exceeds its component hard cap");
+        }
+        int length = Math.addExact(MULTIPART_TOKEN_MAGIC.length + Integer.BYTES * 2, key.length + upload.length);
+        if (length > MAXIMUM_MULTIPART_CONTINUATION_TOKEN_BYTES) {
+            throw new IllegalArgumentException("multipart continuation markers exceed the hard cap");
+        }
+        ByteBuffer target = ByteBuffer.allocate(length);
+        target.put(MULTIPART_TOKEN_MAGIC)
+                .putInt(key.length)
+                .put(key)
+                .putInt(upload.length)
+                .put(upload);
+        return CanonicalBytes.copyOf(target.array());
+    }
+
+    private static MultipartMarkers decodeMultipartContinuation(CanonicalBytes token) {
+        Objects.requireNonNull(token, "token");
+        if (token.isEmpty() || token.length() > MAXIMUM_MULTIPART_CONTINUATION_TOKEN_BYTES) {
+            throw new IllegalArgumentException("multipart continuation token is empty or oversized");
+        }
+        try {
+            ByteBuffer source = ByteBuffer.wrap(token.toByteArray());
+            byte[] magic = new byte[MULTIPART_TOKEN_MAGIC.length];
+            source.get(magic);
+            if (!Arrays.equals(magic, MULTIPART_TOKEN_MAGIC)) {
+                throw new IllegalArgumentException("multipart continuation token has the wrong domain");
+            }
+            int keyLength = source.getInt();
+            if (keyLength < 0 || keyLength > source.remaining() - Integer.BYTES) {
+                throw new IllegalArgumentException("multipart continuation key marker length is invalid");
+            }
+            byte[] key = new byte[keyLength];
+            source.get(key);
+            int uploadLength = source.getInt();
+            if (uploadLength < 0 || uploadLength != source.remaining()) {
+                throw new IllegalArgumentException("multipart continuation upload marker length is invalid");
+            }
+            byte[] upload = new byte[uploadLength];
+            source.get(upload);
+            String keyMarker = new String(key, StandardCharsets.UTF_8);
+            String uploadMarker = new String(upload, StandardCharsets.UTF_8);
+            if (!Arrays.equals(key, keyMarker.getBytes(StandardCharsets.UTF_8))
+                    || !Arrays.equals(upload, uploadMarker.getBytes(StandardCharsets.UTF_8))) {
+                throw new IllegalArgumentException("multipart continuation markers are not canonical UTF-8");
+            }
+            Optional<String> optionalKey = keyLength == 0 ? Optional.empty() : Optional.of(keyMarker);
+            Optional<String> optionalUpload = uploadLength == 0 ? Optional.empty() : Optional.of(uploadMarker);
+            MultipartMarkers markers = new MultipartMarkers(optionalKey, optionalUpload);
+            if (!encodeMultipartContinuation(optionalKey, optionalUpload).equals(token)) {
+                throw new IllegalArgumentException("multipart continuation token is not canonical");
+            }
+            return markers;
+        } catch (java.nio.BufferUnderflowException failure) {
+            throw new IllegalArgumentException("multipart continuation token is truncated", failure);
+        }
+    }
+
+    private static Optional<String> optionalMarker(String marker) {
+        return marker == null || marker.isEmpty() ? Optional.empty() : Optional.of(marker);
+    }
+
+    private static byte[] canonicalMarkerBytes(String marker, String label) {
+        byte[] encoded = marker.getBytes(StandardCharsets.UTF_8);
+        if (marker.isBlank()
+                || marker.indexOf('\0') >= 0
+                || !marker.equals(new String(encoded, StandardCharsets.UTF_8))) {
+            throw new IllegalArgumentException(label + " is not canonical non-empty UTF-8");
+        }
+        return encoded;
     }
 
     private static String decodeUtf8(CanonicalBytes bytes, String label) {
@@ -389,6 +613,26 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
             return ConditionalDeleteResult.DEFINITIVE_CONFLICT;
         }
         throw mapped("conditional DELETE", failure);
+    }
+
+    static ExactMultipartAbortResult classifyMultipartAbortFailure(S3Exception failure) throws IOException {
+        int status = failure.statusCode();
+        String code = failure.awsErrorDetails() == null
+                ? null
+                : failure.awsErrorDetails().errorCode();
+        if (status == 404 && "NoSuchUpload".equals(code)) {
+            return ExactMultipartAbortResult.DEFINITIVELY_NOT_FOUND;
+        }
+        if (status == 429) {
+            return ExactMultipartAbortResult.RETRYABLE;
+        }
+        if (status == 408 || status == 409 || status >= 500) {
+            return ExactMultipartAbortResult.RESPONSE_UNKNOWN;
+        }
+        if (status >= 400 && status < 500) {
+            return ExactMultipartAbortResult.DEFINITIVE_CONFLICT;
+        }
+        throw mapped("exact multipart abort", failure);
     }
 
     static IOException mapped(String operation, Throwable failure) {
@@ -489,6 +733,16 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
                 throw new IllegalArgumentException("invalid Content-Range values");
             }
             return new ParsedContentRange(start, endExclusive, total);
+        }
+    }
+
+    private record MultipartMarkers(Optional<String> keyMarker, Optional<String> uploadIdMarker) {
+        private MultipartMarkers {
+            keyMarker = Objects.requireNonNull(keyMarker, "keyMarker");
+            uploadIdMarker = Objects.requireNonNull(uploadIdMarker, "uploadIdMarker");
+            if (keyMarker.isEmpty() && uploadIdMarker.isEmpty()) {
+                throw new IllegalArgumentException("multipart continuation markers are both empty");
+            }
         }
     }
 }

@@ -79,6 +79,20 @@ class S3C1ObjectProviderTest {
     }
 
     @Test
+    void exactMultipartAbortClassifiesEveryClosedProviderOutcome() throws Exception {
+        assertThat(S3C1ObjectProviderTransport.classifyMultipartAbortFailure(s3Failure(404, "NoSuchUpload")))
+                .isEqualTo(ObjectProviderTransport.ExactMultipartAbortResult.DEFINITIVELY_NOT_FOUND);
+        assertThat(S3C1ObjectProviderTransport.classifyMultipartAbortFailure(s3Failure(429, "SlowDown")))
+                .isEqualTo(ObjectProviderTransport.ExactMultipartAbortResult.RETRYABLE);
+        for (int status : new int[] {408, 409, 500, 503}) {
+            assertThat(S3C1ObjectProviderTransport.classifyMultipartAbortFailure(s3Failure(status, "Injected")))
+                    .isEqualTo(ObjectProviderTransport.ExactMultipartAbortResult.RESPONSE_UNKNOWN);
+        }
+        assertThat(S3C1ObjectProviderTransport.classifyMultipartAbortFailure(s3Failure(403, "AccessDenied")))
+                .isEqualTo(ObjectProviderTransport.ExactMultipartAbortResult.DEFINITIVE_CONFLICT);
+    }
+
+    @Test
     void coreC1SessionResolvesFourTerminalOutcomesWithoutHead() throws Exception {
         FakeTransport transport = new FakeTransport();
         try (C1ObjectProviderSession provider = provider(transport)) {

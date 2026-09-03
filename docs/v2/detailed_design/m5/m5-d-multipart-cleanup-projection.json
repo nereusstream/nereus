@@ -1,0 +1,53 @@
+{
+  "schema": "NEREUS_V2_M5_D_MULTIPART_CLEANUP_PROJECTION_V1",
+  "status": "EXACT_OWNED_MULTIPART_CLEANUP_IMPLEMENTED_NON_PROMOTABLE",
+  "implementationAncestor": "40b0006bf41682534ef33a2da01fb4cfd798c34b",
+  "exactBindings": [
+    "cell_provider_scope_and_exclusive_namespace",
+    "provider_identity_and_exact_upload_id_abort_capability",
+    "persisted_owned_inventory_root",
+    "exact_object_key_and_upload_id",
+    "complete_bounded_exact_key_listing",
+    "key_marker_and_upload_id_marker_continuation",
+    "complete_relist_after_every_abort_result"
+  ],
+  "typedReconciliation": [
+    "AUTHORITATIVELY_ABSENT",
+    "EXACT_OWNED_RESIDUE_REMAINS",
+    "DIFFERENT_OR_FOREIGN_IDENTITY",
+    "OUTCOME_UNKNOWN"
+  ],
+  "provider": {
+    "adapter": "nereus-s3-c1-v1/aws-sdk-s3-2.47.5",
+    "productIdentity": "minio/RELEASE.2025-09-07T16-13-09Z",
+    "imageReference": "quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+    "imageConfigDigest": "sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253",
+    "platform": "linux/arm64",
+    "mechanism": "EXACT_UPLOAD_ID_ABORT_V1",
+    "maximumUploadIdBytes": 2048,
+    "maximumContinuationTokenBytes": 4096,
+    "maximumListPageUploads": 1000,
+    "directoryPrefixListingAdmitted": false,
+    "exactObjectKeyListingAdmitted": true
+  },
+  "responseUnknownAdvancesWithoutEmptyRelist": false,
+  "foreignSameKeyUploadCanBeAborted": false,
+  "emptyOwnedInventoryAdmitted": false,
+  "focusedTests": {
+    "unitClass": "com.nereusstream.storage.object.provider.M5MultipartCleanupSessionV1Test",
+    "unitTests": 7,
+    "realClass": "com.nereusstream.storage.object.s3.M5MinioMultipartCleanupTest",
+    "realTests": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "externalMutationAdapterPresent": true,
+  "intentMutationApiPresent": false,
+  "dispatchAuthority": false,
+  "fullM5DGatePresent": false,
+  "sourceBoundReceiptPresent": false,
+  "physicalDeleteAuthority": false,
+  "scenarioPromotionAuthority": false,
+  "productionAuthority": false
+}

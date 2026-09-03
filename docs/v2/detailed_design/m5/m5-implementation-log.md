@@ -355,6 +355,40 @@ The only public operations create an exact target, start pure progress, and obse
 external-mutation or intent-mutation API, no `DELETE_DONE`, and no receipt, scenario-promotion, physical-delete,
 staging, or production authority.
 
+## M5-D exact owned multipart cleanup adapter foundation
+
+Status: exact owned multipart execution adapter implemented and exercised against fixed-digest MinIO; the complete
+M5-D persisted intent/done coordinator and dispatch-authority gate have not run.
+
+- `ObjectProviderTransport` adds a default-unsupported `EXACT_UPLOAD_ID_ABORT_V1` capability, exact immutable
+  key/upload-ID values, bounded listing pages, two-marker continuation tokens, exact abort, and typed response loss;
+- `M5MultipartCleanupSessionV1` binds the Cell Provider Scope, exclusive namespace, exact Provider identity, a
+  non-empty persisted owned-inventory root, and finite page/upload/byte/key/upload-ID limits. It performs a complete
+  exact-key scan before abort, refuses any same-key upload not in the persisted inventory, aborts only exact owned
+  pairs, and completely rescans all persisted keys after every abort result;
+- empty relist is the only authoritative absence result. Exact residue remains retryable, a changed/foreign identity
+  quarantines, and incomplete, repeated-token, malformed, or over-budget listing fails closed;
+- the S3 adapter encodes both key marker and upload-ID marker in one canonical bounded token. Fixed-digest MinIO
+  demonstrates its narrower product behavior: directory-prefix multipart listing returns no inventory, while exact
+  object-key listing is complete and paginates multiple upload IDs. The admitted adapter therefore never treats a
+  directory-prefix scan as evidence; and
+- the real test uploads a full 5 MiB part into each incomplete upload so the residue is observable, then covers
+  same-key pagination, exact abort, response-loss reconciliation, and foreign-upload veto.
+
+Focused gate:
+
+```text
+./gradlew --no-daemon --no-configuration-cache v2M5MultipartCleanupCheck --rerun-tasks
+PASS_V2_M5_MULTIPART_CLEANUP_NON_PROMOTABLE
+M5MultipartCleanupSessionV1Test: 7 tests, 0 failures, 0 errors, 0 skipped
+M5MinioMultipartCleanupTest: 1 test, 0 failures, 0 errors, 0 skipped
+29 actionable tasks: 29 executed
+```
+
+The session has an external abort adapter because this slice proves transport/reconciliation behavior, but it has no
+method to create intent, publish `DELETE_DONE`, or decide that dispatch is authorized. The focused result is not a
+source-bound child and grants no physical-delete, scenario-promotion, staging, or production authority.
+
 ## Remaining ordered work
 
 1. Complete M5-D persisted intent/done and external cleanup composition above the admitted Object/BookKeeper and pure

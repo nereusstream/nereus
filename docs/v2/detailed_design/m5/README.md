@@ -89,10 +89,16 @@ that historical result.
   attempt, NPO1/NPD1 Object bodies and immutable versions, and intent/release/reference/multipart/provider roots to
   the strict root-absence then data-absence then multipart-absence sequence. `v2M5PulsarCleanupOrderCheck` is pure:
   it never invokes the older unconditional delete seam and exposes no external or intent mutation API.
+- The focused [M5-D multipart cleanup projection](m5-d-multipart-cleanup-projection.json) binds one non-empty exact
+  persisted owned inventory to the Cell/Provider namespace, exact key/upload IDs, bounded two-marker pagination,
+  exact abort, and complete relist after every response. `v2M5MultipartCleanupCheck` executes those rules against
+  fixed-digest MinIO, including response loss, same-key foreign-upload veto, and the product's explicit
+  directory-prefix-listing rejection. It is an execution adapter only: no intent mutation, dispatch authority,
+  source-bound receipt, scenario promotion, or production authority follows.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
-gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order cores without amending that result. All 17 scenario rows whose milestone names
+gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order/multipart cores without amending that result. All 17 scenario rows whose milestone names
 M5 remain `PLANNED` with null receipts. `docs/v2/evidence/v2-m5/`, `v2M5EvidenceExecutionCheck`,
 `v2M5FinalSourceCheck`, and `v2M5Check` remain absent.
 

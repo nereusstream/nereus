@@ -167,8 +167,11 @@ performance-first BookKeeper WAL.
   intent/done. `v2M5OrphanAdmissionCheck` additionally proves the closed six-class orphan taxonomy,
   authority-time mark/grace/rescan, and hard per-Cell accounting without any delete API. The full intent/done and
   Pulsar external execution is still absent. A separate pure Pulsar cleanup-order gate requires authoritative NPO1
-  root absence before NPD1 data and owned multipart residue, but performs no mutation. No physical-delete authority
-  exists.
+  root absence before NPD1 data and owned multipart residue, but performs no mutation. The focused multipart adapter
+  additionally binds a non-empty persisted owned-inventory root, exact key/upload IDs, two-marker pagination, and a
+  complete exact-key relist after every abort outcome against fixed-digest MinIO. That Provider does not admit
+  directory-prefix multipart listing, so the adapter enumerates only exact persisted keys and quarantines any
+  same-key foreign upload. It cannot create intent or decide dispatch. No physical-delete authority exists.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and formal-runner contracts. It did not by itself select a mode or
   promote a scenario; the later e5 Final closes those evidence obligations with `RANGE_64`. It still does not activate

@@ -29,6 +29,11 @@ public interface ObjectProviderTransport {
         return ObjectDeleteCapabilities.unsupported(capabilities().providerIdentity());
     }
 
+    /** M5-D multipart cleanup is a separate additive capability and defaults to no authority and no I/O. */
+    default MultipartCleanupCapabilities multipartCleanupCapabilities() {
+        return MultipartCleanupCapabilities.unsupported(capabilities().providerIdentity());
+    }
+
     ConditionalCreateResult putIfAbsent(ObjectIdentity identity, InputStream body) throws IOException;
 
     StreamingObject get(String key, Optional<CanonicalBytes> exactVersionToken) throws IOException;
@@ -47,6 +52,23 @@ public interface ObjectProviderTransport {
     default ConditionalDeleteResult deleteExactVersion(String key, CanonicalBytes exactVersionToken)
             throws IOException {
         return ConditionalDeleteResult.UNSUPPORTED;
+    }
+
+    /** Lists incomplete multipart uploads using an exact adapter-owned continuation token. */
+    default MultipartListPage listMultipartUploads(
+            String prefix, Optional<CanonicalBytes> continuationToken, int maximumUploads) throws IOException {
+        throw new UnsupportedOperationException("multipart cleanup is unsupported");
+    }
+
+    /**
+     * Requests abort of only the exact key/upload-id pair.
+     *
+     * <p>The response never proves absence. M5-D callers must perform a complete bounded multipart relist after
+     * every result, including response loss and definitive failures.
+     */
+    default ExactMultipartAbortResult abortMultipartUploadExact(String key, CanonicalBytes exactUploadId)
+            throws IOException {
+        return ExactMultipartAbortResult.UNSUPPORTED;
     }
 
     /** Adapter-owned typed classification; unknown exceptions remain fatal and are never interpreted as absence. */
@@ -72,6 +94,15 @@ public interface ObjectProviderTransport {
         DELETED_EXACT,
         DEFINITIVELY_NOT_FOUND,
         VERSION_PRECONDITION_FAILED,
+        RETRYABLE,
+        RESPONSE_UNKNOWN,
+        DEFINITIVE_CONFLICT,
+        UNSUPPORTED
+    }
+
+    enum ExactMultipartAbortResult {
+        ABORT_ACCEPTED,
+        DEFINITIVELY_NOT_FOUND,
         RETRYABLE,
         RESPONSE_UNKNOWN,
         DEFINITIVE_CONFLICT,
@@ -107,6 +138,71 @@ public interface ObjectProviderTransport {
         public void requireVersionMatchDeleteV1() {
             if (!"VERSION_MATCH_DELETE_V1".equals(mechanism) || !exactImmutableVersionDelete) {
                 throw new IllegalArgumentException("Provider does not satisfy VERSION_MATCH_DELETE_V1");
+            }
+        }
+    }
+
+    /** Exact upload-id abort and complete ordered listing admission; this value grants no dispatch authority. */
+    record MultipartCleanupCapabilities(
+            String providerIdentity,
+            String mechanism,
+            boolean exactUploadIdAbort,
+            boolean completeOrderedListing,
+            boolean typedResponseLoss,
+            int maximumUploadIdBytes,
+            int maximumContinuationTokenBytes,
+            int maximumListPageUploads) {
+        public MultipartCleanupCapabilities {
+            if (providerIdentity == null
+                    || providerIdentity.isBlank()
+                    || mechanism == null
+                    || mechanism.isBlank()
+                    || maximumUploadIdBytes < 0
+                    || maximumContinuationTokenBytes < 0
+                    || maximumListPageUploads < 0) {
+                throw new IllegalArgumentException("multipart cleanup capabilities are invalid");
+            }
+            boolean admitted = exactUploadIdAbort && completeOrderedListing && typedResponseLoss;
+            if (admitted
+                    != (maximumUploadIdBytes > 0 && maximumContinuationTokenBytes > 0 && maximumListPageUploads > 0)) {
+                throw new IllegalArgumentException("multipart cleanup capability facts are inconsistent");
+            }
+        }
+
+        public static MultipartCleanupCapabilities unsupported(String providerIdentity) {
+            return new MultipartCleanupCapabilities(providerIdentity, "UNSUPPORTED", false, false, false, 0, 0, 0);
+        }
+
+        public void requireExactUploadIdAbortV1() {
+            if (!"EXACT_UPLOAD_ID_ABORT_V1".equals(mechanism)
+                    || !exactUploadIdAbort
+                    || !completeOrderedListing
+                    || !typedResponseLoss) {
+                throw new IllegalArgumentException("Provider does not satisfy EXACT_UPLOAD_ID_ABORT_V1");
+            }
+        }
+    }
+
+    /** Exact immutable identity for one incomplete multipart upload. */
+    record MultipartUploadIdentity(String key, CanonicalBytes uploadId) {
+        public MultipartUploadIdentity {
+            if (key == null || key.isEmpty() || key.indexOf('\0') >= 0) {
+                throw new IllegalArgumentException("multipart upload key is invalid");
+            }
+            if (uploadId == null || uploadId.isEmpty()) {
+                throw new IllegalArgumentException("multipart upload id is empty");
+            }
+            uploadId = CanonicalBytes.copyOf(uploadId.toByteArray());
+        }
+    }
+
+    record MultipartListPage(List<MultipartUploadIdentity> uploads, Optional<CanonicalBytes> nextContinuationToken) {
+        public MultipartListPage {
+            uploads = List.copyOf(uploads);
+            nextContinuationToken = nextContinuationToken.map(value -> CanonicalBytes.copyOf(value.toByteArray()));
+            if (nextContinuationToken.isPresent()
+                    && nextContinuationToken.orElseThrow().isEmpty()) {
+                throw new IllegalArgumentException("multipart continuation token must be non-empty");
             }
         }
     }

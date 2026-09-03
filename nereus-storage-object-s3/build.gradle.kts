@@ -154,6 +154,18 @@ tasks.register<Test>("v2M5VersionMatchDeleteRealProviderTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("v2M5MultipartCleanupRealProviderTest") {
+    group = "verification"
+    description = "Run the non-promotable M5-D exact multipart cleanup contract against exact-digest MinIO."
+    testClassesDirs = realProviderTest.output.classesDirs
+    classpath = realProviderTest.runtimeClasspath
+    useJUnitPlatform()
+    include("**/M5MinioMultipartCleanupTest.class")
+    maxParallelForks = 1
+    maxHeapSize = "512m"
+    outputs.upToDateWhen { false }
+}
+
 tasks.named<Test>("test") {
     useJUnitPlatform()
 }
