@@ -136,9 +136,9 @@ performance-first BookKeeper WAL.
   read-quiescence proof, exact protection-generation release, M4/M5 ownership, and evidence hierarchy. Runtime,
   current-source Kafka/Pulsar integration, four exclusive evidence tasks, and fail-closed child/Final validation are
   implemented without amending those inputs. Exact tested source
-  `f08bbdeef542c7c4d17ff10fd0f4522b07b6cebb` now binds four exclusive children and the current immutable
-  [M4 Final](evidence/v2-m4/final/final-source-f08bbdeef542c7c4d17ff10fd0f4522b07b6cebb/m4-final.json)
-  SHA-256 `c33f9c990fab012e594814b15e75dafe34cfef3d1dcb02e4d9262b2055751c4d`. Exactly
+  `595c8b34779d1e88187eb0084bf18e65ab2dd742` now binds four exclusive children and the current immutable
+  [M4 Final](evidence/v2-m4/final/final-source-595c8b34779d1e88187eb0084bf18e65ab2dd742/m4-final.json)
+  SHA-256 `31235c738400c71252e1c1c923aabda6f66545767b01c20962c0a881303e1b07`. Exactly
   `V2-READ-001/003/004/005/007` are promoted; shared M4/M5 rows remain `PLANNED`. `v2M4Check` is Final
   authority while `v2M4DesignCheck` remains the historical design-only gate.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
