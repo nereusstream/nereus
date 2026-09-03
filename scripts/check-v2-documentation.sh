@@ -1988,10 +1988,20 @@ if passed_m4 not in (set(), promotable_m4):
         f"found {sorted(passed_m4)}"
     )
 if passed_m4:
-    expected_m4_receipt = "docs/v2/evidence/v2-m4/final/canonical/m4-final.json"
-    for item in scenarios["scenarios"]:
-        if item["id"] in promotable_m4 and item.get("evidenceReceipt") != expected_m4_receipt:
-            fail(f"{item['id']} does not bind the canonical M4 Final receipt")
+    m4_rows = [item for item in scenarios["scenarios"] if item["id"] in promotable_m4]
+    receipt_paths = {item.get("evidenceReceipt") for item in m4_rows}
+    if len(receipt_paths) != 1:
+        fail("M4 scenarios do not bind one exact current Final")
+    expected_m4_receipt = next(iter(receipt_paths))
+    if not isinstance(expected_m4_receipt, str) or "\\" in expected_m4_receipt:
+        fail("M4 scenarios bind an invalid Final receipt path")
+    m4_receipt_path = pathlib.PurePosixPath(expected_m4_receipt)
+    if (
+        m4_receipt_path.is_absolute()
+        or any(part in ("", ".", "..") for part in expected_m4_receipt.split("/"))
+        or m4_receipt_path.parts[:5] != ("docs", "v2", "evidence", "v2-m4", "final")
+    ):
+        fail("M4 scenarios bind a Final receipt outside the closed evidence prefix")
     try:
         m4_final = json.loads((root / expected_m4_receipt).read_text())
     except (OSError, json.JSONDecodeError) as error:

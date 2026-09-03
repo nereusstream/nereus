@@ -234,6 +234,18 @@ class M4EvidenceContractTest(unittest.TestCase):
         self.assertEqual(self.fixture.tested, tested)
         self.assertEqual(2, descendants)
 
+    def test_resolves_current_final_from_exact_promoted_scenarios(self) -> None:
+        self.assertEqual(self.fixture.final_path, CONTRACT.current_final_path(self.fixture.root))
+
+    def test_rejects_split_current_final_scenario_bindings(self) -> None:
+        path = self.fixture.root / CONTRACT.SCENARIO_PATH
+        doc = json.loads(path.read_text())
+        row = next(row for row in doc["scenarios"] if row["id"] == CONTRACT.PROMOTED_SCENARIOS[0])
+        row["evidenceReceipt"] = "docs/v2/evidence/v2-m4/final/other/m4-final.json"
+        path.write_text(json.dumps(doc))
+        with self.assertRaisesRegex(CONTRACT.EvidenceError, "one exact current Final"):
+            CONTRACT.current_final_path(self.fixture.root)
+
     def test_rejects_missing_child(self) -> None:
         value = copy.deepcopy(self.fixture.final_value)
         value["childReceipts"].pop()

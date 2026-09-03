@@ -38,3 +38,16 @@ jobs:
           java-version: '21'
       - name: V2 M1 fast source gate
         run: ./gradlew v2M1FastSourceCheck
+
+  m4-final:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install verification tools
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+      - name: V2 M4 final gate
+        run: ./gradlew v2M4Check

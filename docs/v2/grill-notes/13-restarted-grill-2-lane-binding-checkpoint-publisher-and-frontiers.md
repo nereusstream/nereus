@@ -290,7 +290,7 @@ recovery 按 authenticated append-unit descriptor 分组到各 binding tracker�
 - 不增加 per-binding remote metadata，不持久化 runtime gap map，不在热路径远程验证 Owner Epoch。
 ```
 
-Round 11 真正需要避免的性能问题不在 Q1/Q2，而在 Q3 的实现方式：轻量 ring/window 是必要的顺序完成器；为大量 Topic 常驻分配通用有序 Map、保留 payload，才会变成过度设计。[现有 append 合同](/Users/liusinan/apps/ideaproject/GITHUB/nereus/docs/v2/01-correctness-and-append.md:28)已经要求 binding-scoped contiguous frontier，因此 tracker 应是该合同的可重建实现，而不是第六种权威。
+Round 11 真正需要避免的性能问题不在 Q1/Q2，而在 Q3 的实现方式：轻量 ring/window 是必要的顺序完成器；为大量 Topic 常驻分配通用有序 Map、保留 payload，才会变成过度设计。[现有 append 合同](../01-correctness-and-append.md)已经要求 binding-scoped contiguous frontier，因此 tracker 应是该合同的可重建实现，而不是第六种权威。
 ````
 
 ## Authoritative synchronization

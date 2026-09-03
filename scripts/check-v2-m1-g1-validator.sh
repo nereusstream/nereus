@@ -29,10 +29,13 @@ if rg -n 'ProcessBuilder|Runtime\.getRuntime|GradleConnector|org\.gradle|org\.ju
     "$receipt_main" --glob '*.java'; then
     fail "Final resolver reruns work or imports a test/build framework"
 fi
-if rg -n 'STRICT_SERIALIZED|RANGE_LEASED|AllocatorCandidateHarness' \
+if rg -n 'AllocatorCandidateHarness' \
     "$repo_root/nereus-domain/src/main" "$repo_root/nereus-metadata-spi/src/main" \
     "$repo_root/nereus-metadata-oxia/src/main" --glob '*.java'; then
-    fail "evidence-only allocator candidate leaked into production source or SPI"
+    fail "M1 evidence-only allocator harness leaked into production source or SPI"
+fi
+if rg -n 'STRICT_SERIALIZED|RANGE_LEASED' "$receipt_main" --glob '*.java'; then
+    fail "later allocator authority leaked into the M1 production receipt validator"
 fi
 
 python3 - "$receipt_results" "$allocator_results" <<'PY'
@@ -137,7 +140,9 @@ subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", implement
 implementation_paths = [
     "nereus-domain/build.gradle.kts",
     "nereus-domain/src/main/java/com/nereusstream/domain/receipt",
-    "nereus-domain/src/test/java/com/nereusstream/domain/registry/allocator",
+    "nereus-domain/src/test/java/com/nereusstream/domain/registry/allocator/AllocatorCandidateHarness.java",
+    "nereus-domain/src/test/java/com/nereusstream/domain/registry/allocator/AllocatorEvidenceProtocolHarnessTest.java",
+    "nereus-domain/src/test/java/com/nereusstream/domain/registry/allocator/RangeLeasedCandidateHarnessTest.java",
 ]
 subprocess.run(["git", "-C", str(root), "diff", "--quiet", implementation, "HEAD", "--", *implementation_paths], check=True)
 subprocess.run(["git", "-C", str(root), "diff", "--quiet", "--", *implementation_paths], check=True)

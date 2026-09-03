@@ -680,7 +680,16 @@ tasks.register<Exec>("v2M1ActiveGraphCheck") {
 tasks.register<Exec>("v2M1FastSourceCheck") {
     group = "verification"
     description = "Aggregate executed deterministic local M1 tests and the pure-V2 graph boundary."
-    dependsOn(":nereus-domain:check", ":nereus-metadata-spi:check", ":nereus-metadata-oxia:check")
+    dependsOn(":nereus-domain:check", ":nereus-metadata-spi:check")
+    // The module-wide `check` lifecycle also owns Checkstyle for the M3 formal allocator source set,
+    // whose source-locked Pulsar snapshots are intentionally unavailable to the M1 fast gate.
+    dependsOn(
+        ":nereus-metadata-oxia:test",
+        ":nereus-metadata-oxia:checkstyleMain",
+        ":nereus-metadata-oxia:checkstyleTest",
+        ":nereus-metadata-oxia:checkstyleOxiaIntegrationTest",
+        ":nereus-metadata-oxia:spotlessCheck",
+    )
     dependsOn("v2M1FoundationDependencyCheck", "v2M1FoundationApiCheck")
     dependsOn("v2M1G1ValidatorSourceCheck", "v2M1ActiveGraphCheck")
     workingDir = layout.projectDirectory.asFile
@@ -1967,7 +1976,6 @@ tasks.register<Exec>("v2M4EvidenceContractTest") {
 }
 
 val v2M4FinalReceipt = providers.gradleProperty("v2M4FinalReceipt")
-    .orElse("docs/v2/evidence/v2-m4/final/canonical/m4-final.json")
 
 tasks.register<Exec>("v2M4FinalSourceCheck") {
     group = "verification"
@@ -1980,9 +1988,11 @@ tasks.register<Exec>("v2M4FinalSourceCheck") {
             "scripts/check-v2-m4-evidence.py",
             "--repo-root",
             layout.projectDirectory.asFile.absolutePath,
-            "--receipt",
-            v2M4FinalReceipt.get(),
         )
+        v2M4FinalReceipt.orNull?.let {
+            arguments.add("--receipt")
+            arguments.add(it)
+        }
         providers.gradleProperty("v2M4TestedCommit").orNull?.let {
             arguments.add("--expected-tested-commit")
             arguments.add(it)

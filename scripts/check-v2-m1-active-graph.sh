@@ -22,7 +22,11 @@ expected = {
     "nereus-metadata-oxia",
     "nereus-storage-api",
     "nereus-storage-bookkeeper",
+    "nereus-storage-object",
+    "nereus-storage-object-s3",
+    "nereus-storage-object-vault",
     "nereus-kafka-bookkeeper",
+    "nereus-pulsar-offload",
 }
 if actual != expected:
     raise SystemExit(f"V2 M1 active-graph check: active settings graph differs: {sorted(actual)}")
@@ -46,16 +50,20 @@ for required in \
     [[ -e "$required" ]] || fail "required V2/archive boundary is missing: ${required#"$repo_root/"}"
 done
 
-if find "$repo_root/nereus-metadata-oxia/src" -type f ! -path '*/v2/*' -print -quit | grep -q .; then
+if find "$repo_root/nereus-metadata-oxia/src" -type f \
+    ! -path '*/v2/*' \
+    ! -path '*/realAllocatorTest/*' \
+    -print -quit | grep -q .; then
     fail "a non-V2 metadata-oxia source or test remains after the mechanical prune"
 fi
 
 while IFS= read -r script; do
     case "${script#"$repo_root/"}" in
-        scripts/check-v2-*|scripts/bootstrap-v2-*|scripts/publish-v2-*|scripts/templates/*) ;;
+        scripts/archive-v2-*|scripts/bootstrap-v2-*|scripts/build-v2-*|scripts/check-v2-*) ;;
+        scripts/publish-v2-*|scripts/run-v2-*|scripts/v2-*|scripts/containers/*|scripts/templates/*) ;;
         *) fail "a V1/Phase/F9 executable script remains: ${script#"$repo_root/"}" ;;
     esac
-done < <(find "$repo_root/scripts" -type f -print | sort)
+done < <(find "$repo_root/scripts" -type f ! -path '*/__pycache__/*' -print | sort)
 
 [[ ! -e "$repo_root/docker/nereus-admin" ]] || fail "the V1 Admin Docker runtime remains"
 
@@ -76,4 +84,4 @@ if rg -n 'tasks\.register[^\n]*\("(?:phase[0-9]|f9|bookKeeperPrimaryWal)' \
     fail "a Phase/F9/V1 executable task remains in the root build"
 fi
 
-echo "V2 active graph contains the M1 foundation plus the three K0-M modules; V1 runtime, Phase/F9 scripts, and KoP runtime are absent."
+echo "V2 active graph contains only the accepted V2 modules; V1 runtime, Phase/F9 scripts, and KoP runtime are absent."

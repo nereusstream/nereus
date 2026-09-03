@@ -922,7 +922,7 @@ def dirty_paths(root: Path) -> set[PurePosixPath]:
     return result
 
 
-def validate_scenarios(root: Path, final_path: PurePosixPath) -> None:
+def scenario_rows(root: Path) -> list[dict[str, Any]]:
     try:
         doc = json.loads((root / SCENARIO_PATH).read_bytes(), object_pairs_hook=reject_duplicates)
     except json.JSONDecodeError as error:
@@ -930,6 +930,33 @@ def validate_scenarios(root: Path, final_path: PurePosixPath) -> None:
     rows = doc.get("scenarios") if isinstance(doc, dict) else None
     if not isinstance(rows, list):
         raise EvidenceError("scenario registry has no rows")
+    return rows
+
+
+def current_final_path(root: Path) -> PurePosixPath:
+    root = ensure_root(root)
+    rows = scenario_rows(root)
+    by_id = {
+        row.get("id"): row
+        for row in rows
+        if isinstance(row, dict) and isinstance(row.get("id"), str)
+    }
+    if len(by_id) != len(rows):
+        raise EvidenceError("scenario registry contains malformed/duplicate row")
+    receipts = set()
+    for scenario in PROMOTED_SCENARIOS:
+        row = by_id.get(scenario)
+        if row is None or row.get("status") != "PASSED_CURRENT_SOURCE":
+            raise EvidenceError(f"M4 current Final scenario is not promoted: {scenario}")
+        receipts.add(row.get("evidenceReceipt"))
+    if len(receipts) != 1:
+        raise EvidenceError("M4 promoted scenarios do not bind one exact current Final")
+    receipt = next(iter(receipts))
+    return safe_relative(receipt, "M4 current Final receipt", FINAL_PREFIX)
+
+
+def validate_scenarios(root: Path, final_path: PurePosixPath) -> None:
+    rows = scenario_rows(root)
     by_id: dict[str, dict[str, Any]] = {}
     for row in rows:
         if not isinstance(row, dict) or not isinstance(row.get("id"), str) or row["id"] in by_id:
@@ -965,7 +992,7 @@ def validate_final(root: Path, path: PurePosixPath, expected_tested: str | None 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parent.parent)
-    parser.add_argument("--receipt", required=True)
+    parser.add_argument("--receipt")
     parser.add_argument("--kind", choices=("child", "final"), default="final")
     parser.add_argument("--expected-child-kind", choices=CHILD_KINDS)
     parser.add_argument("--expected-tested-commit")
@@ -977,12 +1004,15 @@ def main(argv: list[str]) -> int:
     args = parse_args(argv)
     try:
         if args.kind == "child":
+            if args.receipt is None:
+                raise EvidenceError("child validation requires --receipt")
             kind, tested, _ = validate_child(args.repo_root, PurePosixPath(args.receipt), args.expected_child_kind, args.expected_tested_commit)
             print(f"V2 M4 child PASS: kind={kind} tested={tested}")
         else:
+            final_path = PurePosixPath(args.receipt) if args.receipt is not None else current_final_path(args.repo_root)
             tested, head, descendants = validate_final(
                 args.repo_root,
-                PurePosixPath(args.receipt),
+                final_path,
                 args.expected_tested_commit,
                 not args.no_scenario_sync,
             )

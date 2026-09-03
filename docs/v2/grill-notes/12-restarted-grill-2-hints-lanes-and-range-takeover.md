@@ -248,7 +248,7 @@ The user then supplied this exact disposition:
 
 The user closed with this performance priority and source pointer:
 
-> 性能上，Q1 是净收益；Q3 用一次可并行 head fencing 换掉全 Cell range 重申请，收益很大。真正要控制的是 Q2：如果实现成三个 eager builder 加三条 checkpoint chain，内存、metadata 写和 Seal 恢复状态都会接近三倍。[ADR 0053](/Users/liusinan/apps/ideaproject/GITHUB/nereus/docs/decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md:15)中的 checkpoint 本来就是异步加速器，因此优先使用单一 vector chain 更符合它的定位。
+> 性能上，Q1 是净收益；Q3 用一次可并行 head fencing 换掉全 Cell range 重申请，收益很大。真正要控制的是 Q2：如果实现成三个 eager builder 加三条 checkpoint chain，内存、metadata 写和 Seal 恢复状态都会接近三倍。[ADR 0053](../../decisions/0053-v2-walrun-checkpoint-bounds-and-open-tail-recovery.md)中的 checkpoint 本来就是异步加速器，因此优先使用单一 vector chain 更符合它的定位。
 
 ## Authoritative synchronization
 

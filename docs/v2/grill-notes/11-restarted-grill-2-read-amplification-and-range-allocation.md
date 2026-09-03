@@ -296,7 +296,7 @@ The user then supplied this exact disposition:
 
 The user closed with this priority statement and source pointers:
 
-> 这轮最该挡住的是 Q5/Q6：Q3 影响日常冷读，而 Q5/Q6 会在多 Topic 和 broker failover 时形成架构级放大。[当前 WalRun 合同](/Users/liusinan/apps/ideaproject/GITHUB/nereus/docs/decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md:35)明确每 shard 只有一个 current pointer，因此 packing class 不能未经 lane/group 设计就成为 Root 的单一身份；[allocator 证据合同](/Users/liusinan/apps/ideaproject/GITHUB/nereus/docs/decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md:13)也正是为了避免重新引入 Cell-wide stall。
+> 这轮最该挡住的是 Q5/Q6：Q3 影响日常冷读，而 Q5/Q6 会在多 Topic 和 broker failover 时形成架构级放大。[当前 WalRun 合同](../../decisions/0039-v2-bounded-walrun-lifecycle-recovery-and-root-pointer.md)明确每 shard 只有一个 current pointer，因此 packing class 不能未经 lane/group 设计就成为 Root 的单一身份；[allocator 证据合同](../../decisions/0055-v2-pulsar-virtual-ledger-allocator-evidence-protocol.md)也正是为了避免重新引入 Cell-wide stall。
 
 ## Authoritative synchronization
 

@@ -23,7 +23,7 @@ expected_capabilities="PulsarTopicGenerationSelectorStore PulsarVirtualLedgerNam
     fail "capability inventory differs: $actual_capabilities"
 
 if rg -n '^import ' "$domain_src" |
-    rg -v '^.*:import (java\.|com\.nereusstream\.domain\.)' >/dev/null; then
+    rg -v '^.*:import (java\.|javax\.|org\.w3c\.dom\.|com\.nereusstream\.domain\.)' >/dev/null; then
     fail "nereus-domain imports a non-JDK or non-domain production package"
 fi
 
@@ -53,12 +53,18 @@ fi
 for forbidden in \
     'interface MetadataStore' \
     'interface TopicBindingStore' \
-    'interface StorageEpochStore' \
+    'interface StorageEpochStore'; do
+    if rg -Fq -- "$forbidden" "$spi_src" "$domain_src"; then
+        fail "forbidden foundation API: $forbidden"
+    fi
+done
+
+for forbidden in \
     'STRICT_SERIALIZED' \
     'RANGE_LEASED' \
     'maxWriterCount'; do
-    if rg -Fq -- "$forbidden" "$spi_src" "$domain_src"; then
-        fail "forbidden foundation API or OPEN constant: $forbidden"
+    if rg -Fq -- "$forbidden" "$capability_dir"; then
+        fail "later allocator authority leaked into the M1 foundation capabilities: $forbidden"
     fi
 done
 
