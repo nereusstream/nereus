@@ -134,7 +134,7 @@ Focused core gate:
 ```text
 ./gradlew --no-daemon --no-configuration-cache v2M5RetentionCoreCheck
 PASS_V2_M5_RETENTION_CORE_NON_PROMOTABLE_OXIA_ATOMIC_TRANSACTION_UNSUPPORTED
-M5RetentionRetirementV1Test: 33 tests, 0 failures, 0 errors, 0 skipped
+M5RetentionRetirementV1Test: 36 tests, 0 failures, 0 errors, 0 skipped
 M5RetentionEvidenceAssemblerV1Test: 67 tests, 0 failures, 0 errors, 0 skipped
 Oxia09ExactMetadataTransactionStoreV1Test: 2 tests, 0 failures, 0 errors, 0 skipped
 ```

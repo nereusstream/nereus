@@ -60,6 +60,7 @@ import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceS
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceTargetKindV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.RetentionFloorObservationV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.RetentionFloorSnapshotV1;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.RetiredSourceRetirementBatchTombstoneV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.RetiredTopicIncarnationTombstoneV1;
 import com.nereusstream.storage.object.retention.M5RetirementCoordinatorV1.BatchRetirementRequest;
 import com.nereusstream.storage.object.retention.M5RetirementCoordinatorV1.ExternalizationRequest;
@@ -67,6 +68,7 @@ import com.nereusstream.storage.object.retention.M5RetirementCoordinatorV1.Pulsa
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -74,6 +76,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -357,6 +360,65 @@ class M5RetentionRetirementV1Test {
     }
 
     @Test
+    void nMemberReleaseRequiresEveryExactSiblingBinding() {
+        RetirementFixture fixture = retirementFixture(true, 3);
+        M5RetirementCoordinatorV1 coordinator = new M5RetirementCoordinatorV1(fixture.metadata);
+
+        ReferenceFreeProofV1 partialProof = proof(
+                fixture.metadata,
+                "/partial-release",
+                ReferenceTargetKindV1.RETIREMENT_BATCH,
+                fixture.batch.batchIdSha256(),
+                fixture.exactSelector,
+                fixture.releases.subList(0, 2));
+        assertThatThrownBy(() -> coordinator.externalize(externalizationRequest(fixture, partialProof)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("count differs");
+
+        M4ReleaseBindingV1 first = fixture.releases.get(0);
+        VersionedValue duplicateAuthority =
+                fixture.metadata.seed("/binding/duplicate-release-authority", first.canonicalProtectionBytes());
+        M4ReleaseBindingV1 duplicateFirst = new M4ReleaseBindingV1(
+                first.sourceIdentitySha256(),
+                first.protectionGeneration(),
+                fact(duplicateAuthority),
+                first.canonicalProtectionBytes(),
+                first.releasedByBatchSha256(),
+                first.releaseProofHeadSha256());
+        List<M4ReleaseBindingV1> missingSibling =
+                new ArrayList<>(List.of(first, duplicateFirst, fixture.releases.get(2)));
+        missingSibling.sort(Comparator.comparing((M4ReleaseBindingV1 value) ->
+                        value.sourceIdentitySha256().toHex())
+                .thenComparingLong(M4ReleaseBindingV1::protectionGeneration));
+        ReferenceFreeProofV1 siblingProof = proof(
+                fixture.metadata,
+                "/missing-sibling-release",
+                ReferenceTargetKindV1.RETIREMENT_BATCH,
+                fixture.batch.batchIdSha256(),
+                fixture.exactSelector,
+                missingSibling);
+        assertThatThrownBy(() -> coordinator.externalize(externalizationRequest(fixture, siblingProof)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("lacks exact");
+        assertThat(fixture.metadata.transactionCalls).isZero();
+        assertThat(fixture.metadata.readNow(fixture.selectorKey)).isEqualTo(fixture.exactSelector);
+        assertThat(fixture.metadata.readOptional(fixture.batchKey)).isEmpty();
+
+        assertThat(coordinator
+                        .externalize(fixture.externalizationRequest())
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+        assertThat(fixture.releases.stream()
+                        .map(M4ReleaseBindingV1::sourceIdentitySha256)
+                        .toList())
+                .isEqualTo(fixture.batch.sources().stream()
+                        .map(SourceProtectionIdentity::sourceIdentitySha256)
+                        .toList());
+        assertThat(fixture.metadata.transactionCalls).isOne();
+    }
+
+    @Test
     void unsupportedBackendPerformsNoTransactionAndNeverCreatesSplitState() {
         RetirementFixture fixture = retirementFixture(false);
 
@@ -394,6 +456,59 @@ class M5RetentionRetirementV1Test {
                         .toCompletableFuture()
                         .join())
                 .isEqualTo(M5RetirementCoordinatorV1.Outcome.QUARANTINED);
+    }
+
+    @Test
+    void everyImpossibleExternalizationSplitStateIsQuarantined() {
+        assertThat(reconcileAfterInterference(fixture ->
+                        fixture.metadata.seed(fixture.batchKey, M5RetentionCodecV1.encodeFullBatch(fixture.fullBatch))))
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.QUARANTINED);
+        assertThat(reconcileAfterInterference(
+                        fixture -> fixture.metadata.seed(fixture.batchKey, retiredBatchBytes(fixture, true))))
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.QUARANTINED);
+        assertThat(reconcileAfterInterference(
+                        fixture -> fixture.metadata.seed(fixture.batchKey, bytes("foreign-batch-state"))))
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.QUARANTINED);
+        assertThat(reconcileAfterInterference(
+                        fixture -> fixture.metadata.overwrite(fixture.selectorKey, fixture.selectorSuccessorBytes)))
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.QUARANTINED);
+        assertThat(reconcileAfterInterference(fixture -> {
+                    fixture.metadata.remove(fixture.selectorKey);
+                    fixture.metadata.seed(fixture.batchKey, M5RetentionCodecV1.encodeFullBatch(fixture.fullBatch));
+                }))
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.QUARANTINED);
+    }
+
+    @Test
+    void mismatchedExternalizationStatesNeverConvergeAsApplied() {
+        assertThat(reconcileAfterInterference(fixture -> {
+                    fixture.metadata.overwrite(fixture.selectorKey, fixture.selectorSuccessorBytes);
+                    fixture.metadata.seed(fixture.batchKey, bytes("foreign-batch-state"));
+                }))
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.CONFLICT);
+        assertThat(reconcileAfterInterference(fixture -> {
+                    fixture.metadata.overwrite(
+                            fixture.selectorKey,
+                            M4ReadControlCodecV1.encodeSelector(new BindingReadSelector(
+                                    BINDING,
+                                    digest("foreign-selected-view"),
+                                    11,
+                                    13,
+                                    17,
+                                    SelectorMode.PREFERRED_ONLY,
+                                    AdmissionState.ADMITTING,
+                                    Optional.empty(),
+                                    CAPABILITY,
+                                    List.of(),
+                                    List.of())));
+                    fixture.metadata.seed(fixture.batchKey, M5RetentionCodecV1.encodeFullBatch(fixture.fullBatch));
+                }))
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.CONFLICT);
+        assertThat(reconcileAfterInterference(fixture -> {
+                    fixture.metadata.overwrite(fixture.selectorKey, fixture.selectorSuccessorBytes);
+                    fixture.metadata.seed(fixture.batchKey, retiredBatchBytes(fixture, false));
+                }))
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.CONFLICT);
     }
 
     @Test
@@ -636,6 +751,58 @@ class M5RetentionRetirementV1Test {
                 .hasMessageContaining("selector");
     }
 
+    private static M5RetirementCoordinatorV1.Outcome reconcileAfterInterference(
+            Consumer<RetirementFixture> interference) {
+        RetirementFixture fixture = retirementFixture(true);
+        fixture.metadata.interfereWithNextTransaction(() -> interference.accept(fixture));
+        return new M5RetirementCoordinatorV1(fixture.metadata)
+                .externalize(fixture.externalizationRequest())
+                .toCompletableFuture()
+                .join();
+    }
+
+    private static ExternalizationRequest externalizationRequest(
+            RetirementFixture fixture, ReferenceFreeProofV1 proof) {
+        CanonicalBytes batchBytes = M4ReadControlCodecV1.encodeBatch(fixture.batch);
+        FullSourceRetirementBatchV1 full = new FullSourceRetirementBatchV1(
+                BatchMetadataStateV1.FULL_V1,
+                BINDING,
+                fixture.batch.batchIdSha256(),
+                Sha256Digest.hash(batchBytes),
+                batchBytes,
+                fixture.exactSelector.canonicalStoredSha256(),
+                proof.proofSha256(),
+                CAPABILITY);
+        return new ExternalizationRequest(
+                fixture.partitionKey,
+                fixture.selectorKey,
+                fixture.batchKey,
+                fixture.exactSelector,
+                fixture.selectorSuccessorBytes,
+                Optional.empty(),
+                full,
+                proof);
+    }
+
+    private static CanonicalBytes retiredBatchBytes(RetirementFixture fixture, boolean matching) {
+        RetiredSourceRetirementBatchTombstoneV1 draft = new RetiredSourceRetirementBatchTombstoneV1(
+                BatchMetadataStateV1.RETIRED_V1,
+                matching
+                        ? BINDING
+                        : new BindingIdentity(
+                                new TopicBindingId(digest("foreign-binding")),
+                                digest("foreign-incarnation"),
+                                digest("foreign-storage-epoch")),
+                fixture.batch.batchIdSha256(),
+                fixture.fullBatch.fullBatchSha256(),
+                fixture.proof.proofSha256(),
+                fixture.exactSelector.metadataVersion(),
+                Sha256Digest.hash(M5RetentionCodecV1.encodeFullBatch(fixture.fullBatch)),
+                CAPABILITY,
+                PLACEHOLDER);
+        return M5RetentionCodecV1.encodeRetiredBatch(M5RetentionCodecV1.finalizeRetiredBatch(draft));
+    }
+
     private static M5RetentionAdmissionV1.Reservation reservation(String id, long bytes, long ageMillis) {
         EnumMap<M5RetentionAdmissionV1.LimitKindV1, Long> reserved = values(0);
         reserved.put(M5RetentionAdmissionV1.LimitKindV1.RESERVATIONS, 1L);
@@ -707,9 +874,20 @@ class M5RetentionRetirementV1Test {
     }
 
     private static RetirementFixture retirementFixture(boolean transactionSupported) {
+        return retirementFixture(transactionSupported, 1);
+    }
+
+    private static RetirementFixture retirementFixture(boolean transactionSupported, int sourceCount) {
+        if (sourceCount <= 0) {
+            throw new IllegalArgumentException("test fixture source count must be positive");
+        }
         InMemoryStore metadata = new InMemoryStore(transactionSupported);
-        SourceProtectionIdentity source = new SourceProtectionIdentity(digest("source"), 3, 5, 7, CAPABILITY);
-        List<SourceProtectionIdentity> sources = List.of(source);
+        List<SourceProtectionIdentity> sources = new ArrayList<>();
+        for (int index = 0; index < sourceCount; index++) {
+            sources.add(new SourceProtectionIdentity(
+                    digest("source-" + index), 3 + index, 5 + index, 7 + index, CAPABILITY));
+        }
+        sources.sort(Comparator.comparing(value -> value.sourceIdentitySha256().toHex()));
         Sha256Digest fallback = M4ReadControlCodecV1.calculateFallbackSetSha256(sources);
         SourceRetirementBatch draft = new SourceRetirementBatch(
                 BINDING,
@@ -718,7 +896,7 @@ class M5RetentionRetirementV1Test {
                 digest("successor-core"),
                 digest("transition"),
                 fallback,
-                9,
+                5L + sourceCount,
                 5,
                 CAPABILITY,
                 sources);
@@ -738,24 +916,32 @@ class M5RetentionRetirementV1Test {
         String selectorKey = "/binding/selector";
         String batchKey = "/binding/retirement-batches/" + batch.batchIdSha256().toHex();
         VersionedValue exactSelector = metadata.seed(selectorKey, M4ReadControlCodecV1.encodeSelector(selector));
-        Sha256Digest proofHead = digest("proof-head");
-        CanonicalBytes protectionBytes = M4ReadControlCodecV1.encodeProtection(new SourceProtection(
-                BINDING, source, ProtectionState.RELEASED, Optional.of(batch.batchIdSha256()), Optional.of(proofHead)));
-        VersionedValue protection = metadata.seed("/binding/protection", protectionBytes);
-        M4ReleaseBindingV1 release = new M4ReleaseBindingV1(
-                source.sourceIdentitySha256(),
-                source.protectionGeneration(),
-                fact(protection),
-                protectionBytes,
-                batch.batchIdSha256(),
-                proofHead);
+        List<M4ReleaseBindingV1> releases = new ArrayList<>();
+        for (int index = 0; index < sources.size(); index++) {
+            SourceProtectionIdentity source = sources.get(index);
+            Sha256Digest proofHead = digest("proof-head-" + index);
+            CanonicalBytes protectionBytes = M4ReadControlCodecV1.encodeProtection(new SourceProtection(
+                    BINDING,
+                    source,
+                    ProtectionState.RELEASED,
+                    Optional.of(batch.batchIdSha256()),
+                    Optional.of(proofHead)));
+            VersionedValue protection = metadata.seed("/binding/protection/" + index, protectionBytes);
+            releases.add(new M4ReleaseBindingV1(
+                    source.sourceIdentitySha256(),
+                    source.protectionGeneration(),
+                    fact(protection),
+                    protectionBytes,
+                    batch.batchIdSha256(),
+                    proofHead));
+        }
         ReferenceFreeProofV1 proof = proof(
                 metadata,
                 "/externalize-proof",
                 ReferenceTargetKindV1.RETIREMENT_BATCH,
                 batch.batchIdSha256(),
                 exactSelector,
-                List.of(release));
+                releases);
         CanonicalBytes batchBytes = M4ReadControlCodecV1.encodeBatch(batch);
         FullSourceRetirementBatchV1 full = new FullSourceRetirementBatchV1(
                 BatchMetadataStateV1.FULL_V1,
@@ -775,7 +961,7 @@ class M5RetentionRetirementV1Test {
                 M4ReadControlCodecV1.encodeSelector(successor),
                 batch,
                 full,
-                List.of(release),
+                releases,
                 proof);
     }
 
@@ -914,6 +1100,7 @@ class M5RetentionRetirementV1Test {
         private boolean failReadAfterCas;
         private boolean failNextRead;
         private boolean casResponseUnknownWithoutApply;
+        private Runnable nextTransactionInterference;
 
         private InMemoryStore(boolean transactionSupported) {
             this.transactionSupported = transactionSupported;
@@ -935,6 +1122,17 @@ class M5RetentionRetirementV1Test {
             VersionedValue stored = stored(key, value);
             values.put(key, stored);
             return stored;
+        }
+
+        synchronized void remove(String key) {
+            values.remove(key);
+        }
+
+        synchronized void interfereWithNextTransaction(Runnable interference) {
+            if (nextTransactionInterference != null) {
+                throw new IllegalStateException("test transaction interference is already installed");
+            }
+            nextTransactionInterference = interference;
         }
 
         synchronized VersionedValue readNow(String key) {
@@ -984,6 +1182,12 @@ class M5RetentionRetirementV1Test {
                             Optional.ofNullable(values.get(condition.key())).equals(condition.expected()));
             if (!matches) {
                 return CompletableFuture.completedFuture(TransactionOutcome.CONDITIONS_UNCHANGED);
+            }
+            if (nextTransactionInterference != null) {
+                Runnable interference = nextTransactionInterference;
+                nextTransactionInterference = null;
+                interference.run();
+                return CompletableFuture.completedFuture(TransactionOutcome.RESPONSE_UNKNOWN);
             }
             if (responseUnknownWithoutApply) {
                 responseUnknownWithoutApply = false;
