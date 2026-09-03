@@ -64,6 +64,18 @@ class M5RetentionCoreContractTest(unittest.TestCase):
             with self.assertRaisesRegex(M5C.RetentionCoreError, "capability projection differs"):
                 M5C.validate_projection(root)
 
+    def test_rejects_projection_that_misclassifies_internal_batch_as_transaction(self) -> None:
+        value = json.loads((ROOT / M5C.PROJECTION_PATH).read_text(encoding="utf-8"))
+        changed = copy.deepcopy(value)
+        changed["selectedMetadataBackend"]["internalWriteBatchQualifiesAsAtomicConditionalTransaction"] = True
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / M5C.PROJECTION_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(json.dumps(changed), encoding="utf-8")
+            with self.assertRaisesRegex(M5C.RetentionCoreError, "capability projection differs"):
+                M5C.validate_projection(root)
+
 
 if __name__ == "__main__":
     unittest.main()

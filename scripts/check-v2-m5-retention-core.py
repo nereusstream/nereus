@@ -14,6 +14,7 @@ import sys
 RESULT = "PASS_V2_M5_RETENTION_CORE_NON_PROMOTABLE_OXIA_ATOMIC_TRANSACTION_UNSUPPORTED"
 M5_B_COMMIT = "027e3bbdb6e60e2b3ec72108ed4b546ba6a15cc8"
 OXIA_CLIENT_COMMIT = "091a42c2780d92da56e9ec1f02ce1c3d988adc16"
+OXIA_SERVER_COMMIT = "37a17bef17202d5fd6e23282da5fd26d94865484"
 PROJECTION_PATH = "docs/v2/detailed_design/m5/m5-c-capability-projection.json"
 REFERENCE_KINDS = (
     "MANIFEST_SELECTED",
@@ -214,6 +215,10 @@ def validate_source_lock(root: Path) -> None:
     output = next((value for value in outputs if value.get("id") == "oxia-client-notification-continuity"), None)
     if output is None or output.get("finalForkCommit") != OXIA_CLIENT_COMMIT:
         raise RetentionCoreError("source-locked Oxia client commit differs")
+    bases = locks.get("dependencyImplementationBases", [])
+    server = next((value for value in bases if value.get("id") == "oxia-server-v2-conformance-base"), None)
+    if server is None or server.get("commit") != OXIA_SERVER_COMMIT:
+        raise RetentionCoreError("source-locked Oxia server commit differs")
 
 
 def validate_projection(root: Path) -> None:
@@ -226,8 +231,13 @@ def validate_projection(root: Path) -> None:
     expected = {
         "clientArtifact": "io.github.oxia-db:oxia-client:0.9.4",
         "clientSourceCommit": OXIA_CLIENT_COMMIT,
+        "serverSourceCommit": OXIA_SERVER_COMMIT,
         "adapter": "Oxia09ExactMetadataTransactionStoreV1",
         "supportsAtomicMultiKeyTransaction": False,
+        "publicClientTransactionApiPresent": False,
+        "internalWriteBatchVisibility": "PACKAGE_PRIVATE",
+        "internalWriteBatchConditionFailureSemantics": "PER_OPERATION_STATUS_CONTINUES_BATCH",
+        "internalWriteBatchQualifiesAsAtomicConditionalTransaction": False,
         "unsupportedBehavior": "RETURN_UNSUPPORTED_BEFORE_MUTATION",
         "sequentialCasFallback": "FORBIDDEN",
     }

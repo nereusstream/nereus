@@ -106,6 +106,14 @@ Status: retention/proof/admission core implemented at a focused, non-promotable 
 transition is blocked because the source-locked Oxia Java 0.9.4 client exposes single-key operations but no atomic
 conditional multi-key transaction primitive required by the accepted design.
 
+Direct source revalidation distinguishes Oxia's internal write batching from the required transaction. At client
+commit `091a42c2780d92da56e9ec1f02ce1c3d988adc16`, `AsyncOxiaClient` exposes only individual key operations and
+`client/.../batch/WriteBatch` is package-private transport batching. At server commit
+`37a17bef17202d5fd6e23282da5fd26d94865484`, `oxiad/dataserver/database/db.go::applyWriteRequest` continues across
+puts whose `applyPut` returns per-operation `UNEXPECTED_VERSION_ID`, then commits the accumulated RocksDB batch.
+Consequently the storage commit is atomic, but one failed version condition does not abort the other writes; this
+cannot implement the accepted all-conditions-or-zero-mutations protocol.
+
 Implemented surfaces:
 
 - a closed ten-class retention-floor snapshot, monotonic typed logical trim, exact version/value vectors, and a

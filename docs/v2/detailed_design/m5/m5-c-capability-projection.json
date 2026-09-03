@@ -5,8 +5,13 @@
   "selectedMetadataBackend": {
     "clientArtifact": "io.github.oxia-db:oxia-client:0.9.4",
     "clientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+    "serverSourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
     "adapter": "Oxia09ExactMetadataTransactionStoreV1",
     "supportsAtomicMultiKeyTransaction": false,
+    "publicClientTransactionApiPresent": false,
+    "internalWriteBatchVisibility": "PACKAGE_PRIVATE",
+    "internalWriteBatchConditionFailureSemantics": "PER_OPERATION_STATUS_CONTINUES_BATCH",
+    "internalWriteBatchQualifiesAsAtomicConditionalTransaction": false,
     "unsupportedBehavior": "RETURN_UNSUPPORTED_BEFORE_MUTATION",
     "sequentialCasFallback": "FORBIDDEN"
   },
