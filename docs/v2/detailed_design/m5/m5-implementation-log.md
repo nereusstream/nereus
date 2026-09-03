@@ -102,9 +102,9 @@ This focused result is not the future `KAFKA_COMPACTION_INDEX_REBUILD` child rec
 
 ## M5-C retention core, rejected capability path, and accepted amendment
 
-Status: retention/proof/admission core implemented at a focused, non-promotable gate. The original multi-key
-retirement path remains rejected evidence. ADR 0146 and the accepted single-Binding authority amendment now authorize
-an exact single-key CAS implementation, but that implementation is not yet complete.
+Status: implementation-complete at the source-locked, real-Oxia, non-promotable gate; the source-bound child receipt
+has not run. The original multi-key retirement path remains rejected evidence, while ADR 0146 and the accepted
+single-Binding authority amendment authorize the implemented exact single-key CAS path.
 
 Direct source revalidation distinguishes Oxia's internal write batching from the required transaction. At client
 commit `091a42c2780d92da56e9ec1f02ce1c3d988adc16`, `AsyncOxiaClient` exposes only individual key operations and
@@ -147,13 +147,13 @@ M5RetentionEvidenceAssemblerV1Test: 67 tests, 0 failures, 0 errors, 0 skipped
 Oxia09ExactMetadataTransactionStoreV1Test: 2 tests, 0 failures, 0 errors, 0 skipped
 ```
 
-This result deliberately does not create the reserved `v2M5RetentionRetirementCheck`, does not declare M5-C
-implementation-complete, and is not a child receipt. The accepted
+This historical focused-core result deliberately did not create the reserved `v2M5RetentionRetirementCheck`, did not
+declare M5-C implementation-complete, and is not a child receipt. The accepted
 [ADR 0146](../../../decisions/0146-v2-m5-single-binding-retirement-authority-amendment.md) and
 [M5-C amendment](m5-c-single-binding-retirement-authority-amendment.md) preserve this failed path as a counterexample
 and replace it with one Binding-scoped selector authority cell, durable reference-mutation tickets, a target scan
-fence, and one exact Oxia single-key retirement CAS. Until that new path and its gate are implemented, both permanent
-retirement families remain non-promotable. Logical trim and admission remain metadata-only; no M4 release, physical
+fence, and one exact Oxia single-key retirement CAS. The later complete implementation gate below realizes that path
+without converting it into source-bound evidence. Logical trim and admission remain metadata-only; no physical
 deletion, scenario promotion, staging certification, or production authority is granted.
 
 The first amended implementation slice now passes `v2M5BindingAuthorityCheck` with these bounded surfaces:
@@ -200,15 +200,40 @@ The closed writer integration slice now passes `v2M5ClosedWriterIntegrationCheck
 - exhaustive floor/reference ownership tests, all-reference ticket response-loss tests, ambiguous-retry recovery,
   fence-first no-dispatch, and both authority families run with no multi-key transaction fallback.
 
-This remains a focused integration contract rather than a source-bound child receipt. M5-C exact-source execution and
-receipt assembly, M5-D, scenario promotion, and aggregate Final remain outstanding.
+This remains a focused integration contract rather than a source-bound child receipt. It is an explicit predecessor
+of the complete M5-C implementation gate.
+
+The complete implementation gate now passes `v2M5RetentionRetirementCheck`:
+
+- the task rebuilds `nereus/oxia-m3-allocator:37a17bef1720` from the exact clean Oxia server source commit
+  `37a17bef17202d5fd6e23282da5fd26d94865484` and rejects any image whose ID differs from
+  `sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da`;
+- it binds Oxia client 0.9.4 source `091a42c2780d92da56e9ec1f02ce1c3d988adc16` and client JAR SHA-256
+  `0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5` to the existing source locks;
+- real Oxia tests migrate both legacy authorities, install/reread tickets, fence reference mutation, execute exact
+  permanent one-key retirement CAS, reconcile exact retry, reconnect a fresh client, and reject stale predecessors;
+- both authority families make zero multi-key transaction calls; and
+- the task-owned container is removed on completion, while the projection keeps receipt, M5-D, physical-delete,
+  scenario-promotion, and production-authority flags false.
+
+Full implementation gate:
+
+```text
+./scripts/run-v2-m5-retention-retirement-check.sh /Users/liusinan/apps/ideaproject/nereusstream/oxia-worktrees/nereus-v2-m3
+PASS_V2_M5_RETENTION_RETIREMENT_IMPLEMENTATION_NON_PROMOTABLE
+M5RetentionOxiaIntegrationTest: 2 tests, 0 failures, 0 errors, 0 skipped
+60 actionable tasks: 60 executed
+PASS_V2_M5_RETENTION_RETIREMENT_REAL_OXIA implementation-only image=nereus/oxia-m3-allocator:37a17bef1720 id=sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da
+```
+
+This is not the `RETENTION_METADATA_RETIREMENT` child receipt because the eventual five children must bind one exact
+tested Nereus source after M5-D and current-source isolation are complete. It promotes no scenario and authorizes no
+physical deletion.
 
 ## Remaining ordered work
 
-1. Implement and gate the accepted single-Binding authority envelope, ticket/fence protocol, M4 selector projection,
-   and exact Oxia single-key permanent metadata retirement transition.
-2. M5-D conditional physical delete, orphan reconciliation, and BookKeeper/Pulsar cleanup.
-3. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
+1. M5-D conditional physical delete, orphan reconciliation, and BookKeeper/Pulsar cleanup.
+2. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
    `v2M5Check`.
 
 `V2-KAF-DATA-012`, `V2-KAF-DATA-013`, and `V2-KAF-DATA-022` remain M6-deferred. Tombstone deletion,

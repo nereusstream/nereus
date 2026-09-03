@@ -48,13 +48,16 @@ class M5ClosedWriterIntegrationContractTest(unittest.TestCase):
         with self.assertRaisesRegex(WRITERS.ClosedWriterIntegrationError, "mutation order"):
             WRITERS.validate_projection_value(changed, BINDING.FLOOR_CLASSES, BINDING.REFERENCE_KINDS)
 
-    def test_projection_rejects_full_gate_or_production_authority(self) -> None:
+    def test_projection_rejects_missing_full_gate_or_production_authority(self) -> None:
         value = json.loads((ROOT / WRITERS.PROJECTION_PATH).read_text(encoding="utf-8"))
-        for field in ("fullRetirementGatePresent", "productionAuthority"):
-            changed = copy.deepcopy(value)
-            changed[field] = True
-            with self.assertRaisesRegex(WRITERS.ClosedWriterIntegrationError, "overstates"):
-                WRITERS.validate_projection_value(changed, BINDING.FLOOR_CLASSES, BINDING.REFERENCE_KINDS)
+        missing = copy.deepcopy(value)
+        missing["fullRetirementGatePresent"] = False
+        with self.assertRaisesRegex(WRITERS.ClosedWriterIntegrationError, "lacks"):
+            WRITERS.validate_projection_value(missing, BINDING.FLOOR_CLASSES, BINDING.REFERENCE_KINDS)
+        overstated = copy.deepcopy(value)
+        overstated["productionAuthority"] = True
+        with self.assertRaisesRegex(WRITERS.ClosedWriterIntegrationError, "overstates"):
+            WRITERS.validate_projection_value(overstated, BINDING.FLOOR_CLASSES, BINDING.REFERENCE_KINDS)
 
     def test_required_sources_reject_missing_guard(self) -> None:
         with self.assertRaisesRegex(WRITERS.ClosedWriterIntegrationError, "missing/empty"):

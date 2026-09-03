@@ -195,8 +195,9 @@ def validate_projection_value(value: object, floor_classes: tuple[str, ...], ref
         raise PulsarAggregateAuthorityError("Pulsar aggregate backend capability projection differs")
     if value.get("pulsarAuthorityGatePresent") is not True:
         raise PulsarAggregateAuthorityError("Pulsar aggregate focused gate is not present")
+    if value.get("fullRetirementGatePresent") is not True:
+        raise PulsarAggregateAuthorityError("Pulsar projection lacks the completed full retirement gate")
     for field in (
-        "fullRetirementGatePresent",
         "m5DImplementationPresent",
         "physicalDeleteAuthority",
         "scenarioPromotionAuthority",
@@ -221,8 +222,8 @@ def validate_tasks(root: Path) -> None:
     )
     if 'tasks.register<Test>("v2M5PulsarAggregateAuthorityTest")' not in oxia_build:
         raise PulsarAggregateAuthorityError("metadata-oxia build lacks v2M5PulsarAggregateAuthorityTest")
-    if re.search(r'tasks\.register(?:<[^>]+>)?\("v2M5RetentionRetirementCheck"\)', root_build):
-        raise PulsarAggregateAuthorityError("full M5-C retirement gate exists before writer integration closure")
+    if re.search(r'tasks\.register(?:<[^>]+>)?\("v2M5RetentionRetirementCheck"\)', root_build) is None:
+        raise PulsarAggregateAuthorityError("root build lacks the completed full M5-C retirement gate")
 
 
 def validate(root: Path) -> None:

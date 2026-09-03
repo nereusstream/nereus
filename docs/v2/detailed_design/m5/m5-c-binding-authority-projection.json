@@ -58,7 +58,7 @@
     "sequentialCasFallback": "FORBIDDEN"
   },
   "bindingAuthorityGatePresent": true,
-  "fullRetirementGatePresent": false,
+  "fullRetirementGatePresent": true,
   "physicalDeleteAuthority": false,
   "scenarioPromotionAuthority": false,
   "productionAuthority": false

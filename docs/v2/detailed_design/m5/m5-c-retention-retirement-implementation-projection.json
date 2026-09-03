@@ -1,0 +1,40 @@
+{
+  "schema": "NEREUS_V2_M5_C_RETENTION_RETIREMENT_IMPLEMENTATION_PROJECTION_V1",
+  "status": "RETENTION_METADATA_RETIREMENT_IMPLEMENTED_NON_PROMOTABLE",
+  "amendmentManifestSha256": "1f769b44740d9bfb2fa5d5d29fe2207d1cc72cb9e1ea5a8384223a6da143b452",
+  "implementationAncestors": [
+    "580257daff9c09f8c5f36976dc342d94d1a79403",
+    "027e3bbdb6e60e2b3ec72108ed4b546ba6a15cc8",
+    "90e220c46b1303d6f490db9c09be31efb11c6c5d",
+    "89bc667bf01692d883a10b1e5078196707e834f2",
+    "70e5efa1643d8ff8fa096a8327512f751d421e3e"
+  ],
+  "authorityFamilies": [
+    "M5R1_BINDING_BATCH",
+    "M5PA_PULSAR_AGGREGATE"
+  ],
+  "realOxiaBoundary": {
+    "operation": "EXACT_SINGLE_KEY_COMPARE_AND_SET",
+    "clientArtifact": "io.github.oxia-db:oxia-client:0.9.4",
+    "clientSourceCommit": "091a42c2780d92da56e9ec1f02ce1c3d988adc16",
+    "clientJarSha256": "0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5",
+    "serverSourceCommit": "37a17bef17202d5fd6e23282da5fd26d94865484",
+    "serverImageReference": "nereus/oxia-m3-allocator:37a17bef1720",
+    "serverImageId": "sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da",
+    "serverImagePlatform": "linux/arm64",
+    "serverImageRecipeSha256": "31388e201ce95fd61c1505a8628a66993ec8c070ba02ad5f71aa647ae066d238",
+    "tests": [
+      "bindingAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart",
+      "pulsarAuthorityMigratesTicketsFencesRetiresAndSurvivesRestart"
+    ],
+    "clientReconnectRequired": true,
+    "stalePredecessorRejected": true,
+    "atomicMultiKeyTransactionUsed": false
+  },
+  "fullRetirementGatePresent": true,
+  "sourceBoundReceiptPresent": false,
+  "m5DImplementationPresent": false,
+  "physicalDeleteAuthority": false,
+  "scenarioPromotionAuthority": false,
+  "productionAuthority": false
+}

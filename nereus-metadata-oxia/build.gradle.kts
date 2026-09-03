@@ -221,6 +221,30 @@ tasks.register<Test>("v2M5PulsarAggregateAuthorityTest") {
     outputs.upToDateWhen { false }
 }
 
+val v2M5RetentionOxiaServiceAddress = providers.gradleProperty("v2M5RetentionOxiaServiceAddress")
+
+tasks.register<Test>("v2M5RetentionRealOxiaTest") {
+    group = "verification"
+    description = "Run the amended M5-C Binding and Pulsar retirement protocols against source-locked real Oxia."
+    testClassesDirs = oxiaIntegrationTest.output.classesDirs
+    classpath = oxiaIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.retention.M5RetentionOxiaIntegrationTest",
+        )
+    }
+    doFirst {
+        systemProperty(
+            "nereus.m5.retention.oxia.serviceAddress",
+            v2M5RetentionOxiaServiceAddress.orNull ?: "UNSET",
+        )
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.register<Test>("r1OxiaIntegrationTest") {
     group = "verification"
     description = "Run R1 Registry create/CAS/restart conformance against source-locked real Oxia."

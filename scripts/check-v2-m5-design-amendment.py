@@ -159,7 +159,7 @@ def validate_current_governance(root: Path) -> None:
         ),
         (
             "docs/v2/detailed_design/m5/m5-implementation-log.md",
-            ("ADR 0146", "implementation is not yet complete"),
+            ("ADR 0146", "source-bound child receipt", "has not run"),
             "M5 implementation log",
         ),
         (

@@ -147,15 +147,16 @@ performance-first BookKeeper WAL.
   consumption, conditional Object/BookKeeper/orphan GC, per-Cell isolation, and future evidence ownership. The exact
   result is `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`: implementation/evidence are `NotStarted`/`NotRun`, all 17
   M5 rows remain `PLANNED`, and no physical deletion or production authority exists.
-- The [M5 implementation log](detailed_design/m5/m5-implementation-log.md) now records M5-A and M5-B descendants.
+- The [M5 implementation log](detailed_design/m5/m5-implementation-log.md) now records M5-A, M5-B, and M5-C descendants.
   Materialization/publication passes `v2M5MaterializationCheck`; real Kafka magic-v2 sparse rewriting, seven
   dispositions, the complete eight-index rebuild, semantic/suppression roots, Cell admission, and final freshness
-  fencing pass `v2M5KafkaCompactionCheck`. Both are focused implementation results only: M5-C/D, all five source-bound
-  children, the M5 Final, every M5 scenario promotion, and physical deletion remain outstanding.
+  fencing pass `v2M5KafkaCompactionCheck`; both permanent retirement families pass source-locked real Oxia execution
+  in `v2M5RetentionRetirementCheck`. These are implementation-only results: M5-D, all five source-bound children, the
+  M5 Final, every M5 scenario promotion, and physical deletion remain outstanding.
 - [ADR 0146](../decisions/0146-v2-m5-single-binding-retirement-authority-amendment.md) and the accepted
   [M5-C amendment](detailed_design/m5/m5-c-single-binding-retirement-authority-amendment.md) preserve the failed
   multi-key Oxia path as rejected evidence and select a single-Binding retirement authority, durable ticket/fence
-  serialization, and exact single-key CAS. This authorizes implementation only; M5-C is not yet complete.
+  serialization, and exact single-key CAS. M5-C now implements that path, but its source-bound child has not run.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and formal-runner contracts. It did not by itself select a mode or
   promote a scenario; the later e5 Final closes those evidence obligations with `RANGE_64`. It still does not activate

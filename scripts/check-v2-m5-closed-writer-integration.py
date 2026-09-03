@@ -157,8 +157,9 @@ def validate_projection_value(value: object, floor_classes: tuple[str, ...], ref
             raise ClosedWriterIntegrationError(f"guard protocol {field} differs")
     if value.get("closedWriterIntegrationGatePresent") is not True:
         raise ClosedWriterIntegrationError("closed writer focused gate is not present")
+    if value.get("fullRetirementGatePresent") is not True:
+        raise ClosedWriterIntegrationError("closed writer projection lacks the completed full retirement gate")
     for field in (
-        "fullRetirementGatePresent",
         "sourceBoundReceiptPresent",
         "physicalDeleteAuthority",
         "scenarioPromotionAuthority",
@@ -183,8 +184,8 @@ def validate_tasks(root: Path) -> None:
     )
     if 'tasks.register<Test>("v2M5ClosedWriterIntegrationTest")' not in module_build:
         raise ClosedWriterIntegrationError("storage-object build lacks v2M5ClosedWriterIntegrationTest")
-    if re.search(r'tasks\.register(?:<[^>]+>)?\("v2M5RetentionRetirementCheck"\)', root_build):
-        raise ClosedWriterIntegrationError("full M5-C retirement gate exists before its source-bound closure")
+    if re.search(r'tasks\.register(?:<[^>]+>)?\("v2M5RetentionRetirementCheck"\)', root_build) is None:
+        raise ClosedWriterIntegrationError("root build lacks the completed full M5-C retirement gate")
 
 
 def validate(root: Path) -> None:

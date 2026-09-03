@@ -14,8 +14,10 @@ compaction, advances typed logical retention, retires no-longer-needed metadata,
 storage. In one sentence: M4 proves an old source is no longer readable; M5 consumes that exact proof and carries the
 source through deterministic replacement, reference-free retirement, and retry-safe deletion.
 
-This directory is the complete M5 hard-freeze. It is design authority only. No M5 runtime code, execution receipt,
-scenario promotion, physical deletion, or production deployment authority is created by these documents.
+This directory contains the complete M5 hard-freeze and later implementation projections/logs. The immutable I0 and
+A through E inputs are design authority only: those documents created no M5 runtime code, execution receipt, scenario
+promotion, physical deletion, or production deployment authority. Later implementation descendants do not rewrite
+that historical result.
 
 ## Current state
 
@@ -52,8 +54,9 @@ scenario promotion, physical deletion, or production deployment authority is cre
   retirement gate.
 - The implementation-selected [M5-C Binding authority projection](m5-c-binding-authority-projection.json) fixes the
   `M5R1` envelope, exact legacy migration, M4 projection, closed writer enrollment, durable tickets, one scan fence,
-  hard caps, and real Oxia single-key CAS used by the first amended implementation slice. Its
-  `v2M5BindingAuthorityCheck` result is focused and non-promotable; the full M5-C retirement gate remains absent.
+  hard caps, and real Oxia single-key CAS used by the first amended implementation slice. Its focused,
+  non-promotable `v2M5BindingAuthorityCheck` result is retained as a predecessor of the complete M5-C implementation
+  gate.
 - The [M5-C Pulsar aggregate authority projection](m5-c-pulsar-aggregate-authority-projection.json) fixes the distinct
   `M5PA` envelope at the existing incarnation aggregate key, exact NTA1 reader projection, closed tickets/fence,
   permanent exact `DELETED(generation)` selector binding, and the post-cleanup one-key transition to `M5PR`. Its
@@ -64,10 +67,17 @@ scenario promotion, physical deletion, or production deployment authority is cre
   authority families. `v2M5ClosedWriterIntegrationCheck` proves missing/duplicate ownership, ticket response loss,
   ambiguous external outcomes, and fence-first races fail closed. It is still a focused, non-promotable gate rather
   than the source-bound `RETENTION_METADATA_RETIREMENT` child.
+- The [complete M5-C retention-retirement implementation projection](m5-c-retention-retirement-implementation-projection.json)
+  binds those focused predecessors to exact Oxia client/server artifacts and real restart execution.
+  `v2M5RetentionRetirementCheck` proves both permanent metadata-retirement families through the accepted one-key CAS
+  path. It remains implementation-only and non-promotable: no source-bound child receipt, M5-D deletion result,
+  scenario promotion, or production authority exists.
 
-The design result is exactly `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. All 17 scenario rows whose milestone names
+At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
+`DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
+gates without amending that result. All 17 scenario rows whose milestone names
 M5 remain `PLANNED` with null receipts. `docs/v2/evidence/v2-m5/`, `v2M5EvidenceExecutionCheck`,
-`v2M5FinalSourceCheck`, and `v2M5Check` do not exist at this design boundary.
+`v2M5FinalSourceCheck`, and `v2M5Check` remain absent.
 
 ## Frozen predecessor
 
@@ -172,7 +182,8 @@ The design is closed only when:
 5. the 14 M5-promotable and three M6-deferred scenario rows are named exactly and remain unpromoted here;
 6. active evidence gates remain active and no prose claims their evidence;
 7. the documentation and M5 design contract gates pass; and
-8. the repository still contains no M5 runtime/evidence/Final gate or evidence artifact.
+8. at the immutable hard-freeze source, the repository contains no M5 runtime/evidence/Final gate or evidence
+   artifact.
 
 Hard freeze authorizes only later implementation work. It does not authorize running a workload, deleting data,
 publishing a receipt, promoting a scenario, or activating a production path.

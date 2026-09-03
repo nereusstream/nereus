@@ -215,8 +215,9 @@ def validate_projection_value(value: object) -> None:
         raise BindingAuthorityError("Binding-authority backend capability projection differs")
     if value.get("bindingAuthorityGatePresent") is not True:
         raise BindingAuthorityError("Binding-authority focused gate is not present")
+    if value.get("fullRetirementGatePresent") is not True:
+        raise BindingAuthorityError("Binding-authority projection lacks the completed full retirement gate")
     for field in (
-        "fullRetirementGatePresent",
         "physicalDeleteAuthority",
         "scenarioPromotionAuthority",
         "productionAuthority",
@@ -241,8 +242,8 @@ def validate_tasks(root: Path) -> None:
     )
     if 'tasks.register<Test>("v2M5BindingAuthorityTest")' not in module_build:
         raise BindingAuthorityError("storage-object build lacks v2M5BindingAuthorityTest")
-    if re.search(r'tasks\.register(?:<[^>]+>)?\("v2M5RetentionRetirementCheck"\)', root_build):
-        raise BindingAuthorityError("full M5-C retirement gate exists before the complete retirement slice")
+    if re.search(r'tasks\.register(?:<[^>]+>)?\("v2M5RetentionRetirementCheck"\)', root_build) is None:
+        raise BindingAuthorityError("root build lacks the completed full M5-C retirement gate")
 
 
 def validate(root: Path) -> None:

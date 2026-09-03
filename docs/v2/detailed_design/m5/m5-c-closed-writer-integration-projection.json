@@ -61,7 +61,7 @@
     "timeoutOrLocalCompletionClear": "FORBIDDEN"
   },
   "closedWriterIntegrationGatePresent": true,
-  "fullRetirementGatePresent": false,
+  "fullRetirementGatePresent": true,
   "sourceBoundReceiptPresent": false,
   "physicalDeleteAuthority": false,
   "scenarioPromotionAuthority": false,

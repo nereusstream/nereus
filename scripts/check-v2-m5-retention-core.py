@@ -268,8 +268,8 @@ def validate_tasks(root: Path) -> None:
     if 'tasks.register<Test>("v2M5RetentionOxiaCapabilityTest")' not in oxia_build:
         raise RetentionCoreError("metadata-oxia build lacks v2M5RetentionOxiaCapabilityTest")
     require_literals(root_build, ("v2M5KafkaCompactionCheck", "v2M5RetentionCoreSourceCheck"), "M5-C aggregate")
-    if re.search(r'tasks\.register(?:<[^>]+>)?\("v2M5RetentionRetirementCheck"\)', root_build):
-        raise RetentionCoreError("full M5-C retirement gate exists while the Oxia capability is blocked")
+    if re.search(r'tasks\.register(?:<[^>]+>)?\("v2M5RetentionRetirementCheck"\)', root_build) is None:
+        raise RetentionCoreError("accepted amended full M5-C retirement gate is missing")
 
 
 def validate(root: Path) -> None:

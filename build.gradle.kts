@@ -2257,6 +2257,34 @@ tasks.register("v2M5ClosedWriterIntegrationCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5RetentionRetirementContractTest") {
+    group = "verification"
+    description = "Test the fail-closed complete M5-C retirement implementation checker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-retention-retirement-tests.py")
+}
+
+tasks.register<Exec>("v2M5RetentionRetirementSourceCheck") {
+    group = "verification"
+    description = "Validate the amended complete M5-C authority implementation and real Oxia source boundary."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-retention-retirement.py")
+}
+
+tasks.register("v2M5RetentionRetirementCheck") {
+    group = "verification"
+    description = "Run complete non-promotable M5-C retirement tests including source-locked real Oxia."
+    dependsOn(
+        "v2M5ClosedWriterIntegrationCheck",
+        "v2M5RetentionRetirementContractTest",
+        "v2M5RetentionRetirementSourceCheck",
+        ":nereus-metadata-oxia:v2M5RetentionRealOxiaTest",
+        ":nereus-metadata-oxia:checkstyleMain",
+        ":nereus-metadata-oxia:checkstyleTest",
+        ":nereus-metadata-oxia:spotlessCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."
