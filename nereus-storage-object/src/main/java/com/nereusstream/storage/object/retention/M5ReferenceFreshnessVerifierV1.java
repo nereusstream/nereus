@@ -20,7 +20,6 @@ import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityF
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.ReferenceFreeProofV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.RetentionFloorSnapshotV1;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,9 +39,9 @@ public final class M5ReferenceFreshnessVerifierV1 {
         Objects.requireNonNull(snapshot, "snapshot");
         M5RetentionCodecV1.encodeSnapshot(snapshot);
         List<AuthorityFactV1> facts = new ArrayList<>();
+        snapshot.rows().forEach(row -> facts.add(row.authority()));
         facts.add(snapshot.ownerFence());
         facts.add(snapshot.storageFence());
-        snapshot.rows().forEach(row -> facts.add(row.authority()));
         return loadExact(deduplicate(facts));
     }
 
@@ -53,12 +52,12 @@ public final class M5ReferenceFreshnessVerifierV1 {
         facts.add(proof.selectorRoot());
         facts.add(proof.manifestRoot());
         facts.add(proof.trimRoot());
+        proof.m4Releases().forEach(release -> facts.add(release.protectionAuthority()));
+        proof.observations().forEach(observation -> facts.add(observation.authority()));
         facts.add(proof.ownerFence());
         facts.add(proof.workerFence());
         facts.add(proof.storageFence());
         facts.add(proof.providerFence());
-        proof.m4Releases().forEach(release -> facts.add(release.protectionAuthority()));
-        proof.observations().forEach(observation -> facts.add(observation.authority()));
         return loadExact(deduplicate(facts));
     }
 
@@ -81,11 +80,12 @@ public final class M5ReferenceFreshnessVerifierV1 {
 
     static List<AuthorityFactV1> deduplicate(List<AuthorityFactV1> facts) {
         Map<String, AuthorityFactV1> byKey = new LinkedHashMap<>();
-        facts.stream().sorted(Comparator.comparing(AuthorityFactV1::key)).forEach(fact -> {
-            AuthorityFactV1 previous = byKey.putIfAbsent(fact.key(), fact);
+        facts.forEach(fact -> {
+            AuthorityFactV1 previous = byKey.remove(fact.key());
             if (previous != null && !previous.equals(fact)) {
                 throw new IllegalArgumentException("one authority key has conflicting facts: " + fact.key());
             }
+            byKey.put(fact.key(), fact);
         });
         return List.copyOf(byKey.values());
     }

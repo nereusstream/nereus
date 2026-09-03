@@ -61,10 +61,12 @@ REQUIRED_SOURCES = (
     "nereus-storage-object/src/main/java/com/nereusstream/storage/object/retention/M5ReferenceFreshnessVerifierV1.java",
     "nereus-storage-object/src/main/java/com/nereusstream/storage/object/retention/M5RetentionAdmissionV1.java",
     "nereus-storage-object/src/main/java/com/nereusstream/storage/object/retention/M5RetentionCodecV1.java",
+    "nereus-storage-object/src/main/java/com/nereusstream/storage/object/retention/M5RetentionEvidenceAssemblerV1.java",
     "nereus-storage-object/src/main/java/com/nereusstream/storage/object/retention/M5RetentionKeysV1.java",
     "nereus-storage-object/src/main/java/com/nereusstream/storage/object/retention/M5RetentionPlannerV1.java",
     "nereus-storage-object/src/main/java/com/nereusstream/storage/object/retention/M5RetentionRecordsV1.java",
     "nereus-storage-object/src/main/java/com/nereusstream/storage/object/retention/M5RetirementCoordinatorV1.java",
+    "nereus-storage-object/src/test/java/com/nereusstream/storage/object/retention/M5RetentionEvidenceAssemblerV1Test.java",
     "nereus-storage-object/src/test/java/com/nereusstream/storage/object/retention/M5RetentionRetirementV1Test.java",
 )
 
@@ -115,10 +117,12 @@ def validate_runtime_contract(root: Path) -> None:
     adapter = source(root, "Oxia09ExactMetadataTransactionStoreV1.java")
     records = source(root, "M5RetentionRecordsV1.java")
     admission = source(root, "M5RetentionAdmissionV1.java")
+    assembler = source(root, "M5RetentionEvidenceAssemblerV1.java")
     coordinator = source(root, "M5RetirementCoordinatorV1.java")
     freshness = source(root, "M5ReferenceFreshnessVerifierV1.java")
     trim = source(root, "M5LogicalTrimCoordinatorV1.java")
     tests = source(root, "M5RetentionRetirementV1Test.java")
+    assembler_tests = source(root, "M5RetentionEvidenceAssemblerV1Test.java")
     adapter_tests = source(root, "Oxia09ExactMetadataTransactionStoreV1Test.java")
     require_literals(port, ("ExactTransaction", "conditionalTransaction", "UNSUPPORTED", "sequential"), "SPI")
     require_literals(
@@ -138,6 +142,11 @@ def validate_runtime_contract(root: Path) -> None:
         "records",
     )
     require_literals(admission, LIMIT_KINDS + ("REJECTED_CAP", "AlertV1", "compareAndSet"), "admission")
+    require_literals(
+        assembler,
+        ("exactFloorRegistry", "exactReferenceRegistry", "freshness.requireFresh", "closed inventory"),
+        "evidence assembler",
+    )
     require_literals(
         coordinator,
         (
@@ -162,6 +171,16 @@ def validate_runtime_contract(root: Path) -> None:
             "pulsarAggregateRetirementInstallsPermanentSameKeyTombstone",
         ),
         "retention tests",
+    )
+    require_literals(
+        assembler_tests,
+        (
+            "closedRegistriesBuildFreshCanonicalSnapshotAndProof",
+            "missingClosedAdapterIsRejectedBeforeAnyScan",
+            "authorityVersionChangeDuringScanIsRejectedByFinalReread",
+            "anyPresentReferenceVetoesProofAssembly",
+        ),
+        "evidence assembler tests",
     )
     require_literals(
         adapter_tests,

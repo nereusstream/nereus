@@ -204,6 +204,7 @@ tasks.register<Test>("v2M5RetentionCoreTest") {
     maxParallelForks = 1
     useJUnitPlatform()
     filter {
+        includeTestsMatching("com.nereusstream.storage.object.retention.M5RetentionEvidenceAssemblerV1Test")
         includeTestsMatching("com.nereusstream.storage.object.retention.M5RetentionRetirementV1Test")
     }
     outputs.upToDateWhen { false }

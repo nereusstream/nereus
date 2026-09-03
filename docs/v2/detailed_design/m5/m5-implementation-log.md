@@ -110,6 +110,8 @@ Implemented surfaces:
 
 - a closed ten-class retention-floor snapshot, monotonic typed logical trim, exact version/value vectors, and a
   verifier that rereads every bound authority fact before accepting a snapshot or proof;
+- exact closed floor/reference adapter registries and a deterministic assembler that rejects a missing adapter,
+  foreign target/class, partial summary, present reference, or any authority version/value change during scanning;
 - the complete closed 15-kind reference-veto inventory, bounded scan summaries, authoritative absence rules, audit
   deadline, and exact M4 `RELEASED` member bindings;
 - canonical bounded codecs and deterministic keys for floor snapshots, trim frontiers, reference-free proofs,
@@ -133,6 +135,7 @@ Focused core gate:
 ./gradlew --no-daemon --no-configuration-cache v2M5RetentionCoreCheck
 PASS_V2_M5_RETENTION_CORE_NON_PROMOTABLE_OXIA_ATOMIC_TRANSACTION_UNSUPPORTED
 M5RetentionRetirementV1Test: 11 tests, 0 failures, 0 errors, 0 skipped
+M5RetentionEvidenceAssemblerV1Test: 4 tests, 0 failures, 0 errors, 0 skipped
 Oxia09ExactMetadataTransactionStoreV1Test: 2 tests, 0 failures, 0 errors, 0 skipped
 ```
 
