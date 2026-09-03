@@ -1,0 +1,70 @@
+{
+  "schema": "NEREUS_V2_M5_D_TARGET_DELETE_AUTHORITY_FOUNDATION_PROJECTION_V1",
+  "status": "TARGET_SCOPED_AUTHORITY_FOUNDATION_IMPLEMENTED_NON_PROMOTABLE",
+  "amendmentCommit": "a3b3884b3da8664465bc114e10b33e35ad32f311",
+  "wire": {
+    "magic": "M5DA",
+    "version": 1,
+    "maximumAuthorityBytes": 1048576,
+    "maximumTargetIdentityBytes": 65536,
+    "maximumExternalIdentityBytes": 262144,
+    "maximumWriterTickets": 256
+  },
+  "authorityStates": [
+    "OPEN_V1",
+    "READ_FENCED_V1",
+    "DELETE_INTENT_V1",
+    "DELETE_DONE_V1"
+  ],
+  "closedWriterClasses": [
+    "M4_SOURCE_PROTECTION_RELEASE_V1",
+    "MANIFEST_SELECTOR_GENERATION_REPRESENTATION_V1",
+    "LOGICAL_TRIM_RETENTION_FLOOR_V1",
+    "REFERENCE_SHARED_PHYSICAL_MEMBER_V1",
+    "REPLICA_TOPOLOGY_V1",
+    "MULTIPART_INVENTORY_PUBLICATION_RESPONSE_LOSS_V1",
+    "TASK_PROJECTION_MIGRATION_RECOVERY_V1",
+    "OWNER_WORKER_LEASE_HANDLE_PIN_V1",
+    "PROVIDER_KMS_STORAGE_PROFILE_CAPABILITY_V1",
+    "DISPATCH_OWNER_CELL_RESERVATION_V1"
+  ],
+  "targetKinds": [
+    "OBJECT_VERSION_V1",
+    "BOOKKEEPER_LEDGER_V1",
+    "PULSAR_ROOT_OBJECT_V1",
+    "PULSAR_DATA_OBJECT_V1",
+    "MULTIPART_UPLOAD_V1"
+  ],
+  "invariants": {
+    "onePermanentKeyPerTarget": true,
+    "cellAndTargetDomainSeparated": true,
+    "everySuccessorIncrementsRevision": true,
+    "everySuccessorBindsExactPredecessorDigest": true,
+    "canonicalNoOpAndAbaForbidden": true,
+    "ticketVisibleBeforeProofMutation": true,
+    "activeTicketVetoesReadFence": true,
+    "readFenceRejectsNewTickets": true,
+    "cas1GrantsDispatch": false,
+    "cas2BindsExactIdentityAttemptOwnerAndCapability": true,
+    "takeoverKeepsFixedAttemptAndIntentRevision": true,
+    "doneIsPermanent": true,
+    "crossTargetAtomicity": false
+  },
+  "focusedTests": {
+    "authorityTests": 11,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "pureCandidateStateMachinePresent": true,
+  "persistedMutationCoordinatorPresent": false,
+  "closedWriterRuntimeIntegrationPresent": false,
+  "externalIdentityReaderPresent": false,
+  "externalDeleteCompositionPresent": false,
+  "realOxiaExecutionPresent": false,
+  "fullM5DGatePresent": false,
+  "sourceBoundReceiptPresent": false,
+  "physicalDeleteAuthority": false,
+  "scenarioPromotionAuthority": false,
+  "productionAuthority": false
+}

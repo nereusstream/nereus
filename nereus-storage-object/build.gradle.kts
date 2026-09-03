@@ -261,6 +261,19 @@ tasks.register<Test>("v2M5ClosedWriterIntegrationTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("v2M5TargetDeleteAuthorityFoundationTest") {
+    group = "verification"
+    description = "Run the non-promotable target key, codec, revision, writer-ticket, intent, takeover, and done tests."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityV1Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true

@@ -166,6 +166,11 @@ performance-first BookKeeper WAL.
   permanent authority cell per target, closed-writer tickets/fencing, and two exact same-key CAS transitions. The
   amendment implementation is `NotStarted`; it grants no intent, dispatch, physical-delete, receipt, scenario, or
   production authority.
+- The subsequent non-promotable `v2M5TargetDeleteAuthorityFoundationCheck` fixes the `M5DA` canonical wire, permanent
+  Cell/target key, exact four-state authority and ten-class writer inventory, monotonic revision/predecessor chain,
+  ticket/fence races, CAS-2 token, fixed-attempt takeover and permanent done in 11 pure tests. It includes no metadata
+  mutation coordinator, runtime writer integration, external identity/delete composition, real Oxia execution, or
+  physical-delete authority.
 - M5-D has begun with non-promotable `v2M5VersionMatchDeleteCheck` and `v2M5BookKeeperDeleteCheck`: fixed-digest MinIO proves enabled-bucket
   version-match deletion, same-key recreation protection, and complete LIST/full-GET response-loss reconciliation.
   The exact BookKeeper adapter binds a closed ledger's complete metadata fingerprint, rejects stale targets before

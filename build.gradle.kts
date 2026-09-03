@@ -2520,6 +2520,35 @@ tasks.register("v2M5MultipartCleanupCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5TargetDeleteAuthorityFoundationContractTest") {
+    group = "verification"
+    description = "Test the fail-closed non-promotable M5-D target authority foundation checker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-target-delete-authority-foundation-tests.py")
+}
+
+tasks.register<Exec>("v2M5TargetDeleteAuthorityFoundationSourceCheck") {
+    group = "verification"
+    description = "Validate M5-D target authority keys, codec, revision chain, and pure candidate state machine."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-target-delete-authority-foundation.py")
+}
+
+tasks.register("v2M5TargetDeleteAuthorityFoundationCheck") {
+    group = "verification"
+    description = "Run the M5-D authority foundation gate without metadata mutation or external delete authority."
+    dependsOn(
+        "v2M5DesignAmendment2Check",
+        "v2M5MultipartCleanupSourceCheck",
+        "v2M5TargetDeleteAuthorityFoundationContractTest",
+        "v2M5TargetDeleteAuthorityFoundationSourceCheck",
+        ":nereus-storage-object:v2M5TargetDeleteAuthorityFoundationTest",
+        ":nereus-storage-object:checkstyleMain",
+        ":nereus-storage-object:checkstyleTest",
+        ":nereus-storage-object:spotlessCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

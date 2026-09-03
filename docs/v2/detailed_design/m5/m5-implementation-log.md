@@ -402,11 +402,38 @@ The session has an external abort adapter because this slice proves transport/re
 method to create intent, publish `DELETE_DONE`, or decide that dispatch is authorized. The focused result is not a
 source-bound child and grants no physical-delete, scenario-promotion, staging, or production authority.
 
+## M5-D target-scoped authority foundation
+
+Status: pure target key/record/codec/state-machine foundation implemented; no metadata mutation or external adapter is
+composed, and the complete M5-D gate has not run.
+
+- `M5TargetDeleteAuthorityKeysV1` domain-separates the exact target by Cell Provider Scope and target kind, then
+  derives the one permanent `v2/physical-delete-m5/.../authority-v1` key and complete dispatch-token root;
+- `M5TargetDeleteAuthorityRecordsV1` closes five target kinds, ten proof-changing writer classes, four irreversible
+  states, exact external identity, fixed intent/dispatch ownership and permanent completion proof under hard caps;
+- `M5TargetDeleteAuthorityCodecV1` supplies the strict `M5DA` v1 canonical envelope, self digest, predecessor digest,
+  trailing/truncated/unknown-code rejection and a revision increment for every successor; and
+- `M5TargetDeleteAuthorityStateMachineV1` constructs pure writer-ticket acquire/reconcile, CAS-1 read fence, CAS-2
+  identity/attempt/owner/capability binding, fenced-owner takeover and done candidates. It performs no CAS itself and
+  calls no Provider or BookKeeper transport.
+
+Focused gate:
+
+```text
+./gradlew --no-daemon --no-configuration-cache v2M5TargetDeleteAuthorityFoundationCheck --rerun-tasks
+PASS_V2_M5_TARGET_DELETE_AUTHORITY_FOUNDATION_NON_PROMOTABLE
+M5TargetDeleteAuthorityV1Test: 11 tests, 0 failures, 0 errors, 0 skipped
+```
+
+The projection deliberately records `persistedMutationCoordinatorPresent=false`,
+`closedWriterRuntimeIntegrationPresent=false`, `externalDeleteCompositionPresent=false`, and
+`realOxiaExecutionPresent=false`. Pure candidate construction is not persisted dispatch authority and grants no
+physical-delete, source-bound receipt, scenario-promotion, staging, or production authority.
+
 ## Remaining ordered work
 
-1. Implement the ADR 0147 target-scoped authority record, closed-writer tickets/fence, two exact same-key CAS
-   transitions, persisted intent/done, and external cleanup composition above the admitted Object/BookKeeper and pure
-   orphan/admission/Pulsar-order cores.
+1. Persist the ADR 0147 authority through exact same-key CAS, integrate all ten proof-bound writer classes, and compose
+   the fenced identity read, intent/done recovery and external cleanup adapters above the pure foundation.
 2. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
    `v2M5Check`.
 

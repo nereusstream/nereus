@@ -103,6 +103,12 @@ that historical result.
   fixed-digest MinIO, including response loss, same-key foreign-upload veto, and the product's explicit
   directory-prefix-listing rejection. It is an execution adapter only: no intent mutation, dispatch authority,
   source-bound receipt, scenario promotion, or production authority follows.
+- The [M5-D target authority foundation projection](m5-d-target-delete-authority-foundation-projection.json) fixes the
+  `M5DA` wire, Cell/target-domain-separated permanent key, four irreversible states, ten-class closed writer
+  enrollment, monotonically increasing revision/predecessor chain, CAS-1/CAS-2 candidates, fixed-attempt takeover,
+  and permanent done shape. `v2M5TargetDeleteAuthorityFoundationCheck` exercises 11 pure tests. There is no metadata
+  mutation coordinator, writer runtime integration, external identity reader/delete composition, real Oxia result,
+  receipt, or physical-delete authority at this foundation.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
