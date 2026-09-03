@@ -176,9 +176,12 @@ def validate_runtime_contract(root: Path) -> None:
         assembler_tests,
         (
             "closedRegistriesBuildFreshCanonicalSnapshotAndProof",
-            "missingClosedAdapterIsRejectedBeforeAnyScan",
-            "authorityVersionChangeDuringScanIsRejectedByFinalReread",
-            "anyPresentReferenceVetoesProofAssembly",
+            "everyMissingFloorAdapterIsRejectedBeforeAnyScan",
+            "everyMissingReferenceAdapterIsRejectedBeforeAnyScan",
+            "everyFloorAuthorityVersionChangeDuringScanIsRejected",
+            "everyPresentReferenceKindVetoesProofAssembly",
+            "everyReferenceAuthorityVersionChangeDuringScanIsRejected",
+            "multiplePresentReferenceKindsRemainACombinedVeto",
         ),
         "evidence assembler tests",
     )

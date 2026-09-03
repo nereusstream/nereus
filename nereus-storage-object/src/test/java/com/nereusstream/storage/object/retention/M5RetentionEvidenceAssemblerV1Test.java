@@ -46,12 +46,16 @@ import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.RetentionF
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class M5RetentionEvidenceAssemblerV1Test {
     private static final CapabilityBinding CAPABILITY = new CapabilityBinding(7, digest("capability"));
@@ -67,7 +71,9 @@ class M5RetentionEvidenceAssemblerV1Test {
         AuthorityFactV1 owner = fact(metadata.seed("/owner", bytes("owner")));
         AuthorityFactV1 storage = fact(metadata.seed("/storage", bytes("storage")));
         M5RetentionEvidenceAssemblerV1 assembler = new M5RetentionEvidenceAssemblerV1(
-                metadata, floorAdapters(metadata, false), referenceAdapters(metadata, Optional.empty()));
+                metadata,
+                floorAdapters(metadata, Optional.empty()),
+                referenceAdapters(metadata, Set.of(), Optional.empty()));
 
         RetentionFloorSnapshotV1 snapshot = assembler
                 .buildFloorSnapshot(new FloorSnapshotRequestV1(
@@ -110,30 +116,61 @@ class M5RetentionEvidenceAssemblerV1Test {
         assertThat(proof.observations()).hasSize(ReferenceKindV1.values().length);
         assertThat(proof.scanSummaries()).hasSize(ReferenceKindV1.values().length);
         assertThat(metadata.lastReadKeys(4)).containsExactly("/owner", "/worker", "/storage", "/provider");
-        assertThat(M5RetentionCodecV1.decodeReferenceFreeProof(M5RetentionCodecV1.encodeReferenceFreeProof(proof)))
-                .isEqualTo(proof);
+        CanonicalBytes encodedProof = M5RetentionCodecV1.encodeReferenceFreeProof(proof);
+        assertThat(M5RetentionCodecV1.decodeReferenceFreeProof(encodedProof)).isEqualTo(proof);
+        byte[] unknownKind = encodedProof.toByteArray();
+        byte[] firstSummary = ByteBuffer.allocate(18)
+                .put((byte) 1)
+                .putInt(1)
+                .putInt(1)
+                .putLong(64)
+                .put((byte) 1)
+                .array();
+        unknownKind[findUnique(unknownKind, firstSummary)] = (byte) 0xff;
+        assertThatThrownBy(() -> M5RetentionCodecV1.decodeReferenceFreeProof(CanonicalBytes.copyOf(unknownKind)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reference kind");
     }
 
-    @Test
-    void missingClosedAdapterIsRejectedBeforeAnyScan() {
+    @ParameterizedTest
+    @EnumSource(FloorClassV1.class)
+    void everyMissingFloorAdapterIsRejectedBeforeAnyScan(FloorClassV1 missing) {
         InMemoryStore metadata = new InMemoryStore();
-        EnumMap<FloorClassV1, FloorAdapterV1> incomplete = floorAdapters(metadata, false);
-        incomplete.remove(FloorClassV1.AUDIT_GRACE);
+        EnumMap<FloorClassV1, FloorAdapterV1> incomplete = floorAdapters(metadata, Optional.empty());
+        incomplete.remove(missing);
 
         assertThatThrownBy(() -> new M5RetentionEvidenceAssemblerV1(
-                        metadata, incomplete, referenceAdapters(metadata, Optional.empty())))
+                        metadata, incomplete, referenceAdapters(metadata, Set.of(), Optional.empty())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("closed inventory");
         assertThat(metadata.readCalls).isZero();
     }
 
-    @Test
-    void authorityVersionChangeDuringScanIsRejectedByFinalReread() {
+    @ParameterizedTest
+    @EnumSource(ReferenceKindV1.class)
+    void everyMissingReferenceAdapterIsRejectedBeforeAnyScan(ReferenceKindV1 missing) {
+        InMemoryStore metadata = new InMemoryStore();
+        EnumMap<ReferenceKindV1, ReferenceAdapterV1> incomplete =
+                referenceAdapters(metadata, Set.of(), Optional.empty());
+        incomplete.remove(missing);
+
+        assertThatThrownBy(() -> new M5RetentionEvidenceAssemblerV1(
+                        metadata, floorAdapters(metadata, Optional.empty()), incomplete))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("closed inventory");
+        assertThat(metadata.readCalls).isZero();
+    }
+
+    @ParameterizedTest
+    @EnumSource(FloorClassV1.class)
+    void everyFloorAuthorityVersionChangeDuringScanIsRejected(FloorClassV1 changed) {
         InMemoryStore metadata = new InMemoryStore();
         AuthorityFactV1 owner = fact(metadata.seed("/owner/change", bytes("owner")));
         AuthorityFactV1 storage = fact(metadata.seed("/storage/change", bytes("storage")));
         M5RetentionEvidenceAssemblerV1 assembler = new M5RetentionEvidenceAssemblerV1(
-                metadata, floorAdapters(metadata, true), referenceAdapters(metadata, Optional.empty()));
+                metadata,
+                floorAdapters(metadata, Optional.of(changed)),
+                referenceAdapters(metadata, Set.of(), Optional.empty()));
 
         assertThatThrownBy(() -> assembler
                         .buildFloorSnapshot(new FloorSnapshotRequestV1(
@@ -143,38 +180,52 @@ class M5RetentionEvidenceAssemblerV1Test {
                 .hasRootCauseInstanceOf(M5ReferenceFreshnessVerifierV1.StaleAuthorityException.class);
     }
 
-    @Test
-    void anyPresentReferenceVetoesProofAssembly() {
+    @ParameterizedTest
+    @EnumSource(ReferenceKindV1.class)
+    void everyPresentReferenceKindVetoesProofAssembly(ReferenceKindV1 present) {
         InMemoryStore metadata = new InMemoryStore();
-        AuthorityFactV1 owner = fact(metadata.seed("/owner/present", bytes("owner")));
-        AuthorityFactV1 storage = fact(metadata.seed("/storage/present", bytes("storage")));
-        AuthorityFactV1 selector = fact(metadata.seed("/selector/present", bytes("selector")));
-        AuthorityFactV1 manifest = fact(metadata.seed("/manifest/present", bytes("manifest")));
-        AuthorityFactV1 trim = fact(metadata.seed("/trim/present", bytes("trim")));
-        AuthorityFactV1 worker = fact(metadata.seed("/worker/present", bytes("worker")));
-        AuthorityFactV1 provider = fact(metadata.seed("/provider/present", bytes("provider")));
         M5RetentionEvidenceAssemblerV1 assembler = new M5RetentionEvidenceAssemblerV1(
                 metadata,
-                floorAdapters(metadata, false),
-                referenceAdapters(metadata, Optional.of(ReferenceKindV1.MANIFEST_FALLBACK)));
+                floorAdapters(metadata, Optional.empty()),
+                referenceAdapters(metadata, EnumSet.of(present), Optional.empty()));
 
         assertThatThrownBy(() -> assembler
-                        .buildReferenceFreeProof(new ReferenceProofRequestV1(
-                                IDENTITY,
-                                ReferenceTargetKindV1.PULSAR_AGGREGATE,
-                                digest("target"),
-                                COVERAGE,
-                                selector,
-                                manifest,
-                                trim,
-                                digest("snapshot"),
-                                List.of(),
-                                owner,
-                                worker,
-                                storage,
-                                provider,
-                                1_000,
-                                1_001))
+                        .buildReferenceFreeProof(referenceRequest(metadata, "present-" + present.ordinal()))
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("present");
+    }
+
+    @ParameterizedTest
+    @EnumSource(ReferenceKindV1.class)
+    void everyReferenceAuthorityVersionChangeDuringScanIsRejected(ReferenceKindV1 changed) {
+        InMemoryStore metadata = new InMemoryStore();
+        M5RetentionEvidenceAssemblerV1 assembler = new M5RetentionEvidenceAssemblerV1(
+                metadata,
+                floorAdapters(metadata, Optional.empty()),
+                referenceAdapters(metadata, Set.of(), Optional.of(changed)));
+
+        assertThatThrownBy(() -> assembler
+                        .buildReferenceFreeProof(referenceRequest(metadata, "changed-" + changed.ordinal()))
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseInstanceOf(M5ReferenceFreshnessVerifierV1.StaleAuthorityException.class);
+    }
+
+    @Test
+    void multiplePresentReferenceKindsRemainACombinedVeto() {
+        InMemoryStore metadata = new InMemoryStore();
+        M5RetentionEvidenceAssemblerV1 assembler = new M5RetentionEvidenceAssemblerV1(
+                metadata,
+                floorAdapters(metadata, Optional.empty()),
+                referenceAdapters(
+                        metadata,
+                        EnumSet.of(ReferenceKindV1.MANIFEST_SELECTED, ReferenceKindV1.AUDIT_GRACE),
+                        Optional.empty()));
+
+        assertThatThrownBy(() -> assembler
+                        .buildReferenceFreeProof(referenceRequest(metadata, "combined"))
                         .toCompletableFuture()
                         .join())
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
@@ -182,13 +233,13 @@ class M5RetentionEvidenceAssemblerV1Test {
     }
 
     private static EnumMap<FloorClassV1, FloorAdapterV1> floorAdapters(
-            InMemoryStore metadata, boolean changeLastAuthority) {
+            InMemoryStore metadata, Optional<FloorClassV1> changedKind) {
         EnumMap<FloorClassV1, FloorAdapterV1> adapters = new EnumMap<>(FloorClassV1.class);
         for (FloorClassV1 floorClass : FloorClassV1.values()) {
             adapters.put(floorClass, request -> {
                 String key = "/floor/" + floorClass.ordinal() + "/" + metadata.nextFixtureOrdinal();
                 VersionedValue value = metadata.seed(key, bytes(floorClass.name()));
-                if (changeLastAuthority && floorClass == FloorClassV1.AUDIT_GRACE) {
+                if (changedKind.filter(kind -> kind == floorClass).isPresent()) {
                     metadata.overwrite(key, bytes("changed"));
                 }
                 RetentionFloorObservationV1 row = new RetentionFloorObservationV1(
@@ -200,18 +251,21 @@ class M5RetentionEvidenceAssemblerV1Test {
     }
 
     private static EnumMap<ReferenceKindV1, ReferenceAdapterV1> referenceAdapters(
-            InMemoryStore metadata, Optional<ReferenceKindV1> presentKind) {
+            InMemoryStore metadata, Set<ReferenceKindV1> presentKinds, Optional<ReferenceKindV1> changedKind) {
         EnumMap<ReferenceKindV1, ReferenceAdapterV1> adapters = new EnumMap<>(ReferenceKindV1.class);
         for (ReferenceKindV1 referenceKind : ReferenceKindV1.values()) {
             adapters.put(referenceKind, request -> {
                 String key = "/reference/" + referenceKind.ordinal() + "/" + metadata.nextFixtureOrdinal();
                 VersionedValue value = metadata.seed(key, bytes(referenceKind.name()));
+                if (changedKind.filter(kind -> kind == referenceKind).isPresent()) {
+                    metadata.overwrite(key, bytes("changed"));
+                }
                 ReferenceObservationV1 row = new ReferenceObservationV1(
                         referenceKind,
                         fact(value),
                         request.targetIdentitySha256(),
                         request.coverage(),
-                        presentKind.filter(kind -> kind == referenceKind).isPresent()
+                        presentKinds.contains(referenceKind)
                                 ? ReferenceDispositionV1.PRESENT
                                 : ReferenceDispositionV1.ABSENT,
                         true);
@@ -220,6 +274,32 @@ class M5RetentionEvidenceAssemblerV1Test {
             });
         }
         return adapters;
+    }
+
+    private static ReferenceProofRequestV1 referenceRequest(InMemoryStore metadata, String suffix) {
+        AuthorityFactV1 owner = fact(metadata.seed("/owner/" + suffix, bytes("owner")));
+        AuthorityFactV1 storage = fact(metadata.seed("/storage/" + suffix, bytes("storage")));
+        AuthorityFactV1 selector = fact(metadata.seed("/selector/" + suffix, bytes("selector")));
+        AuthorityFactV1 manifest = fact(metadata.seed("/manifest/" + suffix, bytes("manifest")));
+        AuthorityFactV1 trim = fact(metadata.seed("/trim/" + suffix, bytes("trim")));
+        AuthorityFactV1 worker = fact(metadata.seed("/worker/" + suffix, bytes("worker")));
+        AuthorityFactV1 provider = fact(metadata.seed("/provider/" + suffix, bytes("provider")));
+        return new ReferenceProofRequestV1(
+                IDENTITY,
+                ReferenceTargetKindV1.PULSAR_AGGREGATE,
+                digest("target"),
+                COVERAGE,
+                selector,
+                manifest,
+                trim,
+                digest("snapshot"),
+                List.of(),
+                owner,
+                worker,
+                storage,
+                provider,
+                1_000,
+                1_001);
     }
 
     private static AuthorityFactV1 fact(VersionedValue value) {
@@ -232,6 +312,29 @@ class M5RetentionEvidenceAssemblerV1Test {
 
     private static Sha256Digest digest(String value) {
         return Sha256Digest.hash(bytes(value));
+    }
+
+    private static int findUnique(byte[] value, byte[] pattern) {
+        int found = -1;
+        for (int offset = 0; offset <= value.length - pattern.length; offset++) {
+            boolean matches = true;
+            for (int index = 0; index < pattern.length; index++) {
+                if (value[offset + index] != pattern[index]) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                if (found >= 0) {
+                    throw new IllegalArgumentException("test pattern is not unique");
+                }
+                found = offset;
+            }
+        }
+        if (found < 0) {
+            throw new IllegalArgumentException("test pattern is absent");
+        }
+        return found;
     }
 
     private static final class InMemoryStore implements ExactMetadataTransactionStoreV1 {
