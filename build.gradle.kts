@@ -17,6 +17,7 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.api.plugins.quality.Checkstyle
 import org.gradle.api.plugins.quality.CheckstyleExtension
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
@@ -24,6 +25,7 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.jvm.tasks.Jar
+import org.gradle.process.CommandLineArgumentProvider
 
 abstract class DockerIntegrationGateService : BuildService<BuildServiceParameters.None>
 
@@ -32,6 +34,13 @@ abstract class PulsarCheckoutGateService : BuildService<BuildServiceParameters.N
 abstract class KafkaCheckoutGateService : BuildService<BuildServiceParameters.None>
 
 abstract class M3NestedGradleGateService : BuildService<BuildServiceParameters.None>
+
+abstract class V2TaskCommandLineArguments : CommandLineArgumentProvider {
+    @get:Input
+    abstract val values: ListProperty<String>
+
+    override fun asArguments(): Iterable<String> = values.get()
+}
 
 abstract class V2ProjectClasspathVerificationTask : DefaultTask() {
     @get:org.gradle.api.tasks.Classpath
@@ -606,7 +615,13 @@ tasks.register<Exec>("v2M1K1FocusedSourceCheck") {
     description = "Run the exact clean Kafka K1 metadata-authority focused gate; this is not M1 PASS."
     usesService(kafkaCheckoutGate)
     workingDir = layout.projectDirectory.asFile
-    commandLine("bash", "scripts/check-v2-m1-k1-kafka.sh", kafkaForkCheckoutPath.get())
+    executable("bash")
+    args("scripts/check-v2-m1-k1-kafka.sh")
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add(kafkaForkCheckoutPath)
+        },
+    )
 }
 
 tasks.register("v2M1K1FocusedCheck") {
@@ -622,10 +637,12 @@ tasks.register<Exec>("v2M1P1FocusedSourceCheck") {
     usesService(dockerIntegrationGate)
     usesService(pulsarCheckoutGate)
     workingDir = layout.projectDirectory.asFile
-    commandLine(
-        "bash",
-        "scripts/check-v2-m1-p1-pulsar.sh",
-        pulsarCheckoutPath.get(),
+    executable("bash")
+    args("scripts/check-v2-m1-p1-pulsar.sh")
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add(pulsarCheckoutPath)
+        },
     )
 }
 
@@ -805,7 +822,12 @@ tasks.register<JavaExec>("v2M2KafkaInputsReceiptCheck") {
     classpath = files(layout.projectDirectory.dir("nereus-kafka-bookkeeper/build/classes/java/main"))
     workingDir = layout.projectDirectory.asFile
     mainClass.set("com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptCli")
-    setArgs(listOf("validate", v2M2KafkaInputsReceiptPath.get()))
+    args("validate")
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add(v2M2KafkaInputsReceiptPath)
+        },
+    )
 }
 
 tasks.register<Exec>("v2M2KafkaInputsLiveSourceCheck") {
@@ -820,7 +842,13 @@ tasks.register<Exec>("v2M2KafkaInputsLiveSourceCheck") {
         "v2M2KafkaInputsReceiptCheck",
     )
     workingDir = layout.projectDirectory.asFile
-    commandLine("bash", "scripts/check-v2-m2-kafka-inputs-source.sh", v2M2KafkaInputsReceiptPath.get())
+    executable("bash")
+    args("scripts/check-v2-m2-kafka-inputs-source.sh")
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add(v2M2KafkaInputsReceiptPath)
+        },
+    )
 }
 
 tasks.register("v2M2KafkaInputsCheck") {
@@ -853,7 +881,13 @@ tasks.register<Exec>("v2M2KafkaK2SourceCheck") {
     dependsOn(v2M2KafkaK2Test)
     usesService(kafkaCheckoutGate)
     workingDir = layout.projectDirectory.asFile
-    commandLine("bash", "scripts/check-v2-m2-kafka-k2.sh", kafkaForkCheckoutPath.get())
+    executable("bash")
+    args("scripts/check-v2-m2-kafka-k2.sh")
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add(kafkaForkCheckoutPath)
+        },
+    )
 }
 
 tasks.register("v2M2KafkaK2Check") {
@@ -1176,7 +1210,13 @@ tasks.register<Exec>("v2M2PulsarP5SourceCheck") {
     dependsOn(":nereus-pulsar-offload:test", "v2M2PulsarP5NativeForkTest")
     usesService(pulsarCheckoutGate)
     workingDir = layout.projectDirectory.asFile
-    commandLine("bash", "scripts/check-v2-m2-pulsar-p5.sh", pulsarCheckoutPath.get())
+    executable("bash")
+    args("scripts/check-v2-m2-pulsar-p5.sh")
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add(pulsarCheckoutPath)
+        },
+    )
 }
 
 tasks.register("v2M2PulsarP5Check") {
@@ -1191,7 +1231,13 @@ tasks.register<Exec>("v2M2PulsarP6SourceCheck") {
     dependsOn(":nereus-pulsar-offload:test", ":nereus-pulsar-offload:p6ProviderTest")
     usesService(pulsarCheckoutGate)
     workingDir = layout.projectDirectory.asFile
-    commandLine("python3", "scripts/check-v2-m2-pulsar-p6.py", pulsarCheckoutPath.get())
+    executable("python3")
+    args("scripts/check-v2-m2-pulsar-p6.py")
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add(pulsarCheckoutPath)
+        },
+    )
 }
 
 tasks.register("v2M2PulsarP6Check") {
@@ -1241,7 +1287,13 @@ tasks.register<Exec>("v2M2PulsarFinalEvidenceSourceCheck") {
     dependsOn(":nereus-pulsar-offload:test", "v2M2PulsarFinalReceiptSourceCheck")
     usesService(pulsarCheckoutGate)
     workingDir = layout.projectDirectory.asFile
-    commandLine("python3", "scripts/check-v2-m2-pulsar-final-evidence.py", pulsarCheckoutPath.get())
+    executable("python3")
+    args("scripts/check-v2-m2-pulsar-final-evidence.py")
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add(pulsarCheckoutPath)
+        },
+    )
 }
 
 tasks.register("v2M2PulsarFinalCheck") {
@@ -1328,7 +1380,13 @@ tasks.register<Exec>("v2M3ModuleApiSourceCheck") {
     group = "verification"
     description = "Run the serialized clean M3 module/API publication, JUnit/style, and external-consumer closure gate."
     workingDir = layout.projectDirectory.asFile
-    commandLine("bash", "scripts/check-v2-m3-module-api.sh", v2M3PulsarEvidenceWorktree.get())
+    executable("bash")
+    args("scripts/check-v2-m3-module-api.sh")
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add(v2M3PulsarEvidenceWorktree)
+        },
+    )
     usesService(m3NestedGradleGate)
 }
 
@@ -2441,13 +2499,15 @@ tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."
     dependsOn("v2M1K1FocusedCheck", "v2M1P1FocusedCheck", "v2M1R1FocusedCheck", "v2M1G1ValidatorCheck")
     workingDir = layout.projectDirectory.asFile
-    commandLine(
-        "bash",
-        "scripts/check-v2-m1-exact-source.sh",
-        kafkaForkCheckoutPath.get(),
-        pulsarCheckoutPath.get(),
-        oxiaClientCheckoutPath.get(),
-        oxiaServerCheckoutPath.get(),
+    executable("bash")
+    args("scripts/check-v2-m1-exact-source.sh")
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add(kafkaForkCheckoutPath)
+            values.add(pulsarCheckoutPath)
+            values.add(oxiaClientCheckoutPath)
+            values.add(oxiaServerCheckoutPath)
+        },
     )
 }
 
@@ -2469,14 +2529,14 @@ tasks.register<JavaExec>("v2M1FastGateResult") {
     dependsOn("v2M1Check", ":nereus-domain:jar")
     classpath = files(v2DomainJar)
     mainClass.set("com.nereusstream.domain.receipt.M1EvidenceCli")
-    setArgs(
-        listOf(
-            "write-gate-result",
-            "V2_M1_FAST",
-            v2M1SourceTupleSha.get(),
-            "PASS",
-            v2M1FastGateResultPath.get(),
-        ),
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add("write-gate-result")
+            values.add("V2_M1_FAST")
+            values.add(v2M1SourceTupleSha)
+            values.add("PASS")
+            values.add(v2M1FastGateResultPath)
+        },
     )
 }
 
@@ -2486,14 +2546,14 @@ tasks.register<JavaExec>("v2M1ExactSourceGateResult") {
     dependsOn("v2M1ExactSourceCheck", ":nereus-domain:jar")
     classpath = files(v2DomainJar)
     mainClass.set("com.nereusstream.domain.receipt.M1EvidenceCli")
-    setArgs(
-        listOf(
-            "write-gate-result",
-            "V2_M1_EXACT_SOURCE",
-            v2M1SourceTupleSha.get(),
-            "PASS",
-            v2M1ExactGateResultPath.get(),
-        ),
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add("write-gate-result")
+            values.add("V2_M1_EXACT_SOURCE")
+            values.add(v2M1SourceTupleSha)
+            values.add("PASS")
+            values.add(v2M1ExactGateResultPath)
+        },
     )
 }
 
@@ -2517,7 +2577,13 @@ tasks.register<Exec>("v2M1EvidenceFreshnessCheck") {
     description = "Require Final evidence to bind this clean checkout through evidence-only descendant commits."
     dependsOn("v2M1EvidenceFreshnessBoundaryTest", "v2M1N3EvidencePublisherBoundaryTest")
     workingDir = layout.projectDirectory.asFile
-    commandLine("bash", "scripts/check-v2-m1-evidence-freshness.sh", v2M1FinalIndexPath.get())
+    executable("bash")
+    args("scripts/check-v2-m1-evidence-freshness.sh")
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add(v2M1FinalIndexPath)
+        },
+    )
 }
 
 tasks.register<JavaExec>("v2M1FinalCheck") {
@@ -2526,7 +2592,12 @@ tasks.register<JavaExec>("v2M1FinalCheck") {
     dependsOn(":nereus-domain:jar", "v2M1EvidenceFreshnessCheck")
     classpath = files(v2DomainJar)
     mainClass.set("com.nereusstream.domain.receipt.M1EvidenceCli")
-    setArgs(listOf("validate-final", v2M1FinalIndexPath.get()))
+    args("validate-final")
+    argumentProviders.add(
+        objects.newInstance<V2TaskCommandLineArguments>().apply {
+            values.add(v2M1FinalIndexPath)
+        },
+    )
 }
 
 tasks.named("check") {
