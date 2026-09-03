@@ -2198,6 +2198,37 @@ tasks.register("v2M5BindingAuthorityCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5PulsarAggregateAuthorityContractTest") {
+    group = "verification"
+    description = "Test the fail-closed focused M5-C Pulsar aggregate authority checker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-pulsar-aggregate-authority-tests.py")
+}
+
+tasks.register<Exec>("v2M5PulsarAggregateAuthoritySourceCheck") {
+    group = "verification"
+    description = "Validate the M5-C Pulsar aggregate envelope, DELETED selector fence, and one-key CAS shape."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-pulsar-aggregate-authority.py")
+}
+
+tasks.register("v2M5PulsarAggregateAuthorityCheck") {
+    group = "verification"
+    description = "Run the non-promotable M5-C Pulsar aggregate authority implementation gate."
+    dependsOn(
+        "v2M5BindingAuthorityCheck",
+        "v2M5PulsarAggregateAuthorityContractTest",
+        "v2M5PulsarAggregateAuthoritySourceCheck",
+        ":nereus-metadata-oxia:v2M5PulsarAggregateAuthorityTest",
+        ":nereus-metadata-oxia:checkstyleMain",
+        ":nereus-metadata-oxia:checkstyleTest",
+        ":nereus-metadata-oxia:spotlessCheck",
+        ":nereus-storage-object:checkstyleMain",
+        ":nereus-storage-object:checkstyleTest",
+        ":nereus-storage-object:spotlessCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

@@ -23,6 +23,7 @@ import com.nereusstream.domain.protocol.PulsarTopicIncarnationIdentity;
 import com.nereusstream.metadata.spi.model.AggregatePublicationCandidate;
 import com.nereusstream.metadata.spi.model.MetadataVersion;
 import com.nereusstream.metadata.spi.model.VersionedAggregateSnapshot;
+import com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityCodecV1;
 import java.util.Objects;
 
 /** Production Oxia aggregate adapter over the domain-owned canonical NTA1 v1 codec. */
@@ -45,6 +46,11 @@ public final class Nta1AggregateAuthorityCodec implements AggregateAuthorityCode
     }
 
     @Override
+    public CanonicalBytes projectStoredBytes(CanonicalBytes storedBytes) {
+        return M5PulsarAggregateAuthorityCodecV1.projectAggregate(storedBytes);
+    }
+
+    @Override
     public VersionedAggregateSnapshot decode(
             String expectedAuthorityKey,
             PulsarTopicIncarnationIdentity expectedIncarnation,
@@ -57,7 +63,8 @@ public final class Nta1AggregateAuthorityCodec implements AggregateAuthorityCode
         Objects.requireNonNull(storedBytes, "storedBytes");
         Objects.requireNonNull(metadataVersion, "metadataVersion");
 
-        TopicBindingAggregateV1 aggregate = Nta1CodecV1.decode(storedBytes);
+        CanonicalBytes projectedBytes = projectStoredBytes(storedBytes);
+        TopicBindingAggregateV1 aggregate = Nta1CodecV1.decode(projectedBytes);
         PulsarTopicIncarnationIdentity decodedIncarnation =
                 requireExpectedPulsarIncarnation(aggregate, expectedIncarnation);
         if (!aggregate
@@ -68,8 +75,8 @@ public final class Nta1AggregateAuthorityCodec implements AggregateAuthorityCode
             throw new IllegalArgumentException("aggregate binding ID does not match its Pulsar incarnation");
         }
         CanonicalBytes canonical = Nta1CodecV1.encode(aggregate);
-        if (!canonical.equals(storedBytes)) {
-            throw new IllegalArgumentException("stored aggregate bytes are not canonical NTA1");
+        if (!canonical.equals(projectedBytes)) {
+            throw new IllegalArgumentException("stored aggregate projection is not canonical NTA1");
         }
         return new VersionedAggregateSnapshot(aggregate, canonical, Sha256Digest.hash(canonical), metadataVersion);
     }

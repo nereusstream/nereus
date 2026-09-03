@@ -16,11 +16,27 @@ package com.nereusstream.storage.object.retention;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.nereusstream.domain.aggregate.FrameEncodingPolicyValueV1;
+import com.nereusstream.domain.aggregate.InitialStorageEpochV1;
+import com.nereusstream.domain.aggregate.PolicyCatalogDigest;
+import com.nereusstream.domain.aggregate.ProfileOriginV1;
+import com.nereusstream.domain.aggregate.StorageProfileV1;
+import com.nereusstream.domain.aggregate.TopicBindingAggregateV1;
+import com.nereusstream.domain.aggregate.TopicBindingV1;
 import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.Sha256Digest;
+import com.nereusstream.domain.codec.DeterministicTopicIdsV1;
+import com.nereusstream.domain.codec.Nta1CodecV1;
+import com.nereusstream.domain.identity.DeploymentId;
+import com.nereusstream.domain.identity.Id128;
+import com.nereusstream.domain.identity.PulsarCellId;
+import com.nereusstream.domain.identity.ReservationDomainId;
+import com.nereusstream.domain.identity.StorageEpochId;
 import com.nereusstream.domain.identity.TopicBindingId;
+import com.nereusstream.domain.protocol.ProtocolKindV1;
 import com.nereusstream.domain.protocol.PulsarBindingGeneration;
 import com.nereusstream.domain.protocol.PulsarPersistenceName;
+import com.nereusstream.domain.protocol.PulsarProtocolCellIdentity;
 import com.nereusstream.domain.protocol.PulsarTopicIncarnationIdentity;
 import com.nereusstream.domain.protocol.PulsarTopicName;
 import com.nereusstream.metadata.spi.model.MetadataVersion;
@@ -52,6 +68,8 @@ import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.Bin
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.ReferenceMutationTicketV1;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.ReferenceWriterEnrollmentV1;
 import com.nereusstream.storage.object.retention.M5LogicalTrimCoordinatorV1.Outcome;
+import com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityRecordsV1.PulsarAggregateAuthorityStateV1;
+import com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityRecordsV1.PulsarAggregateRetirementAuthorityV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.BatchMetadataStateV1;
 import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.FloorClassV1;
@@ -427,6 +445,202 @@ class M5RetentionRetirementV1Test {
                         M4ReadControlCodecV1.encodeSelector(candidate)))
                 .isEqualTo(ControlMutationOutcome.DEFINITIVE_CONFLICT);
         assertThat(store.values.get(selectorKey)).isEqualTo(exactFenced);
+    }
+
+    @Test
+    void pulsarAggregateMigrationPreservesExactNta1Projection() {
+        PulsarAuthorityFixture fixture = pulsarAuthorityFixture();
+        M5PulsarAggregateRetirementCoordinatorV1 coordinator =
+                new M5PulsarAggregateRetirementCoordinatorV1(fixture.metadata);
+
+        assertThat(coordinator
+                        .migrateLegacy(new M5PulsarAggregateRetirementCoordinatorV1.MigrationRequest(
+                                fixture.aggregateKey, fixture.exactAggregate, CAPABILITY))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5PulsarAggregateRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+
+        VersionedValue stored = fixture.metadata.readNow(fixture.aggregateKey);
+        PulsarAggregateRetirementAuthorityV1 authority =
+                M5PulsarAggregateAuthorityCodecV1.decodeAuthority(stored.canonicalStoredBytes());
+        assertThat(authority.state()).isEqualTo(PulsarAggregateAuthorityStateV1.OPEN_V1);
+        assertThat(authority.authorityGeneration()).isEqualTo(1);
+        assertThat(authority.originalAggregateSha256()).isEqualTo(fixture.exactAggregate.canonicalStoredSha256());
+        assertThat(M5PulsarAggregateAuthorityCodecV1.projectAggregate(stored.canonicalStoredBytes()))
+                .isEqualTo(fixture.exactAggregate.canonicalStoredBytes());
+        assertThat(Nta1CodecV1.decode(authority.canonicalAggregateBytes())).isEqualTo(fixture.aggregate);
+        assertThat(fixture.metadata.transactionCalls).isZero();
+    }
+
+    @ParameterizedTest
+    @EnumSource(ReferenceKindV1.class)
+    void pulsarTicketAndFenceRaceHasOnlyOneWinningAuthorityCas(ReferenceKindV1 referenceKind) {
+        PulsarAuthorityFixture fixture = pulsarAuthorityFixture();
+        M5PulsarAggregateRetirementCoordinatorV1 coordinator =
+                new M5PulsarAggregateRetirementCoordinatorV1(fixture.metadata);
+        coordinator
+                .migrateLegacy(new M5PulsarAggregateRetirementCoordinatorV1.MigrationRequest(
+                        fixture.aggregateKey, fixture.exactAggregate, CAPABILITY))
+                .toCompletableFuture()
+                .join();
+        VersionedValue open = fixture.metadata.readNow(fixture.aggregateKey);
+        ReferenceMutationTicketV1 ticket = new ReferenceMutationTicketV1(
+                ReferenceTargetKindV1.PULSAR_AGGREGATE,
+                fixture.exactAggregate.canonicalStoredSha256(),
+                referenceKind,
+                CAPABILITY,
+                digest("pulsar-operation-" + referenceKind),
+                digest("pulsar-external-root-" + referenceKind));
+        M5PulsarAggregateRetirementCoordinatorV1.TicketRequest initialTicket =
+                new M5PulsarAggregateRetirementCoordinatorV1.TicketRequest(fixture.aggregateKey, open, ticket);
+
+        assertThat(coordinator
+                        .acquireTicket(initialTicket)
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5PulsarAggregateRetirementCoordinatorV1.Outcome.RETAIN);
+        assertThat(coordinator
+                        .enrollWriters(new M5PulsarAggregateRetirementCoordinatorV1.EnrollmentRequest(
+                                fixture.aggregateKey, open, writerEnrollment()))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5PulsarAggregateRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+        open = fixture.metadata.readNow(fixture.aggregateKey);
+        assertThat(coordinator
+                        .acquireTicket(new M5PulsarAggregateRetirementCoordinatorV1.TicketRequest(
+                                fixture.aggregateKey, open, ticket))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5PulsarAggregateRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+        VersionedValue ticketed = fixture.metadata.readNow(fixture.aggregateKey);
+        assertThat(coordinator
+                        .fence(fixture.fenceRequest(ticketed, "pulsar-ticketed-fence"))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5PulsarAggregateRetirementCoordinatorV1.Outcome.RETAIN);
+        assertThat(coordinator
+                        .clearTicket(new M5PulsarAggregateRetirementCoordinatorV1.TicketRequest(
+                                fixture.aggregateKey, ticketed, ticket))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5PulsarAggregateRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+        VersionedValue reopened = fixture.metadata.readNow(fixture.aggregateKey);
+        assertThat(coordinator
+                        .fence(fixture.fenceRequest(reopened, "pulsar-winning-fence"))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5PulsarAggregateRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+        VersionedValue fenced = fixture.metadata.readNow(fixture.aggregateKey);
+        assertThat(M5PulsarAggregateAuthorityCodecV1.decodeAuthority(fenced.canonicalStoredBytes())
+                        .state())
+                .isEqualTo(PulsarAggregateAuthorityStateV1.REFERENCE_SCAN_FENCED_V1);
+        assertThat(coordinator
+                        .acquireTicket(new M5PulsarAggregateRetirementCoordinatorV1.TicketRequest(
+                                fixture.aggregateKey, fenced, ticket))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5PulsarAggregateRetirementCoordinatorV1.Outcome.RETAIN);
+        assertThat(fixture.metadata.transactionCalls).isZero();
+    }
+
+    @Test
+    void pulsarFenceRejectsSameNameGenerationAba() {
+        PulsarAuthorityFixture fixture = pulsarAuthorityFixture();
+        M5PulsarAggregateRetirementCoordinatorV1 coordinator =
+                new M5PulsarAggregateRetirementCoordinatorV1(fixture.metadata);
+        coordinator
+                .migrateLegacy(new M5PulsarAggregateRetirementCoordinatorV1.MigrationRequest(
+                        fixture.aggregateKey, fixture.exactAggregate, CAPABILITY))
+                .toCompletableFuture()
+                .join();
+        VersionedValue open = fixture.metadata.readNow(fixture.aggregateKey);
+        coordinator
+                .enrollWriters(new M5PulsarAggregateRetirementCoordinatorV1.EnrollmentRequest(
+                        fixture.aggregateKey, open, writerEnrollment()))
+                .toCompletableFuture()
+                .join();
+        open = fixture.metadata.readNow(fixture.aggregateKey);
+        PulsarTopicGenerationSelectorValueV1 nextGeneration = new PulsarTopicGenerationSelectorValueV1(
+                fixture.selectorValue.persistenceName(),
+                new PulsarBindingGeneration(
+                        Math.addExact(fixture.selectorValue.generation().value(), 1)),
+                PulsarTopicGenerationSelectorStateV1.DELETED,
+                fixture.selectorValue.aggregateBindingId(),
+                fixture.selectorValue.aggregateCanonicalStoredDigest(),
+                fixture.selectorValue.canonicalStoredBytes(),
+                fixture.selectorValue.canonicalStoredDigest());
+
+        VersionedValue exactOpen = open;
+        assertThatThrownBy(() -> coordinator.fence(new M5PulsarAggregateRetirementCoordinatorV1.FenceRequest(
+                        fixture.aggregateKey,
+                        exactOpen,
+                        fixture.selectorKey,
+                        fixture.exactSelector,
+                        nextGeneration,
+                        digest("pulsar-aba-fence"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("DELETED generation selector");
+        assertThat(fixture.metadata.readNow(fixture.aggregateKey)).isEqualTo(open);
+    }
+
+    @Test
+    void fencedPulsarAggregateRetiresInOneSingleKeyCasAfterCleanup() {
+        PulsarAuthorityFixture fixture = pulsarAuthorityFixture();
+        M5PulsarAggregateRetirementCoordinatorV1 coordinator =
+                new M5PulsarAggregateRetirementCoordinatorV1(fixture.metadata);
+        coordinator
+                .migrateLegacy(new M5PulsarAggregateRetirementCoordinatorV1.MigrationRequest(
+                        fixture.aggregateKey, fixture.exactAggregate, CAPABILITY))
+                .toCompletableFuture()
+                .join();
+        VersionedValue open = fixture.metadata.readNow(fixture.aggregateKey);
+        coordinator
+                .enrollWriters(new M5PulsarAggregateRetirementCoordinatorV1.EnrollmentRequest(
+                        fixture.aggregateKey, open, writerEnrollment()))
+                .toCompletableFuture()
+                .join();
+        open = fixture.metadata.readNow(fixture.aggregateKey);
+        coordinator
+                .fence(fixture.fenceRequest(open, "pulsar-retirement-fence"))
+                .toCompletableFuture()
+                .join();
+        VersionedValue fenced = fixture.metadata.readNow(fixture.aggregateKey);
+        ReferenceFreeProofV1 proof = proof(
+                fixture.metadata,
+                "/pulsar/single-key-proof",
+                ReferenceTargetKindV1.PULSAR_AGGREGATE,
+                fixture.exactAggregate.canonicalStoredSha256(),
+                fixture.exactSelector,
+                List.of(),
+                fixture.proofIdentity);
+        PhysicalCleanupSummaryV1 cleanup = new PhysicalCleanupSummaryV1(
+                fact(fixture.metadata.seed("/pulsar/cleanup", bytes("delete-done"))),
+                fixture.incarnation,
+                fixture.aggregate.binding().bindingId(),
+                fixture.exactAggregate.canonicalStoredSha256(),
+                CAPABILITY,
+                2,
+                1,
+                1,
+                0);
+        M5PulsarAggregateRetirementCoordinatorV1.RetirementRequest request =
+                new M5PulsarAggregateRetirementCoordinatorV1.RetirementRequest(
+                        fixture.aggregateKey, fenced, proof, cleanup);
+        int beforeRetirementCas = fixture.metadata.casCalls;
+        fixture.metadata.casResponseUnknownAfterApply = true;
+
+        assertThat(coordinator.retire(request).toCompletableFuture().join())
+                .isEqualTo(M5PulsarAggregateRetirementCoordinatorV1.Outcome.EXISTING_EXACT);
+        assertThat(fixture.metadata.casCalls - beforeRetirementCas).isOne();
+        assertThat(coordinator.retire(request).toCompletableFuture().join())
+                .isEqualTo(M5PulsarAggregateRetirementCoordinatorV1.Outcome.EXISTING_EXACT);
+        RetiredTopicIncarnationTombstoneV1 tombstone = M5RetentionCodecV1.decodeRetiredPulsar(
+                fixture.metadata.readNow(fixture.aggregateKey).canonicalStoredBytes());
+        assertThat(tombstone.incarnation()).isEqualTo(fixture.incarnation);
+        assertThat(tombstone.originalAggregateSha256()).isEqualTo(fixture.exactAggregate.canonicalStoredSha256());
+        assertThat(tombstone.aggregatePredecessorValueSha256()).isEqualTo(fenced.canonicalStoredSha256());
+        assertThat(fixture.metadata.readNow(fixture.selectorKey)).isEqualTo(fixture.exactSelector);
+        assertThat(fixture.metadata.transactionCalls).isZero();
     }
 
     @Test
@@ -1269,6 +1483,57 @@ class M5RetentionRetirementV1Test {
                 proof);
     }
 
+    private static PulsarAuthorityFixture pulsarAuthorityFixture() {
+        InMemoryStore metadata = new InMemoryStore(false);
+        PulsarProtocolCellIdentity cell = new PulsarProtocolCellIdentity(
+                new DeploymentId(new Id128(1, 2)),
+                new ReservationDomainId(new Id128(3, 4)),
+                new PulsarCellId(new Id128(5, 6)));
+        PulsarTopicIncarnationIdentity incarnation = new PulsarTopicIncarnationIdentity(
+                PulsarPersistenceName.fromString("tenant/ns/persistent/orders"),
+                PulsarTopicName.fromString("persistent://tenant/ns/orders"),
+                new PulsarBindingGeneration(7));
+        TopicBindingId bindingId = DeterministicTopicIdsV1.deriveBindingId(cell, incarnation);
+        StorageEpochId epochId = DeterministicTopicIdsV1.deriveStorageEpochId(bindingId, 0);
+        TopicBindingAggregateV1 aggregate = new TopicBindingAggregateV1(
+                TopicBindingAggregateV1.SCHEMA_VERSION,
+                new TopicBindingV1(ProtocolKindV1.PULSAR, bindingId, cell, incarnation),
+                new InitialStorageEpochV1(
+                        epochId,
+                        0,
+                        StorageProfileV1.BOOKKEEPER_WAL_ONLY,
+                        ProfileOriginV1.TOPIC_EXPLICIT,
+                        new PolicyCatalogDigest(digest("pulsar-policy-catalog")),
+                        FrameEncodingPolicyValueV1.none()));
+        CanonicalBytes aggregateBytes = Nta1CodecV1.encode(aggregate);
+        String aggregateKey = "/pulsar/aggregates/generation-7";
+        VersionedValue exactAggregate = metadata.seed(aggregateKey, aggregateBytes);
+        String selectorKey = "/pulsar/selectors/orders";
+        VersionedValue exactSelector = metadata.seed(selectorKey, bytes("deleted-generation-7"));
+        PulsarTopicGenerationSelectorValueV1 selectorValue = new PulsarTopicGenerationSelectorValueV1(
+                incarnation.persistenceName(),
+                incarnation.bindingGeneration(),
+                PulsarTopicGenerationSelectorStateV1.DELETED,
+                bindingId,
+                exactAggregate.canonicalStoredSha256(),
+                exactSelector.canonicalStoredBytes(),
+                exactSelector.canonicalStoredSha256());
+        BindingIdentity proofBinding =
+                new BindingIdentity(bindingId, digest("pulsar-incarnation"), digest("pulsar-storage-epoch"));
+        IdentityEnvelope proofIdentity = new IdentityEnvelope(
+                digest("pulsar-cell"), digest("pulsar-provider"), proofBinding, 11, 13, 17, CAPABILITY);
+        return new PulsarAuthorityFixture(
+                metadata,
+                aggregateKey,
+                selectorKey,
+                aggregate,
+                incarnation,
+                exactAggregate,
+                exactSelector,
+                selectorValue,
+                proofIdentity);
+    }
+
     private static BindingReadSelector selector(List<SourceRetirementBatch> batches) {
         return new BindingReadSelector(
                 BINDING,
@@ -1291,6 +1556,17 @@ class M5RetentionRetirementV1Test {
             Sha256Digest target,
             VersionedValue selector,
             List<M4ReleaseBindingV1> releases) {
+        return proof(metadata, prefix, targetKind, target, selector, releases, IDENTITY);
+    }
+
+    private static ReferenceFreeProofV1 proof(
+            InMemoryStore metadata,
+            String prefix,
+            ReferenceTargetKindV1 targetKind,
+            Sha256Digest target,
+            VersionedValue selector,
+            List<M4ReleaseBindingV1> releases,
+            IdentityEnvelope identity) {
         AuthorityFactV1 manifest = fact(metadata.seed(prefix + "/manifest", bytes("manifest")));
         AuthorityFactV1 trim = fact(metadata.seed(prefix + "/trim", bytes("trim")));
         AuthorityFactV1 owner = fact(metadata.seed(prefix + "/owner", bytes("owner")));
@@ -1309,7 +1585,7 @@ class M5RetentionRetirementV1Test {
         }
         Sha256Digest observationRoot = M5RetentionCodecV1.calculateObservationsRoot(observations);
         ReferenceFreeProofV1 draft = new ReferenceFreeProofV1(
-                IDENTITY,
+                identity,
                 targetKind,
                 target,
                 COVERAGE,
@@ -1401,6 +1677,23 @@ class M5RetentionRetirementV1Test {
         }
     }
 
+    private record PulsarAuthorityFixture(
+            InMemoryStore metadata,
+            String aggregateKey,
+            String selectorKey,
+            TopicBindingAggregateV1 aggregate,
+            PulsarTopicIncarnationIdentity incarnation,
+            VersionedValue exactAggregate,
+            VersionedValue exactSelector,
+            PulsarTopicGenerationSelectorValueV1 selectorValue,
+            IdentityEnvelope proofIdentity) {
+        private M5PulsarAggregateRetirementCoordinatorV1.FenceRequest fenceRequest(
+                VersionedValue open, String attempt) {
+            return new M5PulsarAggregateRetirementCoordinatorV1.FenceRequest(
+                    aggregateKey, open, selectorKey, exactSelector, selectorValue, digest(attempt));
+        }
+    }
+
     private static final class ControlStore implements CanonicalControlMetadataStore {
         private final Map<String, CanonicalBytes> values = new LinkedHashMap<>();
 
@@ -1439,6 +1732,8 @@ class M5RetentionRetirementV1Test {
         private boolean failReadAfterCas;
         private boolean failNextRead;
         private boolean casResponseUnknownWithoutApply;
+        private boolean casResponseUnknownAfterApply;
+        private int casCalls;
         private Runnable nextTransactionInterference;
 
         private InMemoryStore(boolean transactionSupported) {
@@ -1494,6 +1789,7 @@ class M5RetentionRetirementV1Test {
         @Override
         public synchronized CompletionStage<MutationOutcome> compareAndSet(
                 Optional<VersionedValue> exactPredecessor, String key, CanonicalBytes exactCandidate) {
+            casCalls++;
             Optional<VersionedValue> current = Optional.ofNullable(values.get(key));
             if (!current.equals(exactPredecessor)) {
                 return CompletableFuture.completedFuture(MutationOutcome.DEFINITIVE_CONFLICT);
@@ -1503,6 +1799,10 @@ class M5RetentionRetirementV1Test {
                 return CompletableFuture.completedFuture(MutationOutcome.RESPONSE_UNKNOWN);
             }
             values.put(key, stored(key, exactCandidate));
+            if (casResponseUnknownAfterApply) {
+                casResponseUnknownAfterApply = false;
+                return CompletableFuture.completedFuture(MutationOutcome.RESPONSE_UNKNOWN);
+            }
             if (failReadAfterCas) {
                 failReadAfterCas = false;
                 failNextRead = true;

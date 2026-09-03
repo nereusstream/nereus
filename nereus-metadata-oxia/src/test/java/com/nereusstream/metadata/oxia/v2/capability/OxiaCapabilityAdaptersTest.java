@@ -24,6 +24,7 @@ import com.nereusstream.domain.identity.KafkaTopicId;
 import com.nereusstream.domain.protocol.KafkaTopicIncarnationIdentity;
 import com.nereusstream.domain.protocol.KafkaTopicName;
 import com.nereusstream.metadata.oxia.v2.codec.AggregateAuthorityCodec;
+import com.nereusstream.metadata.oxia.v2.codec.Nta1AggregateAuthorityCodec;
 import com.nereusstream.metadata.oxia.v2.codec.OxiaV2CodecSet;
 import com.nereusstream.metadata.oxia.v2.key.OxiaV2AuthorityKeys;
 import com.nereusstream.metadata.oxia.v2.mutation.ConditionalMutationEngine;
@@ -39,6 +40,8 @@ import com.nereusstream.metadata.spi.model.PulsarTopicGenerationSelectorStateV1;
 import com.nereusstream.metadata.spi.model.PulsarTopicGenerationSelectorValueV1;
 import com.nereusstream.metadata.spi.model.PulsarVirtualLedgerNamespaceRegistryValueV1;
 import com.nereusstream.metadata.spi.model.VersionedAggregateSnapshot;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
+import com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityCodecV1;
 import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,6 +84,40 @@ class OxiaCapabilityAdaptersTest {
         assertThat(client.stored(
                         keys.aggregateKey(candidate.aggregate().binding().incarnationIdentity())))
                 .isPresent();
+    }
+
+    @Test
+    void productionAggregateAdaptersProjectOneM5AuthorityEnvelope() {
+        AggregatePublicationCandidate candidate = O2TestValues.productionAggregateCandidate();
+        AggregateAuthorityCodec productionCodec = new Nta1AggregateAuthorityCodec();
+        var authority =
+                M5PulsarAggregateAuthorityCodecV1.encodeAuthority(M5PulsarAggregateAuthorityCodecV1.migrateLegacy(
+                        candidate.canonicalStoredBytes(),
+                        new CapabilityBinding(7, Sha256Digest.hash(O2TestValues.bytes("m5-capability")))));
+        String key = keys.aggregateKey(candidate.aggregate().binding().incarnationIdentity());
+        client.seed(key, authority, 3);
+        var productionReader = new OxiaTopicBindingAggregateReader(() -> {}, keys, productionCodec, client);
+        var productionPublisher = new OxiaTopicBindingAggregatePublisher(
+                () -> {},
+                keys,
+                productionCodec,
+                new ConditionalMutationEngine(client, new MutationFailureClassifier()));
+
+        VersionedAggregateSnapshot snapshot = productionReader
+                .readAggregate(candidate.aggregate().binding().incarnationIdentity())
+                .toCompletableFuture()
+                .join()
+                .orElseThrow();
+        var publish = productionPublisher
+                .publishIfAbsent(candidate)
+                .toCompletableFuture()
+                .join();
+
+        assertThat(snapshot.aggregate()).isEqualTo(candidate.aggregate());
+        assertThat(snapshot.canonicalStoredBytes()).isEqualTo(candidate.canonicalStoredBytes());
+        assertThat(snapshot.canonicalStoredDigest()).isEqualTo(candidate.canonicalStoredDigest());
+        assertThat(publish.outcome()).isEqualTo(CreateMutationOutcome.EXISTING_EXACT);
+        assertThat(client.stored(key).orElseThrow().storedBytes()).isEqualTo(authority);
     }
 
     @Test

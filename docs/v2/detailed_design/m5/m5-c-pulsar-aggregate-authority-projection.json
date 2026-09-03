@@ -1,0 +1,67 @@
+{
+  "schema": "NEREUS_V2_M5_C_PULSAR_AGGREGATE_AUTHORITY_PROJECTION_V1",
+  "status": "PULSAR_AGGREGATE_AUTHORITY_IMPLEMENTED_NON_PROMOTABLE",
+  "amendmentManifestSha256": "1f769b44740d9bfb2fa5d5d29fe2207d1cc72cb9e1ea5a8384223a6da143b452",
+  "authorityKey": "EXISTING_PULSAR_INCARNATION_AGGREGATE_KEY",
+  "authorityWireMagic": "M5PA",
+  "legacyAggregateWireMagic": "NTA1",
+  "legacyMigration": "ONE_EXACT_AGGREGATE_KEY_CAS",
+  "aggregateReaderProjection": "EXACT_ORIGINAL_CANONICAL_NTA1_BYTES",
+  "selectorRequirement": "EXACT_PERMANENT_NPS1_DELETED_SAME_PERSISTENCE_NAME_BINDING_GENERATION_BINDING_ID_AND_NTA1_SHA256",
+  "referenceMutationProtocol": "DURABLE_TICKET_THEN_EXTERNAL_MUTATION_THEN_EXACT_REREAD_THEN_TICKET_CLEAR",
+  "scanFence": "ZERO_TICKETS_THEN_REFERENCE_SCAN_FENCED_V1_BOUND_TO_EXACT_DELETED_SELECTOR",
+  "physicalCleanupRequirement": "EVERY_REQUIRED_SOURCE_DELETE_DONE_OR_AUTHORITATIVELY_ABSENT_WITH_ZERO_PENDING",
+  "retirementTransition": "FENCED_M5PA_TO_PERMANENT_M5PR_ONE_EXACT_AGGREGATE_KEY_CAS",
+  "hardCaps": {
+    "authorityBytes": 1048576,
+    "referenceMutationTickets": 256,
+    "concurrentScanFences": 1
+  },
+  "writerEnrollment": {
+    "required": true,
+    "floorClasses": [
+      "BINDING_EPOCH_POLICY",
+      "KAFKA_CONSUMER_GROUP",
+      "KAFKA_PRODUCER_TRANSACTION",
+      "KAFKA_REPLICATION_RECOVERY",
+      "PULSAR_CURSOR_SUBSCRIPTION",
+      "GENERATION_READ",
+      "LIFECYCLE_TASK",
+      "SHARED_PHYSICAL_SOURCE",
+      "PROJECTION_MIGRATION",
+      "AUDIT_GRACE"
+    ],
+    "referenceKinds": [
+      "MANIFEST_SELECTED",
+      "MANIFEST_FALLBACK",
+      "READ_GENERATION_PIN_OR_OPEN_HANDLE",
+      "SOURCE_PROTECTION",
+      "KAFKA_GROUP_RETENTION",
+      "KAFKA_PRODUCER_RECOVERY",
+      "KAFKA_TRANSACTION_OR_ABORTED_RECOVERY",
+      "KAFKA_REPLICA_OR_LEADER_EPOCH_RECOVERY",
+      "PULSAR_SUBSCRIPTION_OR_REPLICATION_CURSOR",
+      "RECOVERY_CHECKPOINT_OR_SNAPSHOT",
+      "MATERIALIZATION_OR_COMPACTION_TASK",
+      "RETIREMENT_OR_DELETE_RECONCILIATION",
+      "SHARED_PHYSICAL_MEMBER",
+      "PROJECTION_MIGRATION_OR_EXPORT",
+      "AUDIT_GRACE"
+    ]
+  },
+  "selectedMetadataBackend": {
+    "adapter": "Oxia09ExactMetadataTransactionStoreV1",
+    "clientArtifact": "io.github.oxia-db:oxia-client:0.9.4",
+    "operation": "EXACT_SINGLE_KEY_COMPARE_AND_SET",
+    "supportsSelectedOperation": true,
+    "atomicMultiKeyTransactionRequired": false,
+    "internalWriteBatchAuthority": false,
+    "sequentialCasFallback": "FORBIDDEN"
+  },
+  "pulsarAuthorityGatePresent": true,
+  "fullRetirementGatePresent": false,
+  "m5DImplementationPresent": false,
+  "physicalDeleteAuthority": false,
+  "scenarioPromotionAuthority": false,
+  "productionAuthority": false
+}

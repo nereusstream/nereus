@@ -80,7 +80,7 @@ public final class OxiaTopicBindingAggregateReader implements TopicBindingAggreg
                         .bindingId()
                         .equals(DeterministicTopicIdsV1.deriveBindingId(
                                 snapshot.binding().cellIdentity(), incarnation))
-                || !record.storedBytes().equals(snapshot.canonicalStoredBytes())) {
+                || !codec.projectStoredBytes(record.storedBytes()).equals(snapshot.canonicalStoredBytes())) {
             throw new IllegalArgumentException(
                     "aggregate authority key, incarnation, rederived binding ID, or stored bytes mismatch");
         }

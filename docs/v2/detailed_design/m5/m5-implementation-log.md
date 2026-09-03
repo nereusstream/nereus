@@ -169,8 +169,23 @@ The first amended implementation slice now passes `v2M5BindingAuthorityCheck` wi
 - regression tests proving exact M4 projection, both ticket/fence orders, lost response, permanent tombstone
   projection removal, zero transaction calls, and no separate batch-key creation.
 
-This is still a focused non-promotable slice. The complete per-kind writer integrations, Pulsar aggregate authority,
-full M5-C gate, source-bound child receipt, M5-D, and aggregate Final remain outstanding.
+That Binding-only result remained a focused non-promotable slice; Pulsar aggregate authority was its next ordered
+implementation dependency rather than authority supplied by the Binding gate.
+
+The distinct Pulsar aggregate implementation slice now passes `v2M5PulsarAggregateAuthorityCheck`:
+
+- one exact legacy NTA1 aggregate-key CAS installs a canonical `M5PA` authority envelope while the production Oxia
+  publisher/reader continue to expose the exact original NTA1 aggregate bytes and digest;
+- the envelope reuses the closed writer enrollment and durable per-reference-kind ticket protocol, then binds its
+  zero-ticket scan fence to the exact permanent `NPS1 DELETED(generation)` selector version/value;
+- same-name generation ABA, wrong BindingId, wrong original NTA1 digest, stale selector, incomplete cleanup, and stale
+  proof-vector inputs all fail closed;
+- only a complete `PhysicalCleanupSummaryV1` permits one exact aggregate-key CAS from fenced `M5PA` to permanent
+  `M5PR`, with response-loss convergence from that same key and zero multi-key transaction calls; and
+- Object-WAL `M5R1` and Pulsar `M5PA`/`M5PR` remain different codecs and authority cells.
+
+This focused gate deliberately does not implement or certify M5-D cleanup. Complete per-kind writer integration, the
+full M5-C gate and source-bound receipt, M5-D, scenario promotion, and aggregate Final remain outstanding.
 
 ## Remaining ordered work
 

@@ -21,6 +21,8 @@ import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.oxia.v2.mutation.MetadataVersionMapper;
 import com.nereusstream.metadata.oxia.v2.testing.O2TestValues;
 import com.nereusstream.metadata.spi.model.AggregatePublicationCandidate;
+import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding;
+import com.nereusstream.storage.object.retention.M5PulsarAggregateAuthorityCodecV1;
 import org.junit.jupiter.api.Test;
 
 class Nta1AggregateAuthorityCodecTest {
@@ -65,5 +67,25 @@ class Nta1AggregateAuthorityCodecTest {
                         candidate.canonicalStoredBytes(),
                         MetadataVersionMapper.fromOxia(7)))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void decodesM5PulsarAuthorityThroughItsExactNta1Projection() {
+        AggregatePublicationCandidate candidate = O2TestValues.productionAggregateCandidate();
+        CanonicalBytes authority =
+                M5PulsarAggregateAuthorityCodecV1.encodeAuthority(M5PulsarAggregateAuthorityCodecV1.migrateLegacy(
+                        candidate.canonicalStoredBytes(),
+                        new CapabilityBinding(7, Sha256Digest.hash(O2TestValues.bytes("m5-capability")))));
+
+        var snapshot = codec.decode(
+                "/nereus/test/aggregates/v1/key",
+                O2TestValues.incarnation(1),
+                authority,
+                MetadataVersionMapper.fromOxia(11));
+
+        assertThat(snapshot.aggregate()).isEqualTo(candidate.aggregate());
+        assertThat(snapshot.canonicalStoredBytes()).isEqualTo(candidate.canonicalStoredBytes());
+        assertThat(snapshot.canonicalStoredDigest()).isEqualTo(candidate.canonicalStoredDigest());
+        assertThat(authority).isNotEqualTo(candidate.canonicalStoredBytes());
     }
 }

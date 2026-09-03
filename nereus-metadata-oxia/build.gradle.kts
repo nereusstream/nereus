@@ -207,6 +207,20 @@ tasks.register<Test>("v2M5RetentionOxiaCapabilityTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("v2M5PulsarAggregateAuthorityTest") {
+    group = "verification"
+    description = "Run M5-C Pulsar aggregate authority projection tests against the Oxia adapters."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.codec.Nta1AggregateAuthorityCodecTest")
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.capability.OxiaCapabilityAdaptersTest")
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.register<Test>("r1OxiaIntegrationTest") {
     group = "verification"
     description = "Run R1 Registry create/CAS/restart conformance against source-locked real Oxia."

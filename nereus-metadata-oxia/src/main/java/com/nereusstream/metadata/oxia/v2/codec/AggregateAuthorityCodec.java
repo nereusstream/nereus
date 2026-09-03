@@ -24,6 +24,11 @@ import com.nereusstream.metadata.spi.model.VersionedAggregateSnapshot;
 public interface AggregateAuthorityCodec extends AuthorityValueCodec {
     CanonicalBytes encode(AggregatePublicationCandidate candidate);
 
+    /** Exact logical aggregate bytes projected from the physical authority value. */
+    default CanonicalBytes projectStoredBytes(CanonicalBytes storedBytes) {
+        return storedBytes;
+    }
+
     VersionedAggregateSnapshot decode(
             String expectedAuthorityKey,
             PulsarTopicIncarnationIdentity expectedIncarnation,

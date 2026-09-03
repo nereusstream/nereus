@@ -54,6 +54,11 @@ scenario promotion, physical deletion, or production deployment authority is cre
   `M5R1` envelope, exact legacy migration, M4 projection, closed writer enrollment, durable tickets, one scan fence,
   hard caps, and real Oxia single-key CAS used by the first amended implementation slice. Its
   `v2M5BindingAuthorityCheck` result is focused and non-promotable; the full M5-C retirement gate remains absent.
+- The [M5-C Pulsar aggregate authority projection](m5-c-pulsar-aggregate-authority-projection.json) fixes the distinct
+  `M5PA` envelope at the existing incarnation aggregate key, exact NTA1 reader projection, closed tickets/fence,
+  permanent exact `DELETED(generation)` selector binding, and the post-cleanup one-key transition to `M5PR`. Its
+  `v2M5PulsarAggregateAuthorityCheck` result is also focused and non-promotable: it implements no M5-D cleanup and
+  grants no physical-delete, scenario-promotion, or production authority.
 
 The design result is exactly `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. All 17 scenario rows whose milestone names
 M5 remain `PLANNED` with null receipts. `docs/v2/evidence/v2-m5/`, `v2M5EvidenceExecutionCheck`,
