@@ -20,6 +20,7 @@ dependencies {
         exclude(group = "com.nereusstream", module = "nereus-domain")
     }
     api(project(":nereus-domain"))
+    implementation(project(":nereus-metadata-spi"))
     implementation(libs.zstd.jni)
 
     testImplementation(libs.junit.jupiter)
@@ -191,6 +192,19 @@ tasks.register<Test>("v2M5MaterializationTest") {
     useJUnitPlatform()
     filter {
         includeTestsMatching("com.nereusstream.storage.object.materialization.M5MaterializationV1Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("v2M5RetentionCoreTest") {
+    group = "verification"
+    description = "Run the non-promotable M5-C retention, proof, admission, and retirement-core tests."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.storage.object.retention.M5RetentionRetirementV1Test")
     }
     outputs.upToDateWhen { false }
 }

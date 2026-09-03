@@ -192,6 +192,21 @@ tasks.register<Test>("r1MetadataTest") {
     }
 }
 
+tasks.register<Test>("v2M5RetentionOxiaCapabilityTest") {
+    group = "verification"
+    description = "Prove the Oxia 0.9 adapter rejects M5-C multi-key retirement before mutation."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.v2.retention.Oxia09ExactMetadataTransactionStoreV1Test",
+        )
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.register<Test>("r1OxiaIntegrationTest") {
     group = "verification"
     description = "Run R1 Registry create/CAS/restart conformance against source-locked real Oxia."

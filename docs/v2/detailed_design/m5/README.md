@@ -40,6 +40,9 @@ scenario promotion, physical deletion, or production deployment authority is cre
   identity domains, section caps, flags, and lookup rule used by the first runtime slice.
 - The implementation-selected [M5-B wire projection](m5-b-wire-projection.json) fixes the Kafka dependency, magic,
   caps, seven disposition codes, complete eight-index set, gap lookup, fallback suppression, and publication rule.
+- The implementation-selected [M5-C capability projection](m5-c-capability-projection.json) records the closed
+  reference/admission inventories and the source-locked Oxia adapter's fail-closed lack of the required atomic
+  multi-key transaction; it is not the future M5-C retirement gate.
 
 The design result is exactly `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. All 17 scenario rows whose milestone names
 M5 remain `PLANNED` with null receipts. `docs/v2/evidence/v2-m5/`, `v2M5EvidenceExecutionCheck`,

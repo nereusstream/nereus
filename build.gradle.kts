@@ -2110,6 +2110,40 @@ tasks.register("v2M5KafkaCompactionCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5RetentionCoreContractTest") {
+    group = "verification"
+    description = "Test the fail-closed non-promotable M5-C retention-core checker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-retention-core-tests.py")
+}
+
+tasks.register<Exec>("v2M5RetentionCoreSourceCheck") {
+    group = "verification"
+    description = "Validate M5-C core shape and the explicit Oxia atomic-transaction blocker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-retention-core.py")
+}
+
+tasks.register("v2M5RetentionCoreCheck") {
+    group = "verification"
+    description = "Run the non-promotable M5-C core gate; this is not the reserved retirement PASS gate."
+    dependsOn(
+        "v2M5KafkaCompactionCheck",
+        "v2M5RetentionCoreContractTest",
+        "v2M5RetentionCoreSourceCheck",
+        ":nereus-storage-object:v2M5RetentionCoreTest",
+        ":nereus-metadata-oxia:v2M5RetentionOxiaCapabilityTest",
+        ":nereus-metadata-spi:checkstyleMain",
+        ":nereus-metadata-spi:spotlessCheck",
+        ":nereus-storage-object:checkstyleMain",
+        ":nereus-storage-object:checkstyleTest",
+        ":nereus-storage-object:spotlessCheck",
+        ":nereus-metadata-oxia:checkstyleMain",
+        ":nereus-metadata-oxia:checkstyleTest",
+        ":nereus-metadata-oxia:spotlessCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

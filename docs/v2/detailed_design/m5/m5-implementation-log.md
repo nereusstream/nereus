@@ -100,9 +100,52 @@ KafkaSemanticCompactorV1Test: 8 tests, 0 failures, 0 errors, 0 skipped
 This focused result is not the future `KAFKA_COMPACTION_INDEX_REBUILD` child receipt. It does not promote
 `V2-KAF-DATA-012/013/022`, close fallback, release M4 protection, retire metadata, or authorize physical deletion.
 
+## M5-C retention core and metadata capability boundary
+
+Status: retention/proof/admission core implemented at a focused, non-promotable gate; the complete M5-C retirement
+transition is blocked because the source-locked Oxia Java 0.9.4 client exposes single-key operations but no atomic
+conditional multi-key transaction primitive required by the accepted design.
+
+Implemented surfaces:
+
+- a closed ten-class retention-floor snapshot, monotonic typed logical trim, exact version/value vectors, and a
+  verifier that rereads every bound authority fact before accepting a snapshot or proof;
+- the complete closed 15-kind reference-veto inventory, bounded scan summaries, authoritative absence rules, audit
+  deadline, and exact M4 `RELEASED` member bindings;
+- canonical bounded codecs and deterministic keys for floor snapshots, trim frontiers, reference-free proofs,
+  `FULL_V1` batches, permanent `RETIRED_V1` batch tombstones, and permanent Pulsar incarnation tombstones;
+- an exact metadata transaction SPI that forbids sequential-CAS emulation, plus retirement coordinators whose
+  externalization, batch retirement, and Pulsar aggregate replacement use that SPI only;
+- full selector/batch response-loss reconciliation and impossible split-state quarantine, exact M4 inline-batch
+  removal/release validation, same-key irreversible batch retirement, and Pulsar `DELETED(generation)` plus completed
+  physical-cleanup prerequisites;
+- persisted per-Cell/Binding hard caps for all 19 closed retention/admission limit kinds, exact derived usage,
+  reserve-before-exceed behavior, and typed alerts; and
+- an honest Oxia 0.9.4 adapter that supports response-loss-safe single-key CAS but returns `UNSUPPORTED` before any
+  call for multi-key transactions. It contains no selector/batch sequential-CAS fallback.
+
+The implementation-selected `m5-c-capability-projection.json` binds the closed inventories, source-locked client
+identity, explicit unsupported behavior, and false authority flags.
+
+Focused core gate:
+
+```text
+./gradlew --no-daemon --no-configuration-cache v2M5RetentionCoreCheck
+PASS_V2_M5_RETENTION_CORE_NON_PROMOTABLE_OXIA_ATOMIC_TRANSACTION_UNSUPPORTED
+M5RetentionRetirementV1Test: 11 tests, 0 failures, 0 errors, 0 skipped
+Oxia09ExactMetadataTransactionStoreV1Test: 2 tests, 0 failures, 0 errors, 0 skipped
+```
+
+This result deliberately does not create the reserved `v2M5RetentionRetirementCheck`, does not declare M5-C
+implementation-complete, and is not a child receipt. Until an accepted design amendment or a source-locked backend
+primitive supplies the required atomic transition, inline externalization and both permanent retirement families
+return `UNSUPPORTED` on the selected Oxia adapter. Logical trim and admission remain metadata-only; no M4 release,
+physical deletion, scenario promotion, staging certification, or production authority is granted.
+
 ## Remaining ordered work
 
-1. M5-C typed retention, reference inventory/proof, and permanent metadata retirement.
+1. Resolve the accepted-design/source-locked-Oxia atomic multi-key transaction mismatch, then complete and gate the
+   real M5-C permanent metadata retirement transition.
 2. M5-D conditional physical delete, orphan reconciliation, and BookKeeper/Pulsar cleanup.
 3. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
    `v2M5Check`.
