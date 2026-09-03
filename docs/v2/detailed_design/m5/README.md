@@ -76,10 +76,15 @@ that historical result.
   transport API, default-unsupported behavior, bucket-versioning admission, exact-version S3 deletion, and complete
   LIST/full-GET reconciliation to fixed-digest MinIO. `v2M5VersionMatchDeleteCheck` is a Provider foundation only;
   the full M5-D state machine, source-bound child, and all delete authority remain absent.
+- The focused [M5-D BookKeeper delete projection](m5-d-bookkeeper-delete-projection.json) binds the exact BookKeeper
+  4.18.0 client/source and fixed-digest server image to a sealed-ledger metadata fingerprint, stale-target rejection,
+  delete-response-loss handling, and authoritative no-such-ledger reconciliation. `v2M5BookKeeperDeleteCheck` is an
+  execution adapter gate only: it cannot create intent or done, and grants no dispatch, physical-delete, receipt,
+  scenario-promotion, staging, or production authority.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
-gates without amending that result. All 17 scenario rows whose milestone names
+gates plus focused M5-D Provider/BookKeeper adapters without amending that result. All 17 scenario rows whose milestone names
 M5 remain `PLANNED` with null receipts. `docs/v2/evidence/v2-m5/`, `v2M5EvidenceExecutionCheck`,
 `v2M5FinalSourceCheck`, and `v2M5Check` remain absent.
 

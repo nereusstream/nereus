@@ -147,19 +147,24 @@ performance-first BookKeeper WAL.
   consumption, conditional Object/BookKeeper/orphan GC, per-Cell isolation, and future evidence ownership. The exact
   result is `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`: implementation/evidence are `NotStarted`/`NotRun`, all 17
   M5 rows remain `PLANNED`, and no physical deletion or production authority exists.
-- The [M5 implementation log](detailed_design/m5/m5-implementation-log.md) now records M5-A, M5-B, and M5-C descendants.
+- The [M5 implementation log](detailed_design/m5/m5-implementation-log.md) now records M5-A, M5-B, M5-C, and the
+  first two focused M5-D descendants.
   Materialization/publication passes `v2M5MaterializationCheck`; real Kafka magic-v2 sparse rewriting, seven
   dispositions, the complete eight-index rebuild, semantic/suppression roots, Cell admission, and final freshness
   fencing pass `v2M5KafkaCompactionCheck`; both permanent retirement families pass source-locked real Oxia execution
-  in `v2M5RetentionRetirementCheck`. These are implementation-only results: M5-D, all five source-bound children, the
-  M5 Final, every M5 scenario promotion, and physical deletion remain outstanding.
+  in `v2M5RetentionRetirementCheck`; exact-version Object deletion and exact sealed-ledger BookKeeper deletion pass
+  their focused Provider/adapter gates. These are implementation-only results: the complete M5-D intent/done,
+  orphan/Pulsar composition, all five source-bound children, the M5 Final, every M5 scenario promotion, and physical
+  deletion authority remain outstanding.
 - [ADR 0146](../decisions/0146-v2-m5-single-binding-retirement-authority-amendment.md) and the accepted
   [M5-C amendment](detailed_design/m5/m5-c-single-binding-retirement-authority-amendment.md) preserve the failed
   multi-key Oxia path as rejected evidence and select a single-Binding retirement authority, durable ticket/fence
   serialization, and exact single-key CAS. M5-C now implements that path, but its source-bound child has not run.
-- M5-D has begun with non-promotable `v2M5VersionMatchDeleteCheck`: fixed-digest MinIO proves enabled-bucket
+- M5-D has begun with non-promotable `v2M5VersionMatchDeleteCheck` and `v2M5BookKeeperDeleteCheck`: fixed-digest MinIO proves enabled-bucket
   version-match deletion, same-key recreation protection, and complete LIST/full-GET response-loss reconciliation.
-  The full M5-D intent/done, orphan, Pulsar, and BookKeeper gate is still absent, so no physical-delete authority exists.
+  The exact BookKeeper adapter binds a closed ledger's complete metadata fingerprint, rejects stale targets before
+  dispatch, and treats only authoritative no-such-ledger reconciliation as absence. Neither slice can create M5-D
+  intent/done; the full orphan/Pulsar composition is still absent, so no physical-delete authority exists.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and formal-runner contracts. It did not by itself select a mode or
   promote a scenario; the later e5 Final closes those evidence obligations with `RANGE_64`. It still does not activate

@@ -2318,6 +2318,35 @@ tasks.register("v2M5VersionMatchDeleteCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5BookKeeperDeleteContractTest") {
+    group = "verification"
+    description = "Test the fail-closed focused M5-D BookKeeper deletion checker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-bookkeeper-delete-tests.py")
+}
+
+tasks.register<Exec>("v2M5BookKeeperDeleteSourceCheck") {
+    group = "verification"
+    description = "Validate exact sealed-ledger deletion, reconciliation, and non-promotable status."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-bookkeeper-delete.py")
+}
+
+tasks.register("v2M5BookKeeperDeleteCheck") {
+    group = "verification"
+    description = "Run the focused non-promotable M5-D exact BookKeeper deletion adapter gate."
+    dependsOn(
+        "v2M5VersionMatchDeleteCheck",
+        "v2M5BookKeeperDeleteContractTest",
+        "v2M5BookKeeperDeleteSourceCheck",
+        ":nereus-storage-bookkeeper:test",
+        ":nereus-storage-bookkeeper:realBookKeeperTest",
+        ":nereus-storage-bookkeeper:checkstyleMain",
+        ":nereus-storage-bookkeeper:checkstyleTest",
+        ":nereus-storage-bookkeeper:spotlessCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

@@ -204,6 +204,56 @@ class RealBookKeeperCellSessionV1RealTest {
         reader.closeAsync().toCompletableFuture().get(10, TimeUnit.SECONDS);
     }
 
+    @Test
+    void m5DeleteAdapterDeletesOnlyTheExactSealedLedgerAndReconcilesAbsence() throws Exception {
+        RealBookKeeperCellSessionV1 writer = session();
+        RunLedgerHandleV1 handle = create(writer);
+        append(writer, handle, 0, new byte[] {4, 5, 6});
+        writer.closeRunLedger(handle).toCompletableFuture().get(10, TimeUnit.SECONDS);
+        writer.closeAsync().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        M5BookKeeperDeleteAdapterV1 adapter = new M5BookKeeperDeleteAdapterV1(client, capability, PASSWORD);
+        var target = adapter.captureExactTarget(handle)
+                .toCompletableFuture()
+                .get(10, TimeUnit.SECONDS)
+                .exactTarget()
+                .orElseThrow();
+        var stale = new M5BookKeeperDeleteAdapterV1.BookKeeperDeleteTargetV1(
+                target.handle(),
+                target.sealedLastEntryId(),
+                target.sealedLength() + 1,
+                target.ensembleSize(),
+                target.writeQuorumSize(),
+                target.ackQuorumSize(),
+                target.digestType(),
+                target.passwordCredentialIdentityVersion(),
+                target.passwordSha256(),
+                target.metadataFormatVersion(),
+                target.metadataCToken(),
+                target.metadataSha256());
+
+        assertThat(adapter.deleteAndReconcile(stale)
+                        .toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS)
+                        .outcome())
+                .isEqualTo(M5BookKeeperDeleteAdapterV1.DeleteOutcome.DIFFERENT_LEDGER_OR_METADATA);
+        assertThat(adapter.deleteAndReconcile(target)
+                        .toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS)
+                        .outcome())
+                .isEqualTo(M5BookKeeperDeleteAdapterV1.DeleteOutcome.AUTHORITATIVELY_ABSENT);
+        assertThat(adapter.deleteAndReconcile(target)
+                        .toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS)
+                        .outcome())
+                .isEqualTo(M5BookKeeperDeleteAdapterV1.DeleteOutcome.AUTHORITATIVELY_ABSENT);
+        assertThat(adapter.captureExactTarget(handle)
+                        .toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS)
+                        .outcome())
+                .isEqualTo(M5BookKeeperDeleteAdapterV1.CaptureOutcome.DEFINITIVELY_ABSENT);
+    }
+
     private static RealBookKeeperCellSessionV1 session() {
         return new RealBookKeeperCellSessionV1(client, capability, PASSWORD);
     }

@@ -48,10 +48,11 @@ tasks.register<Test>("realBookKeeperTest") {
     useJUnitPlatform()
     maxParallelForks = 1
     outputs.upToDateWhen { false }
-    systemProperty(
-        "nereus.bookkeeper.metadataServiceUri",
-        providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").get(),
-    )
+    doFirst {
+        val metadataServiceUri = providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull
+            ?: error("v2M2BookKeeperMetadataServiceUri is required when realBookKeeperTest executes")
+        systemProperty("nereus.bookkeeper.metadataServiceUri", metadataServiceUri)
+    }
 }
 
 tasks.withType<Jar>().configureEach {

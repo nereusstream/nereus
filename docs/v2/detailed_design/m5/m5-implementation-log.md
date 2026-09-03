@@ -259,9 +259,40 @@ M5MinioVersionMatchDeleteTest: 1 test, 0 failures, 0 errors, 0 skipped
 This slice has no API that can create an M5-D intent or declare `DELETE_DONE`; therefore it grants no physical-delete,
 scenario-promotion, receipt, staging, or production authority.
 
+## M5-D exact BookKeeper deletion adapter foundation
+
+Status: focused adapter slice implemented and executed against the exact BookKeeper 4.18.0 server image; the complete
+M5-D intent/done, orphan, and Pulsar cleanup gate has not run.
+
+- `M5BookKeeperDeleteAdapterV1` captures a target only from an exact closed ledger and binds ledger/run/Cell identity,
+  sealed last entry and length, quorum/digest/password-credential identity, metadata format/token, creation/state,
+  custom metadata, and all ensembles into a deterministic SHA-256 fingerprint;
+- an absent pre-read is idempotent completion without dispatch, while unsealed, rebound, or changed metadata is a
+  conflict input and an ambiguous metadata read remains unknown;
+- a delete return value, exception, or discarded response is never completion: every dispatch is followed by an
+  authoritative metadata read, only the two BookKeeper no-such-ledger codes prove absence, the exact old target
+  remaining is retryable, and changed metadata quarantines;
+- unit tests cover response loss, exact-remains, changed metadata, pre/post-read ambiguity, stale identity, and both
+  no-such-ledger outcomes; and
+- the real fixed-image suite rejects a stale target, deletes one exact sealed ledger, reconciles absence, retries
+  idempotently, and confirms target capture now reports definitive absence.
+
+Focused real gate:
+
+```text
+./scripts/run-v2-m5-bookkeeper-delete-check.sh
+PASS_V2_M5_BOOKKEEPER_DELETE_ADAPTER_NON_PROMOTABLE
+RealBookKeeperCellSessionV1RealTest: 7 tests, 0 failures, 0 errors, 0 skipped
+PASS_V2_M5_BOOKKEEPER_DELETE_REAL implementation-only image=apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d id=sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605
+```
+
+The adapter deliberately exposes no intent creation or dispatch-authority method. It may be invoked only by the
+future complete M5-D coordinator after its exact persisted intent/fences authorize dispatch. This focused result is
+not a source-bound child and grants no physical-delete, scenario-promotion, staging, or production authority.
+
 ## Remaining ordered work
 
-1. Complete M5-D intent/done, orphan reconciliation, and BookKeeper/Pulsar cleanup above the admitted Provider.
+1. Complete M5-D intent/done, orphan reconciliation, and Pulsar cleanup above the admitted Object/BookKeeper adapters.
 2. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
    `v2M5Check`.
 

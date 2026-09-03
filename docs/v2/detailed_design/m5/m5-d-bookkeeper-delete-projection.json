@@ -1,0 +1,34 @@
+{
+  "schema": "NEREUS_V2_M5_D_BOOKKEEPER_DELETE_PROJECTION_V1",
+  "status": "BOOKKEEPER_DELETE_ADAPTER_IMPLEMENTED_NON_PROMOTABLE",
+  "implementationAncestor": "e864d2aa339de04d9e479058f8fd0bd3af49da9e",
+  "bookKeeperBoundary": {
+    "sourceCommit": "cd06340851d6d657b7c7546df01df365c18980de",
+    "coordinate": "org.apache.bookkeeper:bookkeeper-server:4.18.0",
+    "clientJarSha256": "8e64f2b7436bb814705f611eb0ac48d64d90de7a50d295905c459d89bc3f9d8f",
+    "serverImageReference": "apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d",
+    "serverImageId": "sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605",
+    "platform": "linux/amd64",
+    "sealedMetadataFingerprintRequired": true,
+    "deleteResponseNeverSufficient": true,
+    "authoritativeMetadataReconciliationRequired": true
+  },
+  "realBookKeeperTest": {
+    "task": ":nereus-storage-bookkeeper:realBookKeeperTest",
+    "class": "com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1RealTest",
+    "focusedMethod": "m5DeleteAdapterDeletesOnlyTheExactSealedLedgerAndReconcilesAbsence",
+    "suiteTests": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "staleTargetRejectedBeforeDispatch": true,
+  "deleteResponseLossReconciled": true,
+  "repeatAbsenceIdempotent": true,
+  "dispatchAuthorityApiPresent": false,
+  "fullM5DGatePresent": false,
+  "sourceBoundReceiptPresent": false,
+  "physicalDeleteAuthority": false,
+  "scenarioPromotionAuthority": false,
+  "productionAuthority": false
+}
