@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import base64
+import errno
 import importlib.util
 import json
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 
@@ -45,6 +47,19 @@ def git(root: Path, *args: str) -> str:
     ).strip()
 
 
+def cleanup_temporary_directory(temporary: tempfile.TemporaryDirectory) -> None:
+    delays = (0.0, 0.05, 0.1, 0.2, 0.4, 0.8)
+    for index, delay in enumerate(delays):
+        if delay:
+            time.sleep(delay)
+        try:
+            temporary.cleanup()
+            return
+        except OSError as error:
+            if error.errno not in {errno.EEXIST, errno.ENOTEMPTY} or index == len(delays) - 1:
+                raise
+
+
 class FixtureBuilder:
     def __init__(self, allocator_v2: bool = False) -> None:
         self.temporary = tempfile.TemporaryDirectory(prefix="nereus-m3-final-checker-")
@@ -55,6 +70,9 @@ class FixtureBuilder:
         git(self.root, "init", "-b", "main")
         git(self.root, "config", "user.name", "M3 Final Test")
         git(self.root, "config", "user.email", "m3-final@example.invalid")
+        git(self.root, "config", "gc.auto", "0")
+        git(self.root, "config", "gc.autoDetach", "false")
+        git(self.root, "config", "maintenance.auto", "false")
         source_locks = self.root / CONTRACT.SOURCE_LOCKS_PATH
         source_locks.parent.mkdir(parents=True)
         source_lock_value = json.loads((SOURCE_ROOT / CONTRACT.SOURCE_LOCKS_PATH).read_text())
@@ -110,7 +128,7 @@ class FixtureBuilder:
         self.candidate.write_bytes(CONTRACT.canonical_bytes(self.receipt_value()))
 
     def cleanup(self) -> None:
-        self.temporary.cleanup()
+        cleanup_temporary_directory(self.temporary)
 
     def _write(self, relative: PurePosixPath, raw: bytes) -> None:
         path = self.root.joinpath(*relative.parts)

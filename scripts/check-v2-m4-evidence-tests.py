@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import base64
 import copy
+import errno
 import importlib.util
 import json
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 import xml.etree.ElementTree as ET
@@ -38,6 +40,19 @@ def git(root: Path, *args: str) -> str:
     return subprocess.check_output(["git", "-C", str(root), *args], text=True, stderr=subprocess.STDOUT).strip()
 
 
+def cleanup_temporary_directory(temporary: tempfile.TemporaryDirectory) -> None:
+    delays = (0.0, 0.05, 0.1, 0.2, 0.4, 0.8)
+    for index, delay in enumerate(delays):
+        if delay:
+            time.sleep(delay)
+        try:
+            temporary.cleanup()
+            return
+        except OSError as error:
+            if error.errno not in {errno.EEXIST, errno.ENOTEMPTY} or index == len(delays) - 1:
+                raise
+
+
 class Fixture:
     def __init__(self) -> None:
         self.temporary = tempfile.TemporaryDirectory(prefix="nereus-m4-evidence-")
@@ -46,6 +61,9 @@ class Fixture:
         git(self.root, "init", "-b", "main")
         git(self.root, "config", "user.name", "M4 Evidence Test")
         git(self.root, "config", "user.email", "m4-evidence@example.invalid")
+        git(self.root, "config", "gc.auto", "0")
+        git(self.root, "config", "gc.autoDetach", "false")
+        git(self.root, "config", "maintenance.auto", "false")
         locks = json.loads((SOURCE_ROOT / CONTRACT.SOURCE_LOCKS_PATH).read_text())
         path = self.root / CONTRACT.SOURCE_LOCKS_PATH
         path.parent.mkdir(parents=True)
@@ -72,7 +90,7 @@ class Fixture:
         git(self.root, "commit", "-m", "publish M4 Final")
 
     def cleanup(self) -> None:
-        self.temporary.cleanup()
+        cleanup_temporary_directory(self.temporary)
 
     def _xml(self, class_name: str, names: set[str], task: str) -> bytes:
         root = ET.Element(
@@ -224,8 +242,10 @@ class M4EvidenceContractTest(unittest.TestCase):
         self.fixture = Fixture()
 
     def tearDown(self) -> None:
-        self.fixture.cleanup()
-        self.ancestry.stop()
+        try:
+            self.fixture.cleanup()
+        finally:
+            self.ancestry.stop()
 
     def test_accepts_exact_four_child_final_and_scenario_allowlist(self) -> None:
         tested, _, descendants = CONTRACT.validate_final(
