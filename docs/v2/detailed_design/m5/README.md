@@ -34,6 +34,10 @@ scenario promotion, physical deletion, or production deployment authority is cre
 - [M5-E evidence ownership and freeze](m5-e-evidence-ownership-and-freeze.md) freezes child ownership, scenario
   promotion boundaries, exact-source rules, future gate hierarchy, and exclusions.
 - The governance-only [freeze manifest](m5-design-freeze.json) binds I0 and A through E by exact SHA-256.
+- The later [implementation log](m5-implementation-log.md) tracks ordered implementation descendants without
+  changing the frozen I0/A-E bytes or promoting focused results.
+- The implementation-selected [M5-A wire projection](m5-a-wire-projection.json) fixes the version-1 physical codes,
+  identity domains, section caps, flags, and lookup rule used by the first runtime slice.
 
 The design result is exactly `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. All 17 scenario rows whose milestone names
 M5 remain `PLANNED` with null receipts. `docs/v2/evidence/v2-m5/`, `v2M5EvidenceExecutionCheck`,

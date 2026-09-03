@@ -182,6 +182,12 @@ delete/orphan/GC; and M5-E owns current-source evidence and scenario boundaries.
 result `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`; no M5 runtime, evidence, scenario PASS, or deletion exists at this
 cut.
 
+The later [M5 implementation log](detailed_design/m5/m5-implementation-log.md) records the first implementation
+descendant: M5-A now has canonical source-cut/task/output identities, deterministic reuse/index-only/rewrite planning,
+NMS1 and lookup-index projections, independent full validation, persisted Cell admission, and exact selector
+publication. Its focused gate is non-promotable; compaction, retention/retirement, deletion, source-bound evidence,
+scenario promotion, and production authority remain absent.
+
 ## Logical trim and physical GC
 
 Logical trim advances a binding-scoped typed Trim Frontier independently from physical deletion. Physical GC requires:

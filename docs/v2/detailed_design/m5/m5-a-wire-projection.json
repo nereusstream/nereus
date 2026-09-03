@@ -1,0 +1,73 @@
+{
+  "schema": "NEREUS_V2_M5_A_WIRE_PROJECTION_V1",
+  "control": {
+    "version": 1,
+    "maximumBytes": 2097152,
+    "sourceCutMagicHex": "4d355343",
+    "planMagicHex": "4d35504c",
+    "validationMagicHex": "4d355652",
+    "generationMagicHex": "4d354745",
+    "manifestMagicHex": "4d354d56",
+    "taskMagicHex": "4d35544b"
+  },
+  "identityDomains": {
+    "sourceSet": "NEREUS_V2_M5_SOURCE_SET_V1",
+    "task": "NEREUS_V2_M5_MATERIALIZATION_TASK_V1",
+    "output": "NEREUS_V2_M5_MATERIALIZATION_OUTPUT_V1"
+  },
+  "representationModes": {
+    "REFERENCE_REUSE": 0,
+    "INDEX_ONLY_GENERATION": 1,
+    "REWRITE_GENERATION": 2
+  },
+  "payloadKinds": {
+    "KAFKA_BATCH_PRESERVING_V1": 0,
+    "KAFKA_SEMANTIC_COMPACTED_V1": 1,
+    "PULSAR_ENTRY_PRESERVING_V1": 2,
+    "NATIVE_EXTENT_REFERENCE_V1": 3
+  },
+  "indexKinds": {
+    "OFFSET_OR_POSITION": 0,
+    "PAYLOAD_LOCATOR": 1,
+    "TIMESTAMP": 2,
+    "PRODUCER_RECOVERY": 3,
+    "TRANSACTION": 4,
+    "ABORTED_TRANSACTION": 5,
+    "LEADER_EPOCH": 6,
+    "CHECKSUM_COVERAGE": 7
+  },
+  "nms1": {
+    "version": 1,
+    "headerMagicHex": "4e4d5331",
+    "sourceTableMagicHex": "4e535431",
+    "extentDirectoryMagicHex": "4e455831",
+    "indexDirectoryMagicHex": "4e495831",
+    "footerMagicHex": "4e4d4631",
+    "footerBytes": 176,
+    "knownExtentFlagsMask": 7,
+    "maximumHeaderBytes": 1024,
+    "maximumSourceRows": 256,
+    "maximumSourceTableBytes": 65536,
+    "maximumExtentRows": 65536,
+    "maximumExtentDirectoryBytes": 8388608,
+    "maximumIndexSections": 32,
+    "maximumIndexDirectoryBytes": 16384,
+    "maximumSingleIndexBytes": 67108864,
+    "maximumPayloadBytes": 268435456,
+    "maximumCanonicalBodyBytes": 402653184
+  },
+  "lookupIndex": {
+    "magicHex": "4d354931",
+    "version": 1,
+    "maximumRows": 1048576,
+    "maximumBytes": 67108864,
+    "lookupRule": "FLOOR_COVERAGE_THEN_SUCCESSOR"
+  },
+  "hardCounts": {
+    "maximumSources": 256,
+    "maximumParts": 256,
+    "maximumIndexes": 32,
+    "maximumMemberBindings": 256,
+    "maximumPersistedReservations": 1024
+  }
+}

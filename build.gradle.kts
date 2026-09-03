@@ -2053,6 +2053,35 @@ tasks.register("v2M5DesignCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5MaterializationContractTest") {
+    group = "verification"
+    description = "Test the fail-closed non-promotable M5-A implementation checker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-materialization-tests.py")
+}
+
+tasks.register<Exec>("v2M5MaterializationSourceCheck") {
+    group = "verification"
+    description = "Validate M5-A runtime shape while preserving the immutable design and planned scenarios."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-materialization.py")
+}
+
+tasks.register("v2M5MaterializationCheck") {
+    group = "verification"
+    description = "Run the non-promotable M5-A materialization and manifest-publication implementation gate."
+    dependsOn(
+        "v2DocumentationCheck",
+        "v2M5HistoricalM4DependencyCheck",
+        "v2M5MaterializationContractTest",
+        "v2M5MaterializationSourceCheck",
+        ":nereus-storage-object:v2M5MaterializationTest",
+        ":nereus-storage-object:checkstyleMain",
+        ":nereus-storage-object:checkstyleTest",
+        ":nereus-storage-object:spotlessCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

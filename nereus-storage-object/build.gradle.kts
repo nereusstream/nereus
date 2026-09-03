@@ -182,6 +182,19 @@ tasks.register<Test>("v2M4QuiescenceProtectionReleaseEvidenceTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("v2M5MaterializationTest") {
+    group = "verification"
+    description = "Run deterministic M5-A materialization, NMS1, index, admission, validation, and publication tests."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.storage.object.materialization.M5MaterializationV1Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
