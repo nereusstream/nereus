@@ -1,0 +1,30 @@
+{
+  "schema": "NEREUS_V2_M5_DESIGN_FREEZE_V1",
+  "result": "DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED",
+  "documents": [
+    {
+      "path": "docs/v2/detailed_design/m5/m5-a-materialization-and-manifest-publication.md",
+      "sha256": "2ec4d450599dfdabef0525caa839d64bdf01b32d56fc43c9b6fca6a805944cfb"
+    },
+    {
+      "path": "docs/v2/detailed_design/m5/m5-b-kafka-compaction-and-index-rebuild.md",
+      "sha256": "d776a23b6378bc39002ea3db7f13a0b73fbed74463665e9ec3a6abf9ecb7ac96"
+    },
+    {
+      "path": "docs/v2/detailed_design/m5/m5-c-retention-reference-free-and-metadata-retirement.md",
+      "sha256": "0c4176988428f2bccd36bf6de868e6784de057f5740c009782b6094c13210667"
+    },
+    {
+      "path": "docs/v2/detailed_design/m5/m5-d-physical-delete-orphan-and-gc.md",
+      "sha256": "ce4a53c872cdeb5c9f8c1db90d0ed2f7be746e65914b1c5dfe3e4f7e69ab9ba9"
+    },
+    {
+      "path": "docs/v2/detailed_design/m5/m5-e-evidence-ownership-and-freeze.md",
+      "sha256": "49a07496aed14fde8ad5972834ef3d52a1a34c355403df2796aa10c016aa674c"
+    },
+    {
+      "path": "docs/v2/detailed_design/m5/m5-i0-implementation-input-closure.md",
+      "sha256": "402ceb45d2913642bee9b4570d22e906b7ffe78600cacada1c0eb90217ab428a"
+    }
+  ]
+}

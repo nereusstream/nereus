@@ -18,12 +18,13 @@ sourceTuple: v2-m1
 | M2 | Owner Epoch lane and typed frontier; Kafka BookKeeper per-partition leader-epoch-bound run chain, NBKE2 DATA/control frames, packed RecordBatch range indexes, pre-position reservation, bounded overlapping writes and fenced ordered locator/producer/transaction/leader-epoch publication; distinct Allocated/Durable/LEO/HW/LSO state, native duplicate semantics plus storage-retry digests, speculative producer deltas, profile-neutral checkpoint kernel with BK implementation, compact follower-descriptor/Observed/Applied/election-adoption primitives with hard journal/source/apply-lag eligibility, targeted floor+coverage+successor Fetch, delayed-wakeup seam, sequential cursor, bounded suffix recovery, async-Object source switch, and 10k/100k evidence; Pulsar deterministic NPD1-data/NPO1-root pair with checked 16-byte-row/streaming envelope and provider admission plus native-relative block-policy evidence; ManagedLedger-owned dual-source handle/read pins/final-delete revalidation and persisted BK_DELETE state/retention policy | **Promotion-derived: the global current-source receipt binds exact Kafka/Pulsar Final child roots and the disjoint 21-scenario union accepted by `v2M2Check`; M3 Object WAL, M6 process activation, M8 parity, and mixed/downstream rows remain excluded** | `v2M2Check` |
 | M3 | one-cell NWG1 Object WAL groups; binding-context epoch authority, exact per-commit Kafka leader epoch, and commit-set co-location; run-key/per-Object AEAD; final class/lane leaf grammar and post-plan sequence allocation; up to three lazy lanes under one Root/pointer; provider-resolved physical frontier plus owner-local per-binding typed frontier; physical-only de-duplicated checkpoint rows/Seal; separate bounded Root-bound NWKCP1 Kafka protocol-checkpoint family selected by an independent publisher-fenced OPEN/TERMINAL Head; one publisher-epoch-fenced physical vector chain; pre-position tracker/locator reservation and local tickets; shared-verified range-aggregated fenced active-tail publication before ACK; Root-fixed NONE/optional bounded provider-proof mode; provider-absent cuts; conservative bounded prefix/LIST recovery with no partial skip vector; provider/session evidence; fixed-slice Pulsar virtual-ledger path with RANGE evidence | **CLOSED / hard-frozen. Exact common tested source `e5e53e62865c21845621037bea5f18c092bd4259` binds `RANGE_SELECTED(RANGE_64)`, eleven child receipts, 26 promoted scenarios, and immutable Final SHA-256 `81c7004a923e5b96cab0a3c8b4f1fa26d71606a2208bbabe779f0d872f84f84a`. M6 process activation and M8 native parity remain excluded.** | `v2M3Check` |
 | M4 | allocation-free Binding-scoped logical `BindingReadViewSnapshot`; deterministic typed protocol/profile source plan and one-shot pre-observability fallback; bounded generation-tagged hazard slots with stable conservative scanning and ABA-safe terminal drain; fused selector/terminal/proof-window/fold/capability control; exact per-source interval verification and protection-generation release CAS; four-child evidence hierarchy; no physical deletion | **CLOSED. Exact tested source `595c8b34779d1e88187eb0084bf18e65ab2dd742` binds four children, the evidence-selected physical/capability choices, five M4-only scenario promotions, and current immutable Final SHA-256 `31235c738400c71252e1c1c923aabda6f66545767b01c20962c0a881303e1b07`. M5 physical deletion, M6 process activation, M8 native parity, and production deployment authority remain excluded.** | `v2M4Check` |
-| M5 | materialization, compaction, retention, consume exact `RELEASED` protection state, irreversible same-key `FULL_V1 -> RETIRED_V1` batch compaction with permanent compact tombstone, retained-source/batch/tombstone admission and alerting, final provider/source revalidation, per-cell cache/task isolation, physical deletion/orphan/GC execution | Planned | `v2M5Check` |
+| M5 | deterministic materialization with Object-WAL reuse/index-only/rewrite selection; immutable generation and selector publication; Kafka-semantic compaction plus complete index rebuild; typed logical retention and exact reference-free proof; consume exact `RELEASED`; irreversible same-key `FULL_V1 -> RETIRED_V1` batch compaction and final Pulsar aggregate tombstone; final provider/source revalidation; per-Cell admission/isolation; conditional Object, root/data/multipart, BookKeeper, orphan, and GC execution | **DESIGN HARD-FROZEN / implementation NotStarted / evidence NotRun. I0 and A-E are bound by `v2M5DesignCheck`; all 17 M5 rows remain `PLANNED`, no M5 runtime/evidence/Final gate exists, and physical deletion is not authorized.** | future `v2M5Check` |
 | M6 | Kafka/Pulsar broker/controller process integration; native Kafka Produce/Fetch/Admin, replica-Fetch compact descriptor transport, durable observation journal, hard-bounded Observed/Applied ISR eligibility, native election adoption, ISR/minISR/HW/LSO, delayed-Fetch purgatory, native duplicate/error semantics, transactions/control markers, leader-epoch truncation, restart/catch-up/snapshot, and protocol compatibility evidence over the M1/M2/M3 authorities; Pulsar native process integration | Planned | `v2M6Check` |
 | M7 | fencing, planned handoff, bounded recovery, cell-local drain/close isolation, mixed-profile operations | Planned | `v2M7Check` |
 | M8 | scale, shared-infrastructure/noisy-neighbor chaos, exact-source AutoMQ comparison, Pulsar native parity, release evidence | Planned | `v2M8Check` and `v2FinalCheck` |
 
-M0, M1, M2, M3, and M4 are closed by their respective aggregate evidence. M3's current closure is the immutable e5 Final
+M0, M1, M2, M3, and M4 are closed by their respective aggregate evidence. M5 detailed design is hard-frozen but M5
+implementation and evidence have not started. M3's current closure is the immutable e5 Final
 identified below; its historical diagnostics and earlier Finals remain history rather than alternate current
 authority. The [M4 index](detailed_design/m4/README.md) and
 [M4-A read-view authority](detailed_design/m4/m4-a-read-view-authority.md) and
@@ -34,6 +35,39 @@ boundary without claiming implementation, scenario promotion, receipt, or Final.
 evidence tooling do not amend those frozen inputs. `v2M4DesignCheck` remains explicitly non-promotable;
 `v2M4Check` is authoritative after its four exact-source children and current immutable Final are published and
 synchronized.
+
+The [M5 index](detailed_design/m5/README.md),
+[M5-I0 implementation-input closure](detailed_design/m5/m5-i0-implementation-input-closure.md),
+[M5-A materialization/publication](detailed_design/m5/m5-a-materialization-and-manifest-publication.md),
+[M5-B Kafka compaction](detailed_design/m5/m5-b-kafka-compaction-and-index-rebuild.md),
+[M5-C retention/metadata retirement](detailed_design/m5/m5-c-retention-reference-free-and-metadata-retirement.md),
+[M5-D physical delete/orphan/GC](detailed_design/m5/m5-d-physical-delete-orphan-and-gc.md), and
+[M5-E evidence/freeze](detailed_design/m5/m5-e-evidence-ownership-and-freeze.md) close the design boundary only.
+`v2M5DesignCheck` validates their exact bytes and unchanged predecessor/scenario/open-gate state. Its result is
+`DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`; it is not a child receipt, scenario PASS, Final, or deletion authority.
+Because a later M5 design commit cannot truthfully be recertified as the older M4 tested source, the design aggregate
+uses `v2M5HistoricalM4DependencyCheck` to reparse the immutable M4 Final/children/scenarios and prove closure ancestry;
+it does not weaken or replace current-source `v2M4Check`.
+
+## Design-frozen milestone: M5
+
+| Item | Frozen value |
+| --- | --- |
+| Frozen predecessor | M4 Final at tested source `595c8b34779d1e88187eb0084bf18e65ab2dd742`, SHA-256 `31235c738400c71252e1c1c923aabda6f66545767b01c20962c0a881303e1b07` |
+| Design phases | I0; A materialization/publication; B Kafka compaction/indexes; C retention/reference-free/metadata retirement; D physical delete/orphan/GC; E evidence/freeze |
+| Mutable read authority | existing exact `BindingReadSelector` CAS; no second current-manifest pointer |
+| Materialization modes | `REFERENCE_REUSE`, `INDEX_ONLY_GENERATION`, `REWRITE_GENERATION` |
+| Release boundary | exact M4 protection key/generation/value in `RELEASED`; no inferred substitute |
+| Metadata retirement families | Object-WAL batch `FULL_V1 -> RETIRED_V1`; Pulsar full aggregate to permanent incarnation tombstone after physical cleanup |
+| M5-promotable rows | exact 14-row set frozen in M5-E, still `PLANNED` here |
+| M6-deferred shared rows | `V2-KAF-DATA-012/013/022`, still `PLANNED` |
+| Open gate | `V2-OPEN-READ-15` remains active for optional tombstone deletion; 0.2 permanent tombstones are frozen |
+| Design result | `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED` |
+| Exclusions | runtime implementation, M5 evidence/Final, physical deletion, M6/M7/M8, tombstone deletion, allocator-orphan GC, production authority |
+
+Implementation must proceed A, B, C, D, then current-source evidence. The detailed design freezes semantic state,
+identity, ordering, veto, module, and ownership rules; exact codec offsets/caps, finite budgets, real Provider delete
+capability, and performance thresholds remain later implementation/evidence selections inside that envelope.
 
 ## Closed milestone: M4
 

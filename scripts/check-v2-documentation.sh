@@ -69,6 +69,13 @@ required_v2_docs=(
     detailed_design/m4/m4-b-source-plan-and-fallback.md
     detailed_design/m4/m4-c-hazard-slot-reclamation.md
     detailed_design/m4/m4-d-evidence-ownership-and-freeze.md
+    detailed_design/m5/README.md
+    detailed_design/m5/m5-i0-implementation-input-closure.md
+    detailed_design/m5/m5-a-materialization-and-manifest-publication.md
+    detailed_design/m5/m5-b-kafka-compaction-and-index-rebuild.md
+    detailed_design/m5/m5-c-retention-reference-free-and-metadata-retirement.md
+    detailed_design/m5/m5-d-physical-delete-orphan-and-gc.md
+    detailed_design/m5/m5-e-evidence-ownership-and-freeze.md
     open-questions.md
     tradeoffs.md
 )

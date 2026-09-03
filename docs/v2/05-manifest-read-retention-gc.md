@@ -156,8 +156,9 @@ substitutes another release-eligibility authority.
 ## Timestamp and protocol-position indexes
 
 Kafka Offset, Pulsar Position/entry, batch, and timestamp indexes are first-class descriptor members where their
-protocol path requires them. They are built from the same typed source cut as the payload and published atomically
-through the manifest root. Timestamp lookup uses bounded candidate scans and protocol-native sentinel semantics; it must
+protocol path requires them. They are built from the same typed source cut as the payload. The immutable manifest view
+binds them, and the existing `BindingReadSelector` exact CAS is the sole mutable read-publication point; no second
+current-manifest pointer is admitted. Timestamp lookup uses bounded candidate scans and protocol-native sentinel semantics; it must
 not linearly scan a full partition or ManagedLedger under normal operation.
 
 ## Materialization and compaction
@@ -172,6 +173,14 @@ byte identity with the pre-compaction generation is neither required nor claimed
 
 Planner input is a frozen manifest/source root. A local metadata snapshot may schedule work but final publication
 revalidates durable authority. A newer generation or policy invalidates stale work before activation.
+
+The accepted [M5 detailed-design index](detailed_design/m5/README.md) freezes the complete implementation boundary:
+M5-A selects deterministic `REFERENCE_REUSE`, `INDEX_ONLY_GENERATION`, or `REWRITE_GENERATION`; M5-B owns the Kafka
+semantic rewrite and every rebuilt index; M5-C owns typed retention, reference-free proof, inline-batch
+externalization, both permanent metadata-retirement families, and admission; M5-D alone owns conditional physical
+delete/orphan/GC; and M5-E owns current-source evidence and scenario boundaries. This is design-only authority with
+result `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`; no M5 runtime, evidence, scenario PASS, or deletion exists at this
+cut.
 
 ## Logical trim and physical GC
 
@@ -214,5 +223,6 @@ the source was safely retired and the preferred generation is corrupt, the resul
 system does not synthesize records or silently skip the requested Protocol Coverage.
 
 Relevant tradeoffs: `T-MANIFEST-01`, `T-KAFKA-01`, `T-POSITION-01`, `T-PROJECTION-01`, `T-POLICY-01`, and
-`T-FABRIC-01`. Required scenarios: `V2-READ-001..015`, `V2-OBJ-002/020..024`, `V2-BK-007..008`, `V2-BK-011`,
-`V2-KAF-DATA-006..012/015..016`, `V2-PROJECTION-001`, `V2-POLICY-001..002`, and `V2-FABRIC-003`.
+`T-FABRIC-01`. Required scenarios include `V2-READ-001..015`, `V2-OBJ-002/020..024`, `V2-BK-007..008/011`,
+`V2-KAF-DATA-006..013/015..016/022`, `V2-META-007`, `V2-PROJECTION-001`, `V2-POLICY-001..002`, and
+`V2-FABRIC-003`.

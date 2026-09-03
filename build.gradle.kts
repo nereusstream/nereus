@@ -2012,6 +2012,47 @@ tasks.register("v2M4Check") {
     )
 }
 
+tasks.register<Exec>("v2M5DesignContractTest") {
+    group = "verification"
+    description = "Run fail-closed contract tests for the governance-only M5 design freeze."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-design-tests.py")
+}
+
+tasks.register<Exec>("v2M5HistoricalM4DependencyContractTest") {
+    group = "verification"
+    description = "Test M5's immutable historical M4 dependency without weakening the exact-source M4 contract."
+    dependsOn("v2M4EvidenceContractTest")
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-historical-m4-tests.py")
+}
+
+tasks.register<Exec>("v2M5HistoricalM4DependencyCheck") {
+    group = "verification"
+    description = "Validate M5's immutable M4 Final dependency without recertifying current HEAD as M4."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-historical-m4.py")
+}
+
+tasks.register<Exec>("v2M5DesignSourceCheck") {
+    group = "verification"
+    description = "Validate the frozen M5 design manifest and prove implementation/evidence have not started."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-design.py")
+}
+
+tasks.register("v2M5DesignCheck") {
+    group = "verification"
+    description = "Hard-freeze M5 design without runtime, evidence, scenario PASS, Final, or deletion authority."
+    dependsOn(
+        "v2DocumentationCheck",
+        "v2M5HistoricalM4DependencyContractTest",
+        "v2M5HistoricalM4DependencyCheck",
+        "v2M5DesignContractTest",
+        "v2M5DesignSourceCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

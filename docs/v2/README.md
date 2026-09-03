@@ -141,6 +141,12 @@ performance-first BookKeeper WAL.
   SHA-256 `31235c738400c71252e1c1c923aabda6f66545767b01c20962c0a881303e1b07`. Exactly
   `V2-READ-001/003/004/005/007` are promoted; shared M4/M5 rows remain `PLANNED`. `v2M4Check` is Final
   authority while `v2M4DesignCheck` remains the historical design-only gate.
+- The accepted [M5 detailed-design index](detailed_design/m5/README.md) plus I0 and A-E hard-freeze deterministic
+  materialization/manifest publication, Kafka-semantic compaction and complete index rebuild, typed retention and
+  exact reference-free proof, the two distinct permanent metadata-retirement families, exact M4 `RELEASED`
+  consumption, conditional Object/BookKeeper/orphan GC, per-Cell isolation, and future evidence ownership. The exact
+  result is `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`: implementation/evidence are `NotStarted`/`NotRun`, all 17
+  M5 rows remain `PLANNED`, and no physical deletion or production authority exists.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and formal-runner contracts. It did not by itself select a mode or
   promote a scenario; the later e5 Final closes those evidence obligations with `RANGE_64`. It still does not activate
@@ -273,8 +279,9 @@ pooling is optional and remains below the independently owned sessions.
 9. [Protocol integrations and product gates](07-protocol-integrations.md)
 10. [Implementation plan and gates](08-implementation-plan-and-gates.md)
 11. [M1 execution index](detailed_design/m1/README.md), [M2 detailed-design index](detailed_design/m2/README.md),
-    [M3 closed execution index](detailed_design/m3/README.md), and
-    [M4 detailed-design index](detailed_design/m4/README.md)
+    [M3 closed execution index](detailed_design/m3/README.md),
+    [M4 detailed-design index](detailed_design/m4/README.md), and
+    [M5 detailed-design index](detailed_design/m5/README.md)
 12. [Scenario evidence matrix](09-scenario-evidence-matrix.md)
 13. [Architecture tradeoffs](tradeoffs.md)
 14. [Open questions](open-questions.md) and [grill session records](grill-notes/)

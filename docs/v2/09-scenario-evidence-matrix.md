@@ -18,6 +18,12 @@ exact tested source `595c8b34779d1e88187eb0084bf18e65ab2dd742`. It promotes exac
 `V2-READ-001/003/004/005/007`. `V2-READ-002` remains M5-owned, and the shared
 `V2-READ-006/008..015` rows remain `PLANNED` with null receipts until their downstream M5 predicates exist.
 
+The accepted [M5 detailed-design index](detailed_design/m5/README.md) and
+[M5-E evidence freeze](detailed_design/m5/m5-e-evidence-ownership-and-freeze.md) change no scenario status. They freeze
+the current 17-row M5 inventory into an exact 14-row eventual M5 promotion set plus M6-deferred
+`V2-KAF-DATA-012/013/022`. All 17 remain `PLANNED` with null receipts until one current-source M5 Final binds all five
+required children; a design SHA or focused child can never promote them.
+
 Acceptance of the
 [M2-K0 Kafka implementation-input closure](detailed_design/m2/kafka-m2-k0-implementation-input-closure.md) changes no
 scenario status by itself. The current Kafka Final and Pulsar Final child receipts promote disjoint sets of ten and

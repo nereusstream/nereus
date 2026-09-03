@@ -501,6 +501,13 @@ replacement, reverse transition is forbidden, and the tombstone grants no source
 The compact tombstone remains permanent under Binding/Cell lifetime budgets; exhaustion stops new fallback/handoff
 admission and never deletes by age.
 
+The accepted [M5-C detailed design](detailed_design/m5/m5-c-retention-reference-free-and-metadata-retirement.md)
+freezes the current inline-M4 physical seam: after every exact member is `RELEASED` and all references are absent, one
+Oxia conditional transaction externalizes the canonical full batch at its deterministic BatchId key while removing
+only the inline selector member; an exact-version same-key CAS then replaces that `FULL_V1` with `RETIRED_V1`.
+Response loss, split-state quarantine, permanent retention, and admission are closed design inputs only. No runtime
+or evidence exists yet.
+
 Tombstone deletion remains evidence-blocked. Only unacceptable M4/M5 lifetime capacity plus a concrete backend's gap-
 free ordered activation history, monotonic conditional authority, exact incarnation/selector-lineage binding, never-
 reactivation, stale-create, and recovery evidence may reopen a metadata-deletion authority. No retired-through/frontier
