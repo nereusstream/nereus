@@ -160,6 +160,12 @@ performance-first BookKeeper WAL.
   [M5-C amendment](detailed_design/m5/m5-c-single-binding-retirement-authority-amendment.md) preserve the failed
   multi-key Oxia path as rejected evidence and select a single-Binding retirement authority, durable ticket/fence
   serialization, and exact single-key CAS. M5-C now implements that path, but its source-bound child has not run.
+- [ADR 0147](../decisions/0147-v2-m5-target-scoped-physical-delete-authority-amendment.md), the accepted
+  [M5-D target-scoped physical-delete authority amendment](detailed_design/m5/m5-d-target-scoped-physical-delete-authority-amendment.md),
+  and `m5-design-amendment-2.json` replace only M5-D's unavailable conditional multi-key linearization with one
+  permanent authority cell per target, closed-writer tickets/fencing, and two exact same-key CAS transitions. The
+  amendment implementation is `NotStarted`; it grants no intent, dispatch, physical-delete, receipt, scenario, or
+  production authority.
 - M5-D has begun with non-promotable `v2M5VersionMatchDeleteCheck` and `v2M5BookKeeperDeleteCheck`: fixed-digest MinIO proves enabled-bucket
   version-match deletion, same-key recreation protection, and complete LIST/full-GET response-loss reconciliation.
   The exact BookKeeper adapter binds a closed ledger's complete metadata fingerprint, rejects stale targets before
@@ -453,6 +459,7 @@ Accepted decisions:
 - [ADR 0144: M3 V5 frozen-target diagnostic inventory amendment](../decisions/0144-v2-m3-allocator-v5-frozen-target-diagnostic-inventory-amendment.md)
 - [ADR 0145: M3 V5 population-construction budget alignment amendment](../decisions/0145-v2-m3-allocator-v5-population-construction-budget-alignment-amendment.md)
 - [ADR 0146: M5 single-Binding retirement authority amendment](../decisions/0146-v2-m5-single-binding-retirement-authority-amendment.md)
+- [ADR 0147: M5 target-scoped physical-delete authority amendment](../decisions/0147-v2-m5-target-scoped-physical-delete-authority-amendment.md)
 
 ## Open design gates
 

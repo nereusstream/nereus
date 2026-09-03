@@ -2136,6 +2136,32 @@ tasks.register("v2M5DesignAmendmentCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5DesignAmendment2ContractTest") {
+    group = "verification"
+    description = "Run fail-closed contract tests for the accepted M5-D target-scoped delete-authority amendment."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-design-amendment-2-tests.py")
+}
+
+tasks.register<Exec>("v2M5DesignAmendment2SourceCheck") {
+    group = "verification"
+    description = "Validate the chained M5-D target-scoped authority amendment and immutable predecessors."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-design-amendment-2.py")
+}
+
+tasks.register("v2M5DesignAmendment2Check") {
+    group = "verification"
+    description = "Accept M5-D target-scoped authority design without runtime, dispatch, or delete authority."
+    dependsOn(
+        "v2DocumentationCheck",
+        "v2M5HistoricalM4DependencyCheck",
+        "v2M5DesignAmendmentCheck",
+        "v2M5DesignAmendment2ContractTest",
+        "v2M5DesignAmendment2SourceCheck",
+    )
+}
+
 tasks.register<Exec>("v2M5MaterializationContractTest") {
     group = "verification"
     description = "Test the fail-closed non-promotable M5-A implementation checker."

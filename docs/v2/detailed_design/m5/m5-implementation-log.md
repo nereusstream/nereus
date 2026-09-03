@@ -20,6 +20,19 @@ certification, or production authority.
 - immutable predecessor: M4 tested source `595c8b34779d1e88187eb0084bf18e65ab2dd742` and Final SHA-256
   `31235c738400c71252e1c1c923aabda6f66545767b01c20962c0a881303e1b07`.
 
+## Accepted M5-D target authority amendment (governance only)
+
+[ADR 0147](../../../decisions/0147-v2-m5-target-scoped-physical-delete-authority-amendment.md) accepts the narrow
+`M5-AMENDMENT-2-TARGET-SCOPED-PHYSICAL-DELETE-AUTHORITY-V1`. The chained
+`m5-design-amendment-2.json` binds the immutable base freeze, exact `m5-design-amendment-1.json`, and the two new
+normative documents. It substitutes one permanent target-scoped authority key and exact same-key CAS for only the
+unavailable M5-D multi-key linearization primitive; the original M5-D document remains byte-identical.
+
+At this entry the amendment implementation remains NotStarted and evidence remains NotRun. Acceptance creates no
+intent, dispatch, physical-delete, source-bound receipt, scenario-promotion, staging, or production authority. The
+focused M5-D adapters below remain foundations until the authority record, complete closed-writer integration, real
+Oxia intent/done path, external execution composition, and source-bound child all pass.
+
 ## M5-A materialization and manifest publication
 
 Status: implementation-complete at the focused, non-promotable gate; source-bound child evidence has not run.
@@ -391,7 +404,8 @@ source-bound child and grants no physical-delete, scenario-promotion, staging, o
 
 ## Remaining ordered work
 
-1. Complete M5-D persisted intent/done and external cleanup composition above the admitted Object/BookKeeper and pure
+1. Implement the ADR 0147 target-scoped authority record, closed-writer tickets/fence, two exact same-key CAS
+   transitions, persisted intent/done, and external cleanup composition above the admitted Object/BookKeeper and pure
    orphan/admission/Pulsar-order cores.
 2. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
    `v2M5Check`.

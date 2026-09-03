@@ -37,11 +37,19 @@ that historical result.
   exact Oxia single-key CAS. The original freeze remains the immutable base.
 - [M5-D physical delete, orphan, and GC](m5-d-physical-delete-orphan-and-gc.md) freezes exact M4 `RELEASED`
   consumption, final revalidation, Object/BookKeeper deletion protocols, orphan taxonomy, and per-Cell isolation.
+- The accepted [M5-D target-scoped physical-delete authority amendment](m5-d-target-scoped-physical-delete-authority-amendment.md)
+  and [ADR 0147](../../../decisions/0147-v2-m5-target-scoped-physical-delete-authority-amendment.md) replace only the
+  unavailable conditional multi-key deletion linearization with one permanent authority key per immutable target,
+  closed-writer tickets/fencing, and two exact same-key CAS transitions around the external identity read. Its
+  implementation remains `NotStarted`; it grants no dispatch or physical-delete authority.
 - [M5-E evidence ownership and freeze](m5-e-evidence-ownership-and-freeze.md) freezes child ownership, scenario
   promotion boundaries, exact-source rules, future gate hierarchy, and exclusions.
 - The governance-only [freeze manifest](m5-design-freeze.json) binds I0 and A through E by exact SHA-256.
 - The additive [amendment manifest](m5-design-amendment-1.json) binds the immutable base manifest, ADR 0146, and the
   exact amendment bytes without rewriting the original I0/A-E records.
+- The ordered [M5-D amendment manifest](m5-design-amendment-2.json) binds that base freeze, the exact predecessor
+  amendment manifest, ADR 0147, and the exact target-scoped authority amendment bytes. All four authority flags remain
+  false at this governance boundary.
 - The later [implementation log](m5-implementation-log.md) tracks ordered implementation descendants without
   changing the frozen I0/A-E bytes or promoting focused results.
 - The implementation-selected [M5-A wire projection](m5-a-wire-projection.json) fixes the version-1 physical codes,
@@ -98,7 +106,9 @@ that historical result.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
-gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order/multipart cores without amending that result. All 17 scenario rows whose milestone names
+gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order/multipart cores without amending that result.
+ADR 0147 and `m5-design-amendment-2.json` accept the next M5-D implementation mechanism but create no runtime or
+delete authority. All 17 scenario rows whose milestone names
 M5 remain `PLANNED` with null receipts. `docs/v2/evidence/v2-m5/`, `v2M5EvidenceExecutionCheck`,
 `v2M5FinalSourceCheck`, and `v2M5Check` remain absent.
 

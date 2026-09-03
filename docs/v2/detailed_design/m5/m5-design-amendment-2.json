@@ -1,0 +1,30 @@
+{
+  "schema": "NEREUS_V2_M5_DESIGN_AMENDMENT_2_V1",
+  "result": "DESIGN_AMENDMENT_2_ACCEPTED_IMPLEMENTATION_NOT_STARTED",
+  "amendmentId": "M5-AMENDMENT-2-TARGET-SCOPED-PHYSICAL-DELETE-AUTHORITY-V1",
+  "authorizedDate": "2026-09-03",
+  "authorizationSourceCommit": "05a20bf2c86ebb01c87c54ef959a8f6ca9a89796",
+  "baseDesignCommit": "c86fde3ed6f4319642987fd599022bd32e2cca5e",
+  "baseFreezeManifest": {
+    "path": "docs/v2/detailed_design/m5/m5-design-freeze.json",
+    "sha256": "1b510471a49876ae047420ebd4e4196381ee47e69ef0756ef950d68c6e78c5f3"
+  },
+  "predecessorAmendment": {
+    "path": "docs/v2/detailed_design/m5/m5-design-amendment-1.json",
+    "sha256": "1f769b44740d9bfb2fa5d5d29fe2207d1cc72cb9e1ea5a8384223a6da143b452"
+  },
+  "documents": [
+    {
+      "path": "docs/decisions/0147-v2-m5-target-scoped-physical-delete-authority-amendment.md",
+      "sha256": "982dba50b69d04bd36227624d3a6c7a82088e7de8f2d101ec3806807ae2699c4"
+    },
+    {
+      "path": "docs/v2/detailed_design/m5/m5-d-target-scoped-physical-delete-authority-amendment.md",
+      "sha256": "2d0815ba8561952edd5fe4f0fb50861f543090e04a4a240b3c658c4f08c93149"
+    }
+  ],
+  "implementationAuthority": false,
+  "physicalDeleteAuthority": false,
+  "scenarioPromotionAuthority": false,
+  "productionAuthority": false
+}

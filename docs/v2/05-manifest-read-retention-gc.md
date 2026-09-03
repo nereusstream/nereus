@@ -176,14 +176,18 @@ revalidates durable authority. A newer generation or policy invalidates stale wo
 
 The accepted [M5 detailed-design index](detailed_design/m5/README.md) freezes the complete implementation boundary,
 with the later [single-Binding retirement authority amendment](detailed_design/m5/m5-c-single-binding-retirement-authority-amendment.md)
-replacing only the unavailable multi-key externalization mechanism:
+replacing only the unavailable M5-C multi-key externalization mechanism, and the later
+[target-scoped physical-delete authority amendment](detailed_design/m5/m5-d-target-scoped-physical-delete-authority-amendment.md)
+plus [ADR 0147](../decisions/0147-v2-m5-target-scoped-physical-delete-authority-amendment.md) replacing only M5-D's
+unavailable conditional multi-key linearization with one permanent authority cell per target and two exact same-key
+CAS transitions:
 M5-A selects deterministic `REFERENCE_REUSE`, `INDEX_ONLY_GENERATION`, or `REWRITE_GENERATION`; M5-B owns the Kafka
 semantic rewrite and every rebuilt index; M5-C owns typed retention, reference-free proof, the selector-key
 single-Binding authority envelope with ticket/fence serialization and exact single-key CAS, both permanent
-metadata-retirement families, and admission; M5-D alone owns conditional physical
+metadata-retirement families, and admission; M5-D alone owns target-scoped physical
 delete/orphan/GC; and M5-E owns current-source evidence and scenario boundaries. This is design-only authority with
-result `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`; no M5 runtime, evidence, scenario PASS, or deletion exists at this
-cut.
+the base result `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`; amendment-2 implementation remains `NotStarted`, and no
+M5-D intent, dispatch, evidence, scenario PASS, or physical-delete authority exists at this cut.
 
 The later [M5 implementation log](detailed_design/m5/m5-implementation-log.md) records the current implementation
 descendants. M5-A has canonical source-cut/task/output identities, deterministic reuse/index-only/rewrite planning,
