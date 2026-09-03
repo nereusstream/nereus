@@ -147,11 +147,11 @@ performance-first BookKeeper WAL.
   consumption, conditional Object/BookKeeper/orphan GC, per-Cell isolation, and future evidence ownership. The exact
   result is `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`: implementation/evidence are `NotStarted`/`NotRun`, all 17
   M5 rows remain `PLANNED`, and no physical deletion or production authority exists.
-- The [M5 implementation log](detailed_design/m5/m5-implementation-log.md) now records the M5-A descendant. Its
-  deterministic source cut and three-mode planner, NMS1/index wire, independent full validation, persisted Cell
-  admission, create/CAS response-loss reconciliation, and exact M4 selector publication pass the focused
-  `v2M5MaterializationCheck`. This is implementation evidence only: M5-B/C/D, all five source-bound children, the M5
-  Final, every M5 scenario promotion, and physical deletion remain outstanding.
+- The [M5 implementation log](detailed_design/m5/m5-implementation-log.md) now records M5-A and M5-B descendants.
+  Materialization/publication passes `v2M5MaterializationCheck`; real Kafka magic-v2 sparse rewriting, seven
+  dispositions, the complete eight-index rebuild, semantic/suppression roots, Cell admission, and final freshness
+  fencing pass `v2M5KafkaCompactionCheck`. Both are focused implementation results only: M5-C/D, all five source-bound
+  children, the M5 Final, every M5 scenario promotion, and physical deletion remain outstanding.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and formal-runner contracts. It did not by itself select a mode or
   promote a scenario; the later e5 Final closes those evidence obligations with `RANGE_64`. It still does not activate

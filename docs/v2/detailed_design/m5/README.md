@@ -38,6 +38,8 @@ scenario promotion, physical deletion, or production deployment authority is cre
   changing the frozen I0/A-E bytes or promoting focused results.
 - The implementation-selected [M5-A wire projection](m5-a-wire-projection.json) fixes the version-1 physical codes,
   identity domains, section caps, flags, and lookup rule used by the first runtime slice.
+- The implementation-selected [M5-B wire projection](m5-b-wire-projection.json) fixes the Kafka dependency, magic,
+  caps, seven disposition codes, complete eight-index set, gap lookup, fallback suppression, and publication rule.
 
 The design result is exactly `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. All 17 scenario rows whose milestone names
 M5 remain `PLANNED` with null receipts. `docs/v2/evidence/v2-m5/`, `v2M5EvidenceExecutionCheck`,

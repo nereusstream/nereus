@@ -2082,6 +2082,34 @@ tasks.register("v2M5MaterializationCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5KafkaCompactionContractTest") {
+    group = "verification"
+    description = "Test the fail-closed non-promotable M5-B implementation checker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-kafka-compaction-tests.py")
+}
+
+tasks.register<Exec>("v2M5KafkaCompactionSourceCheck") {
+    group = "verification"
+    description = "Validate M5-B production source shape, exact Kafka dependency, and rebuilt-index projection."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-kafka-compaction.py")
+}
+
+tasks.register("v2M5KafkaCompactionCheck") {
+    group = "verification"
+    description = "Run the non-promotable M5-B Kafka semantic compaction and complete-index implementation gate."
+    dependsOn(
+        "v2M5MaterializationCheck",
+        "v2M5KafkaCompactionContractTest",
+        "v2M5KafkaCompactionSourceCheck",
+        ":nereus-kafka-bookkeeper:v2M5KafkaCompactionTest",
+        ":nereus-kafka-bookkeeper:checkstyleMain",
+        ":nereus-kafka-bookkeeper:checkstyleTest",
+        ":nereus-kafka-bookkeeper:spotlessCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

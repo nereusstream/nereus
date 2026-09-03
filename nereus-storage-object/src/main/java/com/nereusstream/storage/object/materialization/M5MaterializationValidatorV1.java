@@ -70,6 +70,28 @@ public final class M5MaterializationValidatorV1 {
         }
     }
 
+    /** M5-B-owned proof binding required before semantic Kafka output may use M5-A publication. */
+    public record SemanticValidationProof(
+            Sha256Digest taskIdSha256,
+            Sha256Digest outputIdentitySha256,
+            Sha256Digest sourceSetSha256,
+            Sha256Digest semanticValidationRootSha256,
+            Sha256Digest protocolStateRootSha256,
+            Sha256Digest compactionSuppressionRootSha256,
+            Sha256Digest payloadBodiesRootSha256,
+            Sha256Digest indexBodiesRootSha256) {
+        public SemanticValidationProof {
+            requireDigest(taskIdSha256, "taskIdSha256");
+            requireDigest(outputIdentitySha256, "outputIdentitySha256");
+            requireDigest(sourceSetSha256, "sourceSetSha256");
+            requireDigest(semanticValidationRootSha256, "semanticValidationRootSha256");
+            requireDigest(protocolStateRootSha256, "protocolStateRootSha256");
+            requireDigest(compactionSuppressionRootSha256, "compactionSuppressionRootSha256");
+            requireDigest(payloadBodiesRootSha256, "payloadBodiesRootSha256");
+            requireDigest(indexBodiesRootSha256, "indexBodiesRootSha256");
+        }
+    }
+
     public ValidatedGeneration validate(
             MaterializationPlan plan,
             BindingReadSelector currentSelector,
@@ -140,6 +162,100 @@ public final class M5MaterializationValidatorV1 {
                 plan.sourceCut().coverage(),
                 Optional.empty());
         return new ValidatedGeneration(validation, generation, manifest);
+    }
+
+    /**
+     * Applies the unchanged M5-A authority/publication envelope to independently validated M5-B semantic output.
+     */
+    public ValidatedGeneration validateSemantic(
+            MaterializationPlan plan,
+            BindingReadSelector currentSelector,
+            List<SourceProtectionIdentity> exactFallbackSources,
+            List<GenerationObject> payloadObjects,
+            List<GenerationObject> indexObjects,
+            MaterializationDataReader reader,
+            SemanticValidationProof proof)
+            throws IOException {
+        Objects.requireNonNull(plan, "plan");
+        Objects.requireNonNull(currentSelector, "currentSelector");
+        Objects.requireNonNull(exactFallbackSources, "exactFallbackSources");
+        Objects.requireNonNull(reader, "reader");
+        Objects.requireNonNull(proof, "proof");
+        M5MaterializationCodecV1.encodePlan(plan);
+        if (plan.representationMode() != RepresentationMode.REWRITE_GENERATION
+                || plan.payloadKind() != PayloadKind.KAFKA_SEMANTIC_COMPACTED_V1
+                || !proof.taskIdSha256().equals(plan.taskIdSha256())
+                || !proof.outputIdentitySha256().equals(plan.outputIdentitySha256())
+                || !proof.sourceSetSha256().equals(plan.sourceCut().sourceSetSha256())) {
+            throw new IllegalArgumentException("M5-B semantic proof differs from the materialization plan");
+        }
+        requireCurrentAuthority(plan, currentSelector);
+        Sha256Digest fallbackSet = requireFallbackSources(plan, exactFallbackSources);
+        payloadObjects = sortedGenerationObjects(payloadObjects, true);
+        indexObjects = sortedGenerationObjects(indexObjects, false);
+        requireOutputShape(plan, payloadObjects, indexObjects);
+
+        readAndValidateSources(plan, reader);
+        List<CanonicalBytes> payloadBodies = readAndValidatePayloads(plan, payloadObjects, reader);
+        List<CanonicalBytes> indexBodies = readAndValidateSemanticIndexes(indexObjects, reader);
+        if (!semanticPayloadBodiesRoot(payloadBodies).equals(proof.payloadBodiesRootSha256())
+                || !semanticIndexBodiesRoot(indexBodies).equals(proof.indexBodiesRootSha256())) {
+            throw new IllegalStateException("M5-B semantic proof does not bind the reread output bytes");
+        }
+
+        long totalBytes = 0;
+        for (CanonicalBytes body : payloadBodies) {
+            totalBytes = Math.addExact(totalBytes, body.length());
+        }
+        for (CanonicalBytes body : indexBodies) {
+            totalBytes = Math.addExact(totalBytes, body.length());
+        }
+        GenerationValidationRoot validation = new GenerationValidationRoot(
+                plan.taskIdSha256(),
+                plan.outputIdentitySha256(),
+                plan.sourceCut().sourceSetSha256(),
+                hashObjects("M5-B-VALIDATED-OBJECTS-V1", payloadObjects, indexObjects),
+                hashCoverage("M5-B-COVERAGE-V1", payloadObjects, indexObjects),
+                proof.indexBodiesRootSha256(),
+                proof.semanticValidationRootSha256(),
+                hashAuthority(plan, currentSelector),
+                payloadObjects.size(),
+                indexObjects.size(),
+                totalBytes);
+        Sha256Digest validationSha = M5MaterializationCodecV1.validationRootSha256(validation);
+        MaterializedGeneration generation = new MaterializedGeneration(
+                plan.sourceCut().identity(),
+                plan.representationMode(),
+                plan.payloadKind(),
+                plan.taskIdSha256(),
+                plan.outputIdentitySha256(),
+                plan.sourceCut().sourceSetSha256(),
+                Math.addExact(currentSelector.sourceGeneration(), 1),
+                plan.sourceCut().coverage(),
+                proof.protocolStateRootSha256(),
+                Optional.of(proof.semanticValidationRootSha256()),
+                validationSha,
+                plan.sourceCut().predecessorViewSha256(),
+                Optional.of(fallbackSet),
+                payloadObjects,
+                indexObjects);
+        Sha256Digest generationSha = M5MaterializationCodecV1.generationSha256(generation);
+        BindingManifestView manifest = new BindingManifestView(
+                plan.sourceCut().identity(),
+                generationSha,
+                plan.sourceCut().predecessorViewSha256(),
+                plan.sourceCut().predecessorSelectorValueSha256(),
+                plan.sourceCut().coverage(),
+                Optional.of(proof.compactionSuppressionRootSha256()));
+        return new ValidatedGeneration(validation, generation, manifest);
+    }
+
+    public static Sha256Digest semanticPayloadBodiesRoot(List<CanonicalBytes> bodies) {
+        return hashBodies("M5-B-PAYLOAD-BODIES-V1", List.of(), List.copyOf(bodies));
+    }
+
+    public static Sha256Digest semanticIndexBodiesRoot(List<CanonicalBytes> bodies) {
+        return hashBodies("M5-B-INDEX-BODIES-V1", List.of(), List.copyOf(bodies));
     }
 
     private static void requireCurrentAuthority(MaterializationPlan plan, BindingReadSelector current) {
@@ -257,6 +373,20 @@ public final class M5MaterializationValidatorV1 {
                 throw new IllegalStateException("M5 index identity differs from the deterministic plan");
             }
             requireLookupBoundaries(decoded);
+            result.add(read.body());
+        }
+        return List.copyOf(result);
+    }
+
+    private static List<CanonicalBytes> readAndValidateSemanticIndexes(
+            List<GenerationObject> objects, MaterializationDataReader reader) throws IOException {
+        List<CanonicalBytes> result = new ArrayList<>(objects.size());
+        for (GenerationObject object : objects) {
+            VerifiedObjectRead read = reader.readObject(object.identity());
+            requireObjectIdentity(object, read);
+            if (!read.immutableProviderVersionToken().equals(object.immutableProviderVersionToken())) {
+                throw new IllegalStateException("M5-B index Provider version differs");
+            }
             result.add(read.body());
         }
         return List.copyOf(result);
@@ -412,6 +542,13 @@ public final class M5MaterializationValidatorV1 {
     private static Sha256Digest hash(String domain, List<String> values) {
         String body = domain + "\0" + String.join("\0", values);
         return Sha256Digest.hash(CanonicalBytes.copyOf(body.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static void requireDigest(Sha256Digest value, String label) {
+        Objects.requireNonNull(value, label);
+        if (value.isZero()) {
+            throw new IllegalArgumentException(label + " is the zero digest");
+        }
     }
 
     private static CanonicalBytes concatenate(List<CanonicalBytes> values) {

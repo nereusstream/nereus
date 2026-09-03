@@ -99,7 +99,9 @@ public final class Nms1CodecV1 {
             List<Nms1ObjectV1.SourceContribution> sources = readSources(input, header.sourceCount());
             List<Nms1ObjectV1.ExtentRow> extents = readExtents(input, header.extentCount());
             List<IndexDescriptor> indexDescriptors = readIndexDirectory(input, header.indexCount());
-            CanonicalBytes payload = readExactBytes(input, header.payloadBytes(), MAX_PAYLOAD_BYTES, "payload");
+            CanonicalBytes payload = header.payloadBytes() == 0
+                    ? CanonicalBytes.empty()
+                    : readExactBytes(input, header.payloadBytes(), MAX_PAYLOAD_BYTES, "payload");
             List<Nms1ObjectV1.IndexSection> indexes = new ArrayList<>(indexDescriptors.size());
             for (IndexDescriptor descriptor : indexDescriptors) {
                 CanonicalBytes body =
@@ -181,7 +183,8 @@ public final class Nms1CodecV1 {
         int sources = boundedCount(input.readInt(), Nms1ObjectV1.MAX_SOURCE_ROWS, "source count", false);
         int extents = boundedCount(input.readInt(), Nms1ObjectV1.MAX_EXTENT_ROWS, "extent count", false);
         int indexes = boundedCount(input.readInt(), Nms1ObjectV1.MAX_INDEX_SECTIONS, "index count", true);
-        int payloadBytes = boundedCount(input.readInt(), MAX_PAYLOAD_BYTES, "payload bytes", false);
+        int payloadBytes = boundedCount(
+                input.readInt(), MAX_PAYLOAD_BYTES, "payload bytes", kind == PayloadKind.KAFKA_SEMANTIC_COMPACTED_V1);
         return new Header(
                 kind,
                 identity,

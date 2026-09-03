@@ -24,9 +24,9 @@ the current 17-row M5 inventory into an exact 14-row eventual M5 promotion set p
 `V2-KAF-DATA-012/013/022`. All 17 remain `PLANNED` with null receipts until one current-source M5 Final binds all five
 required children; a design SHA or focused child can never promote them.
 
-The M5-A implementation descendant is tracked in the
-[M5 implementation log](detailed_design/m5/m5-implementation-log.md). Its focused
-`v2M5MaterializationCheck` remains non-promotable and therefore changes no row: all 17 M5 rows still have
+The M5-A/M5-B implementation descendants are tracked in the
+[M5 implementation log](detailed_design/m5/m5-implementation-log.md). Their focused
+`v2M5MaterializationCheck` and `v2M5KafkaCompactionCheck` remain non-promotable and therefore change no row: all 17 M5 rows still have
 `status=PLANNED` and `evidenceReceipt=null`, including the three M6-deferred Kafka rows.
 
 Acceptance of the

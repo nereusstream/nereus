@@ -16,6 +16,7 @@ dependencies {
     api(project(":nereus-storage-api"))
     implementation(project(":nereus-storage-bookkeeper"))
     api(project(":nereus-storage-object"))
+    implementation(libs.kafka.clients)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
@@ -198,6 +199,21 @@ tasks.register<Test>("v2M4CurrentSourceKafkaTest") {
             "com.nereusstream.kafka.bookkeeper.object.publication." +
                 "KafkaObjectPublicationBridgeV1Test." +
                 "m4KafkaCurrentSourceLatencyAllocationAndCapacityAreBounded",
+        )
+    }
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("v2M5KafkaCompactionTest") {
+    group = "verification"
+    description = "Run focused M5-B Kafka semantic compaction, rebuilt-index, and fallback-suppression tests."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test",
         )
     }
     outputs.upToDateWhen { false }

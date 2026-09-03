@@ -1,0 +1,32 @@
+{
+  "schema": "NEREUS_V2_M5_B_WIRE_PROJECTION_V1",
+  "nativeKafkaLibrary": "org.apache.kafka:kafka-clients:3.9.0",
+  "messageMagic": 2,
+  "maximumBatchBytes": 67108864,
+  "maximumBatches": 65536,
+  "maximumRecords": 1048576,
+  "maximumKeys": 1048576,
+  "dispositions": {
+    "KEEP_KEY_LATEST": 0,
+    "KEEP_NULL_KEY": 1,
+    "KEEP_TOMBSTONE_WITHIN_RETENTION": 2,
+    "KEEP_TRANSACTION_OR_CONTROL": 3,
+    "DROP_SUPERSEDED_VALUE": 4,
+    "DROP_EXPIRED_TOMBSTONE": 5,
+    "RETAIN_UNKNOWN": 6
+  },
+  "rebuiltIndexes": [
+    "OFFSET_OR_POSITION",
+    "PAYLOAD_LOCATOR",
+    "TIMESTAMP",
+    "PRODUCER_RECOVERY",
+    "TRANSACTION",
+    "ABORTED_TRANSACTION",
+    "LEADER_EPOCH",
+    "CHECKSUM_COVERAGE"
+  ],
+  "lookupRule": "FLOOR_COVERAGE_THEN_SUCCESSOR",
+  "fallbackRule": "PREFERRED_COMPACTION_SUPPRESSION_ROOT_FILTERS_PREDECESSOR",
+  "publicationRule": "M5_A_SELECTOR_CAS_AFTER_FRESH_M5_B_SEMANTIC_AND_FENCE_VALIDATION",
+  "scenarioAuthority": "NONE_NON_PROMOTABLE_IMPLEMENTATION_GATE"
+}

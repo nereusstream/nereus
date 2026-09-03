@@ -69,7 +69,9 @@ public record Nms1ObjectV1(
         if (sources.isEmpty() || sources.size() > MAX_SOURCE_ROWS) {
             throw new IllegalArgumentException("NMS1 source table count is outside its cap");
         }
-        if (extents.isEmpty() || extents.size() > MAX_EXTENT_ROWS || payload.isEmpty()) {
+        if (extents.isEmpty()
+                || extents.size() > MAX_EXTENT_ROWS
+                || (payload.isEmpty() && payloadKind != PayloadKind.KAFKA_SEMANTIC_COMPACTED_V1)) {
             throw new IllegalArgumentException("NMS1 extent/payload section is empty or oversized");
         }
         if (indexes.size() > MAX_INDEX_SECTIONS) {
@@ -100,8 +102,11 @@ public record Nms1ObjectV1(
             int protocolFlags) {
         public ExtentRow {
             Objects.requireNonNull(coverage, "coverage");
-            if (payloadOffset < 0 || payloadLength <= 0 || recordCount < 0) {
+            if (payloadOffset < 0 || payloadLength < 0 || recordCount < 0) {
                 throw new IllegalArgumentException("NMS1 extent payload range/count is invalid");
+            }
+            if ((payloadLength == 0) != (recordCount == 0)) {
+                throw new IllegalArgumentException("NMS1 gap extent must have zero bytes and zero records");
             }
             if (recordCount == 0 && (minimumTimestamp != -1 || maximumTimestamp != -1)) {
                 throw new IllegalArgumentException("empty NMS1 extent must use timestamp sentinel -1");

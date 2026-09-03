@@ -58,12 +58,53 @@ receipts, rejects a missing runtime surface or broken design ancestry, and runs 
 It does not satisfy the future `MATERIALIZATION_MANIFEST_PUBLICATION` real-provider/BookKeeper child, does not remove
 fallback or release M4 protection, and grants no metadata-retirement or physical-delete authority.
 
+## M5-B Kafka semantic compaction and complete index rebuild
+
+Status: implementation-complete at the focused, non-promotable gate; native source-bound differential evidence has
+not run.
+
+Implemented surfaces:
+
+- strict parsing of exactly one assigned Kafka magic-v2 `RecordBatch` through Kafka clients 3.9.0, including CRC,
+  compression, sparse/empty records, producer, transaction, control-marker, timestamp, and leader-epoch facts;
+- a frozen candidate cut with exact source locators/bodies, policy generation, Durable/LEO/HW/LSO frontiers, all
+  protocol-state roots, complete-domain key proofs, transactions, leader epochs, recovery-required offsets, and
+  finite per-task caps;
+- deterministic whole/partial/no-data selection for all seven dispositions, including bytewise cross-batch latest-key
+  proofs, null-key retention, exact tombstone deadline behavior, conservative `RETAIN_UNKNOWN`, and unconditional
+  transaction/control retention;
+- sparse batch rewriting that preserves absolute offsets, producer ID/epoch/sequence interpretation, timestamps,
+  keys, values, headers, transaction state, control bytes, leader epoch, and Kafka CRC validity;
+- all eight index families rebuilt from canonical output, with explicit checksum/coverage gap rows and shared
+  floor/coverage/successor behavior across leading, internal, and trailing gaps;
+- independent semantic reread/selection/output/index validation and domain-separated plan, task, disposition,
+  protocol-state, output-record, suppression, and semantic-validation roots;
+- immutable fallback filtering that prevents a raw predecessor from resurrecting superseded values or expired
+  tombstones removed by the preferred generation;
+- persisted per-Cell admission for dirty bytes, batches, records, keys/key bytes, output/index bytes, transactions,
+  tombstones, backlog age, spill, Provider/KMS/metadata operations, and response-unknown slots; and
+- a final policy/root/frontier reread followed by M5-A's exact Object creation, semantic generation validation, and
+  sole M4 selector CAS path.
+
+The implementation-selected codes, caps, exact eight-index set, lookup rule, dependency lock, suppression rule, and
+publication rule are machine-readable in `m5-b-wire-projection.json`.
+
+Focused gate:
+
+```text
+./gradlew --no-daemon --no-configuration-cache v2M5KafkaCompactionCheck
+PASS_V2_M5_KAFKA_COMPACTION_IMPLEMENTATION_NON_PROMOTABLE
+KafkaSemanticCompactorV1Test: 8 tests, 0 failures, 0 errors, 0 skipped
+```
+
+This focused result is not the future `KAFKA_COMPACTION_INDEX_REBUILD` child receipt. It does not promote
+`V2-KAF-DATA-012/013/022`, close fallback, release M4 protection, retire metadata, or authorize physical deletion.
+
 ## Remaining ordered work
 
-1. M5-B Kafka compaction and complete index rebuild.
-2. M5-C typed retention, reference inventory/proof, and permanent metadata retirement.
-3. M5-D conditional physical delete, orphan reconciliation, and BookKeeper/Pulsar cleanup.
-4. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
+1. M5-C typed retention, reference inventory/proof, and permanent metadata retirement.
+2. M5-D conditional physical delete, orphan reconciliation, and BookKeeper/Pulsar cleanup.
+3. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
    `v2M5Check`.
 
 `V2-KAF-DATA-012`, `V2-KAF-DATA-013`, and `V2-KAF-DATA-022` remain M6-deferred. Tombstone deletion,
