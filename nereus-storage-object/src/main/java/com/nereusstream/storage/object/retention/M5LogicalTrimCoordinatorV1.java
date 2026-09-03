@@ -78,24 +78,26 @@ public final class M5LogicalTrimCoordinatorV1 {
             BindingTrimFrontierV1 candidate,
             CanonicalBytes candidateBytes,
             MutationOutcome mutation) {
-        return metadata.read(key).thenApply(observed -> {
-            if (observed.isPresent()
-                    && observed.orElseThrow().canonicalStoredBytes().equals(candidateBytes)) {
-                return new Result(
-                        mutation == MutationOutcome.APPLIED_EXACT ? Outcome.APPLIED_EXACT : Outcome.EXISTING_EXACT,
-                        Optional.of(candidate));
-            }
-            if (observed.equals(predecessor)) {
-                return new Result(
-                        mutation == MutationOutcome.RESPONSE_UNKNOWN
-                                ? Outcome.RESPONSE_UNKNOWN
-                                : Outcome.DEFINITIVELY_NOT_APPLIED,
-                        Optional.empty());
-            }
-            return new Result(
-                    mutation == MutationOutcome.RESPONSE_UNKNOWN ? Outcome.RESPONSE_UNKNOWN : Outcome.CONFLICT,
-                    Optional.empty());
-        });
+        return metadata.read(key)
+                .thenApply(observed -> {
+                    if (observed.isPresent()
+                            && observed.orElseThrow().canonicalStoredBytes().equals(candidateBytes)) {
+                        return new Result(
+                                mutation == MutationOutcome.APPLIED_EXACT
+                                        ? Outcome.APPLIED_EXACT
+                                        : Outcome.EXISTING_EXACT,
+                                Optional.of(candidate));
+                    }
+                    if (observed.equals(predecessor)) {
+                        return new Result(
+                                mutation == MutationOutcome.DEFINITIVE_CONFLICT
+                                        ? Outcome.CONFLICT
+                                        : Outcome.DEFINITIVELY_NOT_APPLIED,
+                                Optional.empty());
+                    }
+                    return new Result(Outcome.CONFLICT, Optional.empty());
+                })
+                .exceptionally(ignored -> new Result(Outcome.RESPONSE_UNKNOWN, Optional.empty()));
     }
 
     private static BindingTrimFrontierV1 decode(String key, VersionedValue stored) {

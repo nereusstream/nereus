@@ -311,27 +311,26 @@ public final class M5RetentionAdmissionV1 {
             CanonicalBytes candidateBytes,
             MutationOutcome mutation,
             boolean install) {
-        return metadata.read(stateKey).thenApply(observed -> {
-            if (observed.isPresent()
-                    && observed.orElseThrow().canonicalStoredBytes().equals(candidateBytes)) {
-                Outcome exact = mutation == MutationOutcome.APPLIED_EXACT
-                        ? (install ? Outcome.INSTALLED : Outcome.APPLIED_EXACT)
-                        : Outcome.EXISTING_EXACT;
-                return new Result(exact, Optional.of(candidate), Optional.empty());
-            }
-            if (observed.equals(predecessor)) {
-                return new Result(
-                        mutation == MutationOutcome.RESPONSE_UNKNOWN
-                                ? Outcome.RESPONSE_UNKNOWN
-                                : Outcome.DEFINITIVELY_NOT_APPLIED,
-                        Optional.empty(),
-                        Optional.empty());
-            }
-            return new Result(
-                    mutation == MutationOutcome.RESPONSE_UNKNOWN ? Outcome.RESPONSE_UNKNOWN : Outcome.CONFLICT,
-                    Optional.empty(),
-                    Optional.empty());
-        });
+        return metadata.read(stateKey)
+                .thenApply(observed -> {
+                    if (observed.isPresent()
+                            && observed.orElseThrow().canonicalStoredBytes().equals(candidateBytes)) {
+                        Outcome exact = mutation == MutationOutcome.APPLIED_EXACT
+                                ? (install ? Outcome.INSTALLED : Outcome.APPLIED_EXACT)
+                                : Outcome.EXISTING_EXACT;
+                        return new Result(exact, Optional.of(candidate), Optional.empty());
+                    }
+                    if (observed.equals(predecessor)) {
+                        return new Result(
+                                mutation == MutationOutcome.DEFINITIVE_CONFLICT
+                                        ? Outcome.CONFLICT
+                                        : Outcome.DEFINITIVELY_NOT_APPLIED,
+                                Optional.empty(),
+                                Optional.empty());
+                    }
+                    return new Result(Outcome.CONFLICT, Optional.empty(), Optional.empty());
+                })
+                .exceptionally(ignored -> new Result(Outcome.RESPONSE_UNKNOWN, Optional.empty(), Optional.empty()));
     }
 
     public static CanonicalBytes encode(State state) {

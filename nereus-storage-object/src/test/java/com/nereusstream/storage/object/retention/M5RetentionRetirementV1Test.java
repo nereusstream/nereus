@@ -162,6 +162,14 @@ class M5RetentionRetirementV1Test {
         RetentionFloorSnapshotV1 first = snapshot(metadata, 0, 100);
         M5LogicalTrimCoordinatorV1 coordinator = new M5LogicalTrimCoordinatorV1(metadata);
 
+        metadata.casResponseUnknownWithoutApply = true;
+        M5LogicalTrimCoordinatorV1.Result notApplied = coordinator
+                .advance("/trim-frontier", first)
+                .toCompletableFuture()
+                .join();
+        assertThat(notApplied.outcome()).isEqualTo(Outcome.DEFINITIVELY_NOT_APPLIED);
+        assertThat(metadata.readOptional("/trim-frontier")).isEmpty();
+
         M5LogicalTrimCoordinatorV1.Result result = coordinator
                 .advance("/trim-frontier", first)
                 .toCompletableFuture()
@@ -424,6 +432,32 @@ class M5RetentionRetirementV1Test {
         assertThat(alert.hardValue()).isEqualTo(100);
         assertThat(admission.read().toCompletableFuture().join().orElseThrow().reservations())
                 .containsExactly(first);
+    }
+
+    @Test
+    void admissionDistinguishesExactNonApplicationFromFailedReconciliationRead() {
+        InMemoryStore metadata = new InMemoryStore(true);
+        M5RetentionAdmissionV1 admission =
+                new M5RetentionAdmissionV1(metadata, "/binding/admission-response", digest("cell"), BINDING);
+        assertThat(admission
+                        .install(new M5RetentionAdmissionV1.Caps(values(100)))
+                        .toCompletableFuture()
+                        .join()
+                        .outcome())
+                .isEqualTo(M5RetentionAdmissionV1.Outcome.INSTALLED);
+        M5RetentionAdmissionV1.Reservation reservation = reservation("response", 1, 1);
+
+        metadata.casResponseUnknownWithoutApply = true;
+        assertThat(admission.reserve(reservation).toCompletableFuture().join().outcome())
+                .isEqualTo(M5RetentionAdmissionV1.Outcome.DEFINITIVELY_NOT_APPLIED);
+        assertThat(admission.read().toCompletableFuture().join().orElseThrow().reservations())
+                .isEmpty();
+
+        metadata.failReadAfterCas = true;
+        assertThat(admission.reserve(reservation).toCompletableFuture().join().outcome())
+                .isEqualTo(M5RetentionAdmissionV1.Outcome.RESPONSE_UNKNOWN);
+        assertThat(admission.read().toCompletableFuture().join().orElseThrow().reservations())
+                .containsExactly(reservation);
     }
 
     @ParameterizedTest
@@ -877,7 +911,9 @@ class M5RetentionRetirementV1Test {
         private boolean responseUnknownAfterApply;
         private boolean responseUnknownWithoutApply;
         private boolean failReadAfterTransaction;
+        private boolean failReadAfterCas;
         private boolean failNextRead;
+        private boolean casResponseUnknownWithoutApply;
 
         private InMemoryStore(boolean transactionSupported) {
             this.transactionSupported = transactionSupported;
@@ -925,7 +961,15 @@ class M5RetentionRetirementV1Test {
             if (!current.equals(exactPredecessor)) {
                 return CompletableFuture.completedFuture(MutationOutcome.DEFINITIVE_CONFLICT);
             }
+            if (casResponseUnknownWithoutApply) {
+                casResponseUnknownWithoutApply = false;
+                return CompletableFuture.completedFuture(MutationOutcome.RESPONSE_UNKNOWN);
+            }
             values.put(key, stored(key, exactCandidate));
+            if (failReadAfterCas) {
+                failReadAfterCas = false;
+                failNextRead = true;
+            }
             return CompletableFuture.completedFuture(MutationOutcome.APPLIED_EXACT);
         }
 

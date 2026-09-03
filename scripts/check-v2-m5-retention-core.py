@@ -170,6 +170,7 @@ def validate_runtime_contract(root: Path) -> None:
             "failedAuthoritativeReconciliationReadRemainsResponseUnknown",
             "unsupportedBackendPerformsNoTransactionAndNeverCreatesSplitState",
             "admissionPersistsExactCapsAndRejectsBeforeExceedingThem",
+            "admissionDistinguishesExactNonApplicationFromFailedReconciliationRead",
             "everyClosedAdmissionLimitRejectsBeforeItsHardCapIsExceeded",
             "pulsarAggregateRetirementInstallsPermanentSameKeyTombstone",
         ),
