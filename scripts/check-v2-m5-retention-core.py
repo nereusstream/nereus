@@ -166,8 +166,11 @@ def validate_runtime_contract(root: Path) -> None:
         (
             "referenceFreeProofRequiresEveryKindCompleteAndAbsent",
             "externalizationIsOneAtomicTransitionAndResponseLossConverges",
+            "externalizationLostResponseWithExactPredecessorsIsDefinitivelyNotApplied",
+            "failedAuthoritativeReconciliationReadRemainsResponseUnknown",
             "unsupportedBackendPerformsNoTransactionAndNeverCreatesSplitState",
             "admissionPersistsExactCapsAndRejectsBeforeExceedingThem",
+            "everyClosedAdmissionLimitRejectsBeforeItsHardCapIsExceeded",
             "pulsarAggregateRetirementInstallsPermanentSameKeyTombstone",
         ),
         "retention tests",

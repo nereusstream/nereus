@@ -75,6 +75,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class M5RetentionRetirementV1Test {
     private static final CapabilityBinding CAPABILITY = new CapabilityBinding(7, digest("capability"));
@@ -193,6 +195,35 @@ class M5RetentionRetirementV1Test {
     }
 
     @Test
+    void externalizationLostResponseWithExactPredecessorsIsDefinitivelyNotApplied() {
+        RetirementFixture fixture = retirementFixture(true);
+        fixture.metadata.responseUnknownWithoutApply = true;
+
+        assertThat(new M5RetirementCoordinatorV1(fixture.metadata)
+                        .externalize(fixture.externalizationRequest())
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.DEFINITIVELY_NOT_APPLIED);
+        assertThat(fixture.metadata.readOptional(fixture.batchKey)).isEmpty();
+        assertThat(M4ReadControlCodecV1.decodeSelector(
+                                fixture.metadata.readNow(fixture.selectorKey).canonicalStoredBytes())
+                        .activeBatches())
+                .containsExactly(fixture.batch);
+    }
+
+    @Test
+    void failedAuthoritativeReconciliationReadRemainsResponseUnknown() {
+        RetirementFixture fixture = retirementFixture(true);
+        fixture.metadata.failReadAfterTransaction = true;
+
+        assertThat(new M5RetirementCoordinatorV1(fixture.metadata)
+                        .externalize(fixture.externalizationRequest())
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.RESPONSE_UNKNOWN);
+    }
+
+    @Test
     void retirementUsesFreshProofAndIrreversibleSameKeyTombstone() {
         RetirementFixture fixture = retirementFixture(true);
         M5RetirementCoordinatorV1 coordinator = new M5RetirementCoordinatorV1(fixture.metadata);
@@ -218,6 +249,14 @@ class M5RetentionRetirementV1Test {
                 fixture.releases);
         VersionedValue exactFull = fixture.metadata.readNow(fixture.batchKey);
 
+        fixture.metadata.responseUnknownWithoutApply = true;
+        assertThat(coordinator
+                        .retireBatch(new BatchRetirementRequest(
+                                fixture.partitionKey, fixture.batchKey, exactFull, fixture.fullBatch, retirementProof))
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.DEFINITIVELY_NOT_APPLIED);
+        assertThat(fixture.metadata.readNow(fixture.batchKey)).isEqualTo(exactFull);
         assertThat(coordinator
                         .retireBatch(new BatchRetirementRequest(
                                 fixture.partitionKey, fixture.batchKey, exactFull, fixture.fullBatch, retirementProof))
@@ -387,6 +426,49 @@ class M5RetentionRetirementV1Test {
                 .containsExactly(first);
     }
 
+    @ParameterizedTest
+    @EnumSource(M5RetentionAdmissionV1.LimitKindV1.class)
+    void everyClosedAdmissionLimitRejectsBeforeItsHardCapIsExceeded(M5RetentionAdmissionV1.LimitKindV1 limitedKind) {
+        InMemoryStore metadata = new InMemoryStore(true);
+        M5RetentionAdmissionV1 admission = new M5RetentionAdmissionV1(
+                metadata, "/binding/admission/" + limitedKind.ordinal(), digest("cell"), BINDING);
+        EnumMap<M5RetentionAdmissionV1.LimitKindV1, Long> hardLimits = values(100);
+        long hard = limitedKind == M5RetentionAdmissionV1.LimitKindV1.RESERVATIONS
+                        || limitedKind == M5RetentionAdmissionV1.LimitKindV1.QUARANTINES
+                ? 1
+                : 10;
+        hardLimits.put(limitedKind, hard);
+        assertThat(admission
+                        .install(new M5RetentionAdmissionV1.Caps(hardLimits))
+                        .toCompletableFuture()
+                        .join()
+                        .outcome())
+                .isEqualTo(M5RetentionAdmissionV1.Outcome.INSTALLED);
+        long firstAmount = limitedKind == M5RetentionAdmissionV1.LimitKindV1.RESERVATIONS
+                        || limitedKind == M5RetentionAdmissionV1.LimitKindV1.QUARANTINES
+                ? 1
+                : 6;
+        long secondAmount = limitedKind == M5RetentionAdmissionV1.LimitKindV1.RETAINED_SOURCE_MAX_AGE_MILLIS
+                ? 11
+                : limitedKind == M5RetentionAdmissionV1.LimitKindV1.RESERVATIONS
+                                || limitedKind == M5RetentionAdmissionV1.LimitKindV1.QUARANTINES
+                        ? 1
+                        : 5;
+        M5RetentionAdmissionV1.Reservation first = reservationForLimit("first", limitedKind, firstAmount);
+        assertThat(admission.reserve(first).toCompletableFuture().join().outcome())
+                .isEqualTo(M5RetentionAdmissionV1.Outcome.APPLIED_EXACT);
+
+        M5RetentionAdmissionV1.Result rejected = admission
+                .reserve(reservationForLimit("second", limitedKind, secondAmount))
+                .toCompletableFuture()
+                .join();
+        assertThat(rejected.outcome()).isEqualTo(M5RetentionAdmissionV1.Outcome.REJECTED_CAP);
+        assertThat(rejected.alert().orElseThrow().limitKind()).isEqualTo(limitedKind);
+        assertThat(rejected.alert().orElseThrow().hardValue()).isEqualTo(hard);
+        assertThat(admission.read().toCompletableFuture().join().orElseThrow().reservations())
+                .containsExactly(first);
+    }
+
     @Test
     void pulsarAggregateRetirementInstallsPermanentSameKeyTombstone() {
         InMemoryStore metadata = new InMemoryStore(true);
@@ -467,6 +549,13 @@ class M5RetentionRetirementV1Test {
                         CAPABILITY,
                         PLACEHOLDER));
 
+        metadata.responseUnknownWithoutApply = true;
+        assertThat(new M5RetirementCoordinatorV1(metadata)
+                        .retirePulsarAggregate(request)
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5RetirementCoordinatorV1.Outcome.DEFINITIVELY_NOT_APPLIED);
+        assertThat(metadata.readNow(aggregateKey)).isEqualTo(aggregate);
         assertThat(new M5RetirementCoordinatorV1(metadata)
                         .retirePulsarAggregate(request)
                         .toCompletableFuture()
@@ -524,6 +613,24 @@ class M5RetentionRetirementV1Test {
                 reserved,
                 List.of(ReferenceKindV1.READ_GENERATION_PIN_OR_OPEN_HANDLE),
                 Optional.empty());
+    }
+
+    private static M5RetentionAdmissionV1.Reservation reservationForLimit(
+            String id, M5RetentionAdmissionV1.LimitKindV1 limitedKind, long amount) {
+        EnumMap<M5RetentionAdmissionV1.LimitKindV1, Long> reserved = values(0);
+        reserved.put(M5RetentionAdmissionV1.LimitKindV1.RESERVATIONS, 1L);
+        if (limitedKind != M5RetentionAdmissionV1.LimitKindV1.RESERVATIONS) {
+            reserved.put(limitedKind, amount);
+        }
+        Optional<String> quarantineReason = limitedKind == M5RetentionAdmissionV1.LimitKindV1.QUARANTINES
+                ? Optional.of("test quarantine " + id)
+                : Optional.empty();
+        return new M5RetentionAdmissionV1.Reservation(
+                digest("reservation-" + limitedKind + "-" + id),
+                digest("oldest-" + limitedKind + "-" + id),
+                reserved,
+                List.of(ReferenceKindV1.RETIREMENT_OR_DELETE_RECONCILIATION),
+                quarantineReason);
     }
 
     private static EnumMap<M5RetentionAdmissionV1.LimitKindV1, Long> values(long value) {
@@ -769,6 +876,8 @@ class M5RetentionRetirementV1Test {
         private int transactionCalls;
         private boolean responseUnknownAfterApply;
         private boolean responseUnknownWithoutApply;
+        private boolean failReadAfterTransaction;
+        private boolean failNextRead;
 
         private InMemoryStore(boolean transactionSupported) {
             this.transactionSupported = transactionSupported;
@@ -802,6 +911,10 @@ class M5RetentionRetirementV1Test {
 
         @Override
         public synchronized CompletionStage<Optional<VersionedValue>> read(String key) {
+            if (failNextRead) {
+                failNextRead = false;
+                return CompletableFuture.failedFuture(new IllegalStateException("injected authoritative read loss"));
+            }
             return CompletableFuture.completedFuture(Optional.ofNullable(values.get(key)));
         }
 
@@ -834,6 +947,10 @@ class M5RetentionRetirementV1Test {
             }
             for (ExactPut put : transaction.puts()) {
                 values.put(put.key(), stored(put.key(), put.canonicalCandidate()));
+            }
+            if (failReadAfterTransaction) {
+                failReadAfterTransaction = false;
+                failNextRead = true;
             }
             if (responseUnknownAfterApply) {
                 responseUnknownAfterApply = false;

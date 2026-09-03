@@ -335,9 +335,7 @@ public final class M5RetirementCoordinatorV1 {
                             selector.orElseThrow().canonicalStoredBytes(),
                             request.fullBatch().batchIdSha256());
                     if (inline && batch.isEmpty()) {
-                        return result == TransactionOutcome.RESPONSE_UNKNOWN
-                                ? Outcome.RESPONSE_UNKNOWN
-                                : Outcome.DEFINITIVELY_NOT_APPLIED;
+                        return Outcome.DEFINITIVELY_NOT_APPLIED;
                     }
                     if (inline || batch.isEmpty()) {
                         return Outcome.QUARANTINED;
@@ -358,7 +356,8 @@ public final class M5RetirementCoordinatorV1 {
                     } catch (IllegalArgumentException ignored) {
                         return Outcome.CONFLICT;
                     }
-                });
+                })
+                .exceptionally(ignored -> Outcome.RESPONSE_UNKNOWN);
     }
 
     private CompletionStage<Outcome> reconcileBatchRetirement(
@@ -366,30 +365,32 @@ public final class M5RetirementCoordinatorV1 {
         if (result == TransactionOutcome.UNSUPPORTED) {
             return CompletableFuture.completedFuture(Outcome.UNSUPPORTED);
         }
-        return metadata.read(request.batchKey()).thenApply(observed -> {
-            if (observed.isEmpty()) {
-                return Outcome.QUARANTINED;
-            }
-            CanonicalBytes bytes = observed.orElseThrow().canonicalStoredBytes();
-            if (bytes.equals(tombstoneBytes)) {
-                return result == TransactionOutcome.APPLIED_EXACT ? Outcome.APPLIED_EXACT : Outcome.EXISTING_EXACT;
-            }
-            if (bytes.equals(request.exactFullValue().canonicalStoredBytes())) {
-                return result == TransactionOutcome.RESPONSE_UNKNOWN
-                        ? Outcome.RESPONSE_UNKNOWN
-                        : Outcome.DEFINITIVELY_NOT_APPLIED;
-            }
-            try {
-                RetiredSourceRetirementBatchTombstoneV1 retired = M5RetentionCodecV1.decodeRetiredBatch(bytes);
-                return matches(retired, request.fullBatch())
-                                && retired.fullPredecessorVersion()
-                                        .equals(request.exactFullValue().metadataVersion())
-                        ? Outcome.ALREADY_RETIRED
-                        : Outcome.CONFLICT;
-            } catch (IllegalArgumentException ignored) {
-                return Outcome.QUARANTINED;
-            }
-        });
+        return metadata.read(request.batchKey())
+                .thenApply(observed -> {
+                    if (observed.isEmpty()) {
+                        return Outcome.QUARANTINED;
+                    }
+                    CanonicalBytes bytes = observed.orElseThrow().canonicalStoredBytes();
+                    if (bytes.equals(tombstoneBytes)) {
+                        return result == TransactionOutcome.APPLIED_EXACT
+                                ? Outcome.APPLIED_EXACT
+                                : Outcome.EXISTING_EXACT;
+                    }
+                    if (bytes.equals(request.exactFullValue().canonicalStoredBytes())) {
+                        return Outcome.DEFINITIVELY_NOT_APPLIED;
+                    }
+                    try {
+                        RetiredSourceRetirementBatchTombstoneV1 retired = M5RetentionCodecV1.decodeRetiredBatch(bytes);
+                        return matches(retired, request.fullBatch())
+                                        && retired.fullPredecessorVersion()
+                                                .equals(request.exactFullValue().metadataVersion())
+                                ? Outcome.ALREADY_RETIRED
+                                : Outcome.CONFLICT;
+                    } catch (IllegalArgumentException ignored) {
+                        return Outcome.QUARANTINED;
+                    }
+                })
+                .exceptionally(ignored -> Outcome.RESPONSE_UNKNOWN);
     }
 
     private CompletionStage<Outcome> reconcilePulsarRetirement(
@@ -397,26 +398,30 @@ public final class M5RetirementCoordinatorV1 {
         if (result == TransactionOutcome.UNSUPPORTED) {
             return CompletableFuture.completedFuture(Outcome.UNSUPPORTED);
         }
-        return metadata.read(request.aggregateKey()).thenApply(observed -> {
-            if (observed.isEmpty()) {
-                return Outcome.QUARANTINED;
-            }
-            CanonicalBytes bytes = observed.orElseThrow().canonicalStoredBytes();
-            if (bytes.equals(tombstoneBytes)) {
-                return result == TransactionOutcome.APPLIED_EXACT ? Outcome.APPLIED_EXACT : Outcome.EXISTING_EXACT;
-            }
-            if (bytes.equals(request.exactAggregate().canonicalStoredBytes())) {
-                return result == TransactionOutcome.RESPONSE_UNKNOWN
-                        ? Outcome.RESPONSE_UNKNOWN
-                        : Outcome.DEFINITIVELY_NOT_APPLIED;
-            }
-            try {
-                RetiredTopicIncarnationTombstoneV1 retired = M5RetentionCodecV1.decodeRetiredPulsar(bytes);
-                return samePulsarRetirement(retired, request.tombstone()) ? Outcome.ALREADY_RETIRED : Outcome.CONFLICT;
-            } catch (IllegalArgumentException ignored) {
-                return Outcome.QUARANTINED;
-            }
-        });
+        return metadata.read(request.aggregateKey())
+                .thenApply(observed -> {
+                    if (observed.isEmpty()) {
+                        return Outcome.QUARANTINED;
+                    }
+                    CanonicalBytes bytes = observed.orElseThrow().canonicalStoredBytes();
+                    if (bytes.equals(tombstoneBytes)) {
+                        return result == TransactionOutcome.APPLIED_EXACT
+                                ? Outcome.APPLIED_EXACT
+                                : Outcome.EXISTING_EXACT;
+                    }
+                    if (bytes.equals(request.exactAggregate().canonicalStoredBytes())) {
+                        return Outcome.DEFINITIVELY_NOT_APPLIED;
+                    }
+                    try {
+                        RetiredTopicIncarnationTombstoneV1 retired = M5RetentionCodecV1.decodeRetiredPulsar(bytes);
+                        return samePulsarRetirement(retired, request.tombstone())
+                                ? Outcome.ALREADY_RETIRED
+                                : Outcome.CONFLICT;
+                    } catch (IllegalArgumentException ignored) {
+                        return Outcome.QUARANTINED;
+                    }
+                })
+                .exceptionally(ignored -> Outcome.RESPONSE_UNKNOWN);
     }
 
     private CompletionStage<VersionedValue> requireFresh(AuthorityFactV1 fact) {
