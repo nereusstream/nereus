@@ -1,0 +1,45 @@
+{
+  "schema": "NEREUS_V2_M5_D_PULSAR_CLEANUP_ORDER_PROJECTION_V1",
+  "status": "PULSAR_ROOT_DATA_MULTIPART_ORDER_IMPLEMENTED_NON_PROMOTABLE",
+  "implementationAncestor": "ee5bd41252dede5e0d567162ace67d15d03f95fa",
+  "exactTargetBindings": [
+    "sealed_ledger_attempt_and_uuid",
+    "npo1_root_key_length_body_sha256_and_immutable_version",
+    "npd1_data_key_length_body_sha256_and_immutable_version",
+    "persisted_intent_binding_root",
+    "m4_released_proof_root",
+    "reference_free_proof_root",
+    "multipart_inventory_root",
+    "provider_admission_root"
+  ],
+  "cleanupSequence": [
+    "NPO1_ROOT_AUTHORITATIVELY_ABSENT",
+    "NPD1_DATA_AUTHORITATIVELY_ABSENT",
+    "OWNED_MULTIPART_RESIDUE_AUTHORITATIVELY_ABSENT",
+    "AUTHORITATIVELY_ABSENT"
+  ],
+  "typedReconciliation": [
+    "AUTHORITATIVELY_ABSENT",
+    "EXACT_OLD_IDENTITY_REMAINS",
+    "DIFFERENT_OR_FOREIGN_IDENTITY",
+    "OUTCOME_UNKNOWN"
+  ],
+  "orderViolationAdvances": false,
+  "responseUnknownAdvances": false,
+  "differentIdentityQuarantines": true,
+  "retainBookKeeperAttemptRejected": true,
+  "focusedTests": {
+    "class": "com.nereusstream.pulsar.offload.M5PulsarObjectCleanupOrderV1Test",
+    "tests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "externalMutationApiPresent": false,
+  "intentMutationApiPresent": false,
+  "fullM5DGatePresent": false,
+  "sourceBoundReceiptPresent": false,
+  "physicalDeleteAuthority": false,
+  "scenarioPromotionAuthority": false,
+  "productionAuthority": false
+}

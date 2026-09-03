@@ -85,10 +85,14 @@ that historical result.
   the only three mark-eligible classes, authority-time grace plus complete rescan, live-owner adoption, permanent
   metadata/allocator retention, foreign quarantine, and hard per-Cell resource envelopes. The pure
   `v2M5OrphanAdmissionCheck` can produce only a future-intent candidate and exposes no delete or intent mutation API.
+- The focused [M5-D Pulsar cleanup-order projection](m5-d-pulsar-cleanup-order-projection.json) binds an exact sealed
+  attempt, NPO1/NPD1 Object bodies and immutable versions, and intent/release/reference/multipart/provider roots to
+  the strict root-absence then data-absence then multipart-absence sequence. `v2M5PulsarCleanupOrderCheck` is pure:
+  it never invokes the older unconditional delete seam and exposes no external or intent mutation API.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
-gates plus focused M5-D Provider/BookKeeper/orphan-admission cores without amending that result. All 17 scenario rows whose milestone names
+gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order cores without amending that result. All 17 scenario rows whose milestone names
 M5 remain `PLANNED` with null receipts. `docs/v2/evidence/v2-m5/`, `v2M5EvidenceExecutionCheck`,
 `v2M5FinalSourceCheck`, and `v2M5Check` remain absent.
 

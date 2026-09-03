@@ -325,9 +325,40 @@ The public protocol methods are only classify, mark, and rescan; readiness is ex
 persisted intent transaction, not authority to create intent or dispatch deletion. No receipt, scenario promotion,
 physical-delete, staging, or production authority follows from this result.
 
+## M5-D Pulsar root/data/multipart cleanup ordering core
+
+Status: pure ordering slice implemented; it invokes neither the M2 unconditional delete seam nor any external
+mutation, and the complete M5-D gate has not run.
+
+- `M5PulsarObjectCleanupOrderV1` binds the exact sealed-ledger attempt/UUID, deterministic NPO1 root and NPD1 data
+  keys, canonical lengths/full-body SHA-256 values, immutable Provider versions, persisted-intent binding,
+  M4-release/reference-free/multipart inventory, and Provider-admission roots into one deterministic target root;
+- only `DELETE_AFTER_VERIFIED` attempts can form a target, and a mismatched/rebound target root is rejected;
+- the state machine first requires authoritative NPO1 root absence, then NPD1 data absence, then exact owned
+  multipart-residue absence. Data-before-root and multipart-before-data are typed order violations and cannot advance;
+- an exact old identity remaining is retryable without advancement, an unknown response remains unknown, and a
+  different/foreign identity permanently quarantines; and
+- the root Gradle gate explicitly selects the local Pulsar composite, preventing accidental resolution of the
+  unpublished ManagedLedger snapshot dependency.
+
+Focused gate:
+
+```text
+./gradlew --no-daemon --no-configuration-cache v2M5PulsarCleanupOrderCheck --rerun-tasks
+PASS_V2_M5_ORPHAN_ADMISSION_CORE_NON_PROMOTABLE
+PASS_V2_M5_PULSAR_CLEANUP_ORDER_NON_PROMOTABLE
+M5PulsarObjectCleanupOrderV1Test: 6 tests, 0 failures, 0 errors, 0 skipped
+45 actionable tasks: 45 executed
+```
+
+The only public operations create an exact target, start pure progress, and observe typed reconciliation. There is no
+external-mutation or intent-mutation API, no `DELETE_DONE`, and no receipt, scenario-promotion, physical-delete,
+staging, or production authority.
+
 ## Remaining ordered work
 
-1. Complete M5-D intent/done and Pulsar cleanup above the admitted Object/BookKeeper and pure orphan/admission cores.
+1. Complete M5-D persisted intent/done and external cleanup composition above the admitted Object/BookKeeper and pure
+   orphan/admission/Pulsar-order cores.
 2. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
    `v2M5Check`.
 

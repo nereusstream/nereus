@@ -96,6 +96,7 @@ val pulsarSourceRequired = gradle.startParameter.taskNames.any { requested ->
             || task.startsWith("v2M3ModuleApi")
             || task in setOf("v2M3M2RegressionSourceCheck", "v2M3InputsCheck", "v2M3Check")
             || task in setOf("v2M4CurrentSourceIntegrationCheck", "v2M4EvidenceExecutionCheck")
+            || task == "v2M5PulsarCleanupOrderCheck"
             || task == "v2M2Check"
 }
 val m3PulsarEvidenceWorktree = configuredM3PulsarEvidenceWorktree?.let(::file)

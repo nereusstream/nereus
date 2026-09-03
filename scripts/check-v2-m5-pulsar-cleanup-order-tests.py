@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""Fail-closed tests for the focused M5-D Pulsar cleanup-order checker."""
+
+from __future__ import annotations
+
+import copy
+import importlib.util
+import json
+from pathlib import Path
+import unittest
+
+
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPT = ROOT / "scripts/check-v2-m5-pulsar-cleanup-order.py"
+
+
+def load_module(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+CHECK = load_module(SCRIPT, "nereus_v2_m5_pulsar_cleanup_order_tests")
+
+
+class M5PulsarCleanupOrderContractTest(unittest.TestCase):
+    def test_accepts_current_pulsar_cleanup_slice(self) -> None:
+        CHECK.validate(ROOT)
+
+    def test_projection_rejects_data_before_root(self) -> None:
+        value = json.loads((ROOT / CHECK.PROJECTION_PATH).read_text(encoding="utf-8"))
+        changed = copy.deepcopy(value)
+        changed["cleanupSequence"][0:2] = reversed(changed["cleanupSequence"][0:2])
+        with self.assertRaisesRegex(CHECK.PulsarCleanupOrderError, "order differs"):
+            CHECK.validate_projection_value(changed)
+
+    def test_projection_rejects_missing_intent_binding(self) -> None:
+        value = json.loads((ROOT / CHECK.PROJECTION_PATH).read_text(encoding="utf-8"))
+        changed = copy.deepcopy(value)
+        changed["exactTargetBindings"].remove("persisted_intent_binding_root")
+        with self.assertRaisesRegex(CHECK.PulsarCleanupOrderError, "bindings differ"):
+            CHECK.validate_projection_value(changed)
+
+    def test_projection_rejects_authority_overclaim(self) -> None:
+        value = json.loads((ROOT / CHECK.PROJECTION_PATH).read_text(encoding="utf-8"))
+        for field in (
+            "externalMutationApiPresent",
+            "intentMutationApiPresent",
+            "fullM5DGatePresent",
+            "physicalDeleteAuthority",
+        ):
+            changed = copy.deepcopy(value)
+            changed[field] = True
+            with self.assertRaisesRegex(CHECK.PulsarCleanupOrderError, "overstates"):
+                CHECK.validate_projection_value(changed)
+
+    def test_sources_reject_missing_ordering_core(self) -> None:
+        original = CHECK.REQUIRED_SOURCES
+        try:
+            CHECK.REQUIRED_SOURCES = ("missing/M5PulsarObjectCleanupOrderV1.java",)
+            with self.assertRaisesRegex(CHECK.PulsarCleanupOrderError, "missing/empty"):
+                CHECK.validate_sources(ROOT)
+        finally:
+            CHECK.REQUIRED_SOURCES = original
+
+
+if __name__ == "__main__":
+    unittest.main()

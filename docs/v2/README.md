@@ -154,8 +154,8 @@ performance-first BookKeeper WAL.
   fencing pass `v2M5KafkaCompactionCheck`; both permanent retirement families pass source-locked real Oxia execution
   in `v2M5RetentionRetirementCheck`; exact-version Object deletion and exact sealed-ledger BookKeeper deletion pass
   their focused Provider/adapter gates. These are implementation-only results: the complete M5-D intent/done,
-  intent/done and Pulsar composition, all five source-bound children, the M5 Final, every M5 scenario promotion, and
-  physical deletion authority remain outstanding.
+  intent/done and Pulsar external-execution composition, all five source-bound children, the M5 Final, every M5
+  scenario promotion, and physical deletion authority remain outstanding.
 - [ADR 0146](../decisions/0146-v2-m5-single-binding-retirement-authority-amendment.md) and the accepted
   [M5-C amendment](detailed_design/m5/m5-c-single-binding-retirement-authority-amendment.md) preserve the failed
   multi-key Oxia path as rejected evidence and select a single-Binding retirement authority, durable ticket/fence
@@ -166,7 +166,9 @@ performance-first BookKeeper WAL.
   dispatch, and treats only authoritative no-such-ledger reconciliation as absence. Neither slice can create M5-D
   intent/done. `v2M5OrphanAdmissionCheck` additionally proves the closed six-class orphan taxonomy,
   authority-time mark/grace/rescan, and hard per-Cell accounting without any delete API. The full intent/done and
-  Pulsar composition is still absent, so no physical-delete authority exists.
+  Pulsar external execution is still absent. A separate pure Pulsar cleanup-order gate requires authoritative NPO1
+  root absence before NPD1 data and owned multipart residue, but performs no mutation. No physical-delete authority
+  exists.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and formal-runner contracts. It did not by itself select a mode or
   promote a scenario; the later e5 Final closes those evidence obligations with `RANGE_64`. It still does not activate
