@@ -24,6 +24,11 @@ import java.util.Optional;
 public interface ObjectProviderTransport {
     ObjectProviderCapabilities capabilities();
 
+    /** M5-D delete capabilities are additive; an M3 C1 adapter is unsupported until explicitly admitted. */
+    default ObjectDeleteCapabilities deleteCapabilities() {
+        return ObjectDeleteCapabilities.unsupported(capabilities().providerIdentity());
+    }
+
     ConditionalCreateResult putIfAbsent(ObjectIdentity identity, InputStream body) throws IOException;
 
     StreamingObject get(String key, Optional<CanonicalBytes> exactVersionToken) throws IOException;
@@ -32,6 +37,17 @@ public interface ObjectProviderTransport {
             throws IOException;
 
     ListPage list(String prefix, Optional<CanonicalBytes> continuationToken, int maximumKeys) throws IOException;
+
+    /**
+     * Deletes only the exact immutable Provider version named by {@code exactVersionToken}.
+     *
+     * <p>Callers must perform the M5-D full-body identity read and the post-delete complete LIST/full-GET absence
+     * reconciliation. A default C1 transport performs no I/O and remains unsupported.
+     */
+    default ConditionalDeleteResult deleteExactVersion(String key, CanonicalBytes exactVersionToken)
+            throws IOException {
+        return ConditionalDeleteResult.UNSUPPORTED;
+    }
 
     /** Adapter-owned typed classification; unknown exceptions remain fatal and are never interpreted as absence. */
     default FailureKind classifyFailure(IOException failure) {
@@ -50,6 +66,49 @@ public interface ObjectProviderTransport {
         ALREADY_EXISTS,
         DEFINITIVE_CONFLICT,
         RESPONSE_UNKNOWN
+    }
+
+    enum ConditionalDeleteResult {
+        DELETED_EXACT,
+        DEFINITIVELY_NOT_FOUND,
+        VERSION_PRECONDITION_FAILED,
+        RETRYABLE,
+        RESPONSE_UNKNOWN,
+        DEFINITIVE_CONFLICT,
+        UNSUPPORTED
+    }
+
+    /** Exact version-delete admission snapshot; this value itself grants no delete authority. */
+    record ObjectDeleteCapabilities(
+            String providerIdentity,
+            String mechanism,
+            boolean exactImmutableVersionDelete,
+            boolean typedResponseLoss,
+            boolean strongGetListReconciliation,
+            int maximumVersionTokenBytes) {
+        public ObjectDeleteCapabilities {
+            if (providerIdentity == null
+                    || providerIdentity.isBlank()
+                    || mechanism == null
+                    || mechanism.isBlank()
+                    || maximumVersionTokenBytes < 0) {
+                throw new IllegalArgumentException("Object delete capabilities are invalid");
+            }
+            if (exactImmutableVersionDelete
+                    != (typedResponseLoss && strongGetListReconciliation && maximumVersionTokenBytes > 0)) {
+                throw new IllegalArgumentException("Object delete capability facts are inconsistent");
+            }
+        }
+
+        public static ObjectDeleteCapabilities unsupported(String providerIdentity) {
+            return new ObjectDeleteCapabilities(providerIdentity, "UNSUPPORTED", false, false, false, 0);
+        }
+
+        public void requireVersionMatchDeleteV1() {
+            if (!"VERSION_MATCH_DELETE_V1".equals(mechanism) || !exactImmutableVersionDelete) {
+                throw new IllegalArgumentException("Provider does not satisfy VERSION_MATCH_DELETE_V1");
+            }
+        }
     }
 
     record StreamingObject(

@@ -230,9 +230,38 @@ This is not the `RETENTION_METADATA_RETIREMENT` child receipt because the eventu
 tested Nereus source after M5-D and current-source isolation are complete. It promotes no scenario and authorizes no
 physical deletion.
 
+## M5-D version-match Object delete Provider foundation
+
+Status: focused Provider slice implemented and executed against exact-digest MinIO; the full M5-D intent/done,
+orphan, Pulsar, and BookKeeper implementation gate has not run.
+
+- `ObjectProviderTransport` adds a default-unsupported delete capability and typed exact-version outcomes without
+  changing the M3 C1 create/read/list contract or forcing existing adapters to claim deletion support;
+- `S3C1ObjectProviderTransport.admitVersionMatchDeleteV1` admits deletion only after a live bucket-versioning read
+  returns `ENABLED`, caps canonical version tokens, and dispatches `DeleteObject` against the exact version ID;
+- `M5ObjectDeleteSessionV1` full-GETs and hashes the complete expected body, requires the immutable version from that
+  response, constrains every key/list to one Cell namespace, and reconciles response loss through bounded complete
+  LIST plus another full GET;
+- exact old-version presence is retryable, a different version or body is conflict/quarantine input, and a recreated
+  current version is never deleted by a stale exact-version operation; and
+- fixed image `quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e`
+  with image ID `sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253`
+  passes the real versioning, delete, recreation, and lost-response paths.
+
+Focused gate:
+
+```text
+./gradlew --no-daemon --no-configuration-cache v2M5VersionMatchDeleteCheck
+PASS_V2_M5_VERSION_MATCH_DELETE_PROVIDER_NON_PROMOTABLE
+M5MinioVersionMatchDeleteTest: 1 test, 0 failures, 0 errors, 0 skipped
+```
+
+This slice has no API that can create an M5-D intent or declare `DELETE_DONE`; therefore it grants no physical-delete,
+scenario-promotion, receipt, staging, or production authority.
+
 ## Remaining ordered work
 
-1. M5-D conditional physical delete, orphan reconciliation, and BookKeeper/Pulsar cleanup.
+1. Complete M5-D intent/done, orphan reconciliation, and BookKeeper/Pulsar cleanup above the admitted Provider.
 2. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
    `v2M5Check`.
 

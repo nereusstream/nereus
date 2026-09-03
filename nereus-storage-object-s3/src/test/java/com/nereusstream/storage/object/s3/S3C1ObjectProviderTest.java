@@ -63,6 +63,22 @@ class S3C1ObjectProviderTest {
     }
 
     @Test
+    void conditionalDeleteClassifiesEveryClosedProviderOutcome() throws Exception {
+        assertThat(S3C1ObjectProviderTransport.classifyConditionalDeleteFailure(s3Failure(404, "NoSuchVersion")))
+                .isEqualTo(ObjectProviderTransport.ConditionalDeleteResult.DEFINITIVELY_NOT_FOUND);
+        assertThat(S3C1ObjectProviderTransport.classifyConditionalDeleteFailure(s3Failure(412, "PreconditionFailed")))
+                .isEqualTo(ObjectProviderTransport.ConditionalDeleteResult.VERSION_PRECONDITION_FAILED);
+        assertThat(S3C1ObjectProviderTransport.classifyConditionalDeleteFailure(s3Failure(429, "SlowDown")))
+                .isEqualTo(ObjectProviderTransport.ConditionalDeleteResult.RETRYABLE);
+        for (int status : new int[] {408, 409, 500, 503}) {
+            assertThat(S3C1ObjectProviderTransport.classifyConditionalDeleteFailure(s3Failure(status, "Injected")))
+                    .isEqualTo(ObjectProviderTransport.ConditionalDeleteResult.RESPONSE_UNKNOWN);
+        }
+        assertThat(S3C1ObjectProviderTransport.classifyConditionalDeleteFailure(s3Failure(403, "AccessDenied")))
+                .isEqualTo(ObjectProviderTransport.ConditionalDeleteResult.DEFINITIVE_CONFLICT);
+    }
+
+    @Test
     void coreC1SessionResolvesFourTerminalOutcomesWithoutHead() throws Exception {
         FakeTransport transport = new FakeTransport();
         try (C1ObjectProviderSession provider = provider(transport)) {

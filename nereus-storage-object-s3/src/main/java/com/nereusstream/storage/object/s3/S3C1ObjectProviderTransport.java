@@ -36,6 +36,10 @@ import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.BucketVersioningStatus;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
+import software.amazon.awssdk.services.s3.model.GetBucketVersioningRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
@@ -49,12 +53,14 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
     public static final long EVIDENCED_MAXIMUM_OBJECT_BYTES = 64L * 1024 * 1024;
     public static final int EVIDENCED_MAXIMUM_RANGE_BYTES = 64 * 1024 * 1024;
     public static final int DEFAULT_MAXIMUM_LIST_PAGE_KEYS = 1_000;
+    public static final int MAXIMUM_DELETE_VERSION_TOKEN_BYTES = 1_024;
     public static final String ADAPTER_VERSION = "nereus-s3-c1-v1/aws-sdk-s3-2.47.5";
 
     private final S3Client client;
     private final String bucket;
     private final boolean closeClient;
     private final ObjectProviderCapabilities capabilities;
+    private final boolean versionMatchDeleteAdmitted;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public S3C1ObjectProviderTransport(
@@ -63,9 +69,20 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
             String exactProviderIdentity,
             boolean closeClient,
             int maximumListPageKeys) {
+        this(client, bucket, exactProviderIdentity, closeClient, maximumListPageKeys, false);
+    }
+
+    private S3C1ObjectProviderTransport(
+            S3Client client,
+            String bucket,
+            String exactProviderIdentity,
+            boolean closeClient,
+            int maximumListPageKeys,
+            boolean versionMatchDeleteAdmitted) {
         this.client = Objects.requireNonNull(client, "client");
         this.bucket = requireNonBlank(bucket, "bucket");
         this.closeClient = closeClient;
+        this.versionMatchDeleteAdmitted = versionMatchDeleteAdmitted;
         if (maximumListPageKeys <= 0 || maximumListPageKeys > DEFAULT_MAXIMUM_LIST_PAGE_KEYS) {
             throw new IllegalArgumentException("maximumListPageKeys must be in [1,1000]");
         }
@@ -81,9 +98,47 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
                 maximumListPageKeys);
     }
 
+    /** Admits M5-D only after an exact live read proves bucket versioning is enabled. */
+    public static S3C1ObjectProviderTransport admitVersionMatchDeleteV1(
+            S3Client client, String bucket, String exactProviderIdentity, boolean closeClient, int maximumListPageKeys)
+            throws IOException {
+        Objects.requireNonNull(client, "client");
+        String canonicalBucket = requireNonBlank(bucket, "bucket");
+        try {
+            BucketVersioningStatus status = client.getBucketVersioning(GetBucketVersioningRequest.builder()
+                            .bucket(canonicalBucket)
+                            .build())
+                    .status();
+            if (status != BucketVersioningStatus.ENABLED) {
+                throw new S3C1ProviderException(
+                        S3C1ProviderException.Kind.UNSUPPORTED_OPERATION,
+                        "VERSION_MATCH_DELETE_V1 requires an enabled versioned bucket");
+            }
+        } catch (S3C1ProviderException failure) {
+            throw failure;
+        } catch (Throwable failure) {
+            throw mapped("bucket-versioning admission", failure);
+        }
+        return new S3C1ObjectProviderTransport(
+                client, canonicalBucket, exactProviderIdentity, closeClient, maximumListPageKeys, true);
+    }
+
     @Override
     public ObjectProviderCapabilities capabilities() {
         return capabilities;
+    }
+
+    @Override
+    public ObjectDeleteCapabilities deleteCapabilities() {
+        return versionMatchDeleteAdmitted
+                ? new ObjectDeleteCapabilities(
+                        capabilities.providerIdentity(),
+                        "VERSION_MATCH_DELETE_V1",
+                        true,
+                        true,
+                        true,
+                        MAXIMUM_DELETE_VERSION_TOKEN_BYTES)
+                : ObjectDeleteCapabilities.unsupported(capabilities.providerIdentity());
     }
 
     @Override
@@ -210,6 +265,41 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
     }
 
     @Override
+    public ConditionalDeleteResult deleteExactVersion(String key, CanonicalBytes exactVersionToken) throws IOException {
+        requireOpen();
+        validateKey(key);
+        Objects.requireNonNull(exactVersionToken, "exactVersionToken");
+        if (!versionMatchDeleteAdmitted) {
+            return ConditionalDeleteResult.UNSUPPORTED;
+        }
+        if (exactVersionToken.isEmpty() || exactVersionToken.length() > MAXIMUM_DELETE_VERSION_TOKEN_BYTES) {
+            throw new IllegalArgumentException("delete version token is empty or oversized");
+        }
+        String versionId = decodeVersionToken(exactVersionToken);
+        try {
+            DeleteObjectResponse response = client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .versionId(versionId)
+                    .build());
+            if (response.versionId() != null
+                    && !response.versionId().isBlank()
+                    && !versionId.equals(response.versionId())) {
+                throw new S3C1ProviderException(
+                        S3C1ProviderException.Kind.INTEGRITY,
+                        "conditional DELETE acknowledged a different immutable version");
+            }
+            return ConditionalDeleteResult.DELETED_EXACT;
+        } catch (S3C1ProviderException failure) {
+            throw failure;
+        } catch (S3Exception failure) {
+            return classifyConditionalDeleteFailure(failure);
+        } catch (SdkClientException | CancellationException failure) {
+            return ConditionalDeleteResult.RESPONSE_UNKNOWN;
+        }
+    }
+
+    @Override
     public FailureKind classifyFailure(IOException failure) {
         if (!(failure instanceof S3C1ProviderException typed)) {
             return FailureKind.FATAL;
@@ -276,6 +366,29 @@ public final class S3C1ObjectProviderTransport implements ObjectProviderTranspor
             return ConditionalCreateResult.DEFINITIVE_CONFLICT;
         }
         throw mapped("conditional PUT", failure);
+    }
+
+    static ConditionalDeleteResult classifyConditionalDeleteFailure(S3Exception failure) throws IOException {
+        int status = failure.statusCode();
+        String code = failure.awsErrorDetails() == null
+                ? null
+                : failure.awsErrorDetails().errorCode();
+        if (status == 404 && ("NoSuchVersion".equals(code) || "NoSuchKey".equals(code))) {
+            return ConditionalDeleteResult.DEFINITIVELY_NOT_FOUND;
+        }
+        if (status == 412) {
+            return ConditionalDeleteResult.VERSION_PRECONDITION_FAILED;
+        }
+        if (status == 429) {
+            return ConditionalDeleteResult.RETRYABLE;
+        }
+        if (status == 408 || status == 409 || status >= 500) {
+            return ConditionalDeleteResult.RESPONSE_UNKNOWN;
+        }
+        if (status >= 400 && status < 500) {
+            return ConditionalDeleteResult.DEFINITIVE_CONFLICT;
+        }
+        throw mapped("conditional DELETE", failure);
     }
 
     static IOException mapped(String operation, Throwable failure) {

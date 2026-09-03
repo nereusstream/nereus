@@ -72,6 +72,10 @@ that historical result.
   `v2M5RetentionRetirementCheck` proves both permanent metadata-retirement families through the accepted one-key CAS
   path. It remains implementation-only and non-promotable: no source-bound child receipt, M5-D deletion result,
   scenario promotion, or production authority exists.
+- The focused [M5-D version-match delete projection](m5-d-version-match-delete-projection.json) binds the additive
+  transport API, default-unsupported behavior, bucket-versioning admission, exact-version S3 deletion, and complete
+  LIST/full-GET reconciliation to fixed-digest MinIO. `v2M5VersionMatchDeleteCheck` is a Provider foundation only;
+  the full M5-D state machine, source-bound child, and all delete authority remain absent.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

@@ -2285,6 +2285,39 @@ tasks.register("v2M5RetentionRetirementCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5VersionMatchDeleteContractTest") {
+    group = "verification"
+    description = "Test the fail-closed focused M5-D version-match Provider checker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-version-match-delete-tests.py")
+}
+
+tasks.register<Exec>("v2M5VersionMatchDeleteSourceCheck") {
+    group = "verification"
+    description = "Validate the additive Provider transport, exact MinIO boundary, and non-promotable status."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-version-match-delete.py")
+}
+
+tasks.register("v2M5VersionMatchDeleteCheck") {
+    group = "verification"
+    description = "Run the focused non-promotable M5-D exact-version Object delete Provider gate."
+    dependsOn(
+        "v2M5RetentionRetirementSourceCheck",
+        "v2M5VersionMatchDeleteContractTest",
+        "v2M5VersionMatchDeleteSourceCheck",
+        ":nereus-storage-object:test",
+        ":nereus-storage-object-s3:test",
+        ":nereus-storage-object-s3:v2M5VersionMatchDeleteRealProviderTest",
+        ":nereus-storage-object:checkstyleMain",
+        ":nereus-storage-object:checkstyleTest",
+        ":nereus-storage-object:spotlessCheck",
+        ":nereus-storage-object-s3:checkstyleMain",
+        ":nereus-storage-object-s3:checkstyleTest",
+        ":nereus-storage-object-s3:spotlessCheck",
+    )
+}
+
 tasks.register<Exec>("v2M1ExactSourceAggregateCheck") {
     group = "verification"
     description = "Verify the final clean exact K1/P1/Oxia/artifact/image tuple after focused suites execute."

@@ -142,6 +142,18 @@ tasks.register<Test>("diagnosticRealProviderTest") {
     systemProperty("nereus.m3.testedCommit", "DIAGNOSTIC-NON-EVIDENCE")
 }
 
+tasks.register<Test>("v2M5VersionMatchDeleteRealProviderTest") {
+    group = "verification"
+    description = "Run the non-promotable M5-D version-match delete contract against exact-digest MinIO."
+    testClassesDirs = realProviderTest.output.classesDirs
+    classpath = realProviderTest.runtimeClasspath
+    useJUnitPlatform()
+    include("**/M5MinioVersionMatchDeleteTest.class")
+    maxParallelForks = 1
+    maxHeapSize = "512m"
+    outputs.upToDateWhen { false }
+}
+
 tasks.named<Test>("test") {
     useJUnitPlatform()
 }

@@ -157,6 +157,9 @@ performance-first BookKeeper WAL.
   [M5-C amendment](detailed_design/m5/m5-c-single-binding-retirement-authority-amendment.md) preserve the failed
   multi-key Oxia path as rejected evidence and select a single-Binding retirement authority, durable ticket/fence
   serialization, and exact single-key CAS. M5-C now implements that path, but its source-bound child has not run.
+- M5-D has begun with non-promotable `v2M5VersionMatchDeleteCheck`: fixed-digest MinIO proves enabled-bucket
+  version-match deletion, same-key recreation protection, and complete LIST/full-GET response-loss reconciliation.
+  The full M5-D intent/done, orphan, Pulsar, and BookKeeper gate is still absent, so no physical-delete authority exists.
 - ADR 0091 is a later M3-P1 implementation descendant: exact `NVAC1`/`NVAH1`/`NVAN1`, bounded Oxia keys, production
   SPI/transitions, 48 ordinary allocator tests, and formal-runner contracts. It did not by itself select a mode or
   promote a scenario; the later e5 Final closes those evidence obligations with `RANGE_64`. It still does not activate

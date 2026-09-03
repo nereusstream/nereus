@@ -1,0 +1,31 @@
+{
+  "schema": "NEREUS_V2_M5_D_VERSION_MATCH_DELETE_PROJECTION_V1",
+  "status": "VERSION_MATCH_DELETE_IMPLEMENTED_NON_PROMOTABLE",
+  "implementationAncestor": "237e902c26a852df757c14952645a6cacace3c8f",
+  "providerBoundary": {
+    "mechanism": "VERSION_MATCH_DELETE_V1",
+    "product": "MinIO RELEASE.2025-09-07T16-13-09Z",
+    "imageReference": "quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+    "imageId": "sha256:8f08aee614800a237906bd48114d733e5ac5bfac4ccdf731f141b0e880d7a253",
+    "platform": "linux/arm64",
+    "bucketVersioningRequired": true,
+    "maximumVersionTokenBytes": 1024,
+    "responseLossTyped": true,
+    "completeListAndFullGetReconciliation": true
+  },
+  "realProviderTest": {
+    "task": ":nereus-storage-object-s3:v2M5VersionMatchDeleteRealProviderTest",
+    "class": "com.nereusstream.storage.object.s3.M5MinioVersionMatchDeleteTest",
+    "tests": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "defaultTransportUnsupported": true,
+  "sameKeyRecreationProtected": true,
+  "fullM5DGatePresent": false,
+  "sourceBoundReceiptPresent": false,
+  "physicalDeleteAuthority": false,
+  "scenarioPromotionAuthority": false,
+  "productionAuthority": false
+}

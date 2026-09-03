@@ -65,7 +65,7 @@ it does not weaken or replace current-source `v2M4Check`.
 | Open gate | `V2-OPEN-READ-15` remains active for optional tombstone deletion; 0.2 permanent tombstones are frozen |
 | Design result | `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED` |
 | Accepted amendment | ADR 0146 plus `m5-design-amendment-1.json`: durable ticket/fence serialization and exact single-key CAS; M5-C implementation complete, source-bound child not run |
-| Exclusions | M5-D runtime implementation, M5 evidence/Final, physical deletion, M6/M7/M8, tombstone deletion, allocator-orphan GC, production authority |
+| Exclusions | full M5-D state machine/cleanup, M5 evidence/Final, physical deletion authority, M6/M7/M8, tombstone deletion, allocator-orphan GC, production authority |
 
 Implementation must proceed A, B, C, D, then current-source evidence. The detailed design freezes semantic state,
 identity, ordering, veto, module, and ownership rules; exact codec offsets/caps, finite budgets, real Provider delete
@@ -79,6 +79,11 @@ source-locked real Oxia server, but remains an implementation-only result rather
 `v2M5MaterializationCheck`, `v2M5KafkaCompactionCheck`, and `v2M5RetentionRetirementCheck` are deliberately
 non-promotable: they prove production source shape and deterministic implementation execution, but none is a future
 real-boundary child receipt or the M5 Final.
+
+M5-D has started with the focused `v2M5VersionMatchDeleteCheck`: the shared Provider transport defaults to unsupported,
+and only an enabled versioned bucket admits exact-version delete. Fixed-digest MinIO proves exact deletion,
+same-key-recreation protection, and lost-response LIST/full-GET reconciliation. This is not the full M5-D gate and
+cannot create intent, claim `DELETE_DONE`, or authorize physical deletion.
 
 ## Closed milestone: M4
 
