@@ -438,7 +438,7 @@ generations without granting production deployment or M5 deletion authority.
 ### `V2-OPEN-READ-08`: proof-window/head/fold physical evidence
 
 Resolved by the current immutable M4 Final at exact tested source
-`9f2b533b0c15593de512559de0a57a40e33e9c32`. The selected representation is a 64-entry live window, exact
+`f08bbdeef542c7c4d17ff10fd0f4522b07b6cebb`. The selected representation is a 64-entry live window, exact
 32-entry contiguous folds, at most 64 folds, a 4,096-epoch verification interval, and bounded 32-row cleanup plans.
 Capacity exhaustion preserves the pending proof and closes selector admission to `STOPPED`. Cleanup is an
 M4-semantic pure predicate bound to exact selector/head bytes plus a Binding-scoped reference generation and

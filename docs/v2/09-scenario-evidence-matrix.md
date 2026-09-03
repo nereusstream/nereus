@@ -13,8 +13,8 @@ The machine-readable owner is [v2-scenarios.json](v2-scenarios.json). M0 started
 the documentation gate proves synchronization only and does not promote runtime evidence.
 
 M4 is now closed by the current immutable
-[M4 Final](evidence/v2-m4/final/final-source-9f2b533b0c15593de512559de0a57a40e33e9c32/m4-final.json), bound to
-exact tested source `9f2b533b0c15593de512559de0a57a40e33e9c32`. It promotes exactly
+[M4 Final](evidence/v2-m4/final/final-source-f08bbdeef542c7c4d17ff10fd0f4522b07b6cebb/m4-final.json), bound to
+exact tested source `f08bbdeef542c7c4d17ff10fd0f4522b07b6cebb`. It promotes exactly
 `V2-READ-001/003/004/005/007`. `V2-READ-002` remains M5-owned, and the shared
 `V2-READ-006/008..015` rows remain `PLANNED` with null receipts until their downstream M5 predicates exist.
 
