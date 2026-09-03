@@ -33,13 +33,25 @@ tasks.named<Test>("test") {
     maxHeapSize = "1024m"
 }
 
+abstract class Nwg1GoldenEmitterOutputArgumentProvider :
+    org.gradle.process.CommandLineArgumentProvider {
+    @get:org.gradle.api.tasks.Input
+    abstract val nwg1GoldenEmitterOutput: org.gradle.api.provider.Property<String>
+
+    override fun asArguments(): Iterable<String> = listOf(nwg1GoldenEmitterOutput.get())
+}
+
 tasks.register<JavaExec>("nwg1GoldenEmitter") {
     group = "verification"
     description = "Emit the NWG1 A corpus twice into an explicit external temporary directory."
     dependsOn(tasks.named("testClasses"))
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass.set("com.nereusstream.storage.object.nwg1.Nwg1GoldenVectorEmitter")
-    args(providers.gradleProperty("nwg1GoldenEmitterOutput").get())
+    argumentProviders.add(
+        objects.newInstance<Nwg1GoldenEmitterOutputArgumentProvider>().apply {
+            nwg1GoldenEmitterOutput.set(providers.gradleProperty("nwg1GoldenEmitterOutput"))
+        },
+    )
     outputs.upToDateWhen { false }
 }
 

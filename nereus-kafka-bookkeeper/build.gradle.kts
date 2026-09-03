@@ -43,6 +43,23 @@ configurations[realBookKeeperTest.runtimeOnlyConfigurationName]
 configurations[bookKeeperScale.implementationConfigurationName]
     .extendsFrom(configurations.implementation.get())
 
+abstract class KafkaBookKeeperApplicationArguments :
+    org.gradle.process.CommandLineArgumentProvider {
+    @get:org.gradle.api.tasks.Input
+    abstract val values: org.gradle.api.provider.ListProperty<String>
+
+    override fun asArguments(): Iterable<String> = values.get()
+}
+
+abstract class KafkaBookKeeperMetadataServiceUriArgumentProvider :
+    org.gradle.process.CommandLineArgumentProvider {
+    @get:org.gradle.api.tasks.Input
+    abstract val v2M2BookKeeperMetadataServiceUri: org.gradle.api.provider.Property<String>
+
+    override fun asArguments(): Iterable<String> =
+        listOf("-Dnereus.bookkeeper.metadataServiceUri=${v2M2BookKeeperMetadataServiceUri.get()}")
+}
+
 tasks.register<Test>("realBookKeeperTest") {
     group = "verification"
     description = "Run K3-K7 Kafka engine paths against the exact-image real BookKeeper provider."
@@ -51,9 +68,12 @@ tasks.register<Test>("realBookKeeperTest") {
     useJUnitPlatform()
     maxParallelForks = 1
     outputs.upToDateWhen { false }
-    systemProperty(
-        "nereus.bookkeeper.metadataServiceUri",
-        providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").get(),
+    jvmArgumentProviders.add(
+        objects.newInstance<KafkaBookKeeperMetadataServiceUriArgumentProvider>().apply {
+            v2M2BookKeeperMetadataServiceUri.set(
+                providers.gradleProperty("v2M2BookKeeperMetadataServiceUri"),
+            )
+        },
     )
 }
 
@@ -64,12 +84,14 @@ tasks.register<JavaExec>("v2M2KafkaK9Scale") {
     classpath = bookKeeperScale.runtimeClasspath
     workingDir(rootProject.projectDir)
     mainClass.set("com.nereusstream.kafka.bookkeeper.evidence.KafkaBookKeeperScaleHarnessV1")
-    args(
-        providers.gradleProperty("v2M2KafkaK9ScalePlan").get(),
-        providers.gradleProperty("v2M2KafkaK9ConformanceConfig").get(),
-        providers.gradleProperty("v2M2KafkaK9ScaleTier").get(),
-        providers.gradleProperty("v2M2KafkaK9ScaleOutput").get(),
-        providers.gradleProperty("v2M2KafkaK9TestedSourceCommit").get(),
+    argumentProviders.add(
+        objects.newInstance<KafkaBookKeeperApplicationArguments>().apply {
+            values.add(providers.gradleProperty("v2M2KafkaK9ScalePlan"))
+            values.add(providers.gradleProperty("v2M2KafkaK9ConformanceConfig"))
+            values.add(providers.gradleProperty("v2M2KafkaK9ScaleTier"))
+            values.add(providers.gradleProperty("v2M2KafkaK9ScaleOutput"))
+            values.add(providers.gradleProperty("v2M2KafkaK9TestedSourceCommit"))
+        },
     )
     maxHeapSize = "1024m"
 }
@@ -86,7 +108,12 @@ tasks.register<JavaExec>("v2M2KafkaInputsReceiptCheck") {
     classpath = sourceSets.main.get().runtimeClasspath
     workingDir(rootProject.projectDir)
     mainClass.set("com.nereusstream.kafka.bookkeeper.evidence.KafkaM2InputsReceiptCli")
-    args("validate", providers.gradleProperty("v2M2KafkaInputsReceipt").get())
+    args("validate")
+    argumentProviders.add(
+        objects.newInstance<KafkaBookKeeperApplicationArguments>().apply {
+            values.add(providers.gradleProperty("v2M2KafkaInputsReceipt"))
+        },
+    )
 }
 
 tasks.register<JavaExec>("v2M2KafkaFinalReceiptCheck") {
@@ -99,7 +126,11 @@ tasks.register<JavaExec>("v2M2KafkaFinalReceiptCheck") {
     args(
         "validate",
         rootProject.projectDir.absolutePath,
-        providers.gradleProperty("v2M2KafkaFinalReceipt").get(),
+    )
+    argumentProviders.add(
+        objects.newInstance<KafkaBookKeeperApplicationArguments>().apply {
+            values.add(providers.gradleProperty("v2M2KafkaFinalReceipt"))
+        },
     )
 }
 
@@ -172,13 +203,25 @@ tasks.register<JavaExec>("v2M3KafkaNativeReceiptCheck") {
     }
 }
 
+abstract class Nwkcp1ProtocolFixtureOutputArgumentProvider :
+    org.gradle.process.CommandLineArgumentProvider {
+    @get:org.gradle.api.tasks.Input
+    abstract val nwkcp1ProtocolFixtureOutput: org.gradle.api.provider.Property<String>
+
+    override fun asArguments(): Iterable<String> = listOf(nwkcp1ProtocolFixtureOutput.get())
+}
+
 tasks.register<JavaExec>("nwkcp1ProtocolFixtureEmitter") {
     group = "verification"
     description = "Emit the exact NWKCP1 Object and OPEN/TERMINAL Head protocol fixture."
     dependsOn(tasks.named("testClasses"))
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass.set("com.nereusstream.kafka.bookkeeper.object.nwkcp1.Nwkcp1ProtocolFixtureV1Test")
-    args(providers.gradleProperty("nwkcp1ProtocolFixtureOutput").get())
+    argumentProviders.add(
+        objects.newInstance<Nwkcp1ProtocolFixtureOutputArgumentProvider>().apply {
+            nwkcp1ProtocolFixtureOutput.set(providers.gradleProperty("nwkcp1ProtocolFixtureOutput"))
+        },
+    )
     outputs.upToDateWhen { false }
 }
 
