@@ -290,6 +290,19 @@ class M5RetentionRetirementV1Test {
                         .toCompletableFuture()
                         .join())
                 .isEqualTo(M5RetirementCoordinatorV1.Outcome.ALREADY_RETIRED);
+        CanonicalBytes permanentTombstone =
+                fixture.metadata.readNow(fixture.batchKey).canonicalStoredBytes();
+        assertThatThrownBy(() -> new M5RetirementCoordinatorV1(fixture.metadata)
+                        .externalize(fixture.externalizationRequest())
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseInstanceOf(M5ReferenceFreshnessVerifierV1.StaleAuthorityException.class);
+        assertThat(fixture.metadata.readNow(fixture.batchKey).canonicalStoredBytes())
+                .isEqualTo(permanentTombstone);
+        assertThatThrownBy(() -> M4ReadControlCodecV1.decodeProtection(permanentTombstone))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> M4ReadControlCodecV1.decodeBatch(permanentTombstone))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -654,6 +667,18 @@ class M5RetentionRetirementV1Test {
                 1,
                 1,
                 0);
+        assertThatThrownBy(() -> new PhysicalCleanupSummaryV1(
+                        cleanup.cleanupRoot(),
+                        incarnation,
+                        BINDING.bindingId(),
+                        aggregate.canonicalStoredSha256(),
+                        CAPABILITY,
+                        2,
+                        1,
+                        0,
+                        1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("incomplete");
         RetiredTopicIncarnationTombstoneV1 tombstone =
                 M5RetentionCodecV1.finalizeRetiredPulsar(new RetiredTopicIncarnationTombstoneV1(
                         incarnation,
@@ -667,7 +692,7 @@ class M5RetentionRetirementV1Test {
                         aggregate.canonicalStoredSha256(),
                         CAPABILITY,
                         PLACEHOLDER));
-        PulsarRetirementRequest request = new PulsarRetirementRequest(
+        PulsarRetirementRequest staleCleanupRequest = new PulsarRetirementRequest(
                 "/pulsar/topic",
                 selectorKey,
                 selector,
@@ -698,6 +723,35 @@ class M5RetentionRetirementV1Test {
                         CAPABILITY,
                         PLACEHOLDER));
 
+        metadata.overwrite(cleanup.cleanupRoot().key(), bytes("cleanup-root-changed"));
+        assertThatThrownBy(() -> new M5RetirementCoordinatorV1(metadata)
+                        .retirePulsarAggregate(staleCleanupRequest)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseInstanceOf(M5ReferenceFreshnessVerifierV1.StaleAuthorityException.class);
+        assertThat(metadata.transactionCalls).isZero();
+        assertThat(metadata.readNow(aggregateKey)).isEqualTo(aggregate);
+        PhysicalCleanupSummaryV1 freshCleanup = new PhysicalCleanupSummaryV1(
+                fact(metadata.readNow(cleanup.cleanupRoot().key())),
+                incarnation,
+                BINDING.bindingId(),
+                aggregate.canonicalStoredSha256(),
+                CAPABILITY,
+                2,
+                1,
+                1,
+                0);
+        PulsarRetirementRequest request = new PulsarRetirementRequest(
+                "/pulsar/topic",
+                selectorKey,
+                selector,
+                selectorValue,
+                aggregateKey,
+                aggregate,
+                proof,
+                freshCleanup,
+                tombstone);
+
         metadata.responseUnknownWithoutApply = true;
         assertThat(new M5RetirementCoordinatorV1(metadata)
                         .retirePulsarAggregate(request)
@@ -722,11 +776,16 @@ class M5RetentionRetirementV1Test {
                                 aggregateKey,
                                 aggregate,
                                 alternateProof,
-                                cleanup,
+                                freshCleanup,
                                 alternateTombstone))
                         .toCompletableFuture()
                         .join())
                 .isEqualTo(M5RetirementCoordinatorV1.Outcome.ALREADY_RETIRED);
+        CanonicalBytes permanentTombstone = metadata.readNow(aggregateKey).canonicalStoredBytes();
+        assertThatThrownBy(() -> M4ReadControlCodecV1.decodeProtection(permanentTombstone))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> M4ReadControlCodecV1.decodeBatch(permanentTombstone))
+                .isInstanceOf(IllegalArgumentException.class);
 
         PulsarTopicGenerationSelectorValueV1 sameNameNextGeneration = new PulsarTopicGenerationSelectorValueV1(
                 persistenceName,
@@ -745,7 +804,7 @@ class M5RetentionRetirementV1Test {
                                 aggregateKey,
                                 aggregate,
                                 proof,
-                                cleanup,
+                                freshCleanup,
                                 tombstone)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("selector");
