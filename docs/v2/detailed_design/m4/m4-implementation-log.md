@@ -5,7 +5,7 @@ implementationStatus: Verified
 evidenceStatus: CurrentSourceReceipt
 authority: CurrentImplementationRecord
 sourceTuple: current-m4-source
-receipt: docs/v2/evidence/v2-m4/final/canonical/m4-final.json
+receipt: docs/v2/evidence/v2-m4/final/final-source-6af0877fcb2a1df09f32b26db74f1edf6b29d784/m4-final.json
 ---
 
 # M4 implementation and evidence log
@@ -142,17 +142,18 @@ formal run and publishes a validated Final.
 
 ## Milestone 6: formal exact-source closure
 
-Exact tested source `0a855a7354631f8eb42adac0d93eacb9ac591027` executed the four mutually exclusive evidence
+Exact tested source `6af0877fcb2a1df09f32b26db74f1edf6b29d784` executed the four mutually exclusive evidence
 children against source-lock SHA-256 `02601b3de76857d5f0c8657b285bc91584486d08077e201a4d9fd34f377b07a2`.
 The child totals are 13, 6, 19, and 5 tests with zero failure, error, or skip.
 
 The governed measurements include zero allocated bytes across 100,000 warmed capture/plan/clear iterations, 84-ns
-hot-path p99, 80,000 concurrent hazard operations at 16,625-ns p99, proof capacity through 2,112 admitted epochs with
+hot-path p99, 80,000 concurrent hazard operations at 25,250-ns p99, proof capacity through 2,112 admitted epochs with
 selector stop on attempt 2,113, and a 32-row cleanup plan blocked by all six reference classes. Current-source
-end-to-end p99 is 114,417 ns for Kafka and 135,166 ns for Pulsar; measured caller-plus-owner allocation is 2,045 and
-9,776 bytes per operation respectively.
+end-to-end p99 is 233,709 ns for Kafka and 143,792 ns for Pulsar; measured caller-plus-owner allocation is 2,045 and
+9,777 bytes per operation respectively.
 
-The canonical immutable [M4 Final](../../evidence/v2-m4/final/canonical/m4-final.json) has SHA-256
-`ee95aa54a43847044e5bdd466edd3d3ac507494028967f529917265bcf4909fe`. It closes
+The current immutable
+[M4 Final](../../evidence/v2-m4/final/final-source-6af0877fcb2a1df09f32b26db74f1edf6b29d784/m4-final.json) has
+SHA-256 `af9de78c8280f6fbe60c08b2c6b26c819381466fb18bd5a8ca76bb472823f704`. It closes
 `V2-OPEN-READ-08/09` and promotes exactly `V2-READ-001/003/004/005/007`. `V2-READ-002` and shared
 `V2-READ-006/008..015` remain `PLANNED` with null receipts. M5 physical deletion remains outside M4.

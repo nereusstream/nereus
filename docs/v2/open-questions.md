@@ -425,7 +425,7 @@ Resolved at the logical proof-authority level by
 [ADR 0073](../decisions/0073-v2-read-admission-epoch-and-source-independent-quiescence-window.md). One monotonic
 Binding Read Admission Epoch order, immutable retirement interval, and at most one reusable source-independent proof
 per epoch replace the rejected mutable per-batch accumulator. Continuous interval coverage is mandatory; exact
-physical proof-window/head/fold representation is selected by the canonical M4 Final described below.
+physical proof-window/head/fold representation is selected by the current immutable M4 Final described below.
 
 ### `V2-OPEN-READ-07`: backend quiescence capability record
 
@@ -437,8 +437,8 @@ generations without granting production deployment or M5 deletion authority.
 
 ### `V2-OPEN-READ-08`: proof-window/head/fold physical evidence
 
-Resolved by the canonical M4 Final at exact tested source
-`0a855a7354631f8eb42adac0d93eacb9ac591027`. The selected representation is a 64-entry live window, exact
+Resolved by the current immutable M4 Final at exact tested source
+`6af0877fcb2a1df09f32b26db74f1edf6b29d784`. The selected representation is a 64-entry live window, exact
 32-entry contiguous folds, at most 64 folds, a 4,096-epoch verification interval, and bounded 32-row cleanup plans.
 Capacity exhaustion preserves the pending proof and closes selector admission to `STOPPED`. Cleanup is an
 M4-semantic pure predicate bound to exact selector/head bytes plus a Binding-scoped reference generation and
@@ -446,7 +446,7 @@ publication-fence SHA; it grants neither protection release nor physical source 
 
 ### `V2-OPEN-READ-09`: capability/receipt encoding and backend admission evidence
 
-Resolved for M4 by the canonical Final and its `QUIESCENCE_PROTECTION_RELEASE` child. Canonical
+Resolved for M4 by the current immutable Final and its `QUIESCENCE_PROTECTION_RELEASE` child. Canonical
 proof/capability/receipt encodings, hard caps, verifier revocation behavior, and admission generation 1 are bound for
 Kafka/BookKeeper Object WAL, Pulsar Object WAL at source
 `a14e0e6f4e49be0677318b4ceefc7b85b445823b`, and the locked Oxia adapter, all under

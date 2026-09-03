@@ -5,7 +5,7 @@ implementationStatus: Verified
 evidenceStatus: CurrentSourceReceipt
 authority: NormativeDesignIndex
 sourceTuple: v2-m1
-receipt: docs/v2/evidence/v2-m4/final/canonical/m4-final.json
+receipt: docs/v2/evidence/v2-m4/final/final-source-6af0877fcb2a1df09f32b26db74f1edf6b29d784/m4-final.json
 ---
 
 # M4 detailed-design index
@@ -23,9 +23,9 @@ per-read durable ticket, a second physical-object pin authority, or physical sou
 - [M4-D evidence ownership and freeze](m4-d-evidence-ownership-and-freeze.md) is accepted design input from Grill 35.
 - The governance-only [freeze manifest](m4-design-freeze.json) binds the eight immutable design/review records.
 - Implementation and formal evidence are complete at exact tested source
-  `0a855a7354631f8eb42adac0d93eacb9ac591027`; the canonical immutable
-  [M4 Final](../../evidence/v2-m4/final/canonical/m4-final.json) has SHA-256
-  `ee95aa54a43847044e5bdd466edd3d3ac507494028967f529917265bcf4909fe`.
+  `6af0877fcb2a1df09f32b26db74f1edf6b29d784`; the current immutable
+  [M4 Final](../../evidence/v2-m4/final/final-source-6af0877fcb2a1df09f32b26db74f1edf6b29d784/m4-final.json)
+  has SHA-256 `af9de78c8280f6fbe60c08b2c6b26c819381466fb18bd5a8ca76bb472823f704`.
 
 The design remains hard-frozen and unchanged. `v2M4DesignCheck` records the clean pre-implementation freeze;
 `v2M4Check` is the post-publication authority. M5 physical deletion, M6 process activation, M8 native parity, and
