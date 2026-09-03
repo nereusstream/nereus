@@ -38,6 +38,19 @@ class HistoricalM3DependencyTest(unittest.TestCase):
         self.assertEqual(40, len(head))
         self.assertEqual("RANGE_64", selected)
 
+    def test_historical_validation_does_not_reopen_workstation_payloads(self) -> None:
+        contract = M4.load_m3_contract(ROOT)
+        child_contract = contract._child_contract()
+        raw = (ROOT / M4.FINAL_PATH).read_bytes()
+        value = contract.load_canonical_json(raw, str(M4.FINAL_PATH))
+        with mock.patch.object(
+            child_contract,
+            "_allocator_stream_identity",
+            side_effect=AssertionError("historical validation reopened an external path"),
+        ):
+            tested = M4.validate_historical_receipt_value(contract, ROOT, value)
+        self.assertEqual(M4.TESTED, tested)
+
     def test_unchanged_m3_descendant_policy_still_rejects_current_head(self) -> None:
         with self.assertRaisesRegex(self.m3.FinalError, "non-evidence path changed"):
             self.m3.validate_descendants(ROOT, M4.TESTED)

@@ -127,7 +127,10 @@ The fifth implementation slice makes the frozen four-child hierarchy executable 
   exact tested Nereus commit and that commit's `source-locks.json` SHA-256; and
 - the Final validator reopens all child/attachment bytes, verifies the immutable M3 identity, permits only a linear
   evidence-only descendant chain, promotes exactly five M4-only scenarios, and preserves all shared rows as
-  `PLANNED` with null receipts.
+  `PLANNED` with null receipts; and
+- historical M3 replay binds the exact frozen Final SHA and closure-commit blob, reopens every repository-owned child
+  and attachment, and recomputes the V5 allocator cross-links from its sealed byte/SHA inventory. It does not require
+  the original 124.9-MB payload at workstation-specific absolute paths and does not recertify M3.
 
 The tested candidate parameters are source-locked as 32 KiB selector bytes, 2 KiB dedicated STOPPED reserve, eight
 anchors, eight active batches, 64 sources per batch, a 64-entry proof window, 32-entry contiguous folds, 64 folds,

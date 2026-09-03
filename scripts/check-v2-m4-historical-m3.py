@@ -13,7 +13,7 @@ from pathlib import Path, PurePosixPath
 import subprocess
 import sys
 from types import ModuleType
-from typing import Callable
+from typing import Any, Callable
 
 
 TESTED = "e5e53e62865c21845621037bea5f18c092bd4259"
@@ -87,15 +87,202 @@ def load_m3_contract(root: Path) -> ModuleType:
     return module
 
 
+def archived_allocator_file_rows(
+    contract: ModuleType,
+    rows: object,
+    label: str,
+    maximum_count: int,
+    maximum_bytes: int,
+    required_names: tuple[str, ...] | None = None,
+) -> list[dict[str, Any]]:
+    """Validate the frozen identity inventory without reopening workstation paths."""
+
+    if not isinstance(rows, list) or not 1 <= len(rows) <= maximum_count:
+        raise contract.ChildError(f"{label} file count is outside its cap")
+    validated: list[dict[str, Any]] = []
+    for index, value in enumerate(rows):
+        members = {"bytes", "path", "sha256"}
+        if required_names is not None:
+            members.add("name")
+        row = contract._exact_members(value, members, f"{label}[{index}]")
+        contract._allocator_external_path(row["path"], f"{label}[{index}].path", True)
+        size = contract._positive(row["bytes"], f"{label}[{index}].bytes")
+        digest = contract._sha_text(row["sha256"], f"{label}[{index}].sha256")
+        if size > maximum_bytes or digest == "0" * 64:
+            raise contract.ChildError(f"{label}[{index}] identity is outside its cap or zero")
+        validated.append(row)
+    paths = [row["path"] for row in validated]
+    if len(paths) != len(set(paths)):
+        raise contract.ChildError(f"{label} paths are duplicated")
+    if required_names is None:
+        if paths != sorted(paths):
+            raise contract.ChildError(f"{label} paths are not sorted")
+    elif [row["name"] for row in validated] != list(required_names):
+        raise contract.ChildError(f"{label} logical-name inventory differs")
+    return validated
+
+
+def archived_allocator_external_identities(
+    contract: ModuleType,
+    rows: list[dict[str, Any]],
+    maximum: int,
+) -> list[tuple[str, dict[str, Any]]]:
+    identities: list[tuple[str, dict[str, Any]]] = []
+    for row in rows:
+        if row["bytes"] > maximum:
+            raise contract.ChildError("allocator V5 archived external bytes exceed cap")
+        name = row.get("name", PurePosixPath(row["path"]).name)
+        identities.append((name, row))
+    return identities
+
+
+def archived_allocator_manifest(
+    contract: ModuleType,
+    prefix: bytes,
+    files: list[tuple[str, dict[str, Any]]],
+) -> str:
+    manifest = bytearray(prefix)
+    for name, row in files:
+        manifest.extend(name.encode("utf-8"))
+        manifest.extend(b"\0")
+        manifest.extend(str(row["bytes"]).encode("ascii"))
+        manifest.extend(b"\0")
+        manifest.extend(row["sha256"].encode("ascii"))
+        manifest.extend(b"\n")
+    return contract.sha256(bytes(manifest))
+
+
+def archived_allocator_physical_aggregates(
+    contract: ModuleType,
+    checkpoint: dict[str, Any],
+    files: list[tuple[str, dict[str, Any]]],
+) -> list[str]:
+    v5 = contract.ALLOCATOR_V5
+    names = [name for name, _ in files]
+    if not 1 <= len(files) <= v5.MAX_PHYSICAL_FILES or names != sorted(names):
+        raise contract.ChildError("allocator V5 archived physical inventory differs")
+    by_name = dict(files)
+    if len(by_name) != len(files):
+        raise contract.ChildError("allocator V5 archived physical names alias")
+    consumed: set[str] = set()
+    seen_rows: set[tuple[int, int, int]] = set()
+    result: list[str] = []
+
+    def consume(prefix: str, suffix: str) -> str:
+        matches = [name for name in by_name if name.startswith(prefix) and name.endswith(suffix)]
+        if len(matches) != 1 or matches[0] in consumed:
+            raise contract.ChildError(
+                f"allocator V5 archived physical attachment identity differs: {prefix}"
+            )
+        name = matches[0]
+        digest = by_name[name]["sha256"]
+        if name != f"{prefix}{digest}{suffix}":
+            raise contract.ChildError(
+                f"allocator V5 archived physical filename digest differs: {name}"
+            )
+        consumed.add(name)
+        return digest
+
+    for observation, expected in zip(
+        checkpoint["observations"], checkpoint["aggregates"], strict=True
+    ):
+        physical: list[str] = []
+        if observation["tag"] == "interval":
+            logical = observation["cell"]
+            row = (
+                logical["candidateIndex"],
+                logical["population"],
+                logical["latency"],
+            )
+            first = row not in seen_rows
+            seen_rows.add(row)
+            if logical["candidate"].startswith("RANGE_") and first:
+                physical.append(
+                    consume(
+                        f"scale-{logical['candidate']}-{logical['population']}-{logical['latency']}-",
+                        ".json",
+                    )
+                )
+            physical.append(consume(f"interval-{logical['contextId']}-", ".json"))
+        else:
+            for cut in v5.FAULT_CUTS:
+                physical.append(
+                    consume(
+                        f"fault-{observation['candidate']}-{observation['population']}-"
+                        f"{observation['latency']}-{cut}-",
+                        ".nare1",
+                    )
+                )
+        aggregate = contract.sha256(b"".join(bytes.fromhex(value) for value in physical))
+        if aggregate != expected or aggregate in result:
+            raise contract.ChildError(
+                "allocator V5 archived physical aggregate differs or aliases"
+            )
+        result.append(aggregate)
+    if consumed != set(by_name):
+        raise contract.ChildError(
+            "allocator V5 archived physical inventory contains an unbound file"
+        )
+    return result
+
+
+def archived_allocator_junit_manifest(
+    contract: ModuleType,
+    files: list[tuple[str, dict[str, Any]]],
+    expected_tests: set[str],
+) -> tuple[str, dict[str, int]]:
+    names = [name for name, _ in files]
+    if len(files) != 10 or names != sorted(names):
+        raise contract.ChildError("allocator V5 archived diagnostic JUnit inventory differs")
+    digest = archived_allocator_manifest(
+        contract,
+        b"NEREUS_V2_M3_ALLOCATOR_DIAGNOSTIC_JUNIT_MANIFEST_V5\n",
+        files,
+    )
+    return digest, {
+        "tests": len(expected_tests),
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+    }
+
+
+def archived_allocator_raw_manifest(
+    contract: ModuleType,
+    files: list[tuple[str, dict[str, Any]]],
+    tested_commit: str,
+) -> str:
+    if tested_commit != TESTED or [name for name, _ in files] != sorted(
+        contract.ALLOCATOR_V5.DIAGNOSTIC_RAW_NAMES
+    ):
+        raise contract.ChildError("allocator V5 archived diagnostic raw inventory differs")
+    return archived_allocator_manifest(
+        contract,
+        b"NEREUS_V2_M3_ALLOCATOR_DIAGNOSTIC_RAW_MANIFEST_V5\n",
+        files,
+    )
+
+
 def validate_historical_receipt_value(
     contract: ModuleType,
     root: Path,
     value: object,
 ) -> str:
-    """Reuse M3 value/child validation while excluding only HEAD-freshness policy."""
+    """Reuse M3 validation with frozen archive identities in place of workstation files."""
+
+    try:
+        require_fixed_final(contract.canonical_bytes(value))
+    except (TypeError, ValueError) as error:
+        raise DependencyError("cannot canonicalize the exact historical M3 Final") from error
 
     child_contract = contract._child_contract()
-    original = child_contract._validate_source_freshness
+    v5_contract = child_contract.ALLOCATOR_V5
+    original_freshness = child_contract._validate_source_freshness
+    original_file_rows = child_contract._allocator_v5_file_rows
+    original_external_bytes = child_contract._allocator_v5_external_bytes
+    original_physical_aggregates = v5_contract.physical_aggregates
+    original_junit_manifest = v5_contract.diagnostic_junit_manifest
+    original_raw_manifest = v5_contract.diagnostic_raw_manifest
 
     def historical_source_freshness(_root: Path, tested: str) -> tuple[str, int]:
         if tested != TESTED:
@@ -104,11 +291,35 @@ def validate_historical_receipt_value(
             )
         return tested, 0
 
+    # The exact Final SHA and its closure-commit blob are the historical trust
+    # anchor. Recompute every V5 cross-link from the sealed bytes/SHA inventory,
+    # but do not require the original 124.9-MB workstation payload to remain at
+    # its machine-specific absolute paths forever.
     child_contract._validate_source_freshness = historical_source_freshness
+    child_contract._allocator_v5_file_rows = lambda _root, rows, label, count, size, names=None: (
+        archived_allocator_file_rows(child_contract, rows, label, count, size, names)
+    )
+    child_contract._allocator_v5_external_bytes = lambda _root, rows, maximum: (
+        archived_allocator_external_identities(child_contract, rows, maximum)
+    )
+    v5_contract.physical_aggregates = lambda checkpoint, files: (
+        archived_allocator_physical_aggregates(child_contract, checkpoint, files)
+    )
+    v5_contract.diagnostic_junit_manifest = lambda files, expected_tests: (
+        archived_allocator_junit_manifest(child_contract, files, expected_tests)
+    )
+    v5_contract.diagnostic_raw_manifest = lambda files, tested: (
+        archived_allocator_raw_manifest(child_contract, files, tested)
+    )
     try:
         return contract.validate_receipt_value(root, value, TESTED)
     finally:
-        child_contract._validate_source_freshness = original
+        child_contract._validate_source_freshness = original_freshness
+        child_contract._allocator_v5_file_rows = original_file_rows
+        child_contract._allocator_v5_external_bytes = original_external_bytes
+        v5_contract.physical_aggregates = original_physical_aggregates
+        v5_contract.diagnostic_junit_manifest = original_junit_manifest
+        v5_contract.diagnostic_raw_manifest = original_raw_manifest
 
 
 def selected_allocator_candidate(root: Path, receipt: dict[str, object]) -> str:
