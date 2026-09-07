@@ -89,6 +89,32 @@ authority unchanged. The [eligibility projection](m5-delete-eligibility-projecti
 source-bound evidence and production flags as false. This slice follows published identity commit
 `77bff9a05bd736285d044a436aa34f3194f62a5b`.
 
+## READ_FENCED observation recovery
+
+Status: focused implementation validated; native protocol owner adapters and real deletion composition remain OPEN.
+
+M5DA wire 4 adds the observation epoch and exact coordinator-owner/capability/fenced-predecessor facts to READ_FENCED.
+The same-key refresh preserves the stable resource, original read attempt and closed writer fence, consumes the exact
+next revision/observation epoch, and reconstructs full eligibility. Owner changes additionally require a native fencing
+verifier; metadata receipt existence alone cannot substitute for that check. The default verifier rejects CAS-1/CAS-2.
+External observations now bind the complete physical resource and exact fenced-authority hash. CAS-2 rejects a late
+observation from any previous epoch and derives owner/capability from the stored context instead of caller hashes.
+Full native verification plus one combined fact-vector reread precedes each observation CAS. Failed refresh leaves the
+previous fence intact. Authority versions 1-3 are rejected; no automatic migration or parallel authority key is offered.
+
+The [recovery projection](m5-read-fenced-recovery-projection.json) keeps native owner adapters, full external readers,
+durable visible recovery-veto records, intent capability refresh and real Oxia recovery as incomplete obligations.
+Synthetic verifiers exercise orchestration and race rejection only. This follows published eligibility commit
+`8e7a963c957f8e7744c36346a525c207eb8445f6`, whose remote main SHA was verified exactly.
+
+Validation: `v2M5ReadFencedRecoveryCheck` passed (44 tasks; 24 executed, 20 up-to-date), including 19 coordinator,
+13 authority, 10 eligibility, 7 identity and 184 retention tests with zero failures/errors/skips, plus 3 new recovery
+contract tests, predecessor contracts, Spotless and Checkstyle. The 7 new coordinator cases cover restart takeover,
+response loss before/after apply, stale observations, missing native adapters, rejected owner fencing, revoked
+capability, failed eligibility refresh, same-owner refresh, and exact epoch/revision requirements. Initial gate runs
+caught projection version/domain references that still described the preceding wire; those references were updated
+to M5DA 4 / external-identity hash V2 before the passing aggregate. No historical receipt or frozen manifest changed.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;

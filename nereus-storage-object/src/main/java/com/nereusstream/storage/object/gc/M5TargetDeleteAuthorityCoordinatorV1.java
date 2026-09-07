@@ -24,6 +24,8 @@ import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.Exact
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterTicketV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.TargetDeleteAuthorityStateV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.TargetDeleteAuthorityV1;
+import com.nereusstream.storage.object.retention.M5RetentionRecordsV1.AuthorityFactV1;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -85,9 +87,16 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
     private record Attempt(MutationOutcome outcome, Throwable failure) {}
 
     private final ExactMetadataTransactionStoreV1 metadata;
+    private final DeleteObservationAuthorityVerifierV2 observationAuthority;
 
     public M5TargetDeleteAuthorityCoordinatorV1(ExactMetadataTransactionStoreV1 metadata) {
+        this(metadata, DeleteObservationAuthorityVerifierV2.unsupported());
+    }
+
+    public M5TargetDeleteAuthorityCoordinatorV1(
+            ExactMetadataTransactionStoreV1 metadata, DeleteObservationAuthorityVerifierV2 observationAuthority) {
         this.metadata = Objects.requireNonNull(metadata, "metadata");
+        this.observationAuthority = Objects.requireNonNull(observationAuthority, "observationAuthority");
     }
 
     public CompletionStage<Optional<VersionedAuthorityV1>> read(String authorityKey) {
@@ -149,13 +158,34 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
     }
 
     public CompletionStage<MutationResultV1> prepareIdentityRead(
-            VersionedValue exactOpenAuthority, Sha256Digest attemptIdSha256) {
+            VersionedValue exactOpenAuthority, Sha256Digest attemptIdSha256, DeleteObservationContextV2 context) {
         VersionedAuthorityV1 exact = exactAuthority(exactOpenAuthority.key(), exactOpenAuthority);
         TargetDeleteAuthorityV1 candidate =
-                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(exact.authority(), attemptIdSha256);
-        return requireFreshEligibility(exact.authority().eligibilitySnapshot().orElseThrow())
+                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(exact.authority(), attemptIdSha256, context);
+        return requireObservationAuthority(candidate)
                 .thenCompose(ignored -> mutate(
                         exact.authority().authorityKey(),
+                        Optional.of(exact.exactStoredValue()),
+                        M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
+                        false));
+    }
+
+    public CompletionStage<MutationResultV1> refreshIdentityRead(
+            VersionedValue exactFencedAuthority,
+            DeleteObservationContextV2 successor,
+            DeleteEligibilitySnapshotV2 snapshot) {
+        VersionedAuthorityV1 exact = exactAuthority(exactFencedAuthority.key(), exactFencedAuthority);
+        TargetDeleteAuthorityV1 candidate =
+                M5TargetDeleteAuthorityStateMachineV1.refreshIdentityRead(exact.authority(), successor, snapshot);
+        DeleteObservationContextV2 previous =
+                exact.authority().readFence().orElseThrow().observationContext();
+        CompletionStage<Void> fenced = previous.coordinatorOwner().equals(successor.coordinatorOwner())
+                ? CompletableFuture.completedFuture(null)
+                : observationAuthority.requirePredecessorFenced(
+                        exact.authority().target().resourceId(), previous, successor);
+        return fenced.thenCompose(ignored -> requireObservationAuthority(candidate))
+                .thenCompose(ignored -> mutate(
+                        candidate.authorityKey(),
                         Optional.of(exact.exactStoredValue()),
                         M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
                         false));
@@ -164,17 +194,11 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
     public CompletionStage<MutationResultV1> bindDeleteIntent(
             VersionedValue exactFencedAuthority,
             ExactExternalIdentityV1 externalIdentity,
-            Sha256Digest deleteAttemptIdSha256,
-            Sha256Digest dispatchOwnerFenceSha256,
-            Sha256Digest capabilityDigestSha256) {
+            Sha256Digest deleteAttemptIdSha256) {
         VersionedAuthorityV1 exact = exactAuthority(exactFencedAuthority.key(), exactFencedAuthority);
         TargetDeleteAuthorityV1 candidate = M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(
-                exact.authority(),
-                externalIdentity,
-                deleteAttemptIdSha256,
-                dispatchOwnerFenceSha256,
-                capabilityDigestSha256);
-        return requireFreshEligibility(exact.authority().eligibilitySnapshot().orElseThrow())
+                exact.authority(), externalIdentity, deleteAttemptIdSha256);
+        return requireObservationAuthority(exact.authority())
                 .thenCompose(ignored -> mutate(
                         exact.authority().authorityKey(),
                         Optional.of(exact.exactStoredValue()),
@@ -223,8 +247,30 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
     }
 
     private CompletionStage<Void> requireFreshEligibility(DeleteEligibilitySnapshotV2 snapshot) {
+        return requireFreshFacts(snapshot.authorityFacts());
+    }
+
+    private CompletionStage<Void> requireObservationAuthority(TargetDeleteAuthorityV1 authority) {
+        DeleteObservationContextV2 context = authority.readFence().orElseThrow().observationContext();
+        java.util.Map<String, AuthorityFactV1> facts = new java.util.TreeMap<>();
+        for (AuthorityFactV1 fact :
+                authority.eligibilitySnapshot().orElseThrow().authorityFacts()) {
+            facts.put(fact.key(), fact);
+        }
+        for (AuthorityFactV1 fact : context.authorityFacts()) {
+            AuthorityFactV1 previous = facts.putIfAbsent(fact.key(), fact);
+            if (previous != null && !previous.equals(fact)) {
+                throw new IllegalArgumentException("observation and eligibility authority conflict");
+            }
+        }
+        return observationAuthority
+                .requireCurrent(authority.target().resourceId(), context)
+                .thenCompose(ignored -> requireFreshFacts(List.copyOf(facts.values())));
+    }
+
+    private CompletionStage<Void> requireFreshFacts(List<AuthorityFactV1> facts) {
         CompletionStage<Void> stage = CompletableFuture.completedFuture(null);
-        for (var fact : snapshot.authorityFacts()) {
+        for (var fact : facts) {
             stage = stage.thenCompose(ignored -> metadata.read(fact.key()).thenAccept(observed -> {
                 VersionedValue value = observed.orElseThrow(
                         () -> new IllegalStateException("eligibility authority is absent: " + fact.key()));

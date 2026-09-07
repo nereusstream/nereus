@@ -1,0 +1,44 @@
+{
+  "schema": "NEREUS_V2_M5_READ_FENCED_RECOVERY_PROJECTION_V2",
+  "status": "IMPLEMENTED_OBSERVATION_RECOVERY_NON_PROMOTABLE",
+  "authorityWireVersion": 4,
+  "observationBinding": [
+    "PHYSICAL_RESOURCE",
+    "EXACT_FENCED_AUTHORITY_SHA256",
+    "READ_ATTEMPT",
+    "OBSERVATION_EPOCH",
+    "COORDINATOR_OWNER_FACT",
+    "CAPABILITY_FACT",
+    "ELIGIBILITY_SNAPSHOT"
+  ],
+  "recovery": {
+    "exactSameKeyCas": true,
+    "refreshRequiresExactNextRevisionAndEpoch": true,
+    "closedAdmissionNeverReopens": true,
+    "resourceAndReadAttemptRemainFixed": true,
+    "ownerChangeRequiresNativeFencingVerifier": true,
+    "missingNativeVerifierRejectsCas1AndCas2": true,
+    "fullFactVectorReread": true,
+    "oldObservationCanBindNewEpoch": false,
+    "sameOwnerCapabilityRefreshSupported": true,
+    "failedRefreshPreservesPredecessor": true,
+    "cas2DerivesOwnerAndCapabilityFromFence": true,
+    "timeoutClearsFence": false
+  },
+  "focusedTests": {
+    "coordinatorAndGuardTests": 19,
+    "newObservationRecoveryTests": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "nativeProtocolOwnerAdaptersIntegrated": false,
+  "externalFullIdentityReaderIntegrated": false,
+  "durableRecoveryVetoRecordImplemented": false,
+  "intentTakeoverCapabilityRefreshIntegrated": false,
+  "realOxiaRecoveryExecutionPresent": false,
+  "completePhysicalDeleteComposition": false,
+  "sourceBoundReceiptPresent": false,
+  "physicalDeleteAuthority": false,
+  "productionAuthority": false
+}

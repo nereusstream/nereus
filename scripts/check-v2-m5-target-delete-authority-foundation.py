@@ -95,7 +95,7 @@ def validate_projection_value(value: object) -> None:
         raise TargetAuthorityFoundationError("target-authority projection amendment commit differs")
     if value.get("wire") != {
         "magic": "M5DA",
-        "version": 3,
+        "version": 4,
         "maximumAuthorityBytes": 1_048_576,
         "maximumTargetIdentityBytes": 65_536,
         "maximumExternalIdentityBytes": 262_144,
@@ -160,7 +160,7 @@ def validate_sources(root: Path) -> None:
         keys,
         (
             "PhysicalResourceIdV2",
-            "NEREUS_V2_M5_EXTERNAL_DELETE_IDENTITY_V1",
+            "NEREUS_V2_M5_EXTERNAL_DELETE_IDENTITY_V2",
             "NEREUS_V2_M5_DELETE_DISPATCH_TOKEN_V1",
             "target.resourceId().authorityKey()",
             "targetIdentitySha256",
@@ -191,7 +191,7 @@ def validate_sources(root: Path) -> None:
         codec,
         (
             "0x4d354441",
-            "VERSION = 3",
+            "VERSION = 4",
             "PhysicalResourceIdCodecV2.decode(targetBytes)",
             "Math.addExact(current.authorityRevision(), 1)",
             "Sha256Digest.hash(predecessor)",

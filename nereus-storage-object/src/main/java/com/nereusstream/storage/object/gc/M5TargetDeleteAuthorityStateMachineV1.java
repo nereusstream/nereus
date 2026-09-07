@@ -144,8 +144,12 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
 
     /** CAS-1 candidate: closes every writer and grants no external dispatch authority. */
     public static TargetDeleteAuthorityV1 prepareIdentityRead(
-            TargetDeleteAuthorityV1 current, Sha256Digest attemptIdSha256) {
+            TargetDeleteAuthorityV1 current, Sha256Digest attemptIdSha256, DeleteObservationContextV2 context) {
         requireOpen(current);
+        Objects.requireNonNull(context, "context");
+        if (context.observationEpoch() != 1 || context.predecessorOwnerFenced().isPresent()) {
+            throw new IllegalArgumentException("CAS-1 requires initial observation epoch without a predecessor");
+        }
         M5TargetDeleteAuthorityRecordsV1.requireDigest(attemptIdSha256, "attemptIdSha256");
         if (!current.activeWriterTickets().isEmpty()) {
             throw new IllegalStateException("active or unresolved writer ticket vetoes CAS-1");
@@ -161,7 +165,8 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 fenceEpoch,
                 Sha256Digest.hash(M5TargetDeleteAuthorityCodecV1.encodeAuthority(current)),
                 current.proofSnapshotDigest(),
-                eligibilityRootSha256);
+                eligibilityRootSha256,
+                context);
         return M5TargetDeleteAuthorityCodecV1.successor(
                 current,
                 TargetDeleteAuthorityStateV1.READ_FENCED_V1,
@@ -174,18 +179,67 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 Optional.empty());
     }
 
+    /** Keeps admission closed while replacing all observation evidence at one exact successor revision. */
+    public static TargetDeleteAuthorityV1 refreshIdentityRead(
+            TargetDeleteAuthorityV1 current,
+            DeleteObservationContextV2 successor,
+            DeleteEligibilitySnapshotV2 snapshot) {
+        requireState(current, TargetDeleteAuthorityStateV1.READ_FENCED_V1);
+        Objects.requireNonNull(successor, "successor");
+        Objects.requireNonNull(snapshot, "snapshot");
+        TargetReadFenceV1 previous = current.readFence().orElseThrow();
+        DeleteObservationContextV2 previousContext = previous.observationContext();
+        boolean ownerChanged = !previousContext.coordinatorOwner().equals(successor.coordinatorOwner());
+        long revision = Math.addExact(current.authorityRevision(), 1);
+        if (successor.observationEpoch() != Math.addExact(previousContext.observationEpoch(), 1)
+                || ownerChanged != successor.predecessorOwnerFenced().isPresent()
+                || snapshot.generation() != revision
+                || !snapshot.resource().equals(current.target().resourceId())) {
+            throw new IllegalArgumentException(
+                    "read refresh has a stale epoch/revision/resource or lacks owner fencing");
+        }
+        TargetReadFenceV1 fence = new TargetReadFenceV1(
+                previous.attemptIdSha256(),
+                revision,
+                previous.fenceEpoch(),
+                previous.openAuthorityValueSha256(),
+                snapshot.sha256(),
+                snapshot.sha256(),
+                successor);
+        return M5TargetDeleteAuthorityCodecV1.finalizeAuthority(new TargetDeleteAuthorityV1(
+                current.authorityKey(),
+                current.target(),
+                revision,
+                Optional.of(Sha256Digest.hash(M5TargetDeleteAuthorityCodecV1.encodeAuthority(current))),
+                TargetDeleteAuthorityStateV1.READ_FENCED_V1,
+                current.closedWriterFenceEpoch(),
+                current.writerEnrollment(),
+                snapshot.sha256(),
+                Optional.of(snapshot),
+                List.of(),
+                Optional.of(fence),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                zeroDigest()));
+    }
+
     /** CAS-2 candidate: binds one exact observation, fixed attempt, owner fence, and dispatch token. */
     public static TargetDeleteAuthorityV1 bindDeleteIntent(
             TargetDeleteAuthorityV1 current,
             ExactExternalIdentityV1 externalIdentity,
-            Sha256Digest deleteAttemptIdSha256,
-            Sha256Digest dispatchOwnerFenceSha256,
-            Sha256Digest capabilityDigestSha256) {
+            Sha256Digest deleteAttemptIdSha256) {
         requireState(current, TargetDeleteAuthorityStateV1.READ_FENCED_V1);
         Objects.requireNonNull(externalIdentity, "externalIdentity");
-        if (externalIdentity.targetKind() != current.target().targetKind()) {
-            throw new IllegalArgumentException("external identity belongs to another target kind");
+        if (!externalIdentity.resourceId().equals(current.target().resourceId())
+                || !externalIdentity
+                        .fencedAuthoritySha256()
+                        .equals(Sha256Digest.hash(M5TargetDeleteAuthorityCodecV1.encodeAuthority(current)))) {
+            throw new IllegalArgumentException("external identity belongs to another resource or observation epoch");
         }
+        DeleteObservationContextV2 context = current.readFence().orElseThrow().observationContext();
+        Sha256Digest dispatchOwnerFenceSha256 = context.coordinatorOwner().valueSha256();
+        Sha256Digest capabilityDigestSha256 = context.capability().valueSha256();
         M5TargetDeleteAuthorityRecordsV1.requireDigest(deleteAttemptIdSha256, "deleteAttemptIdSha256");
         M5TargetDeleteAuthorityRecordsV1.requireDigest(dispatchOwnerFenceSha256, "dispatchOwnerFenceSha256");
         M5TargetDeleteAuthorityRecordsV1.requireDigest(capabilityDigestSha256, "capabilityDigestSha256");

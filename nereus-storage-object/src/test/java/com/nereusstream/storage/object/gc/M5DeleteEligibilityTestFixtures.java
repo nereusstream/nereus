@@ -58,6 +58,29 @@ import java.util.Optional;
 final class M5DeleteEligibilityTestFixtures {
     private M5DeleteEligibilityTestFixtures() {}
 
+    static DeleteObservationContextV2 observation() {
+        return new DeleteObservationContextV2(
+                1, fact("/dispatch/owner/one"), fact("/dispatch/capability/one"), Optional.empty());
+    }
+
+    static DeleteObservationAuthorityVerifierV2 syntheticObservationVerifier() {
+        return new DeleteObservationAuthorityVerifierV2() {
+            @Override
+            public java.util.concurrent.CompletionStage<Void> requireCurrent(
+                    PhysicalResourceIdV2 resource, DeleteObservationContextV2 current) {
+                return java.util.concurrent.CompletableFuture.completedFuture(null);
+            }
+
+            @Override
+            public java.util.concurrent.CompletionStage<Void> requirePredecessorFenced(
+                    PhysicalResourceIdV2 resource,
+                    DeleteObservationContextV2 previous,
+                    DeleteObservationContextV2 successor) {
+                return java.util.concurrent.CompletableFuture.completedFuture(null);
+            }
+        };
+    }
+
     static DeleteEligibilitySnapshotV2 replacement(PhysicalResourceIdV2 resource, long generation) {
         return snapshot(
                 resource, ReclamationReason.REPLACED_REPRESENTATION, generation, 0, PositionDomain.KAFKA_OFFSET);

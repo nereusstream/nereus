@@ -22,7 +22,7 @@
     "hashDomain": "NEREUS_V2_M5_PHYSICAL_RESOURCE_V2"
   },
   "authorityKey": "v2/physical-delete-m5-v2/<PhysicalResourceIdSha256>/authority-v2",
-  "authorityWireVersion": 3,
+  "authorityWireVersion": 4,
   "mutableContextInKey": false,
   "objectFormatRoleInKey": false,
   "legacyOpaqueAuthorityAdmitted": false,

@@ -76,7 +76,7 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
         ALREADY_ABSENT_EXACT_V1
     }
 
-    /** Typed immutable resource. Historical V1 opaque targets are not accepted by the version-2 wire. */
+    /** Typed immutable resource. Historical opaque targets are not accepted by the current wire. */
     public record PhysicalDeleteTargetV1(PhysicalResourceIdV2 resourceId, Sha256Digest targetIdentitySha256) {
         public PhysicalDeleteTargetV1 {
             Objects.requireNonNull(resourceId, "resourceId");
@@ -143,7 +143,8 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             long fenceEpoch,
             Sha256Digest openAuthorityValueSha256,
             Sha256Digest proofSnapshotDigest,
-            Sha256Digest eligibilityRootSha256) {
+            Sha256Digest eligibilityRootSha256,
+            DeleteObservationContextV2 observationContext) {
         public TargetReadFenceV1 {
             requireDigest(attemptIdSha256, "attemptIdSha256");
             requirePositive(fencedAuthorityRevision, "fencedAuthorityRevision");
@@ -151,36 +152,52 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             requireDigest(openAuthorityValueSha256, "openAuthorityValueSha256");
             requireDigest(proofSnapshotDigest, "proofSnapshotDigest");
             requireDigest(eligibilityRootSha256, "eligibilityRootSha256");
+            Objects.requireNonNull(observationContext, "observationContext");
         }
     }
 
     /** Exact target-specific identity observation made only after CAS-1. */
     public record ExactExternalIdentityV1(
-            PhysicalDeleteTargetKindV1 targetKind,
+            PhysicalResourceIdV2 resourceId,
+            Sha256Digest fencedAuthoritySha256,
             ExternalIdentityObservationV1 observation,
             CanonicalBytes exactIdentityBytes,
             Sha256Digest externalIdentitySha256) {
         public ExactExternalIdentityV1 {
-            Objects.requireNonNull(targetKind, "targetKind");
+            Objects.requireNonNull(resourceId, "resourceId");
+            requireDigest(fencedAuthoritySha256, "fencedAuthoritySha256");
             Objects.requireNonNull(observation, "observation");
             requireBytes(exactIdentityBytes, MAX_EXTERNAL_IDENTITY_BYTES, "exactIdentityBytes");
             requireDigest(externalIdentitySha256, "externalIdentitySha256");
-            Sha256Digest expected =
-                    M5TargetDeleteAuthorityKeysV1.externalIdentitySha256(targetKind, observation, exactIdentityBytes);
+            Sha256Digest expected = M5TargetDeleteAuthorityKeysV1.externalIdentitySha256(
+                    resourceId, fencedAuthoritySha256, observation, exactIdentityBytes);
             if (!externalIdentitySha256.equals(expected)) {
                 throw new IllegalArgumentException("external identity SHA-256 differs from its exact observation");
             }
         }
 
         public static ExactExternalIdentityV1 create(
-                PhysicalDeleteTargetKindV1 targetKind,
+                TargetDeleteAuthorityV1 exactFencedAuthority,
                 ExternalIdentityObservationV1 observation,
                 CanonicalBytes exactIdentityBytes) {
+            Objects.requireNonNull(exactFencedAuthority, "exactFencedAuthority");
+            if (exactFencedAuthority.state() != TargetDeleteAuthorityStateV1.READ_FENCED_V1) {
+                throw new IllegalArgumentException("external observation requires exact READ_FENCED authority");
+            }
+            PhysicalResourceIdV2 resource = exactFencedAuthority.target().resourceId();
+            Sha256Digest fencedSha =
+                    Sha256Digest.hash(M5TargetDeleteAuthorityCodecV1.encodeAuthority(exactFencedAuthority));
             return new ExactExternalIdentityV1(
-                    targetKind,
+                    resource,
+                    fencedSha,
                     observation,
                     exactIdentityBytes,
-                    M5TargetDeleteAuthorityKeysV1.externalIdentitySha256(targetKind, observation, exactIdentityBytes));
+                    M5TargetDeleteAuthorityKeysV1.externalIdentitySha256(
+                            resource, fencedSha, observation, exactIdentityBytes));
+        }
+
+        public PhysicalDeleteTargetKindV1 targetKind() {
+            return PhysicalDeleteTargetV1.create(resourceId).targetKind();
         }
     }
 
@@ -336,6 +353,15 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
         if (state != TargetDeleteAuthorityStateV1.OPEN_V1 && !activeWriterTickets.isEmpty()) {
             throw new IllegalArgumentException("writer tickets may exist only while target authority is OPEN_V1");
         }
+        if (readFence.isPresent()) {
+            TargetReadFenceV1 fence = readFence.orElseThrow();
+            if (fence.fencedAuthorityRevision() > authorityRevision
+                    || fence.fenceEpoch() != closedWriterFenceEpoch
+                    || !fence.proofSnapshotDigest().equals(proofSnapshotDigest)
+                    || !fence.eligibilityRootSha256().equals(proofSnapshotDigest)) {
+                throw new IllegalArgumentException("stored read fence differs from the qualified authority");
+            }
+        }
         switch (state) {
             case OPEN_V1 -> {
                 if (closedWriterFenceEpoch != 0 || hasRead || hasExternal || hasIntent || hasDone) {
@@ -395,8 +421,8 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             TargetReadFenceV1 readFence,
             ExactExternalIdentityV1 external,
             TargetDeleteIntentV1 intent) {
-        if (external.targetKind() != target.targetKind()) {
-            throw new IllegalArgumentException("external identity target kind differs");
+        if (!external.resourceId().equals(target.resourceId())) {
+            throw new IllegalArgumentException("external identity resource differs");
         }
         if (intent.intentAuthorityRevision() <= readFence.fencedAuthorityRevision()
                 || intent.intentAuthorityRevision() > authorityRevision

@@ -20,7 +20,6 @@ import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExternalIdentityObservationV1;
-import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.PhysicalDeleteTargetKindV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.PhysicalDeleteTargetV1;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -30,7 +29,7 @@ import java.util.Objects;
 /** Domain-separated target identities, authority keys, and dispatch-token roots for M5-D. */
 public final class M5TargetDeleteAuthorityKeysV1 {
     private static final CanonicalBytes EXTERNAL_IDENTITY_DOMAIN =
-            CanonicalUtf8.fromString("NEREUS_V2_M5_EXTERNAL_DELETE_IDENTITY_V1").bytes();
+            CanonicalUtf8.fromString("NEREUS_V2_M5_EXTERNAL_DELETE_IDENTITY_V2").bytes();
     private static final CanonicalBytes DISPATCH_TOKEN_DOMAIN =
             CanonicalUtf8.fromString("NEREUS_V2_M5_DELETE_DISPATCH_TOKEN_V1").bytes();
 
@@ -50,10 +49,12 @@ public final class M5TargetDeleteAuthorityKeysV1 {
     }
 
     public static Sha256Digest externalIdentitySha256(
-            PhysicalDeleteTargetKindV1 targetKind,
+            PhysicalResourceIdV2 resourceId,
+            Sha256Digest fencedAuthoritySha256,
             ExternalIdentityObservationV1 observation,
             CanonicalBytes exactExternalIdentity) {
-        Objects.requireNonNull(targetKind, "targetKind");
+        Objects.requireNonNull(resourceId, "resourceId");
+        M5TargetDeleteAuthorityRecordsV1.requireDigest(fencedAuthoritySha256, "fencedAuthoritySha256");
         Objects.requireNonNull(observation, "observation");
         M5TargetDeleteAuthorityRecordsV1.requireBytes(
                 exactExternalIdentity,
@@ -61,7 +62,8 @@ public final class M5TargetDeleteAuthorityKeysV1 {
                 "exactExternalIdentity");
         return hash(output -> {
             writeBytes(output, EXTERNAL_IDENTITY_DOMAIN);
-            output.writeByte(targetKind.ordinal());
+            writeBytes(output, resourceId.canonicalBytes());
+            writeDigest(output, fencedAuthoritySha256);
             output.writeByte(observation.ordinal());
             writeBytes(output, exactExternalIdentity);
         });

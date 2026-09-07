@@ -20,6 +20,7 @@ TRANSITIONS = [
     "ACQUIRE_WRITER_TICKET",
     "COMPLETE_WRITER_TICKET_AFTER_EXACT_RECONCILIATION",
     "CAS_1_PREPARE_IDENTITY_READ",
+    "REFRESH_READ_FENCED_AFTER_NATIVE_OWNER_VERIFICATION",
     "CAS_2_BIND_DELETE_INTENT",
     "TAKE_OVER_DISPATCH_AFTER_OLD_OWNER_FENCED",
     "COMPLETE_DELETE_DONE",
@@ -111,7 +112,7 @@ def validate_projection_value(value: object) -> None:
     if value.get("sequentialMultiKeyEmulation") is not False:
         raise TargetAuthorityCoordinatorError("projection permits sequential multi-key emulation")
     if value.get("focusedTests") != {
-        "coordinatorAndGuardTests": 12,
+        "coordinatorAndGuardTests": 19,
         "failures": 0,
         "errors": 0,
         "skipped": 0,

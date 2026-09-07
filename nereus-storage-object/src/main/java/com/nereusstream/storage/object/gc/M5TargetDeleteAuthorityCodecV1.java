@@ -22,7 +22,6 @@ import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdCodecV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.DeleteTerminalOutcomeV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExactExternalIdentityV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExternalIdentityObservationV1;
-import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.PhysicalDeleteTargetKindV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.PhysicalDeleteTargetV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterClassV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterEnrollmentV1;
@@ -45,7 +44,7 @@ import java.util.Optional;
 /** Strict canonical M5DA wire codec for one permanent target-scoped delete-authority value. */
 public final class M5TargetDeleteAuthorityCodecV1 {
     private static final int MAGIC = 0x4d354441; // M5DA
-    private static final int VERSION = 3;
+    private static final int VERSION = 4;
     private static final Sha256Digest PLACEHOLDER = Sha256Digest.copyOf(new byte[Sha256Digest.LENGTH]);
 
     private M5TargetDeleteAuthorityCodecV1() {}
@@ -147,14 +146,13 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                             input.readLong(),
                             readDigest(input),
                             readDigest(input),
-                            readDigest(input)))
+                            readDigest(input),
+                            readObservationContext(input)))
                     : Optional.empty();
             Optional<ExactExternalIdentityV1> externalIdentity = input.readBoolean()
                     ? Optional.of(new ExactExternalIdentityV1(
-                            enumValue(
-                                    PhysicalDeleteTargetKindV1.values(),
-                                    input.readUnsignedByte(),
-                                    "external target kind"),
+                            PhysicalResourceIdCodecV2.decode(readBytes(input, 65536, "external physical resource")),
+                            readDigest(input),
                             enumValue(
                                     ExternalIdentityObservationV1.values(),
                                     input.readUnsignedByte(),
@@ -273,11 +271,13 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                 writeDigest(output, fence.openAuthorityValueSha256());
                 writeDigest(output, fence.proofSnapshotDigest());
                 writeDigest(output, fence.eligibilityRootSha256());
+                writeObservationContext(output, fence.observationContext());
             }
             output.writeBoolean(value.externalIdentity().isPresent());
             if (value.externalIdentity().isPresent()) {
                 ExactExternalIdentityV1 identity = value.externalIdentity().orElseThrow();
-                output.writeByte(identity.targetKind().ordinal());
+                writeBytes(output, identity.resourceId().canonicalBytes());
+                writeDigest(output, identity.fencedAuthoritySha256());
                 output.writeByte(identity.observation().ordinal());
                 writeBytes(output, identity.exactIdentityBytes());
                 writeDigest(output, identity.externalIdentitySha256());
@@ -310,6 +310,26 @@ public final class M5TargetDeleteAuthorityCodecV1 {
             }
             writeDigest(output, value.authorityCanonicalSha256());
         });
+    }
+
+    private static void writeObservationContext(DataOutputStream out, DeleteObservationContextV2 context)
+            throws IOException {
+        out.writeLong(context.observationEpoch());
+        DeleteEligibilityCodecV2.writeFact(out, context.coordinatorOwner());
+        DeleteEligibilityCodecV2.writeFact(out, context.capability());
+        out.writeBoolean(context.predecessorOwnerFenced().isPresent());
+        if (context.predecessorOwnerFenced().isPresent()) {
+            DeleteEligibilityCodecV2.writeFact(
+                    out, context.predecessorOwnerFenced().orElseThrow());
+        }
+    }
+
+    private static DeleteObservationContextV2 readObservationContext(DataInputStream in) throws IOException {
+        return new DeleteObservationContextV2(
+                in.readLong(),
+                DeleteEligibilityCodecV2.readFact(in),
+                DeleteEligibilityCodecV2.readFact(in),
+                in.readBoolean() ? Optional.of(DeleteEligibilityCodecV2.readFact(in)) : Optional.empty());
     }
 
     private static void writeEnrollment(DataOutputStream output, ProofBoundWriterEnrollmentV1 value)

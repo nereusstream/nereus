@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""Validate bounded READ_FENCED recovery without claiming native integration or dispatch."""
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+PROJECTION = "docs/v2/detailed_design/m5/m5-read-fenced-recovery-projection.json"
+EXPECTED = {
+  "schema": "NEREUS_V2_M5_READ_FENCED_RECOVERY_PROJECTION_V2",
+  "status": "IMPLEMENTED_OBSERVATION_RECOVERY_NON_PROMOTABLE",
+  "authorityWireVersion": 4,
+  "observationBinding": [
+    "PHYSICAL_RESOURCE",
+    "EXACT_FENCED_AUTHORITY_SHA256",
+    "READ_ATTEMPT",
+    "OBSERVATION_EPOCH",
+    "COORDINATOR_OWNER_FACT",
+    "CAPABILITY_FACT",
+    "ELIGIBILITY_SNAPSHOT"
+  ],
+  "recovery": {
+    "exactSameKeyCas": True,
+    "refreshRequiresExactNextRevisionAndEpoch": True,
+    "closedAdmissionNeverReopens": True,
+    "resourceAndReadAttemptRemainFixed": True,
+    "ownerChangeRequiresNativeFencingVerifier": True,
+    "missingNativeVerifierRejectsCas1AndCas2": True,
+    "fullFactVectorReread": True,
+    "oldObservationCanBindNewEpoch": False,
+    "sameOwnerCapabilityRefreshSupported": True,
+    "failedRefreshPreservesPredecessor": True,
+    "cas2DerivesOwnerAndCapabilityFromFence": True,
+    "timeoutClearsFence": False
+  },
+  "focusedTests": {
+    "coordinatorAndGuardTests": 19,
+    "newObservationRecoveryTests": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "nativeProtocolOwnerAdaptersIntegrated": False,
+  "externalFullIdentityReaderIntegrated": False,
+  "durableRecoveryVetoRecordImplemented": False,
+  "intentTakeoverCapabilityRefreshIntegrated": False,
+  "realOxiaRecoveryExecutionPresent": False,
+  "completePhysicalDeleteComposition": False,
+  "sourceBoundReceiptPresent": False,
+  "physicalDeleteAuthority": False,
+  "productionAuthority": False
+}
+
+def validate_projection(value):
+    if json.dumps(value, sort_keys=True) != json.dumps(EXPECTED, sort_keys=True):
+        raise ValueError("read-fenced recovery projection differs or overclaims authority")
+
+def validate(root):
+    validate_projection(json.loads((root / PROJECTION).read_text()))
+    base = root / "nereus-storage-object/src/main/java/com/nereusstream/storage/object/gc"
+    checks = {
+        "M5TargetDeleteAuthorityStateMachineV1.java": [
+            "refreshIdentityRead", "Math.addExact(previousContext.observationEpoch(), 1)",
+            "ownerChanged != successor.predecessorOwnerFenced().isPresent()",
+            "snapshot.generation() != revision", "previous.attemptIdSha256()",
+            "current.closedWriterFenceEpoch()", "externalIdentity.fencedAuthoritySha256()",
+            "another resource or observation epoch",
+            "context.coordinatorOwner().valueSha256()", "context.capability().valueSha256()"],
+        "M5TargetDeleteAuthorityCoordinatorV1.java": [
+            "DeleteObservationAuthorityVerifierV2.unsupported()", "observationAuthority.requirePredecessorFenced(",
+            "observationAuthority.requireCurrent(", "requireObservationAuthority(candidate)",
+            "requireObservationAuthority(exact.authority())", "observation and eligibility authority conflict"],
+        "M5TargetDeleteAuthorityCodecV1.java": [
+            "VERSION = 4", "writeObservationContext", "readObservationContext", "identity.fencedAuthoritySha256()"],
+        "M5TargetDeleteAuthorityRecordsV1.java": [
+            "PhysicalResourceIdV2 resourceId", "Sha256Digest fencedAuthoritySha256",
+            "DeleteObservationContextV2 observationContext"],
+        "DeleteObservationAuthorityVerifierV2.java": [
+            "UnsupportedOperationException", "native deletion observation authority is not installed",
+            "native deletion owner fencing is not installed"],
+    }
+    for name, literals in checks.items():
+        source = (base / name).read_text()
+        if any("".join(literal.split()) not in "".join(source.split()) for literal in literals):
+            raise ValueError("read-fenced recovery source omits required predicate: " + name)
+    print("PASS_V2_M5_READ_FENCED_RECOVERY_NON_PROMOTABLE")
+
+if __name__ == "__main__":
+    validate(ROOT)

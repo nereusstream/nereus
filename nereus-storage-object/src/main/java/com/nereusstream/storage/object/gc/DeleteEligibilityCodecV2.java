@@ -204,7 +204,7 @@ public final class DeleteEligibilityCodecV2 {
         return count;
     }
 
-    private static void writeFact(DataOutputStream out, AuthorityFactV1 fact) throws IOException {
+    static void writeFact(DataOutputStream out, AuthorityFactV1 fact) throws IOException {
         CanonicalBytes key = CanonicalUtf8.fromString(fact.key()).bytes();
         if (key.length() > MAX_FACT_COMPONENT_BYTES
                 || fact.metadataVersion().value().length() > MAX_FACT_COMPONENT_BYTES) {
@@ -215,7 +215,7 @@ public final class DeleteEligibilityCodecV2 {
         writeDigest(out, fact.valueSha256());
     }
 
-    private static AuthorityFactV1 readFact(DataInputStream in) throws IOException {
+    static AuthorityFactV1 readFact(DataInputStream in) throws IOException {
         return new AuthorityFactV1(
                 CanonicalUtf8.fromBytes(readBytes(in, MAX_FACT_COMPONENT_BYTES).toByteArray())
                         .value(),

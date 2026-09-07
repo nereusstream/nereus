@@ -52,7 +52,8 @@ class M5DeleteEligibilityV2Test {
         assertThat(DeleteEligibilityCodecV2.decode(DeleteEligibilityCodecV2.encode(snapshot)))
                 .isEqualTo(snapshot);
         var authority = M5TargetDeleteAuthorityStateMachineV1.open(target(), enrollment(), snapshot);
-        var fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(authority, digest("read-attempt"));
+        var fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                authority, digest("read-attempt"), M5DeleteEligibilityTestFixtures.observation());
         assertThat(fenced.eligibilitySnapshot()).contains(snapshot);
         assertThat(fenced.readFence().orElseThrow().eligibilityRootSha256()).isEqualTo(snapshot.sha256());
         assertThat(fenced.deleteIntent()).isEmpty();
@@ -229,8 +230,8 @@ class M5DeleteEligibilityV2Test {
     @Test
     void unqualifiedAuthorityAndPostWriterProofCannotEnterCas1UntilFreshTypedQualification() {
         var unqualified = M5TargetDeleteAuthorityStateMachineV1.open(target(), enrollment(), digest("unassessed"));
-        assertThatThrownBy(
-                        () -> M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(unqualified, digest("attempt")))
+        assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                        unqualified, digest("attempt"), M5DeleteEligibilityTestFixtures.observation()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("complete typed eligibility");
         var qualified = M5TargetDeleteAuthorityStateMachineV1.qualifyEligibility(
@@ -247,8 +248,8 @@ class M5DeleteEligibilityV2Test {
         var reconciled = M5TargetDeleteAuthorityStateMachineV1.completeWriterTicket(
                 acquired, ticket.operationIdSha256(), qualified.proofSnapshotDigest());
         assertThat(reconciled.eligibilitySnapshot()).isEmpty();
-        assertThatThrownBy(() ->
-                        M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(reconciled, digest("attempt-2")))
+        assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                        reconciled, digest("attempt-2"), M5DeleteEligibilityTestFixtures.observation()))
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.qualifyEligibility(reconciled, replacement()))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -256,7 +257,8 @@ class M5DeleteEligibilityV2Test {
         var refreshed = M5TargetDeleteAuthorityStateMachineV1.qualifyEligibility(
                 reconciled,
                 M5DeleteEligibilityTestFixtures.replacement(resource(), reconciled.authorityRevision() + 1));
-        assertThat(M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(refreshed, digest("attempt-3"))
+        assertThat(M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                                refreshed, digest("attempt-3"), M5DeleteEligibilityTestFixtures.observation())
                         .deleteIntent())
                 .isEmpty();
         assertThat(refreshed.authorityKey()).isEqualTo(unqualified.authorityKey());

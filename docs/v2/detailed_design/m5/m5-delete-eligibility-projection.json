@@ -7,7 +7,7 @@
     "maximumSnapshotBytes": 786432,
     "maximumMembers": 64,
     "maximumReplacements": 256,
-    "authorityWireVersion": 3
+    "authorityWireVersion": 4
   },
   "reasons": [
     "REPLACED_REPRESENTATION",

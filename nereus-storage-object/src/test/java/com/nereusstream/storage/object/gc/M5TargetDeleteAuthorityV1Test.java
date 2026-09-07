@@ -23,7 +23,6 @@ import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.DeleteTerminalOutcomeV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExactExternalIdentityV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExternalIdentityObservationV1;
-import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.PhysicalDeleteTargetKindV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.PhysicalDeleteTargetV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterClassV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterEnrollmentV1;
@@ -75,11 +74,13 @@ class M5TargetDeleteAuthorityV1Test {
         TargetDeleteAuthorityV1 ticketed = M5TargetDeleteAuthorityStateMachineV1.acquireWriterTicket(
                 open, ticket(open, ProofBoundWriterClassV1.LOGICAL_TRIM_RETENTION_FLOOR_V1, 11));
 
-        assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(ticketed, digest(20)))
+        assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                        ticketed, digest(20), M5DeleteEligibilityTestFixtures.observation()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ticket vetoes CAS-1");
 
-        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open, digest(20));
+        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                open, digest(20), M5DeleteEligibilityTestFixtures.observation());
         assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.acquireWriterTicket(
                         fenced, ticket(open, ProofBoundWriterClassV1.LOGICAL_TRIM_RETENTION_FLOOR_V1, 12)))
                 .isInstanceOf(IllegalStateException.class)
@@ -93,8 +94,8 @@ class M5TargetDeleteAuthorityV1Test {
         TargetDeleteAuthorityV1 open = open(1);
         TargetDeleteAuthorityV1 ticketCandidate = M5TargetDeleteAuthorityStateMachineV1.acquireWriterTicket(
                 open, ticket(open, ProofBoundWriterClassV1.REFERENCE_SHARED_PHYSICAL_MEMBER_V1, 13));
-        TargetDeleteAuthorityV1 fenceCandidate =
-                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open, digest(22));
+        TargetDeleteAuthorityV1 fenceCandidate = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                open, digest(22), M5DeleteEligibilityTestFixtures.observation());
 
         assertThat(ticketCandidate.predecessorAuthoritySha256()).isEqualTo(fenceCandidate.predecessorAuthoritySha256());
         assertThat(ticketCandidate.authorityRevision()).isEqualTo(fenceCandidate.authorityRevision());
@@ -104,10 +105,11 @@ class M5TargetDeleteAuthorityV1Test {
 
     @Test
     void cas2BindsExactIdentityAttemptOwnerAndDispatchToken() {
-        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open(1), digest(20));
+        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                open(1), digest(20), M5DeleteEligibilityTestFixtures.observation());
         ExactExternalIdentityV1 external = exactPresent(fenced, 30);
-        TargetDeleteAuthorityV1 intent = M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(
-                fenced, external, digest(31), digest(32), digest(33));
+        TargetDeleteAuthorityV1 intent =
+                M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(fenced, external, digest(31));
 
         assertThat(intent.state()).isEqualTo(TargetDeleteAuthorityStateV1.DELETE_INTENT_V1);
         assertThat(intent.authorityRevision()).isEqualTo(3);
@@ -124,17 +126,19 @@ class M5TargetDeleteAuthorityV1Test {
     }
 
     @Test
-    void intentCannotBindAnExternalIdentityFromAnotherTargetKind() {
-        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open(1), digest(20));
-        ExactExternalIdentityV1 ledgerIdentity = ExactExternalIdentityV1.create(
-                PhysicalDeleteTargetKindV1.BOOKKEEPER_LEDGER_V1,
+    void intentCannotBindAnExternalIdentityFromAnotherResource() {
+        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                open(1), digest(20), M5DeleteEligibilityTestFixtures.observation());
+        ExactExternalIdentityV1 foreignIdentity = ExactExternalIdentityV1.create(
+                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                        open(2), digest(20), M5DeleteEligibilityTestFixtures.observation()),
                 ExternalIdentityObservationV1.PRESENT_EXACT_V1,
-                bytes("ledger-1/fingerprint"));
+                bytes("foreign-object/full-identity"));
 
-        assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(
-                        fenced, ledgerIdentity, digest(31), digest(32), digest(33)))
+        assertThatThrownBy(() ->
+                        M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(fenced, foreignIdentity, digest(31)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("another target kind");
+                .hasMessageContaining("another resource");
     }
 
     @Test
@@ -200,13 +204,12 @@ class M5TargetDeleteAuthorityV1Test {
 
     @Test
     void exactInitialAbsenceCanOnlyCompleteAsAlreadyAbsent() {
-        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open(1), digest(20));
+        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                open(1), digest(20), M5DeleteEligibilityTestFixtures.observation());
         ExactExternalIdentityV1 absent = ExactExternalIdentityV1.create(
-                fenced.target().targetKind(),
-                ExternalIdentityObservationV1.ABSENT_EXACT_V1,
-                bytes("expected-object-version/absence-proof"));
-        TargetDeleteAuthorityV1 intent = M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(
-                fenced, absent, digest(31), digest(32), digest(33));
+                fenced, ExternalIdentityObservationV1.ABSENT_EXACT_V1, bytes("expected-object-version/absence-proof"));
+        TargetDeleteAuthorityV1 intent =
+                M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(fenced, absent, digest(31));
 
         assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.completeDelete(
                         intent, DeleteTerminalOutcomeV1.DELETED_EXACT_V1, digest(42), digest(43)))
@@ -252,11 +255,14 @@ class M5TargetDeleteAuthorityV1Test {
 
     @Test
     void oldOpaqueAuthorityWireCannotBeReinterpretedAsStableResourceAuthority() {
-        byte[] encoded = M5TargetDeleteAuthorityCodecV1.encodeAuthority(open(1)).toByteArray();
-        java.nio.ByteBuffer.wrap(encoded).putInt(4, 1);
-        assertThatThrownBy(() -> M5TargetDeleteAuthorityCodecV1.decodeAuthority(CanonicalBytes.copyOf(encoded)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("preamble differs");
+        for (int version : new int[] {1, 2, 3}) {
+            byte[] encoded =
+                    M5TargetDeleteAuthorityCodecV1.encodeAuthority(open(1)).toByteArray();
+            java.nio.ByteBuffer.wrap(encoded).putInt(4, version);
+            assertThatThrownBy(() -> M5TargetDeleteAuthorityCodecV1.decodeAuthority(CanonicalBytes.copyOf(encoded)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("preamble differs");
+        }
     }
 
     @Test
@@ -287,15 +293,14 @@ class M5TargetDeleteAuthorityV1Test {
     }
 
     private static TargetDeleteAuthorityV1 intent(int cell) {
-        TargetDeleteAuthorityV1 fenced =
-                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open(cell), digest(20));
-        return M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(
-                fenced, exactPresent(fenced, 30), digest(31), digest(32), digest(33));
+        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
+                open(cell), digest(20), M5DeleteEligibilityTestFixtures.observation());
+        return M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(fenced, exactPresent(fenced, 30), digest(31));
     }
 
     private static ExactExternalIdentityV1 exactPresent(TargetDeleteAuthorityV1 value, int suffix) {
         return ExactExternalIdentityV1.create(
-                value.target().targetKind(),
+                value,
                 ExternalIdentityObservationV1.PRESENT_EXACT_V1,
                 bytes("object/version-" + suffix + "/length/body/root/footer"));
     }

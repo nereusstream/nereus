@@ -30,7 +30,6 @@ import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1.O
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.DeleteTerminalOutcomeV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExactExternalIdentityV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExternalIdentityObservationV1;
-import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.PhysicalDeleteTargetKindV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.PhysicalDeleteTargetV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterClassV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ProofBoundWriterEnrollmentV1;
@@ -54,16 +53,17 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     @Test
     void persistsEveryLifecycleTransitionAtOneKeyWithSameKeyCasOnly() {
         InMemoryStore store = new InMemoryStore();
-        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         VersionedValue open = create(coordinator, 1);
         VersionedValue fenced = coordinator
-                .prepareIdentityRead(open, digest(20))
+                .prepareIdentityRead(open, digest(20), M5DeleteEligibilityTestFixtures.observation())
                 .toCompletableFuture()
                 .join()
                 .observed()
                 .orElseThrow();
         VersionedValue intent = coordinator
-                .bindDeleteIntent(fenced, exactPresent(30), digest(31), digest(32), digest(33))
+                .bindDeleteIntent(fenced, exactPresent(fenced, 30), digest(31))
                 .toCompletableFuture()
                 .join()
                 .observed()
@@ -91,7 +91,8 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     @Test
     void responseUnknownAfterApplyReconcilesTheExactCandidate() {
         InMemoryStore store = new InMemoryStore();
-        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         TargetDeleteAuthorityV1 initial = open(1);
         store.nextCas = NextCas.RESPONSE_UNKNOWN_AFTER_APPLY;
 
@@ -104,12 +105,13 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     @Test
     void responseUnknownWithoutApplyLeavesTheExactPredecessorAndDoesNotAdvance() {
         InMemoryStore store = new InMemoryStore();
-        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         VersionedValue open = create(coordinator, 1);
         store.nextCas = NextCas.RESPONSE_UNKNOWN_WITHOUT_APPLY;
 
         var result = coordinator
-                .prepareIdentityRead(open, digest(20))
+                .prepareIdentityRead(open, digest(20), M5DeleteEligibilityTestFixtures.observation())
                 .toCompletableFuture()
                 .join();
 
@@ -121,7 +123,8 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     @Test
     void ticketWinningTheExactCasMakesTheCompetingFenceConflict() {
         InMemoryStore store = new InMemoryStore();
-        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         VersionedValue open = create(coordinator, 1);
         TargetDeleteAuthorityV1 decodedOpen = decode(open);
         ProofBoundWriterTicketV1 ticket = ticket(decodedOpen, 40);
@@ -131,7 +134,7 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                 .toCompletableFuture()
                 .join();
         var fenceResult = coordinator
-                .prepareIdentityRead(open, digest(20))
+                .prepareIdentityRead(open, digest(20), M5DeleteEligibilityTestFixtures.observation())
                 .toCompletableFuture()
                 .join();
 
@@ -143,12 +146,13 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     @Test
     void missingPermanentAuthorityAfterTransitionAttemptQuarantines() {
         InMemoryStore store = new InMemoryStore();
-        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         VersionedValue open = create(coordinator, 1);
         store.nextCas = NextCas.REMOVE_AND_RESPONSE_UNKNOWN;
 
         var result = coordinator
-                .prepareIdentityRead(open, digest(20))
+                .prepareIdentityRead(open, digest(20), M5DeleteEligibilityTestFixtures.observation())
                 .toCompletableFuture()
                 .join();
 
@@ -159,7 +163,8 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     @Test
     void writerGuardDispatchesOnlyAfterTicketIsAuthoritativelyVisibleThenClearsIt() {
         InMemoryStore store = new InMemoryStore();
-        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         M5TargetDeleteWriterGuardV1 guard = new M5TargetDeleteWriterGuardV1(coordinator);
         VersionedValue open = create(coordinator, 1);
         ProofBoundWriterTicketV1 ticket = ticket(decode(open), 50);
@@ -186,7 +191,8 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     @Test
     void writerResponseLossRetainsTheDurableTicket() {
         InMemoryStore store = new InMemoryStore();
-        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         M5TargetDeleteWriterGuardV1 guard = new M5TargetDeleteWriterGuardV1(coordinator);
         VersionedValue open = create(coordinator, 1);
         ProofBoundWriterTicketV1 ticket = ticket(decode(open), 50);
@@ -205,10 +211,14 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     @Test
     void fenceWinningFirstPreventsGuardedExternalWriterDispatch() {
         InMemoryStore store = new InMemoryStore();
-        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         M5TargetDeleteWriterGuardV1 guard = new M5TargetDeleteWriterGuardV1(coordinator);
         VersionedValue open = create(coordinator, 1);
-        coordinator.prepareIdentityRead(open, digest(20)).toCompletableFuture().join();
+        coordinator
+                .prepareIdentityRead(open, digest(20), M5DeleteEligibilityTestFixtures.observation())
+                .toCompletableFuture()
+                .join();
         AtomicInteger calls = new AtomicInteger();
 
         var result = guard.execute(open, ticket(decode(open), 70), dispatch -> {
@@ -227,7 +237,8 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     @Test
     void malformedExistingValueAtPermanentKeyQuarantinesCreation() {
         InMemoryStore store = new InMemoryStore();
-        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         TargetDeleteAuthorityV1 initial = open(1);
         store.seed(initial.authorityKey(), bytes("foreign-value"));
 
@@ -240,8 +251,10 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     @Test
     void rediscoveryUnderDifferentProofAndOwnerUsesTheSamePersistedFence() {
         InMemoryStore store = new InMemoryStore();
-        M5TargetDeleteAuthorityCoordinatorV1 first = new M5TargetDeleteAuthorityCoordinatorV1(store);
-        M5TargetDeleteAuthorityCoordinatorV1 second = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        M5TargetDeleteAuthorityCoordinatorV1 first = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
+        M5TargetDeleteAuthorityCoordinatorV1 second = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         TargetDeleteAuthorityV1 original = open(1);
         VersionedValue created =
                 first.create(original).toCompletableFuture().join().observed().orElseThrow();
@@ -252,7 +265,9 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                 digest(113));
         assertThat(second.create(rediscovered).toCompletableFuture().join().outcome())
                 .isEqualTo(Outcome.DEFINITIVE_CONFLICT);
-        first.prepareIdentityRead(created, digest(114)).toCompletableFuture().join();
+        first.prepareIdentityRead(created, digest(114), M5DeleteEligibilityTestFixtures.observation())
+                .toCompletableFuture()
+                .join();
         var observed = second.read(rediscovered.authorityKey())
                 .toCompletableFuture()
                 .join()
@@ -274,7 +289,8 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     @Test
     void qualifierInstallsTypedSnapshotAtExactRevisionAndRejectsMissingNamespaceAuthority() {
         InMemoryStore store = new InMemoryStore();
-        var coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        var coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         var template = open(1);
         var unqualified =
                 M5TargetDeleteAuthorityStateMachineV1.open(template.target(), template.writerEnrollment(), digest(125));
@@ -296,7 +312,8 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
 
         InMemoryStore missing = new InMemoryStore();
         missing.values.remove("/physical-namespace");
-        var other = new M5TargetDeleteAuthorityCoordinatorV1(missing);
+        var other = new M5TargetDeleteAuthorityCoordinatorV1(
+                missing, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         assertThatThrownBy(() -> other.create(template).toCompletableFuture().join())
                 .hasRootCauseMessage("eligibility authority is absent: /physical-namespace");
         assertThat(missing.values).doesNotContainKey(template.authorityKey());
@@ -305,30 +322,272 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     @Test
     void changedSemanticOrReferenceAuthorityVetoesBothCasWindows() {
         InMemoryStore firstStore = new InMemoryStore();
-        var first = new M5TargetDeleteAuthorityCoordinatorV1(firstStore);
+        var first = new M5TargetDeleteAuthorityCoordinatorV1(
+                firstStore, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         var firstOpen = create(first, 1);
         firstStore.seed("/semantic/RECOVERY", bytes("changed recovery authority"));
-        assertThatThrownBy(() -> first.prepareIdentityRead(firstOpen, digest(126))
+        assertThatThrownBy(() -> first.prepareIdentityRead(
+                                firstOpen, digest(126), M5DeleteEligibilityTestFixtures.observation())
                         .toCompletableFuture()
                         .join())
                 .hasRootCauseMessage("eligibility authority changed: /semantic/RECOVERY");
         assertThat(firstStore.readNow(firstOpen.key())).isEqualTo(firstOpen);
 
         InMemoryStore secondStore = new InMemoryStore();
-        var second = new M5TargetDeleteAuthorityCoordinatorV1(secondStore);
+        var second = new M5TargetDeleteAuthorityCoordinatorV1(
+                secondStore, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
         var secondOpen = create(second, 1);
-        var fenced = second.prepareIdentityRead(secondOpen, digest(127))
+        var fenced = second.prepareIdentityRead(secondOpen, digest(127), M5DeleteEligibilityTestFixtures.observation())
                 .toCompletableFuture()
                 .join()
                 .observed()
                 .orElseThrow();
         secondStore.seed("/reference/READ_GENERATION_PIN_OR_OPEN_HANDLE", bytes("new source pin admission"));
-        assertThatThrownBy(() -> second.bindDeleteIntent(fenced, exactPresent(30), digest(31), digest(32), digest(33))
+        assertThatThrownBy(() -> second.bindDeleteIntent(fenced, exactPresent(fenced, 30), digest(31))
                         .toCompletableFuture()
                         .join())
                 .hasRootCauseMessage("eligibility authority changed: /reference/READ_GENERATION_PIN_OR_OPEN_HANDLE");
         assertThat(secondStore.readNow(fenced.key())).isEqualTo(fenced);
         assertThat(decode(fenced).deleteIntent()).isEmpty();
+    }
+
+    @Test
+    void readFencedTakeoverAfterRestartRejectsLateObservationAndNeverReopensWriters() {
+        var harness = new ObservationHarness();
+        VersionedValue oldFence = harness.fenced;
+        ExactExternalIdentityV1 late = exactPresent(oldFence, 141);
+        var snapshot = M5DeleteEligibilityTestFixtures.replacement(
+                decode(oldFence).target().resourceId(), 3);
+        var context = nextObservation(true);
+        harness.store.seedSnapshot(snapshot);
+        harness.store.seedObservation(context);
+        harness.store.nextCas = NextCas.RESPONSE_UNKNOWN_AFTER_APPLY;
+        var restarted = new M5TargetDeleteAuthorityCoordinatorV1(
+                harness.store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
+
+        var result = restarted
+                .refreshIdentityRead(oldFence, context, snapshot)
+                .toCompletableFuture()
+                .join();
+        assertThat(result.outcome()).isEqualTo(Outcome.EXISTING_EXACT);
+        VersionedValue fresh = result.observed().orElseThrow();
+        var decoded = decode(fresh);
+        assertThat(decoded.state()).isEqualTo(TargetDeleteAuthorityStateV1.READ_FENCED_V1);
+        assertThat(decoded.target()).isEqualTo(decode(oldFence).target());
+        assertThat(decoded.closedWriterFenceEpoch()).isEqualTo(decode(oldFence).closedWriterFenceEpoch());
+        assertThat(decoded.readFence().orElseThrow().attemptIdSha256())
+                .isEqualTo(decode(oldFence).readFence().orElseThrow().attemptIdSha256());
+        assertThat(decoded.readFence().orElseThrow().observationContext()).isEqualTo(context);
+        assertThat(decoded.externalIdentity()).isEmpty();
+        assertThatThrownBy(() -> restarted.bindDeleteIntent(fresh, late, digest(142)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("observation epoch");
+        assertThatThrownBy(() -> restarted.acquireWriterTicket(fresh, ticket(decoded, 143)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(restarted
+                        .bindDeleteIntent(oldFence, late, digest(144))
+                        .toCompletableFuture()
+                        .join()
+                        .outcome())
+                .isEqualTo(Outcome.DEFINITIVE_CONFLICT);
+        VersionedValue intent = restarted
+                .bindDeleteIntent(fresh, exactPresent(fresh, 145), digest(146))
+                .toCompletableFuture()
+                .join()
+                .observed()
+                .orElseThrow();
+        assertThat(decode(intent).deleteIntent().orElseThrow().dispatchOwnerFenceSha256())
+                .isEqualTo(context.coordinatorOwner().valueSha256());
+        assertThat(harness.store.casKeys).containsOnly(oldFence.key());
+        assertThat(harness.store.transactionCalls).isZero();
+    }
+
+    @Test
+    void readFencedRefreshResponseLossWithoutApplyRetainsPredecessorAndRetriesExactly() {
+        var harness = new ObservationHarness();
+        var context = nextObservation(true);
+        var snapshot = M5DeleteEligibilityTestFixtures.replacement(
+                decode(harness.fenced).target().resourceId(), 3);
+        harness.store.seedSnapshot(snapshot);
+        harness.store.seedObservation(context);
+        harness.store.nextCas = NextCas.RESPONSE_UNKNOWN_WITHOUT_APPLY;
+
+        var first = harness.coordinator
+                .refreshIdentityRead(harness.fenced, context, snapshot)
+                .toCompletableFuture()
+                .join();
+        assertThat(first.outcome()).isEqualTo(Outcome.PREDECESSOR_UNCHANGED);
+        assertThat(harness.store.readNow(harness.fenced.key())).isEqualTo(harness.fenced);
+        var retried = harness.coordinator
+                .refreshIdentityRead(harness.fenced, context, snapshot)
+                .toCompletableFuture()
+                .join();
+        assertThat(retried.outcome()).isEqualTo(Outcome.APPLIED_EXACT);
+        assertThat(retried.exactCandidate()).isEqualTo(first.exactCandidate());
+        assertThat(decode(retried.observed().orElseThrow()).deleteIntent()).isEmpty();
+    }
+
+    @Test
+    void nativeObservationAdapterIsRequiredEvenWhenEveryFactExists() {
+        var store = new InMemoryStore();
+        var coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        VersionedValue initial = create(coordinator, 1);
+        int calls = store.casCalls;
+
+        assertThatThrownBy(() -> coordinator
+                        .prepareIdentityRead(initial, digest(150), M5DeleteEligibilityTestFixtures.observation())
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseInstanceOf(UnsupportedOperationException.class);
+        assertThat(store.casCalls).isEqualTo(calls);
+        assertThat(store.readNow(initial.key())).isEqualTo(initial);
+    }
+
+    @Test
+    void nativeOwnerFenceRejectionVetoesTakeoverDespiteExistingReceiptBytes() {
+        var harness = new ObservationHarness();
+        var context = nextObservation(true);
+        var snapshot = M5DeleteEligibilityTestFixtures.replacement(
+                decode(harness.fenced).target().resourceId(), 3);
+        harness.store.seedSnapshot(snapshot);
+        harness.store.seedObservation(context);
+        var verifier = new DeleteObservationAuthorityVerifierV2() {
+            @Override
+            public CompletionStage<Void> requireCurrent(
+                    PhysicalResourceIdV2 resource, DeleteObservationContextV2 current) {
+                return CompletableFuture.completedFuture(null);
+            }
+
+            @Override
+            public CompletionStage<Void> requirePredecessorFenced(
+                    PhysicalResourceIdV2 resource,
+                    DeleteObservationContextV2 previous,
+                    DeleteObservationContextV2 successor) {
+                return CompletableFuture.failedFuture(
+                        new IllegalStateException("native previous owner is still active"));
+            }
+        };
+        var successor = new M5TargetDeleteAuthorityCoordinatorV1(harness.store, verifier);
+        int calls = harness.store.casCalls;
+
+        assertThatThrownBy(() -> successor
+                        .refreshIdentityRead(harness.fenced, context, snapshot)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("native previous owner is still active");
+        assertThat(harness.store.casCalls).isEqualTo(calls);
+        assertThat(harness.store.readNow(harness.fenced.key())).isEqualTo(harness.fenced);
+    }
+
+    @Test
+    void capabilityRevocationBeforeCas2AndStaleRefreshKeepTheReadFenceClosed() {
+        var harness = new ObservationHarness();
+        var context = M5DeleteEligibilityTestFixtures.observation();
+        harness.store.seed(context.capability().key(), bytes("revoked"));
+        int calls = harness.store.casCalls;
+        assertThatThrownBy(() -> harness.coordinator
+                        .bindDeleteIntent(harness.fenced, exactPresent(harness.fenced, 151), digest(152))
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage(
+                        "eligibility authority changed: " + context.capability().key());
+        assertThat(harness.store.casCalls).isEqualTo(calls);
+        assertThat(harness.store.readNow(harness.fenced.key())).isEqualTo(harness.fenced);
+
+        var next = nextObservation(true);
+        var snapshot = M5DeleteEligibilityTestFixtures.replacement(
+                decode(harness.fenced).target().resourceId(), 3);
+        harness.store.seedObservation(next);
+        harness.store.seed("/semantic/RECOVERY", bytes("replacement no longer covers recovery"));
+        assertThatThrownBy(() -> harness.coordinator
+                        .refreshIdentityRead(harness.fenced, next, snapshot)
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("eligibility authority changed: /semantic/RECOVERY");
+        assertThat(harness.store.casCalls).isEqualTo(calls);
+        assertThat(harness.store.readNow(harness.fenced.key())).isEqualTo(harness.fenced);
+    }
+
+    @Test
+    void sameOwnerCapabilityRefreshAdvancesEpochAndBindsOnlyNewObservation() {
+        var harness = new ObservationHarness();
+        var old = M5DeleteEligibilityTestFixtures.observation();
+        var context = new DeleteObservationContextV2(
+                2,
+                old.coordinatorOwner(),
+                M5DeleteEligibilityTestFixtures.fact("/dispatch/capability/two"),
+                Optional.empty());
+        var snapshot = M5DeleteEligibilityTestFixtures.replacement(
+                decode(harness.fenced).target().resourceId(), 3);
+        harness.store.seedSnapshot(snapshot);
+        harness.store.seedObservation(context);
+        VersionedValue refreshed = harness.coordinator
+                .refreshIdentityRead(harness.fenced, context, snapshot)
+                .toCompletableFuture()
+                .join()
+                .observed()
+                .orElseThrow();
+        assertThatThrownBy(() ->
+                        harness.coordinator.bindDeleteIntent(refreshed, exactPresent(harness.fenced, 153), digest(154)))
+                .isInstanceOf(IllegalArgumentException.class);
+        VersionedValue intent = harness.coordinator
+                .bindDeleteIntent(refreshed, exactPresent(refreshed, 155), digest(156))
+                .toCompletableFuture()
+                .join()
+                .observed()
+                .orElseThrow();
+        assertThat(decode(intent).deleteIntent().orElseThrow().capabilityDigestSha256())
+                .isEqualTo(context.capability().valueSha256());
+    }
+
+    @Test
+    void readRefreshRejectsMissingFencingProofReusedEpochAndWrongSnapshotRevision() {
+        var harness = new ObservationHarness();
+        var previous = decode(harness.fenced);
+        var context = nextObservation(true);
+        var snapshot =
+                M5DeleteEligibilityTestFixtures.replacement(previous.target().resourceId(), 3);
+        var missing =
+                new DeleteObservationContextV2(2, context.coordinatorOwner(), context.capability(), Optional.empty());
+        var reused = new DeleteObservationContextV2(
+                1, context.coordinatorOwner(), context.capability(), context.predecessorOwnerFenced());
+        int calls = harness.store.casCalls;
+        assertThatThrownBy(() -> harness.coordinator.refreshIdentityRead(harness.fenced, missing, snapshot))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> harness.coordinator.refreshIdentityRead(harness.fenced, reused, snapshot))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> harness.coordinator.refreshIdentityRead(
+                        harness.fenced, context, previous.eligibilitySnapshot().orElseThrow()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(harness.store.casCalls).isEqualTo(calls);
+    }
+
+    private static DeleteObservationContextV2 nextObservation(boolean newOwner) {
+        var previous = M5DeleteEligibilityTestFixtures.observation();
+        return new DeleteObservationContextV2(
+                2,
+                newOwner ? M5DeleteEligibilityTestFixtures.fact("/dispatch/owner/two") : previous.coordinatorOwner(),
+                M5DeleteEligibilityTestFixtures.fact("/dispatch/capability/two"),
+                newOwner
+                        ? Optional.of(M5DeleteEligibilityTestFixtures.fact("/dispatch/owner/one-fenced"))
+                        : Optional.empty());
+    }
+
+    private static final class ObservationHarness {
+        private final InMemoryStore store = new InMemoryStore();
+        private final M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(
+                store, M5DeleteEligibilityTestFixtures.syntheticObservationVerifier());
+        private final VersionedValue fenced;
+
+        private ObservationHarness() {
+            fenced = coordinator
+                    .prepareIdentityRead(
+                            create(coordinator, 1), digest(140), M5DeleteEligibilityTestFixtures.observation())
+                    .toCompletableFuture()
+                    .join()
+                    .observed()
+                    .orElseThrow();
+        }
     }
 
     private static VersionedValue create(M5TargetDeleteAuthorityCoordinatorV1 coordinator, int cell) {
@@ -352,9 +611,9 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                 target, enrollment, M5DeleteEligibilityTestFixtures.replacement(target.resourceId(), 1));
     }
 
-    private static ExactExternalIdentityV1 exactPresent(int suffix) {
+    private static ExactExternalIdentityV1 exactPresent(VersionedValue fenced, int suffix) {
         return ExactExternalIdentityV1.create(
-                PhysicalDeleteTargetKindV1.OBJECT_VERSION_V1,
+                decode(fenced),
                 ExternalIdentityObservationV1.PRESENT_EXACT_V1,
                 bytes("object/version-" + suffix + "/length/body/root/footer"));
     }
@@ -394,17 +653,32 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
         private final Map<String, VersionedValue> values = new LinkedHashMap<>();
         private final java.util.Set<String> casKeys = new java.util.HashSet<>();
         private long version;
+        private int casCalls;
         private int transactionCalls;
         private NextCas nextCas = NextCas.NORMAL;
 
         InMemoryStore() {
             seedEligibility(open(1));
+            M5DeleteEligibilityTestFixtures.observation()
+                    .authorityFacts()
+                    .forEach(fact -> values.put(
+                            fact.key(), VersionedValue.of(fact.key(), bytes(fact.key()), fact.metadataVersion())));
         }
 
         void seedEligibility(TargetDeleteAuthorityV1 authority) {
             authority.eligibilitySnapshot().ifPresent(snapshot -> M5DeleteEligibilityTestFixtures.metadataValues(
                             snapshot)
                     .forEach(value -> values.put(value.key(), value)));
+        }
+
+        void seedSnapshot(DeleteEligibilitySnapshotV2 snapshot) {
+            M5DeleteEligibilityTestFixtures.metadataValues(snapshot).forEach(value -> values.put(value.key(), value));
+        }
+
+        void seedObservation(DeleteObservationContextV2 context) {
+            context.authorityFacts()
+                    .forEach(fact -> values.put(
+                            fact.key(), VersionedValue.of(fact.key(), bytes(fact.key()), fact.metadataVersion())));
         }
 
         synchronized VersionedValue seed(String key, CanonicalBytes value) {
@@ -426,6 +700,7 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
         public synchronized CompletionStage<MutationOutcome> compareAndSet(
                 Optional<VersionedValue> exactPredecessor, String key, CanonicalBytes exactCandidate) {
             casKeys.add(key);
+            casCalls++;
             Optional<VersionedValue> current = Optional.ofNullable(values.get(key));
             if (!current.equals(exactPredecessor)) {
                 return CompletableFuture.completedFuture(MutationOutcome.DEFINITIVE_CONFLICT);

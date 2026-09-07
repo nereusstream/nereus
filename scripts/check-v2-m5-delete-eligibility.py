@@ -13,7 +13,7 @@ EXPECTED = {'schema': 'NEREUS_V2_M5_DELETE_ELIGIBILITY_PROJECTION_V2',
           'maximumSnapshotBytes': 786432,
           'maximumMembers': 64,
           'maximumReplacements': 256,
-          'authorityWireVersion': 3},
+          'authorityWireVersion': 4},
  'reasons': ['REPLACED_REPRESENTATION', 'LOGICAL_EXPIRY', 'UNPUBLISHED_ARTIFACT'],
  'referenceScopes': ['LOGICAL_OBLIGATION', 'OLD_PHYSICAL_REFERENCE', 'BOTH'],
  'semanticAspects': ['READ_RESULTS',
@@ -66,7 +66,7 @@ def validate(root):
                  "snapshot.generation() != Math.addExact(current.authorityRevision(), 1)"]),
         (coordinator, ["requireFreshEligibility(snapshot)", "snapshot.authorityFacts()",
                        "eligibility authority changed", "eligibility authority is absent"]),
-        (codec, ["VERSION = 3", "DeleteEligibilityCodecV2.decode", "current.eligibilitySnapshot()",
+        (codec, ["VERSION = 4", "DeleteEligibilityCodecV2.decode", "current.eligibilitySnapshot()",
                  "tickets.isEmpty()", "DeleteEligibilityCodecV2.encode"]),
     ):
         if any(literal not in source for literal in literals):
@@ -74,8 +74,11 @@ def validate(root):
     for name in ("prepareIdentityRead", "bindDeleteIntent"):
         method = coordinator[coordinator.index("public CompletionStage<MutationResultV1> " + name):]
         method = method[:method.index("\n    public ", 1)]
-        if "requireFreshEligibility(" not in method:
+        if "requireObservationAuthority(" not in method:
             raise ValueError("CAS window no longer rereads the full eligibility vector")
+    verifier = coordinator[coordinator.index("private CompletionStage<Void> requireObservationAuthority"):]
+    if "authorityFacts()" not in verifier or "requireFreshFacts(List.copyOf(facts.values()))" not in verifier:
+        raise ValueError("CAS observation authority no longer includes the full eligibility vector")
     print("PASS_V2_M5_DELETE_ELIGIBILITY_NON_PROMOTABLE")
 
 

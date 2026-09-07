@@ -4,7 +4,7 @@
   "amendmentCommit": "8bd1484ba311bd44a531997b0d16357c5cde7b50",
   "wire": {
     "magic": "M5DA",
-    "version": 3,
+    "version": 4,
     "maximumAuthorityBytes": 1048576,
     "maximumTargetIdentityBytes": 65536,
     "maximumExternalIdentityBytes": 262144,

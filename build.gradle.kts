@@ -2174,6 +2174,30 @@ tasks.register("v2M5DeleteEligibilityCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5ReadFencedRecoverySourceCheck") {
+    group = "verification"
+    description = "Validate observation epochs, closed admission and required native owner verification."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-read-fenced-recovery.py")
+}
+
+tasks.register<Exec>("v2M5ReadFencedRecoveryContractTest") {
+    group = "verification"
+    description = "Reject READ_FENCED recovery predicate bypass and native integration overclaims."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-read-fenced-recovery-tests.py")
+}
+
+tasks.register("v2M5ReadFencedRecoveryCheck") {
+    group = "verification"
+    description = "Check READ_FENCED crash takeover and stale observation rejection; native adapters remain separate."
+    dependsOn(
+        "v2M5DeleteEligibilityCheck",
+        "v2M5ReadFencedRecoverySourceCheck",
+        "v2M5ReadFencedRecoveryContractTest",
+    )
+}
+
 tasks.register<Exec>("v2M5DesignSourceCheck") {
     group = "verification"
     description = "Validate the frozen M5 design manifest and prove implementation/evidence have not started."

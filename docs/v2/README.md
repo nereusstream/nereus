@@ -22,6 +22,8 @@ performance-first BookKeeper WAL.
   incomplete; historical focused PASS is not revised M5 Final.
   Stable physical identity and the three typed deletion-eligibility branches now pass the focused
   `v2M5DeleteEligibilityCheck`; real protocol proof production and complete deletion composition remain OPEN.
+  The subsequent READ_FENCED recovery slice adds owner/epoch-bound observations and a required native fencing
+  verifier; its focused gate cannot supply native owner integration or M5 Final evidence.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.
