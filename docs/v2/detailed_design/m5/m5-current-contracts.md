@@ -18,7 +18,7 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 | --- | --- | --- |
 | Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; native namespace/route admission and real dispatch remain OPEN |
 | Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; real protocol proof producers and full deletion composition remain OPEN |
-| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics feed the Object bridge and inventoried BK parts; typed sealed descriptor, exact M4 selector publication and descriptor-only BK recovery now exist; native namespace/task/read-source-plan admission, internal-topic lifecycle and cleanup remain OPEN |
+| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts, sealed descriptor publication and independent recovery exist; recovery now uses the existing M4 source planner and hazard kernel; native namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
 | Binding retirement | Bounded active selector plus authenticated immutable history | Earlier M5R1 retains permanent inline slots; root/folding/admission migration is OPEN |
 | Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; native owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
@@ -40,6 +40,11 @@ That writer slice requires expected output bodies for part reconciliation. The s
 [descriptor projection](m5-bookkeeper-descriptor-projection.json) adds KBSD2, exact M4 selection and independent
 read-only BK recovery without expected output or old-source bodies. Native namespace/task authority, M4 read-source-plan
 admission, real Oxia control, internal-topic lifecycle and physical deletion remain separate OPEN obligations.
+The [M4 recovery bridge projection](m5-bookkeeper-m4-recovery-projection.json) adds low-frequency descriptor recovery
+under the existing M4 planner and generation lease. Observer cancellation retains the lease through native termination;
+selector closure can install a successor while the old generation remains pinned. Recovered caches retain their exact
+captured authority. This bridge requires the owner's admitted current reference and Cell budget, and does not add
+ordinary-read remote control I/O or independently supply native protocol-owner admission.
 The carrier gate passed 60 executed tasks with 8 inventory/layout, 7 real carrier and 8 real Cell-session tests;
 its exact-native-run check now precedes fencing, including the foreign-run zero-fence negative case.
 

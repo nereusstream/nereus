@@ -211,7 +211,7 @@ class KafkaSealedBookKeeperDescriptorV2RealTest {
         }
     }
 
-    private static final class Context {
+    static final class Context {
         final Input input;
         final Store store = new Store();
         final RealBookKeeperCellSessionV1 writer;
@@ -241,6 +241,11 @@ class KafkaSealedBookKeeperDescriptorV2RealTest {
         }
 
         KafkaBookKeeperCompactionPublicationV2 publication(BookKeeperCellSession provider) {
+            return new KafkaBookKeeperCompactionPublicationV2(
+                    store, 7, input.plan().sourceCut().identity().binding(), reader(provider));
+        }
+
+        KafkaSealedBookKeeperReaderV2 reader(BookKeeperCellSession provider) {
             var inspector = new M5BookKeeperDeleteAdapterV1(
                     client, input.layout().task().capability(), new byte[0]);
             var readOnly = (BookKeeperCellSession) Proxy.newProxyInstance(
@@ -257,11 +262,7 @@ class KafkaSealedBookKeeperDescriptorV2RealTest {
                             throw failure.getCause();
                         }
                     });
-            return new KafkaBookKeeperCompactionPublicationV2(
-                    store,
-                    7,
-                    input.plan().sourceCut().identity().binding(),
-                    new KafkaSealedBookKeeperReaderV2(readOnly, inspector::captureExactTarget, 1_000_000));
+            return new KafkaSealedBookKeeperReaderV2(readOnly, inspector::captureExactTarget, 1_000_000);
         }
 
         PublicationOutcome publish() throws Exception {

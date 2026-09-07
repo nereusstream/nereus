@@ -253,7 +253,7 @@ class KafkaSealedBookKeeperDescriptorV2Test {
         assertThat(fixture.store.selectorCasCount).isZero();
     }
 
-    private static final class Fixture {
+    static final class Fixture {
         final KafkaBookKeeperCompactionTestSupportV2.Input input;
         final Store store = new Store();
         final Map<Long, List<CanonicalBytes>> entries = new LinkedHashMap<>();

@@ -243,6 +243,38 @@ reservation. This slice does not connect those native authorities, real Oxia, ac
 unpublished/replaced-source cleanup. It is not a native broker/controller activation, source-bound M5 child or Final.
 All 17 amended acceptance obligations and the M6/M7/M8 boundaries remain unchanged.
 
+## 2026-09-08 M4 source-plan and generation-lease recovery bridge
+
+Status: M4 kernel recovery bridge; native protocol-owner admission and ordinary protocol reads remain OPEN.
+
+The [M4 recovery bridge projection](m5-bookkeeper-m4-recovery-projection.json) follows published descriptor source
+`cbc1e6d5264617a5be78e667b3d83c8fe2d4bf14`. `KafkaBookKeeperM4RecoveryV2` captures the owner's current authority
+through `BindingReadAsyncExecutorV1` and `BindingReadHazardPoolV1`, derives the complete descriptor cut through the
+existing bounded `BindingReadPlannerV1`, and rejects any different Binding, epoch, protocol, view, descriptor or route
+before native IO. The exact BOOKKEEPER route covers the complete cut, including suppressed gaps, and has no fallback.
+Its projection is pure and grants no durable selection authority; the owner installs it only after exact durable
+selector reconciliation. Recovery uses no remote control metadata lookup or new durable read ticket.
+
+The outer generation lease remains live throughout native metadata/entry validation and complete cache reconstruction.
+Observer cancellation cannot cancel the underlying source stage or clear the lease. Native failure drains the actual
+attempt; an exhausted hazard pool or closed admission rejects before native IO. The existing selector runtime can
+close admission before its CAS, retain closure on an unknown response, and install an exact successor while the older
+recovery stays pinned. `RecoveryResult` carries the original captured authority so an old completion cannot be mistaken
+for a cache rebuilt under the successor. Native protocol cache installation must still reconcile this authority.
+
+Validation: `scripts/run-v2-m5-bookkeeper-m4-recovery-check.sh` ran `v2M5BookKeeperM4RecoveryCheck` with no
+configuration cache and all tasks rerun: **70/70 tasks passed**. The new suites contain **7 unit tests and 2 real BK
+tests**, with zero failures, errors or skips. The same run includes the preceding descriptor/carrier gates plus the
+M4 read-kernel and control-plane suites. Real BK callback delay preserves the old generation across exact selector
+closure until recovery completes; an empty native output recovers indexes and gaps without control metadata IO.
+The scoped local log is `/tmp/nereus-m5-bk-m4-recovery-gate.log`; it is not a source-bound M5 receipt.
+
+This bridge is for low-frequency selected-descriptor recovery. Ordinary reads must consume the recovered immutable
+protocol caches, not repeat full recovery or add per-read metadata checks. Cell cache/temporary-memory reservation,
+native protocol-owner/task/namespace admission, real Oxia composition, internal-topic lifecycle and cleanup remain
+required. The tests use actual M4 control/kernel code and source-locked native BK IO with synthetic source/control
+admission. They are not native broker activation, source-bound M5 children, physical-delete authority or Final.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;
@@ -690,7 +722,7 @@ source-locked real Oxia result, source-bound receipt, physical-delete, staging, 
 
 ## Remaining ordered work
 
-1. Connect the sealed-BK descriptor path to native M4 read/source-plan admission, internal-topic lifecycle,
+1. Connect the M4-protected sealed-BK recovery path to native protocol-owner admission, ordinary reads and internal-topic lifecycle,
    terminal task fencing and unpublished/replaced-output cleanup.
 2. Replace permanent inline retirement slots with authenticated immutable history, bounded active admission,
    exact folding CAS and replay/reuse rejection.

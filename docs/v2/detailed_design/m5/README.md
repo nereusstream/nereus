@@ -135,8 +135,9 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   record/disposition/gap/eight-index output. The Object bridge uses the same record compiler and independent validator;
   the [BK carrier projection](m5-bookkeeper-compaction-carrier-projection.json) adds inventoried native ledger
   allocation, sealing and exact part verification. The [BK descriptor projection](m5-bookkeeper-descriptor-projection.json)
-  adds typed sealed selection and descriptor-only recovery; native task/read admission, internal-topic lifecycle and
-  cleanup remain OPEN.
+  adds typed sealed selection and descriptor-only recovery. The [M4 recovery bridge](m5-bookkeeper-m4-recovery-projection.json)
+  protects low-frequency recovery with the existing source planner and generation lease; native protocol-owner/task
+  admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

@@ -321,3 +321,33 @@ tasks.register<Test>("v2M5BookKeeperDescriptorRealTest") {
         systemProperty("nereus.bookkeeper.metadataServiceUri", metadataServiceUri)
     }
 }
+
+tasks.register<Test>("v2M5BookKeeperM4RecoveryTest") {
+    group = "verification"
+    description = "Verify exact BK source plans and M4 leases through cancellation and selector closure."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("v2M5BookKeeperM4RecoveryRealTest") {
+    group = "verification"
+    description = "Verify real sealed BK recovery under native M4 generation leases."
+    testClassesDirs = realBookKeeperTest.output.classesDirs
+    classpath = realBookKeeperTest.runtimeClasspath
+    useJUnitPlatform()
+    maxParallelForks = 1
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperM4RecoveryV2RealTest")
+    }
+    outputs.upToDateWhen { false }
+    doFirst {
+        val metadataServiceUri = providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull
+            ?: error("v2M2BookKeeperMetadataServiceUri is required for M5 BK M4 recovery")
+        systemProperty("nereus.bookkeeper.metadataServiceUri", metadataServiceUri)
+    }
+}

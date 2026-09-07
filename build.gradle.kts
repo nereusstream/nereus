@@ -2405,6 +2405,31 @@ tasks.register("v2M5BookKeeperDescriptorCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5BookKeeperM4RecoverySourceCheck") {
+    group = "verification"
+    description = "Check BK M4 recovery bridge scope and remaining native admission boundaries."
+    commandLine("python3", "scripts/check-v2-m5-bookkeeper-m4-recovery.py")
+}
+
+tasks.register<Exec>("v2M5BookKeeperM4RecoveryContractTest") {
+    group = "verification"
+    commandLine("python3", "scripts/check-v2-m5-bookkeeper-m4-recovery-tests.py")
+}
+
+tasks.register("v2M5BookKeeperM4RecoveryCheck") {
+    group = "verification"
+    description = "Verify complete sealed BK recovery under the existing M4 source planner and async hazard kernel."
+    dependsOn(
+        "v2M5BookKeeperDescriptorCheck",
+        "v2M5BookKeeperM4RecoverySourceCheck",
+        "v2M5BookKeeperM4RecoveryContractTest",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperM4RecoveryTest",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperM4RecoveryRealTest",
+        ":nereus-storage-object:v2M4ReadKernelTest",
+        ":nereus-storage-object:v2M4ControlPlaneTest",
+    )
+}
+
 tasks.register<Exec>("v2M5RetentionCoreContractTest") {
     group = "verification"
     description = "Test the fail-closed non-promotable M5-C retention-core checker."
