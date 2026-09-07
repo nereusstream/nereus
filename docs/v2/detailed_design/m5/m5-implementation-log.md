@@ -833,6 +833,81 @@ staging or production authority is supplied. Supplemental documentation, frozen 
 coordinator and recovery source checks passed **13/13 tasks** in `/tmp/nereus-m5-namespace-final-check.log`.
 Both captured source maps were independently rechecked after the native run; all 17 acceptance rows remain OPEN/null.
 
+## 2026-09-08 physical tickets around native BK publication
+
+Status: guarded runtime integration validated after `e91253c9f520659c4fa1efbb4a348dd49effd1d1`.
+The [publication ticket projection](m5-publication-tickets-projection.json) records the current boundary. All 17 amended
+obligations remain OPEN/null. Native input catalog/owner admission, all concrete writers, READ_FENCED recovery and
+physical deletion remain required. `KafkaRunRootAuthority` currently has an interface and test implementations only;
+the production persisted run-root/source adapter still needs to supply native input membership.
+
+`M5TargetDeleteMultiWriterGuardV2` deduplicates full physical identities in unsigned canonical-byte order and acquires
+every ticket before invoking one concrete writer. It caps raw target count at 2,048 and aggregate canonical bytes at
+1 MiB. It never initializes absent authority or reserves new-resource quota. Each invocation uses a private random
+nonce, so concurrent retries of the same logical task have distinct tickets. Failure acquiring a later target prevents
+external dispatch and releases only that invocation's attempted prefix where authoritative state excludes a late CAS.
+Unknown acquisitions may arrive late and remain unresolved; unknown external completion retains every relevant ticket.
+Cancelling the observer leaves the underlying native completion and cleanup running.
+
+The explicit ticketed constructor of `KafkaBookKeeperCompactionPublicationV2` resolves all frozen logical inputs,
+adds all inventoried sealed output ledgers, then enters the existing actual descriptor/candidate/selector publication
+path. Missing, foreign or empty source membership rejects before publication writes. Counts are checked before copying
+member lists; the ticket context binds the exact descriptor and complete canonical physical set, plus capability and
+source cut/owner fences. Earlier constructors remain focused foundation profiles, so this is not global writer admission.
+The concrete adapter reads actual irreversible M5 Task selection/cancellation before releasing tickets. A successful
+selection can also reconcile older invocation tickets while an older selector CAS is still held; that old CAS can only
+lose or recover the same decision. Each recovery pass removes at most 256 tickets, reports unresolved/unscanned targets,
+and performs no publication dispatch. Matching hashes supplied by a caller alone are not native terminal proof.
+
+The native fixture uses actual bound BookKeeper INSTANCEID, actual Oxia namespace assignment and the configured durable
+quota route. It writes and verifies actual input and output ledger bytes. Its logical source mapping and OPEN eligibility
+are synthetic; it is not a native source catalog or protocol ownership proof. The actual publisher verifies inventory,
+sealed output, M4 protection and the native selector/Task decision. Tests hold a real selector CAS, race its ticketed
+predecessor with GC, reject a fence-first target, lose native selector responses, cancel a client observer, and cancel an
+unpublished native task. The concurrent case uses independent native clients and owner executors.
+
+For restart, the native selector actually applies before both its response and subsequent control reads are made
+unavailable. Durable tickets remain. The runner restarts the same ZooKeeper, three bookies and Oxia server with retained
+data; a fresh JVM must compare exact ticket authority hashes/versions, read the existing Task decision and protections,
+then clear tickets without new publication records or selector CAS. The checkpoint carries configuration and identities,
+not copied eligibility or decision bodies. The runner first executes all older creation/task-terminal regressions on a
+separate cluster because the native namespace binding is permanent.
+
+Initial focused unit and native compilation found two fixture signature mismatches and one comment-length violation;
+these were corrected before native execution. The first complete native run passed, including all-service restart.
+Review then added complete target-set context binding, bounded recovery bookkeeping and the concurrent winner cleanup
+case. The next native run proved winner-first ticket cleanup, but its final assertion expected only EXISTING_EXACT.
+The existing exact-control adapter also reports APPLIED_EXACT after reconciling identical selected bytes. The corrected
+assertion permits those existing outcomes and additionally compares the full native selector bytes/version before and
+after releasing the old CAS; an old invocation must not modify the winner. Final validation below refers to this later
+source; earlier runs are not evidence for the added behavior.
+
+The corrected native run passes all seven publication cases and both server-restart phases. Runner review then changed
+its final source check to verify each captured manifest independently: merging maps could hide a conflicting hash for
+a path present in both. The final invocation revalidates the unchanged legacy source and XML archive before reuse and
+repeats the bound-profile native gate/restart using the final runner.
+
+Validation: final `scripts/run-v2-m5-publication-tickets-check.sh` passed **75/75 executed main tasks** and a separate
+**20-task** post-restart JVM (**1 executed**, 19 up-to-date). Its five archived suites contain **28 cases/phases**:
+9 multi-writer unit cases, 7 actual publication cases, 2 native restart phases and 10 descriptor regressions, with zero
+failures/errors/skips. The **706** captured inputs remain exact, manifest SHA-256
+`36e32f286cc6d48b446e2da94c56c2c2e305e18645fe0e5e2f8eeaf8232d72fb`. Result:
+`build/m5-publication-tickets/nereus-v2-m5-publication-tickets-55692/run-summary.json`; log:
+`/tmp/nereus-m5-publication-tickets-native-gate4.log`. The same four BK/ZooKeeper containers and Oxia container
+`670bfcf843a5de48d77b4e555a90ca1fe1534f954d8562e9c85100bd851e1752` retained IDs/images and data while their start times changed.
+The new JVM preserved exact pre-restart authority hashes/versions before clearing tickets from the native decision.
+
+The final invocation reuses the verified legacy output
+`build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-38542`, which passed **93/93 executed main tasks**,
+**22 post-restart tasks** (3 executed) and **71 archived cases/phases**. Its **685** inputs remain exact at manifest SHA
+`5081d38ebdccef034a6b6acc7757e962dd6577d9689d7f2d17390fbc156c8434`;
+the copied summary SHA is `0488fc4a884624083ea0cf05cccf1366c8bd2085a5ae4b856b6790d3f9541b73`.
+Both source maps and the final passing XML archives were independently rechecked after execution. Cleanup removes
+only the runner's owned containers and compose volumes. No M5-E receipt, Final, physical-delete or production authority
+is issued by this focused runner. Supplemental documentation, frozen design/M4 dependency, lifecycle, coordinator and
+recovery source checks passed **13/13 tasks** in `/tmp/nereus-m5-publication-final-check.log`. All 17 acceptance rows
+remain OPEN/null; only the unrelated pre-existing connector container remains running.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;
@@ -1280,8 +1355,9 @@ source-locked real Oxia result, source-bound receipt, physical-delete, staging, 
 
 ## Remaining ordered work
 
-1. Extend the guarded create/selection/drain terminal to stale-task and complete writer/adoption admission, then connect
-   M4-protected BK recovery to native protocol-owner admission, ordinary reads, internal topics and grace/rescan cleanup.
+1. Derive complete physical input membership from native run-root/source metadata and integrate the guarded ticketed
+   publisher with real protocol ownership. Extend create/selection/drain terminal to stale-task and complete writer/adoption
+   admission, then connect M4-protected BK recovery to ordinary reads, internal topics and grace/rescan cleanup.
 2. Extend the native BK-to-Oxia namespace assignment to Object and cross-Cell resource ownership; complete Binding
    authority admission, quota/restart accounting and Cell I/O/operator metrics around the native M4/history route. Admit the configured durable GC quota route for every actual writer,
    provision backend capacity and connect worker scheduling to permanent done/cache and reserved intent recovery.

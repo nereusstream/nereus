@@ -48,6 +48,7 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
     private final Executor controlExecutor;
     private final int shardId;
     private final M5TaskSelectionCoordinatorV2 taskSelections;
+    private final Optional<KafkaBookKeeperPublicationTicketsV2> physicalTickets;
 
     public KafkaBookKeeperCompactionPublicationV2(
             CanonicalControlMetadataStore metadata,
@@ -64,6 +65,28 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
             BindingIdentity binding,
             KafkaSealedBookKeeperReaderV2 reader,
             Executor controlExecutor) {
+        this(metadata, shardId, binding, reader, controlExecutor, Optional.empty());
+    }
+
+    /** Admitted lifecycle path: every input and output resource must hold a durable ticket before publication. */
+    public KafkaBookKeeperCompactionPublicationV2(
+            CanonicalControlMetadataStore metadata,
+            int shardId,
+            BindingIdentity binding,
+            KafkaSealedBookKeeperReaderV2 reader,
+            Executor controlExecutor,
+            KafkaBookKeeperPublicationTicketsV2 physicalTickets) {
+        this(metadata, shardId, binding, reader, controlExecutor, Optional.of(physicalTickets));
+    }
+
+    private KafkaBookKeeperCompactionPublicationV2(
+            CanonicalControlMetadataStore metadata,
+            int shardId,
+            BindingIdentity binding,
+            KafkaSealedBookKeeperReaderV2 reader,
+            Executor controlExecutor,
+            Optional<KafkaBookKeeperPublicationTicketsV2> physicalTickets) {
+        this.physicalTickets = physicalTickets;
         this.controlExecutor = Objects.requireNonNull(controlExecutor, "controlExecutor");
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         this.binding = Objects.requireNonNull(binding, "binding");
@@ -81,6 +104,25 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
             List<SourceProtectionIdentity> exactFallbackSources,
             CurrentStateReader currentCompactionState) {
         requireIdentity(plan, semantic, descriptor);
+        if (physicalTickets.isPresent()) {
+            List<SourceProtectionIdentity> sources = List.copyOf(exactFallbackSources);
+            M5MaterializationValidatorV1.requireFallbackProtections(plan.sourceCut(), sources);
+            return physicalTickets
+                    .orElseThrow()
+                    .publish(
+                            descriptor,
+                            () -> publishRegistered(plan, semantic, descriptor, sources, currentCompactionState),
+                            () -> taskSelections.readDecision(descriptor.task().taskIdSha256()));
+        }
+        return publishRegistered(plan, semantic, descriptor, exactFallbackSources, currentCompactionState);
+    }
+
+    private CompletionStage<PublicationOutcome> publishRegistered(
+            CompactionPlan plan,
+            KafkaCompactionSemanticOutputV2 semantic,
+            KafkaSealedBookKeeperDescriptorV2 descriptor,
+            List<SourceProtectionIdentity> exactFallbackSources,
+            CurrentStateReader currentCompactionState) {
         var priorDecision = taskSelections.readDecision(descriptor.task().taskIdSha256());
         if (priorDecision.isPresent()) {
             var decided = priorDecision.orElseThrow();

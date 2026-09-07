@@ -3064,3 +3064,19 @@ tasks.register("v2M5PhysicalNamespaceCheck") {
         ":nereus-storage-bookkeeper:checkstyleRealBookKeeperTest",
     )
 }
+
+
+tasks.register("v2M5PublicationTicketsCheck") {
+    group = "verification"
+    description = "Verify sorted physical tickets around actual BK compaction publication and native reconciliation."
+    dependsOn(
+        "v2M5GcQuotaCheck",
+        ":nereus-storage-object:v2M5MultiWriterTicketTest",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperDescriptorTest",
+        ":nereus-kafka-bookkeeper:v2M5PublicationTicketsRealTest",
+        ":nereus-kafka-bookkeeper:spotlessCheck",
+        ":nereus-kafka-bookkeeper:checkstyleMain",
+        ":nereus-kafka-bookkeeper:checkstyleTest",
+        ":nereus-kafka-bookkeeper:checkstyleRealBookKeeperTest",
+    )
+}

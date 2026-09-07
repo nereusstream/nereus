@@ -356,3 +356,13 @@ tasks.register<Test>("v2M5GcQuotaTest") {
     filter { includeTestsMatching("com.nereusstream.storage.object.gc.M5GcQuotaV2Test") }
     outputs.upToDateWhen { false }
 }
+
+
+tasks.register<Test>("v2M5MultiWriterTicketTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.storage.object.gc.M5TargetDeleteMultiWriterGuardV2Test") }
+    outputs.upToDateWhen { false }
+}

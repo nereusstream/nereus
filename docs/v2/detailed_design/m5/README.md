@@ -186,6 +186,13 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   creation/task-terminal results are revalidated by captured source and XML hashes. Object namespace, cross-Cell
   ownership, all concrete writers, offline compatibility and physical deletion remain OPEN.
 
+- The [publication ticket projection](m5-publication-tickets-projection.json) adds sorted physical tickets around
+  the actual guarded BK publisher. Every resolved input and sealed output must be ticketed before publication writes;
+  a later fence cancels dispatch, while unknown completion retains tickets. Native immutable Task selection/cancellation
+  reconciles old invocations, including a losing selector CAS still in flight. Each recovery pass is bounded at 256
+  removals. The full physical set enters ticket identity. Logical source catalog/admission and eligibility remain
+  fixtures; complete native writer integration, READ_FENCED and physical deletion remain OPEN.
+
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
 gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order/multipart cores without amending that result.

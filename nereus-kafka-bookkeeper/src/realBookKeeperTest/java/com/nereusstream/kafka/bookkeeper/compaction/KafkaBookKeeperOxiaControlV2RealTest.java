@@ -405,6 +405,8 @@ class KafkaBookKeeperOxiaControlV2RealTest {
         final AtomicInteger selectorCas = new AtomicInteger();
         volatile boolean losePart;
         volatile boolean loseSelector;
+        volatile boolean rejectReadsAfterSelector;
+        volatile boolean readsRejected;
         volatile boolean loseTerminal;
         volatile boolean loseDecision;
         volatile boolean holdSelector;
@@ -422,6 +424,10 @@ class KafkaBookKeeperOxiaControlV2RealTest {
 
         public CompletionStage<Optional<AuthorityRecord>> read(String key) {
             reads.incrementAndGet();
+            if (readsRejected) {
+                return CompletableFuture.failedFuture(
+                        new IllegalStateException("native control read delivery unavailable"));
+            }
             return nativeClient.read(key);
         }
 
@@ -470,12 +476,19 @@ class KafkaBookKeeperOxiaControlV2RealTest {
             }
             boolean lose = loseSelector;
             loseSelector = false;
-            return nativeClient
-                    .compareAndSet(key, value, version)
-                    .thenCompose(ignored -> lose
-                            ? CompletableFuture.failedFuture(
-                                    new IllegalStateException("post-native selector response loss"))
-                            : CompletableFuture.completedFuture(null));
+            boolean rejectAfter = rejectReadsAfterSelector;
+            rejectReadsAfterSelector = false;
+            return nativeClient.compareAndSet(key, value, version).thenCompose(ignored -> {
+                if (rejectAfter) {
+                    readsRejected = true;
+                    return CompletableFuture.<Void>failedFuture(
+                            new IllegalStateException("applied native selector and subsequent read delivery loss"));
+                }
+                return lose
+                        ? CompletableFuture.failedFuture(
+                                new IllegalStateException("post-native selector response loss"))
+                        : CompletableFuture.<Void>completedFuture(null);
+            });
         }
     }
 }

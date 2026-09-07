@@ -71,6 +71,13 @@ two Oxia backends, endpoint aliases, delayed creates,
 binding-response loss and retained-data restart of both Oxia servers plus all four BK services. All five new cases/phases
 pass; the 71-task main gate and 16-task post-restart phase pass with 702 unchanged captured inputs. Object namespace,
 cross-Cell ownership, all concrete writers, offline old-authority compatibility and real deletion remain OPEN.
+The guarded native publisher now composes `M5TargetDeleteMultiWriterGuardV2` through
+`KafkaBookKeeperPublicationTicketsV2`. `v2M5PublicationTicketsCheck` and
+`scripts/run-v2-m5-publication-tickets-check.sh` require every resolved input and sealed output ticket before native
+publication writes, private invocation identities, exact selected/cancelled Task reconciliation and bounded recovery.
+The runner uses separate legacy and bound namespace clusters, then restarts all five bound-profile services and verifies
+old tickets from a fresh JVM. Native source catalog/owner admission and OPEN eligibility remain synthetic, so this
+[focused projection](detailed_design/m5/m5-publication-tickets-projection.json) does not close WRITER_RACES or M5-E.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

@@ -415,3 +415,41 @@ tasks.register<Test>("v2M5BookKeeperTaskTerminalTest") {
     filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperTaskTerminalV2Test") }
     outputs.upToDateWhen { false }
 }
+
+
+dependencies {
+    add(realBookKeeperTest.implementationConfigurationName,
+        project(mapOf("path" to ":nereus-storage-object", "configuration" to "m5DeleteTestFixtures")))
+}
+listOf("v2M5PublicationTicketsRealTest", "v2M5PublicationTicketsRestartWriteTest", "v2M5PublicationTicketsRestartReadTest").forEach { taskName ->
+    tasks.register<Test>(taskName) {
+        group = "verification"
+        testClassesDirs = realBookKeeperTest.output.classesDirs
+        classpath = realBookKeeperTest.runtimeClasspath
+        useJUnitPlatform()
+        maxParallelForks = 1
+        filter {
+            val base = "com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperPublicationTicketsV2RealTest"
+            when (taskName) {
+                "v2M5PublicationTicketsRestartWriteTest" -> includeTestsMatching("$base.writeBeforeServerRestart")
+                "v2M5PublicationTicketsRestartReadTest" -> includeTestsMatching("$base.readAfterServerRestart")
+                else -> {
+                    includeTestsMatching(base)
+                    excludeTestsMatching("$base.writeBeforeServerRestart")
+                    excludeTestsMatching("$base.readAfterServerRestart")
+                }
+            }
+        }
+        outputs.upToDateWhen { false }
+        doFirst {
+            systemProperty("nereus.bookkeeper.metadataServiceUri", providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").get())
+            systemProperty("nereus.m5.oxia.serviceAddress", providers.gradleProperty("v2M5RetentionOxiaServiceAddress").get())
+            if (taskName.contains("Restart")) {
+                systemProperty("nereus.m5.publication.restartCheckpoint", providers.gradleProperty("v2M5PublicationTicketsRestartCheckpoint").get())
+            }
+        }
+        if (taskName == "v2M5PublicationTicketsRestartWriteTest") {
+            mustRunAfter("v2M5PublicationTicketsRealTest")
+        }
+    }
+}

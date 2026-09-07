@@ -18,10 +18,10 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 | --- | --- | --- |
 | Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; guarded BK creation now observes actual INSTANCEID and permanent reservations, and a permanent BK binding now selects one actual Oxia namespace; Object namespace, complete writer/Cell admission and real dispatch remain OPEN |
 | Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; guarded BK task cancellation and native drain now produce a durable physical cut, while real protocol proof producers, grace/rescans and full deletion composition remain OPEN |
-| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile fences late creates; same-selector decisions and native writer drain now produce restart-stable cancelled task terminals; complete namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
+| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile fences late creates; same-selector decisions and native writer drain now produce restart-stable cancelled task terminals, and sorted input/output tickets wrap the guarded native publisher; complete namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
 | Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; additive wire 3 preserves that history while carrying one bounded task decision until exact permanent archival; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and physical GC worker scheduling remain OPEN |
 | Permanent delete history | Compact done at the same resource key; resident cap independent of lifetime history | M5DC V2 retains exact resource/attempt/revision/owner/capability/absence identities; native Oxia compaction/cache recovery and a configured durable quota route pass; pre-reserved intent writes continue at exhaustion and pending grants/refunds recover after restart; unique namespace/all-writer admission, backend disk provisioning and GC scheduling remain OPEN |
-| Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; native owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
+| Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; sorted multi-resource tickets now wrap the guarded native BK publication path; complete native input membership, owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
 
 The [physical identity projection](m5-physical-resource-identity-projection.json) and
@@ -135,6 +135,23 @@ Its three identity unit cases and two native phases pass without skips; 702 capt
 prior 71-case legacy regression and service restart are reused only after exact source/XML archive revalidation.
 The carrier gate passed 60 executed tasks with 8 inventory/layout, 7 real carrier and 8 real Cell-session tests;
 its exact-native-run check now precedes fencing, including the foreign-run zero-fence negative case.
+
+The [publication ticket projection](m5-publication-tickets-projection.json) adds bounded, sorted acquisition on every
+resolved input and sealed output physical resource before the guarded BK publisher can write immutable publication
+records or attempt the native selector CAS. Each invocation has a private nonce; the ticket context binds the exact
+descriptor, complete canonical target set, capability and source-owner fence. A later acquisition failure prevents
+dispatch and rolls back only that invocation's acquired prefix. Unknown external completion retains its tickets.
+Only an actual irreversible native selected/cancelled Task decision permits terminal reconciliation, including older
+concurrent invocations; observer cancellation leaves native completion and cleanup running. Recovery removes at most
+256 tickets per pass and reports remaining targets. Missing authority is never initialized implicitly.
+The explicit publisher constructor enables this path; earlier constructors remain foundation profiles and are not
+complete writer admission. The native fixture verifies actual input/output bytes, namespace binding and quota, but its
+logical source membership and OPEN eligibility are synthetic. An admitted source owner must derive complete immutable
+physical membership under existing protection; this slice does not supply the native input catalog, all writer rows,
+READ_FENCED owner verification, physical deletion or any of the 17 aggregate obligations.
+The final native runner passes 75 executed main tasks and a 20-task post-restart JVM (one executed). Its 28 archived
+cases/phases pass without skips; both the 706-input new manifest and 685-input legacy manifest remain exact. The
+71-case legacy regression is reused only after source/XML revalidation.
 
 `v2M5LifecycleDesignCheck` checks the amendment chain, exact bytes, coverage and authority boundaries. It proves no
 runtime behavior. `v2M5HistoricalDesignCheck` replays the unmodified freeze validator at c86fde3e and compares

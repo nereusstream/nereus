@@ -69,6 +69,12 @@ performance-first BookKeeper WAL.
   service restarts. This is a guarded BK profile; Object namespace, cross-Cell ownership, complete writer admission,
   offline compatibility and physical deletion remain required.
 
+  The [publication ticket guard](detailed_design/m5/m5-publication-tickets-projection.json) now acquires every
+  resolved input/output resource ticket before actual BK descriptor/selector publication. Unknown results retain
+  tickets; native irreversible Task decisions reconcile current and older invocations, including after server restart.
+  Native input/output bytes are exercised, while source catalog/ownership and eligibility are still fixtures. Complete
+  writer admission, READ_FENCED integration, external deletion and M5 Final remain outstanding.
+
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.
 - M1 implementation and the pure-V2 active-graph prune are complete. The authoritative completion state is derived
