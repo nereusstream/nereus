@@ -66,8 +66,8 @@ def validate(root):
             "id <= 1_027", "fixture.retire(id)", "fixture.fold(id)", "isLessThan(2_048)",
             "getProtectionDomain()", EXPECTED["clientJarSha256"], "fixture.reconnect()",
             "nativeClient.createIfAbsent(key, value)", "nativeClient.compareAndSet(key, value, version)",
-            "failedReads.set(2)", "heldResponse.completeExceptionally", "fixture.beforeCanonicalCas",
-            "fixture.client.delete(key)", "M5BindingAuthorityControlMetadataStoreV1",
+            "failedReads.set(2)", "heldResponse.completeExceptionally", "fixture.faults.beforeSelectorCas",
+            "fixture.client.delete(nativeKey)", "OxiaBindingLifecycleMetadataStoreV2",
         ),
         "nereus-metadata-oxia/src/oxiaIntegrationTest/java/com/nereusstream/metadata/oxia/v2/retention/"
         "M5RetiredHistoryOxiaRestartTest.java": (

@@ -192,6 +192,20 @@ tasks.register<Test>("r1MetadataTest") {
     }
 }
 
+tasks.register<Test>("v2M5BindingLifecycleRouteTest") {
+    group = "verification"
+    description = "Verify the native Binding history route and exact compatibility with M3 control keys."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.retention.OxiaBindingLifecycleMetadataStoreV2Test")
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.objectwal.OxiaCanonicalControlMetadataStoreTest")
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.register<Test>("v2M5RetentionOxiaCapabilityTest") {
     group = "verification"
     description = "Prove the Oxia 0.9 adapter rejects M5-C multi-key retirement before mutation."

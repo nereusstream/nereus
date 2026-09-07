@@ -40,6 +40,7 @@ import com.nereusstream.domain.protocol.PulsarTopicIncarnationIdentity;
 import com.nereusstream.domain.protocol.PulsarTopicName;
 import com.nereusstream.metadata.spi.model.PulsarTopicGenerationSelectorStateV1;
 import com.nereusstream.metadata.spi.model.PulsarTopicGenerationSelectorValueV1;
+import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.MutationOutcome;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IdentityEnvelope;
@@ -382,7 +383,7 @@ class M5RetentionOxiaIntegrationTest {
     }
 
     private static List<M4ReleaseBindingV1> releases(
-            Oxia09ExactMetadataTransactionStoreV1 store, String root, SourceRetirementBatch batch) {
+            ExactMetadataTransactionStoreV1 store, String root, SourceRetirementBatch batch) {
         List<M4ReleaseBindingV1> releases = new ArrayList<>();
         for (int index = 0; index < batch.sources().size(); index++) {
             SourceProtectionIdentity source = batch.sources().get(index);
@@ -415,7 +416,7 @@ class M5RetentionOxiaIntegrationTest {
     }
 
     static ReferenceFreeProofV1 proof(
-            Oxia09ExactMetadataTransactionStoreV1 store,
+            ExactMetadataTransactionStoreV1 store,
             String prefix,
             ReferenceTargetKindV1 targetKind,
             Sha256Digest target,
@@ -464,8 +465,7 @@ class M5RetentionOxiaIntegrationTest {
         return M5RetentionCodecV1.finalizeProof(draft);
     }
 
-    private static VersionedValue create(
-            Oxia09ExactMetadataTransactionStoreV1 store, String key, CanonicalBytes value) {
+    private static VersionedValue create(ExactMetadataTransactionStoreV1 store, String key, CanonicalBytes value) {
         assertThat(store.compareAndSet(Optional.empty(), key, value)
                         .toCompletableFuture()
                         .join())
@@ -473,7 +473,7 @@ class M5RetentionOxiaIntegrationTest {
         return read(store, key);
     }
 
-    private static VersionedValue read(Oxia09ExactMetadataTransactionStoreV1 store, String key) {
+    private static VersionedValue read(ExactMetadataTransactionStoreV1 store, String key) {
         return store.read(key).toCompletableFuture().join().orElseThrow();
     }
 

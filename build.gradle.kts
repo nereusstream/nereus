@@ -2480,6 +2480,28 @@ tasks.register("v2M5RetiredHistoryOxiaCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5BindingLifecycleRouteSourceCheck") {
+    group = "verification"
+    description = "Check the configured native Binding route and its remaining admission/evidence boundaries."
+    commandLine("python3", "scripts/check-v2-m5-binding-lifecycle-route.py")
+}
+
+tasks.register<Exec>("v2M5BindingLifecycleRouteContractTest") {
+    group = "verification"
+    commandLine("python3", "scripts/check-v2-m5-binding-lifecycle-route-tests.py")
+}
+
+tasks.register("v2M5BindingLifecycleRouteCheck") {
+    group = "verification"
+    description = "Verify one native Cell/Binding route for M4 selectors and permanent retirement history."
+    dependsOn(
+        "v2M5RetiredHistoryOxiaCheck",
+        "v2M5BindingLifecycleRouteSourceCheck",
+        "v2M5BindingLifecycleRouteContractTest",
+        ":nereus-metadata-oxia:v2M5BindingLifecycleRouteTest",
+    )
+}
+
 tasks.register<Exec>("v2M5RetentionCoreContractTest") {
     group = "verification"
     description = "Test the fail-closed non-promotable M5-C retention-core checker."

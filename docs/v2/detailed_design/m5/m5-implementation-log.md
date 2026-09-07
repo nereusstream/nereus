@@ -383,6 +383,63 @@ The local result is `build/m5-retired-history-oxia/nereus-m5-history-oxia-69973/
 and passed **26 tasks** (13 executed, 13 up-to-date), including the unchanged historical M4/M5 boundary,
 6 lifecycle contract tests and 3 new scope tests. No production or integration-test Java changed afterward.
 
+## 2026-09-08 native M4 and retired-history Binding route
+
+Status: focused configured native route; unique native admission, capacity and complete writer/evidence composition
+remain OPEN. The [Binding route projection](m5-binding-lifecycle-route-projection.json) follows published source
+`93d3e36db9161233dd7d98b5e84d0c62eb471498`. It supersedes the preceding run's test-only M4/history bridge for this
+new implementation and verification; the earlier projection retains its historical scope.
+
+`OxiaBindingLifecycleMetadataStoreV2` implements the exact asynchronous metadata port and exposes the production
+M5 control facade. Both use the existing M3/M4 selector key. Public keys stay canonical and relative, including
+returned versioned records; only the adapter adds the configured Cell root. Its closed grammar admits one shard and
+full Binding's M4 records/history, validates decoded incarnation/storage epoch and record-specific key identities,
+and rejects already-qualified, foreign or unsupported keys before native I/O. The constructor bounds the longest
+qualified ASCII key to the locked native 512-byte limit. The existing M3 adapter and frozen M4 wire bytes are unchanged.
+
+The opaque `M5O2` version token is 44 bytes: magic, configured route digest and the exact native version. A token from
+another Cell is rejected even if both native records have identical bytes and version numbers. Tokens remain stable
+across fresh clients and the service restart. This digest binds configured root/shard/Binding; it does not prove that
+two different native clusters or namespaces with identical configuration are the same admitted authority. Unique
+native namespace and Binding assignment still need their own adapter-backed admission.
+
+The history boundary uses the same canonical node decoder as proof reads, verifies full Binding/content address and
+permits immutable creates only. Selector writes reject legacy downgrade, revision/predecessor mismatch and history
+rollback. The full fold coordinator and M4 facade still supply proof and transition validation. The synchronous M4
+view is for the owner's low-frequency control executor; asynchronous history operations do not block native callbacks.
+No multi-key transaction or ordinary-read remote I/O is introduced.
+
+The source-locked real fixture now starts with a selector created by the existing M3 adapter, migrates it through the
+new exact route, verifies both native views and rejects the stale legacy CAS. All M4/history operations then use the
+production route; a narrowly bounded test dispatcher retains only synthetic external source/reference proof facts.
+The 1,026-retirement continuous case, active ordinal-1 hole, 982-byte post-fold selector, current-root admission,
+client reconnect, corrupt/missing history, lost native responses and the separate two-tombstone service-restart
+fixture pass through this route. The lost-response/later-fold case also rejects a stale history rollback directly at
+the native route. The 44-byte version adds 36 bytes per retired leaf relative to the preceding route; final charged
+history bytes are 48,801,690. This is conservative dispatched payload accounting, not native disk/quota measurement.
+
+The new 8-test route suite covers native-key limits, typed identity, canonical immutable history, exact-version ABA,
+response loss, cross-Cell token rejection and downgrade/replay rejection; all 8 prior M3 adapter tests and 15 history
+unit tests also pass. The same real run retains the existing 2 Binding/Pulsar integration tests in addition to the
+5 history cases and 2 separate restart phases. All named suites have zero failures, errors and skips.
+
+Unique native namespace/Binding assignment, durable quota and restart headroom, per-Cell I/O/metrics, the BK task/part/
+descriptor metadata route, native protocol writers, physical-done cache and cross-module delete integration remain
+OPEN. All 17 amended acceptance obligations remain OPEN with null receipts. These focused results create no history
+physical GC, M5 child, aggregate Final, physical-delete or production authority.
+
+Validation: `scripts/run-v2-m5-binding-lifecycle-route-check.sh` passed **76/76 executed tasks** with configuration
+cache disabled and every task rerun. The post-restart JVM passed **12 tasks** (1 executed, 11 up-to-date). The runner
+and an independent reread verified all captured JUnit hashes and **403 unchanged Java inputs**, with manifest SHA-256
+`ffdf5718d02e3b99a90e9daf1da8149764c080204b48aca635cee436118f2874`. Container
+`be408e76ed64068fdfd96a98d3633877459877e41dfcf454c1089b0b9bf58c47` restarted from
+`2026-09-07T18:50:51.274753175Z` to `2026-09-07T19:03:58.491109554Z` and was removed by its owning runner.
+The local result is `build/m5-binding-lifecycle-route-oxia/nereus-m5-binding-route-oxia-858/run-summary.json`; the run
+log is `/tmp/nereus-m5-binding-route-gate.log`. Supplemental projection/governance and style checks passed **35 tasks**
+(13 executed, 22 up-to-date), including 3 route scope tests and the frozen M4/M5 dependency and lifecycle contract
+checks. Their log is `/tmp/nereus-m5-binding-route-final-check.log`. They were wired after native execution; no
+production or integration-test Java changed after it.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;

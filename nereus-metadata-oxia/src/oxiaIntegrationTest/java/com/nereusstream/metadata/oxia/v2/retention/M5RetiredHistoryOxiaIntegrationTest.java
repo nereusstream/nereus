@@ -22,12 +22,15 @@ import com.nereusstream.domain.identity.TopicBindingId;
 import com.nereusstream.metadata.oxia.v2.mutation.AsyncOxiaConditionalClient;
 import com.nereusstream.metadata.oxia.v2.mutation.AuthorityRecord;
 import com.nereusstream.metadata.oxia.v2.mutation.OxiaConditionalClient;
+import com.nereusstream.metadata.oxia.v2.objectwal.OxiaCanonicalControlMetadataStore;
+import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.MutationOutcome;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
 import com.nereusstream.storage.object.control.CanonicalControlMetadataStore;
 import com.nereusstream.storage.object.control.ControlMutationOutcome;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IdentityEnvelope;
 import com.nereusstream.storage.object.read.control.M4ReadControlCodecV1;
+import com.nereusstream.storage.object.read.control.M4ReadControlKeysV1;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.AdmissionState;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
@@ -38,7 +41,6 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Sourc
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceRetirementBatch;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityCodecV1;
-import com.nereusstream.storage.object.retention.M5BindingAuthorityControlMetadataStoreV1;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.BatchAuthoritySlotV1;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.BindingRetirementAuthorityV1;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityRecordsV1.ReferenceMutationTicketV1;
@@ -140,7 +142,8 @@ class M5RetiredHistoryOxiaIntegrationTest {
             assertThat(fixture.exact()).isEqualTo(predecessor);
             assertThat(fixture.budget.snapshot().unresolvedFolds()).isEqualTo(1);
             assertThat(fixture.faults.lastCreatedKey).contains("/nodes/");
-            assertThat(fixture.bytes(fixture.faults.lastCreatedKey)).isPresent();
+            assertThat(await(fixture.nativeStore.read(fixture.faults.lastCreatedKey)))
+                    .isPresent();
             long charged = fixture.budget.snapshot().chargedDurableBytes();
             assertThat(charged).isPositive();
             assertThat(fixture.fold(2)).isEqualTo(Outcome.APPLIED_EXACT);
@@ -158,7 +161,7 @@ class M5RetiredHistoryOxiaIntegrationTest {
             fixture.retire(2);
             fixture.retire(3);
             var before = fixture.exact();
-            fixture.faults.holdSelectorKey = fixture.selectorKey;
+            fixture.faults.holdSelectorKey = fixture.route.nativeKey(fixture.selectorKey);
             var pending = fixture.coordinator.fold(before, fixture.batch(2).batchIdSha256());
             await(fixture.faults.selectorApplied);
             try {
@@ -174,6 +177,11 @@ class M5RetiredHistoryOxiaIntegrationTest {
             assertThat(fixture.budget.snapshot().unresolvedFolds()).isZero();
             assertThat(await(fixture.coordinator.fold(before, fixture.batch(2).batchIdSha256())))
                     .isEqualTo(Outcome.EXISTING_TERMINAL);
+            var current = fixture.exact();
+            assertThatThrownBy(() -> fixture.route.compareAndSet(
+                            Optional.of(current), fixture.selectorKey, before.canonicalStoredBytes()))
+                    .hasMessageContaining("history cannot roll back");
+            assertThat(fixture.exact()).isEqualTo(current);
         }
     }
 
@@ -184,7 +192,7 @@ class M5RetiredHistoryOxiaIntegrationTest {
             fixture.retire(3);
             assertThat(fixture.fold(2)).isEqualTo(Outcome.APPLIED_EXACT);
             var before = fixture.authority();
-            fixture.beforeCanonicalCas = () -> assertThat(fixture.fold(3)).isEqualTo(Outcome.APPLIED_EXACT);
+            fixture.faults.beforeSelectorCas = () -> assertThat(fixture.fold(3)).isEqualTo(Outcome.APPLIED_EXACT);
             assertThat(fixture.facade.compareAndSet(
                             fixture.selectorKey,
                             Optional.of(M4ReadControlCodecV1.encodeSelector(before.selectorProjection())),
@@ -207,17 +215,18 @@ class M5RetiredHistoryOxiaIntegrationTest {
             var before = fixture.exact();
             var history = fixture.history();
             String key = history.key(fixture.authority().retiredHistory().sha256());
-            var exactNode = await(fixture.store.read(key)).orElseThrow();
+            String nativeKey = fixture.route.nativeKey(key);
+            var exactNode = await(fixture.nativeStore.read(nativeKey)).orElseThrow();
             // Only this UUID-owned fixture is corrupted/deleted; the history implementation has no delete method.
-            assertThat(await(fixture.store.compareAndSet(Optional.of(exactNode), key, bytes("corrupt-history"))))
+            assertThat(await(fixture.nativeStore.compareAndSet(
+                            Optional.of(exactNode), nativeKey, bytes("corrupt-history"))))
                     .isEqualTo(MutationOutcome.APPLIED_EXACT);
             assertThatThrownBy(() -> fixture.tryAdmit(4))
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessage("retired history node content address differs");
+                    .hasRootCauseMessage("retired history node content address differs");
             assertThatThrownBy(() -> fixture.fold(3))
                     .hasRootCauseMessage("retired history node content address differs");
             assertThat(fixture.exact()).isEqualTo(before);
-            await(fixture.client.delete(key));
+            await(fixture.client.delete(nativeKey));
             for (int id : List.of(2, 4)) {
                 assertThatThrownBy(() -> fixture.tryAdmit(id))
                         .isInstanceOf(IllegalStateException.class)
@@ -237,16 +246,17 @@ class M5RetiredHistoryOxiaIntegrationTest {
         final M5RetiredHistoryWriteBudgetV2 budget = new M5RetiredHistoryWriteBudgetV2(4, 1_000_000, 128_000_000);
         AsyncOxiaClient client;
         Faults faults;
-        Oxia09ExactMetadataTransactionStoreV1 store;
+        Oxia09ExactMetadataTransactionStoreV1 nativeStore;
+        OxiaBindingLifecycleMetadataStoreV2 route;
+        ExactMetadataTransactionStoreV1 store;
         M5RetiredBatchHistoryCoordinatorV2 coordinator;
-        M5BindingAuthorityControlMetadataStoreV1 facade;
-        Runnable beforeCanonicalCas;
+        CanonicalControlMetadataStore facade;
 
         Fixture(String root) throws Exception {
             this.root = root;
-            this.selectorKey = root + "/selector";
             this.binding = new BindingIdentity(
                     new TopicBindingId(digest(root)), digest(root + "/incarnation"), digest(root + "/storage-epoch"));
+            this.selectorKey = new M4ReadControlKeysV1(7, binding).selector();
             reconnect();
         }
 
@@ -255,10 +265,18 @@ class M5RetiredHistoryOxiaIntegrationTest {
             try {
                 var batches =
                         java.util.Arrays.stream(ids).mapToObj(fixture::batch).toList();
-                fixture.create(
-                        fixture.selectorKey,
-                        M5BindingAuthorityCodecV1.encodeAuthority(
-                                M5BindingAuthorityCodecV1.initial(fixture.selector(batches, 1))));
+                var original = M4ReadControlCodecV1.encodeSelector(fixture.selector(batches, 1));
+                var legacy = new OxiaCanonicalControlMetadataStore(fixture.client, fixture.root, 7);
+                assertThat(legacy.putIfAbsent(fixture.selectorKey, original)).isEqualTo(ControlMutationOutcome.APPLIED);
+                assertThat(await(new M5BindingRetirementCoordinatorV1(fixture.store)
+                                .migrateLegacy(new M5BindingRetirementCoordinatorV1.MigrationRequest(
+                                        fixture.selectorKey, fixture.exact()))))
+                        .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.APPLIED_EXACT);
+                assertThat(fixture.facade.get(fixture.selectorKey)).contains(original);
+                assertThat(legacy.get(fixture.selectorKey))
+                        .contains(fixture.exact().canonicalStoredBytes());
+                assertThat(legacy.compareAndSet(fixture.selectorKey, Optional.of(original), original))
+                        .isEqualTo(ControlMutationOutcome.DEFINITIVE_CONFLICT);
                 assertThat(await(new M5BindingRetirementCoordinatorV1(fixture.store)
                                 .enrollWriters(new M5BindingRetirementCoordinatorV1.EnrollmentRequest(
                                         fixture.selectorKey,
@@ -296,34 +314,35 @@ class M5RetiredHistoryOxiaIntegrationTest {
                     .asyncClient()
                     .get(30, TimeUnit.SECONDS);
             faults = new Faults(new AsyncOxiaConditionalClient(client));
-            store = new Oxia09ExactMetadataTransactionStoreV1(faults);
-            coordinator = new M5RetiredBatchHistoryCoordinatorV2(store, budget);
-            // Test-only synchronous bridge on the JUnit thread; every value/CAS still goes to the native exact adapter.
-            facade = new M5BindingAuthorityControlMetadataStoreV1(
-                    new CanonicalControlMetadataStore() {
-                        public Optional<CanonicalBytes> get(String key) {
-                            return Fixture.this.bytes(key);
-                        }
+            nativeStore = new Oxia09ExactMetadataTransactionStoreV1(faults);
+            route = new OxiaBindingLifecycleMetadataStoreV2(faults, root, 7, binding);
+            coordinator = new M5RetiredBatchHistoryCoordinatorV2(route, budget);
+            facade = route.controlMetadata();
+            // Only synthetic external proof facts use this fixture dispatcher. All M4/history I/O uses the real route.
+            store = new ExactMetadataTransactionStoreV1() {
+                public CompletionStage<Optional<VersionedValue>> read(String key) {
+                    return proofFixtureKey(key) ? nativeStore.read(key) : route.read(key);
+                }
 
-                        public ControlMutationOutcome putIfAbsent(String key, CanonicalBytes value) {
-                            return map(await(store.compareAndSet(Optional.empty(), key, value)));
-                        }
+                public CompletionStage<MutationOutcome> compareAndSet(
+                        Optional<VersionedValue> predecessor, String key, CanonicalBytes candidate) {
+                    return proofFixtureKey(key)
+                            ? nativeStore.compareAndSet(predecessor, key, candidate)
+                            : route.compareAndSet(predecessor, key, candidate);
+                }
 
-                        public ControlMutationOutcome compareAndSet(
-                                String key, Optional<CanonicalBytes> expected, CanonicalBytes candidate) {
-                            var exact = await(store.read(key));
-                            if (!exact.map(VersionedValue::canonicalStoredBytes).equals(expected)) {
-                                return ControlMutationOutcome.DEFINITIVE_CONFLICT;
-                            }
-                            Runnable action = beforeCanonicalCas;
-                            beforeCanonicalCas = null;
-                            if (action != null) {
-                                action.run();
-                            }
-                            return map(await(store.compareAndSet(exact, key, candidate)));
-                        }
-                    },
-                    selectorKey);
+                public CompletionStage<TransactionOutcome> conditionalTransaction(ExactTransaction transaction) {
+                    throw new AssertionError("native Binding lifecycle must never use a multi-key transaction");
+                }
+
+                public boolean supportsAtomicMultiKeyTransactions() {
+                    return false;
+                }
+            };
+        }
+
+        private boolean proofFixtureKey(String key) {
+            return key.startsWith(root + "/proof/") || key.startsWith(root + "/protection/");
         }
 
         void admit(int id) {
@@ -508,6 +527,7 @@ class M5RetiredHistoryOxiaIntegrationTest {
         volatile boolean loseNextNodeResponse;
         volatile String holdSelectorKey;
         volatile String lastCreatedKey;
+        volatile Runnable beforeSelectorCas;
 
         Faults(OxiaConditionalClient nativeClient) {
             this.nativeClient = nativeClient;
@@ -533,14 +553,21 @@ class M5RetiredHistoryOxiaIntegrationTest {
         }
 
         public CompletionStage<Void> compareAndSet(String key, CanonicalBytes value, long version) {
-            return nativeClient.compareAndSet(key, value, version).thenCompose(ignored -> {
-                if (key.equals(holdSelectorKey)) {
-                    holdSelectorKey = null;
-                    selectorApplied.complete(null);
-                    return heldResponse;
-                }
-                return CompletableFuture.completedFuture(null);
-            });
+            Runnable action = key.endsWith("/selector") ? beforeSelectorCas : null;
+            if (action != null) {
+                beforeSelectorCas = null;
+            }
+            CompletionStage<Void> before =
+                    action == null ? CompletableFuture.completedFuture(null) : CompletableFuture.runAsync(action);
+            return before.thenCompose(ignored -> nativeClient.compareAndSet(key, value, version))
+                    .thenCompose(ignored -> {
+                        if (key.equals(holdSelectorKey)) {
+                            holdSelectorKey = null;
+                            selectorApplied.complete(null);
+                            return heldResponse;
+                        }
+                        return CompletableFuture.completedFuture(null);
+                    });
         }
     }
 
@@ -550,14 +577,6 @@ class M5RetiredHistoryOxiaIntegrationTest {
         } catch (Exception failure) {
             throw new IllegalStateException("native Oxia history operation did not complete exactly", failure);
         }
-    }
-
-    private static ControlMutationOutcome map(MutationOutcome outcome) {
-        return switch (outcome) {
-            case APPLIED_EXACT -> ControlMutationOutcome.APPLIED;
-            case PREDECESSOR_UNCHANGED, DEFINITIVE_CONFLICT -> ControlMutationOutcome.DEFINITIVE_CONFLICT;
-            case RESPONSE_UNKNOWN -> ControlMutationOutcome.RESPONSE_UNKNOWN;
-        };
     }
 
     static CanonicalBytes bytes(String value) {

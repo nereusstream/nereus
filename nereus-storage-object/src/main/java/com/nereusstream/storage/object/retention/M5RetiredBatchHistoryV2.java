@@ -269,9 +269,27 @@ public final class M5RetiredBatchHistoryV2 {
         return new NodeWrite(new Root(Sha256Digest.hash(bytes), 1), bytes);
     }
 
+    /** Validate one stored non-empty node at a native boundary without trusting an unselected root/count. */
+    public NodeWrite verifyNode(Sha256Digest expectedSha256, CanonicalBytes bytes) {
+        Node node = decodeNode(expectedSha256, Optional.of(Objects.requireNonNull(bytes, "bytes")));
+        return new NodeWrite(node.root(), bytes);
+    }
+
     private Node readNode(Root expected, int depth, Optional<CanonicalBytes> stored) {
+        Node node = decodeNode(expected.sha256(), stored);
+        if (node.depth() != depth) {
+            throw new IllegalArgumentException("retired history node Binding or depth differs");
+        }
+        if (!node.root().equals(expected)) {
+            throw new IllegalArgumentException("retired history node count or canonical bytes differ");
+        }
+        return node;
+    }
+
+    private Node decodeNode(Sha256Digest expectedSha256, Optional<CanonicalBytes> stored) {
+        Objects.requireNonNull(expectedSha256, "expectedSha256");
         CanonicalBytes bytes = stored.orElseThrow(() -> new IllegalStateException("retired history node is missing"));
-        if (bytes.length() > MAX_NODE_BYTES || !Sha256Digest.hash(bytes).equals(expected.sha256())) {
+        if (bytes.length() > MAX_NODE_BYTES || !Sha256Digest.hash(bytes).equals(expectedSha256)) {
             throw new IllegalStateException("retired history node content address differs");
         }
         try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
@@ -280,33 +298,30 @@ public final class M5RetiredBatchHistoryV2 {
             }
             int type = input.readUnsignedByte();
             int level = input.readUnsignedShort();
-            if (level != depth
-                    || !readDigest(input).equals(binding.bindingId().digest())
+            if (!readDigest(input).equals(binding.bindingId().digest())
                     || !readDigest(input).equals(binding.incarnationSha256())
                     || !readDigest(input).equals(binding.storageEpochSha256())) {
                 throw new IllegalArgumentException("retired history node Binding or depth differs");
             }
             Node node;
             NodeWrite canonical;
-            if (type == 1 && depth < DEPTH) {
+            if (type == 1 && level < DEPTH) {
                 Root left = readRoot(input);
                 Root right = readRoot(input);
-                canonical = branch(depth, left, right);
-                node = new Node(depth, canonical.root(), left, right, Optional.empty());
-            } else if (type == 2 && depth == DEPTH) {
+                canonical = branch(level, left, right);
+                node = new Node(level, canonical.root(), left, right, Optional.empty());
+            } else if (type == 2 && level == DEPTH) {
                 int size = input.readInt();
                 if (size <= 0 || size > MAX_NODE_BYTES) {
                     throw new IllegalArgumentException("retired history leaf byte length exceeds bound");
                 }
                 var tombstone = M5RetentionCodecV1.decodeRetiredBatch(CanonicalBytes.copyOf(input.readNBytes(size)));
                 canonical = leaf(tombstone);
-                node = new Node(depth, canonical.root(), null, null, Optional.of(tombstone));
+                node = new Node(level, canonical.root(), null, null, Optional.of(tombstone));
             } else {
                 throw new IllegalArgumentException("retired history node type or depth differs");
             }
-            if (input.read() != -1
-                    || !canonical.bytes().equals(bytes)
-                    || !node.root().equals(expected)) {
+            if (input.read() != -1 || !canonical.bytes().equals(bytes)) {
                 throw new IllegalArgumentException("retired history node count or canonical bytes differ");
             }
             return node;

@@ -143,8 +143,12 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   and admission rejects historical IDs under the current root. Native namespace quota/restart accounting, Cell I/O,
   operator metrics and permanent physical-done cache integration remain OPEN.
   The [real Oxia history projection](m5-retired-history-oxia-projection.json) verifies 1,026 native folds, unknown-result
-  retries, current-root admission and a separate server restart fixture. Source/reference facts and the M4 bridge are
-  explicit test fixtures; production key routing and complete writer/evidence composition remain OPEN.
+  retries, current-root admission and a separate server restart fixture. Its historical M4 bridge was test-only.
+  The subsequent [Binding route projection](m5-binding-lifecycle-route-projection.json) replaces that bridge with a
+  production M4/history adapter using the same native selector key and route-scoped exact version tokens; the native
+  continuation and restart checks pass again. Unique native namespace/Binding assignment, quota/restart accounting,
+  Cell I/O/metrics, BK compaction metadata routing and complete writer/evidence composition remain OPEN.
+  External source/reference facts remain explicit test fixtures.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

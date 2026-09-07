@@ -19,7 +19,7 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 | Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; native namespace/route admission and real dispatch remain OPEN |
 | Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; real protocol proof producers and full deletion composition remain OPEN |
 | Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts, sealed descriptor publication and independent recovery exist; recovery now uses the existing M4 source planner and hazard kernel; native namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
-| Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; terminal folds and current-root admission now pass source-locked real Oxia continuation/restart checks; native control-key routing, namespace quota/restart accounting, Cell I/O/metrics and physical-done cache lifecycle remain OPEN |
+| Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and physical-done cache lifecycle remain OPEN |
 | Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; native owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
 
@@ -52,8 +52,13 @@ unknown attempts and bound pending bytes; native namespace headroom/restoration 
 The [real Oxia history projection](m5-retired-history-oxia-projection.json) now adds native one-key retirement and
 1,026 continuous folds with one active hole, 982-byte post-fold selectors, exact retry under response loss and
 rejection after client reconnect. A separate two-tombstone fixture retains its exact selector/version/history across
-a service restart. Source/reference facts and the synchronous M4 bridge remain test fixtures; native key routing,
-quota restoration, complete protocol writers and source-bound M5 children remain OPEN.
+a service restart. That published verification used synthetic source/reference facts and a test-only synchronous
+M4 bridge. The subsequent [Binding route projection](m5-binding-lifecycle-route-projection.json) replaces the M4/history
+bridge with `OxiaBindingLifecycleMetadataStoreV2` and the production M5 control facade. It shares the native M3 selector
+key, validates typed full-Binding values and immutable history nodes, and scopes exact version tokens to the configured
+Cell root/shard/Binding. The new route repeats the continuous and restart checks. Synthetic external proof facts,
+unique native namespace/Binding assignment, quota restoration, Cell I/O/metrics, the BK compaction metadata route,
+complete protocol writers and source-bound M5 children remain OPEN.
 The carrier gate passed 60 executed tasks with 8 inventory/layout, 7 real carrier and 8 real Cell-session tests;
 its exact-native-run check now precedes fencing, including the foreign-run zero-fence negative case.
 
