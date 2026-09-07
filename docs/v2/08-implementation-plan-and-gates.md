@@ -36,8 +36,11 @@ operator metrics and physical-done cache lifecycle remain separate requirements.
 the published predecessor used a test-only M4 bridge. `scripts/run-v2-m5-binding-lifecycle-route-check.sh` now repeats
 these checks through a production adapter for the existing native M4 selector and immutable history keys, with exact
 route-scoped version tokens. `v2M5BindingLifecycleRouteCheck` also verifies typed route rejection and the unchanged M3
-adapter. Unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics, BK compaction metadata
-routing, complete writer composition and source-bound M5 evidence are still required.
+adapter. `scripts/run-v2-m5-bookkeeper-oxia-control-check.sh` now runs `v2M5BookKeeperOxiaControlCheck` with real Oxia
+and BK together, plus separate JVM phases across an Oxia restart. It verifies typed immutable compaction records,
+existing M4 selector publication, protected descriptor recovery and bounded owner-executor control continuations.
+Unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics, complete protocol/task/writer
+composition, internal-topic lifecycle, cleanup and source-bound M5 evidence are still required.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

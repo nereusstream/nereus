@@ -122,6 +122,11 @@ final class KafkaBookKeeperCompactionTestSupportV2 {
     static List<com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity>
             installReadAuthority(Store store, Input input) {
         store.allowSelectorCas = true;
+        return installReadAuthority((CanonicalControlMetadataStore) store, input);
+    }
+
+    static List<com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity>
+            installReadAuthority(CanonicalControlMetadataStore store, Input input) {
         var cut = input.plan().sourceCut();
         var m4 = new com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1(
                 store, 7, cut.identity().binding());

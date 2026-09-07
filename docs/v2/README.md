@@ -35,8 +35,11 @@ performance-first BookKeeper WAL.
   client reconnect and a separate server restart fixture. The subsequent
   [Binding route gate](detailed_design/m5/m5-binding-lifecycle-route-projection.json) repeats this verification through
   a production M4/history adapter on the existing selector key, with route-scoped native version tokens. Unique native
-  namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and BK compaction metadata routing remain
-  incomplete; external source/reference facts remain synthetic.
+  namespace/Binding assignment, quota/restart accounting and Cell I/O/metrics remain incomplete.
+  The subsequent [BK/Oxia control gate](detailed_design/m5/m5-bookkeeper-oxia-control-projection.json) verifies typed
+  immutable compaction records and real selector publication with real BK recovery, native response loss and an Oxia
+  service restart. M4 owns projection over the raw envelope port; native source/protocol admission facts remain synthetic,
+  and task fencing, internal-topic lifecycle, physical cleanup and complete writer composition are still required.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.

@@ -147,8 +147,12 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   The subsequent [Binding route projection](m5-binding-lifecycle-route-projection.json) replaces that bridge with a
   production M4/history adapter using the same native selector key and route-scoped exact version tokens; the native
   continuation and restart checks pass again. Unique native namespace/Binding assignment, quota/restart accounting,
-  Cell I/O/metrics, BK compaction metadata routing and complete writer/evidence composition remain OPEN.
-  External source/reference facts remain explicit test fixtures.
+  Cell I/O/metrics and complete writer/evidence composition remain OPEN. External source/reference facts remain fixtures.
+- The [BK/Oxia control projection](m5-bookkeeper-oxia-control-projection.json) adds immutable native compaction-record
+  transport and protocol-owned task/Binding/namespace validation, composed with the raw Binding envelope for M4.
+  Five joint real Oxia/BK cases and two JVM phases across an Oxia server restart verify publication, protected recovery,
+  native response-loss retry and rejection of missing or stale inputs. The configured control executor is bounded;
+  native namespace/source/protocol admission, task terminal fencing, internal-topic lifecycle and cleanup remain OPEN.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

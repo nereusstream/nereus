@@ -351,3 +351,51 @@ tasks.register<Test>("v2M5BookKeeperM4RecoveryRealTest") {
         systemProperty("nereus.bookkeeper.metadataServiceUri", metadataServiceUri)
     }
 }
+
+// Only the joint native test composes Oxia and Kafka; published production module dependencies stay unchanged.
+dependencies {
+    add(realBookKeeperTest.implementationConfigurationName, project(":nereus-metadata-oxia"))
+}
+
+tasks.register<Test>("v2M5BookKeeperControlStoreTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperControlMetadataStoreV2Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
+val m5BookKeeperOxiaCases = mapOf(
+    "v2M5BookKeeperOxiaControlRealTest" to "KafkaBookKeeperOxiaControlV2RealTest",
+    "v2M5BookKeeperOxiaRestartWriteTest" to "KafkaBookKeeperOxiaControlV2RestartTest.writeBeforeServerRestart",
+    "v2M5BookKeeperOxiaRestartReadTest" to "KafkaBookKeeperOxiaControlV2RestartTest.readAfterServerRestart",
+)
+m5BookKeeperOxiaCases.forEach { (taskName, testName) ->
+    tasks.register<Test>(taskName) {
+        group = "verification"
+        testClassesDirs = realBookKeeperTest.output.classesDirs
+        classpath = realBookKeeperTest.runtimeClasspath
+        useJUnitPlatform()
+        maxParallelForks = 1
+        filter {
+            includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.$testName")
+        }
+        outputs.upToDateWhen { false }
+        doFirst {
+            systemProperty("nereus.bookkeeper.metadataServiceUri",
+                providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull
+                    ?: error("v2M2BookKeeperMetadataServiceUri is required"))
+            systemProperty("nereus.m5.oxia.serviceAddress",
+                providers.gradleProperty("v2M5RetentionOxiaServiceAddress").orNull
+                    ?: error("v2M5RetentionOxiaServiceAddress is required"))
+            if (taskName.contains("Restart")) {
+                systemProperty("nereus.m5.bkControl.restartCheckpoint",
+                    providers.gradleProperty("v2M5BookKeeperOxiaRestartCheckpoint").orNull
+                        ?: error("v2M5BookKeeperOxiaRestartCheckpoint is required"))
+            }
+        }
+    }
+}

@@ -76,6 +76,13 @@ class OxiaBindingLifecycleMetadataStoreV2Test {
                 .isEqualTo(1L);
         assertThat(legacy.compareAndSet(KEYS.selector(), Optional.of(before), before))
                 .isEqualTo(ControlMutationOutcome.DEFINITIVE_CONFLICT);
+        assertThat(route.rawControlMetadata().get(KEYS.selector())).isEqualTo(legacy.get(KEYS.selector()));
+        var coordinatorView = new com.nereusstream.storage.object.retention.M5BindingAuthorityControlMetadataStoreV1(
+                route.rawControlMetadata(), KEYS.selector());
+        var next = M4ReadControlCodecV1.encodeSelector(selector(BINDING, 3));
+        assertThat(coordinatorView.compareAndSet(KEYS.selector(), Optional.of(after), next))
+                .isEqualTo(ControlMutationOutcome.APPLIED);
+        assertThat(route.controlMetadata().get(KEYS.selector())).contains(next);
     }
 
     @Test

@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 
 /**
  * Writes and natively seals inventoried BK compaction parts, then verifies every entry and full metadata fingerprint.
@@ -61,9 +62,20 @@ public final class KafkaBookKeeperCompactionWriterV2 {
     private final KafkaBookKeeperInventoryV2 inventory;
     private final BookKeeperCellSession session;
     private final SealedMetadataReader metadataReader;
+    private final Executor controlExecutor;
 
     public KafkaBookKeeperCompactionWriterV2(
             KafkaBookKeeperInventoryV2 inventory, BookKeeperCellSession session, SealedMetadataReader metadataReader) {
+        this(inventory, session, metadataReader, Runnable::run);
+    }
+
+    /** Native metadata calls and continuation admission execute on the owner's bounded control executor. */
+    public KafkaBookKeeperCompactionWriterV2(
+            KafkaBookKeeperInventoryV2 inventory,
+            BookKeeperCellSession session,
+            SealedMetadataReader metadataReader,
+            Executor controlExecutor) {
+        this.controlExecutor = Objects.requireNonNull(controlExecutor, "controlExecutor");
         this.inventory = Objects.requireNonNull(inventory, "inventory");
         this.session = Objects.requireNonNull(session, "session");
         this.metadataReader = Objects.requireNonNull(metadataReader, "metadataReader");
@@ -77,12 +89,13 @@ public final class KafkaBookKeeperCompactionWriterV2 {
         CompletionStage<List<VerifiedPart>> result = CompletableFuture.completedFuture(new ArrayList<>());
         for (int index = 0; index < layout.parts().size(); index++) {
             int ordinal = index;
-            result = result.thenCompose(
+            result = result.thenComposeAsync(
                     parts -> writePart(layout.task(), ordinal, layout.parts().get(ordinal))
                             .thenApply(part -> {
                                 parts.add(part);
                                 return parts;
-                            }));
+                            }),
+                    controlExecutor);
         }
         return result.thenApply(List::copyOf);
     }
@@ -93,36 +106,45 @@ public final class KafkaBookKeeperCompactionWriterV2 {
         CompletionStage<List<VerifiedPart>> result = CompletableFuture.completedFuture(new ArrayList<>());
         for (int index = 0; index < layout.parts().size(); index++) {
             int ordinal = index;
-            result = result.thenCompose(parts -> {
-                Part part = inventory
-                        .readPart(layout.task(), ordinal)
-                        .orElseThrow(() -> new IllegalStateException("BK recovery lacks an inventoried part"));
-                return sealAndVerify(layout.task(), part, layout.parts().get(ordinal))
-                        .thenApply(verified -> {
-                            parts.add(verified);
-                            return parts;
-                        });
-            });
+            result = result.thenComposeAsync(
+                    parts -> {
+                        Part part = inventory
+                                .readPart(layout.task(), ordinal)
+                                .orElseThrow(() -> new IllegalStateException("BK recovery lacks an inventoried part"));
+                        return sealAndVerify(layout.task(), part, layout.parts().get(ordinal))
+                                .thenApply(verified -> {
+                                    parts.add(verified);
+                                    return parts;
+                                });
+                    },
+                    controlExecutor);
         }
         return result.thenApply(List::copyOf);
     }
 
     private CompletionStage<VerifiedPart> writePart(Task task, int ordinal, PartBody body) {
-        return inventory.reservePart(task, ordinal, session).thenCompose(reserved -> {
-            Part part = reserved.orElseThrow(() -> new IllegalStateException("BK part reservation remains unknown"));
-            return inventory.createPart(task, part, session).thenCompose(created -> {
-                if (created == CreateOutcome.CONFLICT) {
-                    return CompletableFuture.failedFuture(new IllegalStateException("different BK run occupies part"));
-                }
-                if (created == CreateOutcome.CREATED_WRITABLE) {
-                    // An unknown append may have applied. Recovery settles native writes before exact full validation.
-                    return appendAll(part, body)
-                            .handle((ignored, failure) -> null)
-                            .thenCompose(ignored -> sealAndVerify(task, part, body));
-                }
-                return sealAndVerify(task, part, body);
-            });
-        });
+        return inventory
+                .reservePart(task, ordinal, session)
+                .thenComposeAsync(
+                        reserved -> {
+                            Part part = reserved.orElseThrow(
+                                    () -> new IllegalStateException("BK part reservation remains unknown"));
+                            return inventory.createPart(task, part, session).thenCompose(created -> {
+                                if (created == CreateOutcome.CONFLICT) {
+                                    return CompletableFuture.failedFuture(
+                                            new IllegalStateException("different BK run occupies part"));
+                                }
+                                if (created == CreateOutcome.CREATED_WRITABLE) {
+                                    // An unknown append may have applied. Recovery settles native writes before exact
+                                    // full validation.
+                                    return appendAll(part, body)
+                                            .handle((ignored, failure) -> null)
+                                            .thenCompose(ignored -> sealAndVerify(task, part, body));
+                                }
+                                return sealAndVerify(task, part, body);
+                            });
+                        },
+                        controlExecutor);
     }
 
     private CompletionStage<Void> appendAll(Part part, PartBody body) {

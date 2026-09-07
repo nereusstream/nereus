@@ -33,6 +33,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 
 /**
  * Immutable BK compaction task and native-ID inventory, written before any ledger creation.
@@ -137,9 +138,16 @@ public final class KafkaBookKeeperInventoryV2 {
     }
 
     private final CanonicalControlMetadataStore metadata;
+    private final Executor controlExecutor;
 
     public KafkaBookKeeperInventoryV2(CanonicalControlMetadataStore metadata) {
+        this(metadata, Runnable::run);
+    }
+
+    /** Native metadata callers supply their bounded Cell control executor and invoke control entrypoints on it. */
+    public KafkaBookKeeperInventoryV2(CanonicalControlMetadataStore metadata, Executor controlExecutor) {
         this.metadata = Objects.requireNonNull(metadata, "metadata");
+        this.controlExecutor = Objects.requireNonNull(controlExecutor, "controlExecutor");
     }
 
     /** A missing reread never authorizes allocation, including a lost put response. */
@@ -160,25 +168,29 @@ public final class KafkaBookKeeperInventoryV2 {
         if (existing.isPresent()) {
             return CompletableFuture.completedFuture(existing);
         }
-        return session.reserveLedgerIdentity().thenApply(result -> {
-            if (result.outcome() != ProviderMutationOutcomeV1.APPLIED_EXACT) {
-                return Optional.empty();
-            }
-            BookKeeperLedgerIdentity id = result.exactProof().orElseThrow();
-            RunLedgerConfigurationV1 configuration = task.configuration(ordinal);
-            Part part = new Part(
-                    task.taskIdSha256(),
-                    ordinal,
-                    new BookKeeperLedger(task.namespace(), id.ledgerId()),
-                    new RunLedgerHandleV1(
-                            configuration.providerScopeId(),
-                            configuration.runId(),
-                            id,
-                            configuration.configurationDigest()));
-            metadata.putIfAbsent(
-                    partKey(task.taskIdSha256(), ordinal), KafkaBookKeeperInventoryCodecV2.encodePart(part));
-            return readPart(task, ordinal);
-        });
+        return session.reserveLedgerIdentity()
+                .thenApplyAsync(
+                        result -> {
+                            if (result.outcome() != ProviderMutationOutcomeV1.APPLIED_EXACT) {
+                                return Optional.empty();
+                            }
+                            BookKeeperLedgerIdentity id = result.exactProof().orElseThrow();
+                            RunLedgerConfigurationV1 configuration = task.configuration(ordinal);
+                            Part part = new Part(
+                                    task.taskIdSha256(),
+                                    ordinal,
+                                    new BookKeeperLedger(task.namespace(), id.ledgerId()),
+                                    new RunLedgerHandleV1(
+                                            configuration.providerScopeId(),
+                                            configuration.runId(),
+                                            id,
+                                            configuration.configurationDigest()));
+                            metadata.putIfAbsent(
+                                    partKey(task.taskIdSha256(), ordinal),
+                                    KafkaBookKeeperInventoryCodecV2.encodePart(part));
+                            return readPart(task, ordinal);
+                        },
+                        controlExecutor);
     }
 
     /** Never allocates here. Every retry targets the same durably recorded native ID and exact run metadata. */

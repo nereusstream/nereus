@@ -192,6 +192,17 @@ tasks.register<Test>("r1MetadataTest") {
     }
 }
 
+tasks.register<Test>("v2M5BookKeeperRecordStoreTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.v2.compaction.OxiaKafkaBookKeeperRecordStoreV2Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.register<Test>("v2M5BindingLifecycleRouteTest") {
     group = "verification"
     description = "Verify the native Binding history route and exact compatibility with M3 control keys."

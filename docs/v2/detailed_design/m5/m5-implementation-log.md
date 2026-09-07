@@ -440,6 +440,68 @@ log is `/tmp/nereus-m5-binding-route-gate.log`. Supplemental projection/governan
 checks. Their log is `/tmp/nereus-m5-binding-route-final-check.log`. They were wired after native execution; no
 production or integration-test Java changed after it.
 
+## 2026-09-08 real Oxia and BK compaction control composition
+
+Status: focused joint native control execution; unique native admission, native protocol/task lifecycle and M5
+source-bound evidence remain OPEN. The [BK/Oxia control projection](m5-bookkeeper-oxia-control-projection.json) follows
+published Binding route source `79f53d5910fd7a2eae5ffdde429bd925afc9ca47`. Earlier projections retain their original
+synthetic-control scope. The existing production module dependency graph remains unchanged; only the joint native
+test source set composes the Kafka and Oxia modules.
+
+`OxiaKafkaBookKeeperRecordStoreV2` admits only immutable task, part, descriptor and candidate keys under a canonical
+configured Cell root. The native key/value caps are 512 bytes and 1 MiB; task/descriptor keys bind their exact body
+hashes, candidate values are exact digests, and no existing record can be overwritten through this port. Lost create
+responses reconcile by authoritative reread. Read failures and corrupt bytes never become authoritative absence.
+`KafkaBookKeeperControlMetadataStoreV2` supplies protocol-owned decoding and full Binding/namespace/provider-scope
+checks, requires each part's exact registered task configuration and each candidate's exact descriptor/task, and
+composes these records with the existing Binding control route.
+
+The first joint run exposed double selector projection: M4ReadControlCoordinatorV1 already owns its M5 envelope
+facade, so passing a projected facade through another store produced invalid creation bytes. The native route now
+exposes `rawControlMetadata()` explicitly for coordinator composition; its existing `controlMetadata()` remains the
+direct projected-selector view. Both share the same validated canonical backend and exact native versions. This
+fix does not weaken typed validation, selector revision/history guards or frozen M4 wire bytes.
+
+Native reservation continuations, per-part write/recovery admission and descriptor publication now accept the
+owner's control executor. The joint fixture uses a single-thread bounded 64-entry executor and checks every
+synchronous control-port call on it, while asynchronous native completions remain asynchronous. Existing constructors
+retain their direct-executor behavior; real composition must supply the admitted control executor. This is execution
+placement, not complete native Cell scheduling, quota accounting or writer admission.
+
+Five joint cases use actual locked Oxia metadata and actual locked BookKeeper ledgers: multi-ledger publication and
+fresh-client recovery with all eight indexes; empty index-only output after a lost native selector response; a lost
+native part-inventory response before ledger creation; missing selected ledger/descriptor without recreation or old
+fallback; and stale protocol-state rejection leaving immutable prewrites unselected. Recovery uses the existing M4
+source planner and generation lease, with read-only BK capabilities and no additional metadata reads during the
+protected BK recovery stage. No Object provider, endpoint or Object I/O participates in this path.
+
+Separate JVM phases cross a restart of the same Oxia server while the owned BK cluster stays live. The checkpoint
+contains the configured task identity and exact selector/version/descriptor hashes, with no source/output bodies.
+Fresh clients recover the native selected descriptor and its sealed BK contents without creating metadata or ledgers.
+The 5 transport and 6 typed-control unit cases cover malformed/foreign records, content-address mismatch, missing
+parent task/descriptor, immutable allocation protection, native key limits and Cell isolation.
+
+Source cuts, policy/frontier facts, native namespace labels and capability admission remain explicit synthetic
+fixtures. Unique native namespace/Binding assignment, real protocol owner/source admission, task terminal/late-writer
+fencing, internal-topic lifecycle, cleanup, durable quota and physical-done cache remain required. All 17 amended
+acceptance obligations remain OPEN with null receipts; no M5 child, Final, physical-delete or production authority is
+created by this joint verification.
+
+Validation: the joint runner's successful run passed **82/82 executed tasks** with configuration cache disabled and
+all tasks rerun. The post-restart JVM passed **17 tasks** (1 executed, 16 up-to-date). All **18 new test executions**
+(5 native, 2 restart phases, 6 typed-control and 5 transport) have zero failures, errors and skips. Existing real BK
+Cell-session (8), carrier (7), descriptor (4), M4 recovery (2), and the prior Binding/M3 adapter suites (8 + 8) also pass.
+An independent audit verified the captured XML hashes, actual same-container restart and **634 unchanged captured
+inputs**, with input-manifest SHA-256 `e828bf11a3168f05839d4ad904057581eb078e3d5ab14194dac2eaa6d7d66519`.
+The Oxia container `8659cf7d980d0dfb50455697fc43148ddc03075be186165555dc0ef8ca0b3196` restarted from
+`2026-09-07T19:27:45.505690672Z` to `2026-09-07T19:28:19.904957466Z`. The runner then removed only its owned native
+containers and volumes. Local result: `build/m5-bookkeeper-oxia-control/nereus-v2-m5-bk-oxia-control-51697/run-summary.json`;
+successful log: `/tmp/nereus-m5-bk-oxia-control-gate-2.log`. The earlier failed double-projection run remains a failed
+diagnostic in `/tmp/nereus-m5-bk-oxia-control-gate.log`; it is not execution evidence for this corrected result.
+The synchronized documentation then passed **13/13 supplemental tasks**, including frozen M4/M5 dependency,
+lifecycle and prior Binding-route contract checks, in `/tmp/nereus-m5-bk-oxia-control-final-check.log`.
+No captured production, test, build or runner input changed after the successful native execution.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;

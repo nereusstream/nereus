@@ -56,6 +56,7 @@ public final class OxiaBindingLifecycleMetadataStoreV2 implements ExactMetadataT
     private final String historyPrefix;
     private final Pattern acceptedKey;
     private final Oxia09ExactMetadataTransactionStoreV1 exact;
+    private final CanonicalControlMetadataStore rawControl;
     private final CanonicalControlMetadataStore control;
 
     public OxiaBindingLifecycleMetadataStoreV2(
@@ -92,12 +93,18 @@ public final class OxiaBindingLifecycleMetadataStoreV2 implements ExactMetadataT
                     "lifecycle Cell root leaves insufficient room for a 512-byte native key");
         }
         exact = new Oxia09ExactMetadataTransactionStoreV1(new RoutedClient(client));
-        control = new M5BindingAuthorityControlMetadataStoreV1(new CanonicalView(), keys.selector());
+        rawControl = new CanonicalView();
+        control = new M5BindingAuthorityControlMetadataStoreV1(rawControl, keys.selector());
     }
 
-    /** M4 and the retirement coordinator observe the same persisted selector through different typed views. */
+    /** Direct projected-selector access; M4ReadControlCoordinatorV1 must receive rawControlMetadata instead. */
     public CanonicalControlMetadataStore controlMetadata() {
         return control;
+    }
+
+    /** Validated raw envelope view for coordinators that own their M5 selector projection. */
+    public CanonicalControlMetadataStore rawControlMetadata() {
+        return rawControl;
     }
 
     /** Checked native projection for admission diagnostics and exact backend conformance. */

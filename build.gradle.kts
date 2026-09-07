@@ -2502,6 +2502,23 @@ tasks.register("v2M5BindingLifecycleRouteCheck") {
     )
 }
 
+tasks.register("v2M5BookKeeperOxiaControlCheck") {
+    group = "verification"
+    description = "Verify the typed native BK/Oxia compaction control path and protected descriptor recovery."
+    dependsOn(
+        "v2M5BookKeeperM4RecoveryCheck",
+        "v2M5LifecycleDesignCheck",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperControlStoreTest",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperOxiaControlRealTest",
+        ":nereus-kafka-bookkeeper:checkstyleRealBookKeeperTest",
+        ":nereus-metadata-oxia:v2M5BookKeeperRecordStoreTest",
+        ":nereus-metadata-oxia:v2M5BindingLifecycleRouteTest",
+        ":nereus-metadata-oxia:spotlessCheck",
+        ":nereus-metadata-oxia:checkstyleMain",
+        ":nereus-metadata-oxia:checkstyleTest",
+    )
+}
+
 tasks.register<Exec>("v2M5RetentionCoreContractTest") {
     group = "verification"
     description = "Test the fail-closed non-promotable M5-C retention-core checker."

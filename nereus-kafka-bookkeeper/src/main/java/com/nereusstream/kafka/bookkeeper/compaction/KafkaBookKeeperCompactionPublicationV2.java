@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 
 /**
  * Publishes one complete BK descriptor through the existing M4 selector CAS, preserving its M5 authority envelope.
@@ -42,12 +43,24 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
     private final BindingIdentity binding;
     private final M4ReadControlCoordinatorV1 m4;
     private final KafkaSealedBookKeeperReaderV2 reader;
+    private final Executor controlExecutor;
 
     public KafkaBookKeeperCompactionPublicationV2(
             CanonicalControlMetadataStore metadata,
             int shardId,
             BindingIdentity binding,
             KafkaSealedBookKeeperReaderV2 reader) {
+        this(metadata, shardId, binding, reader, Runnable::run);
+    }
+
+    /** Native immutable publication and selector CAS run on the owner's bounded control executor. */
+    public KafkaBookKeeperCompactionPublicationV2(
+            CanonicalControlMetadataStore metadata,
+            int shardId,
+            BindingIdentity binding,
+            KafkaSealedBookKeeperReaderV2 reader,
+            Executor controlExecutor) {
+        this.controlExecutor = Objects.requireNonNull(controlExecutor, "controlExecutor");
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         this.binding = Objects.requireNonNull(binding, "binding");
         this.reader = Objects.requireNonNull(reader, "reader");
@@ -64,39 +77,46 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
         requireIdentity(plan, semantic, descriptor);
         List<SourceProtectionIdentity> sources = List.copyOf(exactFallbackSources);
         M5MaterializationValidatorV1.requireFallbackProtections(plan.sourceCut(), sources);
-        return reader.recover(descriptor).thenApply(recovered -> {
-            KafkaSealedBookKeeperDescriptorV2.requireBodies(semantic, recovered.artifacts());
-            Sha256Digest identity = descriptor.descriptorSha256();
-            PublicationOutcome immutable = createExact(descriptorKey(identity), descriptor.encode());
-            if (immutable != PublicationOutcome.EXISTING_EXACT) {
-                return immutable;
-            }
-            immutable = createExact(candidateKey(descriptor.task().taskIdSha256()), identity.bytes());
-            if (immutable != PublicationOutcome.EXISTING_EXACT) {
-                return immutable;
-            }
-            new KafkaCompactionPublicationFenceV1().requireCurrent(plan, currentCompactionState);
-            BindingReadSelector expected = plan.sourceCut().predecessorSelector();
-            Optional<BindingReadSelector> current = m4.readSelector();
-            if (current.isPresent()
-                    && current.orElseThrow().selectedViewSha256().equals(identity)
-                    && current.orElseThrow().sourceGeneration() == descriptor.sourceGeneration()) {
-                return PublicationOutcome.EXISTING_EXACT;
-            }
-            if (!current.equals(Optional.of(expected))) {
-                return PublicationOutcome.CANCELLED_STALE;
-            }
-            M4ReadControlCoordinatorV1.Outcome outcome = expected.mode() == SelectorMode.PREFERRED_ONLY
-                    ? m4.introduceFallback(expected, identity, descriptor.sourceGeneration(), sources)
-                    : m4.updateMembershipNeutralView(expected, identity, descriptor.sourceGeneration(), sources);
-            return switch (outcome) {
-                case APPLIED -> PublicationOutcome.APPLIED_EXACT;
-                case EXISTING_EXACT -> PublicationOutcome.EXISTING_EXACT;
-                case RETRY_EXACT_PREDECESSOR -> PublicationOutcome.DEFINITIVELY_NOT_APPLIED;
-                case RETAIN -> PublicationOutcome.OUTCOME_UNKNOWN;
-                default -> PublicationOutcome.CONFLICT;
-            };
-        });
+        return reader.recover(descriptor)
+                .thenApplyAsync(
+                        recovered -> {
+                            KafkaSealedBookKeeperDescriptorV2.requireBodies(semantic, recovered.artifacts());
+                            Sha256Digest identity = descriptor.descriptorSha256();
+                            PublicationOutcome immutable = createExact(descriptorKey(identity), descriptor.encode());
+                            if (immutable != PublicationOutcome.EXISTING_EXACT) {
+                                return immutable;
+                            }
+                            immutable =
+                                    createExact(candidateKey(descriptor.task().taskIdSha256()), identity.bytes());
+                            if (immutable != PublicationOutcome.EXISTING_EXACT) {
+                                return immutable;
+                            }
+                            new KafkaCompactionPublicationFenceV1().requireCurrent(plan, currentCompactionState);
+                            BindingReadSelector expected = plan.sourceCut().predecessorSelector();
+                            Optional<BindingReadSelector> current = m4.readSelector();
+                            if (current.isPresent()
+                                    && current.orElseThrow()
+                                            .selectedViewSha256()
+                                            .equals(identity)
+                                    && current.orElseThrow().sourceGeneration() == descriptor.sourceGeneration()) {
+                                return PublicationOutcome.EXISTING_EXACT;
+                            }
+                            if (!current.equals(Optional.of(expected))) {
+                                return PublicationOutcome.CANCELLED_STALE;
+                            }
+                            M4ReadControlCoordinatorV1.Outcome outcome = expected.mode() == SelectorMode.PREFERRED_ONLY
+                                    ? m4.introduceFallback(expected, identity, descriptor.sourceGeneration(), sources)
+                                    : m4.updateMembershipNeutralView(
+                                            expected, identity, descriptor.sourceGeneration(), sources);
+                            return switch (outcome) {
+                                case APPLIED -> PublicationOutcome.APPLIED_EXACT;
+                                case EXISTING_EXACT -> PublicationOutcome.EXISTING_EXACT;
+                                case RETRY_EXACT_PREDECESSOR -> PublicationOutcome.DEFINITIVELY_NOT_APPLIED;
+                                case RETAIN -> PublicationOutcome.OUTCOME_UNKNOWN;
+                                default -> PublicationOutcome.CONFLICT;
+                            };
+                        },
+                        controlExecutor);
     }
 
     /**
