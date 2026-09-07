@@ -13,6 +13,26 @@ This log tracks implementation descendants of the immutable M5 hard-freeze. It d
 bound by `m5-design-freeze.json`, and it is not a child receipt, scenario receipt, canonical Final, staging
 certification, or production authority.
 
+## 2026-09-07 lifecycle amendment 3
+
+Status: accepted design; revised implementation and source-bound evidence remain incomplete.
+
+ADR 0148 and `m5-design-amendment-3.json` add exact supersession, stable physical namespace/resource identity,
+three reclamation reasons, sealed BK compaction, authenticated retirement history, concrete writer obligations and
+READ_FENCED recovery. The review 7/8 failure and capacity requirements have exclusive M5 owners and explicit
+M6/M7/M8 interfaces in the acceptance matrix. `v2M5LifecycleDesignCheck` is governance only.
+
+Inherited generic coordinator/guard work is retained, with its original in-memory tests and non-promotable gate.
+No amended resource identity, history folding, BK carrier or real writer composition is claimed by that predecessor.
+The [current contract view](m5-current-contracts.md) tracks implementation as each slice lands; all revised acceptance
+rows remain OPEN. Immutable I0/A-E, amendments 1/2, source locks and historical receipts are unchanged.
+
+Validation: `v2M5LifecycleDesignCheck v2M5TargetDeleteAuthorityCoordinatorCheck` passed (31 tasks; 18 executed,
+13 up-to-date), including 6 amendment-3 contract tests, historical freeze/M4 checks, inherited coordinator/foundation
+tests and module style checks. The original pre-implementation validator correctly rejects current M5 runtime;
+`v2M5HistoricalDesignCheck` replays its unchanged frozen implementation against the exact c86fde3e tree instead.
+This is a historical design check, never current runtime recertification.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;
@@ -430,10 +450,38 @@ The projection deliberately records `persistedMutationCoordinatorPresent=false`,
 `realOxiaExecutionPresent=false`. Pure candidate construction is not persisted dispatch authority and grants no
 physical-delete, source-bound receipt, scenario-promotion, staging, or production authority.
 
+## M5-D same-key coordinator and writer guard
+
+Status: exact same-key metadata coordinator and generic durable proof-bound writer guard implemented against an
+in-memory store; all concrete writer ownership integration and external delete composition remain absent. Real Oxia execution remains absent.
+
+- `M5TargetDeleteAuthorityCoordinatorV1` is the only persistence surface. It creates the permanent key and applies
+  ticket, fence, intent, takeover and done transitions through one `ExactMetadataTransactionStoreV1.compareAndSet`
+  call site; it never invokes or emulates `conditionalTransaction`;
+- every attempt performs an authoritative same-key reread and distinguishes exact applied/existing candidate, exact
+  unchanged predecessor, definitive conflict, unresolved response and missing/malformed permanent-key quarantine;
+- `M5TargetDeleteWriterGuardV1` passes a durable dispatch capability to a proof-changing writer only after the exact
+  ticketed successor is visible. Reconciled terminal outcomes remove the ticket through another exact CAS, while
+  exception or response loss retains it; and
+- deterministic races prove ticket-first vetoes CAS-1 and fence-first prevents writer dispatch. The test store records
+  zero multi-key transaction calls.
+
+Focused gate:
+
+```text
+./gradlew --no-daemon --no-configuration-cache v2M5TargetDeleteAuthorityCoordinatorCheck --rerun-tasks
+PASS_V2_M5_TARGET_DELETE_AUTHORITY_COORDINATOR_NON_PROMOTABLE
+M5TargetDeleteAuthorityCoordinatorV1Test: 9 tests, 0 failures, 0 errors, 0 skipped
+```
+
+This is persisted behavior only against the deterministic in-memory port. The generic guard is not proof that all ten
+production writer classes are wired. There is still no external identity reader, Provider/BookKeeper dispatch,
+source-locked real Oxia result, source-bound receipt, physical-delete, staging, or production authority.
+
 ## Remaining ordered work
 
-1. Persist the ADR 0147 authority through exact same-key CAS, integrate all ten proof-bound writer classes, and compose
-   the fenced identity read, intent/done recovery and external cleanup adapters above the pure foundation.
+1. Integrate all ten proof-bound writer classes with the durable writer-ticket guard, then compose the fenced identity
+   read, intent/done recovery and external cleanup adapters above the same-key coordinator.
 2. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
    `v2M5Check`.
 

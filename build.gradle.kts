@@ -2092,6 +2092,41 @@ tasks.register<Exec>("v2M5HistoricalM4DependencyCheck") {
     commandLine("python3", "scripts/check-v2-m5-historical-m4.py")
 }
 
+tasks.register<Exec>("v2M5LifecycleDesignContractTest") {
+    group = "verification"
+    description = "Test M5 lifecycle supersession, immutable inputs and exclusive acceptance ownership."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-lifecycle-design-tests.py")
+}
+
+tasks.register<Exec>("v2M5LifecycleDesignSourceCheck") {
+    group = "verification"
+    description = "Validate M5 amendment 3 without claiming runtime or source-bound evidence."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-lifecycle-design.py")
+}
+
+tasks.register("v2M5LifecycleDesignCheck") {
+    group = "verification"
+    description = "Check the current M5 lifecycle contract and immutable predecessor chain."
+    dependsOn(
+        "v2DocumentationCheck",
+        "v2M5HistoricalDesignCheck",
+        "v2M5HistoricalM4DependencyContractTest",
+        "v2M5HistoricalM4DependencyCheck",
+        "v2M5DesignAmendment2Check",
+        "v2M5LifecycleDesignContractTest",
+        "v2M5LifecycleDesignSourceCheck",
+    )
+}
+
+tasks.register<Exec>("v2M5HistoricalDesignCheck") {
+    group = "verification"
+    description = "Replay the immutable M5 pre-implementation validator and verify current frozen bytes."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-historical-design.py")
+}
+
 tasks.register<Exec>("v2M5DesignSourceCheck") {
     group = "verification"
     description = "Validate the frozen M5 design manifest and prove implementation/evidence have not started."
@@ -2543,6 +2578,34 @@ tasks.register("v2M5TargetDeleteAuthorityFoundationCheck") {
         "v2M5TargetDeleteAuthorityFoundationContractTest",
         "v2M5TargetDeleteAuthorityFoundationSourceCheck",
         ":nereus-storage-object:v2M5TargetDeleteAuthorityFoundationTest",
+        ":nereus-storage-object:checkstyleMain",
+        ":nereus-storage-object:checkstyleTest",
+        ":nereus-storage-object:spotlessCheck",
+    )
+}
+
+tasks.register<Exec>("v2M5TargetDeleteAuthorityCoordinatorContractTest") {
+    group = "verification"
+    description = "Test the fail-closed M5-D same-key CAS coordinator and durable writer guard checker."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-target-delete-authority-coordinator-tests.py")
+}
+
+tasks.register<Exec>("v2M5TargetDeleteAuthorityCoordinatorSourceCheck") {
+    group = "verification"
+    description = "Validate exact same-key CAS reconciliation and ticket-before-writer-dispatch enforcement."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-target-delete-authority-coordinator.py")
+}
+
+tasks.register("v2M5TargetDeleteAuthorityCoordinatorCheck") {
+    group = "verification"
+    description = "Run the in-memory M5-D persistence gate without external delete or real-Oxia authority."
+    dependsOn(
+        "v2M5TargetDeleteAuthorityFoundationCheck",
+        "v2M5TargetDeleteAuthorityCoordinatorContractTest",
+        "v2M5TargetDeleteAuthorityCoordinatorSourceCheck",
+        ":nereus-storage-object:v2M5TargetDeleteAuthorityCoordinatorTest",
         ":nereus-storage-object:checkstyleMain",
         ":nereus-storage-object:checkstyleTest",
         ":nereus-storage-object:spotlessCheck",

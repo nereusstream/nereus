@@ -55,12 +55,14 @@ implementation input. The strict big-endian body uses a 256-byte Header; a 32-by
 BindingContext rows; 104/96-byte Kafka/Pulsar AppendUnit rows; 48-byte Frame rows; 37-byte HKDF info; 12-byte derived
 nonces; and 272/328-byte Directory/Frame AAD. Its format ceilings are a 4-MiB authenticated prefix, 4-GiB body and
 decoded aggregate, 64-MiB decoded frame, 256 contexts, and 65,536 units/frames. These are parser/compatibility ceilings,
-not production Root targets or Provider evidence. Projection/goldens, codec, mutation runner, state traces and real
-evidence remain unimplemented, so this exact design changes no scenario status.
+not production Root targets or Provider evidence. At the historical input-closure boundary, projection/goldens, codec, mutation runner, state traces and real
+evidence had not yet run. The later M3 Final supplies those implementation descendants; see the
+[current V2 index](README.md) for its exact source and RANGE_SELECTED(RANGE_64) selection. This paragraph preserves
+the format contract and does not recertify M3 at the current M5 source.
 
-ADR 0089 is the sole normative Header offset table. The future `docs/v2/wire/nwg1-v1.json` projection must mechanically
-transcribe that gap-free 256-byte table and cannot create an independent field authority. No production NWG1 bytes
-exist, so the amendment correctly retains `wireVersion=1`. The Header fixes Object digest `SHA-256/v1=1/1` and the
+ADR 0089 is the sole normative Header offset table. The `docs/v2/wire/nwg1-v1.json` projection must mechanically
+transcribe that gap-free 256-byte table and cannot create an independent field authority. At that historical amendment no production NWG1 bytes
+existed, so it retained `wireVersion=1`; the later implementation uses that frozen layout. The Header fixes Object digest `SHA-256/v1=1/1` and the
 twelve first-satisfied actual-close codes; evidence still owns normal target/linger selection.
 
 One Kafka frame is one complete raw broker-assigned RecordBatch. All frames from one partition `MemoryRecords` storage

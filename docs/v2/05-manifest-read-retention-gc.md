@@ -9,6 +9,14 @@ sourceTuple: v2-m1
 
 # Manifest, read, retention, and GC
 
+## Current lifecycle supersession
+
+[ADR 0148](../decisions/0148-v2-m5-lifecycle-contract-amendment.md) and the
+[current M5 contract view](detailed_design/m5/m5-current-contracts.md) select reason-specific reclamation and
+authenticated retirement history. Logical expiry, old physical representation reclamation and unpublished output
+cleanup have distinct predicates. All applicable exact M4 RELEASED, native authority and reference protections remain.
+
+
 ## Immutable physical descriptors
 
 Every physical source or materialized output has an immutable descriptor containing:

@@ -9,6 +9,16 @@ sourceTuple: v2-m1
 
 # V2 open questions
 
+## M5 lifecycle amendment implementation obligations
+
+ADR 0148 resolves design selection for stable physical identity, replacement versus expiry, BK_ONLY compaction and
+protected retirement history. The [current contract view](detailed_design/m5/m5-current-contracts.md),
+[writer matrix](detailed_design/m5/m5-lifecycle-writer-matrix.md) and
+[acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json) track remaining implementation and evidence.
+These are OPEN execution obligations, not permission to defer M5 integration. Native activation remains M6, planned
+operational handoff M7 and scale/parity M8; no historical M3/M4 evidence is reinterpreted.
+
+
 This file records proposals that have not been accepted as runtime contracts and retains resolved gate IDs for
 traceability. An answer moves into a normative document or ADR only after explicit confirmation; editing this file
 alone cannot close a gate.

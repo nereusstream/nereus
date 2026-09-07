@@ -1,0 +1,51 @@
+{
+  "schema": "NEREUS_V2_M5_D_TARGET_DELETE_AUTHORITY_COORDINATOR_PROJECTION_V1",
+  "status": "SAME_KEY_CAS_COORDINATOR_AND_WRITER_GUARD_IMPLEMENTED_NON_PROMOTABLE",
+  "foundationCommit": "f05037bb16017f24e8147e99a61f26e539ed85fa",
+  "metadataOperation": "ExactMetadataTransactionStoreV1.compareAndSet",
+  "transitionOperations": [
+    "CREATE_OPEN",
+    "ACQUIRE_WRITER_TICKET",
+    "COMPLETE_WRITER_TICKET_AFTER_EXACT_RECONCILIATION",
+    "CAS_1_PREPARE_IDENTITY_READ",
+    "CAS_2_BIND_DELETE_INTENT",
+    "TAKE_OVER_DISPATCH_AFTER_OLD_OWNER_FENCED",
+    "COMPLETE_DELETE_DONE"
+  ],
+  "reconciliationOutcomes": [
+    "APPLIED_EXACT",
+    "EXISTING_EXACT",
+    "PREDECESSOR_UNCHANGED",
+    "DEFINITIVE_CONFLICT",
+    "RESPONSE_UNKNOWN",
+    "QUARANTINED"
+  ],
+  "writerGuard": {
+    "ticketMustBeAuthoritativelyVisibleBeforeDispatch": true,
+    "responseUnknownRetainsTicket": true,
+    "exceptionRetainsTicket": true,
+    "terminalReconciliationRequiredBeforeTicketRemoval": true,
+    "fenceWinningFirstPreventsDispatch": true,
+    "timeoutClearsTicket": false
+  },
+  "sameKeyOnly": true,
+  "conditionalMultiKeyCalls": 0,
+  "sequentialMultiKeyEmulation": false,
+  "focusedTests": {
+    "coordinatorAndGuardTests": 9,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "persistedMutationCoordinatorPresent": true,
+  "genericClosedWriterGuardPresent": true,
+  "allProofChangingWritersIntegrated": false,
+  "externalIdentityReaderPresent": false,
+  "externalDeleteCompositionPresent": false,
+  "realOxiaExecutionPresent": false,
+  "fullM5DGatePresent": false,
+  "sourceBoundReceiptPresent": false,
+  "physicalDeleteAuthority": false,
+  "scenarioPromotionAuthority": false,
+  "productionAuthority": false
+}

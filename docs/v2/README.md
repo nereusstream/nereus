@@ -16,6 +16,11 @@ performance-first BookKeeper WAL.
 
 ## Current status
 
+- Current M5 lifecycle authority is [ADR 0148](../decisions/0148-v2-m5-lifecycle-contract-amendment.md) and the
+  [current contract view](detailed_design/m5/m5-current-contracts.md). Amendment 3 supersedes the listed identity,
+  reclamation, BK carrier, history and recovery clauses. Revised implementation and source-bound evidence remain
+  incomplete; historical focused PASS is not revised M5 Final.
+
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.
 - M1 implementation and the pure-V2 active-graph prune are complete. The authoritative completion state is derived
@@ -171,6 +176,10 @@ performance-first BookKeeper WAL.
   ticket/fence races, CAS-2 token, fixed-attempt takeover and permanent done in 11 pure tests. It includes no metadata
   mutation coordinator, runtime writer integration, external identity/delete composition, real Oxia execution, or
   physical-delete authority.
+- `v2M5TargetDeleteAuthorityCoordinatorCheck` adds the same-key CAS coordinator and durable ticket-before-dispatch
+  writer guard. It authoritatively rereads every CAS outcome, retains tickets across exceptions/unknown responses,
+  and proves both ticket/fence race orders in nine in-memory tests without invoking multi-key transactions. Concrete
+  writer integration, external deletion and real Oxia remain absent, so this is still non-promotable.
 - M5-D has begun with non-promotable `v2M5VersionMatchDeleteCheck` and `v2M5BookKeeperDeleteCheck`: fixed-digest MinIO proves enabled-bucket
   version-match deletion, same-key recreation protection, and complete LIST/full-GET response-loss reconciliation.
   The exact BookKeeper adapter binds a closed ledger's complete metadata fingerprint, rejects stale targets before

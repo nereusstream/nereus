@@ -274,6 +274,19 @@ tasks.register<Test>("v2M5TargetDeleteAuthorityFoundationTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("v2M5TargetDeleteAuthorityCoordinatorTest") {
+    group = "verification"
+    description = "Run exact same-key CAS reconciliation and durable writer-ticket guard tests for M5-D."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true

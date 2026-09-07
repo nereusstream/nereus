@@ -9,6 +9,13 @@ sourceTuple: v2-m1
 
 # V2 scenario evidence matrix
 
+## M5 lifecycle acceptance delta
+
+The [amendment 3 acceptance matrix](detailed_design/m5/m5-lifecycle-acceptance.json) adds required predicates to the
+existing M5-E owners without changing historical scenario receipts. Every new row remains OPEN with no receipt.
+V2-KAF-DATA-012/013/022 remain M6 PLANNED for native activation and Fetch/compaction promotion.
+
+
 The machine-readable owner is [v2-scenarios.json](v2-scenarios.json). M0 started with every runtime scenario `PLANNED`;
 the documentation gate proves synchronization only and does not promote runtime evidence.
 

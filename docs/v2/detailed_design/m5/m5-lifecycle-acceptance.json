@@ -1,0 +1,235 @@
+{
+  "schema": "NEREUS_V2_M5_LIFECYCLE_ACCEPTANCE_V2",
+  "authority": "REQUIRED_COVERAGE_NOT_EXECUTION_EVIDENCE",
+  "obligations": [
+    {
+      "id": "RESOURCE_UNIQUENESS",
+      "reviewSection": "2",
+      "owner": "PHYSICAL_DELETE_ORPHAN_RECONCILIATION",
+      "requiredDependencies": [
+        "OXIA",
+        "BOOKKEEPER",
+        "OBJECT"
+      ],
+      "acceptance": "Same physical resource across owner, Binding, Cell alias and proof refresh has one authority; actual version changes differ.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "REPLACEMENT_RETAINED_MESSAGES",
+      "reviewSection": "4",
+      "owner": "PHYSICAL_DELETE_ORPHAN_RECONCILIATION",
+      "requiredDependencies": [
+        "OXIA",
+        "BOOKKEEPER",
+        "OBJECT"
+      ],
+      "acceptance": "Release fully replaced BK and compaction input while logical messages remain; veto incomplete protocol, fallback, pin or member coverage.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "THREE_RECLAMATION_REASONS",
+      "reviewSection": "4",
+      "owner": "RETENTION_METADATA_RETIREMENT",
+      "requiredDependencies": [
+        "OXIA"
+      ],
+      "acceptance": "Verify every floor/reference class by reason; no missing class or orphan adoption path can pass.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "BK_ONLY_COMPACTION",
+      "reviewSection": "5",
+      "owner": "KAFKA_COMPACTION_INDEX_REBUILD",
+      "requiredDependencies": [
+        "BOOKKEEPER",
+        "OXIA"
+      ],
+      "acceptance": "No Object configuration/service: both internal topics and user topic compact, publish, read, restart and reclaim old ledgers with complete indexes.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "BK_OUTPUT_FAILURE",
+      "reviewSection": "5",
+      "owner": "MATERIALIZATION_MANIFEST_PUBLICATION",
+      "requiredDependencies": [
+        "BOOKKEEPER",
+        "OXIA"
+      ],
+      "acceptance": "Unknown ledger creation, partial output, lost publication, empty output and unselected artifacts reconcile without Object.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "RETIREMENT_HISTORY_1024",
+      "reviewSection": "3",
+      "owner": "RETENTION_METADATA_RETIREMENT",
+      "requiredDependencies": [
+        "OXIA"
+      ],
+      "acceptance": "More than 1024 completed batches in one Binding; bounded selector, active holes, replayed BatchId rejection and intact M4 projection.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "RETIREMENT_HISTORY_RECOVERY",
+      "reviewSection": "3",
+      "owner": "RETENTION_METADATA_RETIREMENT",
+      "requiredDependencies": [
+        "OXIA"
+      ],
+      "acceptance": "Fold response loss, stale root, restart, missing/corrupt nodes and rollback attempt preserve terminal rejection.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "DONE_CAPACITY",
+      "reviewSection": "3",
+      "owner": "PHYSICAL_DELETE_ORPHAN_RECONCILIATION",
+      "requiredDependencies": [
+        "OXIA"
+      ],
+      "acceptance": "Completed deletes exceed resident done cap; eviction/reload cannot recreate authority; durable quota and existing-intent progress observable.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "READ_FENCED_TAKEOVER",
+      "reviewSection": "6",
+      "owner": "PHYSICAL_DELETE_ORPHAN_RECONCILIATION",
+      "requiredDependencies": [
+        "OXIA",
+        "BOOKKEEPER",
+        "OBJECT"
+      ],
+      "acceptance": "Crash after CAS-1 before CAS-2; fence old owner, refresh capability/proof, reread full identity, reject late observation and complete same-resource deletion.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "WRITER_RACES",
+      "reviewSection": "6",
+      "owner": "PHYSICAL_DELETE_ORPHAN_RECONCILIATION",
+      "requiredDependencies": [
+        "OXIA",
+        "BOOKKEEPER",
+        "OBJECT"
+      ],
+      "acceptance": "Every applicable real writer tests both ticket/fence orders, unknown external response, revocation, old-owner callback and sorted multi-target conflict.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "PULSAR_NATIVE_LIFECYCLE",
+      "reviewSection": "8.3",
+      "owner": "PHYSICAL_DELETE_ORPHAN_RECONCILIATION",
+      "requiredDependencies": [
+        "OXIA",
+        "BOOKKEEPER",
+        "OBJECT",
+        "PULSAR"
+      ],
+      "acceptance": "Native completion/selection and exact M4 release compose with BK intent/done while subscriptions retain backlog; root-data-multipart order and lost response.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "SLOW_UNKNOWN_PUT",
+      "reviewSection": "7.1",
+      "owner": "CURRENT_SOURCE_CELL_ISOLATION",
+      "requiredDependencies": [
+        "OBJECT"
+      ],
+      "acceptance": "Per-Binding same-lane and other-Cell latency, queue bytes and convergence under slow/unknown PUT; shard-count assembly/recovery measurements.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "RUN_RECOVERY_VS_DELETE",
+      "reviewSection": "7.2",
+      "owner": "RETENTION_METADATA_RETIREMENT",
+      "requiredDependencies": [
+        "OXIA",
+        "OBJECT"
+      ],
+      "acceptance": "Whole run leaves recovery set after all replay obligations transfer while selected long-lived Objects remain readable; blocked physical GC does not alone pin recovery budget.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "QUARANTINE_EXIT",
+      "reviewSection": "8.1",
+      "owner": "CURRENT_SOURCE_CELL_ISOLATION",
+      "requiredDependencies": [
+        "OBJECT",
+        "BOOKKEEPER"
+      ],
+      "acceptance": "Never callback, unconfirmed cancel, retained buffer, verified completion/drain and restart; retain absent qualified proof; healthy Binding retains capacity.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "KAFKA_STORAGE_REPLAY_LOAD",
+      "reviewSection": "8.2",
+      "owner": "CURRENT_SOURCE_CELL_ISOLATION",
+      "requiredDependencies": [
+        "BOOKKEEPER",
+        "OBJECT"
+      ],
+      "acceptance": "Descriptor/payload replay load, Applied lag and admitted journal faults; export exact native election interfaces without claiming M6 process activation.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "CURRENT_SOURCE_REGRESSIONS",
+      "reviewSection": "7/8",
+      "owner": "CURRENT_SOURCE_CELL_ISOLATION",
+      "requiredDependencies": [
+        "OXIA",
+        "BOOKKEEPER",
+        "OBJECT"
+      ],
+      "acceptance": "All affected M2/M3 and shared M4 regressions on exact tested source with bounded Cell budgets and no skipped success.",
+      "status": "OPEN",
+      "receipt": null
+    },
+    {
+      "id": "SOURCE_CHILD_ARCHIVE_AGGREGATE",
+      "reviewSection": "9",
+      "owner": "AGGREGATE",
+      "requiredDependencies": [],
+      "acceptance": "All five exclusive children, matching source locks, raw artifacts, zero failures/errors/skips, independent source/attachment/archive validation and aggregate required.",
+      "status": "OPEN",
+      "receipt": null
+    }
+  ],
+  "deferred": [
+    {
+      "scenario": "V2-KAF-DATA-012",
+      "milestone": "M6",
+      "status": "PLANNED",
+      "interface": "Native descriptor journal, Observed/Applied, election boundary and Fetch/compaction activation",
+      "acceptance": "Observed counted in HW, journal loss plus leader failure, exact replay/election boundary and aggregate shared-storage read metrics",
+      "receipt": null
+    },
+    {
+      "scenario": "V2-KAF-DATA-013",
+      "milestone": "M6",
+      "status": "PLANNED",
+      "interface": "Native descriptor journal, Observed/Applied, election boundary and Fetch/compaction activation",
+      "acceptance": "Observed counted in HW, journal loss plus leader failure, exact replay/election boundary and aggregate shared-storage read metrics",
+      "receipt": null
+    },
+    {
+      "scenario": "V2-KAF-DATA-022",
+      "milestone": "M6",
+      "status": "PLANNED",
+      "interface": "Native descriptor journal, Observed/Applied, election boundary and Fetch/compaction activation",
+      "acceptance": "Observed counted in HW, journal loss plus leader failure, exact replay/election boundary and aggregate shared-storage read metrics",
+      "receipt": null
+    }
+  ]
+}

@@ -187,8 +187,12 @@ For Kafka `BOOKKEEPER_WAL_ASYNC_OBJECT`, the Nereus manifest joins sealed Kafka 
 Object Extent while retaining the BookKeeper Extent as protected fallback.
 Materialization may combine several SEALED Kafka BookKeeper runs, but the Object directory must reproduce their exact
 gap-free RecordBatch coverage. Publishing the new generation changes source selection only; Kafka offsets and group
-committed offsets remain unchanged. BookKeeper deletion still waits for generation publication, exact Object
-verification, logical retention, read-pin/source-protection drain, and response-loss-safe delete proof.
+committed offsets remain unchanged. BookKeeper deletion of a fully replaced representation follows
+[ADR 0148](../decisions/0148-v2-m5-lifecycle-contract-amendment.md): generation publication, complete read/recovery
+semantic coverage, exact Object verification, all physical reference and read-pin/source-protection drain, native
+policy admission and response-loss-safe delete proof. Logical messages may remain retained in the replacement;
+logical expiry uses its separate typed-trim branch. Implementation status is in the
+[current M5 contract view](detailed_design/m5/m5-current-contracts.md).
 
 For Pulsar, native ManagedLedger ledger/offload metadata is the sole authority for attempt identity, completion,
 offloaded read selection and fallback, and BookKeeper deletion eligibility. Nereus implements a custom

@@ -1,7 +1,7 @@
 ---
 productLine: V2
 designStatus: Accepted
-implementationStatus: NotStarted
+implementationStatus: InProgress
 evidenceStatus: NotRun
 authority: NormativeDesignIndex
 sourceTuple: v2-m1
@@ -19,7 +19,13 @@ A through E inputs are design authority only: those documents created no M5 runt
 promotion, physical deletion, or production deployment authority. Later implementation descendants do not rewrite
 that historical result.
 
-## Current state
+## Current effective contracts
+
+Start with [ADR 0148 and the current contract view](m5-current-contracts.md). The
+[lifecycle amendment](m5-lifecycle-contract-amendment.md) and [manifest 3](m5-design-amendment-3.json) select exact
+supersession of the historical clauses below. Earlier focused gates do not satisfy revised implementation or Final.
+
+## Historical inputs and implementation predecessors
 
 - [M5-I0 implementation-input closure](m5-i0-implementation-input-closure.md) freezes authority, dependency, module,
   lifecycle, and implementation-order boundaries.
@@ -40,8 +46,8 @@ that historical result.
 - The accepted [M5-D target-scoped physical-delete authority amendment](m5-d-target-scoped-physical-delete-authority-amendment.md)
   and [ADR 0147](../../../decisions/0147-v2-m5-target-scoped-physical-delete-authority-amendment.md) replace only the
   unavailable conditional multi-key deletion linearization with one permanent authority key per immutable target,
-  closed-writer tickets/fencing, and two exact same-key CAS transitions around the external identity read. Its
-  implementation remains `NotStarted`; it grants no dispatch or physical-delete authority.
+  closed-writer tickets/fencing, and two exact same-key CAS transitions around the external identity read. Its historical acceptance
+  recorded `NotStarted`; later foundation/coordinator slices exist with no dispatch or physical-delete authority.
 - [M5-E evidence ownership and freeze](m5-e-evidence-ownership-and-freeze.md) freezes child ownership, scenario
   promotion boundaries, exact-source rules, future gate hierarchy, and exclusions.
 - The governance-only [freeze manifest](m5-design-freeze.json) binds I0 and A through E by exact SHA-256.
@@ -106,9 +112,15 @@ that historical result.
 - The [M5-D target authority foundation projection](m5-d-target-delete-authority-foundation-projection.json) fixes the
   `M5DA` wire, Cell/target-domain-separated permanent key, four irreversible states, ten-class closed writer
   enrollment, monotonically increasing revision/predecessor chain, CAS-1/CAS-2 candidates, fixed-attempt takeover,
-  and permanent done shape. `v2M5TargetDeleteAuthorityFoundationCheck` exercises 11 pure tests. There is no metadata
-  mutation coordinator, writer runtime integration, external identity reader/delete composition, real Oxia result,
+  and permanent done shape. `v2M5TargetDeleteAuthorityFoundationCheck` exercises 11 pure tests. At the foundation boundary there was no metadata
+  mutation coordinator. The later generic coordinator below still has no writer runtime integration, external identity
+  reader/delete composition, real Oxia result,
   receipt, or physical-delete authority at this foundation.
+- The [M5-D target authority coordinator projection](m5-d-target-delete-authority-coordinator-projection.json) binds
+  `v2M5TargetDeleteAuthorityCoordinatorCheck` to one exact `compareAndSet` call site, complete post-CAS reread
+  reconciliation, and a generic durable ticket-before-writer-dispatch guard. Nine in-memory tests prove both race
+  orders and response-loss ticket retention. All concrete proof-changing writers, external identity/delete adapters,
+  real Oxia execution, source-bound receipt, and physical-delete authority remain absent.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

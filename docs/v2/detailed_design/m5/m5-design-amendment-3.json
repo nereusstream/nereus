@@ -1,0 +1,30 @@
+{
+  "schema": "NEREUS_V2_M5_DESIGN_AMENDMENT_3_V1",
+  "amendmentId": "M5-AMENDMENT-3-LIFECYCLE-V2",
+  "result": "ACCEPTED_DESIGN_IMPLEMENTATION_REQUIRED",
+  "authorizedDate": "2026-09-07",
+  "reviewBaselineCommit": "f05037bb16017f24e8147e99a61f26e539ed85fa",
+  "reviewSha256": "a37e5fde64ea0b1192e61660706ed36d6e3c584728843c43019a56c33be6267d",
+  "predecessorAmendment": {
+    "path": "docs/v2/detailed_design/m5/m5-design-amendment-2.json",
+    "sha256": "839b8238ebb181fa373ebdeca6056ea739cc7f4d9b4861ef53971f7729d6c096"
+  },
+  "documents": [
+    {
+      "path": "docs/decisions/0148-v2-m5-lifecycle-contract-amendment.md",
+      "sha256": "db48ac588d412a2fad62f1b6b46a29d46b0ad069dd4af7fdfa42bd466e8311bd"
+    },
+    {
+      "path": "docs/v2/detailed_design/m5/m5-lifecycle-contract-amendment.md",
+      "sha256": "f8ad1fc4a9d54823b19d6daedfa24cbf80b23b4a2cab1a68b605579af40f98fc"
+    },
+    {
+      "path": "docs/v2/detailed_design/m5/m5-lifecycle-writer-matrix.md",
+      "sha256": "59ffc43bd089da292607993f045b6d5007843508b5712225828c4a9647b1e99a"
+    }
+  ],
+  "acceptanceMatrix": "docs/v2/detailed_design/m5/m5-lifecycle-acceptance.json",
+  "physicalDeleteAuthority": false,
+  "scenarioPromotionAuthority": false,
+  "productionAuthority": false
+}
