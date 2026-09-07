@@ -405,7 +405,7 @@ class M5RetentionOxiaIntegrationTest {
         return List.copyOf(releases);
     }
 
-    private static M5ClosedWriterRegistryV1 registry() {
+    static M5ClosedWriterRegistryV1 registry() {
         return new M5ClosedWriterRegistryV1(List.of(new WriterDeclarationV1(
                 "com.nereusstream.m5.RealOxiaClosedWriter",
                 CAPABILITY,
@@ -414,7 +414,7 @@ class M5RetentionOxiaIntegrationTest {
                 digest("m5-real-oxia-writer-source"))));
     }
 
-    private static ReferenceFreeProofV1 proof(
+    static ReferenceFreeProofV1 proof(
             Oxia09ExactMetadataTransactionStoreV1 store,
             String prefix,
             ReferenceTargetKindV1 targetKind,

@@ -142,6 +142,9 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   BatchId history. Terminal slots fold through one selector CAS, active holes keep their original ordinal and M4 bytes,
   and admission rejects historical IDs under the current root. Native namespace quota/restart accounting, Cell I/O,
   operator metrics and permanent physical-done cache integration remain OPEN.
+  The [real Oxia history projection](m5-retired-history-oxia-projection.json) verifies 1,026 native folds, unknown-result
+  retries, current-root admission and a separate server restart fixture. Source/reference facts and the M4 bridge are
+  explicit test fixtures; production key routing and complete writer/evidence composition remain OPEN.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

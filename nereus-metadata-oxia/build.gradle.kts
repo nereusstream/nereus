@@ -245,6 +245,34 @@ tasks.register<Test>("v2M5RetentionRealOxiaTest") {
     outputs.upToDateWhen { false }
 }
 
+val v2M5HistoryOxiaRestartCheckpoint = providers.gradleProperty("v2M5HistoryOxiaRestartCheckpoint")
+
+for ((taskName, selectedTest) in mapOf(
+    "v2M5RetiredHistoryRealOxiaTest" to
+        "com.nereusstream.metadata.oxia.v2.retention.M5RetiredHistoryOxiaIntegrationTest",
+    "v2M5RetiredHistoryOxiaRestartWriteTest" to
+        "com.nereusstream.metadata.oxia.v2.retention.M5RetiredHistoryOxiaRestartTest.writeBeforeServerRestart",
+    "v2M5RetiredHistoryOxiaRestartReadTest" to
+        "com.nereusstream.metadata.oxia.v2.retention.M5RetiredHistoryOxiaRestartTest.readAfterServerRestart",
+)) {
+    tasks.register<Test>(taskName) {
+        group = "verification"
+        description = "Verify authenticated retired BatchId history against source-locked real Oxia."
+        testClassesDirs = oxiaIntegrationTest.output.classesDirs
+        classpath = oxiaIntegrationTest.runtimeClasspath
+        maxParallelForks = 1
+        maxHeapSize = "1024m"
+        useJUnitPlatform()
+        filter { includeTestsMatching(selectedTest) }
+        doFirst {
+            systemProperty("nereus.m5.retention.oxia.serviceAddress", v2M5RetentionOxiaServiceAddress.orNull ?: "UNSET")
+            systemProperty("nereus.m5.history.oxia.restartCheckpoint", v2M5HistoryOxiaRestartCheckpoint.orNull ?: "UNSET")
+        }
+        testLogging.showStandardStreams = true
+        outputs.upToDateWhen { false }
+    }
+}
+
 tasks.register<Test>("r1OxiaIntegrationTest") {
     group = "verification"
     description = "Run R1 Registry create/CAS/restart conformance against source-locked real Oxia."

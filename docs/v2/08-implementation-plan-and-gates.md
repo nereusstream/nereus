@@ -30,6 +30,10 @@ integration and cleanup remain required next steps.
 `v2M5RetiredHistoryCheck` verifies the version-2 Binding envelope, authenticated history, exact selector folding,
 current-root admission and operation beyond the former lifetime slot cap. Native quota/restart accounting, Cell I/O,
 operator metrics and physical-done cache lifecycle remain separate requirements.
+`scripts/run-v2-m5-retired-history-oxia-check.sh` now exercises native Oxia retirement/folding, response-loss retry,
+1,026 continuous retirements and a separate service restart with exact selector/version/history checks. Its
+`v2M5RetiredHistoryOxiaCheck` and restart phases remain focused verification with synthetic source/reference facts;
+native M4 control-key routing, complete writer composition and source-bound M5 evidence are still required.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

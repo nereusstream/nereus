@@ -334,6 +334,55 @@ shared Kafka/Object compaction and all source-locked real BK carrier/descriptor/
 historical dependency checks. `/tmp/nereus-m5-history-gate.log` is the scoped local run log. The real BK suites are
 regression coverage for the envelope change; they are not real Oxia history or source-bound M5 retirement evidence.
 
+## 2026-09-08 source-locked real Oxia history and restart
+
+Status: focused native metadata verification; native writer admission, quota restoration and M5 evidence remain OPEN.
+
+The [real Oxia history projection](m5-retired-history-oxia-projection.json) follows published history implementation
+`47fa3f1daa6b456c05d1e1eff69deb33803912f5`. It supplements the preceding synthetic-store projection; it does not
+relabel that predecessor's evidence. `Oxia09ExactMetadataTransactionStoreV1` executes the same production history,
+retirement and admission code against the source-locked service. No production Java or historical contract bytes
+change in this verification slice.
+
+The runner pins server source `37a17bef17202d5fd6e23282da5fd26d94865484`, linux/arm64 image ID
+`sha256:7eef9af2cdc897fbf418bf7616da1387aca87ce860b8205395cdf88b867df4da`, and client source
+`091a42c2780d92da56e9ec1f02ce1c3d988adc16`. Each fixture checks the actual loaded client JAR SHA-256
+`0ca719e6d11bd2ee2c2e7e94b42c6843e60f776bea12f7b5814cff9928e2e4c5`. An already-present image must match exactly;
+a missing image is built with the existing locked recipe. The runner snapshots Java inputs before execution and
+rejects a changed captured input afterward. It owns one temporary container and unique Binding identities.
+
+- The continuous case admits and retires 1,026 batches through the real one-key coordinator, then prewrites and folds
+  their history. The earlier FULL batch retains ordinal 1 and byte-exact M4 contents. Each post-fold selector is
+  982 bytes, history count reaches 1,026 and the last activation ordinal reaches 1,027. New batch 1,028 is still
+  admitted. Fresh clients verify early/middle/latest membership and reject old batch/ticket admission.
+- Response faults are injected only after the native create/CAS applies. Lost prewrite/read delivery preserves a
+  bounded reservation for exact retry; lost selector delivery followed by another fold reconciles the exact earlier
+  tombstone. A native root change between proof and CAS rejects stale admission.
+- Corrupt or missing native history prevents old/new control and ticket admission. These failures assert the actual
+  node-validation exception, not a test-method name in a stack trace. Reusing valid old M4 bytes exercises the facade;
+  the separate changed-payload check uses typed admission and a native history proof before M4 encoding.
+- A separate two-tombstone fixture crosses a restart of the same server container and a fresh test JVM. Selector
+  SHA, native metadata version, history root/count, activation ordinal and authority generation remain exact;
+  both old IDs stay rejected and the next new ID is admitted.
+
+Source protection, reference-absence and closed-writer declarations remain explicit synthetic proof facts persisted
+in native Oxia. The synchronous M4 bridge is test-only. This is real metadata execution, not proof that the native
+protocol writer matrix, M3 control-key routing, namespace capacity measurement/restoration, Cell scheduling/metrics,
+physical-done cache or cross-module physical deletion is integrated. All 17 amended acceptance obligations remain OPEN.
+The runner retains JUnit XML, a source-input manifest, restart checkpoint, service log and a non-promotable run summary
+under `build/m5-retired-history-oxia/`; these are local verification artifacts, not M5 children or Final receipts.
+
+Validation: `scripts/run-v2-m5-retired-history-oxia-check.sh` passed **66/66 executed tasks** in its initial
+no-configuration-cache/rerun phase, then the post-restart JVM passed **12 tasks** (1 executed, 11 up-to-date).
+All **5 history integration tests**, **2 restart phase tests** and the existing **2 Binding/Pulsar integration tests**
+passed with zero failures/errors/skips. The same run includes the 15 history unit tests and existing retention/writer
+regressions, Spotless and Checkstyle including the integration source set. Java input manifest SHA-256 is
+`8350e7d41ecdd55f1c3e0f0c6d7f85a1bdd43a3807cd14e826992b3f5ad27225`.
+The local result is `build/m5-retired-history-oxia/nereus-m5-history-oxia-69973/run-summary.json`; the run log is
+`/tmp/nereus-m5-history-oxia-gate.log`. Supplemental projection/governance checks were wired after this execution
+and passed **26 tasks** (13 executed, 13 up-to-date), including the unchanged historical M4/M5 boundary,
+6 lifecycle contract tests and 3 new scope tests. No production or integration-test Java changed afterward.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;
@@ -783,7 +832,7 @@ source-locked real Oxia result, source-bound receipt, physical-delete, staging, 
 
 1. Connect the M4-protected sealed-BK recovery path to native protocol-owner admission, ordinary reads and internal-topic lifecycle,
    terminal task fencing and unpublished/replaced-output cleanup.
-2. Complete native namespace quota/restart accounting, Cell I/O/operator metrics around authenticated history,
+2. Complete native M4 control-key routing, namespace quota/restart accounting and Cell I/O/operator metrics around authenticated history,
    and permanent physical-done cache/checkpoint lifecycle.
 3. Integrate all ten concrete writer classes, native namespace/owner proofs, current capability refresh,
    fenced identity observation, dispatch/done and durable recovery veto above the same-key coordinator.

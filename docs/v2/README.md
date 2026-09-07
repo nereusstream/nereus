@@ -30,8 +30,10 @@ performance-first BookKeeper WAL.
   lease. Native protocol-owner/task admission, ordinary reads, internal-topic lifecycle, real control-authority
   integration and cleanup remain incomplete.
   Binding retirement now folds terminal slots into authenticated immutable history while preserving active ordinals;
-  current-root admission permanently rejects retired BatchIds. Native quota/restart accounting and operator integration
-  remain incomplete.
+  current-root admission permanently rejects retired BatchIds. The
+  [real Oxia history gate](detailed_design/m5/m5-retired-history-oxia-projection.json) now verifies 1,026 native folds,
+  client reconnect and a separate server restart fixture. Native control-key routing, quota/restart accounting and
+  operator integration remain incomplete; reference facts and the M4 bridge are still test fixtures.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.

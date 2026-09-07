@@ -2453,6 +2453,33 @@ tasks.register("v2M5RetiredHistoryCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5RetiredHistoryOxiaSourceCheck") {
+    group = "verification"
+    description = "Check the focused real Oxia history evidence scope and remaining native integration boundaries."
+    commandLine("python3", "scripts/check-v2-m5-retired-history-oxia.py")
+}
+
+tasks.register<Exec>("v2M5RetiredHistoryOxiaContractTest") {
+    group = "verification"
+    commandLine("python3", "scripts/check-v2-m5-retired-history-oxia-tests.py")
+}
+
+tasks.register("v2M5RetiredHistoryOxiaCheck") {
+    group = "verification"
+    description = "Verify real Oxia retired history; server restart is orchestrated by its source-locked runner."
+    dependsOn(
+        "v2M5LifecycleDesignCheck",
+        "v2M5RetiredHistoryOxiaSourceCheck",
+        "v2M5RetiredHistoryOxiaContractTest",
+        "v2M5RetentionRetirementCheck",
+        "v2M5RetiredHistorySourceCheck",
+        "v2M5RetiredHistoryContractTest",
+        ":nereus-storage-object:v2M5RetiredHistoryTest",
+        ":nereus-metadata-oxia:v2M5RetiredHistoryRealOxiaTest",
+        ":nereus-metadata-oxia:checkstyleOxiaIntegrationTest",
+    )
+}
+
 tasks.register<Exec>("v2M5RetentionCoreContractTest") {
     group = "verification"
     description = "Test the fail-closed non-promotable M5-C retention-core checker."
