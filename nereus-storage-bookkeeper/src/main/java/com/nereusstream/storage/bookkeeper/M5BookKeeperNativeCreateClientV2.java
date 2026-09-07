@@ -15,9 +15,11 @@
 package com.nereusstream.storage.bookkeeper;
 
 import com.nereusstream.storage.api.bookkeeper.BookKeeperCapabilitySnapshotV1;
+import com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.meta.zk.ZKMetadataClientDriver;
@@ -52,6 +54,24 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
     public static M5BookKeeperNativeCreateClientV2 connect(
             String metadataServiceUri, BookKeeperCapabilitySnapshotV1 capability, M5BookKeeperNativeCreateSpecV2 spec)
             throws Exception {
+        return connect(metadataServiceUri, capability, spec, Optional.empty());
+    }
+
+    public static M5BookKeeperNativeCreateClientV2 connect(
+            String metadataServiceUri,
+            BookKeeperCapabilitySnapshotV1 capability,
+            M5BookKeeperNativeCreateSpecV2 spec,
+            PhysicalNamespaceAuthorityBindingV2 binding)
+            throws Exception {
+        return connect(metadataServiceUri, capability, spec, Optional.of(binding));
+    }
+
+    private static M5BookKeeperNativeCreateClientV2 connect(
+            String metadataServiceUri,
+            BookKeeperCapabilitySnapshotV1 capability,
+            M5BookKeeperNativeCreateSpecV2 spec,
+            Optional<PhysicalNamespaceAuthorityBindingV2> binding)
+            throws Exception {
         var configuration = RealBookKeeperClientConfigurationV1.from(metadataServiceUri, capability);
         if (!capability.credentialIdentityVersion().equals("bk-k0-no-auth:v1")
                 || spec.configurations().stream()
@@ -63,6 +83,14 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
                                 || run.digestType() != capability.digestType())) {
             throw new IllegalArgumentException("native M5 create scope differs from the admitted no-auth capability");
         }
+        binding.ifPresent(value -> {
+            if (!value.physicalNamespace().equals(spec.namespace())) {
+                throw new IllegalArgumentException("native create binding has another physical namespace");
+            }
+            configuration.setProperty(
+                    M5BookKeeperNativeMetadataDriverV2.NAMESPACE_BINDING_PROPERTY,
+                    Base64.getEncoder().encodeToString(value.encode().toByteArray()));
+        });
         M5BookKeeperNativeMetadataDriverV2.register();
         configuration.setProperty(
                 M5BookKeeperNativeMetadataDriverV2.SPEC_PROPERTY,

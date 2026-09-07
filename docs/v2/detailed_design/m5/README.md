@@ -178,6 +178,14 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   required when permanent history leaves insufficient capacity for another complete reservation. This configured route
   still requires unique namespace/all-writer admission, backend disk provisioning, real deletion proofs and GC scheduling.
 
+- The [physical namespace projection](m5-physical-namespace-projection.json) adds permanent actual BK-to-Oxia
+  namespace assignment. A fixed native Oxia marker and actual BK INSTANCEID determine identity; endpoint aliases
+  converge on one authority root. Binding advances a native gate checked by both ID reservation and ledger create,
+  cutting off delayed unbound creates. The guarded quota route rereads both native assignments before operations.
+  Three identity unit cases and two native phases pass across two Oxia and four BK service restarts; legacy
+  creation/task-terminal results are revalidated by captured source and XML hashes. Object namespace, cross-Cell
+  ownership, all concrete writers, offline compatibility and physical deletion remain OPEN.
+
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
 gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order/multipart cores without amending that result.

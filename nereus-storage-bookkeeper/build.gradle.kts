@@ -85,3 +85,41 @@ tasks.register<Test>("v2M5NativeCreateRealTest") {
                 ?: error("v2M2BookKeeperMetadataServiceUri is required for native M5 create fencing"))
     }
 }
+
+
+// Native namespace conformance composes actual Oxia and BK only in this test source set.
+dependencies {
+    add(realBookKeeperTest.implementationConfigurationName, project(":nereus-metadata-oxia"))
+    add(realBookKeeperTest.implementationConfigurationName, project(":nereus-metadata-spi"))
+    add(realBookKeeperTest.implementationConfigurationName, project(":nereus-storage-object"))
+    add(realBookKeeperTest.implementationConfigurationName,
+        project(path = ":nereus-storage-object", configuration = "m5DeleteTestFixtures"))
+}
+
+
+mapOf(
+    "v2M5PhysicalNamespaceRealTest" to "bindAndWriteBeforeServerRestart",
+    "v2M5PhysicalNamespaceRestartTest" to "readAfterServerRestart",
+).forEach { (taskName, method) ->
+    tasks.register<Test>(taskName) {
+        group = "verification"
+        testClassesDirs = realBookKeeperTest.output.classesDirs
+        classpath = realBookKeeperTest.runtimeClasspath
+        useJUnitPlatform()
+        maxParallelForks = 1
+        filter { includeTestsMatching("com.nereusstream.storage.bookkeeper.M5PhysicalNamespaceOxiaBookKeeperRealTest.$method") }
+        outputs.upToDateWhen { false }
+        doFirst {
+            systemProperty("nereus.bookkeeper.metadataServiceUri",
+                providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull ?: error("native BookKeeper URI is required"))
+            systemProperty("nereus.m5.namespace.oxiaAddress",
+                providers.gradleProperty("v2M5RetentionOxiaServiceAddress").orNull ?: error("native Oxia address is required"))
+            systemProperty("nereus.m5.namespace.oxiaAliasAddress",
+                providers.gradleProperty("v2M5NamespaceOxiaAliasAddress").orNull ?: error("native Oxia alias is required"))
+            systemProperty("nereus.m5.namespace.foreignOxiaAddress",
+                providers.gradleProperty("v2M5NamespaceForeignOxiaAddress").orNull ?: error("second native Oxia address is required"))
+            systemProperty("nereus.m5.namespace.restartCheckpoint",
+                providers.gradleProperty("v2M5NamespaceRestartCheckpoint").orNull ?: error("namespace restart checkpoint is required"))
+        }
+    }
+}

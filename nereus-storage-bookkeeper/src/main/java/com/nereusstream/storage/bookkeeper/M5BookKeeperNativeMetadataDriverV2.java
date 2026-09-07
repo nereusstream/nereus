@@ -40,6 +40,7 @@ import org.apache.bookkeeper.util.ZkUtils;
 public final class M5BookKeeperNativeMetadataDriverV2 extends ZKMetadataClientDriver {
     static final String DRIVER_SCHEME = "m5zk";
     static final String SPEC_PROPERTY = "nereusM5NativeCreateSpecV2";
+    static final String NAMESPACE_BINDING_PROPERTY = "nereusM5NamespaceAuthorityBindingV2";
     private M5BookKeeperNativeCreateGuardV2 guard;
 
     static void register() {
@@ -76,8 +77,11 @@ public final class M5BookKeeperNativeMetadataDriverV2 extends ZKMetadataClientDr
                     || !layout.getManagerFactoryClass().equals(HierarchicalLedgerManagerFactory.class.getName())) {
                 throw new IllegalArgumentException("native M5 profile requires exact hierarchical layout version 1");
             }
+            var namespaceBinding = Optional.ofNullable(configuration.getString(NAMESPACE_BINDING_PROPERTY))
+                    .map(value -> com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2.decode(
+                            CanonicalBytes.copyOf(Base64.getDecoder().decode(value))));
             guard = new M5BookKeeperNativeCreateGuardV2(
-                    zk, ledgersRootPath, spec, ZkUtils.getACLs(nativeConfiguration));
+                    zk, ledgersRootPath, spec, ZkUtils.getACLs(nativeConfiguration), namespaceBinding);
             var factory = new FencedFactory(spec);
             factory.initialize(nativeConfiguration, layoutManager, layout.getManagerVersion());
             lmFactory = factory;

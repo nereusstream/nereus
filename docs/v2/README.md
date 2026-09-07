@@ -62,6 +62,13 @@ performance-first BookKeeper WAL.
   provisioning, actual deletion proofs and GC scheduling;
   this metadata-storage result does not complete DONE_CAPACITY or any other amended acceptance obligation.
 
+  The [physical namespace binding](detailed_design/m5/m5-physical-namespace-projection.json) now assigns an actual
+  BK namespace to one actual Oxia namespace, derives a deterministic authority root and checks the permanent binding
+  in native ledger reservation/create transactions. Binding rejects delayed unbound creates while the exact bound
+  client can continue. Native tests retain binding, quota, authority and sealed data across both Oxia and all BK
+  service restarts. This is a guarded BK profile; Object namespace, cross-Cell ownership, complete writer admission,
+  offline compatibility and physical deletion remain required.
+
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.
 - M1 implementation and the pure-V2 active-graph prune are complete. The authoritative completion state is derived

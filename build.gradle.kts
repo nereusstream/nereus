@@ -3045,3 +3045,22 @@ tasks.register("v2M5GcQuotaCheck") {
         ":nereus-metadata-oxia:v2M5GcQuotaRealOxiaTest",
     )
 }
+
+
+tasks.register("v2M5PhysicalNamespaceCheck") {
+    group = "verification"
+    description = "Verify native metadata namespace assignment, BK creation cut, alias routing and reserved authority."
+    dependsOn(
+        "v2M5GcQuotaCheck",
+        ":nereus-storage-api:v2M5NamespaceIdentityTest",
+        ":nereus-storage-api:spotlessCheck",
+        ":nereus-storage-api:checkstyleMain",
+        ":nereus-storage-api:checkstyleTest",
+        ":nereus-storage-bookkeeper:v2M5NativeCreateTest",
+        ":nereus-storage-bookkeeper:v2M5PhysicalNamespaceRealTest",
+        ":nereus-storage-bookkeeper:spotlessCheck",
+        ":nereus-storage-bookkeeper:checkstyleMain",
+        ":nereus-storage-bookkeeper:checkstyleTest",
+        ":nereus-storage-bookkeeper:checkstyleRealBookKeeperTest",
+    )
+}

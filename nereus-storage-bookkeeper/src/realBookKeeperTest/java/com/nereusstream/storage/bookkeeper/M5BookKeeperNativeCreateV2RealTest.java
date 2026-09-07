@@ -314,7 +314,7 @@ class M5BookKeeperNativeCreateV2RealTest {
     }
 
     /** Only callback delivery is controlled; every reservation, fence and ledger transaction reaches real ZooKeeper. */
-    private static final class NativeFaults implements AutoCloseable {
+    static final class NativeFaults implements AutoCloseable {
         final BookKeeper client;
         final FaultZooKeeper zk;
         final M5BookKeeperNativeCreateSpecV2 spec;
@@ -322,8 +322,13 @@ class M5BookKeeperNativeCreateV2RealTest {
         final M5BookKeeperNativeLedgerManagerV2 manager;
 
         NativeFaults(M5BookKeeperNativeCreateSpecV2 spec) throws Exception {
+            this(uri, CAPABILITY, spec);
+        }
+
+        NativeFaults(String uri, BookKeeperCapabilitySnapshotV1 capability, M5BookKeeperNativeCreateSpecV2 spec)
+                throws Exception {
             this.spec = spec;
-            var configuration = RealBookKeeperClientConfigurationV1.from(uri, CAPABILITY);
+            var configuration = RealBookKeeperClientConfigurationV1.from(uri, capability);
             client = (BookKeeper) org.apache.bookkeeper.client.api.BookKeeper.newBuilder(configuration)
                     .build();
             var connected = new java.util.concurrent.CountDownLatch(1);
@@ -335,7 +340,7 @@ class M5BookKeeperNativeCreateV2RealTest {
             assertThat(connected.await(10, TimeUnit.SECONDS)).isTrue();
             var acls = org.apache.bookkeeper.util.ZkUtils.getACLs(configuration);
             guard = new M5BookKeeperNativeCreateGuardV2(
-                    zk, java.net.URI.create(uri).getPath(), spec, acls);
+                    zk, java.net.URI.create(uri).getPath(), spec, acls, java.util.Optional.empty());
             var delegate = (org.apache.bookkeeper.meta.AbstractZkLedgerManager)
                     client.getLedgerManagerFactory().newLedgerManager();
             manager = new M5BookKeeperNativeLedgerManagerV2(delegate, guard, spec, zk, acls);
@@ -389,7 +394,7 @@ class M5BookKeeperNativeCreateV2RealTest {
         }
     }
 
-    private static final class FaultZooKeeper extends org.apache.zookeeper.ZooKeeper {
+    static final class FaultZooKeeper extends org.apache.zookeeper.ZooKeeper {
         volatile boolean holdNextMulti;
         volatile boolean loseNextMulti;
         volatile boolean loseNextSet;
@@ -479,7 +484,7 @@ class M5BookKeeperNativeCreateV2RealTest {
                         new StorageRunId(new Id128(id.getMostSignificantBits(), id.getLeastSignificantBits())))));
     }
 
-    private static BookKeeperCapabilitySnapshotV1 capability() {
+    static BookKeeperCapabilitySnapshotV1 capability() {
         int frameLimit = 5_242_880;
         return new BookKeeperCapabilitySnapshotV1(
                 new CellProviderScopeId(digest(1)),

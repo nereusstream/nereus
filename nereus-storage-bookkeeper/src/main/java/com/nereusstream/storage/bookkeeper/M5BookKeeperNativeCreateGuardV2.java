@@ -15,10 +15,12 @@
 package com.nereusstream.storage.bookkeeper;
 
 import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.client.BKException;
@@ -39,9 +41,16 @@ final class M5BookKeeperNativeCreateGuardV2 {
     private final String taskPath;
     private final byte[] open;
     private final byte[] fenced;
+    private final String namespaceGatePath;
+    private final int namespaceGateVersion;
 
     M5BookKeeperNativeCreateGuardV2(
-            ZooKeeper zk, String ledgerRoot, M5BookKeeperNativeCreateSpecV2 spec, List<ACL> acls) throws Exception {
+            ZooKeeper zk,
+            String ledgerRoot,
+            M5BookKeeperNativeCreateSpecV2 spec,
+            List<ACL> acls,
+            Optional<PhysicalNamespaceAuthorityBindingV2> binding)
+            throws Exception {
         this.zk = zk;
         this.spec = spec;
         this.acls = List.copyOf(acls);
@@ -50,6 +59,15 @@ final class M5BookKeeperNativeCreateGuardV2 {
         if (!actualInstance.equals(spec.nativeInstanceId())) {
             throw new IllegalStateException("native BookKeeper INSTANCEID differs from the task create scope");
         }
+        var namespaceGate = new M5BookKeeperNamespaceGateV2(zk, ledgerRoot, actualInstance, acls);
+        var namespaceSnapshot = binding.isPresent()
+                ? namespaceGate.read().get()
+                : namespaceGate.initializeUnbound().get();
+        if (!namespaceSnapshot.binding().equals(binding)) {
+            throw new IllegalStateException("native M5 create client lacks the exact bound metadata namespace");
+        }
+        namespaceGatePath = namespaceGate.path();
+        namespaceGateVersion = namespaceSnapshot.nativeVersion();
         base = ledgerRoot + "/nereus-m5-native-v2";
         String hash = spec.taskId().toHex();
         taskPath = base + "/tasks/" + hash.substring(0, 2) + "/" + hash;
@@ -103,7 +121,10 @@ final class M5BookKeeperNativeCreateGuardV2 {
         return createParents(path.substring(0, path.lastIndexOf('/'))).thenCompose(ignored -> {
             var result = new CompletableFuture<Void>();
             zk.multi(
-                    List.of(Op.check(taskPath, 0), Op.create(path, candidate, acls, CreateMode.PERSISTENT)),
+                    List.of(
+                            Op.check(namespaceGatePath, namespaceGateVersion),
+                            Op.check(taskPath, 0),
+                            Op.create(path, candidate, acls, CreateMode.PERSISTENT)),
                     (rc, actualPath, context, operations) -> {
                         if (rc == KeeperException.Code.OK.intValue()) {
                             result.complete(null);
@@ -158,7 +179,10 @@ final class M5BookKeeperNativeCreateGuardV2 {
     }
 
     List<Op> createChecks(long ledgerId) {
-        return List.of(Op.check(taskPath, 0), Op.check(reservationPath(ledgerId), 0));
+        return List.of(
+                Op.check(namespaceGatePath, namespaceGateVersion),
+                Op.check(taskPath, 0),
+                Op.check(reservationPath(ledgerId), 0));
     }
 
     CompletableFuture<Void> fenceCreates() {

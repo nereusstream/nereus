@@ -752,6 +752,87 @@ Supplemental documentation, frozen-design/M4 dependency, lifecycle and coordinat
 in `/tmp/nereus-m5-quota-final-check.log`. All 434 captured inputs were independently rechecked against the final run.
 No source-bound M5 child, Final, physical-delete, staging or production authority is supplied by these results.
 
+## 2026-09-08 native physical namespace and metadata assignment
+
+Status: guarded BK-to-Oxia namespace implementation after `9cd3daf48bde8ff16cfeea94d0b844ec55a95f88`.
+The [physical namespace projection](m5-physical-namespace-projection.json) records this slice. All 17 amended
+acceptance rows remain OPEN/null; Object namespace, cross-Cell resource ownership, Binding authority assignment,
+all concrete writers, offline old-authority compatibility and external deletion remain required.
+
+`MetadataNamespaceIdentityV2` defines a 56-byte M5NM immutable marker and a 96-byte M5NI identity binding its instance,
+actual native creation version and exact marker SHA. `OxiaPhysicalMetadataNamespaceV2.provision()` conditionally
+persists one random marker at `v2/m5-physical-metadata-namespace-v2` and rereads the stored winner, including after an
+unknown write result. Operational `connect()` only reads and verifies the expected marker; absence or a changed native
+version rejects reconnect. This marker is read through the actual shared Oxia client, independently of Cell roots and
+connection aliases. Locally constructed IDs or matching key strings on another backend are not native observations.
+
+`PhysicalNamespaceAuthorityBindingV2` defines strict M5NA wire 2, capped at 16,532 bytes. It binds the full physical
+namespace to one exact metadata identity. Its authority root is `/nereus/m5-native-authorities-v2/<namespace SHA>`;
+canonical physical namespace bytes determine that root without endpoint, Cell, Binding, owner or capability fields.
+The guarded factory rereads the actual Oxia marker and the actual physical-backend assignment before each quota or
+authority read/create/CAS, then uses the existing durable quota route under that root. Low-level configured constructors
+remain available for foundations; their presence is not complete global writer admission. Source/reference facts remain
+a separate owner-provided port and are synthetic in this focused test.
+
+`M5BookKeeperNamespaceAuthorityV2` owns a real native client and reads its actual INSTANCEID. Its persistent M5BG gate
+at `<ledgerRoot>/nereus-m5-native-v2/authority-namespace` advances exactly once from UNBOUND/native version 0 to
+BOUND/native version 1. Native binding always rereads its exact result, including an applied setData with a lost response.
+A conflicting metadata namespace cannot overwrite the assignment. Connection can initialize ordinary BK metadata and
+the unbound gate but allocates no ledger. The existing explicit `m5zk` driver accepts the exact bound identity, while
+both reservation and native ledger-create ZooKeeper transactions now check the permanent namespace gate version in
+addition to the existing task fence and reservation. A delayed unbound transaction loses after binding; a new bound
+client must still own its task and ledger reservation. No locked dependency source, external SPI or native wire changes.
+
+This gate closes guarded creation/reservation only. Existing append/read handles, arbitrary stock BK writers, delayed
+unused task metadata and protocol publication need their own admission and termination paths. Administrative namespace
+reformat, marker cloning/rewrite and external deletion of permanent records are outside this profile. Explicit namespace
+provisioning is not runtime activation, a compatibility migration, or an offline proof that old dispatch authority is absent.
+
+The native runner first executes the complete older guarded-create/task-terminal regression on its own retained-data
+cluster. It then starts another actual BK namespace with two independent locked Oxia servers. The new checks compare
+numeric endpoint aliases, reject a foreign metadata backend, hold an actual native create across binding, lose an applied
+binding response, and create/seal a ledger through the exact bound client. A synthetic OPEN authority reserves native
+quota once and is observed through both aliases. A test-only rewrite on the foreign Oxia backend invalidates its old
+marker observation. A fresh JVM after restart must reread the exact native binding, authority version/SHA, quota head
+and sealed payload. The checkpoint contains encoded namespace/create configuration plus identities/hashes, not copied
+eligibility or deletion proof bodies. These tests issue no physical deletion and do not create DELETE_DONE.
+
+The first complete runner stopped at the unchanged M4 control-capacity p99 assertion
+(10,978,542 ns against a strict 10,000,000 ns bound). Its earlier state assertions passed. The repeat disables Gradle
+cross-project parallelism and limits workers to two; no test threshold or frozen source was changed. The failed run
+remains diagnostic evidence only. The second run completed the entire legacy gate and restart checks, then failed
+before namespace admission because the locked Oxia gRPC client rejects abbreviated `127.1:<port>` as an invalid DNS
+name. The final fixture maps two distinct full `127.0.0.1:<port>` endpoints to the same Oxia container. BookKeeper's
+separately verified numeric alias remains `127.1`. No dependency or host DNS configuration is changed. A third run completed the same legacy regression but exposed
+Docker assigning conflicting automatic ports for the duplicate mapping. The final runner explicitly selects distinct
+loopback ports and records each created container before starting it, so startup failures retain scoped cleanup.
+
+Validation: `scripts/run-v2-m5-physical-namespace-check.sh` passed **71/71 executed main tasks** with configuration
+cache disabled. Its independent post-restart JVM passed **16 tasks** (1 executed, 15 up-to-date). The six archived
+suites contain **26 tests/phases**, including **5 new namespace cases/phases**, with zero failures/errors/skips.
+The final run captured **702 unchanged inputs**, manifest SHA-256
+`f356f99dec02ca12a9951550801d31a8f3284f5b6f91e4fbc6af82a300658d36`.
+Result: `build/m5-physical-namespace/nereus-v2-m5-physical-namespace-56981/run-summary.json`; log:
+`/tmp/nereus-m5-physical-namespace-native-gate4.log`. The same Oxia containers
+`7d2bc2182b493751d8d59ec61023f73f238631259d1155b710ef545e1e56608d` and
+`ef4bdd8db363542c4128ee4738e6dc67a09d074fe1c1ae616d22cb0af5d1bf79` retained data and exact locked images
+while restarting from `2026-09-07T22:49:43.167403836Z` / `2026-09-07T22:49:43.295477502Z` to
+`2026-09-07T22:51:04.468785971Z` / `2026-09-07T22:51:04.727841262Z`. The same four BK/ZooKeeper containers
+also retained their IDs/images and changed start times. Both actual client artifact SHA checks passed.
+
+The verified legacy run `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-49058` passed **93/93 main
+tasks**, **19 restart tasks** (3 executed), and **71 archived focused cases/phases**. Its **682** captured inputs,
+manifest SHA `f0b44552285e612d1d128cf206230047c5c97fcc4b2e1c5876f2112a3e45ebc0`, still exactly match the final
+source. The final invocation supplies that path via `NEREUS_M5_VERIFIED_LEGACY_OUTPUT`; the runner rechecks the entire
+captured map, passing XML hashes/counts and native restart flags before reuse, then rechecks both source maps after
+execution. Its copied summary SHA is `1a6786750dd46b09d0cc79b3025d58cb2a36e6d0b7749e76dd1f00cb93f34ba2`.
+Both invocations use `GRADLE_OPTS='-Dorg.gradle.parallel=false -Dorg.gradle.workers.max=2'`. This reuse avoids repeating
+unchanged legacy behavior after an outer fixture startup correction; it is not a source-bound M5 receipt. The runner
+removed only its owned containers and compose volumes. All 17 obligations remain OPEN/null and no Final, physical-delete,
+staging or production authority is supplied. Supplemental documentation, frozen design/M4 dependency, lifecycle,
+coordinator and recovery source checks passed **13/13 tasks** in `/tmp/nereus-m5-namespace-final-check.log`.
+Both captured source maps were independently rechecked after the native run; all 17 acceptance rows remain OPEN/null.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;
@@ -1201,8 +1282,8 @@ source-locked real Oxia result, source-bound receipt, physical-delete, staging, 
 
 1. Extend the guarded create/selection/drain terminal to stale-task and complete writer/adoption admission, then connect
    M4-protected BK recovery to native protocol-owner admission, ordinary reads, internal topics and grace/rescan cleanup.
-2. Complete unique native namespace/Binding authority admission, quota/restart accounting and Cell I/O/operator metrics
-   around the existing native M4/history route. Admit the configured durable GC quota route for every actual writer,
+2. Extend the native BK-to-Oxia namespace assignment to Object and cross-Cell resource ownership; complete Binding
+   authority admission, quota/restart accounting and Cell I/O/operator metrics around the native M4/history route. Admit the configured durable GC quota route for every actual writer,
    provision backend capacity and connect worker scheduling to permanent done/cache and reserved intent recovery.
 3. Integrate every concrete writer-matrix entry, native namespace/owner proofs, current capability refresh,
    fenced identity observation, dispatch/done and durable recovery veto above the same-key coordinator.

@@ -63,6 +63,14 @@ It checks native grant/refund response-loss and ABA races, 130 settled records a
 intent completing with full quota and another pending grant after server restart. This configured profile depends on
 unique namespace/all-writer admission and does not reserve backend WAL/replica/disk space. GC scheduling, actual physical
 deletion and source-bound DONE_CAPACITY acceptance remain required.
+`scripts/run-v2-m5-physical-namespace-check.sh` adds `v2M5PhysicalNamespaceCheck` and a separate post-restart JVM.
+The implementation binds actual BK INSTANCEID to one native Oxia marker, derives a fixed authority root and adds the
+permanent namespace gate to native ledger reservation/create transactions. The runner first executes legacy creation
+and task-terminal checks on an independent cluster, or revalidates a prior run by source/XML hashes. It then checks
+two Oxia backends, endpoint aliases, delayed creates,
+binding-response loss and retained-data restart of both Oxia servers plus all four BK services. All five new cases/phases
+pass; the 71-task main gate and 16-task post-restart phase pass with 702 unchanged captured inputs. Object namespace,
+cross-Cell ownership, all concrete writers, offline old-authority compatibility and real deletion remain OPEN.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

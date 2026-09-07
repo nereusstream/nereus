@@ -16,7 +16,7 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 
 | Flow | Current contract | Current implementation and evidence boundary |
 | --- | --- | --- |
-| Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; guarded BK creation now observes actual INSTANCEID and permanent reservations, while unique native namespace/route admission and real dispatch remain OPEN |
+| Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; guarded BK creation now observes actual INSTANCEID and permanent reservations, and a permanent BK binding now selects one actual Oxia namespace; Object namespace, complete writer/Cell admission and real dispatch remain OPEN |
 | Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; guarded BK task cancellation and native drain now produce a durable physical cut, while real protocol proof producers, grace/rescans and full deletion composition remain OPEN |
 | Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile fences late creates; same-selector decisions and native writer drain now produce restart-stable cancelled task terminals; complete namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
 | Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; additive wire 3 preserves that history while carrying one bounded task decision until exact permanent archival; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and physical GC worker scheduling remain OPEN |
@@ -116,6 +116,23 @@ expansion restore admission. Canonical byte quota is distinct from backend WAL/r
 quota, resident cache and work queues. The composition owner must exclude old/raw writers and assign a unique native
 route before initializing this profile. All-writer/native namespace admission, real deletion proofs, actual backend
 capacity provisioning, GC worker scheduling and all 17 source-bound acceptance obligations remain OPEN.
+The [physical namespace projection](m5-physical-namespace-projection.json) adds an actual-backend binding for BK.
+Oxia provisioning conditionally creates one permanent M5NM marker at a fixed namespace-global key; operational
+reconnect must reread the expected instance, native version and marker hash and never recreates a missing record.
+The actual BookKeeper INSTANCEID selects the physical namespace. Its permanent M5BG gate binds one M5NA metadata
+identity and advances exactly once from UNBOUND/native version 0 to BOUND/version 1. Both ledger reservation and
+native ledger creation check that version in their ZooKeeper transactions, so binding cuts off delayed unbound creates.
+A correctly bound client still obeys the existing permanent task fence and per-ledger reservation.
+The guarded factory derives the authority root solely from canonical physical namespace bytes. Each quota/authority
+operation rereads the actual Oxia marker and physical-backend binding; a second metadata backend cannot use the same
+physical namespace through this factory, even if it constructs identical key strings. Endpoint aliases do not enter
+the identity or route. Explicit namespace provisioning is not activation or offline compatibility proof. This profile
+excludes administrative marker cloning/rewrite, native reformat and external deletion of permanent records. It closes
+neither outstanding append handles nor stock/protocol writers. Object namespace assignment, cross-Cell ownership,
+Binding routing, all-writer admission, old-authority absence, external deletion and all 17 obligations remain OPEN.
+The native namespace runner passes 71 executed main tasks and a separate 16-task post-restart JVM (one executed).
+Its three identity unit cases and two native phases pass without skips; 702 captured inputs remain unchanged. The
+prior 71-case legacy regression and service restart are reused only after exact source/XML archive revalidation.
 The carrier gate passed 60 executed tasks with 8 inventory/layout, 7 real carrier and 8 real Cell-session tests;
 its exact-native-run check now precedes fencing, including the foreign-run zero-fence negative case.
 

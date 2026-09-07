@@ -43,3 +43,13 @@ tasks.register<Test>("v2M5PhysicalResourceIdentityTest") {
     useJUnitPlatform()
     include("**/PhysicalResourceIdV2Test.class")
 }
+
+
+tasks.register<Test>("v2M5NamespaceIdentityTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.storage.api.lifecycle.PhysicalNamespaceAuthorityBindingV2Test") }
+    outputs.upToDateWhen { false }
+}
