@@ -3018,3 +3018,19 @@ tasks.register("v2M5BookKeeperTaskTerminationCheck") {
         ":nereus-kafka-bookkeeper:v2M5BookKeeperTaskTerminationRealTest",
     )
 }
+
+
+tasks.register("v2M5PermanentDoneCheck") {
+    group = "verification"
+    description = "Verify permanent compact done, bounded resident cache and native same-key terminal rejection."
+    dependsOn(
+        "v2M5ReadFencedRecoveryCheck",
+        ":nereus-storage-object:v2M5PermanentDoneTest",
+        ":nereus-metadata-oxia:v2M5TargetDeleteRouteTest",
+        ":nereus-metadata-oxia:v2M5PermanentDoneRealOxiaTest",
+        ":nereus-metadata-oxia:spotlessCheck",
+        ":nereus-metadata-oxia:checkstyleMain",
+        ":nereus-metadata-oxia:checkstyleTest",
+        ":nereus-metadata-oxia:checkstyleOxiaIntegrationTest",
+    )
+}

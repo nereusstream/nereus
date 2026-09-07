@@ -41,6 +41,7 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
     public enum Outcome {
         APPLIED_EXACT,
         EXISTING_EXACT,
+        EXISTING_TERMINAL,
         PREDECESSOR_UNCHANGED,
         DEFINITIVE_CONFLICT,
         RESPONSE_UNKNOWN,
@@ -77,6 +78,26 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
             });
         }
 
+        /** Permanent completion can survive compaction even though the full candidate is no longer resident. */
+        public boolean exactTerminalIsAuthoritative() {
+            if (outcome != Outcome.APPLIED_EXACT
+                    && outcome != Outcome.EXISTING_EXACT
+                    && outcome != Outcome.EXISTING_TERMINAL) {
+                return false;
+            }
+            if (observed.isEmpty()) {
+                return false;
+            }
+            if (isExactCompactedSuccessor(exactCandidate, observed.orElseThrow())) {
+                return true;
+            }
+            if (!exactCandidateIsAuthoritative()) {
+                return false;
+            }
+            return M5TargetDeleteStoredValueV2.decode(observed.orElseThrow()).state()
+                    == TargetDeleteAuthorityStateV1.DELETE_DONE_V1;
+        }
+
         public boolean exactCandidateIsAuthoritative() {
             return (outcome == Outcome.APPLIED_EXACT || outcome == Outcome.EXISTING_EXACT)
                     && observed.map(value -> value.canonicalStoredBytes().equals(exactCandidate))
@@ -99,9 +120,28 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
         this.observationAuthority = Objects.requireNonNull(observationAuthority, "observationAuthority");
     }
 
+    /** Active/full compatibility view. Use inspect to include permanent compact terminals. */
     public CompletionStage<Optional<VersionedAuthorityV1>> read(String authorityKey) {
         String key = M5TargetDeleteAuthorityRecordsV1.requireKey(authorityKey);
         return metadata.read(key).thenApply(observed -> observed.map(value -> exactAuthority(key, value)));
+    }
+
+    public CompletionStage<Optional<M5TargetDeleteStoredValueV2>> inspect(String authorityKey) {
+        String key = M5TargetDeleteAuthorityRecordsV1.requireKey(authorityKey);
+        return metadata.read(key)
+                .thenApply(observed -> observed.map(value -> {
+                    if (!key.equals(value.key())) {
+                        throw new IllegalArgumentException("observed delete authority key differs");
+                    }
+                    return M5TargetDeleteStoredValueV2.decode(value);
+                }));
+    }
+
+    /** One exact same-key CAS compacts an already permanent full done; no proof is inferred from a cache. */
+    public CompletionStage<MutationResultV1> compactDone(VersionedValue exactFullDone) {
+        var exact = exactAuthority(exactFullDone.key(), exactFullDone);
+        var compact = M5TargetDeleteDoneV2.from(exact.authority());
+        return mutate(compact.authorityKey(), Optional.of(exactFullDone), compact.encode(), false);
     }
 
     public CompletionStage<MutationResultV1> create(TargetDeleteAuthorityV1 initial) {
@@ -283,6 +323,24 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
         return stage;
     }
 
+    private static boolean isExactCompactedSuccessor(CanonicalBytes fullCandidate, VersionedValue observed) {
+        if (!M5TargetDeleteDoneV2.isCompactDone(observed.canonicalStoredBytes())
+                || M5TargetDeleteDoneV2.isCompactDone(fullCandidate)) {
+            return false;
+        }
+        try {
+            var full = M5TargetDeleteAuthorityCodecV1.decodeAuthority(fullCandidate);
+            if (full.state() != TargetDeleteAuthorityStateV1.DELETE_DONE_V1) {
+                return false;
+            }
+            var compact = M5TargetDeleteDoneV2.from(full);
+            return compact.authorityKey().equals(observed.key())
+                    && compact.encode().equals(observed.canonicalStoredBytes());
+        } catch (IllegalArgumentException | ArithmeticException invalid) {
+            return false;
+        }
+    }
+
     private CompletionStage<MutationResultV1> mutate(
             String authorityKey, Optional<VersionedValue> predecessor, CanonicalBytes candidate, boolean create) {
         CompletionStage<MutationOutcome> mutation;
@@ -319,6 +377,9 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
                         : Outcome.EXISTING_EXACT;
                 return new MutationResultV1(exactOutcome, authorityKey, candidate, observed);
             }
+            if (observed.isPresent() && isExactCompactedSuccessor(candidate, observed.orElseThrow())) {
+                return new MutationResultV1(Outcome.EXISTING_TERMINAL, authorityKey, candidate, observed);
+            }
             if (observed.equals(predecessor)) {
                 Outcome predecessorOutcome =
                         attempt.failure() == null && attempt.outcome() == MutationOutcome.APPLIED_EXACT
@@ -328,13 +389,13 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
             }
             if (create && observed.isPresent()) {
                 try {
-                    TargetDeleteAuthorityV1 existing =
-                            exactAuthority(authorityKey, observed.orElseThrow()).authority();
+                    var existing = M5TargetDeleteStoredValueV2.decode(observed.orElseThrow());
                     TargetDeleteAuthorityV1 requested = M5TargetDeleteAuthorityCodecV1.decodeAuthority(candidate);
-                    // Rediscovery can refresh eligibility but must converge on the existing physical resource.
-                    Outcome outcome = existing.target().equals(requested.target())
-                            ? Outcome.DEFINITIVE_CONFLICT
-                            : Outcome.QUARANTINED;
+                    // Rediscovery never reopens a compact done after cache eviction or coordinator restart.
+                    Outcome outcome =
+                            existing.resource().equals(requested.target().resourceId())
+                                    ? Outcome.DEFINITIVE_CONFLICT
+                                    : Outcome.QUARANTINED;
                     return new MutationResultV1(outcome, authorityKey, candidate, observed);
                 } catch (IllegalArgumentException failure) {
                     return new MutationResultV1(Outcome.QUARANTINED, authorityKey, candidate, observed);

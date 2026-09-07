@@ -17,6 +17,7 @@
   "reconciliationOutcomes": [
     "APPLIED_EXACT",
     "EXISTING_EXACT",
+    "EXISTING_TERMINAL",
     "PREDECESSOR_UNCHANGED",
     "DEFINITIVE_CONFLICT",
     "RESPONSE_UNKNOWN",

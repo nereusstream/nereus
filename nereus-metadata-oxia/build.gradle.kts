@@ -2453,3 +2453,43 @@ tasks.register<Test>("v2M5TaskSelectionRouteTest") {
     filter { includeTestsMatching("com.nereusstream.metadata.oxia.v2.retention.OxiaTaskSelectionRouteV2Test") }
     outputs.upToDateWhen { false }
 }
+
+
+// Only storage-format test fixtures; never evidence of native Provider/BK deletion or protocol-owner admission.
+dependencies {
+    testImplementation(project(path = ":nereus-storage-object", configuration = "m5DeleteTestFixtures"))
+}
+
+tasks.register<Test>("v2M5TargetDeleteRouteTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.metadata.oxia.v2.retention.OxiaTargetDeleteAuthorityStoreV2Test") }
+    outputs.upToDateWhen { false }
+}
+
+
+mapOf(
+    "v2M5PermanentDoneRealOxiaTest" to "M5PermanentDoneOxiaIntegrationTest",
+    "v2M5PermanentDoneOxiaRestartWriteTest" to "M5PermanentDoneOxiaRestartTest.writeBeforeServerRestart",
+    "v2M5PermanentDoneOxiaRestartReadTest" to "M5PermanentDoneOxiaRestartTest.readAfterServerRestart",
+).forEach { (taskName, testName) ->
+    tasks.register<Test>(taskName) {
+        group = "verification"
+        testClassesDirs = oxiaIntegrationTest.output.classesDirs
+        classpath = oxiaIntegrationTest.runtimeClasspath
+        useJUnitPlatform()
+        maxParallelForks = 1
+        filter { includeTestsMatching("com.nereusstream.metadata.oxia.v2.retention.$testName") }
+        outputs.upToDateWhen { false }
+        doFirst {
+            systemProperty("nereus.m5.retention.oxia.serviceAddress",
+                providers.gradleProperty("v2M5RetentionOxiaServiceAddress").orNull ?: error("real Oxia address is required"))
+            if (taskName.contains("Restart")) {
+                systemProperty("nereus.m5.done.oxia.restartCheckpoint",
+                    providers.gradleProperty("v2M5DoneOxiaRestartCheckpoint").orNull ?: error("done restart checkpoint is required"))
+            }
+        }
+    }
+}

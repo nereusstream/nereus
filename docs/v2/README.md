@@ -53,6 +53,11 @@ performance-first BookKeeper WAL.
   terminal and native seals after all five services restart. Unknown stale tasks, full writer/namespace admission,
   grace/reference rescans and cleanup remain required, and all 17 M5 acceptance obligations remain OPEN.
 
+  The [permanent-done gate](detailed_design/m5/m5-permanent-done-projection.json) now verifies same-key terminal
+  compaction, bounded positive caching and native Oxia eviction/reload/restart with 258 terminal samples. A late ticket
+  CAS cannot dispatch after compaction. Actual deletion proofs, durable quota and reserved intent headroom remain required;
+  this metadata-storage result does not complete DONE_CAPACITY or any other amended acceptance obligation.
+
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.
 - M1 implementation and the pure-V2 active-graph prune are complete. The authoritative completion state is derived

@@ -152,21 +152,22 @@ public final class M5TargetDeleteWriterGuardV1 {
                 || attempt.result() == null
                 || attempt.result().outcome() == ExternalMutationOutcomeV1.RESPONSE_UNKNOWN_V1) {
             return coordinator
-                    .read(authorityKey)
+                    .inspect(authorityKey)
                     .thenApply(observed -> new GuardResultV1(
                             GuardOutcomeV1.TICKET_RETAINED_RESPONSE_UNKNOWN_V1,
                             true,
-                            observed.map(VersionedAuthorityV1::exactStoredValue)));
+                            observed.map(M5TargetDeleteStoredValueV2::exactStoredValue)));
         }
         Sha256Digest proof = attempt.result().reconciledProofSnapshotDigest().orElseThrow();
-        return coordinator.read(authorityKey).thenCompose(observed -> {
+        return coordinator.inspect(authorityKey).thenCompose(observed -> {
             if (observed.isEmpty()) {
                 return CompletableFuture.completedFuture(
                         new GuardResultV1(GuardOutcomeV1.QUARANTINED_V1, true, Optional.empty()));
             }
-            VersionedAuthorityV1 current = observed.orElseThrow();
-            if (current.authority().state() != TargetDeleteAuthorityStateV1.OPEN_V1
-                    || current.authority().activeWriterTickets().stream().noneMatch(ticket::equals)) {
+            var current = observed.orElseThrow();
+            if (current.state() != TargetDeleteAuthorityStateV1.OPEN_V1
+                    || current.fullAuthority().orElseThrow().activeWriterTickets().stream()
+                            .noneMatch(ticket::equals)) {
                 return CompletableFuture.completedFuture(new GuardResultV1(
                         GuardOutcomeV1.QUARANTINED_V1, true, Optional.of(current.exactStoredValue())));
             }

@@ -53,6 +53,10 @@ create fencing and recovery of every inventoried present ledger precede an immut
 BK/Oxia races, lost responses, old append rejection and independent JVMs across all five service restarts pass. These
 checks still leave stale tasks without decisions, full writer/native authority admission, grace/reference rescans,
 cleanup, quota and source-bound acceptance OPEN.
+`scripts/run-v2-m5-permanent-done-oxia-check.sh` runs `v2M5PermanentDoneCheck` and separate JVM phases around an
+Oxia restart. It verifies exact same-key compact done, positive-only resident caching, native late-ticket rejection and
+recovery of a permanent done plus an existing intent. Its 258 native terminal samples use synthetic deletion proofs;
+durable namespace quota, reserved reconciliation headroom and GC worker scheduling remain required for DONE_CAPACITY.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

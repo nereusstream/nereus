@@ -627,6 +627,69 @@ The source/protocol authority inputs remain synthetic despite real native servic
 source-bound M5 child, aggregate/Final, physical-delete, staging or production authority. Frozen contracts, manifests,
 source locks and receipts remain unchanged. M6 activation and the paused benchmark remain outside this work.
 
+## 2026-09-08 compact permanent done and native cache recovery
+
+Status: focused permanent metadata storage after `dd8a3f1af17891b0bcfb3622f936eb00886b1a6d`.
+The [permanent-done projection](m5-permanent-done-projection.json) records the implemented cache/compaction path.
+DONE_CAPACITY and all 17 amended obligations remain OPEN/null: native quota, existing-intent headroom, actual
+Provider/BK deletion proofs, full writer admission and GC worker scheduling are still required.
+
+`M5TargetDeleteDoneV2` uses M5DC/version 2 and a 66,048-byte maximum including the complete bounded physical resource.
+It retains the full done predecessor SHA, incremented authority revision, closed writer epoch, eligibility digest,
+final capability and dispatch-token identities, exact external-identity digest, fixed intent/attempt/revision,
+final dispatch epoch/owner fence, terminal outcome and absence/completion proof roots. The canonical payload carries
+its own checksum. Existing M5DA wire-4 full done values remain byte-identical; compaction is one separate exact CAS
+from a stored full DELETE_DONE at the original resource key. Compact done has no successor or fresh-import path.
+
+`M5TargetDeleteStoredValueV2` exposes the full/compact union without treating a compact record as absence.
+`M5TargetDeleteAuthorityCoordinatorV1.inspect()` returns that union; `compactDone()` uses the existing single CAS call
+site and exact reconciliation. Rediscovery recognizes the same resource even when the permanent value is compact.
+The writer guard uses `inspect()` when finishing or retaining tickets, preserving visible terminal vetoes.
+A fixed completion retry can arrive after another executor has compacted the full done. Exact full-candidate-to-compact
+matching then returns EXISTING_TERMINAL and `exactTerminalIsAuthoritative()`, while
+`exactCandidateIsAuthoritative()` stays false because those full bytes are no longer stored. A different absence root,
+completion proof, owner, capability, attempt or predecessor cannot inherit this result.
+
+`M5PermanentDoneCacheV2` caches only validated compact terminals. It bounds resident entries and the encoded weight
+of key/value/native version, with object overhead bounded separately by entry count. It never caches absence or active
+work and never deletes durable records. Misses, including after eviction/restart, read the authoritative backend;
+mutations always retain the native conditional check. Metrics expose resident count/weight, hits, reads and evictions.
+These are resident metrics, not measured durable namespace quota or native aggregate-capacity reservations.
+
+`OxiaTargetDeleteAuthorityStoreV2` validates one configured physical namespace, its canonical resource keys and legal
+revision/phase transitions. M5D2 version tokens bind the configured root and complete namespace to the exact native
+version. The route rejects namespace/key mismatch, skipped/reopened phases, changed full-done compaction and every
+compact successor before native mutation. Non-authority fact reads use the separately supplied fact port. The composition
+owner must still prove unique native namespace assignment and admit those fact authorities.
+
+Nine unit cases cover exact identities and byte preservation, all-byte corruption/truncation, lost compaction response,
+130 completions with a two-entry cache, eviction/restart and recreation rejection, stale writer non-dispatch,
+unknown/malformed reads, foreign-key read rejection, a too-small byte cache and exact completion retry after compaction. Four route cases cover native key and
+version scoping, legal transitions, immutable terminals and wrong proofs. Existing 13 authority and 19 coordinator tests
+also pass. A test-only fixture JAR shares explicit synthetic eligibility/owner/absence records with the native metadata
+suite; it is absent from production dependency edges and is not evidence of external deletion.
+
+Four real Oxia cases persist 258 complete metadata phase chains and compact terminals with at most eight resident
+entries/8,192 encoded bytes, reconnect and reject old-resource creation, reconcile applied-response loss, reject unknown
+read inference, and hold an actual native ticket CAS until another client has completed/compacted the resource. The held
+CAS then fails and its external mutation callback is never invoked. Another native case verifies exact completion
+retry after independent-client compaction and rejects changed completion proof. Independent JVM phases restart the same server with
+retained data, recover exact done/intent hashes and scoped versions, reject done recreation and complete the existing
+synthetic intent. Checkpoint files contain resource identities and hashes, not copied authority values or proof bodies.
+
+Validation: `scripts/run-v2-m5-permanent-done-oxia-check.sh` passed **59/59 executed tasks** with configuration cache
+disabled and all tasks rerun; the fresh post-restart JVM passed **15 tasks** (1 executed, 14 up-to-date). All **19** new
+focused cases/phases passed without failures/errors/skips. Independent checks found **428 unchanged inputs**, manifest
+SHA-256 `f808d477118927796aed993af613dadb1ebd58b02fea39788c8a25fa6bcd3a81`.
+The local result is `build/m5-permanent-done-oxia/nereus-m5-permanent-done-oxia-36576/run-summary.json`; successful log
+`/tmp/nereus-m5-permanent-done-native-gate2.log`. Server container
+`238e0e908b781d3e7edf4cb9fb923567a3358ebe23bb339273e6c4efbd17bb6e` retained its exact image/data and restarted from
+`2026-09-07T21:45:19.794453381Z` to `2026-09-07T21:45:47.61722213Z`. The runner removed only its owned container.
+Supplemental frozen-design/M4 dependency, lifecycle and coordinator/recovery contract checks passed **15/15 tasks**
+in `/tmp/nereus-m5-permanent-done-final-check2.log`. All 428 captured inputs were independently rechecked after the
+interruption and remain byte-identical to the final native run.
+No actual Provider/BK deletion, source-bound M5 child, Final, staging or production authority follows from these tests.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;
@@ -1077,7 +1140,8 @@ source-locked real Oxia result, source-bound receipt, physical-delete, staging, 
 1. Extend the guarded create/selection/drain terminal to stale-task and complete writer/adoption admission, then connect
    M4-protected BK recovery to native protocol-owner admission, ordinary reads, internal topics and grace/rescan cleanup.
 2. Complete unique native namespace/Binding authority admission, quota/restart accounting and Cell I/O/operator metrics
-   around the existing native M4/history route, plus permanent physical-done cache/checkpoint lifecycle.
+   around the existing native M4/history route, plus durable GC namespace quota, reserved intent headroom and
+   worker scheduling around the new permanent done/cache route.
 3. Integrate all ten concrete writer classes, native namespace/owner proofs, current capability refresh,
    fenced identity observation, dispatch/done and durable recovery veto above the same-key coordinator.
 4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,

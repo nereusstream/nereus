@@ -19,7 +19,8 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 | Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; guarded BK creation now observes actual INSTANCEID and permanent reservations, while unique native namespace/route admission and real dispatch remain OPEN |
 | Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; guarded BK task cancellation and native drain now produce a durable physical cut, while real protocol proof producers, grace/rescans and full deletion composition remain OPEN |
 | Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile fences late creates; same-selector decisions and native writer drain now produce restart-stable cancelled task terminals; complete namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
-| Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; additive wire 3 preserves that history while carrying one bounded task decision until exact permanent archival; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and physical-done cache lifecycle remain OPEN |
+| Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; additive wire 3 preserves that history while carrying one bounded task decision until exact permanent archival; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and durable physical-done quota/scheduling remain OPEN |
+| Permanent delete history | Compact done at the same resource key; resident cap independent of lifetime history | M5DC V2 retains exact resource/attempt/revision/owner/capability/absence identities; native Oxia compaction and bounded positive-cache eviction/reload/restart pass; durable namespace quota, existing-intent headroom and GC worker scheduling remain OPEN |
 | Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; native owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
 
@@ -86,6 +87,17 @@ stale tasks without a prior decision and native metadata mismatch retain unknown
 native publication, old-writer append rejection, lost responses and independent JVM recovery after all five services
 restart. This guarded profile does not fence delayed unused inventory metadata, admit all stock/protocol writers, or
 supply grace, complete reference rescans and cleanup authority. Complete TaskTerminal and all 17 obligations remain OPEN.
+The [permanent-done projection](m5-permanent-done-projection.json) adds M5DC/version-2 compaction of an exact full
+DELETE_DONE at the same stable resource key. It retains the final attempt/revision/owner/capability and absence-proof
+identities, increments the revision, and binds the full predecessor hash. The native namespace route rejects imports,
+phase rollback, changed proofs and any compact-done successor. A count/encoded-byte bounded cache stores only permanent
+compact terminals; absent and active values always require authoritative reads. `inspect()` distinguishes compact done
+from absent authority, and rediscovery cannot recreate OPEN after eviction. A fixed full-done retry matches its exact
+compact successor as EXISTING_TERMINAL without claiming that the old full candidate is still stored. Native Oxia tests retain 258 terminal
+samples with at most eight resident entries, reject a held ticket CAS after compaction, reconcile lost responses, and
+recover done plus an existing intent in a fresh JVM after server restart. Source/owner/absence proofs in these storage
+samples remain synthetic. Real Provider/BK deletion, durable quota, existing-intent headroom, GC scheduling and the full
+DONE_CAPACITY acceptance remain OPEN.
 The carrier gate passed 60 executed tasks with 8 inventory/layout, 7 real carrier and 8 real Cell-session tests;
 its exact-native-run check now precedes fencing, including the foreign-run zero-fence negative case.
 

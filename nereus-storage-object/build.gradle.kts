@@ -323,3 +323,26 @@ tasks.register<Test>("v2M5TaskSelectionTest") {
     filter { includeTestsMatching("com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test") }
     outputs.upToDateWhen { false }
 }
+
+
+val m5DeleteTestFixtures by configurations.creating {
+    isCanBeConsumed = true
+    isCanBeResolved = false
+}
+val m5DeleteTestFixturesJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("m5-synthetic-delete-test-fixtures")
+    from(sourceSets.test.get().output)
+    include("com/nereusstream/storage/object/gc/SyntheticDeleteAuthorityFixturesV2*.class")
+    include("com/nereusstream/storage/object/gc/M5DeleteEligibilityTestFixtures*.class")
+    dependsOn(tasks.named("testClasses"))
+}
+artifacts { add(m5DeleteTestFixtures.name, m5DeleteTestFixturesJar) }
+
+tasks.register<Test>("v2M5PermanentDoneTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.storage.object.gc.M5PermanentDoneV2Test") }
+    outputs.upToDateWhen { false }
+}
