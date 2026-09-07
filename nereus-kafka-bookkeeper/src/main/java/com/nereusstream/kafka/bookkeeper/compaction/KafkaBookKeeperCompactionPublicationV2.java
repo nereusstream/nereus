@@ -28,6 +28,8 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Bindi
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.BindingReadSelector;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SelectorMode;
 import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity;
+import com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2;
+import com.nereusstream.storage.object.retention.M5TaskSelectionDecisionV2;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -44,6 +46,8 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
     private final M4ReadControlCoordinatorV1 m4;
     private final KafkaSealedBookKeeperReaderV2 reader;
     private final Executor controlExecutor;
+    private final int shardId;
+    private final M5TaskSelectionCoordinatorV2 taskSelections;
 
     public KafkaBookKeeperCompactionPublicationV2(
             CanonicalControlMetadataStore metadata,
@@ -65,6 +69,8 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
         this.binding = Objects.requireNonNull(binding, "binding");
         this.reader = Objects.requireNonNull(reader, "reader");
         this.m4 = new M4ReadControlCoordinatorV1(metadata, shardId, binding);
+        this.shardId = shardId;
+        this.taskSelections = new M5TaskSelectionCoordinatorV2(metadata, shardId, binding);
     }
 
     /** Rechecks exact semantics and all native stored bytes before creating immutable values and selecting once. */
@@ -75,6 +81,16 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
             List<SourceProtectionIdentity> exactFallbackSources,
             CurrentStateReader currentCompactionState) {
         requireIdentity(plan, semantic, descriptor);
+        var priorDecision = taskSelections.readDecision(descriptor.task().taskIdSha256());
+        if (priorDecision.isPresent()) {
+            var decided = priorDecision.orElseThrow();
+            return java.util.concurrent.CompletableFuture.completedFuture(
+                    decided.outcome() == M5TaskSelectionDecisionV2.Outcome.SELECTION_CANCELLED
+                            ? PublicationOutcome.CANCELLED_STALE
+                            : decided.selectedOutput().equals(Optional.of(descriptor.descriptorSha256()))
+                                    ? PublicationOutcome.EXISTING_EXACT
+                                    : PublicationOutcome.CONFLICT);
+        }
         List<SourceProtectionIdentity> sources = List.copyOf(exactFallbackSources);
         M5MaterializationValidatorV1.requireFallbackProtections(plan.sourceCut(), sources);
         return reader.recover(descriptor)
@@ -91,6 +107,18 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
                             if (immutable != PublicationOutcome.EXISTING_EXACT) {
                                 return immutable;
                             }
+                            var decision = taskSelections.readDecision(
+                                    descriptor.task().taskIdSha256());
+                            if (decision.isPresent()) {
+                                return decision.orElseThrow().outcome()
+                                                == M5TaskSelectionDecisionV2.Outcome.SELECTION_CANCELLED
+                                        ? PublicationOutcome.CANCELLED_STALE
+                                        : decision.orElseThrow()
+                                                        .selectedOutput()
+                                                        .equals(Optional.of(identity))
+                                                ? PublicationOutcome.EXISTING_EXACT
+                                                : PublicationOutcome.CONFLICT;
+                            }
                             new KafkaCompactionPublicationFenceV1().requireCurrent(plan, currentCompactionState);
                             BindingReadSelector expected = plan.sourceCut().predecessorSelector();
                             Optional<BindingReadSelector> current = m4.readSelector();
@@ -104,13 +132,39 @@ public final class KafkaBookKeeperCompactionPublicationV2 {
                             if (!current.equals(Optional.of(expected))) {
                                 return PublicationOutcome.CANCELLED_STALE;
                             }
+                            var prepared =
+                                    taskSelections.prepare(descriptor.task().taskIdSha256());
+                            if (prepared.isEmpty()) {
+                                return PublicationOutcome.OUTCOME_UNKNOWN;
+                            }
+                            var selecting = new M4ReadControlCoordinatorV1(
+                                    prepared.orElseThrow().selectingControl(identity), shardId, binding);
                             M4ReadControlCoordinatorV1.Outcome outcome = expected.mode() == SelectorMode.PREFERRED_ONLY
-                                    ? m4.introduceFallback(expected, identity, descriptor.sourceGeneration(), sources)
-                                    : m4.updateMembershipNeutralView(
+                                    ? selecting.introduceFallback(
+                                            expected, identity, descriptor.sourceGeneration(), sources)
+                                    : selecting.updateMembershipNeutralView(
                                             expected, identity, descriptor.sourceGeneration(), sources);
+                            var appliedDecision = taskSelections.readDecision(
+                                    descriptor.task().taskIdSha256());
+                            if (appliedDecision.isPresent()) {
+                                if (appliedDecision.orElseThrow().outcome()
+                                        == M5TaskSelectionDecisionV2.Outcome.SELECTION_CANCELLED) {
+                                    return PublicationOutcome.CANCELLED_STALE;
+                                }
+                                if (!appliedDecision
+                                        .orElseThrow()
+                                        .selectedOutput()
+                                        .equals(Optional.of(identity))) {
+                                    return PublicationOutcome.CONFLICT;
+                                }
+                                taskSelections.archiveCurrentDecision(
+                                        descriptor.task().taskIdSha256());
+                                return outcome == M4ReadControlCoordinatorV1.Outcome.APPLIED
+                                        ? PublicationOutcome.APPLIED_EXACT
+                                        : PublicationOutcome.EXISTING_EXACT;
+                            }
                             return switch (outcome) {
-                                case APPLIED -> PublicationOutcome.APPLIED_EXACT;
-                                case EXISTING_EXACT -> PublicationOutcome.EXISTING_EXACT;
+                                case APPLIED, EXISTING_EXACT -> PublicationOutcome.OUTCOME_UNKNOWN;
                                 case RETRY_EXACT_PREDECESSOR -> PublicationOutcome.DEFINITIVELY_NOT_APPLIED;
                                 case RETAIN -> PublicationOutcome.OUTCOME_UNKNOWN;
                                 default -> PublicationOutcome.CONFLICT;

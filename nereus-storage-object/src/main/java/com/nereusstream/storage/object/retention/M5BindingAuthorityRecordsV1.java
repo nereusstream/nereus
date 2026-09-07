@@ -169,7 +169,41 @@ public final class M5BindingAuthorityRecordsV1 {
             int wireVersion,
             long lastActivationOrdinal,
             M5RetiredBatchHistoryV2.Root retiredHistory,
+            Optional<M5TaskSelectionDecisionV2> taskSelectionDecision,
             Sha256Digest authorityCanonicalSha256) {
+        public BindingRetirementAuthorityV1(
+                BindingIdentity binding,
+                long authorityGeneration,
+                Optional<Sha256Digest> predecessorValueSha256,
+                BindingAuthorityStateV1 state,
+                BindingReadSelector selectorProjection,
+                List<BatchAuthoritySlotV1> batchSlots,
+                Optional<ReferenceScanFenceV1> scanFence,
+                List<ReferenceMutationTicketV1> referenceMutationTickets,
+                Optional<ReferenceWriterEnrollmentV1> writerEnrollment,
+                CapabilityBinding capability,
+                int wireVersion,
+                long lastActivationOrdinal,
+                M5RetiredBatchHistoryV2.Root retiredHistory,
+                Sha256Digest authorityCanonicalSha256) {
+            this(
+                    binding,
+                    authorityGeneration,
+                    predecessorValueSha256,
+                    state,
+                    selectorProjection,
+                    batchSlots,
+                    scanFence,
+                    referenceMutationTickets,
+                    writerEnrollment,
+                    capability,
+                    wireVersion,
+                    lastActivationOrdinal,
+                    retiredHistory,
+                    Optional.empty(),
+                    authorityCanonicalSha256);
+        }
+
         public BindingRetirementAuthorityV1(
                 BindingIdentity binding,
                 long authorityGeneration,
@@ -212,6 +246,13 @@ public final class M5BindingAuthorityRecordsV1 {
             writerEnrollment = Objects.requireNonNull(writerEnrollment, "writerEnrollment");
             Objects.requireNonNull(capability, "capability");
             Objects.requireNonNull(retiredHistory, "retiredHistory");
+            taskSelectionDecision = Objects.requireNonNull(taskSelectionDecision, "taskSelectionDecision");
+            if (taskSelectionDecision
+                            .filter(value -> !value.binding().equals(binding))
+                            .isPresent()
+                    || wireVersion < 3 && taskSelectionDecision.isPresent()) {
+                throw new IllegalArgumentException("task selection anchor Binding or wire version differs");
+            }
             Objects.requireNonNull(authorityCanonicalSha256, "authorityCanonicalSha256");
             if (authorityGeneration <= 0 || (authorityGeneration > 1 && predecessorValueSha256.isEmpty())) {
                 throw new IllegalArgumentException("authority generation and predecessor presence disagree");
@@ -223,7 +264,7 @@ public final class M5BindingAuthorityRecordsV1 {
                     || referenceMutationTickets.size() > MAX_REFERENCE_MUTATION_TICKETS) {
                 throw new IllegalArgumentException("Binding authority exceeds a hard count cap");
             }
-            if ((wireVersion != 1 && wireVersion != 2)
+            if ((wireVersion != 1 && wireVersion != 2 && wireVersion != 3)
                     || lastActivationOrdinal < 0
                     || Math.addExact(retiredHistory.count(), batchSlots.size()) != lastActivationOrdinal
                     || (retiredHistory.count() == 0)

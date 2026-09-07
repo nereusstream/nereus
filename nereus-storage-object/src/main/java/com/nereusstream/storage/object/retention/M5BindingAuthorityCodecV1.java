@@ -236,9 +236,10 @@ public final class M5BindingAuthorityCodecV1 {
                 tickets,
                 enrollment,
                 current.capability(),
-                VERSION,
+                Math.max(VERSION, current.wireVersion()),
                 Math.addExact(current.retiredHistory().count(), slots.size()),
                 current.retiredHistory(),
+                current.taskSelectionDecision(),
                 PLACEHOLDER));
     }
 
@@ -274,9 +275,118 @@ public final class M5BindingAuthorityCodecV1 {
                 current.referenceMutationTickets(),
                 current.writerEnrollment(),
                 current.capability(),
-                VERSION,
+                Math.max(VERSION, current.wireVersion()),
                 current.lastActivationOrdinal(),
                 insertion.successor(),
+                current.taskSelectionDecision(),
+                PLACEHOLDER));
+    }
+
+    /** Validates the inline transition shape; the native route separately checks immutable archive authority. */
+    public static void requireTaskSelectionTransition(
+            BindingRetirementAuthorityV1 current, BindingRetirementAuthorityV1 successor) {
+        if (successor.wireVersion() < current.wireVersion()) {
+            throw new IllegalArgumentException("Binding authority cannot downgrade its task-decision wire version");
+        }
+        if (current.taskSelectionDecision().equals(successor.taskSelectionDecision())) {
+            return;
+        }
+        if (current.taskSelectionDecision().isPresent()
+                && successor.taskSelectionDecision().isPresent()) {
+            throw new IllegalArgumentException("inline task selection decision cannot be replaced");
+        }
+        if (current.state() != BindingAuthorityStateV1.OPEN_V1
+                || successor.state() != current.state()
+                || !successor.batchSlots().equals(current.batchSlots())
+                || !successor.retiredHistory().equals(current.retiredHistory())
+                || successor.lastActivationOrdinal() != current.lastActivationOrdinal()
+                || !successor.scanFence().equals(current.scanFence())
+                || !successor.referenceMutationTickets().equals(current.referenceMutationTickets())
+                || !successor.writerEnrollment().equals(current.writerEnrollment())
+                || !successor.capability().equals(current.capability())) {
+            throw new IllegalArgumentException("task selection transition changes another authority domain");
+        }
+        if (successor.taskSelectionDecision().isPresent()) {
+            var decision = successor.taskSelectionDecision().orElseThrow();
+            if (!decision.equals(M5TaskSelectionDecisionV2.of(
+                            decision.taskId(),
+                            decision.outcome(),
+                            current.selectorProjection(),
+                            successor.selectorProjection()))
+                    || decision.outcome() == M5TaskSelectionDecisionV2.Outcome.SELECTED
+                            && successor.selectorProjection().sourceGeneration()
+                                    <= current.selectorProjection().sourceGeneration()) {
+                throw new IllegalArgumentException("task selection decision does not bind its exact selector CAS");
+            }
+        } else if (!successor.selectorProjection().equals(current.selectorProjection())) {
+            throw new IllegalArgumentException("task selection archival cannot change its read selector");
+        }
+    }
+
+    /** Adds one bounded decision anchor to an already validated exact selector successor. */
+    public static BindingRetirementAuthorityV1 anchorTaskSelection(
+            BindingRetirementAuthorityV1 current,
+            BindingRetirementAuthorityV1 successor,
+            M5TaskSelectionDecisionV2 decision) {
+        if (current.state() != BindingAuthorityStateV1.OPEN_V1
+                || current.taskSelectionDecision().isPresent()
+                || successor.taskSelectionDecision().isPresent()
+                || !successor.binding().equals(current.binding())
+                || successor.authorityGeneration() != Math.addExact(current.authorityGeneration(), 1)
+                || !successor.predecessorValueSha256().equals(Optional.of(Sha256Digest.hash(encodeAuthority(current))))
+                || !decision.equals(M5TaskSelectionDecisionV2.of(
+                        decision.taskId(),
+                        decision.outcome(),
+                        current.selectorProjection(),
+                        successor.selectorProjection()))) {
+            throw new IllegalArgumentException(
+                    "task selection lacks an empty exact predecessor and matching successor");
+        }
+        if (decision.outcome() == M5TaskSelectionDecisionV2.Outcome.SELECTED
+                && successor.selectorProjection().sourceGeneration()
+                        <= current.selectorProjection().sourceGeneration()) {
+            throw new IllegalArgumentException("selected task must advance its source generation");
+        }
+        var anchored = withTaskSelection(successor, Optional.of(decision));
+        requireTaskSelectionTransition(current, anchored);
+        return anchored;
+    }
+
+    /** Clearing is allowed only after the caller authoritatively rereads these exact immutable archive bytes. */
+    public static BindingRetirementAuthorityV1 clearArchivedTaskSelection(
+            BindingRetirementAuthorityV1 current, CanonicalBytes exactArchive) {
+        var decision = current.taskSelectionDecision().orElseThrow();
+        if (!decision.encode().equals(exactArchive) || current.state() != BindingAuthorityStateV1.OPEN_V1) {
+            throw new IllegalArgumentException("task selection archive differs or Binding is fenced");
+        }
+        var successor = buildSuccessor(
+                current,
+                current.state(),
+                current.selectorProjection(),
+                current.batchSlots(),
+                current.scanFence(),
+                current.referenceMutationTickets(),
+                current.writerEnrollment());
+        return withTaskSelection(successor, Optional.empty());
+    }
+
+    private static BindingRetirementAuthorityV1 withTaskSelection(
+            BindingRetirementAuthorityV1 value, Optional<M5TaskSelectionDecisionV2> decision) {
+        return finalizeAuthority(new BindingRetirementAuthorityV1(
+                value.binding(),
+                value.authorityGeneration(),
+                value.predecessorValueSha256(),
+                value.state(),
+                value.selectorProjection(),
+                value.batchSlots(),
+                value.scanFence(),
+                value.referenceMutationTickets(),
+                value.writerEnrollment(),
+                value.capability(),
+                3,
+                value.lastActivationOrdinal(),
+                value.retiredHistory(),
+                decision,
                 PLACEHOLDER));
     }
 
@@ -299,7 +409,7 @@ public final class M5BindingAuthorityCodecV1 {
                 throw new IllegalArgumentException("Binding authority preamble differs");
             }
             int wireVersion = input.readInt();
-            if (wireVersion != 1 && wireVersion != VERSION) {
+            if (wireVersion != 1 && wireVersion != VERSION && wireVersion != 3) {
                 throw new IllegalArgumentException("Binding authority version differs");
             }
             long generation = input.readLong();
@@ -390,6 +500,16 @@ public final class M5BindingAuthorityCodecV1 {
             var history = wireVersion == 1
                     ? M5RetiredBatchHistoryV2.emptyRoot(projection.binding())
                     : new M5RetiredBatchHistoryV2.Root(readDigest(input), input.readLong());
+            Optional<M5TaskSelectionDecisionV2> decision = Optional.empty();
+            if (wireVersion >= 3) {
+                int present = input.readUnsignedByte();
+                if (present > 1) {
+                    throw new IllegalArgumentException("task selection anchor presence is not canonical");
+                }
+                if (present == 1) {
+                    decision = Optional.of(M5TaskSelectionDecisionV2.decode(readBytes(input)));
+                }
+            }
             Sha256Digest canonicalSha = readDigest(input);
             return new BindingRetirementAuthorityV1(
                     projection.binding(),
@@ -405,6 +525,7 @@ public final class M5BindingAuthorityCodecV1 {
                     wireVersion,
                     lastOrdinal,
                     history,
+                    decision,
                     canonicalSha);
         });
         if (!Arrays.equals(encoded.toByteArray(), encodeAuthority(value).toByteArray())) {
@@ -440,6 +561,7 @@ public final class M5BindingAuthorityCodecV1 {
                 value.wireVersion(),
                 value.lastActivationOrdinal(),
                 value.retiredHistory(),
+                value.taskSelectionDecision(),
                 canonicalSha);
     }
 
@@ -509,6 +631,12 @@ public final class M5BindingAuthorityCodecV1 {
                 out.writeLong(value.lastActivationOrdinal());
                 writeDigest(out, value.retiredHistory().sha256());
                 out.writeLong(value.retiredHistory().count());
+            }
+            if (value.wireVersion() >= 3) {
+                out.writeByte(value.taskSelectionDecision().isPresent() ? 1 : 0);
+                if (value.taskSelectionDecision().isPresent()) {
+                    writeBytes(out, value.taskSelectionDecision().orElseThrow().encode());
+                }
             }
             writeDigest(out, value.authorityCanonicalSha256());
         });

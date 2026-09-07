@@ -46,6 +46,13 @@ composition, internal-topic lifecycle, cleanup and source-bound M5 evidence are 
 reconciliation and delayed-create rejection. Guarded BK/Oxia composition and independent JVMs across the same
 ZooKeeper, three bookie and Oxia container restarts verify persistent fencing and selected recovery. This focused gate
 is not complete TaskTerminal/publication fencing, append drain, global writer admission, quota or delete authority.
+`scripts/run-v2-m5-bookkeeper-task-terminal-check.sh` now composes these checks through
+`v2M5BookKeeperTaskTerminationCheck`. One inline decision on the existing selector serializes publication/cancellation;
+exact permanent archival and raw-authority capture prevent late publication after a cancel/archive/clear cycle. Native
+create fencing and recovery of every inventoried present ledger precede an immutable cancelled physical cut. Real
+BK/Oxia races, lost responses, old append rejection and independent JVMs across all five service restarts pass. These
+checks still leave stale tasks without decisions, full writer/native authority admission, grace/reference rescans,
+cleanup, quota and source-bound acceptance OPEN.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

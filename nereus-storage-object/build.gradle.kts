@@ -313,3 +313,13 @@ tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
 }
+
+
+tasks.register<Test>("v2M5TaskSelectionTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.storage.object.retention.M5TaskSelectionCoordinatorV2Test") }
+    outputs.upToDateWhen { false }
+}

@@ -160,6 +160,13 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   two independent JVM phases across ZooKeeper/bookie/Oxia restarts verify late-create rejection and selected recovery.
   Full task terminal/publication fencing, append drain, all-writer admission, durable quota and cleanup remain OPEN.
 
+- The [BK task-terminal projection](m5-bookkeeper-task-terminal-projection.json) adds one bounded task decision on
+  the existing selector and a permanent per-task archive. Cancellation and publication race at the same native CAS;
+  capturing the raw authority prevents projected-selector ABA. Native creation fencing plus recovery of existing
+  writers produces a durable cancelled physical cut. Seven decision, three route and four terminal unit tests, five
+  real BK/Oxia cases and two restart JVM phases pass. Unknown stale tasks, full writer/namespace admission,
+  grace/reference rescans, cleanup, quota and source-bound acceptance remain OPEN.
+
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
 gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order/multipart cores without amending that result.

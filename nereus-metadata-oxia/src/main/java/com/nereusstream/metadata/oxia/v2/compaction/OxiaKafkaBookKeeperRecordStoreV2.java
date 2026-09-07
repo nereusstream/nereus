@@ -36,7 +36,7 @@ public final class OxiaKafkaBookKeeperRecordStoreV2 implements CanonicalControlM
     private static final String PREFIX = "v2/kafka-bk-compaction-v2/";
     private static final Pattern ROOT = Pattern.compile("/(?:[A-Za-z0-9_-]+)(?:/[A-Za-z0-9_-]+)*");
     private static final Pattern KEY = Pattern.compile(PREFIX
-            + "(?:[0-9a-f]{64}/task(?:/candidate|/part/(?:0|[1-9][0-9]{0,2}))?"
+            + "(?:[0-9a-f]{64}/task(?:/candidate|/terminal|/part/(?:0|[1-9][0-9]{0,2}))?"
             + "|views/[0-9a-f]{64}/descriptor)");
     private final OxiaConditionalClient client;
     private final String cellRoot;

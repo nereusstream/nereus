@@ -564,6 +564,69 @@ projection checks passed **13/13 executed tasks** in `/tmp/nereus-m5-native-fina
 synchronized. No production, test, build or runner input changed after native execution. All 17 amended acceptance
 obligations remain OPEN/null, and no source-bound M5 child, Final, physical-delete, staging or production authority is created.
 
+## 2026-09-08 same-selector BK task decisions and native writer drain
+
+Status: focused composition after `b7152c9c11c12e566b7958333ab4f050df926ee4`; all 17 amended acceptance obligations
+remain OPEN/null. The [task-terminal projection](m5-bookkeeper-task-terminal-projection.json) records the new scope.
+This result does not close all TaskTerminal cases, native writer/namespace admission, grace, reference rescans or cleanup.
+
+`M5TaskSelectionCoordinatorV2` attaches one SELECTED or SELECTION_CANCELLED decision to the existing M4 selector
+in the same exact native CAS. M5R1 wire version 3 adds a single optional M5TD/version-2 decision, at most 232 bytes;
+old wire versions 1 and 2 retain their encodings. Ordinary M4, retirement-history and ticket successors preserve the
+anchor and wire version. The decision binds the full Binding/incarnation/storage epoch, task, outcome, selected output
+where applicable, and hashes of both exact M4 projections. Its permanent per-task archive uses the existing native
+Binding route and 512-byte key cap. A missing archive can be created only from its exact durable inline anchor, and
+that anchor can be cleared only after the exact immutable archive is read back. Clearing changes no M4 projection.
+
+An attempt captures the full raw M5 authority before checking task archive absence. Every subsequent task selection
+CAS must still use those raw bytes. This matters when cancellation, archive and clear restore identical projected M4
+bytes: a late publisher cannot use a refreshed raw revision to erase the cancellation. A deterministic native case
+holds the actual Oxia publication CAS, cancels and archives through an independent client, then selects a new task;
+releasing the old CAS yields CANCELLED_STALE. Historical SELECTED decisions retain their permanent reference veto.
+Seven pure cases also cover 1,026 successive decisions with constant inline size, byte compatibility, response loss,
+malformed archives and the projected-selector ABA case. Three route cases verify native archive admission/immutability.
+
+`KafkaBookKeeperTaskTerminationV2` first closes the exact actual-INSTANCEID native create scope. It then resolves the
+same-selector decision, archives cancellation, captures the bounded inventory, and uses a separate owned Cell session
+to check exact native run identity and recover/fence each present ledger. Only matching recovered LAC and exact native
+sealed metadata become a KBTT/version-2 terminal, capped at 1 MiB and tied to the immutable task/create scope/decision.
+Each ordinal records no inventory at the physical cut, an uncreated reserved ID, or its exact recovered seal. Native
+physical creation is ordered after durable part registration, so the native create fence closes that physical cut;
+this does not claim that delayed unused metadata reservations are themselves fenced. Permanent task, reservation and
+selection records remain outside lifecycle garbage collection.
+
+Already selected tasks return SELECTED_VETO without an unpublished terminal. A task whose source predecessor is stale
+and has no prior decision remains RETAIN_UNKNOWN. Missing/changed native identity or incomplete recovery cannot produce
+a terminal, while cancellation and the native create fence remain retained. No branch releases a GC ticket, deletes a
+ledger, completes a grace period or asserts that a reference scan is complete. Four terminal unit cases verify strict
+wire/bounds, complete unique cuts, exact scope and the typed route's task/cancel-archive dependency.
+
+Five locked real BK/Oxia cases verify a partial writer plus uncreated reservation and reconnect; the held native
+publication race; selected-output veto; empty index-only output with lost applied selector/archive/terminal responses;
+and changed native run metadata. The old partial writer's next append is fenced. Two additional JVM phases retain
+the original ZooKeeper, three bookie and Oxia containers, restart all five services, and verify the same terminal hash,
+selector hash/scoped version, native INSTANCEID and every exact native seal. Fresh allocation and late creates remain
+rejected. The checkpoint carries identities/configuration and hashes, not bodies or a copied terminal record.
+
+Validation: `scripts/run-v2-m5-bookkeeper-task-terminal-check.sh` passed **92/92 executed tasks** with configuration
+cache disabled and all tasks rerun; post-restart validation passed **19 tasks** (3 executed, 16 up-to-date). The runner
+verified **71 focused test executions**, including **21 new cases/phases**, with zero failures/errors/skips. It captured
+**667 unchanged inputs**, manifest SHA-256 `25ff59d0d9d0417e23bac541536bdf81b234d5478fb37c64d6c912d73897e970`.
+The result is `build/m5-bookkeeper-task-terminal/nereus-v2-m5-bk-task-terminal-75999/run-summary.json`; the successful
+log is `/tmp/nereus-m5-task-terminal-native-gate1.log`. Oxia container
+`44c47e551ac112f8d6f6ea983cb6385e3e319a0e70c46d60d2655e2f2249951c` restarted from
+`2026-09-07T21:09:32.924404721Z` to `2026-09-07T21:10:41.032336627Z`. The restart inventory preserves all four BK
+container IDs/images and records their changed start times. Independent reread verified the input manifest and prior
+real Cell/descriptor/M4 recovery suites. The runner removed only its owned test resources.
+
+After documentation synchronization, **17/17 supplemental tasks** passed in
+`/tmp/nereus-m5-task-terminal-final-check.log`, including frozen M5 design/M4 dependencies, the lifecycle amendment,
+and existing Binding-route/descriptor/M4 recovery contract checks. No captured source/test/build/runner input changed.
+
+The source/protocol authority inputs remain synthetic despite real native services. These focused results create no
+source-bound M5 child, aggregate/Final, physical-delete, staging or production authority. Frozen contracts, manifests,
+source locks and receipts remain unchanged. M6 activation and the paused benchmark remain outside this work.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;
@@ -1011,8 +1074,8 @@ source-locked real Oxia result, source-bound receipt, physical-delete, staging, 
 
 ## Remaining ordered work
 
-1. Compose the native create fence with complete task terminal/publication fencing and append drain, then connect
-   M4-protected BK recovery to native protocol-owner admission, ordinary reads, internal topics and output cleanup.
+1. Extend the guarded create/selection/drain terminal to stale-task and complete writer/adoption admission, then connect
+   M4-protected BK recovery to native protocol-owner admission, ordinary reads, internal topics and grace/rescan cleanup.
 2. Complete unique native namespace/Binding authority admission, quota/restart accounting and Cell I/O/operator metrics
    around the existing native M4/history route, plus permanent physical-done cache/checkpoint lifecycle.
 3. Integrate all ten concrete writer classes, native namespace/owner proofs, current capability refresh,

@@ -89,7 +89,7 @@ def validate(root):
             "observedBytes[0] > plan.length()"],
         "KafkaBookKeeperCompactionPublicationV2.java": ["validateSemantic(plan, semantic)", "reader.recover(descriptor)",
             "requireFallbackProtections(plan.sourceCut(), sources)", "requireCurrent(plan, currentCompactionState)",
-            "m4.introduceFallback(", "m4.updateMembershipNeutralView(", "createExact(candidateKey(",
+            "selecting.introduceFallback(", "selecting.updateMembershipNeutralView(", "createExact(candidateKey(",
             "recoverSelected(BindingReadSelector admittedSelector)", "selected BK descriptor digest differs from its selector"],
     }
     for name, literals in required.items():

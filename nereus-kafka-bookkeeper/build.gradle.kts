@@ -369,6 +369,9 @@ tasks.register<Test>("v2M5BookKeeperControlStoreTest") {
 }
 
 val m5BookKeeperOxiaCases = mapOf(
+    "v2M5BookKeeperTaskTerminationRestartWriteTest" to "KafkaBookKeeperTaskTerminationV2RestartTest.writeBeforeServerRestart",
+    "v2M5BookKeeperTaskTerminationRestartReadTest" to "KafkaBookKeeperTaskTerminationV2RestartTest.readAfterServerRestart",
+    "v2M5BookKeeperTaskTerminationRealTest" to "KafkaBookKeeperTaskTerminationV2RealTest",
     "v2M5BookKeeperNativeCreateRestartWriteTest" to "KafkaBookKeeperNativeCreateV2RestartTest.writeBeforeServerRestart",
     "v2M5BookKeeperNativeCreateRestartReadTest" to "KafkaBookKeeperNativeCreateV2RestartTest.readAfterServerRestart",
     "v2M5BookKeeperNativeCreateRealTest" to "KafkaBookKeeperNativeCreateV2RealTest",
@@ -401,4 +404,14 @@ m5BookKeeperOxiaCases.forEach { (taskName, testName) ->
             }
         }
     }
+}
+
+
+tasks.register<Test>("v2M5BookKeeperTaskTerminalTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperTaskTerminalV2Test") }
+    outputs.upToDateWhen { false }
 }

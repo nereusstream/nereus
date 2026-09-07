@@ -29,6 +29,7 @@ import com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.Bindi
 import com.nereusstream.storage.object.retention.M5BindingAuthorityCodecV1;
 import com.nereusstream.storage.object.retention.M5BindingAuthorityControlMetadataStoreV1;
 import com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2;
+import com.nereusstream.storage.object.retention.M5TaskSelectionDecisionV2;
 import io.oxia.client.api.AsyncOxiaClient;
 import java.util.Objects;
 import java.util.Optional;
@@ -54,6 +55,7 @@ public final class OxiaBindingLifecycleMetadataStoreV2 implements ExactMetadataT
     private final M4ReadControlKeysV1 keys;
     private final M5RetiredBatchHistoryV2 history;
     private final String historyPrefix;
+    private final String decisionPrefix;
     private final Pattern acceptedKey;
     private final Oxia09ExactMetadataTransactionStoreV1 exact;
     private final CanonicalControlMetadataStore rawControl;
@@ -81,12 +83,15 @@ public final class OxiaBindingLifecycleMetadataStoreV2 implements ExactMetadataT
                 .getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
         String sampleNode = history.key(parseSha("1".repeat(64)));
         historyPrefix = sampleNode.substring(0, sampleNode.length() - 64);
+        String sampleDecision = M5TaskSelectionDecisionV2.key(binding, parseSha("1".repeat(64)));
+        decisionPrefix = sampleDecision.substring(0, sampleDecision.length() - 64);
         String m4Prefix = keys.selector().substring(0, keys.selector().length() - "/selector".length());
         acceptedKey = Pattern.compile("(?:" + Pattern.quote(m4Prefix)
                 + "(?:/selector|/proof-head|/(?:capabilities|terminals|proofs)/[0-9]{20}"
-                + "|/protections/[0-9a-f]{64}-[0-9]{20})|" + Pattern.quote(historyPrefix) + "[0-9a-f]{64})");
+                + "|/protections/[0-9a-f]{64}-[0-9]{20})|" + Pattern.quote(historyPrefix) + "[0-9a-f]{64}|"
+                + Pattern.quote(decisionPrefix) + "[0-9a-f]{64})");
         int maximumRelative = Math.max(
-                sampleNode.length(),
+                Math.max(sampleNode.length(), sampleDecision.length()),
                 keys.protection(parseSha("1".repeat(64)), Long.MAX_VALUE).length());
         if (cellRoot.length() + 1 + maximumRelative > MAX_NATIVE_KEY_BYTES) {
             throw new IllegalArgumentException(
@@ -137,7 +142,7 @@ public final class OxiaBindingLifecycleMetadataStoreV2 implements ExactMetadataT
             }
             verifyValue(key, value.canonicalStoredBytes());
         });
-        if (key.startsWith(historyPrefix) && predecessor.isPresent()) {
+        if ((key.startsWith(historyPrefix) || key.startsWith(decisionPrefix)) && predecessor.isPresent()) {
             throw new IllegalArgumentException("retired history nodes are immutable create-only values");
         }
         if (key.equals(keys.selector())) {
@@ -145,7 +150,8 @@ public final class OxiaBindingLifecycleMetadataStoreV2 implements ExactMetadataT
         }
         var nativePredecessor = predecessor.map(
                 value -> VersionedValue.of(key, value.canonicalStoredBytes(), nativeVersion(value.metadataVersion())));
-        return exact.compareAndSet(nativePredecessor, key, candidate);
+        return requireTaskDecisionAuthority(predecessor, key, candidate)
+                .thenCompose(ignored -> exact.compareAndSet(nativePredecessor, key, candidate));
     }
 
     @Override
@@ -201,6 +207,13 @@ public final class OxiaBindingLifecycleMetadataStoreV2 implements ExactMetadataT
             history.verifyNode(parseSha(key.substring(historyPrefix.length())), value);
             return;
         }
+        if (key.startsWith(decisionPrefix)) {
+            var decision = M5TaskSelectionDecisionV2.decode(value);
+            if (!decision.binding().equals(binding) || !decision.key().equals(key)) {
+                throw new IllegalArgumentException("task selection archive Binding or key differs");
+            }
+            return;
+        }
         BindingIdentity observed;
         String actualKey;
         if (key.equals(keys.selector())) {
@@ -238,7 +251,8 @@ public final class OxiaBindingLifecycleMetadataStoreV2 implements ExactMetadataT
                 var next = M5BindingAuthorityCodecV1.decodeAuthority(candidate);
                 if (next.authorityGeneration() != 1
                         || next.predecessorValueSha256().isPresent()
-                        || next.retiredHistory().count() != 0) {
+                        || next.retiredHistory().count() != 0
+                        || next.taskSelectionDecision().isPresent()) {
                     throw new IllegalArgumentException("lifecycle creation cannot import a prior selector history");
                 }
             }
@@ -257,6 +271,7 @@ public final class OxiaBindingLifecycleMetadataStoreV2 implements ExactMetadataT
         if (wasAuthority) {
             var previous = M5BindingAuthorityCodecV1.decodeAuthority(before.canonicalStoredBytes());
             expectedGeneration = Math.addExact(previous.authorityGeneration(), 1);
+            M5BindingAuthorityCodecV1.requireTaskSelectionTransition(previous, next);
             if (next.lastActivationOrdinal() < previous.lastActivationOrdinal()
                     || next.retiredHistory().count() < previous.retiredHistory().count()
                     || (next.retiredHistory().count()
@@ -266,10 +281,70 @@ public final class OxiaBindingLifecycleMetadataStoreV2 implements ExactMetadataT
                         "lifecycle selector history cannot roll back or replace a current root");
             }
         }
+        if (!wasAuthority && next.taskSelectionDecision().isPresent()) {
+            throw new IllegalArgumentException("task selection requires explicit M5 authority migration first");
+        }
         if (next.authorityGeneration() != expectedGeneration
                 || !next.predecessorValueSha256().equals(Optional.of(before.canonicalStoredSha256()))) {
             throw new IllegalArgumentException("lifecycle selector must name its exact next revision and predecessor");
         }
+    }
+
+    private CompletionStage<Void> requireTaskDecisionAuthority(
+            Optional<VersionedValue> predecessor, String key, CanonicalBytes candidate) {
+        if (key.startsWith(decisionPrefix)) {
+            var decision = M5TaskSelectionDecisionV2.decode(candidate);
+            return read(key).thenCompose(existing -> {
+                if (existing.isPresent()) {
+                    if (!existing.orElseThrow().canonicalStoredBytes().equals(candidate)) {
+                        return CompletableFuture.failedFuture(
+                                new IllegalArgumentException("task decision archive conflicts"));
+                    }
+                    return CompletableFuture.completedFuture(null);
+                }
+                return read(keys.selector()).thenApply(selected -> {
+                    var anchor = selected.filter(
+                                    value -> M5BindingAuthorityCodecV1.isAuthorityValue(value.canonicalStoredBytes()))
+                            .flatMap(value -> M5BindingAuthorityCodecV1.decodeAuthority(value.canonicalStoredBytes())
+                                    .taskSelectionDecision());
+                    if (!anchor.equals(Optional.of(decision))) {
+                        throw new IllegalArgumentException(
+                                "task decision archive lacks its exact durable selector anchor");
+                    }
+                    return null;
+                });
+            });
+        }
+        if (!key.equals(keys.selector())
+                || predecessor.isEmpty()
+                || !M5BindingAuthorityCodecV1.isAuthorityValue(candidate)) {
+            return CompletableFuture.completedFuture(null);
+        }
+        var prior = predecessor.orElseThrow().canonicalStoredBytes();
+        var previous = M5BindingAuthorityCodecV1.isAuthorityValue(prior)
+                ? M5BindingAuthorityCodecV1.decodeAuthority(prior)
+                : M5BindingAuthorityCodecV1.migrateLegacy(prior);
+        var next = M5BindingAuthorityCodecV1.decodeAuthority(candidate);
+        if (previous.taskSelectionDecision().equals(next.taskSelectionDecision())) {
+            return CompletableFuture.completedFuture(null);
+        }
+        if (next.taskSelectionDecision().isPresent()) {
+            var decision = next.taskSelectionDecision().orElseThrow();
+            return read(decision.key()).thenApply(existing -> {
+                if (existing.isPresent()) {
+                    throw new IllegalArgumentException(
+                            "a task with an archived selection decision cannot select again");
+                }
+                return null;
+            });
+        }
+        var decision = previous.taskSelectionDecision().orElseThrow();
+        return read(decision.key()).thenApply(archive -> {
+            if (!archive.map(VersionedValue::canonicalStoredBytes).equals(Optional.of(decision.encode()))) {
+                throw new IllegalArgumentException("inline task decision cannot be cleared without its exact archive");
+            }
+            return null;
+        });
     }
 
     private final class RoutedClient implements OxiaConditionalClient {

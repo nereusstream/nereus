@@ -405,6 +405,12 @@ class KafkaBookKeeperOxiaControlV2RealTest {
         final AtomicInteger selectorCas = new AtomicInteger();
         volatile boolean losePart;
         volatile boolean loseSelector;
+        volatile boolean loseTerminal;
+        volatile boolean loseDecision;
+        volatile boolean holdSelector;
+        final CompletableFuture<Void> selectorHeld = new CompletableFuture<>();
+        final java.util.concurrent.atomic.AtomicReference<Runnable> selectorRelease =
+                new java.util.concurrent.atomic.AtomicReference<>();
 
         Faults(OxiaConditionalClient nativeClient) {
             this.nativeClient = nativeClient;
@@ -421,11 +427,20 @@ class KafkaBookKeeperOxiaControlV2RealTest {
 
         public CompletionStage<Void> createIfAbsent(String key, CanonicalBytes value) {
             recordCreates.incrementAndGet();
-            boolean lose = key.contains("/part/") && losePart;
+            boolean partLoss = key.contains("/part/") && losePart;
+            boolean terminalLoss = key.endsWith("/terminal") && loseTerminal;
+            boolean decisionLoss = key.contains("/decisions/") && loseDecision;
+            boolean lose = partLoss || terminalLoss || decisionLoss;
+            if (terminalLoss) {
+                loseTerminal = false;
+            }
+            if (decisionLoss) {
+                loseDecision = false;
+            }
             if (key.contains("/part/")) {
                 partCreates.incrementAndGet();
             }
-            if (lose) {
+            if (partLoss) {
                 losePart = false;
                 injectedPartLoss.incrementAndGet();
             }
@@ -439,6 +454,20 @@ class KafkaBookKeeperOxiaControlV2RealTest {
 
         public CompletionStage<Void> compareAndSet(String key, CanonicalBytes value, long version) {
             selectorCas.incrementAndGet();
+            if (holdSelector) {
+                holdSelector = false;
+                var delayed = new CompletableFuture<Void>();
+                selectorRelease.set(
+                        () -> nativeClient.compareAndSet(key, value, version).whenComplete((ignored, failure) -> {
+                            if (failure == null) {
+                                delayed.complete(null);
+                            } else {
+                                delayed.completeExceptionally(failure);
+                            }
+                        }));
+                selectorHeld.complete(null);
+                return delayed;
+            }
             boolean lose = loseSelector;
             loseSelector = false;
             return nativeClient

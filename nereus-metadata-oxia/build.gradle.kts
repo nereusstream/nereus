@@ -2443,3 +2443,13 @@ tasks.register<Test>("m3ObjectWalOxiaIntegrationTest") {
         includeTestsMatching("com.nereusstream.metadata.oxia.v2.objectwal.*")
     }
 }
+
+
+tasks.register<Test>("v2M5TaskSelectionRouteTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.metadata.oxia.v2.retention.OxiaTaskSelectionRouteV2Test") }
+    outputs.upToDateWhen { false }
+}

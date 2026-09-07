@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
 public final class KafkaBookKeeperControlMetadataStoreV2 implements CanonicalControlMetadataStore {
     private static final String PREFIX = "v2/kafka-bk-compaction-v2/";
     private static final Pattern RECORD = Pattern.compile(PREFIX
-            + "(?:[0-9a-f]{64}/task(?:/candidate|/part/(?:0|[1-9][0-9]{0,2}))?"
+            + "(?:[0-9a-f]{64}/task(?:/candidate|/terminal|/part/(?:0|[1-9][0-9]{0,2}))?"
             + "|views/[0-9a-f]{64}/descriptor)");
     private final CanonicalControlMetadataStore records;
     private final CanonicalControlMetadataStore control;
@@ -148,6 +148,16 @@ public final class KafkaBookKeeperControlMetadataStoreV2 implements CanonicalCon
         if (key.endsWith("/task")) {
             if (!KafkaBookKeeperInventoryV2.taskKey(task(bytes).taskIdSha256()).equals(key)) {
                 throw new IllegalArgumentException("BK task key differs from its content address");
+            }
+        } else if (key.endsWith("/terminal")) {
+            var terminal = KafkaBookKeeperTaskTerminalV2.decode(bytes);
+            if (!readTask(terminal.task().taskIdSha256()).equals(terminal.task())
+                    || !key.equals(
+                            KafkaBookKeeperTaskTerminalV2.key(terminal.task().taskIdSha256()))
+                    || !control.get(terminal.selection().key())
+                            .equals(Optional.of(terminal.selection().encode()))) {
+                throw new IllegalArgumentException(
+                        "BK terminal lacks its immutable task and exact cancelled selection archive");
             }
         } else if (key.contains("/part/")) {
             var part = KafkaBookKeeperInventoryCodecV2.decodePart(bytes);

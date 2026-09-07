@@ -17,9 +17,9 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 | Flow | Current contract | Current implementation and evidence boundary |
 | --- | --- | --- |
 | Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; guarded BK creation now observes actual INSTANCEID and permanent reservations, while unique native namespace/route admission and real dispatch remain OPEN |
-| Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; real protocol proof producers and full deletion composition remain OPEN |
-| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile now fences late creates atomically and survives native service restart; complete namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
-| Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and physical-done cache lifecycle remain OPEN |
+| Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; guarded BK task cancellation and native drain now produce a durable physical cut, while real protocol proof producers, grace/rescans and full deletion composition remain OPEN |
+| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile fences late creates; same-selector decisions and native writer drain now produce restart-stable cancelled task terminals; complete namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
+| Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; additive wire 3 preserves that history while carrying one bounded task decision until exact permanent archival; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and physical-done cache lifecycle remain OPEN |
 | Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; native owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
 
@@ -75,6 +75,17 @@ after the same ZooKeeper, three bookie and Oxia containers restart. Closing crea
 publication or settle outstanding appends. Permanent records cannot be garbage-collected or reopened; administrative
 namespace reformat and external record deletion are outside this admitted profile. Global writer/namespace admission,
 complete TaskTerminal, quota and cleanup remain OPEN, with all 17 acceptance obligations still OPEN/null.
+The subsequent [BK task-terminal projection](m5-bookkeeper-task-terminal-projection.json) composes native create
+fencing with same-selector publication/cancellation and recovery of existing writers. M5R1 wire version 3 adds at most
+one inline task decision; versions 1 and 2 retain their exact encodings. An immutable per-task archive must be read back
+before the inline decision is cleared. A publication attempt captures the raw authority before checking archive absence,
+so cancellation followed by archive/clear cannot be hidden by an identical projected M4 selector. The native route
+checks archive ownership and permanence. A cancelled task's terminal records its bounded physical cut only after native
+creation is closed and each present ledger has an exact recovered seal. Already selected tasks retain a reference veto;
+stale tasks without a prior decision and native metadata mismatch retain unknown. Real BK/Oxia tests cover delayed
+native publication, old-writer append rejection, lost responses and independent JVM recovery after all five services
+restart. This guarded profile does not fence delayed unused inventory metadata, admit all stock/protocol writers, or
+supply grace, complete reference rescans and cleanup authority. Complete TaskTerminal and all 17 obligations remain OPEN.
 The carrier gate passed 60 executed tasks with 8 inventory/layout, 7 real carrier and 8 real Cell-session tests;
 its exact-native-run check now precedes fencing, including the foreign-run zero-fence negative case.
 

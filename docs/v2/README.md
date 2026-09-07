@@ -47,6 +47,12 @@ performance-first BookKeeper WAL.
   selected BK recovery still succeeds. This closes the guarded create domain only; complete task terminal/publication
   fencing, append drain, all-writer/native namespace admission, quota and cleanup remain required.
 
+  The [BK task-terminal gate](detailed_design/m5/m5-bookkeeper-task-terminal-projection.json) now adds atomic
+  selection/cancellation, permanent bounded-inline decision archival, native writer drain and immutable physical cuts.
+  Actual late publication loses after cancellation even when another task has selected; fresh JVMs verify the same
+  terminal and native seals after all five services restart. Unknown stale tasks, full writer/namespace admission,
+  grace/reference rescans and cleanup remain required, and all 17 M5 acceptance obligations remain OPEN.
+
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.
 - M1 implementation and the pure-V2 active-graph prune are complete. The authoritative completion state is derived

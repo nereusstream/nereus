@@ -3004,3 +3004,17 @@ tasks.named("check") {
     dependsOn("v2M2KafkaK0EvidenceCheck")
     dependsOn("v2M2KafkaK1Check")
 }
+
+
+tasks.register("v2M5BookKeeperTaskTerminationCheck") {
+    group = "verification"
+    description = "Verify same-selector task decisions, native create fencing, writer drain and durable BK terminals."
+    dependsOn(
+        "v2M5BookKeeperNativeCreateCheck",
+        ":nereus-storage-object:v2M5TaskSelectionTest",
+        ":nereus-storage-object:v2M5RetiredHistoryTest",
+        ":nereus-metadata-oxia:v2M5TaskSelectionRouteTest",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperTaskTerminalTest",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperTaskTerminationRealTest",
+    )
+}

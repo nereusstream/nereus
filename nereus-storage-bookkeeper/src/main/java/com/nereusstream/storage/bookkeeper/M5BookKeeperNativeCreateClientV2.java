@@ -86,6 +86,12 @@ public final class M5BookKeeperNativeCreateClientV2 implements AutoCloseable {
         return new RealBookKeeperCellSessionV1(client, capability, new byte[0]);
     }
 
+    /** Captures sealed native metadata through this same owned connection and admitted capability. */
+    public java.util.concurrent.CompletionStage<M5BookKeeperDeleteAdapterV1.CaptureResult> captureExactTarget(
+            com.nereusstream.storage.api.bookkeeper.RunLedgerHandleV1 handle) {
+        return new M5BookKeeperDeleteAdapterV1(client, capability, new byte[0]).captureExactTarget(handle);
+    }
+
     public CompletableFuture<Void> fenceCreates() {
         return driver().fenceCreates();
     }
