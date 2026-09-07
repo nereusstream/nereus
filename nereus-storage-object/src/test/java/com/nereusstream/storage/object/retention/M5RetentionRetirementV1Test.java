@@ -460,6 +460,19 @@ class M5RetentionRetirementV1Test {
         });
         assertThat(fixture.metadata.transactionCalls).isZero();
         assertThat(fixture.metadata.readOptional(fixture.batchKey)).isEmpty();
+        var history = new M5RetiredBatchHistoryCoordinatorV2(
+                fixture.metadata, new M5RetiredHistoryWriteBudgetV2(1, 100_000, 100_000));
+        assertThat(history.fold(fixture.metadata.readNow(fixture.selectorKey), fixture.batch.batchIdSha256())
+                        .toCompletableFuture()
+                        .join())
+                .isEqualTo(M5RetiredBatchHistoryCoordinatorV2.Outcome.APPLIED_EXACT);
+        assertThat(coordinator.retire(request).toCompletableFuture().join())
+                .isEqualTo(M5BindingRetirementCoordinatorV1.Outcome.EXISTING_TERMINAL);
+        var folded = M5BindingAuthorityCodecV1.decodeAuthority(
+                fixture.metadata.readNow(fixture.selectorKey).canonicalStoredBytes());
+        assertThat(folded.batchSlots()).isEmpty();
+        assertThat(folded.retiredHistory().count()).isEqualTo(1);
+        assertThat(fixture.metadata.transactionCalls).isZero();
     }
 
     @Test

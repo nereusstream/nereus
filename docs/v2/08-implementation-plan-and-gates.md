@@ -27,6 +27,9 @@ descriptor publication and independent BK-only recovery. `v2M5BookKeeperM4Recove
 source planner and generation lease around low-frequency recovery, including delayed native completion and selector
 closure. Native protocol-owner/task admission, ordinary reads, internal-topic lifecycle, real control-authority
 integration and cleanup remain required next steps.
+`v2M5RetiredHistoryCheck` verifies the version-2 Binding envelope, authenticated history, exact selector folding,
+current-root admission and operation beyond the former lifetime slot cap. Native quota/restart accounting, Cell I/O,
+operator metrics and physical-done cache lifecycle remain separate requirements.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

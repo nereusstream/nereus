@@ -166,7 +166,39 @@ public final class M5BindingAuthorityRecordsV1 {
             List<ReferenceMutationTicketV1> referenceMutationTickets,
             Optional<ReferenceWriterEnrollmentV1> writerEnrollment,
             CapabilityBinding capability,
+            int wireVersion,
+            long lastActivationOrdinal,
+            M5RetiredBatchHistoryV2.Root retiredHistory,
             Sha256Digest authorityCanonicalSha256) {
+        public BindingRetirementAuthorityV1(
+                BindingIdentity binding,
+                long authorityGeneration,
+                Optional<Sha256Digest> predecessorValueSha256,
+                BindingAuthorityStateV1 state,
+                BindingReadSelector selectorProjection,
+                List<BatchAuthoritySlotV1> batchSlots,
+                Optional<ReferenceScanFenceV1> scanFence,
+                List<ReferenceMutationTicketV1> referenceMutationTickets,
+                Optional<ReferenceWriterEnrollmentV1> writerEnrollment,
+                CapabilityBinding capability,
+                Sha256Digest authorityCanonicalSha256) {
+            this(
+                    binding,
+                    authorityGeneration,
+                    predecessorValueSha256,
+                    state,
+                    selectorProjection,
+                    batchSlots,
+                    scanFence,
+                    referenceMutationTickets,
+                    writerEnrollment,
+                    capability,
+                    2,
+                    batchSlots.size(),
+                    M5RetiredBatchHistoryV2.emptyRoot(binding),
+                    authorityCanonicalSha256);
+        }
+
         public BindingRetirementAuthorityV1 {
             Objects.requireNonNull(binding, "binding");
             predecessorValueSha256 = Objects.requireNonNull(predecessorValueSha256, "predecessorValueSha256");
@@ -179,6 +211,7 @@ public final class M5BindingAuthorityRecordsV1 {
                     List.copyOf(Objects.requireNonNull(referenceMutationTickets, "referenceMutationTickets"));
             writerEnrollment = Objects.requireNonNull(writerEnrollment, "writerEnrollment");
             Objects.requireNonNull(capability, "capability");
+            Objects.requireNonNull(retiredHistory, "retiredHistory");
             Objects.requireNonNull(authorityCanonicalSha256, "authorityCanonicalSha256");
             if (authorityGeneration <= 0 || (authorityGeneration > 1 && predecessorValueSha256.isEmpty())) {
                 throw new IllegalArgumentException("authority generation and predecessor presence disagree");
@@ -190,7 +223,19 @@ public final class M5BindingAuthorityRecordsV1 {
                     || referenceMutationTickets.size() > MAX_REFERENCE_MUTATION_TICKETS) {
                 throw new IllegalArgumentException("Binding authority exceeds a hard count cap");
             }
-            validateSlots(selectorProjection, batchSlots, binding, capability);
+            if ((wireVersion != 1 && wireVersion != 2)
+                    || lastActivationOrdinal < 0
+                    || Math.addExact(retiredHistory.count(), batchSlots.size()) != lastActivationOrdinal
+                    || (retiredHistory.count() == 0)
+                            != retiredHistory
+                                    .sha256()
+                                    .equals(M5RetiredBatchHistoryV2.emptyRoot(binding)
+                                            .sha256())
+                    || wireVersion == 1 && retiredHistory.count() != 0) {
+                throw new IllegalArgumentException(
+                        "Binding history version, root, count or activation ordinal differs");
+            }
+            validateSlots(selectorProjection, batchSlots, binding, capability, lastActivationOrdinal);
             validateTickets(referenceMutationTickets, batchSlots, capability, writerEnrollment);
             if (writerEnrollment.isPresent()
                     && !writerEnrollment.orElseThrow().capability().equals(capability)) {
@@ -236,13 +281,17 @@ public final class M5BindingAuthorityRecordsV1 {
             BindingReadSelector selector,
             List<BatchAuthoritySlotV1> slots,
             BindingIdentity binding,
-            CapabilityBinding capability) {
-        long expectedOrdinal = 1;
+            CapabilityBinding capability,
+            long lastActivationOrdinal) {
+        long previousOrdinal = 0;
         Set<Sha256Digest> identities = new HashSet<>();
         for (BatchAuthoritySlotV1 slot : slots) {
-            if (slot.activationOrdinal() != expectedOrdinal++ || !identities.add(slot.batchIdSha256())) {
+            if (slot.activationOrdinal() <= previousOrdinal
+                    || slot.activationOrdinal() > lastActivationOrdinal
+                    || !identities.add(slot.batchIdSha256())) {
                 throw new IllegalArgumentException("batch slots are not activation-ordered and BatchId-unique");
             }
+            previousOrdinal = slot.activationOrdinal();
             if (slot.state() == BatchMetadataStateV1.FULL_V1) {
                 SourceRetirementBatch batch = slot.fullBatch();
                 if (!batch.binding().equals(binding) || !batch.capability().equals(capability)) {

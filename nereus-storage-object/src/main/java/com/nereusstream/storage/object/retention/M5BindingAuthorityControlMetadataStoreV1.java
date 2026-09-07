@@ -94,7 +94,7 @@ public final class M5BindingAuthorityControlMetadataStoreV1 implements Canonical
             if (current.state() == M5BindingAuthorityRecordsV1.BindingAuthorityStateV1.REFERENCE_SCAN_FENCED_V1) {
                 return ControlMutationOutcome.DEFINITIVE_CONFLICT;
             }
-            successor = M5BindingAuthorityCodecV1.selectorSuccessor(current, candidate);
+            successor = selectorSuccessor(current, candidate);
         } else {
             successor = M5BindingAuthorityCodecV1.migrateLegacyWithSuccessor(rawExpected, candidate);
         }
@@ -114,11 +114,23 @@ public final class M5BindingAuthorityControlMetadataStoreV1 implements Canonical
             if (current.state() == M5BindingAuthorityRecordsV1.BindingAuthorityStateV1.REFERENCE_SCAN_FENCED_V1) {
                 return;
             }
-            projected = M5BindingAuthorityCodecV1.selectorSuccessor(current, candidate);
+            projected = selectorSuccessor(current, candidate);
         } else {
             projected = M5BindingAuthorityCodecV1.migrateLegacyWithSuccessor(raw.orElseThrow(), candidate);
         }
         M5BindingAuthorityCodecV1.encodeAuthority(projected);
+    }
+
+    private BindingRetirementAuthorityV1 selectorSuccessor(
+            BindingRetirementAuthorityV1 current, BindingReadSelector candidate) {
+        var history = new M5RetiredBatchHistoryV2(current.binding());
+        history.requireHead(
+                current.retiredHistory(),
+                current.retiredHistory().count() == 0
+                        ? Optional.empty()
+                        : delegate.get(history.key(current.retiredHistory().sha256())));
+        return M5BindingAuthorityCodecV1.selectorSuccessor(
+                current, candidate, id -> history.readProof(current.retiredHistory(), id, delegate::get));
     }
 
     private static String requireKey(String value) {

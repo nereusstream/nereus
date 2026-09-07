@@ -44,7 +44,7 @@ import java.util.Optional;
 /** Strict canonical wire and legacy-selector projection for the single Binding authority cell. */
 public final class M5BindingAuthorityCodecV1 {
     private static final int MAGIC = 0x4d355231; // M5R1
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private static final Sha256Digest PLACEHOLDER = Sha256Digest.copyOf(new byte[Sha256Digest.LENGTH]);
 
     private M5BindingAuthorityCodecV1() {}
@@ -94,6 +94,20 @@ public final class M5BindingAuthorityCodecV1 {
     /** Apply an M4 selector successor while preserving every M5-only slot/ticket field. */
     public static BindingRetirementAuthorityV1 selectorSuccessor(
             BindingRetirementAuthorityV1 current, BindingReadSelector successor) {
+        return selectorSuccessor(current, successor, id -> {
+            if (current.retiredHistory().count() != 0) {
+                throw new IllegalStateException(
+                        "selector admission requires a proof against the exact retired history");
+            }
+            return new M5RetiredBatchHistoryV2(current.binding())
+                    .readProof(current.retiredHistory(), id, key -> Optional.empty());
+        });
+    }
+
+    public static BindingRetirementAuthorityV1 selectorSuccessor(
+            BindingRetirementAuthorityV1 current,
+            BindingReadSelector successor,
+            java.util.function.Function<Sha256Digest, M5RetiredBatchHistoryV2.Proof> historyProof) {
         if (current.state() != BindingAuthorityStateV1.OPEN_V1) {
             throw new IllegalStateException("REFERENCE_SCAN_FENCED_V1 blocks Binding control mutation");
         }
@@ -110,22 +124,30 @@ public final class M5BindingAuthorityCodecV1 {
             throw new IllegalArgumentException("M4 selector successor removes or reorders a FULL_V1 authority slot");
         }
         List<BatchAuthoritySlotV1> slots = new ArrayList<>(current.batchSlots());
-        long ordinal = slots.size();
+        long ordinal = current.lastActivationOrdinal();
         for (SourceRetirementBatch batch : successor
                 .activeBatches()
                 .subList(existingFull.size(), successor.activeBatches().size())) {
             if (slots.stream().anyMatch(slot -> slot.batchIdSha256().equals(batch.batchIdSha256()))) {
                 throw new IllegalArgumentException("selector successor reuses a retired or existing BatchId slot");
             }
+            var proof = historyProof.apply(batch.batchIdSha256());
+            new M5RetiredBatchHistoryV2(current.binding())
+                    .verify(current.retiredHistory(), batch.batchIdSha256(), proof);
+            if (!proof.batchId().equals(batch.batchIdSha256())
+                    || proof.tombstone().isPresent()) {
+                throw new IllegalArgumentException("selector successor reuses a historical BatchId");
+            }
             slots.add(BatchAuthoritySlotV1.full(++ordinal, batch));
         }
-        return successor(
+        return buildSuccessor(
                 current,
                 BindingAuthorityStateV1.OPEN_V1,
                 successor,
                 slots,
                 Optional.empty(),
-                current.referenceMutationTickets());
+                current.referenceMutationTickets(),
+                current.writerEnrollment());
     }
 
     /** Apply a successor directly to one legacy predecessor in the migration CAS. */
@@ -174,6 +196,34 @@ public final class M5BindingAuthorityCodecV1 {
             Optional<ReferenceScanFenceV1> fence,
             List<ReferenceMutationTicketV1> tickets,
             Optional<ReferenceWriterEnrollmentV1> enrollment) {
+        if (slots.size() != current.batchSlots().size()
+                || slots.stream()
+                        .anyMatch(slot -> current.slot(slot.batchIdSha256()).isEmpty())) {
+            throw new IllegalArgumentException("new BatchId admission must verify the exact current history proof");
+        }
+        return buildSuccessor(current, state, selector, slots, fence, tickets, enrollment);
+    }
+
+    private static BindingRetirementAuthorityV1 buildSuccessor(
+            BindingRetirementAuthorityV1 current,
+            BindingAuthorityStateV1 state,
+            BindingReadSelector selector,
+            List<BatchAuthoritySlotV1> slots,
+            Optional<ReferenceScanFenceV1> fence,
+            List<ReferenceMutationTicketV1> tickets,
+            Optional<ReferenceWriterEnrollmentV1> enrollment) {
+        for (BatchAuthoritySlotV1 old : current.batchSlots()) {
+            var retained = slots.stream()
+                    .filter(slot -> slot.batchIdSha256().equals(old.batchIdSha256()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("only a history fold may remove a slot"));
+            if (retained.activationOrdinal() != old.activationOrdinal()
+                    || !retained.fullBatchSha256().equals(old.fullBatchSha256())
+                    || retained.state() == BatchMetadataStateV1.FULL_V1 && !retained.equals(old)
+                    || old.state() == BatchMetadataStateV1.RETIRED_V1 && !retained.equals(old)) {
+                throw new IllegalArgumentException("ordinary authority successor changed permanent retirement history");
+            }
+        }
         CanonicalBytes predecessor = encodeAuthority(current);
         return finalizeAuthority(new BindingRetirementAuthorityV1(
                 current.binding(),
@@ -186,6 +236,47 @@ public final class M5BindingAuthorityCodecV1 {
                 tickets,
                 enrollment,
                 current.capability(),
+                VERSION,
+                Math.addExact(current.retiredHistory().count(), slots.size()),
+                current.retiredHistory(),
+                PLACEHOLDER));
+    }
+
+    static BindingRetirementAuthorityV1 fold(
+            BindingRetirementAuthorityV1 current,
+            BatchAuthoritySlotV1 terminal,
+            M5RetiredBatchHistoryV2.Insertion insertion) {
+        if (current.state() != BindingAuthorityStateV1.OPEN_V1
+                || !current.batchSlots().contains(terminal)
+                || terminal.state() != BatchMetadataStateV1.RETIRED_V1
+                || !insertion.predecessor().equals(current.retiredHistory())
+                || !insertion.absenceProof().batchId().equals(terminal.batchIdSha256())
+                || current.referenceMutationTickets().stream()
+                        .anyMatch(ticket -> ticket.targetIdentitySha256().equals(terminal.batchIdSha256()))) {
+            throw new IllegalArgumentException("history fold lacks one unreferenced exact terminal slot");
+        }
+        var history = new M5RetiredBatchHistoryV2(current.binding());
+        var expected = history.insert(
+                current.retiredHistory(), terminal.retiredTombstone().orElseThrow(), insertion.absenceProof());
+        if (!expected.equals(insertion)) {
+            throw new IllegalArgumentException("history fold insertion differs from the exact terminal tombstone");
+        }
+        return finalizeAuthority(new BindingRetirementAuthorityV1(
+                current.binding(),
+                Math.addExact(current.authorityGeneration(), 1),
+                Optional.of(Sha256Digest.hash(encodeAuthority(current))),
+                current.state(),
+                current.selectorProjection(),
+                current.batchSlots().stream()
+                        .filter(slot -> !slot.equals(terminal))
+                        .toList(),
+                current.scanFence(),
+                current.referenceMutationTickets(),
+                current.writerEnrollment(),
+                current.capability(),
+                VERSION,
+                current.lastActivationOrdinal(),
+                insertion.successor(),
                 PLACEHOLDER));
     }
 
@@ -204,8 +295,12 @@ public final class M5BindingAuthorityCodecV1 {
 
     public static BindingRetirementAuthorityV1 decodeAuthority(CanonicalBytes encoded) {
         BindingRetirementAuthorityV1 value = decode(encoded, input -> {
-            if (input.readInt() != MAGIC || input.readInt() != VERSION) {
+            if (input.readInt() != MAGIC) {
                 throw new IllegalArgumentException("Binding authority preamble differs");
+            }
+            int wireVersion = input.readInt();
+            if (wireVersion != 1 && wireVersion != VERSION) {
+                throw new IllegalArgumentException("Binding authority version differs");
             }
             long generation = input.readLong();
             Optional<Sha256Digest> predecessor =
@@ -291,6 +386,10 @@ public final class M5BindingAuthorityCodecV1 {
             }
             BindingAuthorityStateV1 authorityState =
                     enumValue(BindingAuthorityStateV1.values(), input.readUnsignedByte(), "Binding authority state");
+            long lastOrdinal = wireVersion == 1 ? slots.size() : input.readLong();
+            var history = wireVersion == 1
+                    ? M5RetiredBatchHistoryV2.emptyRoot(projection.binding())
+                    : new M5RetiredBatchHistoryV2.Root(readDigest(input), input.readLong());
             Sha256Digest canonicalSha = readDigest(input);
             return new BindingRetirementAuthorityV1(
                     projection.binding(),
@@ -303,6 +402,9 @@ public final class M5BindingAuthorityCodecV1 {
                     tickets,
                     enrollment,
                     capability,
+                    wireVersion,
+                    lastOrdinal,
+                    history,
                     canonicalSha);
         });
         if (!Arrays.equals(encoded.toByteArray(), encodeAuthority(value).toByteArray())) {
@@ -335,13 +437,16 @@ public final class M5BindingAuthorityCodecV1 {
                 value.referenceMutationTickets(),
                 value.writerEnrollment(),
                 value.capability(),
+                value.wireVersion(),
+                value.lastActivationOrdinal(),
+                value.retiredHistory(),
                 canonicalSha);
     }
 
     private static CanonicalBytes encodeUnchecked(BindingRetirementAuthorityV1 value) {
         return encode(out -> {
             out.writeInt(MAGIC);
-            out.writeInt(VERSION);
+            out.writeInt(value.wireVersion());
             out.writeLong(value.authorityGeneration());
             out.writeBoolean(value.predecessorValueSha256().isPresent());
             if (value.predecessorValueSha256().isPresent()) {
@@ -400,6 +505,11 @@ public final class M5BindingAuthorityCodecV1 {
                 writeDigest(out, enrollment.implementationRootSha256());
             }
             out.writeByte(value.state().ordinal());
+            if (value.wireVersion() >= 2) {
+                out.writeLong(value.lastActivationOrdinal());
+                writeDigest(out, value.retiredHistory().sha256());
+                out.writeLong(value.retiredHistory().count());
+            }
             writeDigest(out, value.authorityCanonicalSha256());
         });
     }

@@ -316,7 +316,7 @@ public final class M5ReferenceMutationGuardV1 {
         return switch (outcome) {
             case APPLIED_EXACT -> TicketOutcomeV1.APPLIED_EXACT;
             case EXISTING_EXACT -> TicketOutcomeV1.EXISTING_EXACT;
-            case RETAIN -> TicketOutcomeV1.RETAIN;
+            case RETAIN, EXISTING_TERMINAL -> TicketOutcomeV1.RETAIN;
             case DEFINITIVELY_NOT_APPLIED, CONFLICT, QUARANTINED, RESPONSE_UNKNOWN ->
                 TicketOutcomeV1.UNKNOWN_OR_CONFLICT;
         };

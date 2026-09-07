@@ -2430,6 +2430,29 @@ tasks.register("v2M5BookKeeperM4RecoveryCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5RetiredHistorySourceCheck") {
+    group = "verification"
+    description = "Check bounded authenticated retirement history and remaining native quota/evidence boundaries."
+    commandLine("python3", "scripts/check-v2-m5-retired-history.py")
+}
+
+tasks.register<Exec>("v2M5RetiredHistoryContractTest") {
+    group = "verification"
+    commandLine("python3", "scripts/check-v2-m5-retired-history-tests.py")
+}
+
+tasks.register("v2M5RetiredHistoryCheck") {
+    group = "verification"
+    description = "Verify permanent retired BatchId history while keeping active selector work bounded."
+    dependsOn(
+        "v2M5BookKeeperM4RecoveryCheck",
+        "v2M5ClosedWriterIntegrationCheck",
+        "v2M5RetiredHistorySourceCheck",
+        "v2M5RetiredHistoryContractTest",
+        ":nereus-storage-object:v2M5RetiredHistoryTest",
+    )
+}
+
 tasks.register<Exec>("v2M5RetentionCoreContractTest") {
     group = "verification"
     description = "Test the fail-closed non-promotable M5-C retention-core checker."

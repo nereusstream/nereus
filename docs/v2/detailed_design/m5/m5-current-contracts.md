@@ -19,7 +19,7 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 | Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; native namespace/route admission and real dispatch remain OPEN |
 | Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; real protocol proof producers and full deletion composition remain OPEN |
 | Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts, sealed descriptor publication and independent recovery exist; recovery now uses the existing M4 source planner and hazard kernel; native namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
-| Binding retirement | Bounded active selector plus authenticated immutable history | Earlier M5R1 retains permanent inline slots; root/folding/admission migration is OPEN |
+| Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; terminal folds and current-root admission proofs now keep resident slots bounded; native namespace quota/restart accounting, Cell I/O/metrics and physical-done cache lifecycle remain OPEN |
 | Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; native owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
 
@@ -45,6 +45,10 @@ under the existing M4 planner and generation lease. Observer cancellation retain
 selector closure can install a successor while the old generation remains pinned. Recovered caches retain their exact
 captured authority. This bridge requires the owner's admitted current reference and Cell budget, and does not add
 ordinary-read remote control I/O or independently supply native protocol-owner admission.
+The [retired-history projection](m5-retired-history-projection.json) records authenticated 256-level M5H2 proofs,
+exact immutable prewrites followed by one selector CAS, version-1 byte preservation and permanent BatchId rejection
+after folds. M4 control and Binding ticket admission use the current history root. Local prewrite reservations retain
+unknown attempts and bound pending bytes; native namespace headroom/restoration and Cell scheduling remain separate.
 The carrier gate passed 60 executed tasks with 8 inventory/layout, 7 real carrier and 8 real Cell-session tests;
 its exact-native-run check now precedes fencing, including the foreign-run zero-fence negative case.
 

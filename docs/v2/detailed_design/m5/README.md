@@ -138,6 +138,10 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   adds typed sealed selection and descriptor-only recovery. The [M4 recovery bridge](m5-bookkeeper-m4-recovery-projection.json)
   protects low-frequency recovery with the existing source planner and generation lease; native protocol-owner/task
   admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN.
+- The [retired-history projection](m5-retired-history-projection.json) adds M5R1 wire 2 and authenticated immutable
+  BatchId history. Terminal slots fold through one selector CAS, active holes keep their original ordinal and M4 bytes,
+  and admission rejects historical IDs under the current root. Native namespace quota/restart accounting, Cell I/O,
+  operator metrics and permanent physical-done cache integration remain OPEN.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

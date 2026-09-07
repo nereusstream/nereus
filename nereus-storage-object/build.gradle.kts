@@ -236,6 +236,19 @@ tasks.register<Test>("v2M5BindingAuthorityTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("v2M5RetiredHistoryTest") {
+    group = "verification"
+    description = "Verify bounded retired-history proofs, selector folding, migration and permanent BatchId rejection."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.storage.object.retention.M5RetiredBatchHistoryV2Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
 tasks.register<Test>("v2M5ClosedWriterIntegrationTest") {
     group = "verification"
     description = "Run the closed writer registry and ticket-guard integration matrix for both M5-C authorities."

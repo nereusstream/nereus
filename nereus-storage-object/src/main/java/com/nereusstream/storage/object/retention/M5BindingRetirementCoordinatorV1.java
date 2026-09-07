@@ -46,6 +46,7 @@ import java.util.concurrent.CompletionStage;
 /** Ticket/fence/same-key retirement coordinator selected by ADR 0146. */
 public final class M5BindingRetirementCoordinatorV1 {
     public enum Outcome {
+        EXISTING_TERMINAL,
         APPLIED_EXACT,
         EXISTING_EXACT,
         DEFINITIVELY_NOT_APPLIED,
@@ -135,6 +136,14 @@ public final class M5BindingRetirementCoordinatorV1 {
 
     public CompletionStage<Outcome> acquireTicket(TicketRequest request) {
         Objects.requireNonNull(request, "request");
+        return withHistoryAdmission(
+                request.exactAuthority(),
+                request.ticket().targetIdentitySha256(),
+                () -> acquireTicketAtCurrent(request));
+    }
+
+    private CompletionStage<Outcome> acquireTicketAtCurrent(TicketRequest request) {
+        Objects.requireNonNull(request, "request");
         BindingRetirementAuthorityV1 current = exactAuthority(request.exactAuthority());
         if (current.state() != BindingAuthorityStateV1.OPEN_V1
                 || current.writerEnrollment().isEmpty()) {
@@ -163,6 +172,11 @@ public final class M5BindingRetirementCoordinatorV1 {
     }
 
     public CompletionStage<Outcome> enrollWriters(EnrollmentRequest request) {
+        Objects.requireNonNull(request, "request");
+        return withHistoryAdmission(request.exactOpenAuthority(), null, () -> enrollWritersAtCurrent(request));
+    }
+
+    private CompletionStage<Outcome> enrollWritersAtCurrent(EnrollmentRequest request) {
         Objects.requireNonNull(request, "request");
         BindingRetirementAuthorityV1 current = exactAuthority(request.exactOpenAuthority());
         if (current.state() != BindingAuthorityStateV1.OPEN_V1
@@ -193,6 +207,12 @@ public final class M5BindingRetirementCoordinatorV1 {
 
     public CompletionStage<Outcome> clearTicket(TicketRequest request) {
         Objects.requireNonNull(request, "request");
+        return withHistoryAdmission(
+                request.exactAuthority(), request.ticket().targetIdentitySha256(), () -> clearTicketAtCurrent(request));
+    }
+
+    private CompletionStage<Outcome> clearTicketAtCurrent(TicketRequest request) {
+        Objects.requireNonNull(request, "request");
         BindingRetirementAuthorityV1 current = exactAuthority(request.exactAuthority());
         if (current.state() != BindingAuthorityStateV1.OPEN_V1) {
             return CompletableFuture.completedFuture(Outcome.RETAIN);
@@ -215,6 +235,12 @@ public final class M5BindingRetirementCoordinatorV1 {
     }
 
     public CompletionStage<Outcome> fence(FenceRequest request) {
+        Objects.requireNonNull(request, "request");
+        return withHistoryAdmission(
+                request.exactOpenAuthority(), request.batchIdSha256(), () -> fenceAtCurrent(request));
+    }
+
+    private CompletionStage<Outcome> fenceAtCurrent(FenceRequest request) {
         Objects.requireNonNull(request, "request");
         BindingRetirementAuthorityV1 current = exactAuthority(request.exactOpenAuthority());
         if (current.state() != BindingAuthorityStateV1.OPEN_V1
@@ -248,6 +274,11 @@ public final class M5BindingRetirementCoordinatorV1 {
     }
 
     public CompletionStage<Outcome> abortFence(String authorityKey, VersionedValue exactFencedAuthority) {
+        return withHistoryAdmission(
+                exactFencedAuthority, null, () -> abortFenceAtCurrent(authorityKey, exactFencedAuthority));
+    }
+
+    private CompletionStage<Outcome> abortFenceAtCurrent(String authorityKey, VersionedValue exactFencedAuthority) {
         String key = requireKey(authorityKey);
         requireExactKey(key, exactFencedAuthority);
         BindingRetirementAuthorityV1 current = exactAuthority(exactFencedAuthority);
@@ -322,13 +353,66 @@ public final class M5BindingRetirementCoordinatorV1 {
                 return CompletableFuture.completedFuture(Outcome.EXISTING_EXACT);
             }
             if (!observed.equals(Optional.of(request.exactFencedAuthority()))) {
-                return CompletableFuture.completedFuture(observed.isEmpty() ? Outcome.QUARANTINED : Outcome.CONFLICT);
+                return reconcileRetired(observed, tombstone);
             }
             return freshness
                     .requireFresh(proof)
                     .thenCompose(
                             ignored -> mutate(request.authorityKey(), request.exactFencedAuthority(), candidateBytes));
         });
+    }
+
+    private CompletionStage<Outcome> withHistoryAdmission(
+            VersionedValue expected,
+            Sha256Digest target,
+            java.util.function.Supplier<CompletionStage<Outcome>> operation) {
+        return metadata.read(expected.key()).thenCompose(observed -> {
+            if (!observed.equals(Optional.of(expected))) {
+                return CompletableFuture.completedFuture(observed.isEmpty() ? Outcome.QUARANTINED : Outcome.CONFLICT);
+            }
+            var authority = exactAuthority(expected);
+            var history = new M5RetiredBatchHistoryV2(authority.binding());
+            if (target != null) {
+                return history.readProofAsync(authority.retiredHistory(), target, key -> metadata.read(key)
+                                .thenApply(value -> value.map(VersionedValue::canonicalStoredBytes)))
+                        .thenCompose(proof -> proof.tombstone().isPresent()
+                                ? CompletableFuture.completedFuture(Outcome.RETAIN)
+                                : operation.get());
+            }
+            if (authority.retiredHistory().count() == 0) {
+                history.requireHead(authority.retiredHistory(), Optional.empty());
+                return operation.get();
+            }
+            return metadata.read(history.key(authority.retiredHistory().sha256()))
+                    .thenCompose(value -> {
+                        history.requireHead(
+                                authority.retiredHistory(), value.map(VersionedValue::canonicalStoredBytes));
+                        return operation.get();
+                    });
+        });
+    }
+
+    private CompletionStage<Outcome> reconcileRetired(
+            Optional<VersionedValue> observed, RetiredSourceRetirementBatchTombstoneV1 expected) {
+        if (observed.isEmpty()) {
+            return CompletableFuture.completedFuture(Outcome.QUARANTINED);
+        }
+        var current = exactAuthority(observed.orElseThrow());
+        if (!current.binding().equals(expected.binding())) {
+            return CompletableFuture.completedFuture(Outcome.QUARANTINED);
+        }
+        var slot = current.slot(expected.batchIdSha256());
+        if (slot.isPresent()) {
+            return CompletableFuture.completedFuture(
+                    slot.orElseThrow().retiredTombstone().equals(Optional.of(expected))
+                            ? Outcome.EXISTING_TERMINAL
+                            : Outcome.CONFLICT);
+        }
+        var history = new M5RetiredBatchHistoryV2(current.binding());
+        return history.readProofAsync(current.retiredHistory(), expected.batchIdSha256(), key -> metadata.read(key)
+                        .thenApply(value -> value.map(VersionedValue::canonicalStoredBytes)))
+                .thenApply(proof ->
+                        proof.tombstone().equals(Optional.of(expected)) ? Outcome.EXISTING_TERMINAL : Outcome.CONFLICT);
     }
 
     private CompletionStage<Void> requireFreshReleases(List<M4ReleaseBindingV1> releases) {

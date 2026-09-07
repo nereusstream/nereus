@@ -29,6 +29,9 @@ performance-first BookKeeper WAL.
   typed sealed descriptors now publish through M4 and recover solely from BK under its source planner and generation
   lease. Native protocol-owner/task admission, ordinary reads, internal-topic lifecycle, real control-authority
   integration and cleanup remain incomplete.
+  Binding retirement now folds terminal slots into authenticated immutable history while preserving active ordinals;
+  current-root admission permanently rejects retired BatchIds. Native quota/restart accounting and operator integration
+  remain incomplete.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.
