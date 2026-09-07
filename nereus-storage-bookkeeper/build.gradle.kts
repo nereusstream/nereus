@@ -43,6 +43,7 @@ configurations[realBookKeeperTest.runtimeOnlyConfigurationName]
 tasks.register<Test>("realBookKeeperTest") {
     group = "verification"
     description = "Run the exact-image real BookKeeper Cell-session conformance suite."
+    filter { includeTestsMatching("com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1RealTest") }
     testClassesDirs = realBookKeeperTest.output.classesDirs
     classpath = realBookKeeperTest.runtimeClasspath
     useJUnitPlatform()
@@ -58,4 +59,29 @@ tasks.register<Test>("realBookKeeperTest") {
 tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
+}
+
+// Opt-in native create profile checks; the historical conformance task is unchanged.
+tasks.register<Test>("v2M5NativeCreateTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateSpecV2Test") }
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("v2M5NativeCreateRealTest") {
+    group = "verification"
+    testClassesDirs = realBookKeeperTest.output.classesDirs
+    classpath = realBookKeeperTest.runtimeClasspath
+    useJUnitPlatform()
+    maxParallelForks = 1
+    filter { includeTestsMatching("com.nereusstream.storage.bookkeeper.M5BookKeeperNativeCreateV2RealTest") }
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("nereus.bookkeeper.metadataServiceUri",
+            providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull
+                ?: error("v2M2BookKeeperMetadataServiceUri is required for native M5 create fencing"))
+    }
 }

@@ -16,9 +16,9 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 
 | Flow | Current contract | Current implementation and evidence boundary |
 | --- | --- | --- |
-| Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; native namespace/route admission and real dispatch remain OPEN |
+| Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; guarded BK creation now observes actual INSTANCEID and permanent reservations, while unique native namespace/route admission and real dispatch remain OPEN |
 | Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; real protocol proof producers and full deletion composition remain OPEN |
-| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; native namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
+| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile now fences late creates atomically and survives native service restart; complete namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
 | Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and physical-done cache lifecycle remain OPEN |
 | Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; native owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
@@ -65,6 +65,16 @@ Its coordinator composition uses `rawControlMetadata()` because M4 owns the M5 s
 callers retain `controlMetadata()`. Bounded owner-executor continuations keep synchronous control calls off BK completion
 threads. This joint route passes response-loss, missing-record, fresh-client and same-Oxia-server restart cases;
 source/policy/namespace-admission facts remain synthetic and native task/writer/cleanup obligations remain OPEN.
+The subsequent [native BK create projection](m5-bookkeeper-native-create-projection.json) adds an explicit owned
+`m5zk` client profile without changing the locked BookKeeper source or wire. Its permanent task fence and ledger
+reservation are checked in the same ZooKeeper transaction that creates native ledger metadata. The task scope binds
+actual native INSTANCEID and exact run configurations. It verifies allocation reuse rejection, native response loss,
+a held create transaction after fencing, and late recreation attempts after test-owned deletion. Guarded BK/Oxia
+compaction now uses the observed native physical namespace; fresh JVMs retain the fence and recover selected output
+after the same ZooKeeper, three bookie and Oxia containers restart. Closing creates alone deliberately does not close
+publication or settle outstanding appends. Permanent records cannot be garbage-collected or reopened; administrative
+namespace reformat and external record deletion are outside this admitted profile. Global writer/namespace admission,
+complete TaskTerminal, quota and cleanup remain OPEN, with all 17 acceptance obligations still OPEN/null.
 The carrier gate passed 60 executed tasks with 8 inventory/layout, 7 real carrier and 8 real Cell-session tests;
 its exact-native-run check now precedes fencing, including the foreign-run zero-fence negative case.
 

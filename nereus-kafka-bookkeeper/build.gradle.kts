@@ -369,6 +369,9 @@ tasks.register<Test>("v2M5BookKeeperControlStoreTest") {
 }
 
 val m5BookKeeperOxiaCases = mapOf(
+    "v2M5BookKeeperNativeCreateRestartWriteTest" to "KafkaBookKeeperNativeCreateV2RestartTest.writeBeforeServerRestart",
+    "v2M5BookKeeperNativeCreateRestartReadTest" to "KafkaBookKeeperNativeCreateV2RestartTest.readAfterServerRestart",
+    "v2M5BookKeeperNativeCreateRealTest" to "KafkaBookKeeperNativeCreateV2RealTest",
     "v2M5BookKeeperOxiaControlRealTest" to "KafkaBookKeeperOxiaControlV2RealTest",
     "v2M5BookKeeperOxiaRestartWriteTest" to "KafkaBookKeeperOxiaControlV2RestartTest.writeBeforeServerRestart",
     "v2M5BookKeeperOxiaRestartReadTest" to "KafkaBookKeeperOxiaControlV2RestartTest.readAfterServerRestart",

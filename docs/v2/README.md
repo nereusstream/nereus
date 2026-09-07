@@ -27,8 +27,8 @@ performance-first BookKeeper WAL.
   Kafka compaction now exposes carrier-independent semantic output and shares full eight-index validation with the
   Object bridge. A bounded BK part writer now inventories native IDs before creation and verifies sealed output;
   typed sealed descriptors now publish through M4 and recover solely from BK under its source planner and generation
-  lease. Native protocol-owner/task admission, ordinary reads, internal-topic lifecycle, real control-authority
-  integration and cleanup remain incomplete.
+  lease. Native protocol-owner/task admission, ordinary reads, internal-topic lifecycle, complete native authority
+  admission and cleanup remain incomplete.
   Binding retirement now folds terminal slots into authenticated immutable history while preserving active ordinals;
   current-root admission permanently rejects retired BatchIds. The
   [real Oxia history gate](detailed_design/m5/m5-retired-history-oxia-projection.json) now verifies 1,026 native folds,
@@ -40,6 +40,12 @@ performance-first BookKeeper WAL.
   immutable compaction records and real selector publication with real BK recovery, native response loss and an Oxia
   service restart. M4 owns projection over the raw envelope port; native source/protocol admission facts remain synthetic,
   and task fencing, internal-topic lifecycle, physical cleanup and complete writer composition are still required.
+
+  The [native BK create gate](detailed_design/m5/m5-bookkeeper-native-create-projection.json) now checks permanent
+  task/ledger reservations and atomic native creation fencing through an explicit metadata SPI profile. Guarded
+  compaction uses actual INSTANCEID; late creates stay rejected across ZooKeeper, bookie and Oxia restarts while
+  selected BK recovery still succeeds. This closes the guarded create domain only; complete task terminal/publication
+  fencing, append drain, all-writer/native namespace admission, quota and cleanup remain required.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.

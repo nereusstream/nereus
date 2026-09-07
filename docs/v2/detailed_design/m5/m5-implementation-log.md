@@ -502,6 +502,68 @@ The synchronized documentation then passed **13/13 supplemental tasks**, includi
 lifecycle and prior Binding-route contract checks, in `/tmp/nereus-m5-bk-oxia-control-final-check.log`.
 No captured production, test, build or runner input changed after the successful native execution.
 
+## 2026-09-08 native BookKeeper task-create fencing
+
+Status: focused native create-domain execution after `4d63ed3056e40ed390cd45e475e0d569acb782b3`; complete task terminal,
+publication fencing, append drain, unique native authority routing, all-writer admission and physical cleanup remain
+OPEN. The [native create projection](m5-bookkeeper-native-create-projection.json) records this additive profile.
+
+`M5BookKeeperNativeCreateClientV2` owns an explicit `m5zk` client. Its public metadata-driver SPI composes the locked
+hierarchical ledger manager through a create-only decorator; native read, write, recovery, enumeration and deletion
+remain delegated to BookKeeper. The locked BookKeeper source, client JAR and wire format are unchanged. Admission
+requires the exact hierarchical layout/version and no-auth CRC32C profile. A canonical M5NC version-2 scope admits
+1–256 exact run configurations within 32 KiB and binds the task SHA and actual native INSTANCEID. The physical
+namespace excludes endpoint aliases, Cell, Binding, owner and capability identity. Actual connections through
+`127.0.0.1` and `127.1` resolve the same native incarnation.
+
+The native allocator result is permanently reserved before its ID reaches the Cell session. A 56-byte reservation
+binds the scope SHA, ledger ID and allocation nonce; a repeated allocation of the same ID cannot claim the existing
+record. Both reservation and ledger creation atomically check the permanent task's OPEN/version-0 state. Native ledger
+creation also checks reservation version 0 and validates the exact NBKR1 run metadata/quorums/digest/password before
+serializing native metadata with its creator token. Parent-directory preparation creates no ledger metadata; only the
+final guarded ZooKeeper transaction does. Lost native create responses reconcile by the exact original creator token,
+and no reconciliation branch recreates a missing ledger.
+
+`fenceCreates()` performs the permanent OPEN/version-0 to FENCED/version-1 CAS and rereads exact bytes/revision even
+when the response is lost. It never deletes or reopens that task record. A delayed transaction released after the
+fence fails atomically; old and fresh guarded clients cannot recreate a test-deleted ledger. These records remain
+permanent and are excluded from lifecycle cleanup. This profile does not admit administrative namespace reformat,
+external permanent-record deletion, raw stock writers or arbitrary alternative metadata authorities. Those operations
+cannot inherit this scoped result. Its per-record bounds are not native aggregate quota or restart-headroom evidence.
+
+Four scope tests cover canonical limits, malformed/truncated input and callback failure completion. Eight source-locked
+native cases cover actual endpoint aliases and reservation reconnect; sealed write/read plus fence/delete/late-create;
+reservation-before-fence; foreign task/run rejection; wrong INSTANCEID or task scope; missing/corrupt fence rejection;
+a deterministically held create transaction; and post-apply loss of reservation/create/fence responses. The fault harness
+controls only callback delivery or transaction submission; each operation reaches real ZooKeeper. Three further
+BK/Oxia cases use actual native namespaces for multi-ledger recovery with all eight indexes, an inventoried reservation
+that cannot cross the fence, and empty index-only output that cannot be recreated after test-owned deletion. One case
+intentionally publishes already sealed output after closing creates: create fencing alone is not TaskTerminal.
+
+Separate JVM phases write/select sealed output, reserve an uncreated ID and close native creates, then restart the
+same owned ZooKeeper, three bookie and Oxia containers with their storage retained. The new JVM verifies unchanged
+INSTANCEID, exact selector hash/scoped version, selected descriptor recovery, and rejection of both the pending create
+and fresh ID allocation. The checkpoint contains task/configuration identities and hashes, never output/source bodies.
+
+Validation: `scripts/run-v2-m5-bookkeeper-native-create-check.sh` passed **86/86 executed tasks** with configuration
+cache disabled and all tasks rerun. The post-restart JVM passed **18 tasks** (2 executed, 16 up-to-date). The runner and
+independent reread verified **652 unchanged source/test/build/runner inputs**, manifest SHA-256
+`40ccad5255224a9e7816a6aa25da2e993307712269c5d86b45b5f09cee59debe`, and **35** focused test executions including
+**17** new ones, with zero failures/errors/skips. Existing real Cell/carrier/descriptor/M4 recovery suites passed
+8/7/4/2 tests respectively. The local result is
+`build/m5-bookkeeper-native-create/nereus-v2-m5-bk-native-create-21790/run-summary.json`; the successful log is
+`/tmp/nereus-m5-native-gate-3.log`. Its restart inventory preserves all four BK container IDs/images and records changed
+start times; Oxia container `22c86b4acc3a6ea6efae3224c72dc8ab61d07e33e7afd63a0169845ccbffc844` restarted from
+`2026-09-07T20:15:11.719693378Z` to `2026-09-07T20:16:06.931931543Z`. The owning runner removed its resources.
+
+Earlier logs `/tmp/nereus-m5-native-gate.log` and `/tmp/nereus-m5-native-gate-2.log` are failed attempts, not PASS:
+the first attempted a read through a closed write handle and both exposed this host's non-loopback `localhost`
+resolution. The successful suite uses a fresh read session and two valid numeric loopback spellings; no system DNS,
+credentials or deployment configuration was changed. Supplemental lifecycle, frozen M4 dependency and existing
+projection checks passed **13/13 executed tasks** in `/tmp/nereus-m5-native-final-check.log` after the current docs were
+synchronized. No production, test, build or runner input changed after native execution. All 17 amended acceptance
+obligations remain OPEN/null, and no source-bound M5 child, Final, physical-delete, staging or production authority is created.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;
@@ -949,10 +1011,10 @@ source-locked real Oxia result, source-bound receipt, physical-delete, staging, 
 
 ## Remaining ordered work
 
-1. Connect the M4-protected sealed-BK recovery path to native protocol-owner admission, ordinary reads and internal-topic lifecycle,
-   terminal task fencing and unpublished/replaced-output cleanup.
-2. Complete native M4 control-key routing, namespace quota/restart accounting and Cell I/O/operator metrics around authenticated history,
-   and permanent physical-done cache/checkpoint lifecycle.
+1. Compose the native create fence with complete task terminal/publication fencing and append drain, then connect
+   M4-protected BK recovery to native protocol-owner admission, ordinary reads, internal topics and output cleanup.
+2. Complete unique native namespace/Binding authority admission, quota/restart accounting and Cell I/O/operator metrics
+   around the existing native M4/history route, plus permanent physical-done cache/checkpoint lifecycle.
 3. Integrate all ten concrete writer classes, native namespace/owner proofs, current capability refresh,
    fenced identity observation, dispatch/done and durable recovery veto above the same-key coordinator.
 4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,

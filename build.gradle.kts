@@ -2502,6 +2502,18 @@ tasks.register("v2M5BindingLifecycleRouteCheck") {
     )
 }
 
+tasks.register("v2M5BookKeeperNativeCreateCheck") {
+    group = "verification"
+    description = "Verify permanent native BK task-create fencing and real BK/Oxia compaction composition."
+    dependsOn(
+        "v2M5BookKeeperOxiaControlCheck",
+        ":nereus-storage-bookkeeper:v2M5NativeCreateTest",
+        ":nereus-storage-bookkeeper:v2M5NativeCreateRealTest",
+        ":nereus-storage-bookkeeper:checkstyleRealBookKeeperTest",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperNativeCreateRealTest",
+    )
+}
+
 tasks.register("v2M5BookKeeperOxiaControlCheck") {
     group = "verification"
     description = "Verify the typed native BK/Oxia compaction control path and protected descriptor recovery."

@@ -25,8 +25,8 @@ Object bridge. The BK carrier slice adds inventoried native allocation, bounded 
 verification through `v2M5BookKeeperCompactionCarrierCheck`. `v2M5BookKeeperDescriptorCheck` adds typed sealed
 descriptor publication and independent BK-only recovery. `v2M5BookKeeperM4RecoveryCheck` checks the existing M4
 source planner and generation lease around low-frequency recovery, including delayed native completion and selector
-closure. Native protocol-owner/task admission, ordinary reads, internal-topic lifecycle, real control-authority
-integration and cleanup remain required next steps.
+closure. Native protocol-owner/task admission, ordinary reads, internal-topic lifecycle, complete native authority
+admission and cleanup remain required next steps.
 `v2M5RetiredHistoryCheck` verifies the version-2 Binding envelope, authenticated history, exact selector folding,
 current-root admission and operation beyond the former lifetime slot cap. Native quota/restart accounting, Cell I/O,
 operator metrics and physical-done cache lifecycle remain separate requirements.
@@ -41,6 +41,11 @@ and BK together, plus separate JVM phases across an Oxia restart. It verifies ty
 existing M4 selector publication, protected descriptor recovery and bounded owner-executor control continuations.
 Unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics, complete protocol/task/writer
 composition, internal-topic lifecycle, cleanup and source-bound M5 evidence are still required.
+`scripts/run-v2-m5-bookkeeper-native-create-check.sh` now runs `v2M5BookKeeperNativeCreateCheck` with the explicit
+`m5zk` profile: actual native INSTANCEID, permanent task/ledger records, atomic native check-plus-create, lost-response
+reconciliation and delayed-create rejection. Guarded BK/Oxia composition and independent JVMs across the same
+ZooKeeper, three bookie and Oxia container restarts verify persistent fencing and selected recovery. This focused gate
+is not complete TaskTerminal/publication fencing, append drain, global writer admission, quota or delete authority.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

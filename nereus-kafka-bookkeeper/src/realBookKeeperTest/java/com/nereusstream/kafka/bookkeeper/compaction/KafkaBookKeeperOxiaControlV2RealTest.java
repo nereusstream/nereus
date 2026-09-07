@@ -219,6 +219,11 @@ class KafkaBookKeeperOxiaControlV2RealTest {
         List<SourceProtectionIdentity> protections;
 
         NativeContext(KafkaBookKeeperInventoryV2.Task task, String root) throws Exception {
+            this(task, root, null);
+        }
+
+        NativeContext(KafkaBookKeeperInventoryV2.Task task, String root, RealBookKeeperCellSessionV1 guardedSession)
+                throws Exception {
             this.task = task;
             this.root = root;
             binding = M5MaterializationCodecV1.decodeSourceCut(task.sourceCut())
@@ -254,7 +259,10 @@ class KafkaBookKeeperOxiaControlV2RealTest {
                     task.namespace(),
                     task.capability().providerScopeId());
             m4 = new M4ReadControlCoordinatorV1(store, 7, binding);
-            session = new RealBookKeeperCellSessionV1(bk, task.capability(), new byte[0]);
+            session = guardedSession == null
+                    ? new RealBookKeeperCellSessionV1(bk, task.capability(), new byte[0])
+                    : guardedSession;
+            assertThat(session.capabilitySnapshot()).isEqualTo(task.capability());
         }
 
         static String root() {

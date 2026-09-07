@@ -154,6 +154,12 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   native response-loss retry and rejection of missing or stale inputs. The configured control executor is bounded;
   native namespace/source/protocol admission, task terminal fencing, internal-topic lifecycle and cleanup remain OPEN.
 
+- The [native BK create projection](m5-bookkeeper-native-create-projection.json) adds the explicit `m5zk` metadata SPI
+  profile, actual INSTANCEID physical namespace and permanent per-task/per-ledger records. Native ledger creation and
+  fence checks share one ZooKeeper transaction. Eight native create cases, three guarded BK/Oxia compaction cases and
+  two independent JVM phases across ZooKeeper/bookie/Oxia restarts verify late-create rejection and selected recovery.
+  Full task terminal/publication fencing, append drain, all-writer admission, durable quota and cleanup remain OPEN.
+
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation
 gates plus focused M5-D Provider/BookKeeper/orphan-admission/Pulsar-order/multipart cores without amending that result.
