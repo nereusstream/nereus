@@ -169,8 +169,14 @@ supersession of the historical clauses below. Earlier focused gates do not satis
 
 - The [permanent-done projection](m5-permanent-done-projection.json) adds an exact same-key compact terminal and
   a bounded positive cache. Native Oxia samples exceed the resident cap, reject late ticket CAS and new OPEN creation,
-  and preserve exact done/intent identities across server restart. The proofs are synthetic storage fixtures;
-  durable namespace quota, existing-intent headroom, actual physical deletion and GC scheduling remain OPEN.
+  and preserve exact done/intent identities across server restart. These synthetic storage fixtures did not supply
+  durable quota or GC scheduling; the later quota slice below extends this path.
+- The subsequent [GC quota projection](m5-gc-quota-projection.json) adds native durable byte reservations and permanent
+  resource settlement records. One bounded head operation recovers grants/refunds after response loss and server restart;
+  existing intents complete with full capacity and another pending grant. Fixed-depth native scans reject legacy
+  authority before initialization, and 130 settled records match native canonical byte totals. Explicit expansion is
+  required when permanent history leaves insufficient capacity for another complete reservation. This configured route
+  still requires unique namespace/all-writer admission, backend disk provisioning, real deletion proofs and GC scheduling.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

@@ -3034,3 +3034,14 @@ tasks.register("v2M5PermanentDoneCheck") {
         ":nereus-metadata-oxia:checkstyleOxiaIntegrationTest",
     )
 }
+
+
+tasks.register("v2M5GcQuotaCheck") {
+    group = "verification"
+    description = "Verify durable GC byte reservations, bounded recovery, native exhaustion and permanent done refunds."
+    dependsOn(
+        "v2M5PermanentDoneCheck",
+        ":nereus-storage-object:v2M5GcQuotaTest",
+        ":nereus-metadata-oxia:v2M5GcQuotaRealOxiaTest",
+    )
+}

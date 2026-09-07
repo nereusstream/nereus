@@ -690,6 +690,68 @@ in `/tmp/nereus-m5-permanent-done-final-check2.log`. All 428 captured inputs wer
 interruption and remain byte-identical to the final native run.
 No actual Provider/BK deletion, source-bound M5 child, Final, staging or production authority follows from these tests.
 
+## 2026-09-08 durable GC quota and reserved intent recovery
+
+Status: configured native canonical byte quota after `45fb0964579364e801bb2bf2947816ace4a2fc8f`.
+The [GC quota projection](m5-gc-quota-projection.json) records this focused implementation. All 17 acceptance rows
+remain OPEN/null. Real Provider/BK deletion proofs, unique native namespace/all-writer admission, backend capacity
+provisioning and GC worker scheduling remain required for complete DONE_CAPACITY.
+
+`M5GcQuotaRecordsV2` defines strict checksum-protected M5GH/M5GQ wire-2 values. The 272-byte head has counters, a
+monotonic revision/capacity and at most one pending operation. Every physical resource retains a 156-byte accounting
+entry at its stable digest key; settlement preserves its original grant revision and binds exact compact-done SHA/size.
+The quota charges canonical native key/value bytes: fixed head, every permanent accounting entry and authority key,
+1 MiB for each active authority value, and actual compact-done bytes after settlement. This is a conservative namespace
+budget, separate from resident cache weight, Java objects, backend indexes/WAL/replicas and physical disk capacity.
+
+`M5GcQuotaCoordinatorV2` captures the exact head before reading entry absence, commits the grant/refund with one head
+CAS, writes or settles the permanent entry, then clears only that exact pending operation. Every stage rereads native
+state; response loss retains the reservation and another process can recover the same operation. Entry absence, a
+full/active done value or a timeout cannot release bytes. Native compact done is immutable, so unused headroom may be
+refunded in the pending head before its settlement entry is written; the pending operation prevents double refund.
+A head changes revision even when its pending field becomes empty again, excluding stale absence/entry observations.
+There is no unbounded head map, multi-key transaction emulation, entry deletion or quota shrink. Explicit expansion
+preserves counts and pending work. Permanent done costs remain charged, so completion alone need not admit another
+full-size active resource.
+
+`OxiaQuotaTargetDeleteStoreV2` validates accounting transitions and exact native done before refunds. Every new OPEN
+requires a durable reservation; invalid initial phases cannot consume it. Existing authority writes require their
+previous reservation, with no new-capacity check or global pending-operation drain. The underlying same-key M5D2
+route still rejects skipped phases, changed compaction and terminal reopening. Initialization is admitted only after
+an absent head and empty authority/accounting families. It does not import old unbudgeted records or silently expand.
+The native composition owner must exclude old/raw writers and assign the same root to all users of that physical
+namespace. This profile is not a completed global namespace/writer admission mechanism.
+
+Real negative tests exposed the initialization scan's path-depth requirement before publication. The locked server
+`37a17bef17202d5fd6e23282da5fd26d94865484` uses `common/compare/encode.go` in its Pebble path: total slash count
+precedes key bytes. Parent leaf ranges and merely slash-terminated parent ranges both missed resource records.
+The final implementation uses separate same-depth ranges for both permanent record families plus exact head reads;
+it cancels each scan on the first record and waits for all shards on an empty result. Minimum/maximum digest keys,
+malformed legacy values and orphan accounting records all reject initialization. Earlier failed scan runs and one
+style-only failure are diagnostic results, not passing evidence; no source-locked dependency was modified.
+
+Nine unit tests cover all-byte checksum rejection, exhausted admission, full-done refund veto, every grant/refund
+write boundary, both ABA races, pending-preserving expansion, 130 continuous settlements and unknown/missing state.
+Eight native Oxia tests cover real legacy rejection, full/pending quota while an existing intent completes, all six
+applied-write delivery-loss boundaries, held native grant/refund CAS, canonical byte tally across 130 settlements,
+invalid initial authority admission and digest-range extremes. Independent JVM phases verify exact head, intent,
+done and original grant identities after the same server/data restart; the intent completes while the head is still
+full/pending, and reconciliation plus explicit expansion allows later admission. Checkpoints carry hashes/identities,
+not copied proof or authority bodies. Deletion eligibility, owner and absence facts remain synthetic in these tests.
+
+Validation: `scripts/run-v2-m5-gc-quota-oxia-check.sh` passed **61/61 executed tasks** with configuration cache disabled
+and all main tasks rerun. The fresh post-restart JVM passed **15 tasks** (1 executed, 14 up-to-date). All **19** new
+focused cases/phases passed with zero failures/errors/skips; the runner also reverified 17 prior done/route/native cases.
+The final run captured **434 unchanged inputs**, manifest SHA-256
+`2f7ec5f49596cb45d1ee5869373235bb374826758836ec84945cfc744dc2c276`.
+Local result: `build/m5-gc-quota-oxia/nereus-m5-gc-quota-oxia-93214/run-summary.json`; successful log:
+`/tmp/nereus-m5-quota-native-gate4.log`. Container
+`b35a9c61f593d8309f21dc102d625eaa253b3ccfc96f9032b21d2d6442a9fece` retained its exact image/data and restarted
+from `2026-09-07T22:13:09.614264418Z` to `2026-09-07T22:13:49.965453672Z`. The runner removed only its owned container.
+Supplemental documentation, frozen-design/M4 dependency, lifecycle and coordinator/recovery checks passed **15/15 tasks**
+in `/tmp/nereus-m5-quota-final-check.log`. All 434 captured inputs were independently rechecked against the final run.
+No source-bound M5 child, Final, physical-delete, staging or production authority is supplied by these results.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;
@@ -1140,9 +1202,9 @@ source-locked real Oxia result, source-bound receipt, physical-delete, staging, 
 1. Extend the guarded create/selection/drain terminal to stale-task and complete writer/adoption admission, then connect
    M4-protected BK recovery to native protocol-owner admission, ordinary reads, internal topics and grace/rescan cleanup.
 2. Complete unique native namespace/Binding authority admission, quota/restart accounting and Cell I/O/operator metrics
-   around the existing native M4/history route, plus durable GC namespace quota, reserved intent headroom and
-   worker scheduling around the new permanent done/cache route.
-3. Integrate all ten concrete writer classes, native namespace/owner proofs, current capability refresh,
+   around the existing native M4/history route. Admit the configured durable GC quota route for every actual writer,
+   provision backend capacity and connect worker scheduling to permanent done/cache and reserved intent recovery.
+3. Integrate every concrete writer-matrix entry, native namespace/owner proofs, current capability refresh,
    fenced identity observation, dispatch/done and durable recovery veto above the same-key coordinator.
 4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,
    five current-source evidence children, exact-source Final publication and aggregate `v2M5Check`.

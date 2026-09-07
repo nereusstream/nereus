@@ -346,3 +346,13 @@ tasks.register<Test>("v2M5PermanentDoneTest") {
     filter { includeTestsMatching("com.nereusstream.storage.object.gc.M5PermanentDoneV2Test") }
     outputs.upToDateWhen { false }
 }
+
+
+tasks.register<Test>("v2M5GcQuotaTest") {
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.nereusstream.storage.object.gc.M5GcQuotaV2Test") }
+    outputs.upToDateWhen { false }
+}

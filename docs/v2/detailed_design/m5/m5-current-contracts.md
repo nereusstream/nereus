@@ -19,8 +19,8 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 | Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; guarded BK creation now observes actual INSTANCEID and permanent reservations, while unique native namespace/route admission and real dispatch remain OPEN |
 | Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; guarded BK task cancellation and native drain now produce a durable physical cut, while real protocol proof producers, grace/rescans and full deletion composition remain OPEN |
 | Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared semantics, inventoried BK parts and sealed descriptor publication/recovery now compose real Oxia control with real BK under the existing M4 planner and hazard kernel; a native SPI profile fences late creates; same-selector decisions and native writer drain now produce restart-stable cancelled task terminals; complete namespace/task/protocol-owner admission, ordinary reads, internal-topic lifecycle and cleanup remain OPEN |
-| Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; additive wire 3 preserves that history while carrying one bounded task decision until exact permanent archival; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and durable physical-done quota/scheduling remain OPEN |
-| Permanent delete history | Compact done at the same resource key; resident cap independent of lifetime history | M5DC V2 retains exact resource/attempt/revision/owner/capability/absence identities; native Oxia compaction and bounded positive-cache eviction/reload/restart pass; durable namespace quota, existing-intent headroom and GC worker scheduling remain OPEN |
+| Binding retirement | Bounded active selector plus authenticated immutable history | M5R1 wire 2 binds history root/count and monotonic activation ordinals; additive wire 3 preserves that history while carrying one bounded task decision until exact permanent archival; a configured native M4/history route now passes source-locked Oxia continuation/restart checks on the existing M4 selector key; unique native namespace/Binding assignment, quota/restart accounting, Cell I/O/metrics and physical GC worker scheduling remain OPEN |
+| Permanent delete history | Compact done at the same resource key; resident cap independent of lifetime history | M5DC V2 retains exact resource/attempt/revision/owner/capability/absence identities; native Oxia compaction/cache recovery and a configured durable quota route pass; pre-reserved intent writes continue at exhaustion and pending grants/refunds recover after restart; unique namespace/all-writer admission, backend disk provisioning and GC scheduling remain OPEN |
 | Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; native owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
 
@@ -96,8 +96,26 @@ from absent authority, and rediscovery cannot recreate OPEN after eviction. A fi
 compact successor as EXISTING_TERMINAL without claiming that the old full candidate is still stored. Native Oxia tests retain 258 terminal
 samples with at most eight resident entries, reject a held ticket CAS after compaction, reconcile lost responses, and
 recover done plus an existing intent in a fresh JVM after server restart. Source/owner/absence proofs in these storage
-samples remain synthetic. Real Provider/BK deletion, durable quota, existing-intent headroom, GC scheduling and the full
-DONE_CAPACITY acceptance remain OPEN.
+samples remain synthetic. That slice did not supply real Provider/BK deletion, durable quota or GC scheduling;
+the full DONE_CAPACITY acceptance still requires the later implementation and source-bound evidence.
+The subsequent [durable GC quota projection](m5-gc-quota-projection.json) adds fixed-size M5GH/M5GQ records and
+`OxiaQuotaTargetDeleteStoreV2`. A 272-byte head carries at most one pending operation; each resource keeps a permanent
+156-byte grant/settlement entry. New authority admission reserves a full 1 MiB value plus native keys and permanent
+accounting overhead. Existing reserved intent mutations continue without acquiring new quota or clearing another
+resource's pending grant. Only authoritative same-key compact done releases unused reservation; exact done bytes and
+permanent entry/key costs remain charged. The head CAS precedes the entry mutation and clearing CAS, and retries
+capture the exact head before reading entry absence to exclude duplicate charge/refund after ABA. Unknown results
+retain the reservation. Explicit capacity expansion preserves all counters and pending work.
+Initialization refuses existing authority or orphan accounting entries. The locked server's actual hierarchical
+encoder prefixes total slash count, so the route scans each fixed-depth record family separately and cancels on the
+first result; a generic parent-prefix scan is not an emptiness proof. Tests cover both digest extremes and malformed
+legacy values. The configured route verifies 130 permanent settlements against native key/value byte totals, all six
+response-loss boundaries, held native grant/refund CAS races and recovery in an independent JVM after service restart.
+The recovered intent completes while capacity is full and another grant remains pending; later settlement and explicit
+expansion restore admission. Canonical byte quota is distinct from backend WAL/replica/disk space, Binding history
+quota, resident cache and work queues. The composition owner must exclude old/raw writers and assign a unique native
+route before initializing this profile. All-writer/native namespace admission, real deletion proofs, actual backend
+capacity provisioning, GC worker scheduling and all 17 source-bound acceptance obligations remain OPEN.
 The carrier gate passed 60 executed tasks with 8 inventory/layout, 7 real carrier and 8 real Cell-session tests;
 its exact-native-run check now precedes fencing, including the foreign-run zero-fence negative case.
 

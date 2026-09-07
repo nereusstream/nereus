@@ -2493,3 +2493,28 @@ mapOf(
         }
     }
 }
+
+
+mapOf(
+    "v2M5GcQuotaRealOxiaTest" to "M5GcQuotaOxiaIntegrationTest",
+    "v2M5GcQuotaOxiaRestartWriteTest" to "M5GcQuotaOxiaRestartTest.writeBeforeServerRestart",
+    "v2M5GcQuotaOxiaRestartReadTest" to "M5GcQuotaOxiaRestartTest.readAfterServerRestart",
+).forEach { (taskName, testName) ->
+    tasks.register<Test>(taskName) {
+        group = "verification"
+        testClassesDirs = oxiaIntegrationTest.output.classesDirs
+        classpath = oxiaIntegrationTest.runtimeClasspath
+        useJUnitPlatform()
+        maxParallelForks = 1
+        filter { includeTestsMatching("com.nereusstream.metadata.oxia.v2.retention.$testName") }
+        outputs.upToDateWhen { false }
+        doFirst {
+            systemProperty("nereus.m5.retention.oxia.serviceAddress",
+                providers.gradleProperty("v2M5RetentionOxiaServiceAddress").orNull ?: error("real Oxia address is required"))
+            if (taskName.contains("Restart")) {
+                systemProperty("nereus.m5.quota.oxia.restartCheckpoint",
+                    providers.gradleProperty("v2M5QuotaOxiaRestartCheckpoint").orNull ?: error("quota restart checkpoint is required"))
+            }
+        }
+    }
+}

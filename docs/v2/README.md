@@ -55,7 +55,11 @@ performance-first BookKeeper WAL.
 
   The [permanent-done gate](detailed_design/m5/m5-permanent-done-projection.json) now verifies same-key terminal
   compaction, bounded positive caching and native Oxia eviction/reload/restart with 258 terminal samples. A late ticket
-  CAS cannot dispatch after compaction. Actual deletion proofs, durable quota and reserved intent headroom remain required;
+  CAS cannot dispatch after compaction. The subsequent [durable quota gate](detailed_design/m5/m5-gc-quota-projection.json)
+  now reserves complete active authority space before admission, settles only permanent compact done and recovers bounded
+  pending grants/refunds after native restart. Existing intent writes continue with full quota; 130 settled resources match
+  native canonical byte totals. This configured route still requires unique namespace/all-writer admission, backend disk
+  provisioning, actual deletion proofs and GC scheduling;
   this metadata-storage result does not complete DONE_CAPACITY or any other amended acceptance obligation.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
