@@ -20,6 +20,8 @@ Its focused 42-task result includes synthetic proofs and retention regressions; 
 protocol proof production and complete physical deletion remain OPEN.
 The later M5DA version-4 observation slice adds READ_FENCED takeover, epoch invalidation and a required native owner
 verifier. `v2M5ReadFencedRecoveryCheck` validates this focused slice; real owner adapters and execution remain separate.
+`v2M5KafkaSemanticCoreCheck` checks the shared record compiler, full eight-index semantic validation and existing
+Object bridge. Sealed BK allocation, descriptor publication, restart recovery and cleanup remain required next steps.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

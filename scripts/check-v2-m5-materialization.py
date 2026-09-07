@@ -180,16 +180,26 @@ def validate_tasks(root: Path) -> None:
         raise MaterializationError("storage-object build lacks v2M5MaterializationTest")
 
 
+def validate_current_index(root: Path, text: str) -> None:
+    design = load(root / "scripts/check-v2-m5-design.py", "nereus_m5_current_index_parser")
+    front = design.parse_front_matter(text, "current M5 implementation index")
+    for key, expected in {
+        "productLine": "V2", "designStatus": "Accepted", "implementationStatus": "InProgress",
+        "evidenceStatus": "NotRun", "authority": "NormativeDesignIndex", "sourceTuple": "v2-m1",
+    }.items():
+        if front.get(key) != expected:
+            raise MaterializationError(f"current M5 index {key} differs from amended implementation status")
+    require_literals(text, ("m5-current-contracts.md", "m5-design-amendment-3.json"), "current M5 index")
+
+
 def validate(root: Path) -> None:
     root = root.resolve(strict=True)
+    historical = load(root / "scripts/check-v2-m5-historical-design.py", "nereus_m5_historical_materialization_input")
+    historical.validate(root)
+    lifecycle = load(root / "scripts/check-v2-m5-lifecycle-design.py", "nereus_m5_current_materialization_contract")
+    lifecycle.validate(root)
     design = load(root / "scripts/check-v2-m5-design.py", "nereus_m5_design_for_materialization")
-    manifest = design.load_json(design.read_bytes(root, design.MANIFEST_PATH), str(design.MANIFEST_PATH))
-    design.validate_manifest_value(root, manifest)
-    values = {path: design.read_text(root, path) for path in design.DESIGN_DOCUMENTS}
-    for path, value in values.items():
-        design.validate_design_document(value, str(path))
-    design.validate_index(values[design.INDEX_PATH])
-    design.validate_frozen_content(values)
+    validate_current_index(root, design.read_text(root, design.INDEX_PATH))
     design.validate_m4_final(root)
     design.validate_scenarios_value(json.loads((root / design.SCENARIO_PATH).read_text(encoding="utf-8")))
     design.validate_no_m5_evidence(root)

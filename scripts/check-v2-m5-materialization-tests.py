@@ -46,6 +46,17 @@ class M5MaterializationContractTest(unittest.TestCase):
     def test_accepts_exact_machine_readable_wire_projection(self) -> None:
         M5A.validate_projection(ROOT)
 
+    def test_current_index_requires_amended_in_progress_without_evidence_promotion(self) -> None:
+        text = (ROOT / "docs/v2/detailed_design/m5/README.md").read_text()
+        M5A.validate_current_index(ROOT, text)
+        for before, after in (
+            ("implementationStatus: InProgress", "implementationStatus: NotStarted"),
+            ("evidenceStatus: NotRun", "evidenceStatus: Final"),
+            ("m5-current-contracts.md", "missing-current-contracts.md"),
+        ):
+            with self.subTest(after=after), self.assertRaises(M5A.MaterializationError):
+                M5A.validate_current_index(ROOT, text.replace(before, after))
+
 
 if __name__ == "__main__":
     unittest.main()

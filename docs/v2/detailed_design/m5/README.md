@@ -131,6 +131,9 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   same-key takeover/refresh without reopening admission, and mandatory native owner verification that is unsupported
   by default. The expanded coordinator suite uses synthetic facts; real protocol owner adapters, external identity
   readers, intent capability refresh and durable recovery-veto records remain OPEN.
+- The [shared Kafka semantic-core projection](m5-kafka-semantic-core-projection.json) records carrier-independent
+  record/disposition/gap/eight-index output. The Object bridge uses the same record compiler and independent validator;
+  BK ledger allocation, sealing, manifest selection, restart recovery and cleanup remain OPEN.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

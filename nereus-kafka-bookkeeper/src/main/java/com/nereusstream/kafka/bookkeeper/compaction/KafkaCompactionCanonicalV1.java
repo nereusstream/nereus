@@ -35,7 +35,8 @@ public final class KafkaCompactionCanonicalV1 {
 
     public static Sha256Digest planRoot(CompactionPlan plan) {
         Objects.requireNonNull(plan, "plan");
-        return hash("NEREUS_V2_M5_B_COMPACTION_PLAN_V1", output -> {
+        // V2 fixes producer-specific aborted classification; never reuse an older immutable output/task key.
+        return hash("NEREUS_V2_M5_B_COMPACTION_PLAN_V2", output -> {
             writeBytes(output, M5MaterializationCodecV1.encodeSourceCut(plan.sourceCut()));
             var policy = plan.policy();
             output.writeInt(policy.kafkaFeatureLevel());

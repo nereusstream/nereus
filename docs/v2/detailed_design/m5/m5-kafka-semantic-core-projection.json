@@ -1,0 +1,47 @@
+{
+  "schema": "NEREUS_V2_M5_KAFKA_SEMANTIC_CORE_PROJECTION_V2",
+  "status": "SHARED_SEMANTICS_IMPLEMENTED_NON_PROMOTABLE",
+  "semanticOutputIdentityDomain": "NEREUS_V2_M5_KAFKA_SEMANTIC_OUTPUT_V2",
+  "compiledOutput": [
+    "EXACT_RETAINED_RECORD_BATCHES",
+    "DETERMINISTIC_DISPOSITIONS",
+    "COMPLETE_GAPS",
+    "COMPLETE_EIGHT_INDEX_SET",
+    "SEMANTIC_VALIDATION_PROOF"
+  ],
+  "indexKinds": [
+    "OFFSET_OR_POSITION",
+    "PAYLOAD_LOCATOR",
+    "TIMESTAMP",
+    "PRODUCER_RECOVERY",
+    "TRANSACTION",
+    "ABORTED_TRANSACTION",
+    "LEADER_EPOCH",
+    "CHECKSUM_COVERAGE"
+  ],
+  "coreCreatesObjectCandidates": false,
+  "coreUsesObjectSession": false,
+  "coreAllocatesBookKeeperLedger": false,
+  "sharedRecordSelectionAndRewrite": true,
+  "sharedIndependentRecordAndIndexValidation": true,
+  "independentBatchBytesReparse": true,
+  "allIndexKindsRequireCompleteExpectedRows": true,
+  "allLocatorAndProtocolFieldsValidated": true,
+  "existingObjectBridgeRetained": true,
+  "focusedTests": {
+    "kafkaCompactionTests": 14,
+    "newSemanticCoreTests": 6,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "sealedBookKeeperCarrierImplemented": false,
+  "realBookKeeperCompactionEvidencePresent": false,
+  "internalTopicObjectDisabledLifecycleEvidencePresent": false,
+  "sourceBoundReceiptPresent": false,
+  "physicalDeleteAuthority": false,
+  "productionAuthority": false,
+  "abortedIndexMatchesProducerAndTransactionalBatch": true,
+  "planIdentityDomain": "NEREUS_V2_M5_B_COMPACTION_PLAN_V2",
+  "legacyPlanOutputsReused": false
+}

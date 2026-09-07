@@ -88,7 +88,8 @@ public final class KafkaSemanticCompactorV1 {
             GenerationObject payloadObject,
             List<GenerationObject> indexObjects,
             Candidate payloadCandidate,
-            List<Candidate> indexCandidates) {
+            List<Candidate> indexCandidates)
+            implements KafkaCompactionSemanticViewV2 {
         public CandidateGeneration {
             Objects.requireNonNull(materializationPlan, "materializationPlan");
             KafkaCompactionRecordsV1.requireDigest(compactionPlanRootSha256, "compactionPlanRootSha256");
@@ -103,6 +104,16 @@ public final class KafkaSemanticCompactorV1 {
             indexObjects = List.copyOf(indexObjects);
             Objects.requireNonNull(payloadCandidate, "payloadCandidate");
             indexCandidates = List.copyOf(indexCandidates);
+        }
+
+        @Override
+        public Sha256Digest taskIdSha256() {
+            return materializationPlan.taskIdSha256();
+        }
+
+        @Override
+        public Sha256Digest outputIdentitySha256() {
+            return materializationPlan.outputIdentitySha256();
         }
 
         public List<ParsedBatch> outputBatches() {
@@ -123,13 +134,76 @@ public final class KafkaSemanticCompactorV1 {
         }
     }
 
+    private record CompiledRecords(
+            List<ParsedBatch> inputs, List<BatchOutput> outputs, List<DispositionRow> dispositions, List<Gap> gaps) {}
+
     public Result compact(CompactionPlan plan) {
+        CompiledRecords records = compileRecords(plan);
+        MaterializationPlan materialization = materializationPlan(plan);
+        List<KafkaCompactionIndexV1> indexes = indexes(
+                plan,
+                materialization.taskIdSha256(),
+                materialization.outputIdentitySha256(),
+                records.outputs(),
+                records.gaps());
+        requireIndexBudget(plan, indexes);
+        CandidateGeneration candidate = generation(
+                plan,
+                materialization,
+                records.inputs(),
+                records.outputs(),
+                records.dispositions(),
+                records.gaps(),
+                indexes,
+                KafkaCompactionCanonicalV1.planRoot(plan));
+        SemanticValidationProof proof = new KafkaCompactionSemanticValidatorV1().validate(plan, candidate);
+        return new Result(candidate, proof);
+    }
+
+    /** Compiles and validates records without constructing any Object materialization or provider session. */
+    public KafkaCompactionSemanticOutputV2 compileSemantic(CompactionPlan plan) {
+        CompiledRecords records = compileRecords(plan);
+        Sha256Digest taskId = M5MaterializationCodecV1.calculateTaskId(plan.sourceCut());
+        Sha256Digest planRoot = KafkaCompactionCanonicalV1.planRoot(plan);
+        Sha256Digest compactionTask = KafkaCompactionCanonicalV1.compactionTaskId(taskId, planRoot);
+        Sha256Digest outputIdentity = semanticOutputIdentity(compactionTask, planRoot);
+        List<KafkaCompactionIndexV1> indexes = indexes(plan, taskId, outputIdentity, records.outputs(), records.gaps());
+        requireIndexBudget(plan, indexes);
+        KafkaCompactionSemanticOutputV2 output = new KafkaCompactionSemanticOutputV2(
+                taskId,
+                outputIdentity,
+                planRoot,
+                compactionTask,
+                records.inputs(),
+                records.outputs(),
+                records.dispositions(),
+                records.gaps(),
+                indexes,
+                indexes.stream().map(KafkaCompactionIndexV1::encode).toList());
+        new KafkaCompactionSemanticValidatorV1().validateSemantic(plan, output);
+        return output;
+    }
+
+    static Sha256Digest semanticOutputIdentity(Sha256Digest compactionTask, Sha256Digest planRoot) {
+        return hash("NEREUS_V2_M5_KAFKA_SEMANTIC_OUTPUT_V2", compactionTask.toHex(), planRoot.toHex());
+    }
+
+    private static void requireIndexBudget(CompactionPlan plan, List<KafkaCompactionIndexV1> indexes) {
+        long indexBytes = indexes.stream()
+                .map(KafkaCompactionIndexV1::encode)
+                .mapToLong(CanonicalBytes::length)
+                .sum();
+        if (indexBytes > plan.policy().caps().maximumIndexBytes()) {
+            throw new IllegalArgumentException("M5-B rebuilt index bytes exceed the Cell cap");
+        }
+    }
+
+    private static CompiledRecords compileRecords(CompactionPlan plan) {
         Objects.requireNonNull(plan, "plan");
         List<ParsedBatch> inputs = plan.inputBatches().stream()
                 .map(value -> KafkaRecordBatchCodecV1.parse(value.canonicalBody()))
                 .toList();
         requireInputCut(plan, inputs);
-        MaterializationPlan materialization = materializationPlan(plan);
         Map<String, LatestKeyProof> proofs = new LinkedHashMap<>();
         long keyBytes = 0;
         for (LatestKeyProof proof : plan.keyProofs()) {
@@ -197,25 +271,7 @@ public final class KafkaSemanticCompactorV1 {
                 .toList();
         requireDispositionDomain(inputs, dispositions);
         List<Gap> gaps = gaps(plan, outputs);
-        List<KafkaCompactionIndexV1> indexes = indexes(plan, materialization, outputs, gaps);
-        long indexBytes = indexes.stream()
-                .map(KafkaCompactionIndexV1::encode)
-                .mapToLong(CanonicalBytes::length)
-                .sum();
-        if (indexBytes > plan.policy().caps().maximumIndexBytes()) {
-            throw new IllegalArgumentException("M5-B rebuilt index bytes exceed the Cell cap");
-        }
-        CandidateGeneration candidate = generation(
-                plan,
-                materialization,
-                inputs,
-                outputs,
-                dispositions,
-                gaps,
-                indexes,
-                KafkaCompactionCanonicalV1.planRoot(plan));
-        SemanticValidationProof proof = new KafkaCompactionSemanticValidatorV1().validate(plan, candidate);
-        return new Result(candidate, proof);
+        return new CompiledRecords(inputs, List.copyOf(outputs), dispositions, gaps);
     }
 
     private static MaterializationPlan materializationPlan(CompactionPlan plan) {
@@ -362,7 +418,11 @@ public final class KafkaSemanticCompactorV1 {
     }
 
     private static List<KafkaCompactionIndexV1> indexes(
-            CompactionPlan plan, MaterializationPlan materialization, List<BatchOutput> outputs, List<Gap> gaps) {
+            CompactionPlan plan,
+            Sha256Digest taskId,
+            Sha256Digest outputIdentity,
+            List<BatchOutput> outputs,
+            List<Gap> gaps) {
         Map<IndexKind, List<KafkaCompactionIndexV1.Row>> rows = new EnumMap<>(IndexKind.class);
         for (IndexKind kind : REQUIRED_INDEXES) {
             rows.put(kind, new ArrayList<>());
@@ -372,9 +432,11 @@ public final class KafkaSemanticCompactorV1 {
                 continue;
             }
             ParsedBatch batch = output.output().orElseThrow();
-            boolean aborted = plan.transactions().stream()
-                    .anyMatch(transaction -> transaction.outcome() == TransactionOutcome.ABORTED
-                            && transaction.touches(batch.baseOffset(), batch.endOffsetExclusive()));
+            boolean aborted = batch.transactional()
+                    && plan.transactions().stream()
+                            .anyMatch(transaction -> transaction.outcome() == TransactionOutcome.ABORTED
+                                    && transaction.producerId() == batch.producerId()
+                                    && transaction.touches(batch.baseOffset(), batch.endOffsetExclusive()));
             for (RecordValue record : batch.records()) {
                 int flags = KafkaCompactionIndexV1.FLAG_RETAINED;
                 if (batch.transactional()) {
@@ -436,11 +498,7 @@ public final class KafkaSemanticCompactorV1 {
         }
         return REQUIRED_INDEXES.stream()
                 .map(kind -> new KafkaCompactionIndexV1(
-                        kind,
-                        plan.sourceCut().coverage(),
-                        materialization.taskIdSha256(),
-                        materialization.outputIdentitySha256(),
-                        rows.get(kind)))
+                        kind, plan.sourceCut().coverage(), taskId, outputIdentity, rows.get(kind)))
                 .toList();
     }
 

@@ -18,7 +18,7 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 | --- | --- | --- |
 | Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; native namespace/route admission and real dispatch remain OPEN |
 | Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; real protocol proof producers and full deletion composition remain OPEN |
-| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Object bridge and semantic indexes exist; sealed BK compaction lifecycle is OPEN |
+| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared carrier-independent compiler and independent full eight-index validation now exist; existing Object bridge is retained; sealed BK allocation/publication/recovery/cleanup remains OPEN |
 | Binding retirement | Bounded active selector plus authenticated immutable history | Earlier M5R1 retains permanent inline slots; root/folding/admission migration is OPEN |
 | Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; native owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
@@ -30,6 +30,10 @@ The [physical identity projection](m5-physical-resource-identity-projection.json
 [observation recovery projection](m5-read-fenced-recovery-projection.json) adds 7 coordinator cases and requires a
 native verifier that is unsupported by default. These results remain non-promotable and use synthetic eligibility facts.
 `v2M5ReadFencedRecoveryCheck` passed 44 tasks with the expanded 19-test coordinator suite and 3 recovery contract tests.
+The [shared Kafka semantic projection](m5-kafka-semantic-core-projection.json) tracks the compiler extraction and
+complete row validation. Its outputs are in memory and do not authorize publication, read adoption or input deletion.
+`v2M5KafkaSemanticCoreCheck` passed 42 tasks, including 14 Kafka and 7 Object materialization tests. The added
+interleaved-transaction case fixed producer-independent aborted marking and uses a V2 plan/output task identity.
 
 `v2M5LifecycleDesignCheck` checks the amendment chain, exact bytes, coverage and authority boundaries. It proves no
 runtime behavior. `v2M5HistoricalDesignCheck` replays the unmodified freeze validator at c86fde3e and compares

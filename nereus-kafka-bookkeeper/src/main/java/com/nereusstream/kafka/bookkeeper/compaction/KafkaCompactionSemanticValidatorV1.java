@@ -23,6 +23,7 @@ import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.Dis
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.LatestKeyProof;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.ParsedBatch;
 import com.nereusstream.kafka.bookkeeper.compaction.KafkaCompactionRecordsV1.RecordValue;
+import com.nereusstream.storage.object.materialization.M5MaterializationCodecV1;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.IndexKind;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.PayloadKind;
 import com.nereusstream.storage.object.materialization.M5MaterializationRecordsV1.RepresentationMode;
@@ -95,6 +96,58 @@ public final class KafkaCompactionSemanticValidatorV1 {
                 suppressionRoot,
                 payloadBodiesRoot,
                 indexBodiesRoot);
+    }
+
+    /** Independent semantics validation usable before either Object or BK storage allocation. */
+    public SemanticValidationProof validateSemantic(CompactionPlan plan, KafkaCompactionSemanticOutputV2 output) {
+        Objects.requireNonNull(plan, "plan");
+        Objects.requireNonNull(output, "output");
+        Sha256Digest sourceTask = M5MaterializationCodecV1.calculateTaskId(plan.sourceCut());
+        Sha256Digest planRoot = KafkaCompactionCanonicalV1.planRoot(plan);
+        Sha256Digest compactionTask = KafkaCompactionCanonicalV1.compactionTaskId(sourceTask, planRoot);
+        if (!output.taskIdSha256().equals(sourceTask)
+                || !output.compactionPlanRootSha256().equals(planRoot)
+                || !output.compactionTaskIdSha256().equals(compactionTask)
+                || !output.outputIdentitySha256()
+                        .equals(KafkaSemanticCompactorV1.semanticOutputIdentity(compactionTask, planRoot))) {
+            throw new IllegalStateException("carrier-independent semantic identity differs from captured plan");
+        }
+        List<ParsedBatch> inputs = plan.inputBatches().stream()
+                .map(value -> KafkaRecordBatchCodecV1.parse(value.canonicalBody()))
+                .toList();
+        List<DispositionRow> expected = expectedDispositions(plan, inputs);
+        if (!output.inputBatches().equals(inputs) || !output.dispositions().equals(expected)) {
+            throw new IllegalStateException("carrier-independent semantic input/disposition differs on reread");
+        }
+        requireOutputEquivalence(plan, output, expected);
+        requireIndexes(plan, output);
+        Sha256Digest dispositionRoot = KafkaCompactionCanonicalV1.dispositionRoot(expected);
+        Sha256Digest suppressionRoot = KafkaCompactionCanonicalV1.suppressionRoot(expected);
+        Sha256Digest protocolRoot = KafkaCompactionCanonicalV1.protocolStateRoot(plan);
+        Sha256Digest recordRoot = KafkaCompactionCanonicalV1.outputRecordRoot(output.outputBatches());
+        Sha256Digest payloadRoot = M5MaterializationValidatorV1.semanticPayloadBodiesRoot(
+                List.of(concatenate(output.batchOutputs().stream()
+                        .flatMap(batch -> batch.outputBody().stream())
+                        .toList())));
+        Sha256Digest indexesRoot = M5MaterializationValidatorV1.semanticIndexBodiesRoot(output.indexBodies());
+        Sha256Digest semanticRoot = KafkaCompactionCanonicalV1.semanticValidationRoot(
+                compactionTask,
+                planRoot,
+                dispositionRoot,
+                protocolRoot,
+                suppressionRoot,
+                recordRoot,
+                payloadRoot,
+                indexesRoot);
+        return new SemanticValidationProof(
+                sourceTask,
+                output.outputIdentitySha256(),
+                plan.sourceCut().sourceSetSha256(),
+                semanticRoot,
+                protocolRoot,
+                suppressionRoot,
+                payloadRoot,
+                indexesRoot);
     }
 
     private static List<DispositionRow> expectedDispositions(CompactionPlan plan, List<ParsedBatch> inputs) {
@@ -177,9 +230,7 @@ public final class KafkaCompactionSemanticValidatorV1 {
     }
 
     private static void requireOutputEquivalence(
-            CompactionPlan plan,
-            KafkaSemanticCompactorV1.CandidateGeneration candidate,
-            List<DispositionRow> dispositions) {
+            CompactionPlan plan, KafkaCompactionSemanticViewV2 candidate, List<DispositionRow> dispositions) {
         Map<Long, DispositionRow> byOffset =
                 dispositions.stream().collect(Collectors.toMap(DispositionRow::offset, value -> value));
         if (candidate.batchOutputs().size() != candidate.inputBatches().size()) {
@@ -187,9 +238,14 @@ public final class KafkaCompactionSemanticValidatorV1 {
         }
         List<Long> expectedOffsets = new ArrayList<>();
         List<Long> actualOffsets = new ArrayList<>();
+        int outputOrdinal = 0;
+        int payloadOffset = 0;
         for (int ordinal = 0; ordinal < candidate.batchOutputs().size(); ordinal++) {
             var output = candidate.batchOutputs().get(ordinal);
             ParsedBatch input = candidate.inputBatches().get(ordinal);
+            if (output.payloadOffset() != payloadOffset) {
+                throw new IllegalStateException("M5-B output has a discontinuous canonical payload offset");
+            }
             if (!output.input().equals(input)) {
                 throw new IllegalStateException("M5-B output names the wrong input batch");
             }
@@ -206,6 +262,13 @@ public final class KafkaCompactionSemanticValidatorV1 {
             }
             ParsedBatch actual =
                     output.output().orElseThrow(() -> new IllegalStateException("M5-B omitted retained Kafka records"));
+            if (output.outputBatchOrdinal() != outputOrdinal++
+                    || !KafkaRecordBatchCodecV1.parse(output.outputBody().orElseThrow())
+                            .equals(actual)) {
+                throw new IllegalStateException("M5-B output batch bytes or ordinal differ on independent parse");
+            }
+            payloadOffset = Math.addExact(
+                    payloadOffset, output.outputBody().orElseThrow().length());
             if (!actual.records().equals(expectedRecords)
                     || actual.producerId() != input.producerId()
                     || actual.producerEpoch() != input.producerEpoch()
@@ -219,6 +282,21 @@ public final class KafkaCompactionSemanticValidatorV1 {
             }
             actualOffsets.addAll(
                     actual.records().stream().map(RecordValue::offset).toList());
+        }
+        List<KafkaCompactionRecordsV1.Gap> expectedGaps = new ArrayList<>();
+        long cursor = plan.frontiers().candidateStartOffset();
+        for (long offset : expectedOffsets) {
+            if (offset > cursor) {
+                expectedGaps.add(new KafkaCompactionRecordsV1.Gap(cursor, offset));
+            }
+            cursor = Math.addExact(offset, 1);
+        }
+        if (cursor < plan.frontiers().candidateEndOffsetExclusive()) {
+            expectedGaps.add(
+                    new KafkaCompactionRecordsV1.Gap(cursor, plan.frontiers().candidateEndOffsetExclusive()));
+        }
+        if (!candidate.gaps().equals(expectedGaps)) {
+            throw new IllegalStateException("M5-B gap inventory differs from complete retained coverage");
         }
         if (!actualOffsets.equals(expectedOffsets)) {
             throw new IllegalStateException("M5-B output offsets differ from retained absolute offsets");
@@ -242,26 +320,25 @@ public final class KafkaCompactionSemanticValidatorV1 {
         }
     }
 
-    private static void requireIndexes(CompactionPlan plan, KafkaSemanticCompactorV1.CandidateGeneration candidate) {
+    private static void requireIndexes(CompactionPlan plan, KafkaCompactionSemanticViewV2 candidate) {
         if (candidate.indexes().size() != IndexKind.values().length
-                || candidate.indexCandidates().size() != IndexKind.values().length) {
+                || candidate.indexBodies().size() != IndexKind.values().length) {
             throw new IllegalStateException("M5-B did not rebuild the complete eight-index set");
         }
         Map<IndexKind, KafkaCompactionIndexV1> indexes = new EnumMap<>(IndexKind.class);
         for (int ordinal = 0; ordinal < candidate.indexes().size(); ordinal++) {
             KafkaCompactionIndexV1 expected = candidate.indexes().get(ordinal);
-            KafkaCompactionIndexV1 decoded = KafkaCompactionIndexV1.decode(
-                    candidate.indexCandidates().get(ordinal).canonicalBody());
+            KafkaCompactionIndexV1 decoded =
+                    KafkaCompactionIndexV1.decode(candidate.indexBodies().get(ordinal));
             if (!decoded.equals(expected)
                     || decoded.kind().ordinal() != ordinal
-                    || !decoded.materializationTaskIdSha256()
-                            .equals(candidate.materializationPlan().taskIdSha256())
-                    || !decoded.outputIdentitySha256()
-                            .equals(candidate.materializationPlan().outputIdentitySha256())) {
+                    || !decoded.materializationTaskIdSha256().equals(candidate.taskIdSha256())
+                    || !decoded.outputIdentitySha256().equals(candidate.outputIdentitySha256())) {
                 throw new IllegalStateException("M5-B rebuilt index body/identity differs");
             }
             indexes.put(decoded.kind(), decoded);
         }
+        requireCompleteIndexRows(plan, candidate, indexes);
         List<Long> retainedOffsets = candidate.outputBatches().stream()
                 .flatMap(batch -> batch.records().stream())
                 .map(RecordValue::offset)
@@ -306,6 +383,112 @@ public final class KafkaCompactionSemanticValidatorV1 {
                 throw new IllegalStateException("M5-B producer recovery index differs from retained batches");
             }
         }
+    }
+
+    private record ExpectedIndexRecord(KafkaSemanticCompactorV1.BatchOutput output, RecordValue record, int flags) {}
+
+    private static void requireCompleteIndexRows(
+            CompactionPlan plan,
+            KafkaCompactionSemanticViewV2 candidate,
+            Map<IndexKind, KafkaCompactionIndexV1> indexes) {
+        Map<Long, ExpectedIndexRecord> expectedByOffset = new LinkedHashMap<>();
+        for (var output : candidate.batchOutputs()) {
+            output.output().ifPresent(batch -> {
+                int flags = KafkaCompactionIndexV1.FLAG_RETAINED
+                        | (batch.transactional() ? KafkaCompactionIndexV1.FLAG_TRANSACTIONAL : 0)
+                        | (batch.controlKind() != ControlKind.NONE ? KafkaCompactionIndexV1.FLAG_CONTROL : 0)
+                        | (isAborted(plan, batch) ? KafkaCompactionIndexV1.FLAG_ABORTED : 0);
+                batch.records()
+                        .forEach(record ->
+                                expectedByOffset.put(record.offset(), new ExpectedIndexRecord(output, record, flags)));
+            });
+        }
+        for (IndexKind kind : IndexKind.values()) {
+            KafkaCompactionIndexV1 index = indexes.get(kind);
+            if (!index.coverage().equals(plan.sourceCut().coverage())) {
+                throw new IllegalStateException("M5-B index coverage differs from complete source cut");
+            }
+            List<Long> expected = expectedByOffset.keySet().stream()
+                    .filter(offset -> {
+                        ExpectedIndexRecord expectedRow = expectedByOffset.get(offset);
+                        ParsedBatch batch = expectedRow.output().output().orElseThrow();
+                        return switch (kind) {
+                            case PRODUCER_RECOVERY -> batch.producerId() != -1;
+                            case TRANSACTION -> batch.transactional();
+                            case ABORTED_TRANSACTION ->
+                                (expectedRow.flags() & KafkaCompactionIndexV1.FLAG_ABORTED) != 0;
+                            case OFFSET_OR_POSITION, PAYLOAD_LOCATOR, TIMESTAMP, LEADER_EPOCH, CHECKSUM_COVERAGE ->
+                                true;
+                        };
+                    })
+                    .toList();
+            List<Long> actual = index.rows().stream()
+                    .filter(row -> (row.flags() & KafkaCompactionIndexV1.FLAG_GAP) == 0)
+                    .map(row -> row.coverage().inclusiveStart())
+                    .toList();
+            if (!actual.equals(expected)) {
+                throw new IllegalStateException("M5-B index omits or invents required semantic rows: " + kind);
+            }
+            List<KafkaCompactionRecordsV1.Gap> gaps = new ArrayList<>();
+            for (var row : index.rows()) {
+                if ((row.flags() & KafkaCompactionIndexV1.FLAG_GAP) != 0) {
+                    gaps.add(new KafkaCompactionRecordsV1.Gap(
+                            row.coverage().inclusiveStart(), row.coverage().exclusiveEnd()));
+                    String gapIdentity = "M5-B-GAP-V1\0" + row.coverage().inclusiveStart() + "\0"
+                            + row.coverage().exclusiveEnd();
+                    Sha256Digest expectedGap = Sha256Digest.hash(
+                            CanonicalBytes.copyOf(gapIdentity.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                    if (kind != IndexKind.CHECKSUM_COVERAGE
+                            || row.flags() != KafkaCompactionIndexV1.FLAG_GAP
+                            || row.byteOffset() != 0
+                            || row.minimumTimestamp() != -1
+                            || row.maximumTimestamp() != -1
+                            || row.producerId() != -1
+                            || row.producerEpoch() != -1
+                            || row.sequence() != -1
+                            || row.leaderEpoch() != -1
+                            || !row.identitySha256().equals(expectedGap)) {
+                        throw new IllegalStateException("M5-B index gap has fabricated payload or protocol metadata");
+                    }
+                    continue;
+                }
+                ExpectedIndexRecord expectedRow =
+                        expectedByOffset.get(row.coverage().inclusiveStart());
+                RecordValue record = expectedRow.record();
+                var output = expectedRow.output();
+                ParsedBatch batch = output.output().orElseThrow();
+                int expectedFlags = expectedRow.flags();
+                if (row.coverage().exclusiveEnd() != Math.addExact(record.offset(), 1)
+                        || row.outputBatchOrdinal() != output.outputBatchOrdinal()
+                        || row.byteOffset() != output.payloadOffset()
+                        || row.byteLength() != output.outputBody().orElseThrow().length()
+                        || row.minimumTimestamp() != record.timestamp()
+                        || row.maximumTimestamp() != record.timestamp()
+                        || row.producerId() != batch.producerId()
+                        || row.producerEpoch() != batch.producerEpoch()
+                        || row.sequence() != record.sequence()
+                        || row.leaderEpoch() != batch.partitionLeaderEpoch()
+                        || row.flags() != expectedFlags
+                        || !row.identitySha256().equals(KafkaCompactionCanonicalV1.recordIdentity(batch, record))) {
+                    throw new IllegalStateException(
+                            "M5-B index locator or protocol row differs from exact output: " + kind);
+                }
+            }
+            List<KafkaCompactionRecordsV1.Gap> expectedGaps =
+                    kind == IndexKind.CHECKSUM_COVERAGE ? candidate.gaps() : List.of();
+            if (!gaps.equals(expectedGaps)) {
+                throw new IllegalStateException("M5-B index gap rows differ from complete gap inventory");
+            }
+        }
+    }
+
+    private static boolean isAborted(CompactionPlan plan, ParsedBatch batch) {
+        return batch.transactional()
+                && plan.transactions().stream()
+                        .anyMatch(transaction ->
+                                transaction.outcome() == KafkaCompactionRecordsV1.TransactionOutcome.ABORTED
+                                        && transaction.producerId() == batch.producerId()
+                                        && transaction.touches(batch.baseOffset(), batch.endOffsetExclusive()));
     }
 
     private static void requireExactCoverage(KafkaCompactionIndexV1 index, CompactionPlan plan) {

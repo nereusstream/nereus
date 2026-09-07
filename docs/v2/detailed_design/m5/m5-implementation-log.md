@@ -115,6 +115,46 @@ capability, failed eligibility refresh, same-owner refresh, and exact epoch/revi
 caught projection version/domain references that still described the preceding wire; those references were updated
 to M5DA 4 / external-identity hash V2 before the passing aggregate. No historical receipt or frozen manifest changed.
 
+## Carrier-independent Kafka semantic compilation
+
+Status: focused implementation validated; sealed BK carrier lifecycle remains OPEN.
+
+`KafkaSemanticCompactorV1.compileSemantic` returns retained RecordBatch bytes, deterministic dispositions, exact gaps
+and the full eight-index set before allocating storage. Its call path constructs no Object candidate, NMS1 payload,
+Object identity, materialization plan or provider session. The existing Object entry uses the same record-selection
+and rewriting core, then builds its existing materialization envelope. Carrier-independent output has its own V2
+identity domain; protocol/suppression/payload semantics remain comparable across both outputs.
+
+Both paths share independent full-record and index validation. The validator now reparses exact batch bytes, checks
+contiguous batch ordinals/payload offsets and the complete gap inventory, requires every producer/transaction/aborted
+row, and verifies every index locator, checksum identity and protocol field. The previous validator checked existing
+producer rows but could miss omitted recovery rows; new negative tests reject re-encoded, internally consistent
+incomplete indexes and incorrect locators. Transaction classification is computed once per batch for this validation.
+
+An added interleaving regression reproduced an existing aborted-index bug: an aborted producer's offset range marked
+another producer's committed batch/control and an ordinary batch aborted as well. The observed index was
+`[130, 131, 132, 133, 134]` instead of `[130, 134]`. Both generation and independent validation now require a
+transactional batch with the matching producer ID as well as range overlap. The compaction plan hash domain advances
+to `NEREUS_V2_M5_B_COMPACTION_PLAN_V2`, so corrected indexes cannot collide with an old immutable output/task key.
+This is a deterministic focused reproduction, not a claim about deployed data loss or source-bound native parity.
+
+The M5-A checker now validates the immutable design through the unchanged historical validator and separately checks
+the amended current index as InProgress/NotRun. Its old demand for NotStarted on the evolving index was obsolete;
+the additional contract case rejects both status regression and premature Final promotion. Frozen design bytes and
+the original pre-implementation checker remain unchanged.
+
+The [semantic-core projection](m5-kafka-semantic-core-projection.json) retains sealed BK allocation/publication/recovery,
+Object-disabled internal-topic lifecycle, real BK evidence and all deletion/Final flags as false. This slice produces
+no selected descriptor or physical output. It follows published READ_FENCED commit
+`02c487480a68381900b14c4a5047a17c0f8ddfb0`; local and remote main were verified equal before these edits.
+
+Validation: `v2M5KafkaSemanticCoreCheck` passed after the producer-specific fix and V2 plan identity update
+(42 tasks; 24 executed, 18 up-to-date), including 14 Kafka compaction and 7 Object materialization tests with zero
+failures/errors/skips, 3 semantic-core contract tests, 6 M5-A contract tests, predecessor governance and module style
+checks. Six added Java cases cover carrier parity/determinism, empty coverage, omitted recovery indexes, incorrect
+locators, altered batch bytes/gaps and interleaved aborted transactions. All native BK lifecycle and M5-E acceptance
+obligations remain OPEN.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;

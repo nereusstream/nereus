@@ -2325,6 +2325,31 @@ tasks.register("v2M5KafkaCompactionCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5KafkaSemanticCoreSourceCheck") {
+    group = "verification"
+    description = "Validate carrier-independent Kafka semantic output without sealed-BK lifecycle claims."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-kafka-semantic-core.py")
+}
+
+tasks.register<Exec>("v2M5KafkaSemanticCoreContractTest") {
+    group = "verification"
+    description = "Reject semantic-core bypass and premature BookKeeper lifecycle promotion."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-kafka-semantic-core-tests.py")
+}
+
+tasks.register("v2M5KafkaSemanticCoreCheck") {
+    group = "verification"
+    description = "Check shared Kafka semantics, independent eight-index validation and the existing Object bridge."
+    dependsOn(
+        "v2M5LifecycleDesignCheck",
+        "v2M5KafkaCompactionCheck",
+        "v2M5KafkaSemanticCoreSourceCheck",
+        "v2M5KafkaSemanticCoreContractTest",
+    )
+}
+
 tasks.register<Exec>("v2M5RetentionCoreContractTest") {
     group = "verification"
     description = "Test the fail-closed non-promotable M5-C retention-core checker."

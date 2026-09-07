@@ -372,6 +372,210 @@ class KafkaSemanticCompactorV1Test {
                 .isEqualTo(second.candidate().payloadCandidate().canonicalBody());
     }
 
+    @Test
+    void semanticCompilationSharesObjectRecordSelectionWithoutConstructingObjectCandidates() {
+        var fixture = new Fixture(
+                List.of(records(
+                        80,
+                        12,
+                        Compression.NONE,
+                        new SimpleRecord(80, bytes("key"), bytes("old")),
+                        new SimpleRecord(81, bytes("key"), bytes("new")))),
+                80,
+                82);
+        CompactionPlan plan =
+                fixture.plan(List.of(proof("key", 81, 1_000, false)), List.of(), List.of(), 100, CompressionType.GZIP);
+        var compactor = new KafkaSemanticCompactorV1();
+        var semantics = compactor.compileSemantic(plan);
+        var object = compactor.compact(plan);
+        var proof = new KafkaCompactionSemanticValidatorV1().validateSemantic(plan, semantics);
+
+        assertThat(semantics).isEqualTo(compactor.compileSemantic(plan));
+        assertThat(semantics.batchOutputs()).isEqualTo(object.candidate().batchOutputs());
+        assertThat(semantics.dispositions()).isEqualTo(object.candidate().dispositions());
+        assertThat(semantics.gaps()).isEqualTo(object.candidate().gaps());
+        for (IndexKind kind : IndexKind.values()) {
+            assertThat(semantics.indexes().get(kind.ordinal()).rows())
+                    .isEqualTo(object.candidate().indexes().get(kind.ordinal()).rows());
+        }
+        assertThat(proof.protocolStateRootSha256())
+                .isEqualTo(object.semanticProof().protocolStateRootSha256());
+        assertThat(proof.compactionSuppressionRootSha256())
+                .isEqualTo(object.semanticProof().compactionSuppressionRootSha256());
+        assertThat(proof.payloadBodiesRootSha256())
+                .isEqualTo(object.semanticProof().payloadBodiesRootSha256());
+        assertThat(semantics.outputIdentitySha256())
+                .isNotEqualTo(object.candidate().outputIdentitySha256());
+    }
+
+    @Test
+    void semanticEmptyCoverageHasNoBatchAndStillCarriesAllEightIndexes() {
+        var fixture = new Fixture(List.of(emptyBatch(90, 13)), 90, 91);
+        CompactionPlan plan = fixture.plan(List.of(), List.of(), List.of(), 100, CompressionType.NONE);
+        var output = new KafkaSemanticCompactorV1().compileSemantic(plan);
+
+        assertThat(output.outputBatches()).isEmpty();
+        assertThat(output.batchOutputs()).allMatch(batch -> batch.outputBody().isEmpty());
+        assertThat(output.indexes()).hasSize(8);
+        assertThat(output.gaps()).containsExactly(new KafkaCompactionRecordsV1.Gap(90, 91));
+        assertThat(output.indexes().get(IndexKind.CHECKSUM_COVERAGE.ordinal()).rows())
+                .hasSize(1);
+        new KafkaCompactionSemanticValidatorV1().validateSemantic(plan, output);
+    }
+
+    @Test
+    void independentSemanticValidationRejectsMissingProducerTransactionAndAbortedRows() {
+        var transactional =
+                transactionalRecords(100, 14, 75, (short) 1, 3, new SimpleRecord(100, bytes("tx"), bytes("value")));
+        var abort = control(101, 14, 75, (short) 1, ControlRecordType.ABORT, 4);
+        var fixture = new Fixture(List.of(transactional, abort), 100, 102);
+        CompactionPlan plan = fixture.plan(
+                List.of(proof("tx", 100, 1_000, false)),
+                List.of(new TransactionRange(75, 100, 102, TransactionOutcome.ABORTED, 4)),
+                List.of(),
+                100,
+                CompressionType.NONE);
+        var output = new KafkaSemanticCompactorV1().compileSemantic(plan);
+        for (IndexKind kind :
+                List.of(IndexKind.PRODUCER_RECOVERY, IndexKind.TRANSACTION, IndexKind.ABORTED_TRANSACTION)) {
+            var indexes = new java.util.ArrayList<>(output.indexes());
+            var previous = indexes.get(kind.ordinal());
+            assertThat(previous.rows()).isNotEmpty();
+            indexes.set(
+                    kind.ordinal(),
+                    new KafkaCompactionIndexV1(
+                            kind,
+                            previous.coverage(),
+                            previous.materializationTaskIdSha256(),
+                            previous.outputIdentitySha256(),
+                            List.of()));
+            var missing = semanticCopy(output, output.batchOutputs(), output.gaps(), indexes);
+            assertThatThrownBy(() -> new KafkaCompactionSemanticValidatorV1().validateSemantic(plan, missing))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("required semantic rows");
+        }
+    }
+
+    @Test
+    void independentSemanticValidationRejectsSelfConsistentWrongPayloadLocator() {
+        var fixture = new Fixture(
+                List.of(records(110, 15, Compression.NONE, new SimpleRecord(110, bytes("k"), bytes("value")))),
+                110,
+                111);
+        CompactionPlan plan =
+                fixture.plan(List.of(proof("k", 110, 1_000, false)), List.of(), List.of(), 100, CompressionType.NONE);
+        var output = new KafkaSemanticCompactorV1().compileSemantic(plan);
+        var indexes = new java.util.ArrayList<>(output.indexes());
+        var previous = indexes.get(IndexKind.PAYLOAD_LOCATOR.ordinal());
+        var row = previous.rows().get(0);
+        var wrong = new KafkaCompactionIndexV1.Row(
+                row.coverage(),
+                row.outputBatchOrdinal(),
+                row.byteOffset() + 1,
+                row.byteLength(),
+                row.minimumTimestamp(),
+                row.maximumTimestamp(),
+                row.producerId(),
+                row.producerEpoch(),
+                row.sequence(),
+                row.leaderEpoch(),
+                row.flags(),
+                row.identitySha256());
+        indexes.set(
+                IndexKind.PAYLOAD_LOCATOR.ordinal(),
+                new KafkaCompactionIndexV1(
+                        previous.kind(),
+                        previous.coverage(),
+                        previous.materializationTaskIdSha256(),
+                        previous.outputIdentitySha256(),
+                        List.of(wrong)));
+        var invalid = semanticCopy(output, output.batchOutputs(), output.gaps(), indexes);
+
+        assertThatThrownBy(() -> new KafkaCompactionSemanticValidatorV1().validateSemantic(plan, invalid))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("locator or protocol row differs");
+    }
+
+    @Test
+    void independentSemanticValidationReparsesStoredBatchBytesAndRejectsIncompleteGaps() {
+        var body = records(
+                120,
+                16,
+                Compression.NONE,
+                new SimpleRecord(120, bytes("k"), bytes("old")),
+                new SimpleRecord(121, bytes("k"), bytes("new")));
+        var fixture = new Fixture(List.of(body), 120, 122);
+        CompactionPlan plan =
+                fixture.plan(List.of(proof("k", 121, 1_000, false)), List.of(), List.of(), 100, CompressionType.NONE);
+        var output = new KafkaSemanticCompactorV1().compileSemantic(plan);
+        var previous = output.batchOutputs().get(0);
+        var wrongBody = new KafkaSemanticCompactorV1.BatchOutput(
+                previous.input(),
+                previous.output(),
+                Optional.of(body),
+                previous.outputBatchOrdinal(),
+                previous.payloadOffset());
+        var wrongBytes = semanticCopy(output, List.of(wrongBody), output.gaps(), output.indexes());
+        assertThatThrownBy(() -> new KafkaCompactionSemanticValidatorV1().validateSemantic(plan, wrongBytes))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("independent parse");
+        var missingGap = semanticCopy(output, output.batchOutputs(), List.of(), output.indexes());
+        assertThatThrownBy(() -> new KafkaCompactionSemanticValidatorV1().validateSemantic(plan, missingGap))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("gap inventory");
+    }
+
+    @Test
+    void abortedIndexDoesNotCaptureOtherProducersOrNonTransactionalBatchesInsideTheRange() {
+        var aborted = transactionalRecords(
+                130, 17, 85, (short) 1, 0, new SimpleRecord(130, bytes("abort-key"), bytes("abort-value")));
+        var committed = transactionalRecords(
+                131, 17, 86, (short) 1, 0, new SimpleRecord(131, bytes("commit-key"), bytes("commit-value")));
+        var ordinary = records(132, 17, Compression.NONE, new SimpleRecord(132, bytes("ordinary"), bytes("value")));
+        var commitMarker = control(133, 17, 86, (short) 1, ControlRecordType.COMMIT, 2);
+        var abortMarker = control(134, 17, 85, (short) 1, ControlRecordType.ABORT, 2);
+        var fixture = new Fixture(List.of(aborted, committed, ordinary, commitMarker, abortMarker), 130, 135);
+        CompactionPlan plan = fixture.plan(
+                List.of(proof("ordinary", 132, 1_000, false)),
+                List.of(
+                        new TransactionRange(85, 130, 135, TransactionOutcome.ABORTED, 2),
+                        new TransactionRange(86, 131, 134, TransactionOutcome.COMMITTED, 2)),
+                List.of(),
+                100,
+                CompressionType.NONE);
+        var compiler = new KafkaSemanticCompactorV1();
+        for (KafkaCompactionSemanticViewV2 output :
+                List.of(compiler.compileSemantic(plan), compiler.compact(plan).candidate())) {
+            assertThat(output.indexes()
+                            .get(IndexKind.ABORTED_TRANSACTION.ordinal())
+                            .rows())
+                    .extracting(row -> row.coverage().inclusiveStart())
+                    .containsExactly(130L, 134L);
+            assertThat(output.indexes().get(IndexKind.PAYLOAD_LOCATOR.ordinal()).rows())
+                    .filteredOn(row -> row.coverage().inclusiveStart() >= 131
+                            && row.coverage().inclusiveStart() <= 133)
+                    .allMatch(row -> (row.flags() & KafkaCompactionIndexV1.FLAG_ABORTED) == 0);
+        }
+    }
+
+    private static KafkaCompactionSemanticOutputV2 semanticCopy(
+            KafkaCompactionSemanticOutputV2 original,
+            List<KafkaSemanticCompactorV1.BatchOutput> outputs,
+            List<KafkaCompactionRecordsV1.Gap> gaps,
+            List<KafkaCompactionIndexV1> indexes) {
+        return new KafkaCompactionSemanticOutputV2(
+                original.taskIdSha256(),
+                original.outputIdentitySha256(),
+                original.compactionPlanRootSha256(),
+                original.compactionTaskIdSha256(),
+                original.inputBatches(),
+                outputs,
+                original.dispositions(),
+                gaps,
+                indexes,
+                indexes.stream().map(KafkaCompactionIndexV1::encode).toList());
+    }
+
     private static final class Fixture {
         private final List<CanonicalBytes> batches;
         private final CanonicalBytes sourceBody;
