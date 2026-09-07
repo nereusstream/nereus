@@ -95,7 +95,7 @@ def validate_projection_value(value: object) -> None:
         raise TargetAuthorityFoundationError("target-authority projection amendment commit differs")
     if value.get("wire") != {
         "magic": "M5DA",
-        "version": 2,
+        "version": 3,
         "maximumAuthorityBytes": 1_048_576,
         "maximumTargetIdentityBytes": 65_536,
         "maximumExternalIdentityBytes": 262_144,
@@ -191,7 +191,7 @@ def validate_sources(root: Path) -> None:
         codec,
         (
             "0x4d354441",
-            "VERSION = 2",
+            "VERSION = 3",
             "PhysicalResourceIdCodecV2.decode(targetBytes)",
             "Math.addExact(current.authorityRevision(), 1)",
             "Sha256Digest.hash(predecessor)",

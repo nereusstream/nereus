@@ -59,6 +59,36 @@ records remain quarantined. A subsequent projection field rename passed all 5 fo
 Publication predecessor: lifecycle design and inherited coordinator were committed/pushed as
 `8bd1484ba311bd44a531997b0d16357c5cde7b50`; remote refs/heads/main was verified byte-for-byte equal after push.
 
+## Typed deletion eligibility and three reclamation reasons
+
+Status: focused implementation validated; native proof production and physical dispatch composition remain OPEN.
+
+`DeleteEligibilitySnapshotV2` separates REPLACED_REPRESENTATION, LOGICAL_EXPIRY and UNPUBLISHED_ARTIFACT.
+It carries complete M5-C floor/reference proofs, applicable exact M4 RELEASED bytes, native disposition, namespace and
+member-inventory facts, selected replacements with complete protocol semantic transfers, typed expiry trim or fenced
+terminal/unadoptable task evidence. Replacement retains logical messages while requiring distinct selected physical
+coverage and every applicable semantic aspect; expiry requires full-range trim plus every current floor. RETAIN_BK
+native policy still vetoes replacement. M4 identities/receipts remain unchanged.
+
+M5DA wire 3 stores optional full M5ES evidence: OPEN may be unqualified; CAS-1 cannot. Every new writer ticket removes
+the qualified snapshot, and clearing a ticket cannot restore it by copying a digest. Requalification uses the exact
+next authority revision. The coordinator rereads all namespace, membership, floor, reference, native, M4 and semantic
+facts at qualification and both CAS windows; stale/missing evidence performs no candidate mutation.
+
+Existing proofs are interpreted as old-physical-resource absence, with explicit logical/physical/BOTH classification
+for all original floor/reference kinds. Protocol adapters still must produce and validate normalized semantic roots,
+complete member inventory and native namespace routing from actual sources. Synthetic fixture roots prove structural
+and race rejection only, not those native obligations or a source-bound M5 child. The current acceptance rows remain
+OPEN and this slice grants no physical-delete or Final authority.
+
+Validation: `v2M5DeleteEligibilityCheck` passed (42 tasks; 29 executed, 13 up-to-date). Java suites passed 10 new
+eligibility, 12 coordinator, 13 authority, 7 identity and 184 existing retention tests with zero failures/errors/skips.
+The gate also passed 3 new negative projection tests, predecessor contract checks, Spotless and Checkstyle.
+Stale semantic evidence before CAS-1 and a changed physical-reference observation before CAS-2 both leave the
+authority unchanged. The [eligibility projection](m5-delete-eligibility-projection.json) retains all native integration,
+source-bound evidence and production flags as false. This slice follows published identity commit
+`77bff9a05bd736285d044a436aa34f3194f62a5b`.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;

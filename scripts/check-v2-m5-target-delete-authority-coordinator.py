@@ -16,6 +16,7 @@ PROJECTION_PATH = "docs/v2/detailed_design/m5/m5-d-target-delete-authority-coord
 FOUNDATION_COMMIT = "f05037bb16017f24e8147e99a61f26e539ed85fa"
 TRANSITIONS = [
     "CREATE_OPEN",
+    "QUALIFY_TYPED_ELIGIBILITY_AFTER_EXACT_FACT_REREAD",
     "ACQUIRE_WRITER_TICKET",
     "COMPLETE_WRITER_TICKET_AFTER_EXACT_RECONCILIATION",
     "CAS_1_PREPARE_IDENTITY_READ",
@@ -110,7 +111,7 @@ def validate_projection_value(value: object) -> None:
     if value.get("sequentialMultiKeyEmulation") is not False:
         raise TargetAuthorityCoordinatorError("projection permits sequential multi-key emulation")
     if value.get("focusedTests") != {
-        "coordinatorAndGuardTests": 10,
+        "coordinatorAndGuardTests": 12,
         "failures": 0,
         "errors": 0,
         "skipped": 0,

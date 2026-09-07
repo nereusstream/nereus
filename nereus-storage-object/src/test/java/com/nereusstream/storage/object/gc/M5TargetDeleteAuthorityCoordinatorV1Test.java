@@ -57,7 +57,7 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
         M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
         VersionedValue open = create(coordinator, 1);
         VersionedValue fenced = coordinator
-                .prepareIdentityRead(open, digest(20), digest(21))
+                .prepareIdentityRead(open, digest(20))
                 .toCompletableFuture()
                 .join()
                 .observed()
@@ -109,7 +109,7 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
         store.nextCas = NextCas.RESPONSE_UNKNOWN_WITHOUT_APPLY;
 
         var result = coordinator
-                .prepareIdentityRead(open, digest(20), digest(21))
+                .prepareIdentityRead(open, digest(20))
                 .toCompletableFuture()
                 .join();
 
@@ -131,7 +131,7 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                 .toCompletableFuture()
                 .join();
         var fenceResult = coordinator
-                .prepareIdentityRead(open, digest(20), digest(21))
+                .prepareIdentityRead(open, digest(20))
                 .toCompletableFuture()
                 .join();
 
@@ -148,7 +148,7 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
         store.nextCas = NextCas.REMOVE_AND_RESPONSE_UNKNOWN;
 
         var result = coordinator
-                .prepareIdentityRead(open, digest(20), digest(21))
+                .prepareIdentityRead(open, digest(20))
                 .toCompletableFuture()
                 .join();
 
@@ -208,10 +208,7 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
         M5TargetDeleteAuthorityCoordinatorV1 coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
         M5TargetDeleteWriterGuardV1 guard = new M5TargetDeleteWriterGuardV1(coordinator);
         VersionedValue open = create(coordinator, 1);
-        coordinator
-                .prepareIdentityRead(open, digest(20), digest(21))
-                .toCompletableFuture()
-                .join();
+        coordinator.prepareIdentityRead(open, digest(20)).toCompletableFuture().join();
         AtomicInteger calls = new AtomicInteger();
 
         var result = guard.execute(open, ticket(decode(open), 70), dispatch -> {
@@ -255,9 +252,7 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                 digest(113));
         assertThat(second.create(rediscovered).toCompletableFuture().join().outcome())
                 .isEqualTo(Outcome.DEFINITIVE_CONFLICT);
-        first.prepareIdentityRead(created, digest(114), digest(115))
-                .toCompletableFuture()
-                .join();
+        first.prepareIdentityRead(created, digest(114)).toCompletableFuture().join();
         var observed = second.read(rediscovered.authorityKey())
                 .toCompletableFuture()
                 .join()
@@ -274,6 +269,66 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                                 observed.authority().authorityRevision())))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(store.casKeys).containsOnly(original.authorityKey());
+    }
+
+    @Test
+    void qualifierInstallsTypedSnapshotAtExactRevisionAndRejectsMissingNamespaceAuthority() {
+        InMemoryStore store = new InMemoryStore();
+        var coordinator = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        var template = open(1);
+        var unqualified =
+                M5TargetDeleteAuthorityStateMachineV1.open(template.target(), template.writerEnrollment(), digest(125));
+        var created = coordinator
+                .create(unqualified)
+                .toCompletableFuture()
+                .join()
+                .observed()
+                .orElseThrow();
+        var snapshot =
+                M5DeleteEligibilityTestFixtures.replacement(template.target().resourceId(), 2);
+        var qualified = coordinator
+                .qualifyEligibility(created, snapshot)
+                .toCompletableFuture()
+                .join();
+        assertThat(qualified.outcome()).isEqualTo(Outcome.APPLIED_EXACT);
+        assertThat(decode(qualified.observed().orElseThrow()).eligibilitySnapshot())
+                .contains(snapshot);
+
+        InMemoryStore missing = new InMemoryStore();
+        missing.values.remove("/physical-namespace");
+        var other = new M5TargetDeleteAuthorityCoordinatorV1(missing);
+        assertThatThrownBy(() -> other.create(template).toCompletableFuture().join())
+                .hasRootCauseMessage("eligibility authority is absent: /physical-namespace");
+        assertThat(missing.values).doesNotContainKey(template.authorityKey());
+    }
+
+    @Test
+    void changedSemanticOrReferenceAuthorityVetoesBothCasWindows() {
+        InMemoryStore firstStore = new InMemoryStore();
+        var first = new M5TargetDeleteAuthorityCoordinatorV1(firstStore);
+        var firstOpen = create(first, 1);
+        firstStore.seed("/semantic/RECOVERY", bytes("changed recovery authority"));
+        assertThatThrownBy(() -> first.prepareIdentityRead(firstOpen, digest(126))
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("eligibility authority changed: /semantic/RECOVERY");
+        assertThat(firstStore.readNow(firstOpen.key())).isEqualTo(firstOpen);
+
+        InMemoryStore secondStore = new InMemoryStore();
+        var second = new M5TargetDeleteAuthorityCoordinatorV1(secondStore);
+        var secondOpen = create(second, 1);
+        var fenced = second.prepareIdentityRead(secondOpen, digest(127))
+                .toCompletableFuture()
+                .join()
+                .observed()
+                .orElseThrow();
+        secondStore.seed("/reference/READ_GENERATION_PIN_OR_OPEN_HANDLE", bytes("new source pin admission"));
+        assertThatThrownBy(() -> second.bindDeleteIntent(fenced, exactPresent(30), digest(31), digest(32), digest(33))
+                        .toCompletableFuture()
+                        .join())
+                .hasRootCauseMessage("eligibility authority changed: /reference/READ_GENERATION_PIN_OR_OPEN_HANDLE");
+        assertThat(secondStore.readNow(fenced.key())).isEqualTo(fenced);
+        assertThat(decode(fenced).deleteIntent()).isEmpty();
     }
 
     private static VersionedValue create(M5TargetDeleteAuthorityCoordinatorV1 coordinator, int cell) {
@@ -293,7 +348,8 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
                 CanonicalUtf8.fromString("version-7")));
         ProofBoundWriterEnrollmentV1 enrollment = new ProofBoundWriterEnrollmentV1(
                 List.of(ProofBoundWriterClassV1.values()), digest(4), digest(5), digest(6));
-        return M5TargetDeleteAuthorityStateMachineV1.open(target, enrollment, digest(9));
+        return M5TargetDeleteAuthorityStateMachineV1.open(
+                target, enrollment, M5DeleteEligibilityTestFixtures.replacement(target.resourceId(), 1));
     }
 
     private static ExactExternalIdentityV1 exactPresent(int suffix) {
@@ -340,6 +396,16 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
         private long version;
         private int transactionCalls;
         private NextCas nextCas = NextCas.NORMAL;
+
+        InMemoryStore() {
+            seedEligibility(open(1));
+        }
+
+        void seedEligibility(TargetDeleteAuthorityV1 authority) {
+            authority.eligibilitySnapshot().ifPresent(snapshot -> M5DeleteEligibilityTestFixtures.metadataValues(
+                            snapshot)
+                    .forEach(value -> values.put(value.key(), value)));
+        }
 
         synchronized VersionedValue seed(String key, CanonicalBytes value) {
             VersionedValue stored = stored(key, value);

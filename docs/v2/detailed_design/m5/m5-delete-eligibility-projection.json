@@ -1,0 +1,52 @@
+{
+  "schema": "NEREUS_V2_M5_DELETE_ELIGIBILITY_PROJECTION_V2",
+  "status": "IMPLEMENTED_TYPED_PREDICATES_NON_PROMOTABLE",
+  "wire": {
+    "magic": "M5ES",
+    "version": 2,
+    "maximumSnapshotBytes": 786432,
+    "maximumMembers": 64,
+    "maximumReplacements": 256,
+    "authorityWireVersion": 3
+  },
+  "reasons": [
+    "REPLACED_REPRESENTATION",
+    "LOGICAL_EXPIRY",
+    "UNPUBLISHED_ARTIFACT"
+  ],
+  "referenceScopes": [
+    "LOGICAL_OBLIGATION",
+    "OLD_PHYSICAL_REFERENCE",
+    "BOTH"
+  ],
+  "semanticAspects": [
+    "READ_RESULTS",
+    "RECOVERY",
+    "PRODUCER_STATE",
+    "TRANSACTIONS",
+    "LEADER_EPOCH",
+    "TIMESTAMP_LOOKUP",
+    "INDEX_COVERAGE",
+    "NATIVE_SOURCE_AUTHORITY"
+  ],
+  "gates": {
+    "unqualifiedOpenMayFence": false,
+    "writerInvalidatesQualifiedSnapshot": true,
+    "ticketClearRestoresSnapshot": false,
+    "qualificationRequiresExactNextRevision": true,
+    "fullVectorReadBeforeQualificationCas1Cas2": true,
+    "replacementRequiresLogicalExpiry": false,
+    "replacementRequiresCompleteSemanticTransfer": true,
+    "expiryRequiresTrimAndEveryFloor": true,
+    "publishedRequiresExactM4Released": true,
+    "unpublishedRequiresTerminalNoAdoptionAndProtectionClosure": true,
+    "nativeRetainVetoesReplacement": true
+  },
+  "nativeProtocolProofProducersIntegrated": false,
+  "namespaceRouteAdmissionIntegrated": false,
+  "completePhysicalDeleteComposition": false,
+  "realDependencyReclamationEvidencePresent": false,
+  "sourceBoundReceiptPresent": false,
+  "physicalDeleteAuthority": false,
+  "productionAuthority": false
+}

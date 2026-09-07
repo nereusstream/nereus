@@ -45,7 +45,7 @@ import java.util.Optional;
 /** Strict canonical M5DA wire codec for one permanent target-scoped delete-authority value. */
 public final class M5TargetDeleteAuthorityCodecV1 {
     private static final int MAGIC = 0x4d354441; // M5DA
-    private static final int VERSION = 2;
+    private static final int VERSION = 3;
     private static final Sha256Digest PLACEHOLDER = Sha256Digest.copyOf(new byte[Sha256Digest.LENGTH]);
 
     private M5TargetDeleteAuthorityCodecV1() {}
@@ -78,6 +78,9 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                 closedWriterFenceEpoch,
                 current.writerEnrollment(),
                 proofSnapshotDigest,
+                current.eligibilitySnapshot()
+                        .filter(snapshot ->
+                                tickets.isEmpty() && snapshot.sha256().equals(proofSnapshotDigest)),
                 tickets,
                 readFence,
                 externalIdentity,
@@ -120,6 +123,10 @@ public final class M5TargetDeleteAuthorityCodecV1 {
             long fenceEpoch = input.readLong();
             ProofBoundWriterEnrollmentV1 enrollment = readEnrollment(input);
             Sha256Digest proofSnapshotDigest = readDigest(input);
+            Optional<DeleteEligibilitySnapshotV2> eligibilitySnapshot = input.readBoolean()
+                    ? Optional.of(DeleteEligibilityCodecV2.decode(
+                            readBytes(input, DeleteEligibilitySnapshotV2.MAX_SNAPSHOT_BYTES, "eligibility snapshot")))
+                    : Optional.empty();
             int ticketCount = boundedCount(
                     input.readInt(), M5TargetDeleteAuthorityRecordsV1.MAX_WRITER_TICKETS, "writer tickets");
             List<ProofBoundWriterTicketV1> tickets = new ArrayList<>(ticketCount);
@@ -191,6 +198,7 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                     fenceEpoch,
                     enrollment,
                     proofSnapshotDigest,
+                    eligibilitySnapshot,
                     tickets,
                     readFence,
                     externalIdentity,
@@ -215,6 +223,7 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                 value.closedWriterFenceEpoch(),
                 value.writerEnrollment(),
                 value.proofSnapshotDigest(),
+                value.eligibilitySnapshot(),
                 value.activeWriterTickets(),
                 value.readFence(),
                 value.externalIdentity(),
@@ -239,6 +248,13 @@ public final class M5TargetDeleteAuthorityCodecV1 {
             output.writeLong(value.closedWriterFenceEpoch());
             writeEnrollment(output, value.writerEnrollment());
             writeDigest(output, value.proofSnapshotDigest());
+            output.writeBoolean(value.eligibilitySnapshot().isPresent());
+            if (value.eligibilitySnapshot().isPresent()) {
+                writeBytes(
+                        output,
+                        DeleteEligibilityCodecV2.encode(
+                                value.eligibilitySnapshot().orElseThrow()));
+            }
             output.writeInt(value.activeWriterTickets().size());
             for (ProofBoundWriterTicketV1 ticket : value.activeWriterTickets()) {
                 output.writeByte(ticket.writerClass().ordinal());

@@ -274,6 +274,15 @@ tasks.register<Test>("v2M5TargetDeleteAuthorityFoundationTest") {
     outputs.upToDateWhen { false }
 }
 
+tasks.register<Test>("v2M5DeleteEligibilityTest") {
+    group = "verification"
+    description = "Verify reason-specific typed eligibility and fail-closed qualification after writer changes."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    include("**/M5DeleteEligibilityV2Test.class")
+}
+
 tasks.register<Test>("v2M5TargetDeleteAuthorityCoordinatorTest") {
     group = "verification"
     description = "Run exact same-key CAS reconciliation and durable writer-ticket guard tests for M5-D."

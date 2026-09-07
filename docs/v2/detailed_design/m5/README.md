@@ -110,7 +110,7 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   directory-prefix-listing rejection. It is an execution adapter only: no intent mutation, dispatch authority,
   source-bound receipt, scenario promotion, or production authority follows.
 - The [M5-D target authority foundation projection](m5-d-target-delete-authority-foundation-projection.json) fixes the
-  `M5DA` wire (now version 2), stable physical-resource permanent key, four irreversible states, ten-class closed writer
+  `M5DA` wire (now version 3), stable physical-resource permanent key, four irreversible states, ten-class closed writer
   enrollment, monotonically increasing revision/predecessor chain, CAS-1/CAS-2 candidates, fixed-attempt takeover,
   and permanent done shape. `v2M5TargetDeleteAuthorityFoundationCheck` originally exercised 11 pure tests; the current identity slice adds
   typed-resource tests as recorded in its projection. At the foundation boundary there was no metadata
@@ -122,6 +122,11 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   reconciliation, and a generic durable ticket-before-writer-dispatch guard. The original nine in-memory tests prove both race
   orders and response-loss ticket retention. All concrete proof-changing writers, external identity/delete adapters,
   real Oxia execution, source-bound receipt, and physical-delete authority remain absent.
+- The [typed deletion eligibility projection](m5-delete-eligibility-projection.json) adds explicit replacement,
+  logical-expiry and unpublished-artifact predicates, invalidates qualification on writer admission, and requires
+  exact fact rereads at qualification, CAS-1 and CAS-2. `v2M5DeleteEligibilityCheck` passed 42 tasks with synthetic
+  facts and existing retention regressions. Native semantic proof production and complete deletion composition
+  remain OPEN; these focused results create no source-bound child or physical-delete authority.
 
 At immutable design commit `c86fde3ed6f4319642987fd599022bd32e2cca5e`, the result is exactly
 `DESIGN_FROZEN_IMPLEMENTATION_NOT_STARTED`. Current descendants complete the M5-A, M5-B, and M5-C implementation

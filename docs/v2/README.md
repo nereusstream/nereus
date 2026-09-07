@@ -20,6 +20,8 @@ performance-first BookKeeper WAL.
   [current contract view](detailed_design/m5/m5-current-contracts.md). Amendment 3 supersedes the listed identity,
   reclamation, BK carrier, history and recovery clauses. Revised implementation and source-bound evidence remain
   incomplete; historical focused PASS is not revised M5 Final.
+  Stable physical identity and the three typed deletion-eligibility branches now pass the focused
+  `v2M5DeleteEligibilityCheck`; real protocol proof production and complete deletion composition remain OPEN.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.

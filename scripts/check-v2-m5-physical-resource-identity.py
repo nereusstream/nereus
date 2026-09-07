@@ -18,12 +18,12 @@ EXPECTED = {
         "hashDomain": "NEREUS_V2_M5_PHYSICAL_RESOURCE_V2",
     },
     "authorityKey": "v2/physical-delete-m5-v2/<PhysicalResourceIdSha256>/authority-v2",
-    "authorityWireVersion": 2,
+    "authorityWireVersion": 3,
     "mutableContextInKey": False,
     "objectFormatRoleInKey": False,
     "legacyOpaqueAuthorityAdmitted": False,
     "nativeNamespaceAndAuthorityRouteAdmissionImplemented": False,
-    "typedEligibilitySnapshotImplemented": False,
+    "typedEligibilitySnapshotImplemented": True,
     "realDependencyUniquenessEvidencePresent": False,
     "sourceBoundReceiptPresent": False,
     "physicalDeleteAuthority": False,
@@ -46,7 +46,7 @@ def validate(root: Path) -> None:
         (codec, ("0x4d355249", "VERSION = 2", EXPECTED["wire"]["hashDomain"], "CanonicalUtf8.fromBytes",
                  "input.available() != 0", "length > input.available()")),
         (records, ("PhysicalDeleteTargetV1(PhysicalResourceIdV2 resourceId", "resourceId.sha256()")),
-        (authority_codec, ("VERSION = 2", "PhysicalResourceIdCodecV2.decode(targetBytes)", "resourceId().canonicalBytes()")),
+        (authority_codec, ("VERSION = 3", "PhysicalResourceIdCodecV2.decode(targetBytes)", "resourceId().canonicalBytes()")),
     ):
         if any(literal not in text for literal in literals):
             raise ValueError("stable resource implementation no longer matches its wire projection")

@@ -75,13 +75,11 @@ class M5TargetDeleteAuthorityV1Test {
         TargetDeleteAuthorityV1 ticketed = M5TargetDeleteAuthorityStateMachineV1.acquireWriterTicket(
                 open, ticket(open, ProofBoundWriterClassV1.LOGICAL_TRIM_RETENTION_FLOOR_V1, 11));
 
-        assertThatThrownBy(() ->
-                        M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(ticketed, digest(20), digest(21)))
+        assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(ticketed, digest(20)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ticket vetoes CAS-1");
 
-        TargetDeleteAuthorityV1 fenced =
-                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open, digest(20), digest(21));
+        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open, digest(20));
         assertThatThrownBy(() -> M5TargetDeleteAuthorityStateMachineV1.acquireWriterTicket(
                         fenced, ticket(open, ProofBoundWriterClassV1.LOGICAL_TRIM_RETENTION_FLOOR_V1, 12)))
                 .isInstanceOf(IllegalStateException.class)
@@ -96,7 +94,7 @@ class M5TargetDeleteAuthorityV1Test {
         TargetDeleteAuthorityV1 ticketCandidate = M5TargetDeleteAuthorityStateMachineV1.acquireWriterTicket(
                 open, ticket(open, ProofBoundWriterClassV1.REFERENCE_SHARED_PHYSICAL_MEMBER_V1, 13));
         TargetDeleteAuthorityV1 fenceCandidate =
-                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open, digest(22), digest(23));
+                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open, digest(22));
 
         assertThat(ticketCandidate.predecessorAuthoritySha256()).isEqualTo(fenceCandidate.predecessorAuthoritySha256());
         assertThat(ticketCandidate.authorityRevision()).isEqualTo(fenceCandidate.authorityRevision());
@@ -106,8 +104,7 @@ class M5TargetDeleteAuthorityV1Test {
 
     @Test
     void cas2BindsExactIdentityAttemptOwnerAndDispatchToken() {
-        TargetDeleteAuthorityV1 fenced =
-                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open(1), digest(20), digest(21));
+        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open(1), digest(20));
         ExactExternalIdentityV1 external = exactPresent(fenced, 30);
         TargetDeleteAuthorityV1 intent = M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(
                 fenced, external, digest(31), digest(32), digest(33));
@@ -128,8 +125,7 @@ class M5TargetDeleteAuthorityV1Test {
 
     @Test
     void intentCannotBindAnExternalIdentityFromAnotherTargetKind() {
-        TargetDeleteAuthorityV1 fenced =
-                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open(1), digest(20), digest(21));
+        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open(1), digest(20));
         ExactExternalIdentityV1 ledgerIdentity = ExactExternalIdentityV1.create(
                 PhysicalDeleteTargetKindV1.BOOKKEEPER_LEDGER_V1,
                 ExternalIdentityObservationV1.PRESENT_EXACT_V1,
@@ -204,8 +200,7 @@ class M5TargetDeleteAuthorityV1Test {
 
     @Test
     void exactInitialAbsenceCanOnlyCompleteAsAlreadyAbsent() {
-        TargetDeleteAuthorityV1 fenced =
-                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open(1), digest(20), digest(21));
+        TargetDeleteAuthorityV1 fenced = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open(1), digest(20));
         ExactExternalIdentityV1 absent = ExactExternalIdentityV1.create(
                 fenced.target().targetKind(),
                 ExternalIdentityObservationV1.ABSENT_EXACT_V1,
@@ -285,12 +280,15 @@ class M5TargetDeleteAuthorityV1Test {
     }
 
     private static TargetDeleteAuthorityV1 open(int cell) {
-        return M5TargetDeleteAuthorityStateMachineV1.open(target(cell), enrollment(), digest(9));
+        return M5TargetDeleteAuthorityStateMachineV1.open(
+                target(cell),
+                enrollment(),
+                M5DeleteEligibilityTestFixtures.replacement(target(cell).resourceId(), 1));
     }
 
     private static TargetDeleteAuthorityV1 intent(int cell) {
         TargetDeleteAuthorityV1 fenced =
-                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open(cell), digest(20), digest(21));
+                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(open(cell), digest(20));
         return M5TargetDeleteAuthorityStateMachineV1.bindDeleteIntent(
                 fenced, exactPresent(fenced, 30), digest(31), digest(32), digest(33));
     }

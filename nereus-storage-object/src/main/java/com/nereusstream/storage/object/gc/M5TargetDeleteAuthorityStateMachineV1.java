@@ -40,6 +40,25 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
             PhysicalDeleteTargetV1 target,
             ProofBoundWriterEnrollmentV1 writerEnrollment,
             Sha256Digest proofSnapshotDigest) {
+        return initial(target, writerEnrollment, proofSnapshotDigest, Optional.empty());
+    }
+
+    public static TargetDeleteAuthorityV1 open(
+            PhysicalDeleteTargetV1 target,
+            ProofBoundWriterEnrollmentV1 writerEnrollment,
+            DeleteEligibilitySnapshotV2 snapshot) {
+        Objects.requireNonNull(snapshot, "snapshot");
+        if (snapshot.generation() != 1) {
+            throw new IllegalArgumentException("initial eligibility must bind authority revision one");
+        }
+        return initial(target, writerEnrollment, snapshot.sha256(), Optional.of(snapshot));
+    }
+
+    private static TargetDeleteAuthorityV1 initial(
+            PhysicalDeleteTargetV1 target,
+            ProofBoundWriterEnrollmentV1 writerEnrollment,
+            Sha256Digest proofSnapshotDigest,
+            Optional<DeleteEligibilitySnapshotV2> snapshot) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(writerEnrollment, "writerEnrollment");
         M5TargetDeleteAuthorityRecordsV1.requireDigest(proofSnapshotDigest, "proofSnapshotDigest");
@@ -52,6 +71,36 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
                 0,
                 writerEnrollment,
                 proofSnapshotDigest,
+                snapshot,
+                List.of(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                zeroDigest()));
+    }
+
+    /** Installs complete evidence at one exact revision; callers must revalidate its external authority vector. */
+    public static TargetDeleteAuthorityV1 qualifyEligibility(
+            TargetDeleteAuthorityV1 current, DeleteEligibilitySnapshotV2 snapshot) {
+        requireOpen(current);
+        Objects.requireNonNull(snapshot, "snapshot");
+        if (!current.activeWriterTickets().isEmpty()
+                || snapshot.generation() != Math.addExact(current.authorityRevision(), 1)
+                || !snapshot.resource().equals(current.target().resourceId())) {
+            throw new IllegalArgumentException(
+                    "eligibility qualification has writers or a stale/foreign revision/resource");
+        }
+        return M5TargetDeleteAuthorityCodecV1.finalizeAuthority(new TargetDeleteAuthorityV1(
+                current.authorityKey(),
+                current.target(),
+                snapshot.generation(),
+                Optional.of(Sha256Digest.hash(M5TargetDeleteAuthorityCodecV1.encodeAuthority(current))),
+                TargetDeleteAuthorityStateV1.OPEN_V1,
+                0,
+                current.writerEnrollment(),
+                snapshot.sha256(),
+                Optional.of(snapshot),
                 List.of(),
                 Optional.empty(),
                 Optional.empty(),
@@ -95,13 +144,15 @@ public final class M5TargetDeleteAuthorityStateMachineV1 {
 
     /** CAS-1 candidate: closes every writer and grants no external dispatch authority. */
     public static TargetDeleteAuthorityV1 prepareIdentityRead(
-            TargetDeleteAuthorityV1 current, Sha256Digest attemptIdSha256, Sha256Digest eligibilityRootSha256) {
+            TargetDeleteAuthorityV1 current, Sha256Digest attemptIdSha256) {
         requireOpen(current);
         M5TargetDeleteAuthorityRecordsV1.requireDigest(attemptIdSha256, "attemptIdSha256");
-        M5TargetDeleteAuthorityRecordsV1.requireDigest(eligibilityRootSha256, "eligibilityRootSha256");
         if (!current.activeWriterTickets().isEmpty()) {
             throw new IllegalStateException("active or unresolved writer ticket vetoes CAS-1");
         }
+        DeleteEligibilitySnapshotV2 snapshot = current.eligibilitySnapshot()
+                .orElseThrow(() -> new IllegalStateException("CAS-1 requires a complete typed eligibility snapshot"));
+        Sha256Digest eligibilityRootSha256 = snapshot.sha256();
         long fencedRevision = Math.addExact(current.authorityRevision(), 1);
         long fenceEpoch = Math.addExact(current.closedWriterFenceEpoch(), 1);
         TargetReadFenceV1 fence = new TargetReadFenceV1(

@@ -2148,6 +2148,32 @@ tasks.register<Exec>("v2M5PhysicalResourceIdentitySourceCheck") {
     commandLine("python3", "scripts/check-v2-m5-physical-resource-identity.py")
 }
 
+tasks.register<Exec>("v2M5DeleteEligibilitySourceCheck") {
+    group = "verification"
+    description = "Validate the three reason-specific eligibility branches and full-vector CAS windows."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-delete-eligibility.py")
+}
+
+tasks.register<Exec>("v2M5DeleteEligibilityContractTest") {
+    group = "verification"
+    description = "Reject eligibility predicate bypass and native evidence overclaims."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-delete-eligibility-tests.py")
+}
+
+tasks.register("v2M5DeleteEligibilityCheck") {
+    group = "verification"
+    description = "Check typed deletion eligibility; native proof production and full M5-D remain separate."
+    dependsOn(
+        "v2M5PhysicalResourceIdentityCheck",
+        "v2M5DeleteEligibilitySourceCheck",
+        "v2M5DeleteEligibilityContractTest",
+        ":nereus-storage-object:v2M5DeleteEligibilityTest",
+        ":nereus-storage-object:v2M5RetentionCoreTest",
+    )
+}
+
 tasks.register<Exec>("v2M5DesignSourceCheck") {
     group = "verification"
     description = "Validate the frozen M5 design manifest and prove implementation/evidence have not started."

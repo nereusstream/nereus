@@ -5,6 +5,7 @@
   "metadataOperation": "ExactMetadataTransactionStoreV1.compareAndSet",
   "transitionOperations": [
     "CREATE_OPEN",
+    "QUALIFY_TYPED_ELIGIBILITY_AFTER_EXACT_FACT_REREAD",
     "ACQUIRE_WRITER_TICKET",
     "COMPLETE_WRITER_TICKET_AFTER_EXACT_RECONCILIATION",
     "CAS_1_PREPARE_IDENTITY_READ",
@@ -32,7 +33,7 @@
   "conditionalMultiKeyCalls": 0,
   "sequentialMultiKeyEmulation": false,
   "focusedTests": {
-    "coordinatorAndGuardTests": 10,
+    "coordinatorAndGuardTests": 12,
     "failures": 0,
     "errors": 0,
     "skipped": 0

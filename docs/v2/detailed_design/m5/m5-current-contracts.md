@@ -16,15 +16,17 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 
 | Flow | Current contract | Current implementation and evidence boundary |
 | --- | --- | --- |
-| Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 2 and generic same-key CAS; native namespace/route admission, typed eligibility and real dispatch remain OPEN |
-| Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Earlier retention/delete adapters exist; amended reason-specific composition is OPEN |
+| Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 3 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; native namespace/route admission and real dispatch remain OPEN |
+| Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; real protocol proof producers and full deletion composition remain OPEN |
 | Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Object bridge and semantic indexes exist; sealed BK compaction lifecycle is OPEN |
 | Binding retirement | Bounded active selector plus authenticated immutable history | Earlier M5R1 retains permanent inline slots; root/folding/admission migration is OPEN |
 | Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | Generic coordinator is in-memory validated only; [concrete writer matrix](m5-lifecycle-writer-matrix.md) remains OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
 
-The [physical identity projection](m5-physical-resource-identity-projection.json) records the 7 identity, 13 authority
-and 10 coordinator tests covered by `v2M5PhysicalResourceIdentityCheck`; these are focused, non-promotable results.
+The [physical identity projection](m5-physical-resource-identity-projection.json) and
+[eligibility projection](m5-delete-eligibility-projection.json) record the current focused results:
+`v2M5DeleteEligibilityCheck` passed 42 tasks, including 7 identity, 13 authority, 12 coordinator, 10 eligibility and
+184 existing retention tests. These results remain non-promotable and use synthetic eligibility facts.
 
 `v2M5LifecycleDesignCheck` checks the amendment chain, exact bytes, coverage and authority boundaries. It proves no
 runtime behavior. `v2M5HistoricalDesignCheck` replays the unmodified freeze validator at c86fde3e and compares

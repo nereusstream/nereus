@@ -103,7 +103,10 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
             throw new IllegalArgumentException("initial target authority must be revision-one OPEN_V1");
         }
         CanonicalBytes candidate = M5TargetDeleteAuthorityCodecV1.encodeAuthority(initial);
-        return mutate(initial.authorityKey(), Optional.empty(), candidate, true);
+        CompletionStage<Void> admission = initial.eligibilitySnapshot()
+                .map(this::requireFreshEligibility)
+                .orElseGet(() -> CompletableFuture.completedFuture(null));
+        return admission.thenCompose(ignored -> mutate(initial.authorityKey(), Optional.empty(), candidate, true));
     }
 
     public CompletionStage<MutationResultV1> acquireWriterTicket(
@@ -132,16 +135,30 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
                 false);
     }
 
-    public CompletionStage<MutationResultV1> prepareIdentityRead(
-            VersionedValue exactOpenAuthority, Sha256Digest attemptIdSha256, Sha256Digest eligibilityRootSha256) {
+    public CompletionStage<MutationResultV1> qualifyEligibility(
+            VersionedValue exactOpenAuthority, DeleteEligibilitySnapshotV2 snapshot) {
         VersionedAuthorityV1 exact = exactAuthority(exactOpenAuthority.key(), exactOpenAuthority);
-        TargetDeleteAuthorityV1 candidate = M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(
-                exact.authority(), attemptIdSha256, eligibilityRootSha256);
-        return mutate(
-                exact.authority().authorityKey(),
-                Optional.of(exact.exactStoredValue()),
-                M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
-                false);
+        TargetDeleteAuthorityV1 candidate =
+                M5TargetDeleteAuthorityStateMachineV1.qualifyEligibility(exact.authority(), snapshot);
+        return requireFreshEligibility(snapshot)
+                .thenCompose(ignored -> mutate(
+                        exact.authority().authorityKey(),
+                        Optional.of(exact.exactStoredValue()),
+                        M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
+                        false));
+    }
+
+    public CompletionStage<MutationResultV1> prepareIdentityRead(
+            VersionedValue exactOpenAuthority, Sha256Digest attemptIdSha256) {
+        VersionedAuthorityV1 exact = exactAuthority(exactOpenAuthority.key(), exactOpenAuthority);
+        TargetDeleteAuthorityV1 candidate =
+                M5TargetDeleteAuthorityStateMachineV1.prepareIdentityRead(exact.authority(), attemptIdSha256);
+        return requireFreshEligibility(exact.authority().eligibilitySnapshot().orElseThrow())
+                .thenCompose(ignored -> mutate(
+                        exact.authority().authorityKey(),
+                        Optional.of(exact.exactStoredValue()),
+                        M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
+                        false));
     }
 
     public CompletionStage<MutationResultV1> bindDeleteIntent(
@@ -157,11 +174,12 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
                 deleteAttemptIdSha256,
                 dispatchOwnerFenceSha256,
                 capabilityDigestSha256);
-        return mutate(
-                exact.authority().authorityKey(),
-                Optional.of(exact.exactStoredValue()),
-                M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
-                false);
+        return requireFreshEligibility(exact.authority().eligibilitySnapshot().orElseThrow())
+                .thenCompose(ignored -> mutate(
+                        exact.authority().authorityKey(),
+                        Optional.of(exact.exactStoredValue()),
+                        M5TargetDeleteAuthorityCodecV1.encodeAuthority(candidate),
+                        false));
     }
 
     public CompletionStage<MutationResultV1> takeOverDispatch(
@@ -202,6 +220,21 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
         return new VersionedAuthorityV1(
                 exactStoredValue,
                 M5TargetDeleteAuthorityCodecV1.decodeAuthority(exactStoredValue.canonicalStoredBytes()));
+    }
+
+    private CompletionStage<Void> requireFreshEligibility(DeleteEligibilitySnapshotV2 snapshot) {
+        CompletionStage<Void> stage = CompletableFuture.completedFuture(null);
+        for (var fact : snapshot.authorityFacts()) {
+            stage = stage.thenCompose(ignored -> metadata.read(fact.key()).thenAccept(observed -> {
+                VersionedValue value = observed.orElseThrow(
+                        () -> new IllegalStateException("eligibility authority is absent: " + fact.key()));
+                if (!value.metadataVersion().equals(fact.metadataVersion())
+                        || !value.canonicalStoredSha256().equals(fact.valueSha256())) {
+                    throw new IllegalStateException("eligibility authority changed: " + fact.key());
+                }
+            }));
+        }
+        return stage;
     }
 
     private CompletionStage<MutationResultV1> mutate(

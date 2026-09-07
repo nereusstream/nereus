@@ -14,8 +14,10 @@ sourceTuple: v2-m1
 [Current M5 contracts](detailed_design/m5/m5-current-contracts.md) and ADR 0148 govern the current implementation.
 `v2M5LifecycleDesignCheck` validates amendment 3 and its immutable chain. Execute stable resource identity, three
 reclamation branches, sealed BK compaction, protected retirement history, real writer/recovery composition and then
-all five source-bound children and aggregate. `v2M5PhysicalResourceIdentityCheck` now validates M5RI and the
-M5DA version-2 same-resource coordinator path, with native namespace/route admission and typed eligibility still OPEN.
+all five source-bound children and aggregate. `v2M5DeleteEligibilityCheck` now validates stable M5RI identity,
+M5DA version-3 authority, three typed eligibility branches and complete fact rereads before qualification/CAS-1/CAS-2.
+Its focused 42-task result includes synthetic proofs and retention regressions; native namespace/route admission,
+protocol proof production and complete physical deletion remain OPEN.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

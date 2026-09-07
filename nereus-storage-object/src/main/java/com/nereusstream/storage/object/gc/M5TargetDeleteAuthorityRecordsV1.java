@@ -237,6 +237,7 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             long closedWriterFenceEpoch,
             ProofBoundWriterEnrollmentV1 writerEnrollment,
             Sha256Digest proofSnapshotDigest,
+            Optional<DeleteEligibilitySnapshotV2> eligibilitySnapshot,
             List<ProofBoundWriterTicketV1> activeWriterTickets,
             Optional<TargetReadFenceV1> readFence,
             Optional<ExactExternalIdentityV1> externalIdentity,
@@ -253,6 +254,19 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
             Objects.requireNonNull(writerEnrollment, "writerEnrollment");
             requireDigest(proofSnapshotDigest, "proofSnapshotDigest");
             activeWriterTickets = List.copyOf(Objects.requireNonNull(activeWriterTickets, "activeWriterTickets"));
+            eligibilitySnapshot = Objects.requireNonNull(eligibilitySnapshot, "eligibilitySnapshot");
+            if (eligibilitySnapshot.isPresent()) {
+                DeleteEligibilitySnapshotV2 snapshot = eligibilitySnapshot.orElseThrow();
+                if (!snapshot.resource().equals(target.resourceId())
+                        || !snapshot.sha256().equals(proofSnapshotDigest)
+                        || snapshot.generation() > authorityRevision
+                        || !activeWriterTickets.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "eligibility snapshot differs from resource/revision/proof or has writers");
+                }
+            } else if (state != TargetDeleteAuthorityStateV1.OPEN_V1) {
+                throw new IllegalArgumentException("deletion phase requires a complete typed eligibility snapshot");
+            }
             readFence = Objects.requireNonNull(readFence, "readFence");
             externalIdentity = Objects.requireNonNull(externalIdentity, "externalIdentity");
             deleteIntent = Objects.requireNonNull(deleteIntent, "deleteIntent");
@@ -335,7 +349,8 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
                 TargetReadFenceV1 fence = readFence.orElseThrow();
                 if (fence.fencedAuthorityRevision() != authorityRevision
                         || fence.fenceEpoch() != closedWriterFenceEpoch
-                        || !fence.proofSnapshotDigest().equals(proofSnapshotDigest)) {
+                        || !fence.proofSnapshotDigest().equals(proofSnapshotDigest)
+                        || !fence.eligibilityRootSha256().equals(proofSnapshotDigest)) {
                     throw new IllegalArgumentException("read fence differs from its authority revision/proof");
                 }
             }
