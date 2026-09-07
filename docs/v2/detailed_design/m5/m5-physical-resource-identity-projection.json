@@ -1,0 +1,35 @@
+{
+  "schema": "NEREUS_V2_M5_PHYSICAL_RESOURCE_IDENTITY_PROJECTION_V2",
+  "status": "IMPLEMENTED_IDENTITY_ONLY_NON_PROMOTABLE",
+  "wire": {
+    "magic": "M5RI",
+    "version": 2,
+    "maximumComponentBytes": 8192,
+    "maximumEncodedBytes": 65536,
+    "resourceTags": {
+      "OBJECT_VERSION": 1,
+      "BOOKKEEPER_LEDGER": 2,
+      "MULTIPART_UPLOAD": 3
+    },
+    "providerTags": {
+      "OBJECT_PROVIDER": 1,
+      "BOOKKEEPER": 2
+    },
+    "objectIdentityTags": {
+      "IMMUTABLE_VERSION": 1,
+      "IMMUTABLE_CREATE": 2
+    },
+    "hashDomain": "NEREUS_V2_M5_PHYSICAL_RESOURCE_V2"
+  },
+  "authorityKey": "v2/physical-delete-m5-v2/<PhysicalResourceIdSha256>/authority-v2",
+  "authorityWireVersion": 2,
+  "mutableContextInKey": false,
+  "objectFormatRoleInKey": false,
+  "legacyOpaqueAuthorityAdmitted": false,
+  "nativeNamespaceAndAuthorityRouteAdmissionImplemented": false,
+  "typedEligibilitySnapshotImplemented": false,
+  "realDependencyUniquenessEvidencePresent": false,
+  "sourceBoundReceiptPresent": false,
+  "physicalDeleteAuthority": false,
+  "productionAuthority": false
+}

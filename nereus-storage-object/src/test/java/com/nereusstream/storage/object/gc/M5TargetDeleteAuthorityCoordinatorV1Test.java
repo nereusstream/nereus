@@ -15,7 +15,9 @@
 package com.nereusstream.storage.object.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.spi.model.MetadataVersion;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
@@ -23,7 +25,7 @@ import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.E
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.MutationOutcome;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.TransactionOutcome;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1.VersionedValue;
-import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityCoordinatorV1.Outcome;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.DeleteTerminalOutcomeV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExactExternalIdentityV1;
@@ -238,6 +240,42 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
         assertThat(store.transactionCalls).isZero();
     }
 
+    @Test
+    void rediscoveryUnderDifferentProofAndOwnerUsesTheSamePersistedFence() {
+        InMemoryStore store = new InMemoryStore();
+        M5TargetDeleteAuthorityCoordinatorV1 first = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        M5TargetDeleteAuthorityCoordinatorV1 second = new M5TargetDeleteAuthorityCoordinatorV1(store);
+        TargetDeleteAuthorityV1 original = open(1);
+        VersionedValue created =
+                first.create(original).toCompletableFuture().join().observed().orElseThrow();
+        TargetDeleteAuthorityV1 rediscovered = M5TargetDeleteAuthorityStateMachineV1.open(
+                original.target(),
+                new ProofBoundWriterEnrollmentV1(
+                        List.of(ProofBoundWriterClassV1.values()), digest(110), digest(111), digest(112)),
+                digest(113));
+        assertThat(second.create(rediscovered).toCompletableFuture().join().outcome())
+                .isEqualTo(Outcome.DEFINITIVE_CONFLICT);
+        first.prepareIdentityRead(created, digest(114), digest(115))
+                .toCompletableFuture()
+                .join();
+        var observed = second.read(rediscovered.authorityKey())
+                .toCompletableFuture()
+                .join()
+                .orElseThrow();
+        assertThat(observed.authority().state()).isEqualTo(TargetDeleteAuthorityStateV1.READ_FENCED_V1);
+        assertThatThrownBy(() -> second.acquireWriterTicket(
+                        observed.exactStoredValue(),
+                        new ProofBoundWriterTicketV1(
+                                ProofBoundWriterClassV1.REFERENCE_SHARED_PHYSICAL_MEMBER_V1,
+                                digest(116),
+                                digest(117),
+                                digest(118),
+                                digest(119),
+                                observed.authority().authorityRevision())))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(store.casKeys).containsOnly(original.authorityKey());
+    }
+
     private static VersionedValue create(M5TargetDeleteAuthorityCoordinatorV1 coordinator, int cell) {
         var result = coordinator.create(open(cell)).toCompletableFuture().join();
         assertThat(result.outcome()).isEqualTo(Outcome.APPLIED_EXACT);
@@ -245,10 +283,14 @@ class M5TargetDeleteAuthorityCoordinatorV1Test {
     }
 
     private static TargetDeleteAuthorityV1 open(int cell) {
-        PhysicalDeleteTargetV1 target = PhysicalDeleteTargetV1.create(
-                new CellProviderScopeId(digest(cell)),
-                PhysicalDeleteTargetKindV1.OBJECT_VERSION_V1,
-                bytes("cell/" + cell + "/bucket/object/version-7/descriptor"));
+        PhysicalDeleteTargetV1 target = PhysicalDeleteTargetV1.create(new PhysicalResourceIdV2.ObjectVersion(
+                new PhysicalResourceIdV2.Namespace(
+                        PhysicalResourceIdV2.ProviderKind.OBJECT_PROVIDER,
+                        CanonicalUtf8.fromString("physical-cluster-" + cell),
+                        CanonicalUtf8.fromString("bucket-incarnation")),
+                CanonicalUtf8.fromString("object"),
+                PhysicalResourceIdV2.ObjectIdentityKind.IMMUTABLE_VERSION,
+                CanonicalUtf8.fromString("version-7")));
         ProofBoundWriterEnrollmentV1 enrollment = new ProofBoundWriterEnrollmentV1(
                 List.of(ProofBoundWriterClassV1.values()), digest(4), digest(5), digest(6));
         return M5TargetDeleteAuthorityStateMachineV1.open(target, enrollment, digest(9));

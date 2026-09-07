@@ -2127,6 +2127,27 @@ tasks.register<Exec>("v2M5HistoricalDesignCheck") {
     commandLine("python3", "scripts/check-v2-m5-historical-design.py")
 }
 
+tasks.register("v2M5PhysicalResourceIdentityCheck") {
+    group = "verification"
+    description = "Verify stable M5 resource identity in codec and authority CAS without real dispatch claims."
+    dependsOn(
+        "v2M5LifecycleDesignCheck",
+        "v2M5PhysicalResourceIdentitySourceCheck",
+        "v2M5TargetDeleteAuthorityCoordinatorCheck",
+        ":nereus-storage-api:v2M5PhysicalResourceIdentityTest",
+        ":nereus-storage-api:spotlessCheck",
+        ":nereus-storage-api:checkstyleMain",
+        ":nereus-storage-api:checkstyleTest",
+    )
+}
+
+tasks.register<Exec>("v2M5PhysicalResourceIdentitySourceCheck") {
+    group = "verification"
+    description = "Bind the physical-resource wire projection to its typed authority implementation."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("python3", "scripts/check-v2-m5-physical-resource-identity.py")
+}
+
 tasks.register<Exec>("v2M5DesignSourceCheck") {
     group = "verification"
     description = "Validate the frozen M5 design manifest and prove implementation/evidence have not started."

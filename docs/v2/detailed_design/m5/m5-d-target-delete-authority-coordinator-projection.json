@@ -32,7 +32,7 @@
   "conditionalMultiKeyCalls": 0,
   "sequentialMultiKeyEmulation": false,
   "focusedTests": {
-    "coordinatorAndGuardTests": 9,
+    "coordinatorAndGuardTests": 10,
     "failures": 0,
     "errors": 0,
     "skipped": 0

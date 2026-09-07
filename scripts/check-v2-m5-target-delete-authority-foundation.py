@@ -13,7 +13,7 @@ import sys
 
 RESULT = "PASS_V2_M5_TARGET_DELETE_AUTHORITY_FOUNDATION_NON_PROMOTABLE"
 PROJECTION_PATH = "docs/v2/detailed_design/m5/m5-d-target-delete-authority-foundation-projection.json"
-AMENDMENT_COMMIT = "a3b3884b3da8664465bc114e10b33e35ad32f311"
+AMENDMENT_COMMIT = "8bd1484ba311bd44a531997b0d16357c5cde7b50"
 STATES = ["OPEN_V1", "READ_FENCED_V1", "DELETE_INTENT_V1", "DELETE_DONE_V1"]
 WRITER_CLASSES = [
     "M4_SOURCE_PROTECTION_RELEASE_V1",
@@ -70,7 +70,7 @@ def validate_projection_value(value: object) -> None:
         "wire",
         "authorityStates",
         "closedWriterClasses",
-        "targetKinds",
+        "externalObservationKinds",
         "invariants",
         "focusedTests",
         "pureCandidateStateMachinePresent",
@@ -87,7 +87,7 @@ def validate_projection_value(value: object) -> None:
     }
     if not isinstance(value, dict) or set(value) != members:
         raise TargetAuthorityFoundationError("target-authority projection members differ")
-    if value.get("schema") != "NEREUS_V2_M5_D_TARGET_DELETE_AUTHORITY_FOUNDATION_PROJECTION_V1" or value.get(
+    if value.get("schema") != "NEREUS_V2_M5_D_TARGET_DELETE_AUTHORITY_FOUNDATION_PROJECTION_V2" or value.get(
         "status"
     ) != "TARGET_SCOPED_AUTHORITY_FOUNDATION_IMPLEMENTED_NON_PROMOTABLE":
         raise TargetAuthorityFoundationError("target-authority projection schema/status differs")
@@ -95,7 +95,7 @@ def validate_projection_value(value: object) -> None:
         raise TargetAuthorityFoundationError("target-authority projection amendment commit differs")
     if value.get("wire") != {
         "magic": "M5DA",
-        "version": 1,
+        "version": 2,
         "maximumAuthorityBytes": 1_048_576,
         "maximumTargetIdentityBytes": 65_536,
         "maximumExternalIdentityBytes": 262_144,
@@ -106,11 +106,11 @@ def validate_projection_value(value: object) -> None:
         raise TargetAuthorityFoundationError("target-authority states differ")
     if value.get("closedWriterClasses") != WRITER_CLASSES:
         raise TargetAuthorityFoundationError("closed proof-bound writer inventory differs")
-    if value.get("targetKinds") != TARGET_KINDS:
-        raise TargetAuthorityFoundationError("closed physical target inventory differs")
+    if value.get("externalObservationKinds") != TARGET_KINDS:
+        raise TargetAuthorityFoundationError("closed external observation inventory differs")
     if value.get("invariants") != {
         "onePermanentKeyPerTarget": True,
-        "cellAndTargetDomainSeparated": True,
+        "stablePhysicalResourceIdentity": True,
         "everySuccessorIncrementsRevision": True,
         "everySuccessorBindsExactPredecessorDigest": True,
         "canonicalNoOpAndAbaForbidden": True,
@@ -125,7 +125,7 @@ def validate_projection_value(value: object) -> None:
     }:
         raise TargetAuthorityFoundationError("target-authority invariant projection differs")
     if value.get("focusedTests") != {
-        "authorityTests": 11,
+        "authorityTests": 13,
         "failures": 0,
         "errors": 0,
         "skipped": 0,
@@ -159,11 +159,10 @@ def validate_sources(root: Path) -> None:
     require_literals(
         keys,
         (
-            "NEREUS_V2_M5_TARGET_DELETE_IDENTITY_V1",
+            "PhysicalResourceIdV2",
             "NEREUS_V2_M5_EXTERNAL_DELETE_IDENTITY_V1",
             "NEREUS_V2_M5_DELETE_DISPATCH_TOKEN_V1",
-            '"v2/physical-delete-m5/"',
-            '"/authority-v1"',
+            "target.resourceId().authorityKey()",
             "targetIdentitySha256",
             "dispatchTokenSha256",
         ),
@@ -192,6 +191,8 @@ def validate_sources(root: Path) -> None:
         codec,
         (
             "0x4d354441",
+            "VERSION = 2",
+            "PhysicalResourceIdCodecV2.decode(targetBytes)",
             "Math.addExact(current.authorityRevision(), 1)",
             "Sha256Digest.hash(predecessor)",
             "DELETE_DONE_V1 is permanent and has no successor",
@@ -227,7 +228,7 @@ def validate_sources(root: Path) -> None:
             "dispatchTakeoverKeepsTheFixedAttemptAndRequiresFencedOldOwner",
             "doneIsPermanentAndBindsTheExactLastIntent",
             "codecRejectsTamperTruncationAndTrailingBytes",
-            "closedEnrollmentAndCellBoundTargetIdentityFailClosed",
+            "closedEnrollmentAndPhysicalNamespaceIdentityFailClosed",
         ),
         "target-authority tests",
     )
@@ -236,7 +237,8 @@ def validate_sources(root: Path) -> None:
         "conditionalTransaction(",
         "commitExactMultiKey",
         "ObjectProviderTransport",
-        "BookKeeper",
+        "org.apache.bookkeeper",
+        "RealBookKeeperCellSessionV1",
         "compareAndSet(",
     ):
         if forbidden in production:

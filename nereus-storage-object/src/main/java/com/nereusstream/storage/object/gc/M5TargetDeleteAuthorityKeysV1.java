@@ -18,7 +18,7 @@ import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
-import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExternalIdentityObservationV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.PhysicalDeleteTargetKindV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.PhysicalDeleteTargetV1;
@@ -29,8 +29,6 @@ import java.util.Objects;
 
 /** Domain-separated target identities, authority keys, and dispatch-token roots for M5-D. */
 public final class M5TargetDeleteAuthorityKeysV1 {
-    private static final CanonicalBytes TARGET_DOMAIN =
-            CanonicalUtf8.fromString("NEREUS_V2_M5_TARGET_DELETE_IDENTITY_V1").bytes();
     private static final CanonicalBytes EXTERNAL_IDENTITY_DOMAIN =
             CanonicalUtf8.fromString("NEREUS_V2_M5_EXTERNAL_DELETE_IDENTITY_V1").bytes();
     private static final CanonicalBytes DISPATCH_TOKEN_DOMAIN =
@@ -38,29 +36,13 @@ public final class M5TargetDeleteAuthorityKeysV1 {
 
     private M5TargetDeleteAuthorityKeysV1() {}
 
-    public static Sha256Digest targetIdentitySha256(
-            CellProviderScopeId cellProviderScopeId,
-            PhysicalDeleteTargetKindV1 targetKind,
-            CanonicalBytes exactTargetIdentity) {
-        Objects.requireNonNull(cellProviderScopeId, "cellProviderScopeId");
-        Objects.requireNonNull(targetKind, "targetKind");
-        M5TargetDeleteAuthorityRecordsV1.requireBytes(
-                exactTargetIdentity, M5TargetDeleteAuthorityRecordsV1.MAX_TARGET_IDENTITY_BYTES, "exactTargetIdentity");
-        return hash(output -> {
-            writeBytes(output, TARGET_DOMAIN);
-            writeDigest(output, cellProviderScopeId.digest());
-            output.writeByte(targetKind.ordinal());
-            writeBytes(output, exactTargetIdentity);
-        });
+    public static Sha256Digest targetIdentitySha256(PhysicalResourceIdV2 resourceId) {
+        return Objects.requireNonNull(resourceId, "resourceId").sha256();
     }
 
     public static String authorityKey(PhysicalDeleteTargetV1 target) {
         Objects.requireNonNull(target, "target");
-        String key = "v2/physical-delete-m5/"
-                + target.cellProviderScopeId().digest().toHex()
-                + "/"
-                + target.targetIdentitySha256().toHex()
-                + "/authority-v1";
+        String key = target.resourceId().authorityKey();
         if (CanonicalUtf8.fromString(key).bytes().length() > ExactMetadataTransactionStoreV1.MAX_KEY_BYTES) {
             throw new IllegalArgumentException("target delete authority key exceeds the metadata key hard cap");
         }

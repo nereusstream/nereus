@@ -248,7 +248,18 @@ public final class M5TargetDeleteAuthorityCoordinatorV1 {
                 return new MutationResultV1(predecessorOutcome, authorityKey, candidate, observed);
             }
             if (create && observed.isPresent()) {
-                return new MutationResultV1(Outcome.QUARANTINED, authorityKey, candidate, observed);
+                try {
+                    TargetDeleteAuthorityV1 existing =
+                            exactAuthority(authorityKey, observed.orElseThrow()).authority();
+                    TargetDeleteAuthorityV1 requested = M5TargetDeleteAuthorityCodecV1.decodeAuthority(candidate);
+                    // Rediscovery can refresh eligibility but must converge on the existing physical resource.
+                    Outcome outcome = existing.target().equals(requested.target())
+                            ? Outcome.DEFINITIVE_CONFLICT
+                            : Outcome.QUARANTINED;
+                    return new MutationResultV1(outcome, authorityKey, candidate, observed);
+                } catch (IllegalArgumentException failure) {
+                    return new MutationResultV1(Outcome.QUARANTINED, authorityKey, candidate, observed);
+                }
             }
             if (!create && observed.isEmpty()) {
                 return new MutationResultV1(Outcome.QUARANTINED, authorityKey, candidate, observed);

@@ -18,7 +18,7 @@ import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
-import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -38,7 +38,9 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
     public enum PhysicalDeleteTargetKindV1 {
         OBJECT_VERSION_V1,
         BOOKKEEPER_LEDGER_V1,
+        /** Historical format role, never a stable physical resource kind. */
         PULSAR_ROOT_OBJECT_V1,
+        /** Historical format role, never a stable physical resource kind. */
         PULSAR_DATA_OBJECT_V1,
         MULTIPART_UPLOAD_V1
     }
@@ -74,34 +76,28 @@ public final class M5TargetDeleteAuthorityRecordsV1 {
         ALREADY_ABSENT_EXACT_V1
     }
 
-    /** Immutable target bytes and their Cell-bound domain-separated identity. */
-    public record PhysicalDeleteTargetV1(
-            CellProviderScopeId cellProviderScopeId,
-            PhysicalDeleteTargetKindV1 targetKind,
-            CanonicalBytes exactTargetIdentity,
-            Sha256Digest targetIdentitySha256) {
+    /** Typed immutable resource. Historical V1 opaque targets are not accepted by the version-2 wire. */
+    public record PhysicalDeleteTargetV1(PhysicalResourceIdV2 resourceId, Sha256Digest targetIdentitySha256) {
         public PhysicalDeleteTargetV1 {
-            Objects.requireNonNull(cellProviderScopeId, "cellProviderScopeId");
-            Objects.requireNonNull(targetKind, "targetKind");
-            requireBytes(exactTargetIdentity, MAX_TARGET_IDENTITY_BYTES, "exactTargetIdentity");
+            Objects.requireNonNull(resourceId, "resourceId");
             requireDigest(targetIdentitySha256, "targetIdentitySha256");
-            Sha256Digest expected = M5TargetDeleteAuthorityKeysV1.targetIdentitySha256(
-                    cellProviderScopeId, targetKind, exactTargetIdentity);
-            if (!targetIdentitySha256.equals(expected)) {
-                throw new IllegalArgumentException("target identity SHA-256 differs from its exact target bytes");
+            if (!targetIdentitySha256.equals(resourceId.sha256())) {
+                throw new IllegalArgumentException("target identity SHA-256 differs from its stable physical resource");
             }
         }
 
-        public static PhysicalDeleteTargetV1 create(
-                CellProviderScopeId cellProviderScopeId,
-                PhysicalDeleteTargetKindV1 targetKind,
-                CanonicalBytes exactTargetIdentity) {
-            return new PhysicalDeleteTargetV1(
-                    cellProviderScopeId,
-                    targetKind,
-                    exactTargetIdentity,
-                    M5TargetDeleteAuthorityKeysV1.targetIdentitySha256(
-                            cellProviderScopeId, targetKind, exactTargetIdentity));
+        public static PhysicalDeleteTargetV1 create(PhysicalResourceIdV2 resourceId) {
+            return new PhysicalDeleteTargetV1(resourceId, resourceId.sha256());
+        }
+
+        public PhysicalDeleteTargetKindV1 targetKind() {
+            if (resourceId instanceof PhysicalResourceIdV2.ObjectVersion) {
+                return PhysicalDeleteTargetKindV1.OBJECT_VERSION_V1;
+            }
+            if (resourceId instanceof PhysicalResourceIdV2.BookKeeperLedger) {
+                return PhysicalDeleteTargetKindV1.BOOKKEEPER_LEDGER_V1;
+            }
+            return PhysicalDeleteTargetKindV1.MULTIPART_UPLOAD_V1;
         }
     }
 

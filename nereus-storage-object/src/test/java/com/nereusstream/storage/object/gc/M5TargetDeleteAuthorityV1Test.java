@@ -17,8 +17,9 @@ package com.nereusstream.storage.object.gc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.domain.bytes.CanonicalBytes;
+import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.domain.bytes.Sha256Digest;
-import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.DeleteTerminalOutcomeV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExactExternalIdentityV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExternalIdentityObservationV1;
@@ -42,11 +43,9 @@ class M5TargetDeleteAuthorityV1Test {
 
         assertThat(M5TargetDeleteAuthorityCodecV1.decodeAuthority(encoded)).isEqualTo(open);
         assertThat(open.authorityKey())
-                .isEqualTo("v2/physical-delete-m5/"
-                        + open.target().cellProviderScopeId().digest().toHex()
-                        + "/"
+                .isEqualTo("v2/physical-delete-m5-v2/"
                         + open.target().targetIdentitySha256().toHex()
-                        + "/authority-v1");
+                        + "/authority-v2");
         assertThat(open.authorityRevision()).isEqualTo(1);
         assertThat(open.predecessorAuthoritySha256()).isEmpty();
         assertThat(open.state()).isEqualTo(TargetDeleteAuthorityStateV1.OPEN_V1);
@@ -243,18 +242,46 @@ class M5TargetDeleteAuthorityV1Test {
     }
 
     @Test
-    void closedEnrollmentAndCellBoundTargetIdentityFailClosed() {
+    void closedEnrollmentAndPhysicalNamespaceIdentityFailClosed() {
         assertThatThrownBy(() -> new ProofBoundWriterEnrollmentV1(
                         List.of(ProofBoundWriterClassV1.REPLICA_TOPOLOGY_V1), digest(1), digest(2), digest(3)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("closed inventory");
 
         PhysicalDeleteTargetV1 first = target(1);
-        PhysicalDeleteTargetV1 second = PhysicalDeleteTargetV1.create(
-                new CellProviderScopeId(digest(2)), first.targetKind(), first.exactTargetIdentity());
+        PhysicalDeleteTargetV1 second = target(2);
         assertThat(first.targetIdentitySha256()).isNotEqualTo(second.targetIdentitySha256());
         assertThat(M5TargetDeleteAuthorityKeysV1.authorityKey(first))
                 .isNotEqualTo(M5TargetDeleteAuthorityKeysV1.authorityKey(second));
+    }
+
+    @Test
+    void oldOpaqueAuthorityWireCannotBeReinterpretedAsStableResourceAuthority() {
+        byte[] encoded = M5TargetDeleteAuthorityCodecV1.encodeAuthority(open(1)).toByteArray();
+        java.nio.ByteBuffer.wrap(encoded).putInt(4, 1);
+        assertThatThrownBy(() -> M5TargetDeleteAuthorityCodecV1.decodeAuthority(CanonicalBytes.copyOf(encoded)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("preamble differs");
+    }
+
+    @Test
+    void proofOwnerAndCapabilityRefreshNeverChangeTheResourceAuthorityKey() {
+        TargetDeleteAuthorityV1 first = open(1);
+        ProofBoundWriterTicketV1 update = ticket(first, ProofBoundWriterClassV1.OWNER_WORKER_LEASE_HANDLE_PIN_V1, 100);
+        TargetDeleteAuthorityV1 ticketed = M5TargetDeleteAuthorityStateMachineV1.acquireWriterTicket(first, update);
+        TargetDeleteAuthorityV1 refreshed = M5TargetDeleteAuthorityStateMachineV1.completeWriterTicket(
+                ticketed, update.operationIdSha256(), digest(120));
+        TargetDeleteAuthorityV1 rediscovered = M5TargetDeleteAuthorityStateMachineV1.open(
+                first.target(),
+                new ProofBoundWriterEnrollmentV1(
+                        List.of(ProofBoundWriterClassV1.values()), digest(121), digest(122), digest(123)),
+                digest(124));
+        assertThat(refreshed.authorityKey()).isEqualTo(first.authorityKey()).isEqualTo(rediscovered.authorityKey());
+        assertThat(refreshed.target()).isEqualTo(rediscovered.target());
+        assertThat(refreshed.proofSnapshotDigest()).isNotEqualTo(rediscovered.proofSnapshotDigest());
+        assertThat(M5TargetDeleteAuthorityCodecV1.decodeAuthority(
+                        M5TargetDeleteAuthorityCodecV1.encodeAuthority(refreshed)))
+                .isEqualTo(refreshed);
     }
 
     private static TargetDeleteAuthorityV1 open(int cell) {
@@ -287,10 +314,14 @@ class M5TargetDeleteAuthorityV1Test {
     }
 
     private static PhysicalDeleteTargetV1 target(int cell) {
-        return PhysicalDeleteTargetV1.create(
-                new CellProviderScopeId(digest(cell)),
-                PhysicalDeleteTargetKindV1.OBJECT_VERSION_V1,
-                bytes("cell/" + cell + "/bucket/object/version-7/descriptor"));
+        return PhysicalDeleteTargetV1.create(new PhysicalResourceIdV2.ObjectVersion(
+                new PhysicalResourceIdV2.Namespace(
+                        PhysicalResourceIdV2.ProviderKind.OBJECT_PROVIDER,
+                        CanonicalUtf8.fromString("physical-cluster-" + cell),
+                        CanonicalUtf8.fromString("bucket-incarnation")),
+                CanonicalUtf8.fromString("object"),
+                PhysicalResourceIdV2.ObjectIdentityKind.IMMUTABLE_VERSION,
+                CanonicalUtf8.fromString("version-7")));
     }
 
     private static ProofBoundWriterEnrollmentV1 enrollment() {

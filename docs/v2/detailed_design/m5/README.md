@@ -110,15 +110,16 @@ supersession of the historical clauses below. Earlier focused gates do not satis
   directory-prefix-listing rejection. It is an execution adapter only: no intent mutation, dispatch authority,
   source-bound receipt, scenario promotion, or production authority follows.
 - The [M5-D target authority foundation projection](m5-d-target-delete-authority-foundation-projection.json) fixes the
-  `M5DA` wire, Cell/target-domain-separated permanent key, four irreversible states, ten-class closed writer
+  `M5DA` wire (now version 2), stable physical-resource permanent key, four irreversible states, ten-class closed writer
   enrollment, monotonically increasing revision/predecessor chain, CAS-1/CAS-2 candidates, fixed-attempt takeover,
-  and permanent done shape. `v2M5TargetDeleteAuthorityFoundationCheck` exercises 11 pure tests. At the foundation boundary there was no metadata
+  and permanent done shape. `v2M5TargetDeleteAuthorityFoundationCheck` originally exercised 11 pure tests; the current identity slice adds
+  typed-resource tests as recorded in its projection. At the foundation boundary there was no metadata
   mutation coordinator. The later generic coordinator below still has no writer runtime integration, external identity
   reader/delete composition, real Oxia result,
   receipt, or physical-delete authority at this foundation.
 - The [M5-D target authority coordinator projection](m5-d-target-delete-authority-coordinator-projection.json) binds
   `v2M5TargetDeleteAuthorityCoordinatorCheck` to one exact `compareAndSet` call site, complete post-CAS reread
-  reconciliation, and a generic durable ticket-before-writer-dispatch guard. Nine in-memory tests prove both race
+  reconciliation, and a generic durable ticket-before-writer-dispatch guard. The original nine in-memory tests prove both race
   orders and response-loss ticket retention. All concrete proof-changing writers, external identity/delete adapters,
   real Oxia execution, source-bound receipt, and physical-delete authority remain absent.
 

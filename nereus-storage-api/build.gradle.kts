@@ -34,3 +34,12 @@ tasks.withType<Jar>().configureEach {
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
 }
+
+tasks.register<Test>("v2M5PhysicalResourceIdentityTest") {
+    group = "verification"
+    description = "Verify canonical stable physical identities, exact naming and closed wire decoding."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    include("**/PhysicalResourceIdV2Test.class")
+}

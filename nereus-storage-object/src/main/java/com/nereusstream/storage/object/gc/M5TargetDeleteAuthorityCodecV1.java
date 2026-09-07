@@ -18,7 +18,7 @@ import com.nereusstream.domain.bytes.CanonicalBytes;
 import com.nereusstream.domain.bytes.CanonicalUtf8;
 import com.nereusstream.domain.bytes.Sha256Digest;
 import com.nereusstream.metadata.spi.retention.ExactMetadataTransactionStoreV1;
-import com.nereusstream.storage.api.bookkeeper.CellProviderScopeId;
+import com.nereusstream.storage.api.lifecycle.PhysicalResourceIdCodecV2;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.DeleteTerminalOutcomeV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExactExternalIdentityV1;
 import com.nereusstream.storage.object.gc.M5TargetDeleteAuthorityRecordsV1.ExternalIdentityObservationV1;
@@ -45,7 +45,7 @@ import java.util.Optional;
 /** Strict canonical M5DA wire codec for one permanent target-scoped delete-authority value. */
 public final class M5TargetDeleteAuthorityCodecV1 {
     private static final int MAGIC = 0x4d354441; // M5DA
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private static final Sha256Digest PLACEHOLDER = Sha256Digest.copyOf(new byte[Sha256Digest.LENGTH]);
 
     private M5TargetDeleteAuthorityCodecV1() {}
@@ -108,13 +108,10 @@ public final class M5TargetDeleteAuthorityCodecV1 {
                 throw new IllegalArgumentException("target delete authority preamble differs");
             }
             String authorityKey = readString(input, ExactMetadataTransactionStoreV1.MAX_KEY_BYTES);
-            CellProviderScopeId scopeId = new CellProviderScopeId(readDigest(input));
-            PhysicalDeleteTargetKindV1 targetKind =
-                    enumValue(PhysicalDeleteTargetKindV1.values(), input.readUnsignedByte(), "target kind");
             CanonicalBytes targetBytes =
                     readBytes(input, M5TargetDeleteAuthorityRecordsV1.MAX_TARGET_IDENTITY_BYTES, "target identity");
             PhysicalDeleteTargetV1 target =
-                    new PhysicalDeleteTargetV1(scopeId, targetKind, targetBytes, readDigest(input));
+                    new PhysicalDeleteTargetV1(PhysicalResourceIdCodecV2.decode(targetBytes), readDigest(input));
             long revision = input.readLong();
             Optional<Sha256Digest> predecessor =
                     input.readBoolean() ? Optional.of(readDigest(input)) : Optional.empty();
@@ -231,9 +228,7 @@ public final class M5TargetDeleteAuthorityCodecV1 {
             output.writeInt(MAGIC);
             output.writeInt(VERSION);
             writeString(output, value.authorityKey());
-            writeDigest(output, value.target().cellProviderScopeId().digest());
-            output.writeByte(value.target().targetKind().ordinal());
-            writeBytes(output, value.target().exactTargetIdentity());
+            writeBytes(output, value.target().resourceId().canonicalBytes());
             writeDigest(output, value.target().targetIdentitySha256());
             output.writeLong(value.authorityRevision());
             output.writeBoolean(value.predecessorAuthoritySha256().isPresent());

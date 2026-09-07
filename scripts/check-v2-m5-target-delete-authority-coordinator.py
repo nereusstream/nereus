@@ -110,7 +110,7 @@ def validate_projection_value(value: object) -> None:
     if value.get("sequentialMultiKeyEmulation") is not False:
         raise TargetAuthorityCoordinatorError("projection permits sequential multi-key emulation")
     if value.get("focusedTests") != {
-        "coordinatorAndGuardTests": 9,
+        "coordinatorAndGuardTests": 10,
         "failures": 0,
         "errors": 0,
         "skipped": 0,

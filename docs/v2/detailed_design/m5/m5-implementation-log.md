@@ -33,6 +33,32 @@ tests and module style checks. The original pre-implementation validator correct
 `v2M5HistoricalDesignCheck` replays its unchanged frozen implementation against the exact c86fde3e tree instead.
 This is a historical design check, never current runtime recertification.
 
+## Stable physical resource identity implementation slice
+
+Status: focused identity implementation validated; no real namespace admission or deletion evidence.
+
+`PhysicalResourceIdV2` and strict M5RI codec separate Object key/version or create identity, BK namespace/ledger ID,
+and multipart key/upload ID. Canonical component boundaries and provider kinds reject ambiguity; format roles,
+Cell/Binding and mutable owner/proof/capability are excluded from the identity. M5DA wire 2 consumes only that typed
+resource and uses its stable key throughout the existing state machine, coordinator, writer guard and dispatch token.
+Opaque version-1 authority bytes are rejected; no dual-key migration is offered. The implementation projection is
+[m5-physical-resource-identity-projection.json](m5-physical-resource-identity-projection.json).
+
+Namespace fields still require native adapter verification and a unique metadata authority route before activation.
+The current slice proves codec and same-store coordinator identity, not cross-backend alias admission or complete
+DeleteEligibilitySnapshotV2. Those remain required OPEN obligations; all full writer/real-dependency evidence remains
+unclaimed. Previous 11-test foundation and 9-test coordinator results describe their historical source; revised suites
+add opaque-wire rejection, proof/owner refresh and competing rediscovery against the same durable fence.
+
+Validation: `v2M5PhysicalResourceIdentityCheck` passed (38 tasks; 23 executed, 15 up-to-date). Java suites passed
+7 identity, 13 authority and 10 coordinator tests with zero failures/errors/skips; both affected modules passed
+Spotless and Checkstyle. The new race found and fixed a coordinator classification bug: a valid existing authority
+for the same resource with different eligibility is a conflict to reread, while malformed or different-resource
+records remain quarantined. A subsequent projection field rename passed all 5 foundation checker tests.
+
+Publication predecessor: lifecycle design and inherited coordinator were committed/pushed as
+`8bd1484ba311bd44a531997b0d16357c5cde7b50`; remote refs/heads/main was verified byte-for-byte equal after push.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;

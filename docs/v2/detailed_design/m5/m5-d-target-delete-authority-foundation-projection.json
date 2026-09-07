@@ -1,10 +1,10 @@
 {
-  "schema": "NEREUS_V2_M5_D_TARGET_DELETE_AUTHORITY_FOUNDATION_PROJECTION_V1",
+  "schema": "NEREUS_V2_M5_D_TARGET_DELETE_AUTHORITY_FOUNDATION_PROJECTION_V2",
   "status": "TARGET_SCOPED_AUTHORITY_FOUNDATION_IMPLEMENTED_NON_PROMOTABLE",
-  "amendmentCommit": "a3b3884b3da8664465bc114e10b33e35ad32f311",
+  "amendmentCommit": "8bd1484ba311bd44a531997b0d16357c5cde7b50",
   "wire": {
     "magic": "M5DA",
-    "version": 1,
+    "version": 2,
     "maximumAuthorityBytes": 1048576,
     "maximumTargetIdentityBytes": 65536,
     "maximumExternalIdentityBytes": 262144,
@@ -28,16 +28,8 @@
     "PROVIDER_KMS_STORAGE_PROFILE_CAPABILITY_V1",
     "DISPATCH_OWNER_CELL_RESERVATION_V1"
   ],
-  "targetKinds": [
-    "OBJECT_VERSION_V1",
-    "BOOKKEEPER_LEDGER_V1",
-    "PULSAR_ROOT_OBJECT_V1",
-    "PULSAR_DATA_OBJECT_V1",
-    "MULTIPART_UPLOAD_V1"
-  ],
   "invariants": {
     "onePermanentKeyPerTarget": true,
-    "cellAndTargetDomainSeparated": true,
     "everySuccessorIncrementsRevision": true,
     "everySuccessorBindsExactPredecessorDigest": true,
     "canonicalNoOpAndAbaForbidden": true,
@@ -48,10 +40,11 @@
     "cas2BindsExactIdentityAttemptOwnerAndCapability": true,
     "takeoverKeepsFixedAttemptAndIntentRevision": true,
     "doneIsPermanent": true,
-    "crossTargetAtomicity": false
+    "crossTargetAtomicity": false,
+    "stablePhysicalResourceIdentity": true
   },
   "focusedTests": {
-    "authorityTests": 11,
+    "authorityTests": 13,
     "failures": 0,
     "errors": 0,
     "skipped": 0
@@ -66,5 +59,12 @@
   "sourceBoundReceiptPresent": false,
   "physicalDeleteAuthority": false,
   "scenarioPromotionAuthority": false,
-  "productionAuthority": false
+  "productionAuthority": false,
+  "externalObservationKinds": [
+    "OBJECT_VERSION_V1",
+    "BOOKKEEPER_LEDGER_V1",
+    "PULSAR_ROOT_OBJECT_V1",
+    "PULSAR_DATA_OBJECT_V1",
+    "MULTIPART_UPLOAD_V1"
+  ]
 }
