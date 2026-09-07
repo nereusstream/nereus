@@ -581,7 +581,7 @@ class KafkaSemanticCompactorV1Test {
         private final CanonicalBytes sourceBody;
         private final BindingIdentity binding = new BindingIdentity(
                 new TopicBindingId(digest("binding")), digest("incarnation"), digest("storage-epoch"));
-        private final CapabilityBinding capability = new CapabilityBinding(1, digest("capability"));
+        private final CapabilityBinding capability;
         private final BindingReadSelector selector;
         private final IdentityEnvelope envelope;
         private final SourceExtent source;
@@ -591,6 +591,11 @@ class KafkaSemanticCompactorV1Test {
         private final long end;
 
         Fixture(List<CanonicalBytes> batches, long start, long end) {
+            this(batches, start, end, new CapabilityBinding(1, digest("capability")));
+        }
+
+        Fixture(List<CanonicalBytes> batches, long start, long end, CapabilityBinding capability) {
+            this.capability = capability;
             this.batches = List.copyOf(batches);
             this.start = start;
             this.end = end;
@@ -798,7 +803,7 @@ class KafkaSemanticCompactorV1Test {
                 records));
     }
 
-    private static CanonicalBytes idempotentRecords(
+    static CanonicalBytes idempotentRecords(
             long baseOffset,
             int leaderEpoch,
             long producerId,
@@ -816,7 +821,7 @@ class KafkaSemanticCompactorV1Test {
                 records));
     }
 
-    private static CanonicalBytes transactionalRecords(
+    static CanonicalBytes transactionalRecords(
             long baseOffset,
             int leaderEpoch,
             long producerId,
@@ -834,7 +839,7 @@ class KafkaSemanticCompactorV1Test {
                 records));
     }
 
-    private static CanonicalBytes control(
+    static CanonicalBytes control(
             long offset,
             int leaderEpoch,
             long producerId,

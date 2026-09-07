@@ -199,6 +199,50 @@ Spotless and Checkstyle also passed. The seven-test carrier result includes the 
 The older deletion adapter projection/runner now expects the expanded eight-test Cell suite; historical seven-test
 results remain historical. Its five projection contract tests and source checker also passed.
 
+## 2026-09-08 sealed BK descriptors, selection and independent recovery
+
+Status: typed descriptor and physical recovery/publication slice; native lifecycle composition remains OPEN.
+
+The [descriptor projection](m5-bookkeeper-descriptor-projection.json) follows published carrier source
+`b0b885e0160006a46ac891f986a108f8cdc592e7`. `KafkaSealedBookKeeperDescriptorV2` and strict KBSD2 bind the immutable
+BK task/cut/profile, predecessor and successor generation, complete semantic/disposition/gap roots, ordered native
+ledger IDs and sealed fingerprints, retained batch count and eight exact index locators. Each locator identifies the
+first part/entry and contiguous chunk count, full length and artifact SHA. The descriptor is bounded to 1 MiB and
+requires the complete part inventory; duplicate native IDs, mismatched metadata or missing indexes are rejected.
+
+The assembler independently checks chunk order, boundaries, body length, task identity and full artifact checksum.
+`KafkaSealedBookKeeperReaderV2` accepts only a descriptor and admitted recovery byte bound. It rereads exact sealed
+metadata before and after each part, opens without recovery, validates every part root and byte count, and reconstructs
+all retained batches and indexes. It has no allocation, append, fencing, deletion, Object provider or old-source read
+path. `KafkaBookKeeperReadViewV2` recomputes semantic/payload/index/gap roots, validates complete index rows and
+physical/protocol fields, and exposes offset successor, ListOffsets, exact batch and protocol-index caches. Explicit
+gaps suppress obsolete predecessor records. It neither requires expected output bodies nor uses them as recovery data.
+
+`KafkaBookKeeperCompactionPublicationV2` revalidates the source-bound semantic result and all stored physical output,
+creates one immutable descriptor and one exact candidate pointer per task, rereads protocol/policy/frontiers and
+invokes the existing M4 selector CAS. M4's M5 authority envelope and exact protected fallback membership are preserved.
+Object and BK now share the source-cut fallback-protection validator without constructing an Object plan on the BK path.
+Response loss reconciles exact selection; an unchanged predecessor remains unselected and retries the same candidate.
+A deterministic owner takeover after the final reread wins the selector CAS and prevents stale publication.
+
+Tests explicitly use synthetic source/control/capability admission. Real BK tests hash the loaded locked client JAR,
+use the locked server image and Kafka client-generated RecordBatch bytes, then publish, reopen in fresh sessions and
+recover data, gaps and all eight indexes from the selected descriptor. Interleaved idempotent and aborted-transaction
+producers recover distinct protocol rows. Empty output remains index-only. A fixture-only deleted selected ledger
+fails recovery without mutation or obsolete fallback; this fault injection is not M5-D deletion evidence.
+
+Validation: `scripts/run-v2-m5-bookkeeper-descriptor-check.sh` ran the source-locked
+`v2M5BookKeeperDescriptorCheck` with configuration cache disabled and every task rerun: **64/64 tasks passed**.
+The descriptor suites report **10 unit tests and 4 real BK tests**, with zero failures, errors or skips. The same
+run also passed 8 inventory tests, 7 real carrier tests, 8 real Cell-session tests, the shared Kafka/Object suites,
+style checks, projection contracts, documentation and immutable historical dependency checks. The local run log is
+`/tmp/nereus-m5-bk-descriptor-gate.log`; these are scoped implementation results, not source-bound M5 evidence.
+
+The caller still owns native task fencing, namespace admission, M4 read/source-plan pins and Cell cache/temporary-memory
+reservation. This slice does not connect those native authorities, real Oxia, actual internal-topic lifecycle or
+unpublished/replaced-source cleanup. It is not a native broker/controller activation, source-bound M5 child or Final.
+All 17 amended acceptance obligations and the M6/M7/M8 boundaries remain unchanged.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;
@@ -646,8 +690,8 @@ source-locked real Oxia result, source-bound receipt, physical-delete, staging, 
 
 ## Remaining ordered work
 
-1. Complete the typed sealed-BK descriptor, exact M4 selector publication, descriptor-only protocol recovery,
-   native internal-topic cases, terminal task fencing and unpublished/replaced-output cleanup.
+1. Connect the sealed-BK descriptor path to native M4 read/source-plan admission, internal-topic lifecycle,
+   terminal task fencing and unpublished/replaced-output cleanup.
 2. Replace permanent inline retirement slots with authenticated immutable history, bounded active admission,
    exact folding CAS and replay/reuse rejection.
 3. Integrate all ten concrete writer classes, native namespace/owner proofs, current capability refresh,

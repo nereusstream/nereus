@@ -271,6 +271,12 @@ public final class M5MaterializationValidatorV1 {
 
     private static Sha256Digest requireFallbackSources(
             MaterializationPlan plan, List<SourceProtectionIdentity> sources) {
+        return requireFallbackProtections(plan.sourceCut(), sources);
+    }
+
+    /** Shared source-cut membership validation; it constructs no Object materialization plan. */
+    public static Sha256Digest requireFallbackProtections(
+            M5MaterializationRecordsV1.MaterializationSourceCut cut, List<SourceProtectionIdentity> sources) {
         sources = List.copyOf(sources);
         List<SourceProtectionIdentity> sorted = sources.stream()
                 .sorted(Comparator.comparing(
@@ -280,13 +286,13 @@ public final class M5MaterializationValidatorV1 {
                 || !sources.equals(sorted)
                 || sources.stream().distinct().count() != sources.size()
                 || sources.stream().anyMatch(value -> !value.capability()
-                        .equals(plan.sourceCut().identity().capability()))) {
+                        .equals(cut.identity().capability()))) {
             throw new IllegalArgumentException("M5 fallback protections are empty, non-canonical, or capability-stale");
         }
         List<Sha256Digest> protectedIdentities = sources.stream()
                 .map(SourceProtectionIdentity::sourceIdentitySha256)
                 .toList();
-        List<Sha256Digest> cutIdentities = plan.sourceCut().sources().stream()
+        List<Sha256Digest> cutIdentities = cut.sources().stream()
                 .map(SourceExtent::sourceIdentitySha256)
                 .sorted(Comparator.comparing(Sha256Digest::toHex))
                 .toList();
@@ -294,7 +300,7 @@ public final class M5MaterializationValidatorV1 {
             throw new IllegalArgumentException("M5 fallback protections differ from the frozen source identities");
         }
         Sha256Digest calculated = M4ReadControlCodecV1.calculateFallbackSetSha256(sources);
-        Optional<Sha256Digest> existing = plan.sourceCut().predecessorSelector().fallbackSetSha256();
+        Optional<Sha256Digest> existing = cut.predecessorSelector().fallbackSetSha256();
         if (existing.isPresent() && !existing.orElseThrow().equals(calculated)) {
             throw new IllegalArgumentException("M5 fallback protection membership differs from the predecessor");
         }

@@ -22,8 +22,9 @@ The later M5DA version-4 observation slice adds READ_FENCED takeover, epoch inva
 verifier. `v2M5ReadFencedRecoveryCheck` validates this focused slice; real owner adapters and execution remain separate.
 `v2M5KafkaSemanticCoreCheck` checks the shared record compiler, full eight-index semantic validation and existing
 Object bridge. The BK carrier slice adds inventoried native allocation, bounded chunks, sealing and exact part
-verification through `v2M5BookKeeperCompactionCarrierCheck`; descriptor publication/recovery, native task fencing,
-real control-authority integration and cleanup remain required next steps.
+verification through `v2M5BookKeeperCompactionCarrierCheck`. `v2M5BookKeeperDescriptorCheck` adds typed sealed
+descriptor publication and independent BK-only recovery. Native task/read-source-plan admission, internal-topic
+lifecycle, real control-authority integration and cleanup remain required next steps.
 Each slice updates code, projection, scenarios, log and evidence status
 and is independently validated and published. All OPEN [acceptance obligations](detailed_design/m5/m5-lifecycle-acceptance.json)
 remain required; M6-deferred activation rows cannot be promoted by these checks.

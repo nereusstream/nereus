@@ -291,3 +291,33 @@ tasks.register<Test>("v2M5BookKeeperCompactionInventoryTest") {
     }
     outputs.upToDateWhen { false }
 }
+
+tasks.register<Test>("v2M5BookKeeperDescriptorTest") {
+    group = "verification"
+    description = "Run strict sealed-BK descriptor, recovery and exact selector publication tests."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("v2M5BookKeeperDescriptorRealTest") {
+    group = "verification"
+    description = "Recover selected descriptors and Kafka protocol indexes through the locked real BK provider."
+    testClassesDirs = realBookKeeperTest.output.classesDirs
+    classpath = realBookKeeperTest.runtimeClasspath
+    useJUnitPlatform()
+    maxParallelForks = 1
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaSealedBookKeeperDescriptorV2RealTest")
+    }
+    outputs.upToDateWhen { false }
+    doFirst {
+        val metadataServiceUri = providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull
+            ?: error("v2M2BookKeeperMetadataServiceUri is required for the M5 BK descriptor test")
+        systemProperty("nereus.bookkeeper.metadataServiceUri", metadataServiceUri)
+    }
+}

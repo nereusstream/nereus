@@ -2382,6 +2382,29 @@ tasks.register("v2M5BookKeeperCompactionCarrierCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5BookKeeperDescriptorSourceCheck") {
+    group = "verification"
+    description = "Check sealed BK descriptor/recovery/publication scope and remaining native lifecycle obligations."
+    commandLine("python3", "scripts/check-v2-m5-bookkeeper-descriptor.py")
+}
+
+tasks.register<Exec>("v2M5BookKeeperDescriptorContractTest") {
+    group = "verification"
+    commandLine("python3", "scripts/check-v2-m5-bookkeeper-descriptor-tests.py")
+}
+
+tasks.register("v2M5BookKeeperDescriptorCheck") {
+    group = "verification"
+    description = "Verify typed sealed BK descriptors and exact M4 selection with locked real BK IO."
+    dependsOn(
+        "v2M5BookKeeperCompactionCarrierCheck",
+        "v2M5BookKeeperDescriptorSourceCheck",
+        "v2M5BookKeeperDescriptorContractTest",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperDescriptorTest",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperDescriptorRealTest",
+    )
+}
+
 tasks.register<Exec>("v2M5RetentionCoreContractTest") {
     group = "verification"
     description = "Test the fail-closed non-promotable M5-C retention-core checker."

@@ -42,6 +42,17 @@ final class KafkaBookKeeperCompactionTestSupportV2 {
     private KafkaBookKeeperCompactionTestSupportV2() {}
 
     static KafkaBookKeeperCompactionLayoutV2.Layout layout(boolean empty, long attempt) {
+        return input(empty, attempt).layout();
+    }
+
+    record Input(
+            KafkaCompactionRecordsV1.CompactionPlan plan,
+            KafkaCompactionSemanticOutputV2 semantic,
+            KafkaBookKeeperCompactionLayoutV2.Layout layout,
+            com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityEvidence
+                    capabilityEvidence) {}
+
+    static Input input(boolean empty, long attempt) {
         var bodies = empty
                 ? List.of(KafkaSemanticCompactorV1Test.emptyBatch(0, 1))
                 : List.of(
@@ -49,14 +60,48 @@ final class KafkaBookKeeperCompactionTestSupportV2 {
                                 0, 1, Compression.NONE, new SimpleRecord(1, new byte[] {1}, new byte[] {4, 5, 6})),
                         KafkaSemanticCompactorV1Test.records(
                                 1, 1, Compression.NONE, new SimpleRecord(2, new byte[] {1}, new byte[1024])));
-        var fixture = new KafkaSemanticCompactorV1Test.Fixture(bodies, 0, empty ? 1 : 2);
         var proofs = empty
                 ? List.<KafkaCompactionRecordsV1.LatestKeyProof>of()
                 : List.of(new KafkaCompactionRecordsV1.LatestKeyProof(
                         CanonicalBytes.copyOf(new byte[] {1}), 1, true, true, false, 100));
-        var plan = fixture.plan(proofs, List.of(), List.of(), 100, CompressionType.NONE);
+        return input(bodies, 0, empty ? 1 : 2, proofs, List.of(), attempt);
+    }
+
+    static Input input(
+            List<CanonicalBytes> bodies,
+            long start,
+            long end,
+            List<KafkaCompactionRecordsV1.LatestKeyProof> proofs,
+            List<KafkaCompactionRecordsV1.TransactionRange> transactions,
+            long attempt) {
+        var fixture = new KafkaSemanticCompactorV1Test.Fixture(bodies, start, end);
+        var initial = fixture.plan(proofs, transactions, List.of(), 100, CompressionType.NONE);
+        var capabilityEvidence =
+                new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityEvidence(
+                        initial.sourceCut().identity().binding(),
+                        1,
+                        1,
+                        com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityKind
+                                .DURABLE_DRAIN_ONLY_V1,
+                        com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityState.ADMITTED,
+                        digest("synthetic-adapter"),
+                        digest("synthetic-backend"),
+                        digest("synthetic-contract"),
+                        digest("synthetic-verifier"),
+                        digest("synthetic-receipt-id"),
+                        digest("synthetic-receipt"),
+                        digest("synthetic-time"),
+                        10_000,
+                        0,
+                        0);
+        var admitted = new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.CapabilityBinding(
+                1,
+                com.nereusstream.storage.object.read.control.M4ReadControlCodecV1.capabilityEvidenceSha256(
+                        capabilityEvidence));
+        var plan = new KafkaSemanticCompactorV1Test.Fixture(bodies, start, end, admitted)
+                .plan(proofs, transactions, List.of(), 100, CompressionType.NONE);
         var semantic = new KafkaSemanticCompactorV1().compileSemantic(plan);
-        return KafkaBookKeeperCompactionLayoutV2.plan(
+        var layout = KafkaBookKeeperCompactionLayoutV2.plan(
                 plan,
                 semantic,
                 new Namespace(
@@ -67,6 +112,44 @@ final class KafkaBookKeeperCompactionTestSupportV2 {
                 attempt,
                 512,
                 1024);
+        return new Input(plan, semantic, layout, capabilityEvidence);
+    }
+
+    static Sha256Digest digest(String value) {
+        return Sha256Digest.hash(CanonicalUtf8.fromString(value).bytes());
+    }
+
+    static List<com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtectionIdentity>
+            installReadAuthority(Store store, Input input) {
+        store.allowSelectorCas = true;
+        var cut = input.plan().sourceCut();
+        var m4 = new com.nereusstream.storage.object.read.control.M4ReadControlCoordinatorV1(
+                store, 7, cut.identity().binding());
+        m4.createCapability(input.capabilityEvidence());
+        var sources = cut.sources().stream()
+                .map(source ->
+                        new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1
+                                .SourceProtectionIdentity(
+                                source.sourceIdentitySha256(),
+                                1,
+                                1,
+                                cut.predecessorSelector().sourceGeneration(),
+                                cut.identity().capability()))
+                .sorted(java.util.Comparator.comparing(
+                        source -> source.sourceIdentitySha256().toHex()))
+                .toList();
+        for (var source : sources) {
+            m4.createProtection(
+                    new com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.SourceProtection(
+                            cut.identity().binding(),
+                            source,
+                            com.nereusstream.storage.object.read.control.M4ReadControlRecordsV1.ProtectionState
+                                    .PROTECTED,
+                            Optional.empty(),
+                            Optional.empty()));
+        }
+        m4.createSelector(cut.predecessorSelector());
+        return sources;
     }
 
     private static BookKeeperCapabilitySnapshotV1 capability(Sha256Digest scope) {
@@ -102,6 +185,11 @@ final class KafkaBookKeeperCompactionTestSupportV2 {
         final List<String> operations = new ArrayList<>();
         boolean loseNextPutResponse;
         boolean dropNextPut;
+        boolean allowSelectorCas;
+        boolean loseNextSelectorCasResponse;
+        boolean dropNextSelectorCas;
+        int selectorCasCount;
+        Runnable beforeNextSelectorCas;
 
         @Override
         public synchronized Optional<CanonicalBytes> get(String key) {
@@ -125,9 +213,30 @@ final class KafkaBookKeeperCompactionTestSupportV2 {
         }
 
         @Override
-        public ControlMutationOutcome compareAndSet(
+        public synchronized ControlMutationOutcome compareAndSet(
                 String key, Optional<CanonicalBytes> expected, CanonicalBytes value) {
-            throw new AssertionError("immutable BK inventory must never overwrite a prior allocation");
+            if (!allowSelectorCas || !key.endsWith("/selector")) {
+                throw new AssertionError("immutable BK inventory must never overwrite a prior allocation");
+            }
+            selectorCasCount++;
+            Runnable before = beforeNextSelectorCas;
+            beforeNextSelectorCas = null;
+            if (before != null) {
+                before.run();
+            }
+            if (dropNextSelectorCas) {
+                dropNextSelectorCas = false;
+                return ControlMutationOutcome.RESPONSE_UNKNOWN;
+            }
+            boolean matches = Optional.ofNullable(values.get(key)).equals(expected);
+            if (matches) {
+                values.put(key, value);
+            }
+            if (loseNextSelectorCasResponse) {
+                loseNextSelectorCasResponse = false;
+                return ControlMutationOutcome.RESPONSE_UNKNOWN;
+            }
+            return matches ? ControlMutationOutcome.APPLIED : ControlMutationOutcome.DEFINITIVE_CONFLICT;
         }
     }
 }
