@@ -109,6 +109,25 @@ class RealBookKeeperCellSessionV1Test {
     }
 
     @Test
+    void reservedCreationRejectsForeignCapabilityAndMissingNativeAllocatorBeforeDispatch() {
+        RealBookKeeperCellSessionV1 session =
+                new RealBookKeeperCellSessionV1(noopClient(new AtomicInteger()), capability(), new byte[0]);
+        assertThatThrownBy(session::reserveLedgerIdentity).isInstanceOf(UnsupportedOperationException.class);
+        var original = configuration();
+        var foreign = new RunLedgerConfigurationV1(
+                new CellProviderScopeId(digest(101)),
+                original.runId(),
+                original.ensembleSize(),
+                original.writeQuorumSize(),
+                original.ackQuorumSize(),
+                original.digestType(),
+                original.configurationDigest());
+        assertThatThrownBy(() -> session.createReservedRunLedger(foreign, new BookKeeperLedgerIdentity(71)))
+                .isInstanceOf(IllegalArgumentException.class);
+        session.closeAsync().toCompletableFuture().join();
+    }
+
+    @Test
     void realProviderRejectsAFrameProjectionThatWasNotSourceLocked() {
         BookKeeperCapabilitySnapshotV1 source = capability();
         BookKeeperCapabilitySnapshotV1 mismatch = new BookKeeperCapabilitySnapshotV1(

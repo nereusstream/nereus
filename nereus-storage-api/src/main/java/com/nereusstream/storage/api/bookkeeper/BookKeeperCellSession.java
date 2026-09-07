@@ -31,6 +31,20 @@ public interface BookKeeperCellSession {
     CompletionStage<ProviderMutationResultV1<RunLedgerHandleV1>> createRunLedger(
             RunLedgerConfigurationV1 configuration);
 
+    /**
+     * Allocates one never-reused native ledger ID without creating a ledger. The caller must durably record an exact
+     * successful result in its task inventory before createReservedRunLedger; an unknown allocation burns only an ID.
+     */
+    default CompletionStage<ProviderMutationResultV1<BookKeeperLedgerIdentity>> reserveLedgerIdentity() {
+        throw new UnsupportedOperationException("native ledger identity reservation is not implemented");
+    }
+
+    /** Creates only the natively reserved, durably inventoried ID; retries may never allocate a different ID. */
+    default CompletionStage<ProviderMutationResultV1<RunLedgerHandleV1>> createReservedRunLedger(
+            RunLedgerConfigurationV1 configuration, BookKeeperLedgerIdentity reservedIdentity) {
+        throw new UnsupportedOperationException("reserved ledger creation is not implemented");
+    }
+
     CompletionStage<RunLedgerOpenResultV1> openRunLedger(RunLedgerHandleV1 expectedHandle);
 
     CompletionStage<ProviderMutationResultV1<AppendQuorumProofV1>> appendExplicitEntry(

@@ -5,7 +5,7 @@ export LANG=C
 
 m5_repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 m5_compose="$m5_repo_root/config/v2/m2/kafka/k9/bookkeeper-conformance.compose.yml"
-m5_project="nereus-v2-m5-bookkeeper-delete-$$"
+m5_project="nereus-v2-m5-bookkeeper-compaction-$$"
 m5_image="apache/bookkeeper@sha256:c0a128931c402d6bf6a6f973ba2f305b9be261659e30754ab95a29510a33bc0d"
 m5_expected_image_id="sha256:d0e78aaf987ac2feb526507ffb7d4c5137d58c0530f2a8cab4a9595abc89d605"
 
@@ -31,7 +31,7 @@ done
   --no-configuration-cache \
   --rerun-tasks \
   "-Pv2M2BookKeeperMetadataServiceUri=zk://127.0.0.1:2181/ledgers" \
-  v2M5BookKeeperDeleteCheck \
+  v2M5BookKeeperCompactionCarrierCheck \
   --console=plain
 
 python3 - "$m5_repo_root" <<'PY'
@@ -49,8 +49,18 @@ if {key: suite.attrib.get(key) for key in ("tests", "failures", "errors", "skipp
 names = {case.attrib.get("name") for case in suite.findall("testcase")}
 if "m5DeleteAdapterDeletesOnlyTheExactSealedLedgerAndReconcilesAbsence()" not in names:
     raise SystemExit("real BookKeeper M5 deletion testcase is absent")
+for task, class_name, expected in (
+    ("v2M5BookKeeperCompactionInventoryTest", "KafkaBookKeeperInventoryV2Test", 8),
+    ("v2M5BookKeeperCompactionRealTest", "KafkaBookKeeperCompactionWriterV2RealTest", 7),
+):
+    path = root / f"nereus-kafka-bookkeeper/build/test-results/{task}/TEST-com.nereusstream.kafka.bookkeeper.compaction.{class_name}.xml"
+    suite = ET.parse(path).getroot()
+    if {key: suite.attrib.get(key) for key in ("tests", "failures", "errors", "skipped")} != {
+        "tests": str(expected), "failures": "0", "errors": "0", "skipped": "0"
+    }:
+        raise SystemExit(f"BK carrier JUnit summary differs: {class_name}")
 PY
 
-printf 'PASS_V2_M5_BOOKKEEPER_DELETE_REAL implementation-only image=%s id=%s\n' \
+printf 'PASS_V2_M5_BK_COMPACTION_CARRIER_REAL implementation-only image=%s id=%s\n' \
   "$m5_image" \
   "$m5_expected_image_id"

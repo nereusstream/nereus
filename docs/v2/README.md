@@ -25,7 +25,8 @@ performance-first BookKeeper WAL.
   The subsequent READ_FENCED recovery slice adds owner/epoch-bound observations and a required native fencing
   verifier; its focused gate cannot supply native owner integration or M5 Final evidence.
   Kafka compaction now exposes carrier-independent semantic output and shares full eight-index validation with the
-  Object bridge. Sealed BK persistence, publication, recovery and cleanup remain incomplete.
+  Object bridge. A bounded BK part writer now inventories native IDs before creation and verifies sealed output;
+  selected descriptor publication, descriptor-only recovery, native task fencing and cleanup remain incomplete.
 
 - `main` develops `0.2.0-SNAPSHOT` from the N2 source tuple `v2-m1`; historical focused inputs retain their original
   `v2-m0` identity instead of being relabelled.

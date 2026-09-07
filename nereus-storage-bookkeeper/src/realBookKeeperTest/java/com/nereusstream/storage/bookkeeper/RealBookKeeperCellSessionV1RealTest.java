@@ -258,6 +258,67 @@ class RealBookKeeperCellSessionV1RealTest {
         return new RealBookKeeperCellSessionV1(client, capability, PASSWORD);
     }
 
+    @Test
+    void reservedIdentityReconcilesTheSameLedgerAfterRestartAndRejectsForeignRunAdoption() throws Exception {
+        RealBookKeeperCellSessionV1 writer = session();
+        var reserved = writer.reserveLedgerIdentity().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        assertThat(reserved.outcome()).isEqualTo(ProviderMutationOutcomeV1.APPLIED_EXACT);
+        var id = reserved.exactProof().orElseThrow();
+        var configuration =
+                RunLedgerConfigurationV1.from(capability, new StorageRunId(new Id128(0, RUN_IDS.incrementAndGet())));
+        // The durable M5 task records this exact ID before creation; reconstruct the handle from those inputs.
+        var expected = new RunLedgerHandleV1(
+                capability.providerScopeId(), configuration.runId(), id, configuration.configurationDigest());
+        var created = writer.createReservedRunLedger(configuration, id)
+                .toCompletableFuture()
+                .get(10, TimeUnit.SECONDS);
+        assertThat(created.exactProof()).contains(expected);
+        append(writer, expected, 0, new byte[] {3, 1, 4});
+        writer.closeRunLedger(expected).toCompletableFuture().get(10, TimeUnit.SECONDS);
+        writer.closeAsync().toCompletableFuture().get(10, TimeUnit.SECONDS);
+
+        RealBookKeeperCellSessionV1 restarted = session();
+        var duplicate = restarted
+                .createReservedRunLedger(configuration, id)
+                .toCompletableFuture()
+                .get(10, TimeUnit.SECONDS);
+        assertThat(duplicate.outcome()).isEqualTo(ProviderMutationOutcomeV1.FENCED_OR_CONFLICT);
+        assertThat(restarted
+                        .openRunLedger(expected)
+                        .toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS)
+                        .outcome())
+                .isEqualTo(RunLedgerOpenOutcomeV1.OPENED_EXACT);
+        assertThat(restarted
+                        .readExactEntry(expected, 0)
+                        .toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS)
+                        .exactEntry()
+                        .orElseThrow()
+                        .payload()
+                        .toByteArray())
+                .containsExactly(3, 1, 4);
+        var foreign = new RunLedgerHandleV1(
+                expected.providerScopeId(),
+                new StorageRunId(new Id128(0, RUN_IDS.incrementAndGet())),
+                id,
+                expected.configurationDigest());
+        assertThat(restarted
+                        .openRunLedger(foreign)
+                        .toCompletableFuture()
+                        .get(10, TimeUnit.SECONDS)
+                        .outcome())
+                .isEqualTo(RunLedgerOpenOutcomeV1.CONFIGURATION_MISMATCH);
+        var next = restarted
+                .reserveLedgerIdentity()
+                .toCompletableFuture()
+                .get(10, TimeUnit.SECONDS)
+                .exactProof()
+                .orElseThrow();
+        assertThat(next).isNotEqualTo(id);
+        restarted.closeAsync().toCompletableFuture().get(10, TimeUnit.SECONDS);
+    }
+
     private static RunLedgerHandleV1 create(RealBookKeeperCellSessionV1 session) throws Exception {
         RunLedgerConfigurationV1 configuration =
                 RunLedgerConfigurationV1.from(capability, new StorageRunId(new Id128(0, RUN_IDS.incrementAndGet())));

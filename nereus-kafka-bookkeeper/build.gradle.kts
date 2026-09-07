@@ -25,8 +25,26 @@ dependencies {
 
 val realBookKeeperTest by sourceSets.creating {
     java.srcDir("src/realBookKeeperTest/java")
-    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    compileClasspath += sourceSets.main.get().output + sourceSets.test.get().output + configurations.testRuntimeClasspath.get()
     runtimeClasspath += output + compileClasspath
+}
+
+tasks.register<Test>("v2M5BookKeeperCompactionRealTest") {
+    group = "verification"
+    description = "Run inventoried BK compaction writes and sealed-part recovery against the exact real BK provider."
+    testClassesDirs = realBookKeeperTest.output.classesDirs
+    classpath = realBookKeeperTest.runtimeClasspath
+    useJUnitPlatform()
+    maxParallelForks = 1
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperCompactionWriterV2RealTest")
+    }
+    outputs.upToDateWhen { false }
+    doFirst {
+        val metadataServiceUri = providers.gradleProperty("v2M2BookKeeperMetadataServiceUri").orNull
+            ?: error("v2M2BookKeeperMetadataServiceUri is required for the M5 BK carrier test")
+        systemProperty("nereus.bookkeeper.metadataServiceUri", metadataServiceUri)
+    }
 }
 
 val bookKeeperScale by sourceSets.creating {
@@ -258,6 +276,18 @@ tasks.register<Test>("v2M5KafkaCompactionTest") {
         includeTestsMatching(
             "com.nereusstream.kafka.bookkeeper.compaction.KafkaSemanticCompactorV1Test",
         )
+    }
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("v2M5BookKeeperCompactionInventoryTest") {
+    group = "verification"
+    description = "Run bounded BK compaction layout, strict inventory, and unknown-creation tests."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.bookkeeper.compaction.KafkaBookKeeperInventoryV2Test")
     }
     outputs.upToDateWhen { false }
 }

@@ -18,7 +18,7 @@ The [amendment 3 manifest](m5-design-amendment-3.json) binds this decision and i
 | --- | --- | --- |
 | Resource authority | Typed stable namespace/resource ID; eligibility in revisioned value | Typed M5RI V2 identity now feeds authority M5DA wire 4 and generic same-key CAS; typed M5ES eligibility and full fact reread now guard CAS-1/CAS-2; native namespace/route admission and real dispatch remain OPEN |
 | Replacement / expiry / unpublished cleanup | Three explicit branches with complete semantic and physical-reference proofs | Reason-specific typed predicates, snapshot invalidation and fact freshness passed the focused gate; real protocol proof producers and full deletion composition remain OPEN |
-| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared carrier-independent compiler and independent full eight-index validation now exist; existing Object bridge is retained; sealed BK allocation/publication/recovery/cleanup remains OPEN |
+| Kafka compaction | Shared semantics; Object or sealed BK carrier; internal topics remain BK_ONLY | Shared compiler and full eight-index validation feed the Object bridge and an inventoried BK part writer; native allocation, sealing and exact part verification exist; selected descriptor, native source recovery, task fencing and cleanup remain OPEN |
 | Binding retirement | Bounded active selector plus authenticated immutable history | Earlier M5R1 retains permanent inline slots; root/folding/admission migration is OPEN |
 | Writers and recovery | Target-relevant tickets, local pins, READ_FENCED takeover, current-owner intent/done | In-memory READ_FENCED refresh/takeover now preserves admission fencing and rejects stale observation epochs; native owner adapters, intent capability refresh, visible durable veto and [concrete writer matrix](m5-lifecycle-writer-matrix.md) remain OPEN |
 | Evidence | Five M5-E children plus amended [acceptance matrix](m5-lifecycle-acceptance.json) | No revised source-bound M5 children or aggregate Final; scenario promotion remains unauthorized |
@@ -34,6 +34,12 @@ The [shared Kafka semantic projection](m5-kafka-semantic-core-projection.json) t
 complete row validation. Its outputs are in memory and do not authorize publication, read adoption or input deletion.
 `v2M5KafkaSemanticCoreCheck` passed 42 tasks, including 14 Kafka and 7 Object materialization tests. The added
 interleaved-transaction case fixed producer-independent aborted marking and uses a V2 plan/output task identity.
+The [BK carrier projection](m5-bookkeeper-compaction-carrier-projection.json) adds immutable task/part inventory,
+native ID reservation, bounded retained-batch/index chunks, native fencing and complete entry/metadata verification.
+The carrier still requires expected output bodies for recovery; it has no selected descriptor, M4 publication,
+native namespace/task authority, real Oxia control result, internal-topic lifecycle or physical deletion authority.
+The carrier gate passed 60 executed tasks with 8 inventory/layout, 7 real carrier and 8 real Cell-session tests;
+its exact-native-run check now precedes fencing, including the foreign-run zero-fence negative case.
 
 `v2M5LifecycleDesignCheck` checks the amendment chain, exact bytes, coverage and authority boundaries. It proves no
 runtime behavior. `v2M5HistoricalDesignCheck` replays the unmodified freeze validator at c86fde3e and compares

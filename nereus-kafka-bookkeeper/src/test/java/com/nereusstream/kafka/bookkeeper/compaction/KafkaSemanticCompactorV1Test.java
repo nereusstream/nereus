@@ -576,7 +576,7 @@ class KafkaSemanticCompactorV1Test {
                 indexes.stream().map(KafkaCompactionIndexV1::encode).toList());
     }
 
-    private static final class Fixture {
+    static final class Fixture {
         private final List<CanonicalBytes> batches;
         private final CanonicalBytes sourceBody;
         private final BindingIdentity binding = new BindingIdentity(
@@ -590,7 +590,7 @@ class KafkaSemanticCompactorV1Test {
         private final long start;
         private final long end;
 
-        private Fixture(List<CanonicalBytes> batches, long start, long end) {
+        Fixture(List<CanonicalBytes> batches, long start, long end) {
             this.batches = List.copyOf(batches);
             this.start = start;
             this.end = end;
@@ -660,7 +660,7 @@ class KafkaSemanticCompactorV1Test {
                     List.of(source));
         }
 
-        private CompactionPlan plan(
+        CompactionPlan plan(
                 List<LatestKeyProof> proofs,
                 List<TransactionRange> transactions,
                 List<Long> undecidable,
@@ -784,8 +784,7 @@ class KafkaSemanticCompactorV1Test {
         return new LatestKeyProof(bytesValue(key), latest, true, true, olderMayReappear, deadline);
     }
 
-    private static CanonicalBytes records(
-            long baseOffset, int leaderEpoch, Compression compression, SimpleRecord... records) {
+    static CanonicalBytes records(long baseOffset, int leaderEpoch, Compression compression, SimpleRecord... records) {
         return canonical(MemoryRecords.withRecords(
                 RecordBatch.MAGIC_VALUE_V2,
                 baseOffset,
@@ -846,7 +845,7 @@ class KafkaSemanticCompactorV1Test {
                 offset, 100, leaderEpoch, producerId, producerEpoch, new EndTransactionMarker(type, coordinatorEpoch)));
     }
 
-    private static CanonicalBytes emptyBatch(long offset, int leaderEpoch) {
+    static CanonicalBytes emptyBatch(long offset, int leaderEpoch) {
         ByteBuffer buffer = ByteBuffer.allocate(DefaultRecordBatch.RECORD_BATCH_OVERHEAD);
         DefaultRecordBatch.writeEmptyHeader(
                 buffer,

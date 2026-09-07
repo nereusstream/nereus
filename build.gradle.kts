@@ -2350,6 +2350,38 @@ tasks.register("v2M5KafkaSemanticCoreCheck") {
     )
 }
 
+tasks.register<Exec>("v2M5BookKeeperCompactionCarrierSourceCheck") {
+    group = "verification"
+    description = "Check the scoped BK compaction writer projection and remaining lifecycle boundaries."
+    commandLine("python3", "scripts/check-v2-m5-bookkeeper-compaction-carrier.py")
+}
+
+tasks.register<Exec>("v2M5BookKeeperCompactionCarrierContractTest") {
+    group = "verification"
+    commandLine("python3", "scripts/check-v2-m5-bookkeeper-compaction-carrier-tests.py")
+}
+
+tasks.register("v2M5BookKeeperCompactionCarrierCheck") {
+    group = "verification"
+    description = "Verify inventoried BK compaction writes with the locked real provider; no M5 Final authority."
+    dependsOn(
+        "v2M5KafkaSemanticCoreCheck",
+        "v2M5BookKeeperCompactionCarrierSourceCheck",
+        "v2M5BookKeeperCompactionCarrierContractTest",
+        ":nereus-storage-api:spotlessCheck",
+        ":nereus-storage-api:checkstyleMain",
+        ":nereus-storage-bookkeeper:test",
+        ":nereus-storage-bookkeeper:realBookKeeperTest",
+        ":nereus-storage-bookkeeper:spotlessCheck",
+        ":nereus-storage-bookkeeper:checkstyleMain",
+        ":nereus-storage-bookkeeper:checkstyleTest",
+        ":nereus-storage-bookkeeper:checkstyleRealBookKeeperTest",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperCompactionInventoryTest",
+        ":nereus-kafka-bookkeeper:v2M5BookKeeperCompactionRealTest",
+        ":nereus-kafka-bookkeeper:checkstyleRealBookKeeperTest",
+    )
+}
+
 tasks.register<Exec>("v2M5RetentionCoreContractTest") {
     group = "verification"
     description = "Test the fail-closed non-promotable M5-C retention-core checker."

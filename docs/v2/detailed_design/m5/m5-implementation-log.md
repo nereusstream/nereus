@@ -155,6 +155,50 @@ checks. Six added Java cases cover carrier parity/determinism, empty coverage, o
 locators, altered batch bytes/gaps and interleaved aborted transactions. All native BK lifecycle and M5-E acceptance
 obligations remain OPEN.
 
+## Inventoried BK compaction writes and sealed part verification
+
+Status: bounded physical writer slice; full selected-read and reclaim lifecycle remains OPEN.
+
+The [BK carrier projection](m5-bookkeeper-compaction-carrier-projection.json) follows semantic-core source
+`806d8c0298fbf3ff8497b0c62fd43938fe9ebcf5`. `KafkaBookKeeperCompactionLayoutV2` validates the shared semantic result,
+segments only retained RecordBatch bytes and all eight index bodies into KBCE2 entries, and binds their ordered roots
+to a strict KBIV2 task. The layout checks the admitted native entry limit and caps tasks at 256 parts, part length at
+64 MiB, entries per part at 65536, artifact length at 64 MiB and task encoding at 1 MiB. These are per-task bounds;
+Cell-wide admission and M5 capacity evidence remain separate. Empty output creates index parts without a DATA ledger.
+
+`RealBookKeeperCellSessionV1` exposes the locked native ledger-ID generator and explicit-ID creation. The inventory
+writes and exactly rereads the task, reserves a native ID, then writes and exactly rereads its immutable part slot before
+creation. Concurrent reservations adopt the persisted winner and burn only unused IDs. Missing/unknown control writes
+do not authorize native creation. Every create retry uses the same ledger ID and deterministic task/part run identity.
+Native explicit-ID creation can recreate a deleted ID, so terminal writer fencing and permanent inventory retention are
+still mandatory; this slice offers no abort/delete or task termination API and cannot authorize late create retries.
+
+The writer first performs an exact read-only native run open, then seals through native recovery and checks complete
+LAC/length, every exact entry, and the full native sealed metadata fingerprint before and after reads. A new real-BK
+negative test first reproduced an ordering bug in this new carrier: an inventory slot pointing to a different native
+run caused recovery to seal the unrelated ledger before rejecting its custom metadata. The corrected carrier rejects
+the open before fencing; the regression asserts that the foreign ledger remains OPEN with zero recovery/fence calls. A complete last-append response loss can reconcile successfully; partial
+output remains sealed and inventoried and is never rewritten. Failure in one part yields no complete output result.
+The reader dependency exposes only sealed-metadata capture; no Object session, Object configuration, selector CAS or
+physical delete call is reachable through this writer.
+
+Control/source/namespace inputs in the focused tests are explicitly synthetic. Real tests use the locked BookKeeper
+4.18 source, client artifact and server image; response loss is injected at the application observer after real provider
+completion. Restart tests open fresh BK sessions and reload the immutable task, but still supply the expected retained
+output bodies. This is not a persisted SEALED_BK_COMPACTED_RUN_V2 descriptor, descriptor-only protocol recovery, real
+Oxia control evidence, native internal-topic lifecycle, source-bound M5 child, M4 release or physical deletion authority.
+All 17 amended acceptance obligations remain OPEN; native task/namespace admission, M4 publication, cleanup and
+source-bound evidence remain required. Historical frozen inputs and source locks are unchanged.
+
+Validation: `bash scripts/run-v2-m5-bookkeeper-compaction-check.sh` passed the no-configuration-cache
+`v2M5BookKeeperCompactionCarrierCheck` with all 60 tasks executed. JUnit reported 8 inventory/layout, 7 real BK carrier,
+8 real BK Cell-session, 28 provider unit, 14 shared Kafka semantic and 7 Object materialization tests, with zero
+failures/errors/skips. The gate checks the exact image digest/platform/container image IDs; the real carrier suite
+hashes the actual loaded BK client JAR before connecting. Three new negative projection tests, predecessor governance,
+Spotless and Checkstyle also passed. The seven-test carrier result includes the foreign-run zero-fence regression.
+The older deletion adapter projection/runner now expects the expanded eight-test Cell suite; historical seven-test
+results remain historical. Its five projection contract tests and source checker also passed.
+
 ## Design freeze
 
 - accepted design commit: `c86fde3ed6f4319642987fd599022bd32e2cca5e`;
@@ -602,10 +646,14 @@ source-locked real Oxia result, source-bound receipt, physical-delete, staging, 
 
 ## Remaining ordered work
 
-1. Integrate all ten proof-bound writer classes with the durable writer-ticket guard, then compose the fenced identity
-   read, intent/done recovery and external cleanup adapters above the same-key coordinator.
-2. Five current-source evidence children, exact-source Final publication, 14-row promotion, and aggregate
-   `v2M5Check`.
+1. Complete the typed sealed-BK descriptor, exact M4 selector publication, descriptor-only protocol recovery,
+   native internal-topic cases, terminal task fencing and unpublished/replaced-output cleanup.
+2. Replace permanent inline retirement slots with authenticated immutable history, bounded active admission,
+   exact folding CAS and replay/reuse rejection.
+3. Integrate all ten concrete writer classes, native namespace/owner proofs, current capability refresh,
+   fenced identity observation, dispatch/done and durable recovery veto above the same-key coordinator.
+4. Close real source-locked Oxia/BK/Object/Pulsar cross-module validation, all 17 amended acceptance obligations,
+   five current-source evidence children, exact-source Final publication and aggregate `v2M5Check`.
 
 `V2-KAF-DATA-012`, `V2-KAF-DATA-013`, and `V2-KAF-DATA-022` remain M6-deferred. Tombstone deletion,
 allocator-orphan GC, M6/M7/M8, and production deployment authority remain excluded.

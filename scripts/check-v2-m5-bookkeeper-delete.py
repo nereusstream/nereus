@@ -89,7 +89,7 @@ def validate_projection_value(value: object) -> None:
         "task": ":nereus-storage-bookkeeper:realBookKeeperTest",
         "class": "com.nereusstream.storage.bookkeeper.RealBookKeeperCellSessionV1RealTest",
         "focusedMethod": "m5DeleteAdapterDeletesOnlyTheExactSealedLedgerAndReconcilesAbsence",
-        "suiteTests": 7,
+        "suiteTests": 8,
         "failures": 0,
         "errors": 0,
         "skipped": 0,

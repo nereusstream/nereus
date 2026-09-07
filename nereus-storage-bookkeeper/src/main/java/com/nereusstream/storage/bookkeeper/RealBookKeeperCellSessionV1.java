@@ -97,38 +97,95 @@ public final class RealBookKeeperCellSessionV1 implements BookKeeperCellSession 
     @Override
     public CompletionStage<ProviderMutationResultV1<RunLedgerHandleV1>> createRunLedger(
             RunLedgerConfigurationV1 configuration) {
+        return createRunLedger(configuration, java.util.OptionalLong.empty());
+    }
+
+    @Override
+    public CompletionStage<ProviderMutationResultV1<RunLedgerHandleV1>> createReservedRunLedger(
+            RunLedgerConfigurationV1 configuration, BookKeeperLedgerIdentity reservedIdentity) {
+        Objects.requireNonNull(reservedIdentity, "reservedIdentity");
+        return createRunLedger(configuration, java.util.OptionalLong.of(reservedIdentity.ledgerId()));
+    }
+
+    @Override
+    public CompletionStage<ProviderMutationResultV1<BookKeeperLedgerIdentity>> reserveLedgerIdentity() {
+        if (!(client instanceof org.apache.bookkeeper.client.BookKeeper nativeClient)) {
+            throw new UnsupportedOperationException("native BookKeeper ledger allocator is unavailable");
+        }
+        CellSessionOperationRegistry.OperationLease lease = operations.acceptOperation();
+        CompletableFuture<ProviderMutationResultV1<BookKeeperLedgerIdentity>> observer = new CompletableFuture<>();
+        org.apache.bookkeeper.meta.LedgerIdGenerator generator;
+        try {
+            generator = nativeClient.getLedgerManagerFactory().newLedgerIdGenerator();
+        } catch (RuntimeException failure) {
+            lease.resolveTerminal();
+            observer.completeExceptionally(failure);
+            return observer;
+        }
+        CompletableFuture<ProviderMutationResultV1<BookKeeperLedgerIdentity>> operation = new CompletableFuture<>();
+        operation.whenComplete((result, failure) -> {
+            try {
+                generator.close();
+                if (failure == null) {
+                    observer.complete(result);
+                } else {
+                    observer.completeExceptionally(failure);
+                }
+            } catch (java.io.IOException | RuntimeException closeFailure) {
+                observer.completeExceptionally(closeFailure);
+            } finally {
+                lease.resolveTerminal();
+            }
+        });
+        try {
+            generator.generateLedgerId((rc, id) -> {
+                if (rc == org.apache.bookkeeper.client.api.BKException.Code.OK && id != null && id >= 0) {
+                    operation.complete(ProviderMutationResultV1.appliedExact(new BookKeeperLedgerIdentity(id)));
+                } else {
+                    operation.complete(ProviderMutationResultV1.outcomeUnknown());
+                }
+            });
+        } catch (RuntimeException failure) {
+            operation.completeExceptionally(failure);
+        }
+        return observer;
+    }
+
+    private CompletionStage<ProviderMutationResultV1<RunLedgerHandleV1>> createRunLedger(
+            RunLedgerConfigurationV1 configuration, java.util.OptionalLong reservedLedgerId) {
         requireConfiguration(configuration);
         CellSessionOperationRegistry.OperationLease lease = operations.acceptOperation();
         CompletableFuture<ProviderMutationResultV1<RunLedgerHandleV1>> observer = new CompletableFuture<>();
         try {
-            client.newCreateLedgerOp()
+            org.apache.bookkeeper.client.api.CreateAdvBuilder create = client.newCreateLedgerOp()
                     .withEnsembleSize(configuration.ensembleSize())
                     .withWriteQuorumSize(configuration.writeQuorumSize())
                     .withAckQuorumSize(configuration.ackQuorumSize())
                     .withDigestType(digestType(configuration.digestType()))
                     .withPassword(password)
                     .withCustomMetadata(metadata(configuration))
-                    .makeAdv()
-                    .execute()
-                    .whenComplete((handle, failure) -> {
-                        try {
-                            if (failure != null) {
-                                observer.complete(createFailure(failure));
-                                return;
-                            }
-                            RunLedgerHandleV1 exactHandle = exactHandle(configuration, handle.getId());
-                            OwnedLedger previous =
-                                    ledgers.putIfAbsent(handle.getId(), new OwnedLedger(exactHandle, handle));
-                            if (previous != null) {
-                                closeQuietly(handle);
-                                observer.complete(ProviderMutationResultV1.fencedOrConflict());
-                                return;
-                            }
-                            observer.complete(ProviderMutationResultV1.appliedExact(exactHandle));
-                        } finally {
-                            lease.resolveTerminal();
-                        }
-                    });
+                    .makeAdv();
+            if (reservedLedgerId.isPresent()) {
+                create = create.withLedgerId(reservedLedgerId.getAsLong());
+            }
+            create.execute().whenComplete((handle, failure) -> {
+                try {
+                    if (failure != null) {
+                        observer.complete(createFailure(failure));
+                        return;
+                    }
+                    RunLedgerHandleV1 exactHandle = exactHandle(configuration, handle.getId());
+                    OwnedLedger previous = ledgers.putIfAbsent(handle.getId(), new OwnedLedger(exactHandle, handle));
+                    if (previous != null) {
+                        closeQuietly(handle);
+                        observer.complete(ProviderMutationResultV1.fencedOrConflict());
+                        return;
+                    }
+                    observer.complete(ProviderMutationResultV1.appliedExact(exactHandle));
+                } finally {
+                    lease.resolveTerminal();
+                }
+            });
         } catch (RuntimeException failure) {
             lease.resolveTerminal();
             observer.completeExceptionally(failure);
